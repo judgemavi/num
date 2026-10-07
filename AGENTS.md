@@ -43,6 +43,8 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 - Put business logic in service functions in `apps/api/src/services/`. Routes and MCP tools only validate input and call services.
 - Each service function that writes data uses one database transaction and writes the audit log (§11).
 - Keep files under 400 lines. Keep functions small.
+  Exception: files that a tool generates (shadcn components in `components/ui/`, `routeTree.gen.ts`). Do not edit them by hand.
+- Add a shadcn component only in the slice that uses it. Remove components that no code uses.
 - Do not keep dead code.
 - Use the shadcn components in `apps/web/src/components/ui/`. Do not add TanStack Table or virtual scrolling.
 - The web app imports only `packages/shared`. Do not import `packages/db` or API code in the web app.
