@@ -10,7 +10,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^4.13.12"
+    "@hono/zod-openapi": "1.6.3",
+    "@num/db": "workspace:*",
+    "@num/shared": "workspace:*",
+    "drizzle-orm": "^0.45.3",
+    "hono": "^4.13.12",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",

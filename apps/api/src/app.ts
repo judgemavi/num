@@ -1,29 +1,51 @@
-import { Hono } from "hono";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import { healthRoute } from "./routes/health";
+import { validationHook } from "./validation";
 import { hasFileExtension, webFile, webIndex } from "./web-files";
 
-export const app = new Hono();
+export function createApp() {
+  const app = new OpenAPIHono({
+    defaultHook: validationHook,
+  });
 
-app.get("/api/health", (c) => c.json({ ok: true as const }));
+  app.openapi(healthRoute, (c) => c.json({ ok: true as const }, 200));
 
-app.get("*", async (c) => {
-  const pathname = new URL(c.req.url).pathname;
-  if (pathname === "/api" || pathname.startsWith("/api/")) {
-    return c.notFound();
-  }
+  app.doc("/api/openapi.json", {
+    openapi: "3.0.0",
+    info: {
+      title: "Num",
+      version: "0.0.1",
+    },
+  });
 
-  const file = await webFile(pathname);
-  if (file) {
-    return new Response(file);
-  }
-  if (hasFileExtension(pathname)) {
-    return c.notFound();
-  }
+  return app;
+}
 
-  const index = webIndex();
-  if (!(await index.exists())) {
-    return c.notFound();
-  }
-  return new Response(index);
-});
+export function serveWeb<T extends OpenAPIHono>(app: T) {
+  app.get("*", async (c) => {
+    const pathname = new URL(c.req.url).pathname;
+    if (pathname === "/api" || pathname.startsWith("/api/")) {
+      return c.notFound();
+    }
+
+    const file = await webFile(pathname);
+    if (file) {
+      return new Response(file);
+    }
+    if (hasFileExtension(pathname)) {
+      return c.notFound();
+    }
+
+    const index = webIndex();
+    if (!(await index.exists())) {
+      return c.notFound();
+    }
+    return new Response(index);
+  });
+
+  return app;
+}
+
+export const app = serveWeb(createApp());
 
 export type AppType = typeof app;
