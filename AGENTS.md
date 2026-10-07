@@ -47,6 +47,14 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 - Add a shadcn component only in the slice that uses it. Remove components that no code uses.
 - Do not keep dead code.
 - Use the shadcn components in `apps/web/src/components/ui/`. Do not add TanStack Table or virtual scrolling.
+- Use shadcn components for all UI controls. Add them with the shadcn CLI when a slice needs them:
+  - Forms: `Field` and `Label`.
+  - Short lists of options: `Select`.
+  - Long lists of options: Combobox (`Command` + `Popover`).
+  - Create and edit: `Dialog`.
+  - Lists of records: `Table`.
+  - Confirmations: `AlertDialog`.
+- Do not use native `<select>`, `<label>` or custom-styled inputs.
 - The web app imports only `packages/shared`. Do not import `packages/db` or API code in the web app.
 - Use `Temporal.PlainDate` for calendar dates. Do not use `Date` for calendar dates.
 - Lists: one shared Zod query schema for the URL and the API. Follow decision 0004.
