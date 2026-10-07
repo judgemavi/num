@@ -1,7 +1,11 @@
 import { asOfQuerySchema, errorSchema, listQuerySchema, pagedResponseSchema } from "@num/shared";
 import { createRoute, z } from "@hono/zod-openapi";
 import { expect, test } from "bun:test";
-import { app, createApp } from "./app";
+import { Database } from "bun:sqlite";
+import { createApp } from "./app";
+import { createDb } from "./db";
+
+const app = createApp(createDb(new Database(":memory:")));
 
 const datedRoute = createRoute({
   method: "get",
@@ -64,7 +68,7 @@ test("the OpenAPI document lists the health route", async () => {
 });
 
 test("a date-dependent route without asOf returns 400", async () => {
-  const app = createApp();
+  const app = createApp(createDb(new Database(":memory:")));
   app.openapi(datedRoute, (c) => c.json({ asOf: c.req.valid("query").asOf }, 200));
 
   const missing = await app.request("/api/dated");
@@ -87,7 +91,7 @@ test("health does not require asOf", async () => {
 });
 
 test("sort with an unknown column returns 400", async () => {
-  const app = createApp();
+  const app = createApp(createDb(new Database(":memory:")));
   app.openapi(listRoute, (c) => {
     const query = c.req.valid("query");
     return c.json({ items: [], page: query.page, pageSize: query.pageSize, total: 0 }, 200);

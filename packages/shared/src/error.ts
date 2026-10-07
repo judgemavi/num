@@ -7,6 +7,9 @@ export const errorCodes = [
   "invalid_query",
   "invalid_body",
   "invalid_params",
+  "setup_already_complete",
+  "setup_required",
+  "currency_locked",
 ] as const;
 
 export type ErrorCode = (typeof errorCodes)[number];

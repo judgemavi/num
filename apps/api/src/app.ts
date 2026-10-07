@@ -1,14 +1,30 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { HTTPException } from "hono/http-exception";
+import type { Db } from "./db";
 import { healthRoute } from "./routes/health";
+import { registerSetup } from "./routes/setup";
+import { ServiceError } from "./service-error";
 import { validationHook } from "./validation";
 import { hasFileExtension, webFile, webIndex } from "./web-files";
 
-export function createApp() {
+export function createApp(db: Db) {
   const app = new OpenAPIHono({
     defaultHook: validationHook,
   });
 
+  app.onError((error, c) => {
+    if (error instanceof ServiceError) {
+      return c.json({ code: error.code, params: error.params }, error.status);
+    }
+    if (error instanceof HTTPException) {
+      return error.getResponse();
+    }
+    console.error(error);
+    return c.text("Internal Server Error", 500);
+  });
+
   app.openapi(healthRoute, (c) => c.json({ ok: true as const }, 200));
+  registerSetup(app, db);
 
   app.doc("/api/openapi.json", {
     openapi: "3.0.0",
@@ -20,6 +36,8 @@ export function createApp() {
 
   return app;
 }
+
+export type AppType = ReturnType<typeof createApp>;
 
 export function serveWeb<T extends OpenAPIHono>(app: T) {
   app.get("*", async (c) => {
@@ -45,7 +63,3 @@ export function serveWeb<T extends OpenAPIHono>(app: T) {
 
   return app;
 }
-
-export const app = serveWeb(createApp());
-
-export type AppType = typeof app;

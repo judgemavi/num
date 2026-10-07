@@ -26,6 +26,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@fontsource-variable/geist": "^5.3.0",
+        "@num/shared": "workspace:*",
         "@tanstack/react-query": "^5.90.2",
         "@tanstack/react-router": "^1.132.0",
         "class-variance-authority": "^0.7.1",

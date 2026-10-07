@@ -1,5 +1,10 @@
+import { setupStatusSchema } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { apiRequest } from "@/request";
+import { SetupScreen } from "@/setup-screen";
 import { navItems, type NavPath } from "@/nav";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -66,7 +71,7 @@ function AppSidebar() {
   );
 }
 
-export function RootLayout() {
+function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const current = navItems.find((item) => isCurrent(pathname, item.to));
 
@@ -86,4 +91,35 @@ export function RootLayout() {
       </SidebarProvider>
     </TooltipProvider>
   );
+}
+
+export function RootLayout() {
+  const setup = useQuery({
+    queryKey: ["setup"],
+    queryFn: async () => {
+      const result = await apiRequest("/api/setup", setupStatusSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
+    },
+  });
+
+  if (setup.isPending) {
+    return <p className="p-6 text-muted-foreground">Loading setup.</p>;
+  }
+  if (setup.isError) {
+    return (
+      <div className="flex flex-col items-start gap-4 p-6">
+        <p>The setup status did not load.</p>
+        <Button type="button" onClick={() => void setup.refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+  if (!setup.data.complete) {
+    return <SetupScreen onDone={() => void setup.refetch()} />;
+  }
+  return <AppShell />;
 }
