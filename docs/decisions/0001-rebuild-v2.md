@@ -19,7 +19,7 @@ Date: 2026-10-07
 ## Decision
 
 - Write a fixed domain spec (`docs/spec.md`). Changes need a decision record.
-- Build v2 on a new schema. Port the v1 data with one verified script.
+- Build v2 on a new schema. Do not port v1 data (changed by 0002).
 - Remove ML. Use rules, payee history and arithmetic.
 - Categories are a separate table with a kind (`income | expense`).
 - Transactions belong to one account. Lines carry categories. Transfers are mirror transactions.
@@ -31,5 +31,5 @@ Date: 2026-10-07
 ## Consequences
 
 - v1 features that are not in the spec are removed. The list is in spec §3.
-- The v1 database stays unchanged. v2 gets a new database from the port script.
+- The v1 database stays unchanged. v2 starts with an empty database.
 - The owner uses Claude through MCP for PDF statements and merchant research.

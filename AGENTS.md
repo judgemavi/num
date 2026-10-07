@@ -23,8 +23,9 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 
 ## Data safety
 
-- Do not read or write `.data/num.sqlite`. Only `scripts/port-v1.ts` can open it, and only read-only.
 - Do not run SQL by hand on any real database. Do not "fix" data with scripts.
+- The `v1` branch is private and read-only. Read it only with `git show v1:<path>`.
+  Do not check it out, merge it, rebase it or push it.
 - Tests must use temporary databases.
 - Money is integer cents. Do not use floating-point numbers for money.
 

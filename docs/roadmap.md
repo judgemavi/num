@@ -7,16 +7,18 @@ A slice is complete only when all of its acceptance criteria pass.
 
 ## Repositories
 
-| Repository | Visibility | Contents |
+| Branch | Visibility | Contents |
 |---|---|---|
-| `num` | Public | v2 code, docs, synthetic test fixtures. New git history (starts with the v2 docs). |
-| `num-v1` (local folder `../num-v1`) | Private | v1 code and history, the v1 database, the port script, `docs/port-v1.md`, the owner's private tests. Never push it to a public remote. |
+| `main` | Public | v2 code, docs, synthetic test fixtures. New git history (starts with the v2 docs). |
+| `v1` | Local only | v1 code and history. Reference only. A pre-push hook blocks it. Delete it after cutover. |
+
+v2 does not port v1 data. The owner imports the statements again to test v2.
 
 ## Rules for all phases
 
-- Build v2 in the new repository. Work on slice branches from `main`. The owner merges.
-- Do not change v1, except to add the port script and private tests (slice 2.6, 5.2).
-- Do not read or write the v1 database, except with the port script. The port script opens it read-only.
+- Work on slice branches from `main`. The owner merges.
+- Do not change, merge, rebase or push the `v1` branch. Read v1 files only with `git show v1:<path>`.
+- Do not copy v1 code without change. Read it, then write new code that agrees with the spec.
 - Each slice must pass: `bun test`, API type check, web build, lint with zero new warnings.
 - Each slice that changes the UI must include a manual check list in the PR. The owner does the check in a browser.
 - Tests must cover each invariant and rule in the spec sections that the slice implements.
@@ -29,7 +31,7 @@ Goal: an empty app that is safe to deploy, for the owner and for other people.
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
-| 0.1 New repository | Monorepo (Bun workspaces): `apps/api`, `apps/web`, `packages/db`. Copy the shadcn UI components and tooling settings from `../num-v1`. `docs/`, `AGENTS.md` and `LICENSE` are already in the repository. Keep `LICENSE` (AGPL-3.0, decision 0003). Set `"license": "AGPL-3.0-only"` in each `package.json`. Add `README.md`, `CONTRIBUTING.md`. Add the `typecheck` script to `apps/api`. | App starts. One health route. One web shell with the 8 nav items (§14). No Python. No v1 history. Search the repository for the owner's names, banks' account numbers and balances: zero results. |
+| 0.1 New repository | Monorepo (Bun workspaces): `apps/api`, `apps/web`, `packages/db`. Add the shadcn UI components with the shadcn CLI. Use the tooling settings from `v1` as a reference. `docs/`, `AGENTS.md` and `LICENSE` are already in the repository. Keep `LICENSE` (AGPL-3.0, decision 0003). Set `"license": "AGPL-3.0-only"` in each `package.json`. Add `README.md`, `CONTRIBUTING.md`. Add the `typecheck` script to `apps/api`. | App starts. One health route. One web shell with the 8 nav items (§14). No Python. No v1 history. Search the repository for the owner's names, banks' account numbers and balances: zero results. |
 | 0.2 Schema baseline | Drizzle schema for all entities in §5. One baseline migration. | Fresh DB creates. `PRAGMA integrity_check` = ok. `PRAGMA foreign_key_check` is empty. Migration test: run two times, no change. |
 | 0.3 Auth | Both auth modes, API tokens, dev bypass (§13). | Tests for `cloudflare-access`: no token, bad signature, wrong audience → 401. Valid → 200. Tests for `password`: wrong password → 401. Rate limit works. Cookie flags are correct. Tests for tokens: revoked token → 401. Only the hash is stored. Dev bypass only with `NODE_ENV=development` and `127.0.0.1`. App does not start without a valid `AUTH_MODE`. |
 | 0.4 API conventions | `asOf` validation, error codes, audit log writer (§4, §11). | Tests: a date-dependent route without `asOf` → 400. API responses contain no formatted numbers or dates. Each write service creates one audit row with `before` and `after`. |
@@ -49,7 +51,7 @@ Goal: accounts and transactions are correct.
 
 ## Phase 2 — Capture
 
-Goal: imports are safe and the Inbox works. The owner's data moves to v2.
+Goal: imports are safe and the Inbox works.
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
@@ -58,7 +60,7 @@ Goal: imports are safe and the Inbox works. The owner's data moves to v2.
 | 2.3 Normalization and suggestions | Normalized payee, rules, payee history, merchant default, promote to rule, transfer detection (§5.6, §7.3). | Table test with 50 or more synthetic payee strings in real bank formats from several countries. Each suggestion has a reason code. Promote suggestion after `promoteAfter` confirmations. |
 | 2.4 Inbox | Inbox screen with all item types from phases 1–2. Dismiss with reason. Text made in the browser from codes. | Manual check list passes. Inbox count in the nav. |
 | 2.5 Checkpoints | Checkpoints, unlock, difference help (§5.13, §7.5). | Tests: checkpoint only when balances are equal. Reconciled status is set. Unlock is audited. |
-| 2.6 Port from v1 (private) | Script in the **private v1 repository**. It opens the v1 DB read-only and writes a new v2 DB. It uses the v2 `packages/db` by path. The mapping is in `docs/port-v1.md` in the private v1 repository. | Report shows each account's balance at each month end: v1 = v2 for all accounts. Counts of transactions, merchants and rules agree. The script stops with an error if a balance does not agree. Owner approves the report. |
+| 2.6 Owner import test | No code. The owner creates the accounts and imports the real statements into a local v2 instance. | Each account balance agrees with its latest statement. Importing all files a second time creates zero transactions. The owner writes the defects as issues. |
 
 ## Phase 3 — Plan
 
@@ -84,18 +86,18 @@ Goal: recurring plans, buckets and paycheck funding.
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
 | 5.1 Forecast | Known and estimated series, card payments, safe to spend, accuracy record (§8, §6). | Tests: card purchase moves cash on the due day only. Bucket spending is not counted two times. Outliers are not included. Accuracy record is stored one time for each month. |
-| 5.2 Mortgage | Terms, schedule, payment prefill, payoff, extra payment, valuations (§5.2, §5.10, §9). | Public tests with synthetic loans: monthly and semiannual compounding, weekly, biweekly and monthly payments, compared with values from a published lender calculator. Private test in the v1 repository: the owner's 39-payment check. |
+| 5.2 Mortgage | Terms, schedule, payment prefill, payoff, extra payment, valuations (§5.2, §5.10, §9). | Public tests with synthetic loans: monthly and semiannual compounding, weekly, biweekly and monthly payments, compared with values from a published lender calculator. Owner check in the UI: the owner enters the real mortgage terms and compares the schedule with a lender statement. |
 
 ## Phase 6 — MCP and cutover
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
 | 6.1 MCP | Read tools and proposal tools (§12, §5.14). | Tests: each proposal tool writes only a proposal. Approval uses the UI service function. Proposed rows go through dedupe. Date tools require `asOf`. |
-| 6.2 Cutover | Run the port again on the latest v1 data. Deploy v2 on the NUC. Stop v1. | Owner uses v2 for one full weekly review and one paycheck funding without v1. |
+| 6.2 Cutover | Owner imports all statements into the production v2 instance. Stop v1. Delete the `v1` branch. | Owner uses v2 for one full weekly review and one paycheck funding without v1. |
 
 ## Reuse from v1
 
-Read these v1 files as a reference. Write new code in v2. Do not copy v1 history.
+Read these files from the `v1` branch with `git show v1:<path>`. Write new code in v2.
 
 | v1 file | Use in slice | Note |
 |---|---|---|
