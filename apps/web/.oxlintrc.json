@@ -6,14 +6,11 @@
     "no-restricted-imports": [
       "error",
       {
-        "paths": [
+        "patterns": [
           {
-            "name": "@num/db",
-            "message": "The web app imports only packages/shared."
-          },
-          {
-            "name": "api",
-            "message": "The web app imports only packages/shared."
+            "group": ["@num/db", "@num/db/*", "api", "api/*"],
+            "message": "The web app imports only packages/shared.",
+            "caseSensitive": true
           }
         ]
       }
