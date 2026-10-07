@@ -1,0 +1,22 @@
+# dependencies
+node_modules
+
+# build output
+dist
+out
+*.tsbuildinfo
+
+# test coverage
+coverage
+
+# environment
+.env
+.env.*
+!.env.example
+
+# local data (SQLite, uploads, backups)
+.data/
+
+# OS and editor files
+.DS_Store
+.idea
