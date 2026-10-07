@@ -7,7 +7,7 @@ import {
 } from "@num/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { changeCurrency, runSetup, setupStatus } from "../services/setup";
+import { bookCurrency, changeCurrency, runSetup, setupStatus } from "../services/setup";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -60,6 +60,22 @@ const setupRoute = createRoute({
   },
 });
 
+const currencyReadRoute = createRoute({
+  method: "get",
+  path: "/api/settings/currency",
+  responses: {
+    200: {
+      description: "The book currency",
+      content: {
+        "application/json": {
+          schema: currencyUpdateSchema,
+        },
+      },
+    },
+    409: errorResponse,
+  },
+});
+
 const currencyRoute = createRoute({
   method: "patch",
   path: "/api/settings/currency",
@@ -94,6 +110,8 @@ export function registerSetup(app: OpenAPIHono, db: Db) {
     const body = c.req.valid("json");
     return c.json(runSetup(db, { ...body, source: "ui" }), 200);
   });
+
+  app.openapi(currencyReadRoute, (c) => c.json(bookCurrency(db), 200));
 
   app.openapi(currencyRoute, (c) => {
     const body = c.req.valid("json");

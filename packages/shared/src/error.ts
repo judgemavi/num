@@ -10,6 +10,13 @@ export const errorCodes = [
   "setup_already_complete",
   "setup_required",
   "currency_locked",
+  "account_not_found",
+  "account_archived",
+  "kind_class_mismatch",
+  "archive_confirmation_required",
+  "card_fields_invalid",
+  "interest_rate_invalid",
+  "internal_error",
 ] as const;
 
 export type ErrorCode = (typeof errorCodes)[number];

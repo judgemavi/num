@@ -1,3 +1,23 @@
+export {
+  accountClass,
+  accountClasses,
+  accountCreateSchema,
+  accountKinds,
+  accountListQuerySchema,
+  accountListSchema,
+  accountSchema,
+  accountUpdateSchema,
+  allowsInterestRate,
+  archiveAccountSchema,
+  defaultOnBudget,
+  paymentPolicies,
+  type Account,
+  type AccountClass,
+  type AccountCreate,
+  type AccountKind,
+  type AccountUpdate,
+  type PaymentPolicy,
+} from "./account";
 export { Temporal } from "temporal-polyfill";
 export {
   currencyCodeSchema,

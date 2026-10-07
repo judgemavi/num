@@ -1,20 +1,13 @@
-import { currencyCodes, setupRequestSchema, setupResultSchema, type CategorySet } from "@num/shared";
-import { useMemo, useState, type FormEvent } from "react";
+import { currencyCodes, setupRequestSchema, setupResultSchema, type CategorySet, type CurrencyCode } from "@num/shared";
+import { useState, type FormEvent } from "react";
+import { CurrencyCombobox } from "@/currency-combobox";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Field, FieldLabel } from "@/components/ui/field";
 
 type SetupScreenProps = {
   onDone: () => void;
 };
-
-function currencyLabel(code: string, names: Intl.DisplayNames | null): string {
-  const name = names?.of(code);
-  if (!name || name.toUpperCase() === code) {
-    return code;
-  }
-  return `${name} (${code})`;
-}
 
 function messageFor(code: string): string {
   switch (code) {
@@ -27,37 +20,22 @@ function messageFor(code: string): string {
   }
 }
 
+function isCurrency(code: string): code is CurrencyCode {
+  return (currencyCodes as readonly string[]).includes(code);
+}
+
 export function SetupScreen({ onDone }: SetupScreenProps) {
-  const [query, setQuery] = useState("");
   const [currency, setCurrency] = useState("");
   const [categorySet, setCategorySet] = useState<CategorySet>("default");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const names = useMemo(() => {
-    if (typeof Intl.DisplayNames !== "function") {
-      return null;
-    }
-    return new Intl.DisplayNames(undefined, { type: "currency" });
-  }, []);
-
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    const matches = currencyCodes.filter((code) => {
-      if (needle.length === 0) {
-        return true;
-      }
-      const label = currencyLabel(code, names).toLowerCase();
-      return label.includes(needle) || code.toLowerCase().includes(needle);
-    });
-    const selected = currencyCodes.find((code) => code === currency);
-    if (selected && !matches.includes(selected)) {
-      return [selected, ...matches];
-    }
-    return matches;
-  }, [currency, names, query]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isCurrency(currency)) {
+      setError("Choose a currency.");
+      return;
+    }
     const body = setupRequestSchema.safeParse({ currency, categorySet });
     if (!body.success) {
       setError("Choose a currency.");
@@ -94,33 +72,15 @@ export function SetupScreen({ onDone }: SetupScreenProps) {
         Choose the currency for this book. You cannot change it after you add a transaction.
       </p>
       <form className="mt-8 flex flex-col gap-6" onSubmit={(event) => void onSubmit(event)}>
-        <div className="flex flex-col gap-2">
-          <label htmlFor="currency-search">Currency</label>
-          <Input
-            id="currency-search"
-            value={query}
-            autoComplete="off"
-            placeholder="Search by name or code"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <select
+        <Field data-invalid={error !== null && currency.length === 0}>
+          <FieldLabel htmlFor="currency">Currency</FieldLabel>
+          <CurrencyCombobox
             id="currency"
-            className="h-36 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base"
-            size={6}
-            required
             value={currency}
-            aria-invalid={error !== null}
-            onChange={(event) => setCurrency(event.target.value)}
-          >
-            <option value="">Select a currency</option>
-            {visible.map((code) => (
-              <option key={code} value={code}>
-                {currencyLabel(code, names)}
-              </option>
-            ))}
-          </select>
-          {visible.length === 0 ? <p className="text-sm text-muted-foreground">No currency matches.</p> : null}
-        </div>
+            invalid={error !== null && currency.length === 0}
+            onChange={setCurrency}
+          />
+        </Field>
         <fieldset className="flex flex-col gap-3">
           <legend>Categories</legend>
           <label className="flex items-start gap-2">

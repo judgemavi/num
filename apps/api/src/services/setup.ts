@@ -89,6 +89,15 @@ function insertDefaultCategories(tx: WriteTx) {
   }
 }
 
+export function bookCurrency(db: Db): { currency: CurrencyCode } {
+  const row = db.select().from(settings).where(eq(settings.key, "currency")).get();
+  if (!row) {
+    throw new ServiceError("setup_required", 409);
+  }
+  assertCurrency(row.value);
+  return { currency: row.value };
+}
+
 export function setupStatus(db: Db): { complete: boolean } {
   const row = db.select({ key: settings.key }).from(settings).where(eq(settings.key, "currency")).get();
   return { complete: row !== undefined };

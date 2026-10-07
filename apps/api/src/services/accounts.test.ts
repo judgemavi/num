@@ -1,0 +1,238 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { migrateDatabase, openDatabase, transactions, valuations } from "@num/db";
+import { expect, test } from "bun:test";
+import { createDb, type Db } from "../db";
+import { ServiceError } from "../service-error";
+import { archiveAccount, createAccount, listAccounts, updateAccount } from "./accounts";
+import type { AccountCreate, AccountKind, AccountUpdate, ErrorCode } from "@num/shared";
+
+function tempDatabase() {
+  const dir = mkdtempSync(join(tmpdir(), "num-accounts-"));
+  const sqlite = openDatabase(join(dir, "num.sqlite"));
+  migrateDatabase(sqlite);
+  return {
+    db: createDb(sqlite),
+    close() {
+      sqlite.close();
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
+}
+
+const at = "2026-10-07T16:00:00Z";
+
+function base(kind: AccountKind, openingBalance = 0): AccountCreate & { source: "ui"; at: string } {
+  return {
+    name: "Example account",
+    institution: null,
+    kind,
+    openingDate: "2026-01-01",
+    openingBalance,
+    source: "ui",
+    at,
+  };
+}
+
+function card(kind: AccountKind = "credit_card"): AccountCreate & { source: "ui"; at: string } {
+  return {
+    ...base(kind),
+    paymentPolicy: "full",
+  };
+}
+
+function expectCode(run: () => void, code: ErrorCode) {
+  try {
+    run();
+  } catch (error) {
+    expect(error).toBeInstanceOf(ServiceError);
+    expect((error as ServiceError).code).toBe(code);
+    return;
+  }
+  throw new Error(`Expected ${code}`);
+}
+
+function addTransaction(db: Db, accountId: string, date: string, amount: number, deleted = false) {
+  db.insert(transactions)
+    .values({
+      id: crypto.randomUUID(),
+      accountId,
+      date,
+      amount,
+      payeeRaw: "Example shop",
+      status: "cleared",
+      source: "manual",
+      deletedAt: deleted ? at : null,
+    })
+    .run();
+}
+
+function addValuation(db: Db, accountId: string, date: string, balance: number, deleted = false) {
+  db.insert(valuations)
+    .values({
+      id: crypto.randomUUID(),
+      accountId,
+      date,
+      balance,
+      deletedAt: deleted ? at : null,
+    })
+    .run();
+}
+
+function balanceOf(db: Db, id: string): number {
+  const page = listAccounts(db, { page: 1, pageSize: 50 });
+  const account = page.items.find((item) => item.id === id);
+  if (!account) {
+    throw new Error("Account is missing");
+  }
+  return account.balance;
+}
+
+test("a transaction account balance is the opening balance plus transactions", () => {
+  const book = tempDatabase();
+  try {
+    const account = createAccount(book.db, base("chequing", 1_000));
+    addTransaction(book.db, account.id, "2026-02-01", -250);
+    addTransaction(book.db, account.id, "2026-02-02", 25);
+    addTransaction(book.db, account.id, "2026-02-03", 999, true);
+    addValuation(book.db, account.id, "2026-02-01", 5_000);
+    expect(balanceOf(book.db, account.id)).toBe(775);
+  } finally {
+    book.close();
+  }
+});
+
+test("an investment or property balance uses the latest valuation and later transactions", () => {
+  const book = tempDatabase();
+  try {
+    for (const kind of ["investment", "property"] as const) {
+      const account = createAccount(book.db, { ...base(kind, 999), name: kind });
+      addValuation(book.db, account.id, "2026-03-01", 500);
+      addValuation(book.db, account.id, "2026-06-01", 1_000);
+      addValuation(book.db, account.id, "2026-07-01", 9_000, true);
+      addTransaction(book.db, account.id, "2026-05-01", -100);
+      addTransaction(book.db, account.id, "2026-06-01", 200);
+      addTransaction(book.db, account.id, "2026-06-02", 300);
+      addTransaction(book.db, account.id, "2026-06-03", 400, true);
+      expect(balanceOf(book.db, account.id)).toBe(1_300);
+    }
+
+    const empty = createAccount(book.db, { ...base("investment", 1_000), name: "No valuation" });
+    addTransaction(book.db, empty.id, "2026-02-01", 50);
+    expect(balanceOf(book.db, empty.id)).toBe(1_050);
+
+    const mortgage = createAccount(book.db, base("mortgage", -20_000));
+    addValuation(book.db, mortgage.id, "2026-06-01", -15_000);
+    addTransaction(book.db, mortgage.id, "2026-07-01", 500);
+    expect(balanceOf(book.db, mortgage.id)).toBe(-19_500);
+  } finally {
+    book.close();
+  }
+});
+
+test("a kind change across classes is rejected", () => {
+  const book = tempDatabase();
+  try {
+    const cash = createAccount(book.db, base("chequing"));
+    const next: AccountUpdate = {
+      name: cash.name,
+      institution: null,
+      kind: "credit_card",
+      onBudget: true,
+      openingDate: cash.openingDate,
+      openingBalance: cash.openingBalance,
+      paymentPolicy: "full",
+    };
+    expectCode(() => updateAccount(book.db, cash.id, { ...next, source: "ui", at }), "kind_class_mismatch");
+
+    const cardAccount = createAccount(book.db, card());
+    const sameClass: AccountUpdate = {
+      name: "Example loan",
+      institution: null,
+      kind: "loan",
+      onBudget: false,
+      openingDate: cardAccount.openingDate,
+      openingBalance: 0,
+      paymentPolicy: null,
+      creditLimit: null,
+      statementDay: null,
+      dueDay: null,
+      fixedPayment: null,
+    };
+    const updated = updateAccount(book.db, cardAccount.id, { ...sameClass, source: "ui", at });
+    expect(updated.kind).toBe("loan");
+    expect(updated.paymentPolicy).toBeNull();
+  } finally {
+    book.close();
+  }
+});
+
+test("archive of a non-zero balance needs confirmation", () => {
+  const book = tempDatabase();
+  try {
+    const open = createAccount(book.db, base("chequing", 100));
+    expectCode(
+      () => archiveAccount(book.db, open.id, { confirm: false, source: "ui", at }),
+      "archive_confirmation_required",
+    );
+    const archived = archiveAccount(book.db, open.id, { confirm: true, source: "ui", at });
+    expect(archived.archivedAt).toBe(at);
+    expect(archived.balance).toBe(100);
+
+    const settled = createAccount(book.db, { ...base("savings", 40), name: "Settled" });
+    addTransaction(book.db, settled.id, "2026-04-01", -40);
+    const zero = archiveAccount(book.db, settled.id, { confirm: false, source: "ui", at });
+    expect(zero.balance).toBe(0);
+    expect(zero.archivedAt).toBe(at);
+
+    const valued = createAccount(book.db, { ...base("property", 0), name: "House" });
+    addValuation(book.db, valued.id, "2026-06-01", 250_000);
+    expectCode(
+      () => archiveAccount(book.db, valued.id, { confirm: false, source: "ui", at }),
+      "archive_confirmation_required",
+    );
+  } finally {
+    book.close();
+  }
+});
+
+test("card fields belong only to a credit card", () => {
+  const book = tempDatabase();
+  try {
+    expectCode(() => createAccount(book.db, { ...base("chequing"), paymentPolicy: "full" }), "card_fields_invalid");
+    expectCode(() => createAccount(book.db, base("credit_card")), "card_fields_invalid");
+    expectCode(
+      () => createAccount(book.db, { ...card(), paymentPolicy: "fixed" }),
+      "card_fields_invalid",
+    );
+    expectCode(
+      () => createAccount(book.db, { ...card(), fixedPayment: 500 }),
+      "card_fields_invalid",
+    );
+
+    const created = createAccount(book.db, {
+      ...card(),
+      paymentPolicy: "fixed",
+      fixedPayment: 2_500,
+      creditLimit: 100_000,
+      statementDay: 12,
+      dueDay: 7,
+    });
+    expect(created.paymentPolicy).toBe("fixed");
+    expect(created.fixedPayment).toBe(2_500);
+    expect(created.onBudget).toBe(true);
+
+    const mortgage = createAccount(book.db, base("mortgage"));
+    expect(mortgage.onBudget).toBe(false);
+
+    expectCode(
+      () => createAccount(book.db, { ...base("chequing"), interestRateBps: 150 }),
+      "interest_rate_invalid",
+    );
+    const savings = createAccount(book.db, { ...base("savings"), interestRateBps: 150, name: "Savings" });
+    expect(savings.interestRateBps).toBe(150);
+  } finally {
+    book.close();
+  }
+});

@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import type { Db } from "./db";
+import { registerAccounts } from "./routes/accounts";
 import { healthRoute } from "./routes/health";
 import { registerSetup } from "./routes/setup";
 import { ServiceError } from "./service-error";
@@ -20,11 +21,12 @@ export function createApp(db: Db) {
       return error.getResponse();
     }
     console.error(error);
-    return c.text("Internal Server Error", 500);
+    return c.json({ code: "internal_error" as const, params: {} }, 500);
   });
 
   app.openapi(healthRoute, (c) => c.json({ ok: true as const }, 200));
   registerSetup(app, db);
+  registerAccounts(app, db);
 
   app.doc("/api/openapi.json", {
     openapi: "3.0.0",
