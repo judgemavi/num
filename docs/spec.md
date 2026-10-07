@@ -84,6 +84,8 @@ The owner finds information about unknown merchants with Claude through MCP.
     The browser makes the text. Thus, translation is possible later.
 - **Lists:** Filter, sort and page state is in the URL. The URL agrees 1:1 with the API query.
   Pagination is on the server (decision 0004).
+- **Rates:** Interest rates are integers in thousandths of a percent (`MilliPct`). Example: 6.875% = `6875`.
+  The user types a percent with a maximum of 3 decimal places.
 - **IDs:** Use UUID text.
 - **Delete:** Use a soft delete (`deletedAt`) for financial records. You can archive configuration records (rules, plans, buckets).
 - **Audit:** Each change writes one `audit_log` row (§11).
@@ -106,9 +108,10 @@ Rules:
   The user can change it.
 - Card fields (only for `credit_card`): `creditLimit?`, `statementDay?` (1–31), `dueDay?` (1–31),
   `paymentPolicy` (`full | fixed | manual`), `fixedPayment?`.
-- `interestRateBps?` is for savings, cards and loans. It is for information and for payoff calculations.
+- `interestRateMilliPct?` is for savings, cards and loans. It is for information and for payoff calculations.
 - Balance of a transaction account = `openingBalance` + the sum of the transaction amounts in the account.
 - Balance of an `investment` or `property` account = the latest valuation (§5.10) + the transactions after the valuation date.
+  If the account has no valuation, use the transaction account formula.
 
 The opening balance is a field. It is not a transaction. There is no equity account.
 
@@ -117,7 +120,7 @@ The opening balance is a field. It is not a transaction. There is no equity acco
 Each `mortgage` account has one row of current terms. There is no history of terms.
 
 Fields:
-- `principal`, `principalAsOf`, `rateBps`, `compounding` (`monthly | semiannual`)
+- `principal`, `principalAsOf`, `rateMilliPct`, `compounding` (`monthly | semiannual`)
 - `paymentAmount`, `paymentFrequency` (`weekly | biweekly | semimonthly | monthly`), `firstPaymentDate`
 - `termEnd`, `amortizationMonthsRemaining`
 - `paymentAccountId`, `interestCategoryId`, `propertyAccountId?`
