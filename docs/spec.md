@@ -326,12 +326,9 @@ Fields: `month` (`YYYY-MM`, unique), `asOf`, `predictedTotal`, `createdAt`.
 
 It stores the forecast of the on-budget total for the last day of the month (§8).
 
-### 5.17 Audit log and auth records
+### 5.17 Audit log
 
-- `audit_log`: §11.
-- `api_tokens`: `name`, `tokenHash`, `createdAt`, `lastUsedAt?`, `revokedAt?` (§13).
-- `sessions`: `idHash`, `createdAt`, `expiresAt` (`password` auth mode only, §13).
-- The password hash is the setting `passwordHash`.
+`audit_log`: §11.
 
 ### 5.18 Settings
 
@@ -343,7 +340,6 @@ It stores the forecast of the on-budget total for the last day of the month (§8
 | `staleImportDays` | 10 | Hygiene check |
 | `promoteAfter` | 3 | Confirmations before a rule suggestion |
 | `recurringGraceDays` | 3 | Date window for recurring links |
-| `passwordHash` | Set at setup | `password` auth mode only (§13) |
 
 ## 6. Calculated values
 
@@ -363,8 +359,7 @@ It stores the forecast of the on-budget total for the last day of the month (§8
 
 When the database has no settings, the app shows the setup screen. The user:
 1. Selects the book currency.
-2. Sets the password (only in `password` auth mode, §13).
-3. Selects the default category set, or starts with no categories.
+2. Selects the default category set, or starts with no categories.
 
 The app does not create accounts at setup.
 
@@ -570,7 +565,7 @@ To correct other records, the user edits them. The audit log records each edit.
 
 ## 12. MCP
 
-- Transport: streamable HTTP. The API serves it. The auth mode and API tokens protect it (§13).
+- Transport: streamable HTTP. The API serves it. The proxy in front of the app protects it (§13).
 - **Read tools:** accounts, balances, transaction search, categories, merchants, buckets, plan, forecast, insights, inbox.
 - **Write tools create proposals only:**
   - `propose_transactions`: for example, rows from a PDF statement, with the closing balance.
@@ -593,14 +588,14 @@ To correct other records, the user edits them. The audit log records each edit.
   - Use **stop-first** deploys. Two containers must not use the same database.
   - The owner's instance: Coolify on a Fedora NUC, Cloudflare Tunnel, Cloudflare Access, Cloudflare MCP portal.
     This is an example in the docs. The code does not require Cloudflare.
-- **Auth modes.** The environment variable `AUTH_MODE` selects one. There is no "no auth" mode.
-  - `cloudflare-access`: a middleware verifies `Cf-Access-Jwt-Assertion` (team certificates and audience).
-  - `password`: one user. The password hash uses argon2id (`Bun.password`). The session is an HttpOnly, Secure,
-    SameSite=Strict cookie. Login has a rate limit.
-  - **API tokens** (both modes): the user creates personal tokens in Settings for MCP clients. The app stores only a hash.
-    A token is sent as `Authorization: Bearer`. The user can revoke a token.
-  - If authentication fails, the response is 401.
-  - The only bypass: `NODE_ENV=development` and the server listens only on `127.0.0.1`.
+- **Access control is outside the app (decision 0006).** Num has no login, no users and no tokens.
+  - The operator must run Num on a private network, with no public port.
+  - The operator must put an authenticating proxy in front of all remote access.
+    The owner's instance: Cloudflare Tunnel with Cloudflare Access for the web app,
+    and the Cloudflare MCP portal with Cloudflare Access for MCP.
+  - `docs/self-hosting.md` must tell this in a warning at the start.
+  - The server listens on `HOST` (default `127.0.0.1`) and `PORT` (default `3000`).
+    The Docker image sets `HOST=0.0.0.0`.
 - **Storage:** One volume. It contains `num.sqlite` (WAL mode) and `uploads/`.
 - **Migrations:** Drizzle. At startup, first copy the database to `backups/pre-migrate-<timestamp>.sqlite` on the volume.
   Then apply the migrations.
@@ -631,6 +626,6 @@ There are 8 screens.
 | Insights | Month story, categories, merchants, tags, net worth, mortgage, hygiene panel |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms |
 | Recurring | Plans, occurrences, links, skips |
-| Settings | Categories, merchants and rules, tags, preferences, API tokens, backup download |
+| Settings | Categories, merchants and rules, tags, preferences, backup download |
 
 The first-run setup screen (§7.0) is not one of the 8 screens. It shows only one time.

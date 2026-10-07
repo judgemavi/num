@@ -26,9 +26,9 @@ Spec changes:
 | §5.14 | Proposals have `createdAt` and `decidedAt`. |
 | §5.15 (new) | Inbox dismissals. |
 | §5.16 (new) | Forecast snapshots. |
-| §5.17 (new) | Audit log, API tokens, sessions and the password hash in one list. |
+| §5.17 (new) | Audit log. (0006 removed API tokens, sessions and the password hash.) |
 
 ## Consequences
 
-- Slice 0.2 adds the tables for §5.15, §5.16 and `audit_log`. Slice 0.3 adds `api_tokens`, `sessions` and `passwordHash`.
+- Slice 0.2 adds the tables for §5.15, §5.16 and `audit_log`.
 - §5.15 Settings is now §5.18.

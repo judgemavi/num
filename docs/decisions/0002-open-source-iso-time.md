@@ -21,6 +21,7 @@ Date: 2026-10-07
 - **Localization.** The API returns codes, integers and ISO strings. The browser formats and writes all text.
 - **Bank formats** are presets (data). OFX/QFX is a built-in parser.
 - **Auth modes:** `cloudflare-access` and `password`. API tokens for MCP clients. No mode without auth.
+  (Replaced by 0006: access control is outside the app.)
 - **Variable recurring amounts.** A plan can be `variable`. The forecast uses the median of the last 6 actuals.
   Goal feasibility uses the lowest of the last 6 actuals.
 - **No personal data in the repository.** Test fixtures are synthetic.
