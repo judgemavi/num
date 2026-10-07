@@ -82,6 +82,8 @@ The owner finds information about unknown merchants with Claude through MCP.
   - The browser formats with `Intl` and the browser locale.
   - The API returns codes and parameters, not English sentences. Examples: Inbox item kinds, error codes, suggestion reasons.
     The browser makes the text. Thus, translation is possible later.
+- **Lists:** Filter, sort and page state is in the URL. The URL agrees 1:1 with the API query.
+  Pagination is on the server (decision 0004).
 - **IDs:** Use UUID text.
 - **Delete:** Use a soft delete (`deletedAt`) for financial records. You can archive configuration records (rules, plans, buckets).
 - **Audit:** Each change writes one `audit_log` row (§11).
@@ -542,7 +544,10 @@ To correct other records, the user edits them. The audit log records each edit.
 
 ## 13. Platform
 
-- **Stack:** Bun, Hono, Zod, Drizzle with `bun:sqlite`. React, Vite, TanStack Router and Query, shadcn/ui, Tailwind. Tests use `bun test`.
+- **Stack:** Bun, Hono with `@hono/zod-openapi`, Zod, Drizzle with `bun:sqlite`, `Temporal.PlainDate`.
+  React, Vite, TanStack Router and Query, shadcn/ui, Tailwind. Tests use `bun test`.
+  Decision 0004 gives the package boundary, list queries and the test policy.
+- **One process:** Hono serves the API, MCP and the built web app on one port.
 - **Hosting:** One Docker image. It runs on any Docker host. `docs/self-hosting.md` tells how to install it.
   - Use one instance only.
   - Use **stop-first** deploys. Two containers must not use the same database.

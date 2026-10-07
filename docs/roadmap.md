@@ -21,7 +21,7 @@ v2 does not port v1 data. The owner imports the statements again to test v2.
 - Do not copy v1 code without change. Read it, then write new code that agrees with the spec.
 - Each slice must pass: `bun test`, API type check, web build, lint with zero new warnings.
 - Each slice that changes the UI must include a manual check list in the PR. The owner does the check in a browser.
-- Tests must cover each invariant and rule in the spec sections that the slice implements.
+- Write tests only for logic (decision 0004). Do not write tests for simple CRUD, UI rendering or framework behavior.
 - Write the PR description in ASD-STE100. Include: spec sections, what changed, how you verified it.
 - Do not put personal data in the repository (spec §15).
 
@@ -31,11 +31,11 @@ Goal: an empty app that is safe to deploy, for the owner and for other people.
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
-| 0.1 New repository | Monorepo (Bun workspaces): `apps/api`, `apps/web`, `packages/db`. Add the shadcn UI components with the shadcn CLI. Use the tooling settings from `v1` as a reference. `docs/`, `AGENTS.md` and `LICENSE` are already in the repository. Keep `LICENSE` (AGPL-3.0, decision 0003). Set `"license": "AGPL-3.0-only"` in each `package.json`. Add `README.md`, `CONTRIBUTING.md`. Add the `typecheck` script to `apps/api`. | App starts. One health route. One web shell with the 8 nav items (§14). No Python. No v1 history. Search the repository for the owner's names, banks' account numbers and balances: zero results. |
-| 0.2 Schema baseline | Drizzle schema for all entities in §5. One baseline migration. | Fresh DB creates. `PRAGMA integrity_check` = ok. `PRAGMA foreign_key_check` is empty. Migration test: run two times, no change. |
+| 0.1 New repository | Monorepo (Bun workspaces): `apps/api`, `apps/web`, `packages/db`, `packages/shared`. The web app imports only `packages/shared` (decision 0004). Hono serves the built web app. Add the shadcn UI components with the shadcn CLI. Use the tooling settings from `v1` as a reference. `docs/`, `AGENTS.md` and `LICENSE` are already in the repository. Keep `LICENSE` (AGPL-3.0, decision 0003). Set `"license": "AGPL-3.0-only"` in each `package.json`. Add `README.md`, `CONTRIBUTING.md`. Add the `typecheck` script to `apps/api`. | App starts. One health route. One web shell with the 8 nav items (§14). No Python. No v1 history. Search the repository for the owner's names, banks' account numbers and balances: zero results. |
+| 0.2 Schema baseline | Drizzle schema for all entities in §5. One baseline migration. | Fresh DB creates. `PRAGMA integrity_check` = ok. `PRAGMA foreign_key_check` is empty. Migrations run two times without change. |
 | 0.3 Auth | Both auth modes, API tokens, dev bypass (§13). | Tests for `cloudflare-access`: no token, bad signature, wrong audience → 401. Valid → 200. Tests for `password`: wrong password → 401. Rate limit works. Cookie flags are correct. Tests for tokens: revoked token → 401. Only the hash is stored. Dev bypass only with `NODE_ENV=development` and `127.0.0.1`. App does not start without a valid `AUTH_MODE`. |
-| 0.4 API conventions | `asOf` validation, error codes, audit log writer (§4, §11). | Tests: a date-dependent route without `asOf` → 400. API responses contain no formatted numbers or dates. Each write service creates one audit row with `before` and `after`. |
-| 0.5 Setup | First-run setup: currency, password, default category set (§7.0). Currency minor units from ISO 4217. | Tests: setup runs only one time. Currency cannot change after the first transaction. JPY (0 minor units) and KWD (3) amounts are correct. |
+| 0.4 API conventions | `asOf` validation, error codes, audit log writer (§4, §11). | `@hono/zod-openapi` route pattern and OpenAPI document. Shared list-query schema and paged response (decision 0004). Tests: a date-dependent route without `asOf` → 400. Each write service creates one audit row with `before` and `after`. `sort` with an unknown column → 400. |
+| 0.5 Setup | First-run setup: currency, password, default category set (§7.0). Currency minor units from ISO 4217. | Tests: setup runs only one time. Currency cannot change after the first transaction. Minor-unit conversion is correct for JPY (0), CAD (2) and KWD (3). |
 | 0.6 Deploy | Dockerfile, pre-migrate backup, optional Litestream, optional uploads copy, "Download backup", `docs/self-hosting.md` (generic Docker + example: Coolify with Cloudflare Tunnel and Access). | A person can install with only `docs/self-hosting.md`. Owner deploys to the NUC with stop-first. Owner does a test restore from backup to a new volume. The app starts. |
 
 ## Phase 1 — Ledger core
@@ -44,10 +44,10 @@ Goal: accounts and transactions are correct.
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
-| 1.1 Accounts | Account CRUD, kinds, class, onBudget, card fields, balances (§5.1, §7.1). | Tests: balance = opening + transactions. Kind change across class is rejected. Archive with a balance needs a confirmation. |
-| 1.2 Categories and tags | Categories, groups, tags (§5.3, §5.5). | Tests: refund decreases spending. Transfers are not spending or income. Tag totals are correct. |
+| 1.1 Accounts | Account CRUD, kinds, class, onBudget, card fields, balances (§5.1, §7.1). | Tests: balance = opening + transactions, for transaction accounts and valuation accounts. Kind change across class is rejected. |
+| 1.2 Categories and tags | Categories, groups, tags (§5.3, §5.5). | Tests: refund decreases spending. Transfers are not spending or income. |
 | 1.3 Transactions | Transactions, lines, mirror transfers, status (§5.4). | Tests: lines must sum to the amount. Edit and delete of a transfer update both sides in one DB transaction. Self-transfer is rejected. Reconciled records cannot change. Mortgage payment with principal transfer and interest line is correct. |
-| 1.4 Transactions screen | List, search, filters (account, category, merchant, tag, date, uncategorized), detail, edit lines. Formatting with `Intl` in the browser. | Manual check list passes, also with browser locale `fr-CA` and `en-US`. A list of 1,000 rows loads in less than 300 ms on the NUC. |
+| 1.4 Transactions screen | List with server pagination, search, filters (account, category, merchant, tag, date, uncategorized) and sort. URL state = API query (decision 0004). Detail, edit lines. Formatting with `Intl` in the browser. | Owner check: URL reload, back and forward keep the state. Locales `fr-CA` and `en-US` format correctly. With 50,000 transactions in the DB, each filtered page of 50 loads in less than 200 ms on the NUC. |
 
 ## Phase 2 — Capture
 
@@ -58,7 +58,7 @@ Goal: imports are safe and the Inbox works.
 | 2.1 Documents and parsers | Documents (§5.12). OFX/QFX parser. CSV column-map parser. Preset format and loader. Presets for TD chequing, TD savings, TD credit card and CIBC credit card (§7.2). | Each preset has a synthetic test file. Tests: correct dates, amounts, signs and closing balance for each preset and for OFX. Date order (DMY/MDY) and both sign conventions are tested. |
 | 2.2 Import pipeline | Identity, dedupe, matching, batch summary, undo (§5.11, §7.2). | Tests: same file two times → 0 new. Overlapping files → 0 duplicates. Two identical rows on one day in one file → 2 transactions. Undo removes only unedited, unreconciled rows. |
 | 2.3 Normalization and suggestions | Normalized payee, rules, payee history, merchant default, promote to rule, transfer detection (§5.6, §7.3). | Table test with 50 or more synthetic payee strings in real bank formats from several countries. Each suggestion has a reason code. Promote suggestion after `promoteAfter` confirmations. |
-| 2.4 Inbox | Inbox screen with all item types from phases 1–2. Dismiss with reason. Text made in the browser from codes. | Manual check list passes. Inbox count in the nav. |
+| 2.4 Inbox | Inbox screen with all item types from phases 1–2. Dismiss with reason. Text made in the browser from codes. | Owner check list passes. |
 | 2.5 Checkpoints | Checkpoints, unlock, difference help (§5.13, §7.5). | Tests: checkpoint only when balances are equal. Reconciled status is set. Unlock is audited. |
 | 2.6 Owner import test | No code. The owner creates the accounts and imports the real statements into a local v2 instance. | Each account balance agrees with its latest statement. Importing all files a second time creates zero transactions. The owner writes the defects as issues. |
 
@@ -71,21 +71,21 @@ Goal: recurring plans, buckets and paycheck funding.
 | 3.1 Recurring plans | Plans, `amountMode`, occurrences, business-day shift, links, skips, changed, missed, detection (§5.7, §7.4). | Tests: monthly day 31 in February. Biweekly gives 3 paychecks in some months. Weekend shift. One occurrence per transaction. Variable plan: median and lowest of the last 6, fallback when fewer than 3, no "changed amount" items. |
 | 3.2 Buckets | Buckets, kinds, category map, events, balances, moves, overspending (§5.8, §7.7). | Tests: balance formula. Each category in one bucket only. Refund increases the balance. Card purchase does not change Unassigned. |
 | 3.3 Funding | Unassigned, bills reserved, funding proposal, funding run, undo (§6, §5.9, §7.6). | Tests: proposal order by priority. Sinking and goal amounts for each paycheck. The proposal stops at the smaller of paycheck or Unassigned. A variable paycheck uses its actual amount. Undo removes all events. |
-| 3.4 Plan screen | Monthly plan, goal feasibility (§7.8, §14). | Manual check list passes. Shortfall shows both fixes. |
+| 3.4 Plan screen | Monthly plan, goal feasibility (§7.8, §14). | Tests: shortfall calculation and both fixes. Owner check list passes. |
 
 ## Phase 4 — Understand
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
 | 4.1 Month close | Close rules, summary, open again (§7.5). | Tests: a missing checkpoint blocks the close. Open Inbox items block the close. Reopen needs a reason. |
-| 4.2 Insights | Month story, category, merchant and tag reports, trends, net worth (§9). | Tests: story numbers agree with raw sums. Net worth agrees with account balances. |
+| 4.2 Insights | Month story, category, merchant and tag reports, trends, net worth (§9). | Tests: month story calculations (changes against the 3-month median, savings rate). Net worth at month end. |
 | 4.3 Hygiene panel | All checks in §10. | One test for each check: pass case and fail case. |
 
 ## Phase 5 — Forecast and mortgage
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
-| 5.1 Forecast | Known and estimated series, card payments, safe to spend, accuracy record (§8, §6). | Tests: card purchase moves cash on the due day only. Bucket spending is not counted two times. Outliers are not included. Accuracy record is stored one time for each month. |
+| 5.1 Forecast | Known and estimated series, card payments, safe to spend, accuracy record (§8, §6). | Tests: card purchase moves cash on the due day only. Bucket spending is not counted two times. Outliers are not included. Accuracy record is stored one time for each month. Variable income uses the median. |
 | 5.2 Mortgage | Terms, schedule, payment prefill, payoff, extra payment, valuations (§5.2, §5.10, §9). | Public tests with synthetic loans: monthly and semiannual compounding, weekly, biweekly and monthly payments, compared with values from a published lender calculator. Owner check in the UI: the owner enters the real mortgage terms and compares the schedule with a lender statement. |
 
 ## Phase 6 — MCP and cutover

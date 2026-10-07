@@ -44,7 +44,16 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 - Each service function that writes data uses one database transaction and writes the audit log (§11).
 - Keep files under 400 lines. Keep functions small.
 - Do not keep dead code.
-- Use the existing shadcn components in `apps/web/src/components/ui/`.
+- Use the shadcn components in `apps/web/src/components/ui/`. Do not add TanStack Table or virtual scrolling.
+- The web app imports only `packages/shared`. Do not import `packages/db` or API code in the web app.
+- Use `Temporal.PlainDate` for calendar dates. Do not use `Date` for calendar dates.
+- Lists: one shared Zod query schema for the URL and the API. Follow decision 0004.
+
+## Tests
+
+- Write tests only for logic. Decision 0004 gives the list.
+- Do not write tests for simple CRUD, UI rendering, framework behavior or schema shape.
+- Do not write browser end-to-end tests. The owner does usability tests.
 - Use plain language in the UI (spec §2.6).
 
 ## Verification
@@ -58,7 +67,7 @@ bun run --filter web build
 bun run --filter web lint
 ```
 
-For UI changes, write a manual check list in the PR. Do not say that the UI works if a person did not examine it.
+For UI changes, write a manual check list in the PR for the owner's usability test. Do not say that the UI works if a person did not examine it.
 
 ## PR description
 
