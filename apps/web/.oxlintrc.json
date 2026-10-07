@@ -1,0 +1,37 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "oxc"],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@num/db",
+            "message": "The web app imports only packages/shared."
+          },
+          {
+            "name": "api",
+            "message": "The web app imports only packages/shared."
+          }
+        ]
+      }
+    ],
+    "react/only-export-components": [
+      "warn",
+      {
+        "allowConstantExport": true,
+        "allowExportNames": ["Route", "buttonVariants", "useSidebar"]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/hooks/use-mobile.ts"],
+      "rules": {
+        "react/set-state-in-effect": "off"
+      }
+    }
+  ]
+}
