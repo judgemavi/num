@@ -132,6 +132,7 @@ The terms do not create transactions.
 ### 5.3 Category and category group
 
 - Category fields: `name`, `kind` (`income | expense`), `groupId?`, `essential` (boolean, only for expense), `archivedAt?`.
+  The name is unique. The comparison ignores case.
 - Group fields: `name`, `sortOrder`. Groups are only for display.
 - **Spending** = the sum of the lines in expense categories.
   A refund is a positive line in an expense category. A refund decreases spending.
@@ -161,6 +162,8 @@ Rules:
   - `transferPeerId` links the two transactions in both directions.
   - If the user edits or deletes one side, update the other side in the same database transaction.
   - A transfer line must not target its own account.
+  - A transaction has a maximum of one transfer line.
+  - The mirror transaction has one line. Its `transferAccountId` is the account of the source transaction.
 - A mortgage payment is one chequing transaction with two lines:
   - A transfer line for the principal. The target is the mortgage account.
   - An expense line for the interest. The category is the interest category.
@@ -168,7 +171,7 @@ Rules:
 
 ### 5.5 Tag
 
-Fields: `name`, `archivedAt?`. A line can have many tags. A tag can be on many lines.
+Fields: `name`, `archivedAt?`. The name is unique. The comparison ignores case. A line can have many tags. A tag can be on many lines.
 
 Use tags for trips and projects. Example: "Italy Vacation 2026". Reports can filter and add totals by tag.
 
@@ -182,6 +185,7 @@ Rule fields:
 - `accountId?`: if it is set, the rule applies only to this account.
 - `merchantId?`, `categoryId?`, `priority`
 - `origin`: `manual | promoted`
+- A rule must set `merchantId`, `categoryId` or both.
 
 Rules make suggestions. §7.3 tells how the import uses them.
 A change to a rule does not change existing transactions.
@@ -203,6 +207,10 @@ Fields:
 - `fundsBuckets` (boolean, only for income)
 
 Rules:
+- Kind fields:
+  - `transfer`: `transferAccountId` is necessary. It must not be `accountId`. `categoryId` is empty.
+  - `income` and `bill`: `transferAccountId` is empty.
+- `monthDay` is only for `monthly` and `yearly`. For `yearly`, the month comes from `startDate`.
 - The app calculates occurrences. It does not store occurrences as transactions.
 - If a month has fewer days than `monthDay`, use the last day of the month.
 - `occurrence_link` fields: `planId`, `dueDate`, and `transactionId` or `skipped` + `reason`.
@@ -232,9 +240,11 @@ Bucket events (append only):
 - `fund`: money from Unassigned into the bucket.
 - `move`: money from one bucket to a different bucket.
 - `release`: money from the bucket back to Unassigned.
-- Each event has `amount`, `date`, `note?`, `fundingRunId?`.
+- Each event has `amount` (positive), `date`, `note?`, `fundingRunId?`, `undoneAt?`.
+- Undo of an event sets `undoneAt`. The app does not delete events.
 
 Bucket balance = funds + moves in − moves out − releases + the sum of the lines in the bucket's categories.
+Do not count events with `undoneAt`. Do not count events of a funding run with `undoneAt`.
 Spending lines are negative. Refund lines are positive.
 The balance carries over. There is no reset at the end of a cycle.
 
@@ -244,7 +254,8 @@ A funding run is one confirmed assignment of a paycheck.
 
 Fields: `incomeTransactionId`, `date`, `createdAt`, `undoneAt?`.
 
-The funding run owns its `fund` events. Undo of the run removes all of its events.
+The funding run owns its `fund` events. Undo of the run sets `undoneAt` on the run. Then its events do not count.
+An income transaction has a maximum of one funding run that is not undone.
 
 ### 5.10 Valuation
 
@@ -254,12 +265,16 @@ Use valuations for:
 - `investment` and `property` accounts.
 - Lender checkpoints for `mortgage` and `loan` accounts.
 
+An account has a maximum of one active valuation on each date.
+
 The user enters a valuation, or approves an MCP proposal.
 For a mortgage, a valuation replaces the calculated balance from its date.
 
 ### 5.11 Import batch and import row
 
-Batch fields: `accountId`, `documentId`, `parser`, `periodStart`, `periodEnd`, `closingBalance?`, `closingDate?`, `undoneAt?`.
+Batch fields: `accountId`, `documentId?`, `proposalId?`, `parser`, `periodStart`, `periodEnd`, `closingBalance?`, `closingDate?`,
+`createdAt`, `undoneAt?`.
+- A batch has a document (file upload) or a proposal (MCP, §12). It must have one of them, not both.
 
 Row fields: `batchId`, `rowIndex`, `date`, `amount`, `payeeRaw`, `bankId?`, `identity`,
 `outcome` (`created | matched | duplicate | ignored`), `transactionId?`.
@@ -269,6 +284,9 @@ Identity:
 - If not: `identity` = `fp:<hash(accountId, date, amount, normalizedPayee, n)>`.
   `n` is the position of the row among rows with the same date, amount and payee **in the same file**.
 - There is a unique index on (`accountId`, `identity`) for active rows.
+  An active row has the outcome `created`, `matched` or `ignored`, and its batch is not undone.
+  A `duplicate` row is never active, because it has the same identity as an earlier row.
+  An `ignored` row is active. Thus, an ignored row does not come back when the user imports the file again.
 
 ### 5.12 Document
 
@@ -290,11 +308,32 @@ Month close fields: `month` (`YYYY-MM`), `closedAt`, `reopenedAt?`, `reopenReaso
 
 A proposal is a change that MCP suggests (§12).
 
-Fields: `kind`, `payloadJson`, `source`, `status` (`pending | approved | rejected`), `resultRef?`.
+Fields: `kind`, `payloadJson`, `source`, `status` (`pending | approved | rejected`), `resultRef?`, `createdAt`, `decidedAt?`.
 
 When the user approves a proposal, the app makes the change with the same code that the UI uses.
 
-### 5.15 Settings
+### 5.15 Inbox dismissal
+
+Fields: `itemKey`, `reason`, `dismissedAt`.
+
+The app calculates most Inbox items from other records. It does not store them.
+`itemKey` is a stable key for one item: the item kind and the IDs of its records.
+A dismissed item does not show again. If the user removes the dismissal, the item shows again.
+
+### 5.16 Forecast snapshot
+
+Fields: `month` (`YYYY-MM`, unique), `asOf`, `predictedTotal`, `createdAt`.
+
+It stores the forecast of the on-budget total for the last day of the month (§8).
+
+### 5.17 Audit log and auth records
+
+- `audit_log`: §11.
+- `api_tokens`: `name`, `tokenHash`, `createdAt`, `lastUsedAt?`, `revokedAt?` (§13).
+- `sessions`: `idHash`, `createdAt`, `expiresAt` (`password` auth mode only, §13).
+- The password hash is the setting `passwordHash`.
+
+### 5.18 Settings
 
 | Key | Default | Use |
 |---|---|---|
@@ -304,6 +343,7 @@ When the user approves a proposal, the app makes the change with the same code t
 | `staleImportDays` | 10 | Hygiene check |
 | `promoteAfter` | 3 | Confirmations before a rule suggestion |
 | `recurringGraceDays` | 3 | Date window for recurring links |
+| `passwordHash` | Set at setup | `password` auth mode only (§13) |
 
 ## 6. Calculated values
 
