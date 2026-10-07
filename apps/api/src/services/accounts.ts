@@ -6,9 +6,9 @@ import {
   type Account,
   type AccountCreate,
   type AccountKind,
+  type AccountListQuery,
   type AccountUpdate,
   type PaymentPolicy,
-  isUtcTimestamp,
   utcNow,
 } from "@num/shared";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
@@ -23,13 +23,6 @@ import {
   type CardFields,
 } from "./account-rules";
 import { write, type AuditSource, type WriteTx } from "./write";
-
-type AccountQuery = {
-  page: number;
-  pageSize: number;
-  sort?: "name" | "kind";
-  dir?: "asc" | "desc";
-};
 
 type WriteInput = {
   source: AuditSource;
@@ -171,7 +164,7 @@ function snapshot(row: {
   dueDay: number | null;
   paymentPolicy: string | null;
   fixedPayment: number | null;
-  interestRateBps: number | null;
+  interestRateMilliPct: number | null;
 }) {
   return {
     name: row.name,
@@ -186,7 +179,7 @@ function snapshot(row: {
     dueDay: row.dueDay,
     paymentPolicy: row.paymentPolicy,
     fixedPayment: row.fixedPayment,
-    interestRateBps: row.interestRateBps,
+    interestRateMilliPct: row.interestRateMilliPct,
   };
 }
 
@@ -205,7 +198,7 @@ function toAccount(row: AccountRow, balance: number): Account {
     dueDay: row.dueDay,
     paymentPolicy: asPolicy(row.paymentPolicy),
     fixedPayment: row.fixedPayment,
-    interestRateBps: row.interestRateBps,
+    interestRateMilliPct: row.interestRateMilliPct,
     balance,
   };
 }
@@ -219,7 +212,7 @@ function storedFields(input: {
   openingBalance: number;
   archivedAt: string | null;
   card: CardFields;
-  interestRateBps: number | null;
+  interestRateMilliPct: number | null;
 }) {
   return {
     name: input.name,
@@ -234,7 +227,7 @@ function storedFields(input: {
     dueDay: input.card.dueDay,
     paymentPolicy: input.card.paymentPolicy,
     fixedPayment: input.card.fixedPayment,
-    interestRateBps: input.interestRateBps,
+    interestRateMilliPct: input.interestRateMilliPct,
   };
 }
 
@@ -248,15 +241,27 @@ function compareText(left: string, right: string): number {
   return 0;
 }
 
-export function listAccounts(db: Db, query: AccountQuery) {
-  const rows = db.select().from(accounts).all();
+function compareName(left: string, right: string): number {
+  const folded = compareText(left.toLowerCase(), right.toLowerCase());
+  if (folded !== 0) {
+    return folded;
+  }
+  return compareText(left, right);
+}
+
+export function listAccounts(db: Db, query: AccountListQuery) {
+  const rows = db
+    .select()
+    .from(accounts)
+    .all()
+    .filter((row) => (query.archived ? row.archivedAt !== null : row.archivedAt === null));
   const totals = transactionTotals(db);
   const latest = latestValuations(db);
   const items = rows.map((row) => toAccount(row, balanceFor(db, { ...row, kind: asKind(row.kind) }, totals, latest)));
   const sort = query.sort ?? "name";
   const dir = query.dir === "desc" ? -1 : 1;
   items.sort((left, right) => {
-    const field = sort === "kind" ? compareText(left.kind, right.kind) : compareText(left.name, right.name);
+    const field = sort === "kind" ? compareText(left.kind, right.kind) : compareName(left.name, right.name);
     if (field !== 0) {
       return field * dir;
     }
@@ -273,7 +278,7 @@ export function listAccounts(db: Db, query: AccountQuery) {
 
 export function createAccount(db: Db, input: AccountCreate & WriteInput): Account {
   const card = cardFields(input.kind, input);
-  const rate = interestRate(input.kind, input.interestRateBps);
+  const rate = interestRate(input.kind, input.interestRateMilliPct);
   const id = crypto.randomUUID();
   const row = {
     id,
@@ -286,7 +291,7 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
       openingBalance: input.openingBalance,
       archivedAt: null,
       card,
-      interestRateBps: rate,
+      interestRateMilliPct: rate,
     }),
   };
   write(db, { source: input.source, at: input.at }, (tx) => {
@@ -312,7 +317,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
     const currentKind = asKind(existing.kind);
     assertSameClass(currentKind, input.kind);
     const card = cardFields(input.kind, input);
-    const rate = interestRate(input.kind, input.interestRateBps);
+    const rate = interestRate(input.kind, input.interestRateMilliPct);
     const next = storedFields({
       name: input.name.trim(),
       institution: blankToNull(input.institution),
@@ -322,7 +327,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
       openingBalance: input.openingBalance,
       archivedAt: existing.archivedAt,
       card,
-      interestRateBps: rate,
+      interestRateMilliPct: rate,
     });
     tx.update(accounts).set(next).where(eq(accounts.id, id)).run();
     tx.audit({
@@ -349,9 +354,6 @@ export function archiveAccount(
   input: { confirm: boolean } & WriteInput,
 ): Account {
   const at = input.at ?? utcNow();
-  if (!isUtcTimestamp(at)) {
-    throw new Error("Audit time must be a UTC timestamp");
-  }
   let archived: Account | undefined;
   write(db, { source: input.source, at }, (tx) => {
     const existing = tx.select().from(accounts).where(eq(accounts.id, id)).get();

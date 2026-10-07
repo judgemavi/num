@@ -20,7 +20,7 @@ export const accounts = sqliteTable(
     dueDay: integer("due_day"),
     paymentPolicy: text("payment_policy"),
     fixedPayment: integer("fixed_payment"),
-    interestRateBps: integer("interest_rate_bps"),
+    interestRateMilliPct: integer("interest_rate_milli_pct"),
   },
   (table) => [
     check("accounts_kind", oneOf(table.kind, accountKinds)),
@@ -30,7 +30,7 @@ export const accounts = sqliteTable(
     check("accounts_payment_policy", nullOrOneOf(table.paymentPolicy, paymentPolicies)),
     check(
       "accounts_interest_rate",
-      sql`${table.interestRateBps} is null or ${table.interestRateBps} >= 0`,
+      sql`${table.interestRateMilliPct} is null or ${table.interestRateMilliPct} >= 0`,
     ),
     check(
       "accounts_card_fields",
@@ -58,7 +58,7 @@ export const mortgageTerms = sqliteTable(
       .references(() => accounts.id),
     principal: integer("principal").notNull(),
     principalAsOf: text("principal_as_of").notNull(),
-    rateBps: integer("rate_bps").notNull(),
+    rateMilliPct: integer("rate_milli_pct").notNull(),
     compounding: text("compounding").notNull(),
     paymentAmount: integer("payment_amount").notNull(),
     paymentFrequency: text("payment_frequency").notNull(),
@@ -74,7 +74,7 @@ export const mortgageTerms = sqliteTable(
     propertyAccountId: text("property_account_id").references(() => accounts.id),
   },
   (table) => [
-    check("mortgage_terms_rate", sql`${table.rateBps} >= 0`),
+    check("mortgage_terms_rate", sql`${table.rateMilliPct} >= 0`),
     check("mortgage_terms_months", sql`${table.amortizationMonthsRemaining} >= 0`),
     check("mortgage_terms_compounding", oneOf(table.compounding, compounding)),
     check("mortgage_terms_frequency", oneOf(table.paymentFrequency, paymentFrequencies)),

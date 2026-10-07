@@ -6,6 +6,9 @@ import {
   accountUpdateSchema,
   allowsInterestRate,
   defaultOnBudget,
+  fromMinorUnits,
+  milliPctToPercent,
+  percentToMilliPct,
   toMinorUnits,
   Temporal,
   type Account,
@@ -13,7 +16,7 @@ import {
   type PaymentPolicy,
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
-import { accountError, bpsToPercent, fromMinorUnits, kindLabel, percentToBps, policyLabel } from "@/accounts/format";
+import { accountError, kindLabel, policyLabel } from "@/accounts/format";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -67,6 +70,20 @@ function readDay(text: string, label: string): number | null {
   return day;
 }
 
+function readInterest(text: string): number | null {
+  if (text.trim().length === 0) {
+    return null;
+  }
+  try {
+    return percentToMilliPct(text);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Interest rate is too high") {
+      throw new Error("Enter an interest rate from 0 to 1000.");
+    }
+    throw new Error("Enter the interest rate as a percent with up to 3 decimal places.");
+  }
+}
+
 function isKind(value: string): value is AccountKind {
   return (accountKinds as readonly string[]).includes(value);
 }
@@ -104,9 +121,9 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
       : fromMinorUnits(currency, account.fixedPayment),
   );
   const [interestRate, setInterestRate] = useState(
-    account?.interestRateBps === null || account?.interestRateBps === undefined
+    account?.interestRateMilliPct === null || account?.interestRateMilliPct === undefined
       ? ""
-      : bpsToPercent(account.interestRateBps),
+      : milliPctToPercent(account.interestRateMilliPct),
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -166,7 +183,7 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
         onBudget,
         openingDate,
         openingBalance: readAmount(currency, openingBalance, "the opening balance"),
-        interestRateBps: allowsInterestRate(kind) ? percentToBps(interestRate) : null,
+        interestRateMilliPct: allowsInterestRate(kind) ? readInterest(interestRate) : null,
         ...card,
       };
     } catch (caught) {
@@ -275,7 +292,7 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
               inputMode="decimal"
               autoComplete="off"
               value={interestRate}
-              placeholder="5.25"
+              placeholder="6.875"
               onChange={(event) => setInterestRate(event.target.value)}
             />
           </Field>

@@ -3,9 +3,11 @@ import {
   accountSchema,
   currencyUpdateSchema,
   type Account,
+  type AccountListQuery,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { getRouteApi } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { AccountForm } from "@/accounts/account-form";
 import { accountError, formatBalance, kindLabel } from "@/accounts/format";
 import { apiRequest } from "@/request";
@@ -21,6 +23,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -30,27 +34,33 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-async function loadAccounts(): Promise<Account[]> {
-  const items: Account[] = [];
-  let page = 1;
-  let total = 0;
-  do {
-    const result = await apiRequest(`/api/accounts?page=${page}&pageSize=200`, accountListSchema);
-    if (!result.ok) {
-      throw new Error(result.code);
-    }
-    items.push(...result.data.items);
-    total = result.data.total;
-    if (result.data.items.length === 0) {
-      break;
-    }
-    page += 1;
-  } while (items.length < total);
-  return items;
+const accountsRoute = getRouteApi("/accounts");
+
+function accountPath(search: AccountListQuery): string {
+  const params = new URLSearchParams();
+  if (search.page !== 1) {
+    params.set("page", String(search.page));
+  }
+  if (search.pageSize !== 50) {
+    params.set("pageSize", String(search.pageSize));
+  }
+  if (search.sort) {
+    params.set("sort", search.sort);
+  }
+  if (search.dir) {
+    params.set("dir", search.dir);
+  }
+  if (search.archived) {
+    params.set("archived", "true");
+  }
+  const text = params.toString();
+  return text.length === 0 ? "/api/accounts" : `/api/accounts?${text}`;
 }
 
 export function AccountsScreen() {
   const queryClient = useQueryClient();
+  const search = accountsRoute.useSearch();
+  const navigate = accountsRoute.useNavigate();
   const [draft, setDraft] = useState<Account | "new" | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<Account | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -67,9 +77,25 @@ export function AccountsScreen() {
   });
 
   const accounts = useQuery({
-    queryKey: ["accounts"],
-    queryFn: loadAccounts,
+    queryKey: ["accounts", search],
+    queryFn: async () => {
+      const result = await apiRequest(accountPath(search), accountListSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
+    },
   });
+
+  useEffect(() => {
+    if (!accounts.data) {
+      return;
+    }
+    const lastPage = Math.max(1, Math.ceil(accounts.data.total / accounts.data.pageSize));
+    if (search.page > lastPage) {
+      void navigate({ search: { ...search, page: lastPage }, replace: true });
+    }
+  }, [accounts.data, navigate, search]);
 
   async function confirmArchive() {
     if (!archiveTarget) {
@@ -110,11 +136,25 @@ export function AccountsScreen() {
   }
 
   const bookCurrency = currency.data;
-  const rows = accounts.data ?? [];
+  const page = accounts.data;
+  const rows = page?.items ?? [];
+  const lastPage = page ? Math.max(1, Math.ceil(page.total / page.pageSize)) : 1;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-4">
+        <Field orientation="horizontal" className="w-auto">
+          <Switch
+            id="show-archived"
+            checked={search.archived}
+            onCheckedChange={(checked) => {
+              void navigate({
+                search: { ...search, archived: checked === true, page: 1 },
+              });
+            }}
+          />
+          <FieldLabel htmlFor="show-archived">Show archived</FieldLabel>
+        </Field>
         <Button type="button" onClick={() => setDraft("new")}>
           New account
         </Button>
@@ -138,7 +178,7 @@ export function AccountsScreen() {
           {rows.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5} className="text-muted-foreground">
-                No accounts yet.
+                {search.archived ? "No archived accounts." : "No accounts yet."}
               </TableCell>
             </TableRow>
           ) : (
@@ -171,6 +211,30 @@ export function AccountsScreen() {
           )}
         </TableBody>
       </Table>
+      {page && page.total > page.pageSize ? (
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={search.page <= 1}
+            onClick={() => {
+              void navigate({ search: { ...search, page: search.page - 1 } });
+            }}
+          >
+            Previous
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={search.page >= lastPage}
+            onClick={() => {
+              void navigate({ search: { ...search, page: search.page + 1 } });
+            }}
+          >
+            Next
+          </Button>
+        </div>
+      ) : null}
       <Dialog open={draft !== null} onOpenChange={(open) => !open && setDraft(null)}>
         <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto sm:max-w-md">
           {draft !== null ? (
@@ -195,7 +259,7 @@ export function AccountsScreen() {
             <AlertDialogDescription>
               {archiveTarget && archiveTarget.balance !== 0
                 ? `${archiveTarget.name} has a balance of ${formatBalance(bookCurrency, archiveTarget.kind, archiveTarget.balance)}. Archive it only if you mean to.`
-                : `Archive ${archiveTarget?.name ?? "this account"}. It stays in the list.`}
+                : `Archive ${archiveTarget?.name ?? "this account"}. It leaves the active list.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

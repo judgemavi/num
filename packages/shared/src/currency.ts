@@ -42,4 +42,20 @@ export function toMinorUnits(code: string, amount: string): number {
   return Number(minor);
 }
 
+export function fromMinorUnits(code: string, minor: number): string {
+  const digits = minorUnitDigits(code);
+  if (digits === undefined) {
+    throw new Error("Unknown currency");
+  }
+  const negative = minor < 0;
+  const text = Math.abs(minor).toString().padStart(digits + 1, "0");
+  if (digits === 0) {
+    return `${negative ? "-" : ""}${text}`;
+  }
+  const whole = text.slice(0, -digits);
+  const fraction = text.slice(-digits).replace(/0+$/, "");
+  const body = fraction.length === 0 ? whole : `${whole}.${fraction}`;
+  return `${negative ? "-" : ""}${body}`;
+}
+
 export const currencyCodeSchema = z.enum(currencyCodeList);

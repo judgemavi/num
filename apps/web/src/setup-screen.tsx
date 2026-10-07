@@ -3,7 +3,8 @@ import { useState, type FormEvent } from "react";
 import { CurrencyCombobox } from "@/currency-combobox";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type SetupScreenProps = {
   onDone: () => void;
@@ -81,35 +82,33 @@ export function SetupScreen({ onDone }: SetupScreenProps) {
             onChange={setCurrency}
           />
         </Field>
-        <fieldset className="flex flex-col gap-3">
-          <legend>Categories</legend>
-          <label className="flex items-start gap-2">
-            <input
-              type="radio"
-              name="categorySet"
-              value="default"
-              checked={categorySet === "default"}
-              onChange={() => setCategorySet("default")}
-            />
-            <span>
-              Common categories
-              <span className="block text-sm text-muted-foreground">A short list you can change later.</span>
-            </span>
-          </label>
-          <label className="flex items-start gap-2">
-            <input
-              type="radio"
-              name="categorySet"
-              value="none"
-              checked={categorySet === "none"}
-              onChange={() => setCategorySet("none")}
-            />
-            <span>
-              No categories
-              <span className="block text-sm text-muted-foreground">Start with an empty list.</span>
-            </span>
-          </label>
-        </fieldset>
+        <FieldSet>
+          <FieldLegend variant="label">Categories</FieldLegend>
+          <RadioGroup
+            name="categorySet"
+            value={categorySet}
+            onValueChange={(value) => {
+              if (value === "default" || value === "none") {
+                setCategorySet(value);
+              }
+            }}
+          >
+            <Field orientation="horizontal">
+              <RadioGroupItem id="categories-default" value="default" />
+              <FieldContent>
+                <FieldLabel htmlFor="categories-default">Common categories</FieldLabel>
+                <FieldDescription>A short list you can change later.</FieldDescription>
+              </FieldContent>
+            </Field>
+            <Field orientation="horizontal">
+              <RadioGroupItem id="categories-none" value="none" />
+              <FieldContent>
+                <FieldLabel htmlFor="categories-none">No categories</FieldLabel>
+                <FieldDescription>Start with an empty list.</FieldDescription>
+              </FieldContent>
+            </Field>
+          </RadioGroup>
+        </FieldSet>
         {error ? (
           <p role="alert" className="text-sm text-destructive">
             {error}

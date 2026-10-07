@@ -81,7 +81,7 @@ function addValuation(db: Db, accountId: string, date: string, balance: number, 
 }
 
 function balanceOf(db: Db, id: string): number {
-  const page = listAccounts(db, { page: 1, pageSize: 50 });
+  const page = listAccounts(db, { page: 1, pageSize: 50, archived: false });
   const account = page.items.find((item) => item.id === id);
   if (!account) {
     throw new Error("Account is missing");
@@ -227,11 +227,30 @@ test("card fields belong only to a credit card", () => {
     expect(mortgage.onBudget).toBe(false);
 
     expectCode(
-      () => createAccount(book.db, { ...base("chequing"), interestRateBps: 150 }),
+      () => createAccount(book.db, { ...base("chequing"), interestRateMilliPct: 150 }),
       "interest_rate_invalid",
     );
-    const savings = createAccount(book.db, { ...base("savings"), interestRateBps: 150, name: "Savings" });
-    expect(savings.interestRateBps).toBe(150);
+    const savings = createAccount(book.db, { ...base("savings"), interestRateMilliPct: 150, name: "Savings" });
+    expect(savings.interestRateMilliPct).toBe(150);
+  } finally {
+    book.close();
+  }
+});
+
+test("the account list shows active accounts unless archived is requested", () => {
+  const book = tempDatabase();
+  try {
+    createAccount(book.db, { ...base("chequing"), name: "Open account" });
+    const closed = createAccount(book.db, { ...base("savings"), name: "Closed account" });
+    archiveAccount(book.db, closed.id, { confirm: false, source: "ui", at });
+
+    const active = listAccounts(book.db, { page: 1, pageSize: 50, archived: false });
+    expect(active.total).toBe(1);
+    expect(active.items.map((item) => item.name)).toEqual(["Open account"]);
+
+    const archived = listAccounts(book.db, { page: 1, pageSize: 50, archived: true });
+    expect(archived.total).toBe(1);
+    expect(archived.items.map((item) => item.name)).toEqual(["Closed account"]);
   } finally {
     book.close();
   }

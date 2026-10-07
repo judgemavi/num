@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { listQuerySchema, pagedResponseSchema } from "./list";
+import { interestRateMilliPctSchema } from "./rate";
 import { isUtcTimestamp } from "./time";
 
 export const accountKinds = [
@@ -62,7 +63,7 @@ const accountFields = {
   dueDay: daySchema.nullable().optional(),
   paymentPolicy: z.enum(paymentPolicies).nullable().optional(),
   fixedPayment: nonNegativeCentsSchema.nullable().optional(),
-  interestRateBps: nonNegativeCentsSchema.nullable().optional(),
+  interestRateMilliPct: interestRateMilliPctSchema.nullable().optional(),
 };
 
 export const accountCreateSchema = z.object({
@@ -93,14 +94,20 @@ export const accountSchema = z.object({
   dueDay: daySchema.nullable(),
   paymentPolicy: z.enum(paymentPolicies).nullable(),
   fixedPayment: nonNegativeCentsSchema.nullable(),
-  interestRateBps: nonNegativeCentsSchema.nullable(),
+  interestRateMilliPct: interestRateMilliPctSchema.nullable(),
   balance: centsSchema,
 });
 
-export const accountListQuerySchema = listQuerySchema(["name", "kind"]);
+export const accountListQuerySchema = listQuerySchema(["name", "kind"]).extend({
+  archived: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .optional()
+    .transform((value) => value === true || value === "true"),
+});
 
 export const accountListSchema = pagedResponseSchema(accountSchema);
 
 export type Account = z.infer<typeof accountSchema>;
 export type AccountCreate = z.infer<typeof accountCreateSchema>;
 export type AccountUpdate = z.infer<typeof accountUpdateSchema>;
+export type AccountListQuery = z.output<typeof accountListQuerySchema>;

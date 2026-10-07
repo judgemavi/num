@@ -15,6 +15,7 @@ export {
   type AccountClass,
   type AccountCreate,
   type AccountKind,
+  type AccountListQuery,
   type AccountUpdate,
   type PaymentPolicy,
 } from "./account";
@@ -24,12 +25,19 @@ export {
   currencyCodes,
   currencyMinorUnits,
   minorUnitDigits,
+  fromMinorUnits,
   toMinorUnits,
   type CurrencyCode,
 } from "./currency";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
 export { errorCodes, errorSchema, type ErrorBody, type ErrorCode } from "./error";
 export { listQuerySchema, pagedResponseSchema, sortDirections } from "./list";
+export {
+  interestRateMilliPctSchema,
+  maxInterestMilliPct,
+  milliPctToPercent,
+  percentToMilliPct,
+} from "./rate";
 export {
   categorySetSchema,
   categorySets,
