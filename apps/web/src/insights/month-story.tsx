@@ -18,6 +18,17 @@ function nameOf(map: Map<string, string>, id: string): string {
 export function MonthStoryView({ currency, story, names }: { currency: string; story: MonthStory; names: Names }) {
   return (
     <div className="grid gap-5">
+      <ListCard label="Uncategorized" title="Uncategorized">
+        <ListRow simple>
+          <span className={listName}>
+            {story.uncategorized.count === 1 ? "1 line" : `${story.uncategorized.count} lines`}
+            <small>Needs a category</small>
+          </span>
+          <span className={listAmt}>
+            <Amount currency={currency} minor={story.uncategorized.amount} />
+          </span>
+        </ListRow>
+      </ListCard>
       <ListCard label="Category changes" title="Category changes">
         <ListGroup label="Largest increases" />
         {story.increases.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">No category went up.</p> : null}

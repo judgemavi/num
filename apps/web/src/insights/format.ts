@@ -2,6 +2,7 @@ import { Temporal, type CloseBlockerCode, type ErrorCode, type MonthStatus } fro
 import { formatMoney } from "@/money";
 
 const monthErrorText: Partial<Record<ErrorCode, string>> = {
+  month_not_ended: "This month has not ended.",
   month_not_ready: "This month is not ready to close.",
   month_closed: "This month is already closed.",
   month_not_closed: "This month is open.",
@@ -39,6 +40,9 @@ export function statusVariant(status: MonthStatus): "neutral" | "positive" | "at
 }
 
 export function blockerText(code: CloseBlockerCode, accountName: string | null): string {
+  if (code === "month_not_ended") {
+    return "This month has not ended.";
+  }
   if (code === "inbox_open") {
     return "The Inbox still has something from this month.";
   }

@@ -94,6 +94,7 @@ test("the stored story matches the raw sums when refunds reduce spending and tra
     expect(detail.story.spending).toBe(-rawExpense.reduce((sum, amount) => sum + amount, 0));
     expect(detail.story.spending).toBe(3_000);
     expect(detail.story.savingsRateMilliPct).toBe(70_000);
+    expect(detail.story.uncategorized).toEqual({ count: 1, amount: -200 });
   } finally {
     book.close();
   }
@@ -114,6 +115,22 @@ test("category changes use the median of the previous 3 months", () => {
       { categoryId: groceries.id, amount: 800, median: 200, delta: 600 },
     ]);
     expect(detail.story.decreases).toEqual([]);
+  } finally {
+    book.close();
+  }
+});
+
+test("a month cannot close on or before its last day", () => {
+  const book = tempDatabase();
+  try {
+    const account = cash(book.db, 500);
+    createCheckpoint(book.db, account.id, { date: "2026-03-31", statementBalance: 500, ...saved });
+    const blocked = listMonths(book.db, "2026-03-31").items.find((item) => item.month === "2026-03");
+    expect(blocked?.status).toBe("open");
+    expect(blocked?.blockers.map((item) => item.code)).toEqual(["month_not_ended"]);
+    expectCode(() => closeMonth(book.db, "2026-03", "2026-03-31", saved), "month_not_ended");
+    expect(book.db.select().from(monthCloses).all()).toEqual([]);
+    expect(closeMonth(book.db, "2026-03", "2026-04-01", saved).status).toBe("closed");
   } finally {
     book.close();
   }

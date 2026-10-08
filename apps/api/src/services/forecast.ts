@@ -124,11 +124,21 @@ function closedMonths(db: Db): string[] {
     .slice(-3);
 }
 
-function balanceAsOf(db: Db, account: { id: string; kind: AccountKind; openingBalance: number }, asOf: string): number {
+export function balanceAsOf(
+  db: Db,
+  account: { id: string; kind: AccountKind; openingBalance: number },
+  asOf?: string,
+): number {
   const total = db
     .select({ total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)` })
     .from(transactions)
-    .where(and(eq(transactions.accountId, account.id), isNull(transactions.deletedAt), lte(transactions.date, asOf)))
+    .where(
+      and(
+        eq(transactions.accountId, account.id),
+        isNull(transactions.deletedAt),
+        asOf ? lte(transactions.date, asOf) : undefined,
+      ),
+    )
     .get();
   if (account.kind !== "investment" && account.kind !== "property") {
     return account.openingBalance + integerSum(total?.total);
@@ -136,7 +146,9 @@ function balanceAsOf(db: Db, account: { id: string; kind: AccountKind; openingBa
   const marks = db
     .select({ date: valuations.date, balance: valuations.balance })
     .from(valuations)
-    .where(and(eq(valuations.accountId, account.id), isNull(valuations.deletedAt), lte(valuations.date, asOf)))
+    .where(
+      and(eq(valuations.accountId, account.id), isNull(valuations.deletedAt), asOf ? lte(valuations.date, asOf) : undefined),
+    )
     .all();
   const latest = marks.sort((left, right) => (left.date < right.date ? 1 : -1))[0];
   if (!latest) {
@@ -150,7 +162,7 @@ function balanceAsOf(db: Db, account: { id: string; kind: AccountKind; openingBa
         eq(transactions.accountId, account.id),
         isNull(transactions.deletedAt),
         gt(transactions.date, latest.date),
-        lte(transactions.date, asOf),
+        asOf ? lte(transactions.date, asOf) : undefined,
       ),
     )
     .get();

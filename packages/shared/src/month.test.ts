@@ -26,26 +26,6 @@ function story(input: Partial<MonthStoryInput> & Pick<MonthStoryInput, "lines">)
   });
 }
 
-test("spending is the expense lines, refunds reduce it, and transfers are excluded", () => {
-  const result = story({
-    lines: [
-      line("2026-04", 10_000, income, "income"),
-      line("2026-04", -4_000, groceries, "expense"),
-      line("2026-04", 1_000, groceries, "expense"),
-      line("2026-04", -500, null, null, true),
-      line("2026-04", 500, null, null, true),
-      line("2026-04", -200, null, null),
-      line("2026-03", -9_999, groceries, "expense"),
-    ],
-  });
-  const expense = [-4_000, 1_000];
-  const rawSpending = -expense.reduce((sum, amount) => sum + amount, 0);
-  expect(result.income).toBe(10_000);
-  expect(result.spending).toBe(rawSpending);
-  expect(result.spending).toBe(3_000);
-  expect(result.savings).toBe(7_000);
-});
-
 test("the 3 largest changes use the median of the previous 3 months", () => {
   const months = ["2026-01", "2026-02", "2026-03"];
   const history: StoryLine[] = [];

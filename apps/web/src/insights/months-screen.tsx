@@ -163,6 +163,9 @@ export function MonthsScreen() {
               key={item.month}
               current={item.month === selected}
               onOpen={() => {
+                if (item.month !== selected) {
+                  setError(null);
+                }
                 void navigate({ search: (prev) => ({ ...prev, month: item.month }) });
               }}
             >
@@ -193,6 +196,7 @@ export function MonthsScreen() {
           }
         >
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {detail.isError ? <p className="text-sm">The month story did not load.</p> : null}
           {story?.status !== "closed"
             ? story?.blockers.map((blocker) => (
                 <p key={`${blocker.code}-${blocker.accountId ?? "inbox"}`} className="text-sm">

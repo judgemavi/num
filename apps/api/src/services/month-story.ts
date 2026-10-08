@@ -1,16 +1,4 @@
-import {
-  accounts,
-  bucketCategories,
-  bucketEvents,
-  buckets,
-  categories,
-  fundingRuns,
-  occurrenceLinks,
-  recurringPlans,
-  transactionLines,
-  transactions,
-  valuations,
-} from "@num/db";
+import { accounts, buckets, categories, occurrenceLinks, recurringPlans, transactionLines, transactions } from "@num/db";
 import {
   accountKinds,
   buildMonthStory,
@@ -30,11 +18,11 @@ import {
   type StoryLine,
   type StoryOccurrence,
 } from "@num/shared";
-import { and, eq, gt, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
 import { ServiceError } from "../service-error";
-import { accountBalance } from "./account-rules";
+import { bucketBalances } from "./bucket-balance";
+import { balanceAsOf } from "./forecast";
 
 type PlanRow = typeof recurringPlans.$inferSelect;
 
@@ -82,98 +70,9 @@ export function onBudgetTotal(db: Db, asOf: string): number {
     if (!account.onBudget || account.archivedAt !== null) {
       continue;
     }
-    total += balanceAsOf(db, account, asOf);
+    total += balanceAsOf(db, { id: account.id, kind: asAccountKind(account.kind), openingBalance: account.openingBalance }, asOf);
   }
   return total;
-}
-
-function balanceAsOf(db: Db, account: { id: string; kind: string; openingBalance: number }, asOf: string): number {
-  const kind = asAccountKind(account.kind);
-  const posted = db
-    .select({ total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)` })
-    .from(transactions)
-    .where(and(eq(transactions.accountId, account.id), isNull(transactions.deletedAt), lte(transactions.date, asOf)))
-    .get();
-  const transactionTotal = integerSum(posted?.total);
-  if (kind !== "investment" && kind !== "property") {
-    return accountBalance({ kind, openingBalance: account.openingBalance, transactionTotal, valuation: null });
-  }
-  const marks = db
-    .select({ date: valuations.date, balance: valuations.balance })
-    .from(valuations)
-    .where(and(eq(valuations.accountId, account.id), isNull(valuations.deletedAt), lte(valuations.date, asOf)))
-    .all();
-  const latest = marks.sort((left, right) => (left.date < right.date ? 1 : -1))[0];
-  if (!latest) {
-    return accountBalance({ kind, openingBalance: account.openingBalance, transactionTotal, valuation: null });
-  }
-  const after = db
-    .select({ total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)` })
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.accountId, account.id),
-        isNull(transactions.deletedAt),
-        gt(transactions.date, latest.date),
-        lte(transactions.date, asOf),
-      ),
-    )
-    .get();
-  return accountBalance({
-    kind,
-    openingBalance: account.openingBalance,
-    transactionTotal,
-    valuation: { balance: latest.balance, transactionsAfter: integerSum(after?.total) },
-  });
-}
-
-function bucketBalances(db: Db, asOf: string): Map<string, number> {
-  const balances = new Map<string, number>();
-  function add(id: string, amount: number) {
-    balances.set(id, (balances.get(id) ?? 0) + amount);
-  }
-  const events = db
-    .select({
-      kind: bucketEvents.kind,
-      bucketId: bucketEvents.bucketId,
-      otherBucketId: bucketEvents.otherBucketId,
-      amount: bucketEvents.amount,
-    })
-    .from(bucketEvents)
-    .leftJoin(fundingRuns, eq(bucketEvents.fundingRunId, fundingRuns.id))
-    .where(
-      and(
-        isNull(bucketEvents.undoneAt),
-        lte(bucketEvents.date, asOf),
-        or(isNull(bucketEvents.fundingRunId), isNull(fundingRuns.undoneAt)),
-      ),
-    )
-    .all();
-  for (const event of events) {
-    if (event.kind === "fund") {
-      add(event.bucketId, event.amount);
-    } else if (event.kind === "release") {
-      add(event.bucketId, -event.amount);
-    } else if (event.kind === "move" && event.otherBucketId) {
-      add(event.bucketId, -event.amount);
-      add(event.otherBucketId, event.amount);
-    }
-  }
-  const lines = db
-    .select({
-      bucketId: bucketCategories.bucketId,
-      total: sql<unknown>`coalesce(sum(${transactionLines.amount}), 0)`,
-    })
-    .from(transactionLines)
-    .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
-    .innerJoin(bucketCategories, eq(transactionLines.categoryId, bucketCategories.categoryId))
-    .where(and(isNull(transactions.deletedAt), lte(transactions.date, asOf)))
-    .groupBy(bucketCategories.bucketId)
-    .all();
-  for (const line of lines) {
-    add(line.bucketId, integerSum(line.total));
-  }
-  return balances;
 }
 
 function storyLines(db: Db, from: string, through: string): StoryLine[] {

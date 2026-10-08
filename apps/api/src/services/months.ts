@@ -91,12 +91,27 @@ function accountBlockers(
     .sort((left, right) => ((left.accountId ?? "") < (right.accountId ?? "") ? -1 : 1));
 }
 
-export function blockersFor(db: Db, month: string, asOf: string): Blocker[] {
-  const blockers = accountBlockers(month, db.select().from(accounts).all(), db.select().from(checkpoints).all());
-  if (listInbox(db, asOf).items.some((item) => item.date.startsWith(`${month}-`))) {
+function withInbox(blockers: Blocker[], month: string, inboxMonths: ReadonlySet<string>): Blocker[] {
+  if (inboxMonths.has(month)) {
     blockers.push({ code: "inbox_open", accountId: null });
   }
   return blockers;
+}
+
+function endBlocker(month: string, asOf: string): Blocker[] {
+  if (asOf > monthLastDay(month)) {
+    return [];
+  }
+  return [{ code: "month_not_ended", accountId: null }];
+}
+
+export function blockersFor(db: Db, month: string, asOf: string): Blocker[] {
+  const blockers = [
+    ...endBlocker(month, asOf),
+    ...accountBlockers(month, db.select().from(accounts).all(), db.select().from(checkpoints).all()),
+  ];
+  const inboxMonths = new Set(listInbox(db, asOf).items.map((item) => item.date.slice(0, 7)));
+  return withInbox(blockers, month, inboxMonths);
 }
 
 function isClosed(row: CloseRow | undefined): boolean {
@@ -138,10 +153,11 @@ export function listMonths(db: Db, asOf: string): MonthList {
   return {
     asOf,
     items: monthsInBook(db, asOf).map((month) => {
-      const blockers = accountBlockers(month, accountRows, checkpointRows);
-      if (inboxMonths.has(month)) {
-        blockers.push({ code: "inbox_open", accountId: null });
-      }
+      const blockers = withInbox(
+        [...endBlocker(month, asOf), ...accountBlockers(month, accountRows, checkpointRows)],
+        month,
+        inboxMonths,
+      );
       return { month, status: statusOf(isClosed(closes.get(month)), blockers), blockers };
     }),
   };
@@ -170,6 +186,9 @@ export function closeMonth(db: Db, month: string, asOf: string, input: WriteInpu
     throw new ServiceError("month_closed", 409, { month });
   }
   const blockers = blockersFor(db, month, asOf);
+  if (blockers.some((item) => item.code === "month_not_ended")) {
+    throw new ServiceError("month_not_ended", 409, { month });
+  }
   if (blockers.length > 0) {
     throw new ServiceError("month_not_ready", 409, { month, blocker: blockers[0]?.code ?? "month_not_ready" });
   }

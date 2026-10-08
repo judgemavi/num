@@ -9,7 +9,7 @@ export const monthStatuses = ["open", "ready", "closed"] as const;
 
 export type MonthStatus = (typeof monthStatuses)[number];
 
-export const closeBlockerCodes = ["checkpoint_missing", "inbox_open"] as const;
+export const closeBlockerCodes = ["month_not_ended", "checkpoint_missing", "inbox_open"] as const;
 
 export type CloseBlockerCode = (typeof closeBlockerCodes)[number];
 
@@ -56,6 +56,10 @@ export const monthStorySchema = z.object({
   spending: cents,
   savings: cents,
   savingsRateMilliPct: z.number().int().nullable(),
+  uncategorized: z.object({
+    count: z.number().int().nonnegative(),
+    amount: cents,
+  }),
   increases: z.array(categoryChangeSchema).max(3),
   decreases: z.array(categoryChangeSchema).max(3),
   newMerchants: z.array(z.object({ merchantId: z.uuid() })),
@@ -172,6 +176,19 @@ function expenseByMonth(lines: readonly StoryLine[]): Map<string, Map<string, nu
   return months;
 }
 
+function uncategorizedOf(lines: readonly StoryLine[], month: string): { count: number; amount: number } {
+  let count = 0;
+  let amount = 0;
+  for (const line of lines) {
+    if (line.month !== month || line.transfer || line.categoryId !== null) {
+      continue;
+    }
+    count += 1;
+    amount += line.amount;
+  }
+  return { count, amount };
+}
+
 function incomeOf(lines: readonly StoryLine[], month: string): number {
   let total = 0;
   for (const line of lines) {
@@ -268,6 +285,7 @@ export function buildMonthStory(input: MonthStoryInput): MonthStory {
     spending,
     savings: income - spending,
     savingsRateMilliPct: savingsRateMilliPct(income, spending),
+    uncategorized: uncategorizedOf(input.lines, input.month),
     increases,
     decreases,
     newMerchants: input.merchants

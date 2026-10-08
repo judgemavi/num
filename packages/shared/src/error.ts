@@ -102,6 +102,7 @@ export const errorCodes = [
   "import_match_invalid",
   "transfer_pair_not_found",
   "month_invalid",
+  "month_not_ended",
   "month_not_found",
   "month_not_ready",
   "month_closed",
