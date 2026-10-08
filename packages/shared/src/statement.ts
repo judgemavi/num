@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isIsoDate } from "./date";
 
 export const unreadableReasons = [
   "date_unreadable",
@@ -32,8 +33,40 @@ export type DecimalSeparator = (typeof decimalSeparators)[number];
 
 const columnSchema = z.number().int().nonnegative();
 
+export const hasHeaderSchema = z.union([z.literal("auto"), z.boolean()]).default("auto");
+
+export function statementDate(raw: string, order: DateOrder): string | null {
+  const text = raw.trim();
+  if (isIsoDate(text)) {
+    return text;
+  }
+
+  const match = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/.exec(text);
+  if (!match) {
+    return null;
+  }
+
+  const yearPart = match[3];
+  const firstPart = match[1];
+  const secondPart = match[2];
+  if (yearPart === undefined || firstPart === undefined || secondPart === undefined) {
+    return null;
+  }
+
+  let year = Number(yearPart);
+  if (year < 100) {
+    year += 2000;
+  }
+  const first = Number(firstPart);
+  const second = Number(secondPart);
+  const month = order === "mdy" ? first : second;
+  const day = order === "mdy" ? second : first;
+  const iso = `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+  return isIsoDate(iso) ? iso : null;
+}
+
 const columnMapFields = {
-  hasHeader: z.boolean(),
+  hasHeader: hasHeaderSchema,
   date: columnSchema,
   description: columnSchema,
   amount: columnSchema.nullable().optional(),

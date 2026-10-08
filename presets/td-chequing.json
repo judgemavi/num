@@ -1,7 +1,7 @@
 {
   "id": "td-chequing",
   "name": "TD chequing",
-  "hasHeader": true,
+  "hasHeader": "auto",
   "date": 0,
   "description": 1,
   "debit": 2,

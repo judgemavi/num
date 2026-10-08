@@ -98,20 +98,25 @@ function ImportForm({
     if (columnMap) {
       body.set("columnMap", JSON.stringify(columnMap));
     }
-    const response = await apiRequest("/api/imports", importResultSchema, { method: "POST", body });
-    setPending(false);
-    if (!response.ok) {
-      setError(importError(response.code));
-      return;
+    try {
+      const response = await apiRequest("/api/imports", importResultSchema, { method: "POST", body });
+      if (!response.ok) {
+        setError(importError(response.code));
+        return;
+      }
+      if (response.data.kind === "preview") {
+        setPreview(response.data.rows);
+        return;
+      }
+      setPreview(null);
+      setResult(response.data);
+      onImported();
+      await queryClient.invalidateQueries({ queryKey: ["imports"] });
+    } catch {
+      setError(importError("internal_error"));
+    } finally {
+      setPending(false);
     }
-    if (response.data.kind === "preview") {
-      setPreview(response.data.rows);
-      return;
-    }
-    setPreview(null);
-    setResult(response.data);
-    onImported();
-    await queryClient.invalidateQueries({ queryKey: ["imports"] });
   }
 
   return (

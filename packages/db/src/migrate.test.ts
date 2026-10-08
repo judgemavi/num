@@ -41,3 +41,25 @@ test("a fresh database migrates and the second run does not change it", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a later migration row stops startup when a journal migration is missing", () => {
+  const dir = mkdtempSync(join(tmpdir(), "num-db-"));
+  const sqlite = openDatabase(join(dir, "num.sqlite"));
+  try {
+    sqlite.exec(`
+      create table __drizzle_migrations (
+        id integer primary key autoincrement,
+        hash text not null,
+        created_at numeric
+      );
+      insert into __drizzle_migrations (hash, created_at) values ('later-version', 9999999999999);
+    `);
+    expect(() => migrateDatabase(sqlite)).toThrow(
+      "Migration 0000_baseline is missing. This database was migrated by a different version; restore a backup or start a new database.",
+    );
+    expect(sqlite.query("pragma foreign_keys").get()).toEqual({ foreign_keys: 1 });
+  } finally {
+    sqlite.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

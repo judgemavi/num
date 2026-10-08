@@ -1,4 +1,4 @@
-import { isIsoDate, type ColumnMap, type DecimalSeparator, type SignConvention } from "@num/shared";
+import { statementDate, type ColumnMap, type DecimalSeparator, type SignConvention } from "@num/shared";
 import { readMinorAmount, type AmountProblem } from "./parse-amount";
 import type { ParsedStatement, StatementRow, UnreadableReason, UnreadableRow } from "./statement";
 
@@ -55,34 +55,25 @@ export function splitCsvLine(line: string): string[] {
   return cells;
 }
 
-function toIsoDate(raw: string, order: ColumnMap["dateOrder"]): string | null {
-  const text = raw.trim();
-  if (isIsoDate(text)) {
-    return text;
+function firstContentIndex(lines: string[]): number {
+  for (let index = 0; index < lines.length; index += 1) {
+    if ((lines[index] ?? "").trim().length > 0) {
+      return index;
+    }
   }
+  return -1;
+}
 
-  const match = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/.exec(text);
-  if (!match) {
-    return null;
+function headerIndex(lines: string[], map: ColumnMap): number {
+  const index = firstContentIndex(lines);
+  if (index < 0 || map.hasHeader === false) {
+    return -1;
   }
-
-  const yearPart = match[3];
-  const firstPart = match[1];
-  const secondPart = match[2];
-  if (yearPart === undefined || firstPart === undefined || secondPart === undefined) {
-    return null;
+  if (map.hasHeader === true) {
+    return index;
   }
-
-  let year = Number(yearPart);
-  if (year < 100) {
-    year += 2000;
-  }
-  const first = Number(firstPart);
-  const second = Number(secondPart);
-  const month = order === "mdy" ? first : second;
-  const day = order === "mdy" ? second : first;
-  const iso = `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
-  return isIsoDate(iso) ? iso : null;
+  const date = statementDate(cell(splitCsvLine(lines[index] ?? ""), map.date), map.dateOrder);
+  return date === null ? index : -1;
 }
 
 function cell(cells: string[], index: number | null | undefined): string {
@@ -145,7 +136,7 @@ function rowAmount(
 }
 
 function readRow(cells: string[], map: ColumnMap, digits: number): ReadRow {
-  const date = toIsoDate(cell(cells, map.date), map.dateOrder);
+  const date = statementDate(cell(cells, map.date), map.dateOrder);
   if (!date) {
     return { ok: false, reason: "date_unreadable" };
   }
@@ -198,15 +189,11 @@ export function parseCsvStatement(text: string, map: ColumnMap, minorDigits: num
   const rows: StatementRow[] = [];
   const unreadable: UnreadableRow[] = [];
   const balances: BalanceRow[] = [];
-  let headerPending = map.hasHeader;
+  const header = headerIndex(lines, map);
 
   for (let index = 0; index < lines.length; index += 1) {
     const raw = lines[index] ?? "";
-    if (raw.trim().length === 0) {
-      continue;
-    }
-    if (headerPending) {
-      headerPending = false;
+    if (raw.trim().length === 0 || index === header) {
       continue;
     }
 

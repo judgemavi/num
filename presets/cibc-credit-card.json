@@ -1,7 +1,7 @@
 {
   "id": "cibc-credit-card",
   "name": "CIBC credit card",
-  "hasHeader": true,
+  "hasHeader": "auto",
   "date": 0,
   "description": 1,
   "debit": 2,

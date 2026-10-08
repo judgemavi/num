@@ -1,10 +1,9 @@
-import { columnMapSchema, type ColumnMap, type DateOrder, type DecimalSeparator, type SignConvention } from "@num/shared";
+import { columnMapSchema, statementDate, type ColumnMap, type DateOrder, type DecimalSeparator, type SignConvention } from "@num/shared";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 
 type ImportMapFormProps = {
   rows: string[][];
@@ -15,13 +14,25 @@ type ImportMapFormProps = {
 
 const none = "none";
 
+type HeaderChoice = "auto" | "yes" | "no";
+
+function headerValue(choice: HeaderChoice): ColumnMap["hasHeader"] {
+  if (choice === "yes") {
+    return true;
+  }
+  if (choice === "no") {
+    return false;
+  }
+  return "auto";
+}
+
 function columnCount(rows: string[][]): number {
   return Math.max(1, ...rows.map((row) => row.length));
 }
 
 export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapFormProps) {
   const width = columnCount(rows);
-  const [hasHeader, setHasHeader] = useState(true);
+  const [headerChoice, setHeaderChoice] = useState<HeaderChoice>("auto");
   const [date, setDate] = useState("0");
   const [description, setDescription] = useState(width > 1 ? "1" : "0");
   const [amountMode, setAmountMode] = useState<"amount" | "split">("amount");
@@ -34,7 +45,9 @@ export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapForm
   const [signConvention, setSignConvention] = useState<SignConvention>("account");
   const [decimalSeparator, setDecimalSeparator] = useState<DecimalSeparator>(".");
   const [error, setError] = useState<string | null>(null);
-  const header = hasHeader ? rows[0] : undefined;
+  const hasHeader = headerValue(headerChoice);
+  const firstDate = statementDate(rows[0]?.[Number(date)] ?? "", dateOrder);
+  const header = hasHeader === true || (hasHeader === "auto" && firstDate === null) ? rows[0] : undefined;
 
   function label(index: number): string {
     const name = header?.[index]?.trim() ?? "";
@@ -43,7 +56,7 @@ export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapForm
 
   function submit() {
     const map = {
-      hasHeader,
+      hasHeader: headerValue(headerChoice),
       date: Number(date),
       description: Number(description),
       amount: amountMode === "amount" ? Number(amount) : null,
@@ -90,13 +103,23 @@ export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapForm
           </tbody>
         </table>
       </div>
-      <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-        <div>
-          <FieldLabel htmlFor="import-header">The first row is a header</FieldLabel>
-          <FieldDescription>Column names are not transactions.</FieldDescription>
-        </div>
-        <Switch id="import-header" checked={hasHeader} onCheckedChange={(checked) => setHasHeader(checked === true)} />
-      </div>
+      <Field>
+        <FieldLabel>Header row</FieldLabel>
+        <Select
+          value={headerChoice}
+          onValueChange={(value) => setHeaderChoice(value === "yes" || value === "no" ? value : "auto")}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">Detect the header</SelectItem>
+            <SelectItem value="yes">The first row is a header</SelectItem>
+            <SelectItem value="no">There is no header</SelectItem>
+          </SelectContent>
+        </Select>
+        <FieldDescription>A date in the first row is a transaction.</FieldDescription>
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <ColumnSelect id="import-date" label="Date" value={date} width={width} labelFor={label} onChange={setDate} />
         <ColumnSelect

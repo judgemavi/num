@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ColumnMap } from "@num/shared";
+import { columnMapSchema, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
 import { parseCsvStatement } from "./parse-csv";
 import { parseOfxStatement } from "./parse-ofx";
@@ -254,4 +254,29 @@ test("a leading unicode minus is negative, and CR or DR is a sign marker", () =>
   const cad = parseCsvStatement("2026-07-04,NORTH MARKET,CAD 12.50,12.50\n", map, digits);
   expect(cad.rows[0]?.amount).toBe(1250);
   expect(cad.unreadable).toEqual([]);
+});
+
+test("auto keeps a data row and skips a header row", () => {
+  const parsed = columnMapSchema.parse({
+    date: 0,
+    description: 1,
+    debit: 2,
+    credit: 3,
+    balance: 4,
+    dateOrder: "mdy",
+    signConvention: "account",
+  });
+  expect(parsed.hasHeader).toBe("auto");
+
+  const data = ['"2026-03-25",NORTH MARKET,12.50,,100.00', '"2026-03-26",PAY DEPOSIT,,4.00,104.00'].join("\n");
+  const withoutHeader = parseCsvStatement(data, parsed, digits);
+  expect(withoutHeader.unreadable).toEqual([]);
+  expect(withoutHeader.rows.map((row) => [row.date, row.amount])).toEqual([
+    ["2026-03-25", -1250],
+    ["2026-03-26", 400],
+  ]);
+
+  const withHeader = parseCsvStatement(["Date,Description,Debit,Credit,Balance", data].join("\n"), parsed, digits);
+  expect(withHeader.unreadable).toEqual([]);
+  expect(withHeader.rows.map((row) => row.date)).toEqual(["2026-03-25", "2026-03-26"]);
 });

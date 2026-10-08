@@ -69,7 +69,9 @@ export function importError(code: string): string {
       return "Check the file and the columns.";
     case "import_not_found":
       return "That import is not available.";
+    case "internal_error":
+      return "Something went wrong on the server. The server log has the details.";
     default:
-      return "The import did not finish.";
+      return "Something went wrong on the server. The server log has the details.";
   }
 }
