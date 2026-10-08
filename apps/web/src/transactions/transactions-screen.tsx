@@ -5,20 +5,23 @@ import {
   merchantListSchema,
   tagListSchema,
   transactionListSchema,
+  transactionSchema,
   type Account,
   type Category,
   type Tag,
   type TransactionListQuery,
   accountClass,
 } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { Amount } from "@/components/amount";
+import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -43,7 +46,17 @@ async function loadNamed<T extends { id: string }>(
 export function TransactionsScreen() {
   const search = transactionsRoute.useSearch();
   const navigate = transactionsRoute.useNavigate();
+  const queryClient = useQueryClient();
   const { openEditor } = useEditors();
+
+  async function looksRight(id: string) {
+    const result = await apiRequest(`/api/transactions/${id}/looks-right`, transactionSchema, { method: "POST" });
+    if (!result.ok) {
+      return;
+    }
+    void queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    void queryClient.invalidateQueries({ queryKey: ["inbox"] });
+  }
 
   const currency = useQuery({
     queryKey: ["book-currency"],
@@ -249,6 +262,19 @@ export function TransactionsScreen() {
                       <span className="text-sm text-muted-foreground">
                         {automaticReasonText(row.autoReason, row.autoPattern, row.autoDate)}
                       </span>
+                      {search.automatic ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void looksRight(row.id);
+                          }}
+                        >
+                          Looks right
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         variant="outline"
@@ -260,6 +286,24 @@ export function TransactionsScreen() {
                       >
                         Correct
                       </Button>
+                      <RowMenu label={`Actions for ${row.payeeRaw}`}>
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.stopPropagation();
+                            void looksRight(row.id);
+                          }}
+                        >
+                          Looks right
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.stopPropagation();
+                            void openEditor("transaction", { id: row.id });
+                          }}
+                        >
+                          Correct
+                        </DropdownMenuItem>
+                      </RowMenu>
                     </div>
                   ) : null}
                 </TableCell>

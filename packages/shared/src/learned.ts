@@ -14,7 +14,7 @@ export type Confirmation = {
 
 export type LearnedPayee =
   | {
-      level: "sure" | "suggestion";
+      level: "sure" | "suggestion" | "conflict";
       categoryId: string;
       merchantId: string | null;
       sourceId: string;
@@ -73,7 +73,17 @@ export function learnedPayee(rows: readonly Confirmation[]): LearnedPayee {
   if (best.count / last.length >= 0.8) {
     return { level: "suggestion", ...agreed };
   }
-  return { level: "conflict" };
+  const newest = last[0];
+  if (!newest) {
+    return { level: "conflict" };
+  }
+  return {
+    level: "conflict",
+    categoryId: newest.categoryId,
+    merchantId: newest.merchantId,
+    sourceId: newest.id,
+    sourceDate: newest.date,
+  };
 }
 
 export function automaticLabel(input: {

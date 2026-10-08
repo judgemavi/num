@@ -11,7 +11,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listTransactions } from "../services/transaction-list";
 import { saveTransactionWithRule } from "../services/inbox-group";
-import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
+import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -65,6 +65,18 @@ const listRoute = createRoute({
       },
     },
     400: errorResponse,
+  },
+});
+
+const looksRightRoute = createRoute({
+  method: "post",
+  path: "/api/transactions/{id}/looks-right",
+  request: { params: idParams },
+  responses: {
+    200: transactionResponse,
+    400: errorResponse,
+    404: errorResponse,
+    409: errorResponse,
   },
 });
 
@@ -157,6 +169,11 @@ export function registerTransactions(app: OpenAPIHono, db: Db) {
       return c.json(saveTransactionWithRule(db, null, { ...body, source: "ui" }), 200);
     }
     return c.json(createTransaction(db, { ...body, source: "ui" }), 200);
+  });
+
+  app.openapi(looksRightRoute, (c) => {
+    const { id } = c.req.valid("param");
+    return c.json(acceptLooksRight(db, id, { source: "ui" }), 200);
   });
 
   app.openapi(updateRoute, (c) => {

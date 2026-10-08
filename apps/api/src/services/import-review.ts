@@ -3,7 +3,6 @@ import { storedAutomatic, storedPayee, Temporal, type ImportReviewResolve, type 
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { spreadSureLabels } from "./auto-label";
 import { suggestForPayee } from "./suggestions";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -68,7 +67,6 @@ function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>, su
   auditTransaction(tx, transactionId, "create", null, readTransaction(tx, transactionId), {
     suggestionReason: suggestion.reason,
   });
-  spreadSureLabels(tx, payee.payeeNormalized, new Set());
   return transactionId;
 }
 

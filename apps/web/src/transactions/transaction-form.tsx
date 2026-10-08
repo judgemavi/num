@@ -7,6 +7,7 @@ import {
   moneyDirection,
   normalizePayee,
   Temporal,
+  transactionSchema,
   type Account,
   type Category,
   type Merchant,
@@ -17,11 +18,12 @@ import {
   type WhatChoice,
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
+import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FieldError } from "@/components/ui/field";
 import { formatMoney } from "@/money";
-import { automaticReasonText, formatDate } from "@/transactions/format";
+import { automaticReasonText, formatDate, transactionError } from "@/transactions/format";
 import { MortgageSplitWatch } from "@/transactions/mortgage-split-watch";
 import { DeleteMenu, MoneySection, MoreDetails } from "@/transactions/transaction-parts";
 import { alreadyChosen, choiceOf, linesOf, signedTotal, useApplySuggestion } from "@/transactions/transaction-draft";
@@ -211,6 +213,17 @@ export function TransactionForm({
     }
     onSaved(result.id);
   }
+  async function markRight() {
+    if (!transaction) return;
+    setSaving(true);
+    const result = await apiRequest(`/api/transactions/${transaction.id}/looks-right`, transactionSchema, { method: "POST" });
+    setSaving(false);
+    if (!result.ok) {
+      setError(transactionError(result.code));
+      return;
+    }
+    onSaved(result.data.id);
+  }
 
   const summary = `${formatDate(date)} · ${accountName} · ${direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(imported && transaction ? transaction.amount : (totalMinor ?? 0)))} · ${payee}`;
 
@@ -232,9 +245,10 @@ export function TransactionForm({
         <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, notes, category and tags can change.</p>
       ) : null}
       {transaction?.autoReason ? (
-        <p className="text-sm text-muted-foreground">
-          {automaticReasonText(transaction.autoReason, transaction.autoPattern, transaction.autoDate)}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-muted-foreground">{automaticReasonText(transaction.autoReason, transaction.autoPattern, transaction.autoDate)}</p>
+          <Button type="button" variant="outline" disabled={saving} onClick={() => void markRight()}>Looks right</Button>
+        </div>
       ) : null}
       {imported ? (
         <p className="text-sm">{summary}</p>

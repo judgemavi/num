@@ -123,7 +123,7 @@ export function suggestCategorization(input: {
     .filter((row) => normalizePayee(row.payeeRaw) === payee && row.categoryId !== null && !row.transferAccountId)
     .map((row) => ({ id: row.id, date: row.date, categoryId: row.categoryId ?? "", merchantId: row.merchantId }));
   const learned = learnedPayee(confirmations);
-  if (learned.level === "sure" || learned.level === "suggestion") {
+  if ("categoryId" in learned) {
     return {
       merchantId: learned.merchantId,
       categoryId: learned.categoryId,

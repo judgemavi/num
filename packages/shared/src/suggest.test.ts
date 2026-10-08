@@ -79,7 +79,7 @@ test("payee history wins when 80 percent of the last 10 agree", () => {
   expect(result.sourceId).toBe("h7");
 });
 
-test("history below 80 percent falls through to the merchant default", () => {
+test("a conflict suggests the most recent confirmation and is not sure", () => {
   const rows = [
     ...Array.from({ length: 7 }, (_, index) => history(`h${index}`, `2026-03-${String(index + 1).padStart(2, "0")}`, coffee)),
     ...Array.from({ length: 3 }, (_, index) => history(`g${index}`, `2026-02-${String(index + 1).padStart(2, "0")}`, groceries, null)),
@@ -89,6 +89,24 @@ test("history below 80 percent falls through to the merchant default", () => {
     rawPayee: "SQ *STARBUCKS",
     rules: [rule({ id: "other", pattern: "OTHER", accountId: otherAccount })],
     history: rows,
+    merchants,
+  });
+  expect(result).toEqual({
+    merchantId: merchant,
+    categoryId: coffee,
+    transferAccountId: null,
+    reason: "payee_history",
+    sure: false,
+    sourceId: "h6",
+  });
+});
+
+test("the merchant default is a suggestion when there is no confirmation", () => {
+  const result = suggestCategorization({
+    accountId: account,
+    rawPayee: "STARBUCKS",
+    rules: [],
+    history: [],
     merchants,
   });
   expect(result).toEqual({ merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "merchant_default", sure: false, sourceId: null });
@@ -128,7 +146,13 @@ test("one agreement is sure and a disagreement below 80 percent is a conflict", 
     ...Array.from({ length: 7 }, (_, index) => ({ id: `c${index}`, date: `2026-03-${String(index + 1).padStart(2, "0")}`, categoryId: coffee, merchantId: merchant })),
     ...Array.from({ length: 3 }, (_, index) => ({ id: `g${index}`, date: `2026-02-${String(index + 1).padStart(2, "0")}`, categoryId: groceries, merchantId: null })),
   ];
-  expect(learnedPayee(mixed).level).toBe("conflict");
+  expect(learnedPayee(mixed)).toEqual({
+    level: "conflict",
+    categoryId: coffee,
+    merchantId: merchant,
+    sourceId: "c6",
+    sourceDate: "2026-03-07",
+  });
 });
 
 test("transfer pairs stay inside 90 days and use each transaction once", () => {

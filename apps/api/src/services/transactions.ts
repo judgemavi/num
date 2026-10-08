@@ -24,9 +24,29 @@ type WriteInput = {
   at?: string;
 };
 
-export type AutoStamp = { autoReason: "rule" | null; autoSourceId: string | null };
+export type AutoStamp = { autoReason: "rule" | "learned" | null; autoSourceId: string | null };
 
 const clearedAuto: AutoStamp = { autoReason: null, autoSourceId: null };
+
+function keptAuto(row: TxRow): AutoStamp {
+  if (row.autoReason === "rule" || row.autoReason === "learned") {
+    return { autoReason: row.autoReason, autoSourceId: row.autoSourceId };
+  }
+  return clearedAuto;
+}
+
+function labelChanged(existing: TxRow, existingLines: StoredLine[], header: Header, lines: NormalizedLine[]): boolean {
+  if ((existing.merchantId ?? null) !== (header.merchantId ?? null)) {
+    return true;
+  }
+  const before = existingLines.map((line) => line.categoryId).sort();
+  const after = lines.map((line) => line.categoryId ?? null).sort();
+  return before.length !== after.length || before.some((value, index) => value !== after[index]);
+}
+
+function isTransferOrSplit(lines: NormalizedLine[]): boolean {
+  return lines.length !== 1 || lines.some((line) => line.transferAccountId !== null);
+}
 
 function isUserConfirmation(txn: Transaction): boolean {
   if (txn.mirror || txn.deletedAt !== null || txn.lines.length !== 1) {
@@ -229,19 +249,45 @@ export function applyTransactionUpdate(
   const previousTarget = existingLines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null;
   assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
   const savedHeader = existing.status === "reconciled" ? { ...header, status: "reconciled" as const } : header;
+  const changed = labelChanged(existing, existingLines, savedHeader, lines);
   const auto: AutoStamp = automatic
     ? { autoReason: automatic.reason, autoSourceId: automatic.sourceId }
-    : clearedAuto;
+    : changed || isTransferOrSplit(lines)
+      ? clearedAuto
+      : keptAuto(existing);
   if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {
     applyMirrorEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at, auto);
   } else {
     applySourceEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at, auto);
   }
   const saved = readTransaction(tx, id);
-  if (spread && !automatic && isUserConfirmation(saved)) {
+  if (spread && !automatic && changed && isUserConfirmation(saved)) {
     spreadSureLabels(tx, saved.payeeNormalized, new Set([saved.id]));
   }
   return saved;
+}
+
+export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transaction {
+  const at = input.at ?? utcNow();
+  let accepted: Transaction | undefined;
+  write(db, { source: input.source, at }, (tx) => {
+    const existing = requireActive(tx, id);
+    if (existing.autoReason !== "rule" && existing.autoReason !== "learned") {
+      throw new ServiceError("invalid_body", 400);
+    }
+    const before = readTransaction(tx, id);
+    tx.update(transactions).set(clearedAuto).where(eq(transactions.id, id)).run();
+    const saved = readTransaction(tx, id);
+    auditTransaction(tx, id, "update", before, saved);
+    if (isUserConfirmation(saved)) {
+      spreadSureLabels(tx, saved.payeeNormalized, new Set([saved.id]));
+    }
+    accepted = saved;
+  });
+  if (!accepted) {
+    throw new Error("Confirm did not return a transaction");
+  }
+  return accepted;
 }
 
 export function spreadAfterConfirmation(tx: WriteTx, id: string, alsoExcept: ReadonlySet<string> = new Set()): void {

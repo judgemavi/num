@@ -9,6 +9,7 @@ type OpenRow = {
   id: string;
   accountId: string;
   payeeRaw: string;
+  merchantId: string | null;
   lineId: string;
 };
 
@@ -43,7 +44,7 @@ export function spreadSureLabels(tx: WriteTx, payee: string, except: ReadonlySet
     return;
   }
   const rows = tx.all<OpenRow>(sql`
-    select t.id as id, t.account_id as accountId, t.payee_raw as payeeRaw, l.id as lineId
+    select t.id as id, t.account_id as accountId, t.payee_raw as payeeRaw, t.merchant_id as merchantId, l.id as lineId
     from transactions t
     inner join transaction_lines l on l.transaction_id = t.id
     where t.deleted_at is null
@@ -73,7 +74,11 @@ export function spreadSureLabels(tx: WriteTx, payee: string, except: ReadonlySet
     }
     const before = readTransaction(tx, row.id);
     tx.update(transactions)
-      .set({ merchantId: label.merchantId, autoReason: label.reason, autoSourceId: label.sourceId })
+      .set({
+        merchantId: label.merchantId ?? row.merchantId,
+        autoReason: label.reason,
+        autoSourceId: label.sourceId,
+      })
       .where(eq(transactions.id, row.id))
       .run();
     tx.update(transactionLines).set({ categoryId: label.categoryId }).where(eq(transactionLines.id, row.lineId)).run();

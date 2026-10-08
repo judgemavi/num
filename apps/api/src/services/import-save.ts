@@ -7,7 +7,6 @@ import type { Db } from "../db";
 import { accountAuditSnapshot } from "./account-snapshot";
 import { countOutcomes, presentBatch } from "./import-read";
 import type { PlannedImportRow } from "./import-plan";
-import { spreadSureLabels } from "./auto-label";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -39,7 +38,7 @@ type SaveInput = {
   columnMap: ColumnMap | null;
 };
 
-function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: PlannedImportRow): string {
+function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: PlannedImportRow): void {
   const rowId = crypto.randomUUID();
   const transactionId = crypto.randomUUID();
   const payee = storedPayee(row.payeeRaw);
@@ -95,7 +94,6 @@ function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: Pla
   auditTransaction(tx, transactionId, "create", null, readTransaction(tx, transactionId), {
     suggestionReason: suggestion?.reason ?? "none",
   });
-  return payee.payeeNormalized;
 }
 
 function insertMatched(tx: WriteTx, batchId: string, accountId: string, row: PlannedImportRow): void {
@@ -238,18 +236,14 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
         undoneAt: null,
       })
       .run();
-    const payees = new Set<string>();
     for (const row of input.rows) {
       if (row.outcome === "created") {
-        payees.add(insertCreated(tx, batchId, input.accountId, row));
+        insertCreated(tx, batchId, input.accountId, row);
       } else if (row.outcome === "matched") {
         insertMatched(tx, batchId, input.accountId, row);
       } else {
         insertPlain(tx, batchId, input.accountId, row);
       }
-    }
-    for (const payee of payees) {
-      spreadSureLabels(tx, payee, new Set());
     }
     saveFormat(tx, input.accountId, input.presetId, input.columnMap);
     const batch = tx.select().from(importBatches).where(eq(importBatches.id, batchId)).get();

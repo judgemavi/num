@@ -57,7 +57,10 @@ function linkMatch(tx: WriteTx, sourceId: string, sourceAccountId: string, match
   const before = toTransaction(tx, match, matchLines);
   const line = matchLines[0];
   tx.update(transactions).set({ transferPeerId: matchId }).where(eq(transactions.id, sourceId)).run();
-  tx.update(transactions).set({ transferPeerId: sourceId }).where(eq(transactions.id, matchId)).run();
+  tx.update(transactions)
+    .set({ transferPeerId: sourceId, autoReason: null, autoSourceId: null })
+    .where(eq(transactions.id, matchId))
+    .run();
   replaceLines(tx, matchId, [
     {
       amount: match.amount,
@@ -181,7 +184,7 @@ export function applyMirrorEdit(
   header: Header,
   lines: NormalizedLine[],
   at: string,
-  auto: { autoReason: "rule" | null; autoSourceId: string | null },
+  auto: { autoReason: "rule" | "learned" | null; autoSourceId: string | null },
 ): void {
   const line = lines[0];
   if (lines.length !== 1 || !line || line.transferAccountId !== peer.accountId) {
@@ -221,7 +224,7 @@ export function applySourceEdit(
   header: Header,
   lines: NormalizedLine[],
   at: string,
-  auto: { autoReason: "rule" | null; autoSourceId: string | null },
+  auto: { autoReason: "rule" | "learned" | null; autoSourceId: string | null },
 ): void {
   const before = toTransaction(tx, existing, existingLines);
   tx.update(transactions).set({ ...header, ...auto }).where(eq(transactions.id, existing.id)).run();

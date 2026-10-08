@@ -130,8 +130,14 @@ export function acceptTransferPair(db: Db, asOf: string, leftId: string, rightId
     const rightLines = loadLines(tx, right.id);
     const leftBefore = toTransaction(tx, left, leftLines);
     const rightBefore = toTransaction(tx, right, rightLines);
-    tx.update(transactions).set({ transferPeerId: right.id }).where(eq(transactions.id, left.id)).run();
-    tx.update(transactions).set({ transferPeerId: left.id }).where(eq(transactions.id, right.id)).run();
+    tx.update(transactions)
+      .set({ transferPeerId: right.id, autoReason: null, autoSourceId: null })
+      .where(eq(transactions.id, left.id))
+      .run();
+    tx.update(transactions)
+      .set({ transferPeerId: left.id, autoReason: null, autoSourceId: null })
+      .where(eq(transactions.id, right.id))
+      .run();
     replaceLines(tx, left.id, [
       {
         amount: left.amount,
