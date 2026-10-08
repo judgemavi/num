@@ -44,6 +44,15 @@ export const errorCodes = [
   "merchant_archived",
   "document_not_found",
   "document_too_large",
+  "plan_not_found",
+  "plan_archived",
+  "plan_not_archived",
+  "plan_fields_invalid",
+  "occurrence_not_found",
+  "occurrence_taken",
+  "transaction_already_linked",
+  "link_not_found",
+  "skip_not_found",
   "internal_error",
 ] as const;
 

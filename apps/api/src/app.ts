@@ -6,6 +6,7 @@ import { registerCategories } from "./routes/categories";
 import { registerDocuments } from "./routes/documents";
 import { healthRoute } from "./routes/health";
 import { registerMerchants } from "./routes/merchants";
+import { registerRecurring } from "./routes/recurring";
 import { registerSetup } from "./routes/setup";
 import { registerTags } from "./routes/tags";
 import { registerTransactions } from "./routes/transactions";
@@ -36,6 +37,7 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
   registerCategories(app, db);
   registerTags(app, db);
   registerMerchants(app, db);
+  registerRecurring(app, db);
   registerTransactions(app, db);
 
   app.doc("/api/openapi.json", {
