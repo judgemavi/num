@@ -17,6 +17,11 @@ import { Route as PlanRouteImport } from './routes/plan'
 import { Route as RecurringRouteImport } from './routes/recurring'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TransactionsRouteImport } from './routes/transactions'
+import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as SettingsBackupRouteImport } from './routes/settings/backup'
+import { Route as SettingsCategoriesRouteImport } from './routes/settings/categories'
+import { Route as SettingsGroupsRouteImport } from './routes/settings/groups'
+import { Route as SettingsTagsRouteImport } from './routes/settings/tags'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -58,6 +63,31 @@ const TransactionsRoute = TransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsBackupRoute = SettingsBackupRouteImport.update({
+  id: '/backup',
+  path: '/backup',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsCategoriesRoute = SettingsCategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsGroupsRoute = SettingsGroupsRouteImport.update({
+  id: '/groups',
+  path: '/groups',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsTagsRoute = SettingsTagsRouteImport.update({
+  id: '/tags',
+  path: '/tags',
+  getParentRoute: () => SettingsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -66,8 +96,13 @@ export interface FileRoutesByFullPath {
   '/insights': typeof InsightsRoute
   '/plan': typeof PlanRoute
   '/recurring': typeof RecurringRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/transactions': typeof TransactionsRoute
+  '/settings/backup': typeof SettingsBackupRoute
+  '/settings/categories': typeof SettingsCategoriesRoute
+  '/settings/groups': typeof SettingsGroupsRoute
+  '/settings/tags': typeof SettingsTagsRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -76,8 +111,12 @@ export interface FileRoutesByTo {
   '/insights': typeof InsightsRoute
   '/plan': typeof PlanRoute
   '/recurring': typeof RecurringRoute
-  '/settings': typeof SettingsRoute
   '/transactions': typeof TransactionsRoute
+  '/settings/backup': typeof SettingsBackupRoute
+  '/settings/categories': typeof SettingsCategoriesRoute
+  '/settings/groups': typeof SettingsGroupsRoute
+  '/settings/tags': typeof SettingsTagsRoute
+  '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -87,8 +126,13 @@ export interface FileRoutesById {
   '/insights': typeof InsightsRoute
   '/plan': typeof PlanRoute
   '/recurring': typeof RecurringRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/transactions': typeof TransactionsRoute
+  '/settings/backup': typeof SettingsBackupRoute
+  '/settings/categories': typeof SettingsCategoriesRoute
+  '/settings/groups': typeof SettingsGroupsRoute
+  '/settings/tags': typeof SettingsTagsRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +145,11 @@ export interface FileRouteTypes {
     | '/recurring'
     | '/settings'
     | '/transactions'
+    | '/settings/backup'
+    | '/settings/categories'
+    | '/settings/groups'
+    | '/settings/tags'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -109,8 +158,12 @@ export interface FileRouteTypes {
     | '/insights'
     | '/plan'
     | '/recurring'
-    | '/settings'
     | '/transactions'
+    | '/settings/backup'
+    | '/settings/categories'
+    | '/settings/groups'
+    | '/settings/tags'
+    | '/settings'
   id:
     | '__root__'
     | '/'
@@ -121,6 +174,11 @@ export interface FileRouteTypes {
     | '/recurring'
     | '/settings'
     | '/transactions'
+    | '/settings/backup'
+    | '/settings/categories'
+    | '/settings/groups'
+    | '/settings/tags'
+    | '/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -130,7 +188,7 @@ export interface RootRouteChildren {
   InsightsRoute: typeof InsightsRoute
   PlanRoute: typeof PlanRoute
   RecurringRoute: typeof RecurringRoute
-  SettingsRoute: typeof SettingsRoute
+  SettingsRoute: typeof SettingsRouteWithChildren
   TransactionsRoute: typeof TransactionsRoute
 }
 
@@ -192,8 +250,63 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/': {
+      id: '/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/backup': {
+      id: '/settings/backup'
+      path: '/backup'
+      fullPath: '/settings/backup'
+      preLoaderRoute: typeof SettingsBackupRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/categories': {
+      id: '/settings/categories'
+      path: '/categories'
+      fullPath: '/settings/categories'
+      preLoaderRoute: typeof SettingsCategoriesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/groups': {
+      id: '/settings/groups'
+      path: '/groups'
+      fullPath: '/settings/groups'
+      preLoaderRoute: typeof SettingsGroupsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/tags': {
+      id: '/settings/tags'
+      path: '/tags'
+      fullPath: '/settings/tags'
+      preLoaderRoute: typeof SettingsTagsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
   }
 }
+
+interface SettingsRouteChildren {
+  SettingsBackupRoute: typeof SettingsBackupRoute
+  SettingsCategoriesRoute: typeof SettingsCategoriesRoute
+  SettingsGroupsRoute: typeof SettingsGroupsRoute
+  SettingsTagsRoute: typeof SettingsTagsRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
+}
+
+const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsBackupRoute: SettingsBackupRoute,
+  SettingsCategoriesRoute: SettingsCategoriesRoute,
+  SettingsGroupsRoute: SettingsGroupsRoute,
+  SettingsTagsRoute: SettingsTagsRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
+}
+
+const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
+  SettingsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -202,7 +315,7 @@ const rootRouteChildren: RootRouteChildren = {
   InsightsRoute: InsightsRoute,
   PlanRoute: PlanRoute,
   RecurringRoute: RecurringRoute,
-  SettingsRoute: SettingsRoute,
+  SettingsRoute: SettingsRouteWithChildren,
   TransactionsRoute: TransactionsRoute,
 }
 export const routeTree = rootRouteImport

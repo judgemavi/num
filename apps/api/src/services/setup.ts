@@ -51,15 +51,13 @@ function insertSetting(tx: WriteTx, key: (typeof settings.$inferInsert)["key"], 
 function insertDefaultCategories(tx: WriteTx) {
   for (const group of defaultCategoryGroups) {
     const groupId = crypto.randomUUID();
-    tx.insert(categoryGroups)
-      .values({ id: groupId, name: group.name, sortOrder: group.sortOrder })
-      .run();
+    tx.insert(categoryGroups).values({ id: groupId, name: group.name }).run();
     tx.audit({
       entity: "category_groups",
       entityId: groupId,
       action: "create",
       before: null,
-      after: { name: group.name, sortOrder: group.sortOrder },
+      after: { name: group.name },
     });
 
     for (const category of group.categories) {

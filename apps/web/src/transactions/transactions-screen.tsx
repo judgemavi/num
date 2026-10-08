@@ -16,7 +16,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { Amount } from "@/components/amount";
@@ -33,10 +33,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TransactionFilters } from "@/transactions/filters";
+import { TransactionFilterBar } from "@/transactions/filters";
 import { formatDate, statusLabel, transactionError } from "@/transactions/format";
 import { hasFilters, transactionPath } from "@/transactions/query";
 import { TransactionDialog } from "@/transactions/transaction-dialog";
@@ -49,8 +47,8 @@ async function loadNamed<T extends { id: string }>(
   base: string,
   schema: { parse: (data: unknown) => { items: T[]; page: number; pageSize: number; total: number } },
 ): Promise<T[]> {
-  const active = await loadAllPages(base, schema, false);
-  const archived = await loadAllPages(base, schema, true);
+  const active = await loadAllPages(base, schema, { archived: false });
+  const archived = await loadAllPages(base, schema, { archived: true });
   return [...active.items, ...archived.items];
 }
 
@@ -58,16 +56,9 @@ export function TransactionsScreen() {
   const queryClient = useQueryClient();
   const search = transactionsRoute.useSearch();
   const navigate = transactionsRoute.useNavigate();
-  const [text, setText] = useState(search.q ?? "");
-  const [seenQuery, setSeenQuery] = useState(search.q);
   const [draft, setDraft] = useState<string | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-
-  if (search.q !== seenQuery) {
-    setSeenQuery(search.q);
-    setText(search.q ?? "");
-  }
 
   const currency = useQuery({
     queryKey: ["book-currency"],
@@ -106,24 +97,17 @@ export function TransactionsScreen() {
   const merchants = useQuery({
     queryKey: ["merchants", "options"],
     queryFn: async () => {
-      const page = await loadAllPages("/api/merchants", merchantListSchema, false);
+      const page = await loadAllPages("/api/merchants", merchantListSchema, { archived: false });
       return page.items;
     },
   });
 
-  useEffect(() => {
-    const next = text.trim();
-    const current = search.q ?? "";
-    if (next === current) {
-      return;
-    }
-    const handle = window.setTimeout(() => {
-      void navigate({
-        search: { ...search, q: next.length === 0 ? undefined : next, page: 1 },
-      });
-    }, 300);
-    return () => window.clearTimeout(handle);
-  }, [navigate, search, text]);
+  const changeFilters = useCallback(
+    (patch: Partial<TransactionListQuery>) => {
+      void navigate({ search: { ...search, ...patch, page: 1 } });
+    },
+    [navigate, search],
+  );
 
   useEffect(() => {
     if (!transactions.data) {
@@ -134,10 +118,6 @@ export function TransactionsScreen() {
       void navigate({ search: { ...search, page: lastPage }, replace: true });
     }
   }, [navigate, search, transactions.data]);
-
-  function changeFilters(patch: Partial<TransactionListQuery>) {
-    void navigate({ search: { ...search, ...patch, page: 1 } });
-  }
 
   function sortBy(column: SortColumn) {
     const current = search.sort ?? "date";
@@ -237,29 +217,13 @@ export function TransactionsScreen() {
           </Button>
         }
       />
-      <Field className="max-w-sm">
-        <FieldLabel htmlFor="transaction-search">Search</FieldLabel>
-        <Input id="transaction-search" value={text} placeholder="Payee, notes or merchant" onChange={(event) => setText(event.target.value)} />
-      </Field>
-      <TransactionFilters
+      <TransactionFilterBar
         search={search}
         accounts={accounts.data}
         categories={categories.data}
         merchants={merchants.data}
         tags={tags.data}
         onChange={changeFilters}
-        onClear={() =>
-          changeFilters({
-            q: undefined,
-            accountId: undefined,
-            categoryId: undefined,
-            merchantId: undefined,
-            tagId: undefined,
-            from: undefined,
-            to: undefined,
-            uncategorized: false,
-          })
-        }
       />
       {actionError ? (
         <p role="alert" className="text-sm text-attn">

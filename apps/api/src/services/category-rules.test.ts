@@ -22,6 +22,7 @@ import {
   listCategoryGroups,
   restoreCategory,
   updateCategory,
+  updateCategoryGroup,
 } from "./categories";
 import { archiveTag, createTag, restoreTag, updateTag } from "./tags";
 import type { ErrorCode } from "@num/shared";
@@ -219,6 +220,38 @@ test("delete of a group moves its categories to no group", () => {
     const byId = new Map(page.items.map((item) => [item.id, item.groupId]));
     expect(byId.get(rent.id)).toBeNull();
     expect(byId.get(tax.id)).toBeNull();
+  } finally {
+    book.close();
+  }
+});
+
+test("groups and categories sort by name without case", () => {
+  const book = tempDatabase();
+  try {
+    createCategoryGroup(book.db, { name: "zeta", ...write });
+    createCategoryGroup(book.db, { name: "Alpha", ...write });
+    expect(listCategoryGroups(book.db).items.map((group) => group.name)).toEqual(["Alpha", "zeta"]);
+
+    createCategory(book.db, { name: "rent", kind: "expense", ...write });
+    createCategory(book.db, { name: "Groceries", kind: "expense", ...write });
+    const page = listCategories(book.db, { page: 1, pageSize: 50, archived: false });
+    expect(page.items.map((category) => category.name)).toEqual(["Groceries", "rent"]);
+  } finally {
+    book.close();
+  }
+});
+
+test("a duplicate group name is rejected", () => {
+  const book = tempDatabase();
+  try {
+    const home = createCategoryGroup(book.db, { name: "Home", ...write });
+    expectCode(() => createCategoryGroup(book.db, { name: "home", ...write }), "group_name_taken");
+    const bills = createCategoryGroup(book.db, { name: "Bills", ...write });
+    expectCode(
+      () => updateCategoryGroup(book.db, bills.id, { name: "HOME", ...write }),
+      "group_name_taken",
+    );
+    expect(updateCategoryGroup(book.db, home.id, { name: "HOME", ...write }).name).toBe("HOME");
   } finally {
     book.close();
   }

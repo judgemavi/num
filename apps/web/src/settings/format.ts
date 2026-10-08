@@ -8,8 +8,8 @@ export function categoryError(code: string): string {
       return "You cannot change this kind. A transaction or a bucket uses this category. Make a new category.";
     case "group_not_found":
       return "That group is not in the book.";
-    case "group_order_invalid":
-      return "The group order is not valid.";
+    case "group_name_taken":
+      return "A group already uses this name.";
     case "category_not_found":
       return "That category is not in the book.";
     case "category_archived":

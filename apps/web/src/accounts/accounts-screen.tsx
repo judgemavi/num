@@ -10,8 +10,8 @@ import { groupAccounts, groupHue, groupLabel, worthOf } from "@/accounts/groups"
 import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
+import { AccountFilterBar } from "@/accounts/filters";
 import { Button } from "@/components/ui/button";
-import { Toggle } from "@/components/ui/toggle";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { IconTile } from "@/components/icon-tile";
 import { BalanceScaleIllustration } from "@/components/illustrations";
@@ -57,8 +57,13 @@ export function AccountsScreen() {
   });
 
   const accounts = useQuery({
-    queryKey: ["accounts", search.archived],
-    queryFn: () => loadAllPages("/api/accounts", accountListSchema, search.archived),
+    queryKey: ["accounts", search],
+    queryFn: () =>
+      loadAllPages("/api/accounts", accountListSchema, {
+        archived: search.archived,
+        sort: search.sort,
+        dir: search.dir,
+      }),
   });
 
   async function confirmPending() {
@@ -118,22 +123,17 @@ export function AccountsScreen() {
         kicker={search.archived ? "Archived" : accountCountLabel(rows.length)}
         title="Accounts"
         actions={
-          <>
-            <Toggle
-              variant="outline"
-              pressed={search.archived}
-              onPressedChange={(pressed) => {
-                void navigate({ search: { ...search, archived: pressed, page: 1 } });
-              }}
-            >
-              Show archived
-            </Toggle>
-            <Button type="button" onClick={() => setDraft("new")}>
-              <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
-              Add account
-            </Button>
-          </>
+          <Button type="button" onClick={() => setDraft("new")}>
+            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
+            Add account
+          </Button>
         }
+      />
+      <AccountFilterBar
+        search={search}
+        onChange={(patch) => {
+          void navigate({ search: { ...search, ...patch, page: 1 } });
+        }}
       />
       <SummaryStrip
         tint="accounts"

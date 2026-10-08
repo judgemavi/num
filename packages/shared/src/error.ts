@@ -24,7 +24,7 @@ export const errorCodes = [
   "category_kind_locked",
   "essential_expense_only",
   "group_not_found",
-  "group_order_invalid",
+  "group_name_taken",
   "tag_not_found",
   "tag_archived",
   "tag_not_archived",

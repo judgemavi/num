@@ -3,7 +3,6 @@ import {
   categoryGroupCreateSchema,
   categoryGroupDeleteSchema,
   categoryGroupListSchema,
-  categoryGroupOrderSchema,
   categoryGroupSchema,
   categoryGroupUpdateSchema,
   categoryListQuerySchema,
@@ -21,7 +20,6 @@ import {
   deleteCategoryGroup,
   listCategories,
   listCategoryGroups,
-  reorderCategoryGroups,
   restoreCategory,
   updateCategory,
   updateCategoryGroup,
@@ -66,6 +64,7 @@ const createGroupRoute = createRoute({
       content: { "application/json": { schema: categoryGroupSchema } },
     },
     400: errorResponse,
+    409: errorResponse,
   },
 });
 
@@ -86,6 +85,7 @@ const updateGroupRoute = createRoute({
     },
     400: errorResponse,
     404: errorResponse,
+    409: errorResponse,
   },
 });
 
@@ -99,24 +99,6 @@ const deleteGroupRoute = createRoute({
       content: { "application/json": { schema: categoryGroupDeleteSchema } },
     },
     404: errorResponse,
-  },
-});
-
-const orderGroupsRoute = createRoute({
-  method: "post",
-  path: "/api/category-groups/order",
-  request: {
-    body: {
-      required: true,
-      content: { "application/json": { schema: categoryGroupOrderSchema } },
-    },
-  },
-  responses: {
-    200: {
-      description: "Category groups in the new order",
-      content: { "application/json": { schema: categoryGroupListSchema } },
-    },
-    400: errorResponse,
   },
 });
 
@@ -204,10 +186,6 @@ const archiveCategoryRoute = createRoute({
 
 export function registerCategories(app: OpenAPIHono, db: Db) {
   app.openapi(listGroupsRoute, (c) => c.json(listCategoryGroups(db), 200));
-  app.openapi(orderGroupsRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(reorderCategoryGroups(db, body.ids, { source: "ui" }), 200);
-  });
   app.openapi(createGroupRoute, (c) => {
     const body = c.req.valid("json");
     return c.json(createCategoryGroup(db, { ...body, source: "ui" }), 200);

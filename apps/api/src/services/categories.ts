@@ -49,8 +49,8 @@ function compareName(left: string, right: string): number {
   return compareText(left, right);
 }
 
-function groupSnapshot(row: { name: string; sortOrder: number }) {
-  return { name: row.name, sortOrder: row.sortOrder };
+function groupSnapshot(row: { name: string }) {
+  return { name: row.name };
 }
 
 function categorySnapshot(row: {
@@ -70,7 +70,7 @@ function categorySnapshot(row: {
 }
 
 function toGroup(row: GroupRow): CategoryGroup {
-  return { id: row.id, name: row.name, sortOrder: row.sortOrder };
+  return { id: row.id, name: row.name };
 }
 
 function toCategory(row: CategoryRow): Category {
@@ -91,6 +91,17 @@ function assertGroup(tx: WriteTx, groupId: string | null) {
   const group = tx.select({ id: categoryGroups.id }).from(categoryGroups).where(eq(categoryGroups.id, groupId)).get();
   if (!group) {
     throw new ServiceError("group_not_found", 404);
+  }
+}
+
+function assertGroupName(tx: WriteTx, name: string, exceptId?: string) {
+  const row = tx
+    .select({ id: categoryGroups.id })
+    .from(categoryGroups)
+    .where(sql`lower(${categoryGroups.name}) = lower(${name})`)
+    .get();
+  if (row && row.id !== exceptId) {
+    throw new ServiceError("group_name_taken", 409);
   }
 }
 
@@ -128,12 +139,7 @@ function assertKindChange(tx: WriteTx, id: string, current: CategoryKind, next: 
 
 export function listCategoryGroups(db: Db): { items: CategoryGroup[] } {
   const items = db.select().from(categoryGroups).all().map(toGroup);
-  items.sort((left, right) => {
-    if (left.sortOrder !== right.sortOrder) {
-      return left.sortOrder - right.sortOrder;
-    }
-    return compareName(left.name, right.name) || compareText(left.id, right.id);
-  });
+  items.sort((left, right) => compareName(left.name, right.name) || compareText(left.id, right.id));
   return { items };
 }
 
@@ -141,9 +147,8 @@ export function createCategoryGroup(db: Db, input: CategoryGroupCreate & WriteIn
   const id = crypto.randomUUID();
   let created: CategoryGroup | undefined;
   write(db, { source: input.source, at: input.at }, (tx) => {
-    const rows = tx.select({ sortOrder: categoryGroups.sortOrder }).from(categoryGroups).all();
-    const sortOrder = rows.reduce((max, row) => Math.max(max, row.sortOrder), -1) + 1;
-    const row = { id, name: input.name.trim(), sortOrder };
+    const row = { id, name: input.name.trim() };
+    assertGroupName(tx, row.name);
     tx.insert(categoryGroups).values(row).run();
     tx.audit({
       entity: "category_groups",
@@ -171,7 +176,8 @@ export function updateCategoryGroup(
     if (!existing) {
       throw new ServiceError("group_not_found", 404);
     }
-    const next = { name: input.name.trim(), sortOrder: existing.sortOrder };
+    const next = { name: input.name.trim() };
+    assertGroupName(tx, next.name, id);
     tx.update(categoryGroups).set({ name: next.name }).where(eq(categoryGroups.id, id)).run();
     tx.audit({
       entity: "category_groups",
@@ -217,46 +223,21 @@ export function deleteCategoryGroup(db: Db, id: string, input: WriteInput): void
   });
 }
 
-export function reorderCategoryGroups(db: Db, ids: string[], input: WriteInput): { items: CategoryGroup[] } {
-  const current = db.select().from(categoryGroups).all();
-  const byId = new Map(current.map((row) => [row.id, row]));
-  if (ids.length !== current.length || new Set(ids).size !== ids.length || ids.some((id) => !byId.has(id))) {
-    throw new ServiceError("group_order_invalid", 400);
-  }
-  const changes = ids.flatMap((id, index) => {
-    const row = byId.get(id);
-    if (!row || row.sortOrder === index) {
-      return [];
-    }
-    return [{ row, sortOrder: index }];
-  });
-  if (changes.length === 0) {
-    return listCategoryGroups(db);
-  }
-  write(db, { source: input.source, at: input.at }, (tx) => {
-    for (const change of changes) {
-      tx.update(categoryGroups)
-        .set({ sortOrder: change.sortOrder })
-        .where(eq(categoryGroups.id, change.row.id))
-        .run();
-      tx.audit({
-        entity: "category_groups",
-        entityId: change.row.id,
-        action: "update",
-        before: groupSnapshot(change.row),
-        after: groupSnapshot({ name: change.row.name, sortOrder: change.sortOrder }),
-      });
-    }
-  });
-  return listCategoryGroups(db);
-}
-
 export function listCategories(db: Db, query: CategoryListQuery) {
   const rows = db
     .select()
     .from(categories)
     .all()
     .filter((row) => (query.archived ? row.archivedAt !== null : row.archivedAt === null))
+    .filter((row) => {
+      if (query.groupId === undefined) {
+        return true;
+      }
+      if (query.groupId === "none") {
+        return row.groupId === null;
+      }
+      return row.groupId === query.groupId;
+    })
     .map(toCategory);
   const sort = query.sort ?? "name";
   const dir = query.dir === "desc" ? -1 : 1;

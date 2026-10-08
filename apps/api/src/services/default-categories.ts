@@ -6,7 +6,6 @@ export type CategorySeed = {
 
 export type CategoryGroupSeed = {
   name: string;
-  sortOrder: number;
   categories: CategorySeed[];
 };
 
@@ -21,17 +20,14 @@ function expense(name: string, essential = false): CategorySeed {
 export const defaultCategoryGroups: CategoryGroupSeed[] = [
   {
     name: "Income",
-    sortOrder: 1,
     categories: [income("Pay"), income("Interest and dividends"), income("Other income")],
   },
   {
     name: "Home",
-    sortOrder: 2,
     categories: [expense("Rent", true), expense("Property tax", true), expense("Home maintenance")],
   },
   {
     name: "Bills",
-    sortOrder: 3,
     categories: [
       expense("Utilities", true),
       expense("Phone and internet", true),
@@ -41,12 +37,10 @@ export const defaultCategoryGroups: CategoryGroupSeed[] = [
   },
   {
     name: "Food",
-    sortOrder: 4,
     categories: [expense("Groceries", true), expense("Eating out")],
   },
   {
     name: "Transport",
-    sortOrder: 5,
     categories: [
       expense("Fuel", true),
       expense("Public transit", true),
@@ -56,17 +50,14 @@ export const defaultCategoryGroups: CategoryGroupSeed[] = [
   },
   {
     name: "Health",
-    sortOrder: 6,
     categories: [expense("Medical", true), expense("Fitness")],
   },
   {
     name: "Family",
-    sortOrder: 7,
     categories: [expense("Childcare", true), expense("Pets")],
   },
   {
     name: "Lifestyle",
-    sortOrder: 8,
     categories: [
       expense("Clothing"),
       expense("Personal care"),
@@ -79,12 +70,10 @@ export const defaultCategoryGroups: CategoryGroupSeed[] = [
   },
   {
     name: "Financial",
-    sortOrder: 9,
     categories: [expense("Interest", true), expense("Bank fees"), expense("Taxes", true)],
   },
   {
     name: "Other",
-    sortOrder: 10,
     categories: [expense("Miscellaneous")],
   },
 ];

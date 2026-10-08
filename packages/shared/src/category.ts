@@ -18,7 +18,6 @@ const archivedQuery = {
 export const categoryGroupSchema = z.object({
   id: z.uuid(),
   name: z.string(),
-  sortOrder: z.number().int(),
 });
 
 export const categoryGroupListSchema = z.object({
@@ -31,10 +30,6 @@ export const categoryGroupCreateSchema = z.object({
 
 export const categoryGroupUpdateSchema = z.object({
   name: nameSchema,
-});
-
-export const categoryGroupOrderSchema = z.object({
-  ids: z.array(z.uuid()),
 });
 
 export const categoryGroupDeleteSchema = z.object({
@@ -68,7 +63,17 @@ export const categoryUpdateSchema = z
   })
   .refine((value) => value.kind === "expense" || value.essential !== true, { path: ["essential"] });
 
-export const categoryListQuerySchema = listQuerySchema(["name", "kind"]).extend(archivedQuery);
+function blankQuery(value: unknown): unknown {
+  if (typeof value === "string" && value.trim() === "") {
+    return undefined;
+  }
+  return value;
+}
+
+export const categoryListQuerySchema = listQuerySchema(["name", "kind"]).extend({
+  ...archivedQuery,
+  groupId: z.preprocess(blankQuery, z.union([z.uuid(), z.literal("none")]).optional()),
+});
 
 export const categoryListSchema = pagedResponseSchema(categorySchema);
 
@@ -93,7 +98,6 @@ export const tagListSchema = pagedResponseSchema(tagSchema);
 export type CategoryGroup = z.infer<typeof categoryGroupSchema>;
 export type CategoryGroupCreate = z.infer<typeof categoryGroupCreateSchema>;
 export type CategoryGroupUpdate = z.infer<typeof categoryGroupUpdateSchema>;
-export type CategoryGroupOrder = z.infer<typeof categoryGroupOrderSchema>;
 export type Category = z.infer<typeof categorySchema>;
 export type CategoryCreate = z.infer<typeof categoryCreateSchema>;
 export type CategoryUpdate = z.infer<typeof categoryUpdateSchema>;

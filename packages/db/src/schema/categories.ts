@@ -3,11 +3,14 @@ import { check, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqli
 import { categoryKinds } from "./codes";
 import { oneOf } from "./sql";
 
-export const categoryGroups = sqliteTable("category_groups", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  sortOrder: integer("sort_order").notNull(),
-});
+export const categoryGroups = sqliteTable(
+  "category_groups",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+  },
+  (table) => [uniqueIndex("category_groups_name_lower_unique").on(sql`lower(${table.name})`)],
+);
 
 export const categories = sqliteTable(
   "categories",

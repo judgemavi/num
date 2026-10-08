@@ -1,10 +1,12 @@
-import { tagListSchema, tagSchema, type Tag } from "@num/shared";
+import { tagListSchema, tagSchema, type Tag, type TagListQuery } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
-import { tagError } from "@/settings/format";
-import { loadAllPages } from "@/settings/load-all-pages";
-import { NameForm } from "@/settings/name-form";
-import { apiRequest } from "@/request";
+import { FilterBar } from "@/components/filter-bar";
+import { sortChoice } from "@/components/sort-choice";
+import { ListCard, ListRow, listName } from "@/components/list-card";
+import { PageHeader } from "@/components/page-header";
+import { RowMenu } from "@/components/row-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,23 +18,47 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Toggle } from "@/components/ui/toggle";
-import { ListCard, ListRow } from "@/components/list-card";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { RowMenu } from "@/components/row-menu";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Switch } from "@/components/ui/switch";
+import { apiRequest } from "@/request";
+import { tagError } from "@/settings/format";
+import { loadAllPages } from "@/settings/load-all-pages";
+import { NameForm } from "@/settings/name-form";
+import { SettingsBack } from "@/settings/settings-nav";
 
-export function TagsPanel() {
+const tagsRoute = getRouteApi("/settings/tags");
+
+const sortOptions = [
+  { value: "name:asc", label: "Name, A to Z" },
+  { value: "name:desc", label: "Name, Z to A" },
+];
+
+function applySort(value: string): Partial<TagListQuery> {
+  if (value === "name:asc") {
+    return { sort: undefined, dir: undefined };
+  }
+  return { sort: "name", dir: "desc" };
+}
+
+export function TagsPage() {
   const queryClient = useQueryClient();
-  const [archived, setArchived] = useState(false);
+  const search = tagsRoute.useSearch();
+  const navigate = tagsRoute.useNavigate();
+  const [archived, setArchived] = useState(search.archived);
   const [draft, setDraft] = useState<Tag | "new" | null>(null);
   const [pending, setPending] = useState<Tag | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const tags = useQuery({
-    queryKey: ["tags", archived],
-    queryFn: () => loadAllPages("/api/tags", tagListSchema, archived),
+    queryKey: ["tags", search],
+    queryFn: () => loadAllPages("/api/tags", tagListSchema, { archived: search.archived, sort: search.sort, dir: search.dir }),
   });
+
+  function changeFilters(patch: Partial<TagListQuery>) {
+    void navigate({ search: { ...search, ...patch, page: 1 } });
+  }
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["tags"] });
@@ -85,42 +111,63 @@ export function TagsPanel() {
   const rows = tags.data?.items ?? [];
 
   return (
-    <ListCard
-      label="Tags"
-      title="Tags"
-      actions={
-        <>
-          <Toggle variant="outline" pressed={archived} onPressedChange={setArchived}>
-            Show archived
-          </Toggle>
+    <>
+      <SettingsBack />
+      <PageHeader
+        kicker="Settings"
+        title="Tags"
+        actions={
           <Button type="button" onClick={() => setDraft("new")}>
             New tag
           </Button>
-        </>
-      }
-    >
+        }
+      />
+      <FilterBar
+        activeCount={search.archived ? 1 : 0}
+        badges={search.archived ? [{ key: "archived", label: "Archived", onRemove: () => changeFilters({ archived: false }) }] : []}
+        onOpenChange={(open) => {
+          if (open) {
+            setArchived(search.archived);
+          }
+        }}
+        onApply={() => changeFilters({ archived })}
+        onClear={() => setArchived(false)}
+        onClearAll={() => changeFilters({ archived: false })}
+        sort={{
+          id: "tag-sort",
+          label: "Sort",
+          value: sortChoice(search.sort, search.dir, "name", "asc"),
+          options: sortOptions,
+          onChange: (value) => changeFilters(applySort(value)),
+        }}
+        fields={
+          <Field orientation="horizontal">
+            <Switch id="filter-archived-tags" checked={archived} onCheckedChange={setArchived} />
+            <FieldLabel htmlFor="filter-archived-tags">Show archived</FieldLabel>
+          </Field>
+        }
+      />
       {actionError ? (
         <p role="alert" className="text-sm text-attn">
           {actionError}
         </p>
       ) : null}
-      {rows.length === 0 ? (
-        <p className="px-5 py-5 text-muted-foreground">{archived ? "No archived tags." : "No tags yet."}</p>
-      ) : (
-        rows.map((tag) => (
-          <ListRow key={tag.id} simple onOpen={() => setDraft(tag)}>
-            <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-              {tag.name}
-              {tag.archivedAt ? <small>Archived</small> : null}
-            </div>
-            <RowMenu label={`Actions for ${tag.name}`}>
-              <DropdownMenuItem className="min-h-11" onSelect={() => setPending(tag)}>
-                {tag.archivedAt ? "Restore" : "Archive"}
-              </DropdownMenuItem>
-            </RowMenu>
-          </ListRow>
-        ))
-      )}
+      <ListCard label="Tags">
+        {rows.length === 0 ? (
+          <p className="px-5 py-5 text-muted-foreground">{search.archived ? "No archived tags." : "No tags yet."}</p>
+        ) : (
+          rows.map((tag) => (
+            <ListRow key={tag.id} simple onOpen={() => setDraft(tag)}>
+              <div className={listName}>{tag.name}</div>
+              <RowMenu label={`Actions for ${tag.name}`}>
+                <DropdownMenuItem className="min-h-11" onSelect={() => setPending(tag)}>
+                  {tag.archivedAt ? "Restore" : "Archive"}
+                </DropdownMenuItem>
+              </RowMenu>
+            </ListRow>
+          ))
+        )}
+      </ListCard>
       <Dialog open={draft !== null} onOpenChange={(open) => !open && setDraft(null)}>
         <DialogContent>
           {draft ? (
@@ -156,6 +203,6 @@ export function TagsPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </ListCard>
+    </>
   );
 }
