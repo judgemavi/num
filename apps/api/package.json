@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@hono/zod-openapi": "1.6.3",
+    "@modelcontextprotocol/server": "2.3.1",
     "@num/db": "workspace:*",
     "@num/shared": "workspace:*",
     "drizzle-orm": "^0.45.3",

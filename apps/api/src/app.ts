@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { dataDirectory, type Db } from "./db";
+import { registerMcp } from "./mcp/register";
 import { registerAccounts } from "./routes/accounts";
 import { registerCheckpoints } from "./routes/checkpoints";
 import { registerBuckets } from "./routes/buckets";
@@ -59,6 +60,7 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
   registerSuggestions(app, db);
   registerRecurring(app, db);
   registerTransactions(app, db);
+  registerMcp(app, db);
 
   app.doc("/api/openapi.json", {
     openapi: "3.0.0",

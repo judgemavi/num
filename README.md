@@ -32,6 +32,19 @@ The health route is `GET /api/health`.
 
 Set `PORT` to use a different port.
 
+## MCP
+
+The API serves MCP at `/mcp` on the same process.
+The transport is streamable HTTP.
+
+Set the client URL to `http://127.0.0.1:3000/mcp`.
+Use your `PORT` value when the port is not 3000.
+
+Num has no login and no token.
+Run Num on a private network.
+Put an authenticating proxy in front of remote access.
+The Cloudflare MCP portal with Cloudflare Access is one example.
+
 ## Checks
 
 ```sh
