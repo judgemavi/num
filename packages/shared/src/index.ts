@@ -29,6 +29,38 @@ export {
   toMinorUnits,
   type CurrencyCode,
 } from "./currency";
+export {
+  categoryCreateSchema,
+  categoryGroupCreateSchema,
+  categoryGroupDeleteSchema,
+  categoryGroupListSchema,
+  categoryGroupOrderSchema,
+  categoryGroupSchema,
+  categoryGroupUpdateSchema,
+  categoryKinds,
+  categoryListQuerySchema,
+  categoryListSchema,
+  categorySchema,
+  categoryUpdateSchema,
+  tagCreateSchema,
+  tagListQuerySchema,
+  tagListSchema,
+  tagSchema,
+  tagUpdateSchema,
+  type Category,
+  type CategoryCreate,
+  type CategoryGroup,
+  type CategoryGroupCreate,
+  type CategoryGroupOrder,
+  type CategoryGroupUpdate,
+  type CategoryKind,
+  type CategoryListQuery,
+  type CategoryUpdate,
+  type Tag,
+  type TagCreate,
+  type TagListQuery,
+  type TagUpdate,
+} from "./category";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
 export { errorCodes, errorSchema, type ErrorBody, type ErrorCode } from "./error";
 export { listQuerySchema, pagedResponseSchema, sortDirections } from "./list";

@@ -16,6 +16,16 @@ export const errorCodes = [
   "archive_confirmation_required",
   "card_fields_invalid",
   "interest_rate_invalid",
+  "category_not_found",
+  "category_archived",
+  "category_name_taken",
+  "essential_expense_only",
+  "group_not_found",
+  "group_in_use",
+  "group_order_invalid",
+  "tag_not_found",
+  "tag_archived",
+  "tag_name_taken",
   "internal_error",
 ] as const;
 

@@ -2,8 +2,10 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import type { Db } from "./db";
 import { registerAccounts } from "./routes/accounts";
+import { registerCategories } from "./routes/categories";
 import { healthRoute } from "./routes/health";
 import { registerSetup } from "./routes/setup";
+import { registerTags } from "./routes/tags";
 import { ServiceError } from "./service-error";
 import { validationHook } from "./validation";
 import { hasFileExtension, webFile, webIndex } from "./web-files";
@@ -27,6 +29,8 @@ export function createApp(db: Db) {
   app.openapi(healthRoute, (c) => c.json({ ok: true as const }, 200));
   registerSetup(app, db);
   registerAccounts(app, db);
+  registerCategories(app, db);
+  registerTags(app, db);
 
   app.doc("/api/openapi.json", {
     openapi: "3.0.0",
