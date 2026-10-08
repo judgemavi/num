@@ -183,7 +183,7 @@ function planAmount(plan: PlanRow, links: { planId: string; dueDate: string; tra
   return variableAmounts(actuals, plan.expectedAmount).forecast;
 }
 
-export function readForecast(db: Db, asOf: string, input: WriteInput): Forecast {
+export function readForecastOnly(db: Db, asOf: string): Forecast {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
@@ -363,6 +363,11 @@ export function readForecast(db: Db, asOf: string, input: WriteInput): Forecast 
     deltas,
     cards,
   });
+  return forecast;
+}
+
+export function readForecast(db: Db, asOf: string, input: WriteInput): Forecast {
+  const forecast = readForecastOnly(db, asOf);
   const end = monthEnd(asOf);
   const endIndex = forecast.dates.indexOf(end);
   storeForecastSnapshot(db, asOf, forecast.total.estimated[endIndex] ?? forecast.total.estimated[0] ?? 0, input);

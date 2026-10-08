@@ -16,7 +16,7 @@ import type { Db } from "../db";
 import { listAccounts } from "../services/accounts";
 import { listBuckets } from "../services/buckets";
 import { listCategories, listCategoryGroups } from "../services/categories";
-import { readForecast } from "../services/forecast";
+import { readForecastOnly } from "../services/forecast";
 import { fundingPosition } from "../services/funding-book";
 import { listImportView } from "../services/import-list";
 import { listInbox } from "../services/inbox";
@@ -156,7 +156,7 @@ export function registerReadTools(server: McpServer, db: Db) {
       description: "Read the 90-day forecast, including safe to spend. Requires asOf.",
       inputSchema: asOfQuerySchema,
     },
-    (args) => readForecast(db, asOfQuerySchema.parse(args).asOf, { source: "mcp" }),
+    (args) => readForecastOnly(db, asOfQuerySchema.parse(args).asOf),
   );
 
   addTool(

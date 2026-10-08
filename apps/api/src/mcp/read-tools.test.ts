@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, openDatabase } from "@num/db";
+import { auditLog, forecastSnapshots, migrateDatabase, openDatabase } from "@num/db";
 import {
   accountListQuerySchema,
   categoryListQuerySchema,
@@ -19,7 +19,7 @@ import { createDb, type Db } from "../db";
 import { createAccount } from "../services/accounts";
 import { listBuckets } from "../services/buckets";
 import { listCategories, listCategoryGroups } from "../services/categories";
-import { readForecast } from "../services/forecast";
+import { readForecastOnly } from "../services/forecast";
 import { fundingPosition } from "../services/funding-book";
 import { listImportView } from "../services/import-list";
 import { importStatement } from "../services/imports";
@@ -225,9 +225,7 @@ test("each read tool returns the same data as its service", async () => {
     expect(dataOf(await callTool(book.db, book.dir, "list_occurrences", { id: planId, asOf }))).toEqual(
       listOccurrences(book.db, planId, asOf),
     );
-    expect(dataOf(await callTool(book.db, book.dir, "get_forecast", { asOf }))).toEqual(
-      readForecast(book.db, asOf, { source: "mcp" }),
-    );
+    expect(dataOf(await callTool(book.db, book.dir, "get_forecast", { asOf }))).toEqual(readForecastOnly(book.db, asOf));
     expect(dataOf(await callTool(book.db, book.dir, "list_inbox", { asOf, dismissed: false }))).toEqual(
       listInbox(book.db, inboxQuery.asOf, inboxQuery.dismissed),
     );
@@ -243,11 +241,50 @@ test("tools that need today require asOf", async () => {
   const book = tempBook();
   try {
     const listed = await post(book.db, book.dir, "tools/list", {});
-    const tools = (listed.body as Rpc & { result?: { tools?: { name: string; inputSchema?: { required?: string[] } }[] } }).result?.tools ?? [];
+    const tools =
+      (
+        listed.body as Rpc & {
+          result?: { tools?: { name: string; inputSchema?: { required?: string[]; properties?: Record<string, { format?: string; pattern?: string }> } }[] };
+        }
+      ).result?.tools ?? [];
     for (const name of ["list_buckets", "list_occurrences", "get_forecast", "list_inbox"]) {
-      expect(tools.find((tool) => tool.name === name)?.inputSchema?.required).toContain("asOf");
+      const schema = tools.find((tool) => tool.name === name)?.inputSchema;
+      expect(schema?.required).toContain("asOf");
+      expect(schema?.properties?.asOf).toMatchObject({ format: "date", pattern: String.raw`^\d{4}-\d{2}-\d{2}$` });
     }
     expect(tools.find((tool) => tool.name === "list_accounts")?.inputSchema?.required ?? []).not.toContain("asOf");
+  } finally {
+    book.close();
+  }
+});
+
+test("read tools do not write", async () => {
+  const book = tempBook();
+  try {
+    const { accountId, planId } = seed(book.db, book.dir);
+    const before = {
+      audit: book.db.select().from(auditLog).all().length,
+      snapshots: book.db.select().from(forecastSnapshots).all().length,
+    };
+    const calls: [string, Record<string, unknown>][] = [
+      ["list_accounts", {}],
+      ["search_transactions", { accountId }],
+      ["list_categories", {}],
+      ["list_category_groups", {}],
+      ["list_merchants", {}],
+      ["list_buckets", { asOf }],
+      ["list_plans", {}],
+      ["list_occurrences", { id: planId, asOf }],
+      ["get_forecast", { asOf }],
+      ["list_inbox", { asOf }],
+      ["list_imports", {}],
+    ];
+    for (const [name, args] of calls) {
+      const body = await callTool(book.db, book.dir, name, args);
+      expect(body.result?.isError).toBeFalsy();
+    }
+    expect(book.db.select().from(auditLog).all().length).toBe(before.audit);
+    expect(book.db.select().from(forecastSnapshots).all().length).toBe(before.snapshots);
   } finally {
     book.close();
   }
