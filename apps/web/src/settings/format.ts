@@ -65,7 +65,7 @@ export function merchantError(code: string): string {
 export function ruleError(code: string): string {
   switch (code) {
     case "rule_pattern_invalid":
-      return "This pattern is not a valid regular expression.";
+      return "Enter a pattern.";
     case "rule_target_required":
       return "Choose a merchant, a category, or both.";
     case "rule_not_found":

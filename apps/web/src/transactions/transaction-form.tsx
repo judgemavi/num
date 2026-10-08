@@ -130,9 +130,6 @@ export function TransactionForm({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (locked) {
-      return;
-    }
     setError(null);
     const amountProblem = lineAmountError(currency, lines);
     if (amountProblem) {
@@ -210,7 +207,7 @@ export function TransactionForm({
         </DialogDescription>
       </DialogHeader>
       {locked ? (
-        <p role="status">This transaction is reconciled. Unlock its checkpoint before you change it.</p>
+        <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, notes, category, memo and tags can change.</p>
       ) : null}
       <Field data-invalid={error !== null || undefined}>
         <FieldLabel htmlFor="txn-account">Account</FieldLabel>
@@ -233,7 +230,7 @@ export function TransactionForm({
       </Field>
       <Field>
         <FieldLabel htmlFor="txn-payee">Payee</FieldLabel>
-        <Input id="txn-payee" value={payee} disabled={locked || payeeLocked} onChange={(event) => setPayee(event.target.value)} />
+        <Input id="txn-payee" value={payee} disabled={payeeLocked} onChange={(event) => setPayee(event.target.value)} />
         {payeeLocked ? <FieldDescription>The bank text stays as it was imported.</FieldDescription> : null}
         <SuggestionHint accountId={accountId} payee={payee} merchants={merchants} categories={categories} />
       </Field>
@@ -256,13 +253,12 @@ export function TransactionForm({
           options={merchants.map((merchant) => ({ id: merchant.id, label: merchant.name }))}
           placeholder="No merchant"
           emptyLabel="No merchant"
-          disabled={locked}
           onChange={setMerchantId}
         />
       </Field>
       <Field>
         <FieldLabel htmlFor="txn-notes">Notes</FieldLabel>
-        <Textarea id="txn-notes" value={notes} disabled={locked} onChange={(event) => setNotes(event.target.value)} />
+        <Textarea id="txn-notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
       </Field>
       <Field>
         <FieldLabel htmlFor="txn-status">Status</FieldLabel>
@@ -293,8 +289,9 @@ export function TransactionForm({
         categories={categories}
         tags={tags}
         transferOptions={transferOptions}
-        disabled={locked}
-        amountLocked={amountLocked}
+        disabled={false}
+        amountLocked={locked || amountLocked}
+        categoryLocked={amountLocked}
         onChange={changeLines}
       />
       {error ? <FieldError>{error}</FieldError> : null}
@@ -307,11 +304,9 @@ export function TransactionForm({
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        {locked ? null : (
-          <Button type="submit" disabled={saving || accountId.length === 0}>
-            {saving ? "Saving" : "Save"}
-          </Button>
-        )}
+        <Button type="submit" disabled={saving || accountId.length === 0}>
+          {saving ? "Saving" : "Save"}
+        </Button>
       </DialogFooter>
     </form>
   );

@@ -1,3 +1,4 @@
+import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import { dayDistance } from "./recurring-calc";
 import { normalizePayee } from "./payee";
@@ -182,42 +183,63 @@ export type TransferCandidate = {
   linked: boolean;
 };
 
-export function transferPairs(rows: TransferCandidate[]): TransferPair[] {
-  const open = rows
-    .filter((row) => row.onBudget && !row.linked && row.amount !== 0)
-    .sort((left, right) => (left.date < right.date ? -1 : left.date > right.date ? 1 : left.id < right.id ? -1 : 1));
+function pairAmount(group: TransferCandidate[]): TransferPair[] {
+  const outgoing = group.filter((row) => row.amount < 0);
+  const incoming = group.filter((row) => row.amount > 0);
   const used = new Set<string>();
   const pairs: TransferPair[] = [];
-  for (const row of open) {
-    if (used.has(row.id)) {
-      continue;
+  let incomingIndex = 0;
+  for (const row of outgoing) {
+    while (
+      incomingIndex < incoming.length &&
+      incoming[incomingIndex] !== undefined &&
+      incoming[incomingIndex]!.date < row.date &&
+      dayDistance(row.date, incoming[incomingIndex]!.date) > 3
+    ) {
+      incomingIndex += 1;
     }
-    let best: TransferCandidate | null = null;
-    let bestDistance = 4;
-    for (const other of open) {
-      if (other.id === row.id || used.has(other.id) || other.accountId === row.accountId || other.amount !== -row.amount) {
+    for (let cursor = incomingIndex; cursor < incoming.length; cursor += 1) {
+      const other = incoming[cursor];
+      if (!other) {
+        break;
+      }
+      if (other.date > row.date && dayDistance(row.date, other.date) > 3) {
+        break;
+      }
+      if (used.has(other.id) || other.accountId === row.accountId || other.amount !== -row.amount) {
         continue;
       }
-      const distance = dayDistance(row.date, other.date);
-      if (distance > 3) {
-        continue;
-      }
-      const closer =
-        !best ||
-        distance < bestDistance ||
-        (distance === bestDistance && (other.date < best.date || (other.date === best.date && other.id < best.id)));
-      if (closer) {
-        best = other;
-        bestDistance = distance;
-      }
+      used.add(other.id);
+      const [leftId, rightId] = row.id < other.id ? [row.id, other.id] : [other.id, row.id];
+      pairs.push({ leftId, rightId });
+      break;
     }
-    if (!best) {
-      continue;
-    }
-    used.add(row.id);
-    used.add(best.id);
-    const [leftId, rightId] = row.id < best.id ? [row.id, best.id] : [best.id, row.id];
-    pairs.push({ leftId, rightId });
   }
   return pairs;
+}
+
+export function transferPairs(rows: TransferCandidate[], asOf: string): TransferPair[] {
+  const start = Temporal.PlainDate.from(asOf).subtract({ days: 90 }).toString();
+  const open = rows
+    .filter((row) => row.onBudget && !row.linked && row.amount !== 0 && row.date >= start && row.date <= asOf)
+    .sort((left, right) => {
+      const amount = Math.abs(left.amount) - Math.abs(right.amount);
+      if (amount !== 0) {
+        return amount;
+      }
+      if (left.date !== right.date) {
+        return left.date < right.date ? -1 : 1;
+      }
+      return left.id < right.id ? -1 : 1;
+    });
+  const groups: TransferCandidate[][] = [];
+  for (const row of open) {
+    const last = groups.at(-1);
+    if (!last || Math.abs(last[0]?.amount ?? 0) !== Math.abs(row.amount)) {
+      groups.push([row]);
+    } else {
+      last.push(row);
+    }
+  }
+  return groups.flatMap(pairAmount);
 }

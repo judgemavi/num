@@ -1,4 +1,5 @@
 import {
+  asOfQuerySchema,
   errorSchema,
   promotionAcceptSchema,
   promotionListSchema,
@@ -50,8 +51,10 @@ const acceptRoute = createRoute({
 const transfersRoute = createRoute({
   method: "get",
   path: "/api/transfer-pairs",
+  request: { query: asOfQuerySchema },
   responses: {
     200: { description: "Possible transfer pairs", content: { "application/json": { schema: transferPairListSchema } } },
+    400: errorResponse,
   },
 });
 
@@ -62,5 +65,5 @@ export function registerSuggestions(app: OpenAPIHono, db: Db) {
   });
   app.openapi(promotionsRoute, (c) => c.json(listPromotionCandidates(db), 200));
   app.openapi(acceptRoute, (c) => c.json(promotePayee(db, { ...c.req.valid("json"), source: "ui" }), 200));
-  app.openapi(transfersRoute, (c) => c.json(listTransferPairs(db), 200));
+  app.openapi(transfersRoute, (c) => c.json(listTransferPairs(db, c.req.valid("query").asOf), 200));
 }

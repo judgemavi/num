@@ -3,7 +3,7 @@ import { isoDateSchema } from "./date";
 import { listQuerySchema, pagedResponseSchema } from "./list";
 import { isUtcTimestamp } from "./time";
 
-export const ruleMatches = ["exact", "prefix", "contains", "regex"] as const;
+export const ruleMatches = ["exact", "prefix", "contains"] as const;
 export const ruleOrigins = ["manual", "promoted"] as const;
 
 export type RuleMatch = (typeof ruleMatches)[number];
@@ -84,27 +84,16 @@ export type RulePattern = {
 };
 
 export function validRulePattern(match: RuleMatch, pattern: string): boolean {
+  if (match !== "exact" && match !== "prefix" && match !== "contains") {
+    return false;
+  }
   const text = pattern.trim();
-  if (text.length === 0 || text.length > 200) {
-    return false;
-  }
-  if (match !== "regex") {
-    return true;
-  }
-  try {
-    RegExp(text, "i");
-    return true;
-  } catch {
-    return false;
-  }
+  return text.length > 0 && text.length <= 200;
 }
 
 export function patternHits(match: RuleMatch, pattern: string, normalizedPayee: string): boolean {
   if (!validRulePattern(match, pattern) || normalizedPayee.length === 0) {
     return false;
-  }
-  if (match === "regex") {
-    return new RegExp(pattern.trim(), "i").test(normalizedPayee);
   }
   const needle = pattern.trim().replace(/\s+/g, " ").toUpperCase();
   if (match === "exact") {

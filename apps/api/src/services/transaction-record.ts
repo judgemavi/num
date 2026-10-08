@@ -1,5 +1,6 @@
 import { transactions } from "@num/db";
 import {
+  storedPayee,
   transactionInputStatuses,
   transactionSources,
   transactionStatuses,
@@ -26,7 +27,8 @@ export type Header = {
   merchantId: string | null;
   notes: string | null;
   payeeRaw: string;
-  status: TransactionInputStatus;
+  payeeNormalized: string;
+  status: TransactionInputStatus | "reconciled";
 };
 
 export type TransactionBody = Omit<TransactionCreate, "status"> & { status: string };
@@ -66,7 +68,7 @@ export function headerFrom(input: TransactionBody): Header {
     amount: input.amount,
     merchantId: input.merchantId ?? null,
     notes: blankToNull(input.notes),
-    payeeRaw: requireText(input.payeeRaw, "payeeRaw"),
+    ...storedPayee(requireText(input.payeeRaw, "payeeRaw")),
     status: inputStatus(input.status),
   };
 }
@@ -80,6 +82,7 @@ export function toTransaction(row: TxRow, lines: StoredLine[]): Transaction {
     merchantId: row.merchantId,
     notes: row.notes,
     payeeRaw: row.payeeRaw,
+    payeeNormalized: row.payeeNormalized,
     status: asStatus(row.status),
     source: asSource(row.source),
     importRowId: row.importRowId,
@@ -97,6 +100,7 @@ function snapshot(record: Transaction) {
     merchantId: record.merchantId,
     notes: record.notes,
     payeeRaw: record.payeeRaw,
+    payeeNormalized: record.payeeNormalized,
     status: record.status,
     source: record.source,
     importRowId: record.importRowId,

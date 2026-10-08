@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { migrateDatabase, openDatabase } from "@num/db";
-import { Temporal, type TransactionListQuery } from "@num/shared";
+import { normalizePayee, Temporal, type TransactionListQuery } from "@num/shared";
 import { createDb } from "../src/db";
 import { listTransactions } from "../src/services/transaction-list";
 
@@ -58,8 +58,8 @@ insertMerchant.run(markerMerchant, "Marker merchant");
 
 const insertTransaction = sqlite.prepare(
   `insert into transactions (
-    id, account_id, date, amount, merchant_id, notes, payee_raw, status, source, import_row_id, transfer_peer_id, deleted_at
-  ) values (?, ?, ?, ?, ?, ?, ?, 'open', 'manual', null, null, null)`,
+    id, account_id, date, amount, merchant_id, notes, payee_raw, payee_normalized, status, source, import_row_id, transfer_peer_id, deleted_at
+  ) values (?, ?, ?, ?, ?, ?, ?, ?, 'open', 'manual', null, null, null)`,
 );
 const insertLine = sqlite.prepare(
   `insert into transaction_lines (id, transaction_id, amount, memo, category_id, transfer_account_id) values (?, ?, ?, null, ?, null)`,
@@ -78,7 +78,7 @@ for (let index = 0; index < count; index += 1) {
   const merchantId = index === 12 ? markerMerchant : index % 7 === 0 ? null : (merchants[index % merchants.length] ?? null);
   const payee = index === 10 ? "Marker payee" : `Payee ${index % 500}`;
   const notes = index === 11 ? "marker note" : null;
-  insertTransaction.run(id, accountId, date, amount, merchantId, notes, payee);
+  insertTransaction.run(id, accountId, date, amount, merchantId, notes, payee, normalizePayee(payee));
   insertLine.run(lineId, id, amount, uncategorized ? null : (categories[index % categories.length] ?? null));
   if (index % 11 === 0) {
     insertTagLink.run(lineId, tags[index % tags.length] ?? null);

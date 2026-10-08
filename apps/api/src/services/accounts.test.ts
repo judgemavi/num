@@ -6,7 +6,7 @@ import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
 import { archiveAccount, createAccount, listAccounts, restoreAccount, updateAccount } from "./accounts";
-import type { AccountCreate, AccountKind, AccountUpdate, ErrorCode } from "@num/shared";
+import { storedPayee, type AccountCreate, type AccountKind, type AccountUpdate, type ErrorCode } from "@num/shared";
 
 function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-accounts-"));
@@ -60,7 +60,7 @@ function addTransaction(db: Db, accountId: string, date: string, amount: number,
       accountId,
       date,
       amount,
-      payeeRaw: "Example shop",
+      ...storedPayee("Example shop"),
       status: "cleared",
       source: "manual",
       deletedAt: deleted ? at : null,

@@ -60,6 +60,7 @@ export const transactionSchema = z.object({
   merchantId: z.uuid().nullable(),
   notes: z.string().nullable(),
   payeeRaw: z.string(),
+  payeeNormalized: z.string(),
   status: z.enum(transactionStatuses),
   source: z.enum(transactionSources),
   importRowId: z.uuid().nullable(),

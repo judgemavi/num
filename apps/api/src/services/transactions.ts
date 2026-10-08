@@ -3,7 +3,7 @@ import { utcNow, type Transaction } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { loadLines, replaceLines } from "./transaction-lines";
+import { loadLines, replaceLines, type StoredLine } from "./transaction-lines";
 import {
   auditTransaction,
   headerFrom,
@@ -31,8 +31,36 @@ function requireActive(db: Db | WriteTx, id: string): TxRow {
   return row;
 }
 
-function assertMutable(row: { status: string }, peer: { status: string } | null): void {
+function assertDeletable(row: { status: string }, peer: { status: string } | null): void {
   if (row.status === "reconciled" || peer?.status === "reconciled") {
+    throw new ServiceError("transaction_reconciled", 409);
+  }
+}
+
+function moneySame(existing: TxRow, existingLines: StoredLine[], header: Header, lines: NormalizedLine[]): boolean {
+  if (header.date !== existing.date || header.accountId !== existing.accountId || header.amount !== existing.amount) {
+    return false;
+  }
+  if (lines.length !== existingLines.length) {
+    return false;
+  }
+  const key = (amount: number, transferAccountId: string | null) => `${amount}\0${transferAccountId ?? ""}`;
+  const next = lines.map((line) => key(line.amount, line.transferAccountId)).sort();
+  const current = existingLines.map((line) => key(line.amount, line.transferAccountId)).sort();
+  return next.every((value, index) => value === current[index]);
+}
+
+function assertReconciledMoney(
+  existing: TxRow,
+  existingLines: StoredLine[],
+  peer: TxRow | null,
+  header: Header,
+  lines: NormalizedLine[],
+): void {
+  if (existing.status !== "reconciled" && peer?.status !== "reconciled") {
+    return;
+  }
+  if (!moneySame(existing, existingLines, header, lines)) {
     throw new ServiceError("transaction_reconciled", 409);
   }
 }
@@ -158,15 +186,16 @@ export function updateTransaction(db: Db, id: string, input: TransactionBody & W
     const existingLines = loadLines(tx, id);
     const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
     const peerLines = peer ? loadLines(tx, peer.id) : [];
-    assertMutable(existing, peer);
+    assertReconciledMoney(existing, existingLines, peer, header, lines);
     assertPayee(existing, header.payeeRaw);
     assertLineShape(header.accountId, header.amount, lines);
     const previousTarget = existingLines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null;
     assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
+    const savedHeader = existing.status === "reconciled" ? { ...header, status: "reconciled" as const } : header;
     if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {
-      applyMirrorEdit(tx, existing, existingLines, peer, peerLines, header, lines);
+      applyMirrorEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines);
     } else {
-      applySourceEdit(tx, existing, existingLines, peer, peerLines, header, lines, at);
+      applySourceEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at);
     }
     updated = readTransaction(tx, id);
   });
@@ -184,7 +213,7 @@ export function deleteTransaction(db: Db, id: string, input: WriteInput): Transa
     const existingLines = loadLines(tx, id);
     const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
     const peerLines = peer ? loadLines(tx, peer.id) : [];
-    assertMutable(existing, peer);
+    assertDeletable(existing, peer);
     const before = toTransaction(existing, existingLines);
     tx.update(transactions).set({ deletedAt: at }).where(eq(transactions.id, existing.id)).run();
     auditTransaction(tx, existing.id, "delete", before, readTransaction(tx, existing.id));

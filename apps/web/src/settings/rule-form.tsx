@@ -13,7 +13,6 @@ const matchLabels: Record<RuleMatch, string> = {
   exact: "Exact",
   prefix: "Starts with",
   contains: "Contains",
-  regex: "Regular expression",
 };
 
 type RuleFormProps = {
@@ -106,11 +105,7 @@ export function RuleForm({ rule, accounts, categories, merchants, onClose, onSav
       <Field data-invalid={error !== null || undefined}>
         <FieldLabel htmlFor="rule-pattern">Pattern</FieldLabel>
         <Input id="rule-pattern" value={pattern} onChange={(event) => setPattern(event.target.value)} />
-        <FieldDescription>
-          {match === "regex"
-            ? "Use a regular expression for the normalized payee."
-            : "The app compares this text with the normalized payee."}
-        </FieldDescription>
+        <FieldDescription>The app compares this text with the normalized payee.</FieldDescription>
       </Field>
       <Field>
         <FieldLabel htmlFor="rule-priority">Priority</FieldLabel>

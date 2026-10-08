@@ -1,8 +1,9 @@
-import { accounts, merchants, rules, settings, transactionLines, transactions } from "@num/db";
+import { accounts, merchants, rules, settings } from "@num/db";
 import {
   normalizePayee,
-  promotionCandidates,
+  ruleCoversPayee,
   suggestCategorization,
+  Temporal,
   transferPairs,
   type HistoryRow,
   type Promotion,
@@ -10,7 +11,7 @@ import {
   type Suggestion,
   type TransferPair,
 } from "@num/shared";
-import { eq, isNull } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { createRule, toRule } from "./rules";
@@ -30,33 +31,24 @@ function promoteAfter(db: Db): number {
   return value;
 }
 
-function categoryByTransaction(db: Db): Map<string, string | null> {
-  const grouped = new Map<string, Set<string>>();
-  for (const line of db.select().from(transactionLines).all()) {
-    if (!line.categoryId) {
-      continue;
-    }
-    const set = grouped.get(line.transactionId) ?? new Set<string>();
-    set.add(line.categoryId);
-    grouped.set(line.transactionId, set);
-  }
-  return new Map([...grouped].map(([id, set]) => [id, set.size === 1 ? ([...set][0] ?? null) : null]));
-}
-
-function historyRows(db: Db): HistoryRow[] {
-  const categories = categoryByTransaction(db);
-  return db
-    .select()
-    .from(transactions)
-    .where(isNull(transactions.deletedAt))
-    .all()
-    .map((row) => ({
-      id: row.id,
-      date: row.date,
-      payeeRaw: row.payeeRaw,
-      merchantId: row.merchantId,
-      categoryId: categories.get(row.id) ?? null,
-    }));
+function lastCategorized(db: Db, payee: string): HistoryRow[] {
+  return db.all<HistoryRow>(sql`
+    select
+      t.id as id,
+      t.date as date,
+      t.payee_raw as payeeRaw,
+      t.merchant_id as merchantId,
+      min(l.category_id) as categoryId
+    from transactions t
+    inner join transaction_lines l on l.transaction_id = t.id
+    where t.deleted_at is null
+      and t.payee_normalized = ${payee}
+      and l.category_id is not null
+    group by t.id
+    having count(distinct l.category_id) = 1
+    order by t.date desc, t.id desc
+    limit 10
+  `);
 }
 
 function ruleRows(db: Db): RulePattern[] {
@@ -68,46 +60,75 @@ export function suggestForPayee(db: Db, accountId: string, rawPayee: string): Su
   if (!account) {
     throw new ServiceError("account_not_found", 404);
   }
+  const payee = normalizePayee(rawPayee);
   return suggestCategorization({
     accountId,
     rawPayee,
     rules: ruleRows(db),
-    history: historyRows(db),
+    history: lastCategorized(db, payee),
     merchants: db.select().from(merchants).all(),
   });
 }
 
 export function listPromotionCandidates(db: Db): { items: Promotion[] } {
-  const rows = historyRows(db).filter((row) => row.merchantId !== null && row.categoryId !== null);
-  return { items: promotionCandidates(rows, ruleRows(db), promoteAfter(db)) };
+  const minimum = promoteAfter(db);
+  const activeRules = ruleRows(db);
+  const rows = db.all<Promotion>(sql`
+    with categorized as (
+      select
+        t.id as id,
+        t.payee_normalized as payee,
+        t.merchant_id as merchantId,
+        t.date as date,
+        min(l.category_id) as categoryId
+      from transactions t
+      inner join transaction_lines l on l.transaction_id = t.id
+      where t.deleted_at is null
+        and t.merchant_id is not null
+        and l.category_id is not null
+      group by t.id
+      having count(distinct l.category_id) = 1
+    ),
+    ranked as (
+      select
+        payee,
+        merchantId,
+        categoryId,
+        row_number() over (partition by payee order by date desc, id desc) as rn
+      from categorized
+    )
+    select payee, merchantId, categoryId, count(*) as count
+    from ranked
+    where rn <= 10
+    group by payee, merchantId, categoryId
+    having count(*) >= ${minimum}
+  `);
+  return {
+    items: rows
+      .map((row) => ({ ...row, count: Number(row.count) }))
+      .filter((row) => !ruleCoversPayee(activeRules, row.payee))
+      .sort((left, right) => right.count - left.count || (left.payee < right.payee ? -1 : 1)),
+  };
 }
 
-export function listTransferPairs(db: Db): { items: TransferPair[] } {
-  const rows = db
-    .select({
-      id: transactions.id,
-      accountId: transactions.accountId,
-      onBudget: accounts.onBudget,
-      date: transactions.date,
-      amount: transactions.amount,
-      transferPeerId: transactions.transferPeerId,
-      deletedAt: transactions.deletedAt,
-    })
-    .from(transactions)
-    .innerJoin(accounts, eq(accounts.id, transactions.accountId))
-    .all();
+export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[] } {
+  const start = Temporal.PlainDate.from(asOf).subtract({ days: 90 }).toString();
+  const rows = db.all<{ id: string; accountId: string; date: string; amount: number }>(sql`
+    select t.id as id, t.account_id as accountId, t.date as date, t.amount as amount
+    from transactions t
+    inner join accounts a on a.id = t.account_id
+    where t.deleted_at is null
+      and t.transfer_peer_id is null
+      and a.on_budget = 1
+      and t.amount != 0
+      and t.date >= ${start}
+      and t.date <= ${asOf}
+    order by abs(t.amount), t.date, t.id
+  `);
   return {
     items: transferPairs(
-      rows
-        .filter((row) => row.deletedAt === null)
-        .map((row) => ({
-          id: row.id,
-          accountId: row.accountId,
-          onBudget: row.onBudget,
-          date: row.date,
-          amount: row.amount,
-          linked: row.transferPeerId !== null,
-        })),
+      rows.map((row) => ({ ...row, onBudget: true, linked: false })),
+      asOf,
     ),
   };
 }

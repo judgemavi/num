@@ -14,6 +14,7 @@ type LineEditorProps = {
   transferOptions: Option[];
   disabled: boolean;
   amountLocked: boolean;
+  categoryLocked?: boolean;
   onChange: (lines: LineDraft[]) => void;
 };
 
@@ -34,6 +35,7 @@ export function LineEditor({
   transferOptions,
   disabled,
   amountLocked,
+  categoryLocked = false,
   onChange,
 }: LineEditorProps) {
   function update(key: string, patch: Partial<LineDraft>) {
@@ -77,7 +79,7 @@ export function LineEditor({
                 options={activeOptions(categories, line.categoryId)}
                 placeholder="No category"
                 emptyLabel="No category"
-                disabled={disabled || amountLocked}
+                disabled={disabled || categoryLocked}
                 onChange={(categoryId) =>
                   update(line.key, {
                     categoryId,

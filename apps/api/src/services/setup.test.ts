@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { accounts, migrateDatabase, openDatabase, transactions } from "@num/db";
+import { storedPayee } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
 import { ServiceError } from "../service-error";
@@ -106,7 +107,7 @@ test("currency cannot change after the first transaction", () => {
         accountId,
         date: "2026-01-02",
         amount: -100,
-        payeeRaw: "Shop",
+        ...storedPayee("Shop"),
         status: "open",
         source: "manual",
       })

@@ -125,10 +125,11 @@ export {
   type MerchantListQuery,
   type MerchantUpdate,
 } from "./merchant";
-export { normalizePayee } from "./payee";
+export { normalizePayee, storedPayee } from "./payee";
 export {
   chooseRule,
   patternHits,
+  ruleCoversPayee,
   ruleApplyPreviewSchema,
   ruleCreateSchema,
   ruleListQuerySchema,

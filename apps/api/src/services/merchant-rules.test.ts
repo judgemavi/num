@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { merchants, migrateDatabase, openDatabase, recurringPlans, rules, settings, transactionLines, transactions } from "@num/db";
+import { storedPayee } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
@@ -9,10 +10,12 @@ import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { mergeMerchants } from "./merchant-merge";
-import { createMerchant } from "./merchants";
+import { applyRule, previewRuleApply } from "./rule-apply";
+import { archiveMerchant, createMerchant } from "./merchants";
 import { createPlan } from "./recurring-plans";
-import { createRule } from "./rules";
+import { archiveRule, createRule, restoreRule } from "./rules";
 import { listPromotionCandidates, listTransferPairs, suggestForPayee } from "./suggestions";
+import { createTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
 
@@ -80,7 +83,7 @@ test("merge moves transactions, rules and plans, then archives the source", () =
         date: "2026-02-01",
         amount: -500,
         merchantId: source.id,
-        payeeRaw: "CAFE NORTH",
+        ...storedPayee("CAFE NORTH"),
         status: "open",
         source: "manual",
       })
@@ -97,19 +100,78 @@ test("merge moves transactions, rules and plans, then archives the source", () =
   }
 });
 
-test("a rule rejects an invalid regular expression", () => {
+test("restore rejects a rule whose merchant is archived", () => {
   const { db, close } = tempDatabase();
   try {
     const category = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
-    expect(() =>
-      createRule(db, { match: "regex", pattern: "(", categoryId: category.id, priority: 0, source: "ui", at }),
-    ).toThrow(ServiceError);
-    try {
-      createRule(db, { match: "regex", pattern: "(", categoryId: category.id, priority: 0, source: "ui", at });
-    } catch (error) {
-      expect(error).toBeInstanceOf(ServiceError);
-      expect(error instanceof ServiceError ? error.code : "").toBe("rule_pattern_invalid");
-    }
+    const shop = createMerchant(db, { name: "Cafe", source: "ui", at });
+    const rule = createRule(db, {
+      match: "exact",
+      pattern: "CAFE",
+      merchantId: shop.id,
+      categoryId: category.id,
+      priority: 0,
+      source: "ui",
+      at,
+    });
+    archiveMerchant(db, shop.id, { source: "ui", at });
+    archiveRule(db, rule.id, { source: "ui", at });
+    expect(() => restoreRule(db, rule.id, { source: "ui", at })).toThrow(ServiceError);
+  } finally {
+    close();
+  }
+});
+
+test("apply to existing skips a split and updates a single line", () => {
+  const { db, close } = tempDatabase();
+  try {
+    const account = createAccount(db, {
+      name: "Chequing",
+      institution: null,
+      kind: "chequing",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      source: "ui",
+      at,
+    });
+    const groceries = createCategory(db, { name: "Groceries", kind: "expense", source: "ui", at });
+    const coffee = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
+    const single = createTransaction(db, {
+      accountId: account.id,
+      date: "2026-04-01",
+      amount: -500,
+      payeeRaw: "SQ *CAFE",
+      status: "open",
+      lines: [{ amount: -500 }],
+      source: "ui",
+      at,
+    });
+    const split = createTransaction(db, {
+      accountId: account.id,
+      date: "2026-04-02",
+      amount: -500,
+      payeeRaw: "SQ *CAFE",
+      status: "open",
+      lines: [
+        { amount: -300, categoryId: groceries.id },
+        { amount: -200, categoryId: groceries.id },
+      ],
+      source: "ui",
+      at,
+    });
+    const rule = createRule(db, {
+      match: "exact",
+      pattern: "CAFE",
+      categoryId: coffee.id,
+      priority: 1,
+      source: "ui",
+      at,
+    });
+    expect(previewRuleApply(db, rule.id).count).toBe(1);
+    expect(applyRule(db, rule.id, { source: "ui", at }).count).toBe(1);
+    expect(db.select().from(transactionLines).where(eq(transactionLines.transactionId, single.id)).all()[0]?.categoryId).toBe(coffee.id);
+    const splitLines = db.select().from(transactionLines).where(eq(transactionLines.transactionId, split.id)).all();
+    expect(splitLines.every((line) => line.categoryId === groceries.id)).toBe(true);
   } finally {
     close();
   }
@@ -147,7 +209,7 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
           date: `2026-03-0${day}`,
           amount: -400,
           merchantId: shop.id,
-          payeeRaw: "SQ *CAFE TORONTO ON",
+          ...storedPayee("SQ *CAFE"),
           status: "cleared",
           source: "manual",
         })
@@ -170,7 +232,7 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
       source: "ui",
       at,
     });
-    expect(suggestForPayee(db, account.id, "TST*CAFE TORONTO ON")).toEqual({
+    expect(suggestForPayee(db, account.id, "TST*CAFE")).toEqual({
       merchantId: shop.id,
       categoryId: category.id,
       reason: "rule",
@@ -185,7 +247,7 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
           accountId: account.id,
           date: "2026-04-01",
           amount: -2500,
-          payeeRaw: "Transfer out",
+          ...storedPayee("Transfer out"),
           status: "open",
           source: "manual",
         },
@@ -194,13 +256,15 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
           accountId: savings.id,
           date: "2026-04-03",
           amount: 2500,
-          payeeRaw: "Transfer in",
+          ...storedPayee("Transfer in"),
           status: "open",
           source: "manual",
         },
       ])
       .run();
-    expect(listTransferPairs(db).items).toEqual([{ leftId: inId < outId ? inId : outId, rightId: inId < outId ? outId : inId }]);
+    expect(listTransferPairs(db, "2026-04-03").items).toEqual([
+      { leftId: inId < outId ? inId : outId, rightId: inId < outId ? outId : inId },
+    ]);
   } finally {
     close();
   }

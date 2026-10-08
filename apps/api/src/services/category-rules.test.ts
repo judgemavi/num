@@ -10,6 +10,7 @@ import {
   transactionLines,
   transactions,
 } from "@num/db";
+import { storedPayee } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
 import { ServiceError } from "../service-error";
@@ -132,7 +133,7 @@ function addLine(db: ReturnType<typeof tempDatabase>["db"], categoryId: string) 
       accountId,
       date: "2026-03-01",
       amount: -100,
-      payeeRaw: "Example shop",
+      ...storedPayee("Example shop"),
       status: "cleared",
       source: "manual",
     })

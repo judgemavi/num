@@ -49,7 +49,7 @@ const sortOptions = [
   { value: "name:desc", label: "Name, Z to A" },
 ];
 
-const matchLabels = { exact: "Exact", prefix: "Starts with", contains: "Contains", regex: "Regular expression" };
+const matchLabels = { exact: "Exact", prefix: "Starts with", contains: "Contains" };
 
 function applySort(value: string): Partial<MerchantListQuery> {
   if (value === "name:asc") {

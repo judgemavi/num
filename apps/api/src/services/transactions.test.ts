@@ -260,11 +260,12 @@ test("a second transfer line is rejected", () => {
   }
 });
 
-test("a reconciled transaction cannot change", () => {
+test("a reconciled transaction accepts a category change and rejects an amount change", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db, "Chequing", "chequing");
     const savings = account(book.db, "Savings", "savings");
+    const food = createCategory(book.db, { name: "Food", kind: "expense", ...saved });
     const created = createTransaction(book.db, entry(chequing.id, -15, [{ amount: -15 }]));
     book.sqlite.query("update transactions set status = 'reconciled' where id = ?").run(created.id);
     expect(getTransaction(book.db, created.id)?.status).toBe("reconciled");
@@ -272,8 +273,11 @@ test("a reconciled transaction cannot change", () => {
       () => updateTransaction(book.db, created.id, entry(chequing.id, -16, [{ amount: -16 }])),
       "transaction_reconciled",
     );
+    const changed = updateTransaction(book.db, created.id, entry(chequing.id, -15, [{ amount: -15, categoryId: food.id }]));
+    expect(changed.status).toBe("reconciled");
+    expect(changed.amount).toBe(-15);
+    expect(changed.lines[0]?.categoryId).toBe(food.id);
     expectCode(() => deleteTransaction(book.db, created.id, saved), "transaction_reconciled");
-    expect(getTransaction(book.db, created.id)?.amount).toBe(-15);
     expect(getTransaction(book.db, created.id)?.deletedAt).toBeNull();
 
     const transfer = createTransaction(

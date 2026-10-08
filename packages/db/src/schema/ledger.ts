@@ -27,6 +27,7 @@ export const transactions = sqliteTable(
     merchantId: text("merchant_id").references(() => merchants.id),
     notes: text("notes"),
     payeeRaw: text("payee_raw").notNull(),
+    payeeNormalized: text("payee_normalized").notNull(),
     status: text("status").notNull(),
     source: text("source").notNull(),
     importRowId: text("import_row_id")
@@ -53,6 +54,9 @@ export const transactions = sqliteTable(
       .where(sql`${table.deletedAt} is null`),
     index("transactions_active_merchant_date")
       .on(table.merchantId, table.date, table.id)
+      .where(sql`${table.deletedAt} is null`),
+    index("transactions_payee_normalized")
+      .on(table.payeeNormalized, table.date, table.id)
       .where(sql`${table.deletedAt} is null`),
   ],
 );

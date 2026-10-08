@@ -25,6 +25,7 @@ export function insertMirror(
       merchantId: header.merchantId,
       notes: header.notes,
       payeeRaw: header.payeeRaw,
+      payeeNormalized: header.payeeNormalized,
       status: "open",
       source,
       importRowId: null,

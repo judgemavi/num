@@ -24,7 +24,7 @@ export const transactionStatuses = ["open", "cleared", "reconciled"] as const;
 
 export const transactionSources = ["import", "manual", "mcp"] as const;
 
-export const ruleMatches = ["exact", "prefix", "contains", "regex"] as const;
+export const ruleMatches = ["exact", "prefix", "contains"] as const;
 
 export const ruleOrigins = ["manual", "promoted"] as const;
 

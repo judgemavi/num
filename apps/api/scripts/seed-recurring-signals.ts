@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { migrateDatabase, openDatabase } from "@num/db";
-import { Temporal } from "@num/shared";
+import { normalizePayee, Temporal } from "@num/shared";
 import { createDb } from "../src/db";
 import { recurringSignals } from "../src/services/recurring-view";
 
@@ -56,8 +56,8 @@ for (let index = 0; index < planCount; index += 1) {
 }
 const insertTransaction = sqlite.prepare(
   `insert into transactions (
-    id, account_id, date, amount, merchant_id, notes, payee_raw, status, source, import_row_id, transfer_peer_id, deleted_at
-  ) values (?, ?, ?, ?, ?, null, ?, 'open', 'manual', null, null, null)`,
+    id, account_id, date, amount, merchant_id, notes, payee_raw, payee_normalized, status, source, import_row_id, transfer_peer_id, deleted_at
+  ) values (?, ?, ?, ?, ?, null, ?, ?, 'open', 'manual', null, null, null)`,
 );
 for (let index = 0; index < count; index += 1) {
   const date = origin.add({ days: index % 540 }).toString();
@@ -68,6 +68,7 @@ for (let index = 0; index < count; index += 1) {
     ((index % 80) - 40) * 100,
     merchants[index % merchants.length],
     `Payee ${index % 200}`,
+    normalizePayee(`Payee ${index % 200}`),
   );
 }
 sqlite.exec("commit");

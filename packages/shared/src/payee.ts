@@ -38,11 +38,6 @@ const REGIONS = new Set([
   "IT", "NL", "BE", "SE", "NO", "DK", "FI", "JP", "MX", "IN", "SG", "HK", "US",
 ]);
 
-const CITY_LEAD = new Set([
-  "NEW", "LOS", "SAN", "SANTA", "SAINT", "ST", "STE", "FORT", "FT", "NORTH", "SOUTH", "EAST",
-  "WEST", "PORT", "MOUNT", "MT", "LAS", "DES", "VAN",
-]);
-
 function stripPrefixes(value: string): string {
   let current = value;
   for (let pass = 0; pass < 4; pass += 1) {
@@ -58,13 +53,16 @@ function stripPrefixes(value: string): string {
 function stripNoise(value: string): string {
   return value
     .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
-    .replace(/\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/g, " ")
+    .replace(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, " ")
     .replace(/\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/g, " ")
-    .replace(/\b[X*]{2,}\d{2,4}\b/g, " ")
+    .replace(/[X*]{2,}\d{2,4}/g, " ")
     .replace(/\b\d{4}[X*]{2,}\d{0,4}\b/g, " ")
-    .replace(/\b(?:STORE|TERMINAL|TERM|LOCATION|BRANCH|REF|AUTH|APPROVAL|TRACE|SEQ|CONF|REFERENCE|INVOICE|INV)\b\s*#?\s*[A-Z0-9]+\b/g, " ")
-    .replace(/\b(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*\d)[A-Z0-9]{8,}\b/g, " ")
-    .replace(/\b\d{3,}\b/g, " ")
+    .replace(/#\s*\d+\b/g, " ")
+    .replace(
+      /\b(?:STORE|TERMINAL|TERM|NO|LOCATION|BRANCH|REF|AUTH|APPROVAL|TRACE|SEQ|CONF|REFERENCE|INVOICE|INV)\s+#?\s*[A-Z0-9]*\d[A-Z0-9]*\b/g,
+      " ",
+    )
+    .replace(/\b\d{7,}\b/g, " ")
     .replace(/[*#]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -77,18 +75,15 @@ function stripPlace(value: string): string {
     return words.join(" ");
   }
   words.pop();
-  const city = words.at(-1);
-  if (words.length >= 2 && city && /^[A-Z]+$/.test(city)) {
-    words.pop();
-    while (words.length >= 2 && CITY_LEAD.has(words.at(-1) ?? "")) {
-      words.pop();
-    }
-  }
   return words.join(" ");
 }
 
 function tidy(value: string): string {
-  return value.replace(/\s+/g, " ").trim().replace(/^[^A-Z0-9]+|[^A-Z0-9]+$/g, "");
+  return value.replace(/\s+/g, " ").trim().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+}
+
+export function storedPayee(payeeRaw: string): { payeeRaw: string; payeeNormalized: string } {
+  return { payeeRaw, payeeNormalized: normalizePayee(payeeRaw) };
 }
 
 /** Normalized payee for rules, history and merchant defaults (spec §7.3). */

@@ -65,7 +65,7 @@ function snapshot(row: {
 }
 
 function asMatch(value: string): RuleMatch {
-  if (value !== "exact" && value !== "prefix" && value !== "contains" && value !== "regex") {
+  if (value !== "exact" && value !== "prefix" && value !== "contains") {
     throw new Error("Unknown rule match");
   }
   return value;
@@ -251,6 +251,9 @@ export function restoreRule(db: Db, id: string, input: WriteInput): Rule {
     if (!existing.archivedAt) {
       throw new ServiceError("rule_not_archived", 409);
     }
+    assertAccount(tx, existing.accountId);
+    assertMerchant(tx, existing.merchantId);
+    assertActiveCategory(tx, existing.categoryId);
     const next = { ...existing, archivedAt: null };
     tx.update(rules).set({ archivedAt: null }).where(eq(rules.id, id)).run();
     tx.audit({ entity: "rules", entityId: id, action: "restore", before: snapshot(existing), after: snapshot(next) });

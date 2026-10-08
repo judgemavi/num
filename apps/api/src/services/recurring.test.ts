@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { merchants, migrateDatabase, openDatabase, transactions } from "@num/db";
+import { storedPayee } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
 import { ServiceError } from "../service-error";
@@ -58,7 +59,7 @@ function payment(
       date,
       amount,
       merchantId,
-      payeeRaw: "Example payee",
+      ...storedPayee("Example payee"),
       status: "cleared",
       source: "manual",
     })

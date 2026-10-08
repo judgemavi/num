@@ -21,7 +21,7 @@ function rule(patch: Partial<RulePattern> & Pick<RulePattern, "id" | "pattern">)
 }
 
 function history(id: string, date: string, categoryId: string | null, merchantId: string | null = merchant): HistoryRow {
-  return { id, date, payeeRaw: "SQ *STARBUCKS TORONTO ON", merchantId, categoryId };
+  return { id, date, payeeRaw: "SQ *STARBUCKS", merchantId, categoryId };
 }
 
 const merchants: MerchantChoice[] = [
@@ -31,7 +31,7 @@ const merchants: MerchantChoice[] = [
 test("suggestion order uses a scoped rule before a global rule", () => {
   const result = suggestCategorization({
     accountId: account,
-    rawPayee: "SQ *STARBUCKS #12 TORONTO ON",
+    rawPayee: "SQ *STARBUCKS",
     rules: [
       rule({ id: "global", pattern: "starbucks", priority: 100, categoryId: groceries }),
       rule({ id: "scoped", pattern: "STAR", match: "prefix", accountId: account, priority: 0, categoryId: coffee }),
@@ -65,7 +65,7 @@ test("payee history wins when 80 percent of the last 10 agree", () => {
   ];
   const result = suggestCategorization({
     accountId: account,
-    rawPayee: "TST*STARBUCKS OTTAWA ON",
+    rawPayee: "TST*STARBUCKS",
     rules: [],
     history: rows,
     merchants: [],
@@ -82,7 +82,7 @@ test("history below 80 percent falls through to the merchant default", () => {
   ];
   const result = suggestCategorization({
     accountId: account,
-    rawPayee: "SQ *STARBUCKS TORONTO ON",
+    rawPayee: "SQ *STARBUCKS",
     rules: [rule({ id: "other", pattern: "OTHER", accountId: otherAccount })],
     history: rows,
     merchants,
@@ -126,32 +126,28 @@ test("promote after the confirmation count when no rule covers the payee", () =>
   expect(promotionCandidates(split, [], 3).map((item) => item.categoryId)).toEqual([coffee]);
 });
 
-test("transfer pairs are opposite amounts in two on-budget accounts within 3 days", () => {
-  const pairs = transferPairs([
-    { id: "a", accountId: account, onBudget: true, date: "2026-01-01", amount: -5000, linked: false },
-    { id: "b", accountId: otherAccount, onBudget: true, date: "2026-01-03", amount: 5000, linked: false },
-    { id: "c", accountId: account, onBudget: true, date: "2026-02-01", amount: -800, linked: false },
-    { id: "d", accountId: otherAccount, onBudget: true, date: "2026-02-05", amount: 800, linked: false },
-    { id: "e", accountId: "off", onBudget: false, date: "2026-03-01", amount: -100, linked: false },
-    { id: "f", accountId: otherAccount, onBudget: true, date: "2026-03-01", amount: 100, linked: false },
-    { id: "g", accountId: account, onBudget: true, date: "2026-04-01", amount: -100, linked: true },
-    { id: "h", accountId: otherAccount, onBudget: true, date: "2026-04-01", amount: 100, linked: false },
-    { id: "i", accountId: account, onBudget: true, date: "2026-05-01", amount: -50, linked: false },
-    { id: "j", accountId: account, onBudget: true, date: "2026-05-01", amount: 50, linked: false },
-    { id: "k", accountId: account, onBudget: true, date: "2026-06-01", amount: -20, linked: false },
-    { id: "near", accountId: otherAccount, onBudget: true, date: "2026-06-01", amount: 20, linked: false },
-    { id: "far", accountId: otherAccount, onBudget: true, date: "2026-06-03", amount: 20, linked: false },
-  ]);
-  expect(pairs).toEqual([
-    { leftId: "a", rightId: "b" },
-    { leftId: "k", rightId: "near" },
-  ]);
+test("transfer pairs stay inside 90 days and use each transaction once", () => {
+  const asOf = "2026-06-10";
+  const pairs = transferPairs(
+    [
+      { id: "old-out", accountId: account, onBudget: true, date: "2026-03-11", amount: -5000, linked: false },
+      { id: "old-in", accountId: otherAccount, onBudget: true, date: "2026-03-11", amount: 5000, linked: false },
+      { id: "out", accountId: account, onBudget: true, date: "2026-06-01", amount: -2000, linked: false },
+      { id: "in-near", accountId: otherAccount, onBudget: true, date: "2026-06-03", amount: 2000, linked: false },
+      { id: "in-extra", accountId: otherAccount, onBudget: true, date: "2026-06-04", amount: 2000, linked: false },
+      { id: "wide-out", accountId: account, onBudget: true, date: "2026-06-01", amount: -800, linked: false },
+      { id: "wide-in", accountId: otherAccount, onBudget: true, date: "2026-06-05", amount: 800, linked: false },
+      { id: "off-out", accountId: "off", onBudget: false, date: "2026-06-02", amount: -100, linked: false },
+      { id: "off-in", accountId: otherAccount, onBudget: true, date: "2026-06-02", amount: 100, linked: false },
+      { id: "linked", accountId: account, onBudget: true, date: "2026-06-02", amount: -50, linked: true },
+      { id: "linked-in", accountId: otherAccount, onBudget: true, date: "2026-06-02", amount: 50, linked: false },
+    ],
+    asOf,
+  );
+  expect(pairs).toEqual([{ leftId: "in-near", rightId: "out" }]);
 });
 
-test("regex patterns are checked before save", () => {
-  expect(validRulePattern("regex", "(")).toBe(false);
-  expect(validRulePattern("regex", "")).toBe(false);
-  expect(validRulePattern("regex", "^STAR.+")).toBe(true);
+test("a rule pattern must contain text", () => {
   expect(validRulePattern("exact", "Starbucks")).toBe(true);
   expect(validRulePattern("contains", "   ")).toBe(false);
 });
