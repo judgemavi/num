@@ -9,6 +9,8 @@ import { registerDocuments } from "./routes/documents";
 import { healthRoute } from "./routes/health";
 import { registerMerchants } from "./routes/merchants";
 import { registerRecurring } from "./routes/recurring";
+import { registerRules } from "./routes/rules";
+import { registerSuggestions } from "./routes/suggestions";
 import { registerSetup } from "./routes/setup";
 import { registerTags } from "./routes/tags";
 import { registerTransactions } from "./routes/transactions";
@@ -41,6 +43,8 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
   registerCategories(app, db);
   registerTags(app, db);
   registerMerchants(app, db);
+  registerRules(app, db);
+  registerSuggestions(app, db);
   registerRecurring(app, db);
   registerTransactions(app, db);
 

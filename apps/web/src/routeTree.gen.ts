@@ -22,6 +22,7 @@ import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsBackupRouteImport } from './routes/settings/backup'
 import { Route as SettingsCategoriesRouteImport } from './routes/settings/categories'
 import { Route as SettingsGroupsRouteImport } from './routes/settings/groups'
+import { Route as SettingsMerchantsRouteImport } from './routes/settings/merchants'
 import { Route as SettingsTagsRouteImport } from './routes/settings/tags'
 
 const IndexRoute = IndexRouteImport.update({
@@ -89,6 +90,11 @@ const SettingsGroupsRoute = SettingsGroupsRouteImport.update({
   path: '/groups',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsMerchantsRoute = SettingsMerchantsRouteImport.update({
+  id: '/merchants',
+  path: '/merchants',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsTagsRoute = SettingsTagsRouteImport.update({
   id: '/tags',
   path: '/tags',
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
+  '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
   '/settings/': typeof SettingsIndexRoute
 }
@@ -123,6 +130,7 @@ export interface FileRoutesByTo {
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
+  '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
   '/settings': typeof SettingsIndexRoute
 }
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
+  '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
   '/settings/': typeof SettingsIndexRoute
 }
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
+    | '/settings/merchants'
     | '/settings/tags'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
+    | '/settings/merchants'
     | '/settings/tags'
     | '/settings'
   id:
@@ -189,6 +200,7 @@ export interface FileRouteTypes {
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
+    | '/settings/merchants'
     | '/settings/tags'
     | '/settings/'
   fileRoutesById: FileRoutesById
@@ -298,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsGroupsRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/merchants': {
+      id: '/settings/merchants'
+      path: '/merchants'
+      fullPath: '/settings/merchants'
+      preLoaderRoute: typeof SettingsMerchantsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/tags': {
       id: '/settings/tags'
       path: '/tags'
@@ -312,6 +331,7 @@ interface SettingsRouteChildren {
   SettingsBackupRoute: typeof SettingsBackupRoute
   SettingsCategoriesRoute: typeof SettingsCategoriesRoute
   SettingsGroupsRoute: typeof SettingsGroupsRoute
+  SettingsMerchantsRoute: typeof SettingsMerchantsRoute
   SettingsTagsRoute: typeof SettingsTagsRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
@@ -320,6 +340,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsBackupRoute: SettingsBackupRoute,
   SettingsCategoriesRoute: SettingsCategoriesRoute,
   SettingsGroupsRoute: SettingsGroupsRoute,
+  SettingsMerchantsRoute: SettingsMerchantsRoute,
   SettingsTagsRoute: SettingsTagsRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }

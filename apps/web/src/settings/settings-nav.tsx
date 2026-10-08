@@ -21,7 +21,11 @@ export function SettingsSubnav() {
           <Link
             key={area.to}
             to={area.to}
-            search={area.to === "/settings/categories" || area.to === "/settings/tags" ? listSearch : undefined}
+            search={
+              area.to === "/settings/categories" || area.to === "/settings/tags" || area.to === "/settings/merchants"
+                ? listSearch
+                : undefined
+            }
             aria-current={current ? "page" : undefined}
             className={`flex min-h-11 items-center rounded-xl px-3 font-semibold ${current ? "bg-primary-soft text-primary" : "hover:bg-sunken"}`}
           >

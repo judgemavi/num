@@ -19,7 +19,7 @@ export function SettingsIndex() {
             key={area.to}
             simple
             onOpen={() => {
-              if (area.to === "/settings/categories" || area.to === "/settings/tags") {
+              if (area.to === "/settings/categories" || area.to === "/settings/tags" || area.to === "/settings/merchants") {
                 void navigate({ to: area.to, search: listSearch });
                 return;
               }

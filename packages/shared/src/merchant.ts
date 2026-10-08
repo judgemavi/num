@@ -1,14 +1,41 @@
 import { z } from "zod";
 import { listQuerySchema, pagedResponseSchema } from "./list";
+import { isUtcTimestamp } from "./time";
+
+const nameSchema = z.string().trim().min(1);
+
+const archivedQuery = {
+  archived: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .optional()
+    .transform((value) => value === true || value === "true"),
+};
 
 export const merchantSchema = z.object({
   id: z.uuid(),
   name: z.string(),
+  defaultCategoryId: z.uuid().nullable(),
+  archivedAt: z.string().refine(isUtcTimestamp).nullable(),
 });
 
-export const merchantListQuerySchema = listQuerySchema(["name"]);
+export const merchantCreateSchema = z.object({
+  name: nameSchema,
+  defaultCategoryId: z.uuid().nullable().optional(),
+});
 
+export const merchantUpdateSchema = z.object({
+  name: nameSchema,
+  defaultCategoryId: z.uuid().nullable(),
+});
+
+export const merchantMergeSchema = z.object({
+  targetId: z.uuid(),
+});
+
+export const merchantListQuerySchema = listQuerySchema(["name"]).extend(archivedQuery);
 export const merchantListSchema = pagedResponseSchema(merchantSchema);
 
 export type Merchant = z.infer<typeof merchantSchema>;
+export type MerchantCreate = z.infer<typeof merchantCreateSchema>;
+export type MerchantUpdate = z.infer<typeof merchantUpdateSchema>;
 export type MerchantListQuery = z.output<typeof merchantListQuerySchema>;

@@ -29,6 +29,7 @@ import { transactionError } from "@/transactions/format";
 import { emptyLine, lineAmountError, lineAmounts, type LineDraft } from "@/transactions/line-draft";
 import { LineEditor } from "@/transactions/line-editor";
 import { OptionCombobox } from "@/transactions/option-combobox";
+import { SuggestionHint } from "@/transactions/suggestion-hint";
 
 type TransactionFormProps = {
   currency: string;
@@ -234,6 +235,7 @@ export function TransactionForm({
         <FieldLabel htmlFor="txn-payee">Payee</FieldLabel>
         <Input id="txn-payee" value={payee} disabled={locked || payeeLocked} onChange={(event) => setPayee(event.target.value)} />
         {payeeLocked ? <FieldDescription>The bank text stays as it was imported.</FieldDescription> : null}
+        <SuggestionHint accountId={accountId} payee={payee} merchants={merchants} categories={categories} />
       </Field>
       <Field>
         <FieldLabel htmlFor="txn-amount">Amount</FieldLabel>

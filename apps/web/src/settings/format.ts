@@ -40,6 +40,56 @@ export function tagError(code: string): string {
   }
 }
 
+export function merchantError(code: string): string {
+  switch (code) {
+    case "merchant_name_taken":
+      return "A merchant already uses this name.";
+    case "merchant_not_found":
+      return "That merchant is not in the book.";
+    case "merchant_archived":
+      return "This merchant is already archived.";
+    case "merchant_not_archived":
+      return "This merchant is already active.";
+    case "merchant_merge_same":
+      return "Choose a different merchant.";
+    case "category_not_found":
+    case "category_archived":
+      return "Choose a category that is still in use.";
+    case "invalid_body":
+      return "Check the fields.";
+    default:
+      return "The change did not save. Try again.";
+  }
+}
+
+export function ruleError(code: string): string {
+  switch (code) {
+    case "rule_pattern_invalid":
+      return "This pattern is not a valid regular expression.";
+    case "rule_target_required":
+      return "Choose a merchant, a category, or both.";
+    case "rule_not_found":
+      return "That rule is not in the book.";
+    case "rule_archived":
+      return "This rule is already archived.";
+    case "rule_not_archived":
+      return "This rule is already active.";
+    case "account_not_found":
+    case "account_archived":
+      return "Choose an account that is still in use.";
+    case "merchant_not_found":
+    case "merchant_archived":
+      return "Choose a merchant that is still in use.";
+    case "category_not_found":
+    case "category_archived":
+      return "Choose a category that is still in use.";
+    case "invalid_body":
+      return "Check the fields.";
+    default:
+      return "The change did not save. Try again.";
+  }
+}
+
 export function kindLabel(kind: "income" | "expense"): string {
   return kind === "income" ? "Income" : "Expense";
 }
