@@ -18,6 +18,7 @@ export type EditorInput = {
   rule: { id: string | null };
   bucket: { id: string | null };
   plan: { id: string | null; seed?: PlanSeed };
+  mortgage: { id: string | null };
   import: { accountId: string | null };
   reconcile: { accountId: string };
   fundPaycheck: { incomeTransactionId?: string };
@@ -46,6 +47,7 @@ export function isRecordKind(kind: EditorKind): kind is RecordEditorKind {
     kind === "merchant" ||
     kind === "rule" ||
     kind === "bucket" ||
-    kind === "plan"
+    kind === "plan" ||
+    kind === "mortgage"
   );
 }

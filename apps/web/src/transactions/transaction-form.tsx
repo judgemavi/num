@@ -6,9 +6,6 @@ import {
   merchantForChoice,
   moneyDirection,
   normalizePayee,
-  transactionSaveResultSchema,
-  transactionWriteSchema,
-  signedAmount,
   Temporal,
   type Account,
   type Category,
@@ -20,14 +17,15 @@ import {
   type WhatChoice,
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
-import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FieldError } from "@/components/ui/field";
 import { formatMoney } from "@/money";
-import { formatDate, transactionError } from "@/transactions/format";
+import { formatDate } from "@/transactions/format";
+import { MortgageSplitWatch } from "@/transactions/mortgage-split-watch";
 import { DeleteMenu, MoneySection, MoreDetails } from "@/transactions/transaction-parts";
-import { alreadyChosen, choiceOf, linesOf, readPositive, signedTotal, useApplySuggestion } from "@/transactions/transaction-draft";
+import { alreadyChosen, choiceOf, linesOf, signedTotal, useApplySuggestion } from "@/transactions/transaction-draft";
+import { submitTransaction } from "@/transactions/transaction-submit";
 import { PayeeRuleField } from "@/transactions/payee-rule-field";
 import { splitRemainder, type SplitLine } from "@/transactions/what-choice";
 import { WhatIsThis } from "@/transactions/what-is-this";
@@ -177,73 +175,38 @@ export function TransactionForm({
       setError("Assign the whole amount.");
       return;
     }
-    const memoAt = (index: number) => transaction?.lines[index]?.memo ?? null;
-    let built;
-    try {
-      built =
-        choice === "split"
-          ? lines.map((line, index) => ({
-              amount: signedAmount(line.direction, readPositive(currency, line.amount)),
-              memo: memoAt(index),
-              categoryId: line.categoryId,
-              transferAccountId: line.transferAccountId,
-              tagIds,
-            }))
-          : [
-              {
-                amount: totalMinor,
-                memo: memoAt(0),
-                categoryId: choice === "transfer" ? null : categoryId,
-                transferAccountId: choice === "transfer" ? transferAccountId : null,
-                tagIds,
-              },
-            ];
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Check the transaction fields.");
-      return;
-    }
-    if (always && choice !== "split") {
-      if ((choice === "transfer" && !transferAccountId) || (choice !== "transfer" && !categoryId) || rulePattern.trim().length === 0) {
-        setError("Choose a category or account for the rule.");
-        return;
-      }
-    }
-    const body = {
+    setSaving(true);
+    const result = await submitTransaction({
+      currency,
+      transaction,
+      reconciled,
       accountId,
       date,
-      amount: totalMinor,
-      merchantId: merchantForChoice(choice, merchantId),
-      notes: notes.trim().length === 0 ? null : notes.trim(),
-      payeeRaw: payee.trim(),
-      status: reconciled ? "open" : cleared ? "cleared" : "open",
-      lines: built,
-      ...(always && choice !== "split"
-        ? { rule: { payee: normalizePayee(payee), match: ruleMatch, pattern: rulePattern.trim() } }
-        : {}),
-    };
-    const parsed = transactionWriteSchema.safeParse(body);
-    if (!parsed.success) {
-      setError("Check the transaction fields.");
-      return;
-    }
-    setSaving(true);
-    const result = await apiRequest(transaction ? `/api/transactions/${transaction.id}` : "/api/transactions", transactionSaveResultSchema, {
-      method: transaction ? "PATCH" : "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(parsed.data),
+      totalMinor,
+      payee,
+      notes,
+      cleared,
+      merchantId,
+      choice,
+      categoryId,
+      transferAccountId,
+      lines,
+      tagIds,
+      always,
+      ruleMatch,
+      rulePattern,
     });
     setSaving(false);
     if (!result.ok) {
-      setError(transactionError(result.code));
+      setError(result.error);
       return;
     }
-    const skipped = result.data.skipped?.length ?? 0;
-    if (skipped > 0) {
-      setNotice(`Applied to ${result.data.applied ?? 0} · skipped ${skipped}`);
-      setSavedId(result.data.id);
+    if (result.skipped > 0) {
+      setNotice(`Applied to ${result.applied} · skipped ${result.skipped}`);
+      setSavedId(result.id);
       return;
     }
-    onSaved(result.data.id);
+    onSaved(result.id);
   }
 
   const summary = `${formatDate(date)} · ${accountName} · ${direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(imported && transaction ? transaction.amount : (totalMinor ?? 0)))} · ${payee}`;
@@ -294,6 +257,23 @@ export function TransactionForm({
           onDate={setDate}
         />
       )}
+      <MortgageSplitWatch
+        enabled={!transaction && !moneyLocked}
+        fromAccountId={accountId}
+        toAccountId={transferAccountId}
+        date={date}
+        direction={direction}
+        currency={currency}
+        amount={amount}
+        onPrefill={(prefill) => {
+          setChoice("split");
+          setLines(prefill.lines);
+          if (prefill.total !== null) {
+            setAmount(prefill.total);
+          }
+          setNotice("Num put the principal and interest from the schedule in the lines. You can change the amounts.");
+        }}
+      />
       <WhatIsThis
         idPrefix="txn"
         direction={direction}

@@ -8,6 +8,7 @@ export const recordEditorKinds = [
   "rule",
   "bucket",
   "plan",
+  "mortgage",
 ] as const;
 
 export type RecordEditorKind = (typeof recordEditorKinds)[number];

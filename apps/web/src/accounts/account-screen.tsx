@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { AccountImports } from "@/accounts/account-imports";
+import { MortgagePanel } from "@/accounts/mortgage-panel";
 import { AccountTransactions } from "@/accounts/account-transactions";
 import { CheckpointHistory } from "@/accounts/checkpoint-history";
 import { accountDetail, kindLabel } from "@/accounts/format";
@@ -85,6 +86,11 @@ export function AccountScreen() {
             <Button type="button" variant="outline" onClick={() => void openEditor("account", { id: accountId })}>
               Edit
             </Button>
+            {row.kind === "mortgage" ? (
+              <Button type="button" variant="outline" onClick={() => void openEditor("mortgage", { id: accountId })}>
+                Mortgage terms
+              </Button>
+            ) : null}
             <Button
               type="button"
               onClick={() => {
@@ -107,6 +113,7 @@ export function AccountScreen() {
         Balance <Amount currency={bookCurrency} minor={row.balance} owed={accountClass(row.kind) === "liability"} />
       </p>
       <div className="grid items-start gap-5">
+        {row.kind === "mortgage" ? <MortgagePanel accountId={row.id} currency={bookCurrency} /> : null}
         <AccountTransactions
           accountId={row.id}
           currency={bookCurrency}

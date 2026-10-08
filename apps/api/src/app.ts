@@ -12,6 +12,7 @@ import { registerImports } from "./routes/imports";
 import { registerInbox } from "./routes/inbox";
 import { healthRoute } from "./routes/health";
 import { registerMerchants } from "./routes/merchants";
+import { registerMortgage } from "./routes/mortgage";
 import { registerRecurring } from "./routes/recurring";
 import { registerRules } from "./routes/rules";
 import { registerSuggestions } from "./routes/suggestions";
@@ -44,6 +45,7 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
   registerImports(app, db, options.dataDir ?? dataDirectory(undefined));
   registerInbox(app, db);
   registerAccounts(app, db);
+  registerMortgage(app, db);
   registerCheckpoints(app, db);
   registerBuckets(app, db);
   registerFunding(app, db);
