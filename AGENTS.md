@@ -70,6 +70,11 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 - Use `Temporal.PlainDate` for calendar dates. Do not use `Date` for calendar dates.
 - Lists: one shared Zod query schema for the URL and the API. Follow decision 0004.
 
+## Editors and dialogs
+
+- Follow `docs/design.md` §6b: one shared editor for each entity, one dialog host at the app root, `openEditor(...)`.
+  Do not add a dialog inside a screen or a list row. Use the shared `confirm()`.
+
 ## Tests
 
 - Write tests only for logic. Decision 0004 gives the list.

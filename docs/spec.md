@@ -106,11 +106,11 @@ Rules:
   All other kinds are assets.
 - `onBudget` = true means that the user can assign the money in the account to buckets.
   The default is true for `chequing`, `savings`, `cash` and `credit_card`. The default is false for all other kinds.
-  The user can change it.
-- Card fields (only for `credit_card`): `creditLimit?`, `statementDay?` (1–31), `dueDay?` (1–31),
-  `paymentPolicy` (`full | fixed | manual`), `fixedPayment?`.
+  The user can change it. The UI label is "Use this account's money in my budget", under "More details".
+- Card fields (only for `credit_card`): `paymentPolicy` (`full | fixed | manual`, UI label "How you pay"), `fixedPayment?`.
+  There is no statement day, due day or credit limit: statement dates move, and the app derives them (§5.13).
 - Import fields: `importPreset?` (a preset ID) and `columnMap?` (JSON, §7.2). The app saves them after the first import.
-- `interestRateMilliPct?` is for savings, cards and loans. It is for information and for payoff calculations.
+- `interestRateMilliPct?` is for savings and loans (not for credit cards). It is for information and for payoff calculations.
 - Balance of a transaction account = `openingBalance` + the sum of the transaction amounts in the account.
 - Balance of an `investment` or `property` account = the latest valuation (§5.10) + the transactions after the valuation date.
   If the account has no valuation, use the transaction account formula.
@@ -345,6 +345,12 @@ Checkpoint fields: `accountId`, `date`, `statementBalance`, `createdAt`, `unlock
 
 Month close fields: `month` (`YYYY-MM`), `closedAt`, `reopenedAt?`, `reopenReason?`, `summaryJson`.
 
+**Card statements are derived (no fixed days):**
+- A checkpoint of a `credit_card` account is a statement: its date and balance.
+- Due date of a statement = statement date + the median number of days between earlier statements and the next card
+  payment (a transfer into the card account). It needs 2 or more examples; otherwise use 21 days.
+- Future statement dates are estimated as one month after the last statement. The UI labels them "estimated".
+
 ### 5.14 Proposal
 
 A proposal is a change that MCP suggests (§12).
@@ -487,14 +493,27 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
 On import, the app applies steps 1–3. The transaction stays `open`. It shows in "Review recent".
 Only rows without a suggestion go to the Inbox.
 
-**What is this?** An uncategorized transaction in the Inbox offers three choices:
-1. **Spending or income:** a category. Money in shows income categories first; money out shows expense categories first.
-   All categories are available (a refund is money in to an expense category).
-2. **Transfer:** the other account. If that account has an unlinked transaction with the opposite amount within ±3 days,
+**What is this?** The choices follow the direction of the money (decision 0014):
+- Money out: **Spending** (default) · Transfer · Split.
+- Money in: **Income** (default) · Refund · Transfer · Split.
+
+1. **Spending** and **Refund:** an expense category. The list shows only expense categories.
+   **Income:** an income category. The list shows only income categories.
+2. **Transfer:** the other account. The app preselects Transfer only on evidence: an opposite transaction in another
+   account within ±3 days, or a transfer rule. A transfer has no merchant. If that account has an unlinked transaction with the opposite amount within ±3 days,
    the app links the two (no new mirror). If not, the app creates the mirror transaction. A later import of the other
    account matches the mirror (§7.2 step 4).
-3. **Split:** opens the transaction editor (several lines, for example a mortgage payment).
+3. **Split:** several lines, for example a mortgage payment. Each line has its own direction, and its category list shows
+   both groups with labels (this also covers returned income).
 The suggestion (§7.3) preselects the choice: a category, or a transfer from a transfer rule.
+
+**Inbox groups by payee.** Uncategorized transactions with the same normalized payee are one Inbox item: payee, count,
+total. The item has one-click suggestion chips and "Other…". "Other…" opens the transaction editor in group mode
+(§14 of docs/design.md). "Review one by one" opens the editor as a queue (Next, Previous, auto-advance after Save).
+
+**Create on the spot.** The editor can create a merchant (name from the payee, for example "SQ *BLUE BOTTLE 0423" →
+"Blue Bottle"), a category, a group and a tag without leaving the flow. "Always do this for <payee>" creates a rule
+(match type editable) and applies it to that payee's other uncategorized transactions after it shows the count.
 
 **Promote to rule.** The user confirms the same normalized payee with the same merchant and category (or transfer account)
 `promoteAfter` times. If no rule exists for it, the Inbox suggests a rule.
@@ -594,7 +613,8 @@ The forecast is daily, for 90 days. It shows each on-budget account and the tota
   Do not include lines larger than 3 × the median line of that category.
 
 **Card payments:**
-- `full`: the balance on the statement day. The payment occurs on the due day, from the usual payment account of the card.
+- `full`: the balance of the latest statement (§5.13). The payment occurs on its due date, from the usual payment account
+  of the card. Spending after that statement goes into the next estimated statement.
 - `fixed`: `fixedPayment`.
 - `manual`: no payment. The app shows a warning.
 
@@ -630,7 +650,7 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 | Check | The check passes when |
 |---|---|
 | Emergency fund | Essential goal buckets (or savings accounts, if there are no essential goal buckets) ≥ `emergencyFundMonths` × (monthly bills + monthly essential refills) |
-| Cards paid in full | The last statement balance of each `full` card was paid by its due day |
+| Cards paid in full | The last statement balance of each `full` card was paid by its derived due date (§5.13) |
 | Imports are current | Each on-budget account has an import in the last `staleImportDays` days |
 | Months are closed | The previous month is closed |
 | Inbox | No items are older than 7 days |

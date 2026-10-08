@@ -159,22 +159,45 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 
 ## 6a. Transaction editor
 
-One shared "What is this?" component. The transaction dialog uses it as its core. The Inbox uses the same component inline.
+The transaction editor is one shared editor (§6b). The Inbox, Transactions, import detail and Recurring open it.
 
-Dialog order, top to bottom:
+Order, top to bottom:
 1. **Money out / Money in** (ToggleGroup) and **Amount** as a positive number. The sign comes from the toggle.
    Never ask the user to type a minus sign. For an imported transaction, show this section as a read-only summary:
    date · account · money out/in amount · bank text.
 2. **Account** and **Date** on one row (manual transactions only).
-3. **What is this?** (ToggleGroup): Spending or income | Transfer | Split.
-   - Spending or income: category Combobox (income categories first for money in, expense first for money out).
-   - Transfer: "To account" / "From account" Combobox (spec §7.3: link an existing match or create the mirror).
-   - Split: line rows (amount, then category or account) and a live "$X left to assign". Save is disabled until it is 0.
-4. **Merchant** Combobox, with the suggestion and its reason.
-5. **More details** (Collapsible, closed): notes, tags, bank text, "Cleared" checkbox. No "status" word in the UI.
-6. Footer: Save (primary). Delete goes in a More menu with AlertDialog.
+3. **What is this?** (ToggleGroup). The choices follow the direction (spec §7.3):
+   - Money out: Spending · Transfer · Split. Money in: Income · Refund · Transfer · Split.
+   - Spending / Refund: expense categories only. Income: income categories only.
+   - Transfer: "To account" / "From account" Combobox (link an existing match or create the mirror). No merchant.
+   - Split: line rows (direction, amount, then category or account) and a live "$X left to assign". Save is disabled until it is 0.
+4. **Merchant** Combobox, with the suggestion and its reason. Hidden for Transfer.
+5. **"Always do this for <payee>"** checkbox: creates a rule (match type editable) and shows "also applies to N more".
+6. **More details** (Collapsible, closed): notes, tags, bank text, "Cleared" checkbox. No "status" word in the UI.
+7. Footer: Save (primary). Delete goes in a More menu (shared confirm).
 
-The Inbox shows section 3 and the merchant inline, with one primary action (Save) and "More…" that opens the dialog.
+**Group mode:** opened with several transactions (an Inbox payee group). Header: "12 transactions · $84.20".
+Category, transfer and merchant apply to all; the user can exclude items. Split is not available.
+
+**Queue mode:** "Review one by one" opens the editor with a list. Next, Previous, auto-advance after Save.
+
+The Inbox item does not contain a form: payee, count, total, suggestion chips (one click), and "Other…" (opens the editor).
+
+## 6b. Shared editors and the dialog host
+
+- One editor component for each entity: Transaction, Account, Category, Group, Tag, Merchant, Rule, Bucket, Plan.
+  The same editor creates and edits, on every screen.
+- One dialog host at the app root. Screens call `openEditor(kind, props)`. Screens do not render their own dialogs.
+  Only the open editor exists in the page.
+- An editor loads its own data when it opens (by ID, through the query cache). List rows carry only what they show.
+- Editors stack: an editor can open another editor and get the new ID back (create on the spot).
+- One shared `confirm()` (AlertDialog) for every confirmation.
+- The URL shows the open single-record editor (`?edit=transaction:<id>`). Back closes it. Group and queue modes stay in memory.
+
+**Create on the spot:** every picker of user-managed things (categories, groups, tags, merchants, accounts) offers
+"Create …" when the typed name does not exist. It shows a case-insensitive existing match first.
+A new category takes its kind from the current choice; its group picker can create a group; it offers
+"Add to a bucket" (optional).
 
 ## 7. Illustrations
 
