@@ -45,7 +45,15 @@ export const transactions = sqliteTable(
       "transactions_transfer_peer",
       sql`${table.transferPeerId} is null or ${table.transferPeerId} <> ${table.id}`,
     ),
-    index("transactions_account_date").on(table.accountId, table.date),
+    index("transactions_active_date")
+      .on(table.date, table.id)
+      .where(sql`${table.deletedAt} is null`),
+    index("transactions_active_account_date")
+      .on(table.accountId, table.date, table.id, table.amount)
+      .where(sql`${table.deletedAt} is null`),
+    index("transactions_active_merchant_date")
+      .on(table.merchantId, table.date, table.id)
+      .where(sql`${table.deletedAt} is null`),
   ],
 );
 
@@ -68,6 +76,9 @@ export const transactionLines = sqliteTable(
     ),
     index("transaction_lines_transaction").on(table.transactionId),
     index("transaction_lines_category").on(table.categoryId),
+    index("transaction_lines_uncategorized")
+      .on(table.transactionId)
+      .where(sql`${table.categoryId} is null and ${table.transferAccountId} is null`),
     uniqueIndex("transaction_lines_one_transfer")
       .on(table.transactionId)
       .where(sql`${table.transferAccountId} is not null`),
@@ -84,5 +95,8 @@ export const lineTags = sqliteTable(
       .notNull()
       .references(() => tags.id),
   },
-  (table) => [primaryKey({ columns: [table.lineId, table.tagId] })],
+  (table) => [
+    primaryKey({ columns: [table.lineId, table.tagId] }),
+    index("line_tags_tag").on(table.tagId),
+  ],
 );

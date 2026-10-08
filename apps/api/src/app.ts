@@ -4,6 +4,7 @@ import type { Db } from "./db";
 import { registerAccounts } from "./routes/accounts";
 import { registerCategories } from "./routes/categories";
 import { healthRoute } from "./routes/health";
+import { registerMerchants } from "./routes/merchants";
 import { registerSetup } from "./routes/setup";
 import { registerTags } from "./routes/tags";
 import { registerTransactions } from "./routes/transactions";
@@ -32,6 +33,7 @@ export function createApp(db: Db) {
   registerAccounts(app, db);
   registerCategories(app, db);
   registerTags(app, db);
+  registerMerchants(app, db);
   registerTransactions(app, db);
 
   app.doc("/api/openapi.json", {

@@ -1,7 +1,16 @@
-import { errorSchema, transactionCreateSchema, transactionSchema, transactionUpdateSchema } from "@num/shared";
+import {
+  errorSchema,
+  transactionCreateSchema,
+  transactionListQuerySchema,
+  transactionListSchema,
+  transactionSchema,
+  transactionUpdateSchema,
+} from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { createTransaction, deleteTransaction, updateTransaction } from "../services/transactions";
+import { ServiceError } from "../service-error";
+import { listTransactions } from "../services/transaction-list";
+import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -24,6 +33,35 @@ const transactionResponse = {
     },
   },
 } as const;
+
+const listRoute = createRoute({
+  method: "get",
+  path: "/api/transactions",
+  request: {
+    query: transactionListQuerySchema,
+  },
+  responses: {
+    200: {
+      description: "One page of transactions",
+      content: {
+        "application/json": {
+          schema: transactionListSchema,
+        },
+      },
+    },
+    400: errorResponse,
+  },
+});
+
+const readRoute = createRoute({
+  method: "get",
+  path: "/api/transactions/{id}",
+  request: { params: idParams },
+  responses: {
+    200: transactionResponse,
+    404: errorResponse,
+  },
+});
 
 const createRouteDef = createRoute({
   method: "post",
@@ -87,6 +125,17 @@ const deleteRoute = createRoute({
 });
 
 export function registerTransactions(app: OpenAPIHono, db: Db) {
+  app.openapi(listRoute, (c) => c.json(listTransactions(db, c.req.valid("query")), 200));
+
+  app.openapi(readRoute, (c) => {
+    const { id } = c.req.valid("param");
+    const record = getTransaction(db, id);
+    if (!record || record.deletedAt !== null) {
+      throw new ServiceError("transaction_not_found", 404);
+    }
+    return c.json(record, 200);
+  });
+
   app.openapi(createRouteDef, (c) => {
     const body = c.req.valid("json");
     return c.json(createTransaction(db, { ...body, source: "ui" }), 200);

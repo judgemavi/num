@@ -65,6 +65,13 @@ export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
 export { errorCodes, errorSchema, type ErrorBody, type ErrorCode } from "./error";
 export { listQuerySchema, pagedResponseSchema, sortDirections } from "./list";
 export {
+  merchantListQuerySchema,
+  merchantListSchema,
+  merchantSchema,
+  type Merchant,
+  type MerchantListQuery,
+} from "./merchant";
+export {
   interestRateMilliPctSchema,
   maxInterestMilliPct,
   milliPctToPercent,
@@ -85,7 +92,11 @@ export {
   transactionInputStatuses,
   transactionLineInputSchema,
   transactionLineSchema,
+  transactionListItemSchema,
+  transactionListQuerySchema,
+  transactionListSchema,
   transactionSchema,
+  transactionSortColumns,
   transactionSources,
   transactionStatuses,
   transactionUpdateSchema,
@@ -94,6 +105,8 @@ export {
   type TransactionInputStatus,
   type TransactionLine,
   type TransactionLineInput,
+  type TransactionListItem,
+  type TransactionListQuery,
   type TransactionSource,
   type TransactionStatus,
   type TransactionUpdate,
