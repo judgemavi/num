@@ -586,7 +586,7 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
 
 **Unlock.** The user can unlock a checkpoint to edit reconciled transactions. The audit log records the unlock.
 
-**Month close.** The user can close a month only when:
+**Month close.** The user can close a month only when the month has ended (`asOf` is after its last day) and:
 - Each on-budget account has a checkpoint on or after the last day of the month.
 - The Inbox has no items with a date in that month.
 
@@ -705,7 +705,8 @@ To correct other records, the user edits them. The audit log records each edit.
 ## 12. MCP
 
 - Transport: streamable HTTP. The API serves it. The proxy in front of the app protects it (§13).
-- **Read tools:** accounts, balances, transaction search, categories, merchants, buckets, plan, forecast, insights, inbox.
+- **Read tools:** accounts, balances, transaction search, categories, merchants, buckets, plan, forecast, insights, inbox,
+  imports. Read tools never write (the forecast tool does not store the month snapshot).
 - **Write tools create proposals only:**
   - `propose_transactions`: for example, rows from a PDF statement, with the closing balance.
   - `propose_categorization`
@@ -759,7 +760,7 @@ There are 8 screens.
 |---|---|
 | Inbox | All items that need a decision. The user clears it to zero. |
 | Transactions | Search and filter, detail and edit, lines, tags, transfers |
-| Plan | Monthly: income → bills → bucket funding → Unassigned. Goal feasibility. Forecast chart. Safe to spend. |
+| Plan | Monthly: income → bills → bucket funding → left to save (the month remainder, not the Unassigned balance). Goal feasibility. Forecast chart. |
 | Buckets | Balances, funding history, moves, settings |
 | Insights | Month story, categories, merchants, tags, net worth, mortgage, hygiene panel |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports (§7.2). |
