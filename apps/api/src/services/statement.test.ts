@@ -109,3 +109,115 @@ test("both sign conventions set the amount and the closing balance", () => {
   expect(inverted.closingBalance).toBe(-875);
   expect(inverted.closingDate).toBe("2026-04-02");
 });
+
+test("unreadable rows keep their line number and the other rows still parse", () => {
+  const csv = [
+    "date,description,amount,balance",
+    "2026-05-01,NORTH MARKET,4.00,10.00",
+    "xx/yy/2026,NORTH MARKET,1.00,9.00",
+    "2026-05-02,CITY TRANSIT,nope,8.00",
+    "2026-05-03,PAY DEPOSIT,1.005,7.00",
+    "2026-05-04,CARD PAYMENT,100000000000000.00,4.50",
+    "2026-05-05,CITY TRANSIT,-2.50,2.00",
+  ].join("\n");
+  const parsed = parseCsvStatement(
+    csv,
+    {
+      hasHeader: true,
+      date: 0,
+      description: 1,
+      amount: 2,
+      balance: 3,
+      dateOrder: "mdy",
+      signConvention: "account",
+    },
+    digits,
+  );
+  expect(parsed.rows.map((row) => [row.date, row.amount])).toEqual([
+    ["2026-05-01", 400],
+    ["2026-05-05", -250],
+  ]);
+  expect(parsed.unreadable).toEqual([
+    { line: 3, raw: "xx/yy/2026,NORTH MARKET,1.00,9.00", reason: "date_unreadable" },
+    { line: 4, raw: "2026-05-02,CITY TRANSIT,nope,8.00", reason: "amount_unreadable" },
+    { line: 5, raw: "2026-05-03,PAY DEPOSIT,1.005,7.00", reason: "too_many_decimals" },
+    { line: 6, raw: "2026-05-04,CARD PAYMENT,100000000000000.00,4.50", reason: "amount_too_large" },
+  ]);
+  expect(parsed.closingBalance).toBe(200);
+  expect(parsed.closingDate).toBe("2026-05-05");
+
+  const ofx = [
+    "<OFX>",
+    "<STMTTRN>",
+    "<DTPOSTED>20260501",
+    "<TRNAMT>-4.00",
+    "<FITID>A",
+    "<NAME>NORTH MARKET",
+    "</STMTTRN>",
+    "<STMTTRN>",
+    "<DTPOSTED>NOTADATE",
+    "<TRNAMT>-1.00",
+    "<FITID>B",
+    "<NAME>BAD DATE",
+    "</STMTTRN>",
+    "<STMTTRN>",
+    "<DTPOSTED>20260502",
+    "<TRNAMT>1.005",
+    "<FITID>C",
+    "<NAME>TOO FINE",
+    "</STMTTRN>",
+    "<LEDGERBAL>",
+    "<BALAMT>-2.50",
+    "<DTASOF>20260502",
+    "</LEDGERBAL>",
+    "</OFX>",
+  ].join("\n");
+  const ofxResult = parseOfxStatement(ofx, digits);
+  expect(ofxResult.rows).toEqual([
+    { date: "2026-05-01", description: "NORTH MARKET", amount: -400, bankId: "A" },
+  ]);
+  expect(ofxResult.unreadable.map((row) => ({ line: row.line, reason: row.reason }))).toEqual([
+    { line: 8, reason: "date_unreadable" },
+    { line: 14, reason: "too_many_decimals" },
+  ]);
+  expect(ofxResult.closingBalance).toBe(-250);
+  expect(ofxResult.closingDate).toBe("2026-05-02");
+});
+
+test("a decimal comma reads 1.234,56 and letters around an amount are ignored", () => {
+  const text = [
+    "date,description,amount,balance",
+    '2026-06-01,NORTH MARKET,"EUR 1.234,56","€ 2.000,00"',
+    '2026-06-02,PAY DEPOSIT,"10,50","2.010,50"',
+  ].join("\n");
+  const result = parseCsvStatement(
+    text,
+    {
+      hasHeader: true,
+      date: 0,
+      description: 1,
+      amount: 2,
+      balance: 3,
+      dateOrder: "mdy",
+      signConvention: "account",
+      decimalSeparator: ",",
+    },
+    digits,
+  );
+  expect(result.rows.map((row) => row.amount)).toEqual([123456, 1050]);
+  expect(result.unreadable).toEqual([]);
+  expect(result.closingBalance).toBe(201050);
+  expect(result.closingDate).toBe("2026-06-02");
+
+  const dotted = parseCsvStatement("2026-06-03,NORTH MARKET,CAD 12.50,USD 20.00\n", {
+    hasHeader: false,
+    date: 0,
+    description: 1,
+    amount: 2,
+    balance: 3,
+    dateOrder: "mdy",
+    signConvention: "account",
+  }, digits);
+  expect(dotted.rows[0]?.amount).toBe(1250);
+  expect(dotted.closingBalance).toBe(2000);
+});

@@ -8,6 +8,10 @@ export const dateOrders = ["dmy", "mdy"] as const;
 
 export type DateOrder = (typeof dateOrders)[number];
 
+export const decimalSeparators = [".", ","] as const;
+
+export type DecimalSeparator = (typeof decimalSeparators)[number];
+
 const columnSchema = z.number().int().nonnegative();
 
 const columnMapFields = {
@@ -22,6 +26,7 @@ const columnMapFields = {
   dateOrder: z.enum(dateOrders),
   signConvention: z.enum(signConventions),
   balanceSign: z.enum(signConventions).optional(),
+  decimalSeparator: z.enum(decimalSeparators).optional(),
 };
 
 function hasAmountColumn(map: {

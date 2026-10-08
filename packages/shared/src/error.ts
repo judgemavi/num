@@ -43,6 +43,7 @@ export const errorCodes = [
   "merchant_not_found",
   "merchant_archived",
   "document_not_found",
+  "document_too_large",
   "internal_error",
 ] as const;
 

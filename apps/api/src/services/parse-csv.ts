@@ -1,12 +1,16 @@
-import { isIsoDate, type ColumnMap, type SignConvention } from "@num/shared";
-import { parseMinorAmount } from "./parse-amount";
-import type { ParsedStatement, StatementRow } from "./statement";
+import { isIsoDate, type ColumnMap, type DecimalSeparator, type SignConvention } from "@num/shared";
+import { readMinorAmount, type AmountProblem } from "./parse-amount";
+import type { ParsedStatement, StatementRow, UnreadableReason, UnreadableRow } from "./statement";
 
 type BalanceRow = {
   date: string;
   balance: number;
   index: number;
 };
+
+type ReadRow =
+  | { ok: true; row: StatementRow; balance: number | null }
+  | { ok: false; reason: UnreadableReason };
 
 function stripBom(text: string): string {
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
@@ -92,29 +96,88 @@ function applySign(amount: number, convention: SignConvention): number {
   return convention === "inverted" ? -amount : amount;
 }
 
-function rowAmount(cells: string[], map: ColumnMap, digits: number): number | null {
+function money(
+  raw: string,
+  digits: number,
+  decimal: DecimalSeparator,
+): { ok: true; minor: number | null } | { ok: false; reason: AmountProblem } {
+  const read = readMinorAmount(raw, digits, decimal);
+  if (read.kind === "empty") {
+    return { ok: true, minor: null };
+  }
+  if (read.kind === "error") {
+    return { ok: false, reason: read.reason };
+  }
+  return { ok: true, minor: read.minor };
+}
+
+function rowAmount(
+  cells: string[],
+  map: ColumnMap,
+  digits: number,
+  decimal: DecimalSeparator,
+): { ok: true; amount: number } | { ok: false; reason: AmountProblem } {
   if (map.debit != null || map.credit != null) {
-    const debit = map.debit == null ? null : parseMinorAmount(cell(cells, map.debit), digits);
-    const credit = map.credit == null ? null : parseMinorAmount(cell(cells, map.credit), digits);
-    if (debit === null && credit === null) {
-      return null;
+    const debit = map.debit == null ? { ok: true as const, minor: null } : money(cell(cells, map.debit), digits, decimal);
+    if (!debit.ok) {
+      return debit;
     }
-    const out = debit === null ? 0 : Math.abs(debit);
-    const inn = credit === null ? 0 : Math.abs(credit);
-    if (out === 0 && inn === 0) {
-      return null;
+    const credit = map.credit == null ? { ok: true as const, minor: null } : money(cell(cells, map.credit), digits, decimal);
+    if (!credit.ok) {
+      return credit;
     }
-    return inn - out;
+    if (debit.minor === null && credit.minor === null) {
+      return { ok: false, reason: "amount_unreadable" };
+    }
+    const out = debit.minor === null ? 0 : Math.abs(debit.minor);
+    const inn = credit.minor === null ? 0 : Math.abs(credit.minor);
+    return { ok: true, amount: inn - out };
   }
 
-  if (map.amount == null) {
-    return null;
+  const read = money(cell(cells, map.amount), digits, decimal);
+  if (!read.ok) {
+    return read;
   }
-  const amount = parseMinorAmount(cell(cells, map.amount), digits);
-  if (amount === null) {
-    return null;
+  if (read.minor === null) {
+    return { ok: false, reason: "amount_unreadable" };
   }
-  return applySign(amount, map.signConvention);
+  return { ok: true, amount: applySign(read.minor, map.signConvention) };
+}
+
+function readRow(cells: string[], map: ColumnMap, digits: number): ReadRow {
+  const date = toIsoDate(cell(cells, map.date), map.dateOrder);
+  if (!date) {
+    return { ok: false, reason: "date_unreadable" };
+  }
+
+  const decimal = map.decimalSeparator ?? ".";
+  const amount = rowAmount(cells, map, digits, decimal);
+  if (!amount.ok) {
+    return amount;
+  }
+
+  let balance: number | null = null;
+  if (map.balance != null) {
+    const read = money(cell(cells, map.balance), digits, decimal);
+    if (!read.ok) {
+      return read;
+    }
+    if (read.minor !== null) {
+      balance = applySign(read.minor, map.balanceSign ?? map.signConvention);
+    }
+  }
+
+  const bankId = cell(cells, map.bankId).trim();
+  return {
+    ok: true,
+    balance,
+    row: {
+      date,
+      description: cell(cells, map.description).trim(),
+      amount: amount.amount,
+      bankId: bankId.length > 0 ? bankId : null,
+    },
+  };
 }
 
 function closing(rows: BalanceRow[], newestFirst: boolean): BalanceRow | null {
@@ -131,45 +194,30 @@ function closing(rows: BalanceRow[], newestFirst: boolean): BalanceRow | null {
 }
 
 export function parseCsvStatement(text: string, map: ColumnMap, minorDigits: number): ParsedStatement {
-  const lines = stripBom(text)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  const start = map.hasHeader ? 1 : 0;
+  const lines = stripBom(text).split(/\r?\n/);
   const rows: StatementRow[] = [];
+  const unreadable: UnreadableRow[] = [];
   const balances: BalanceRow[] = [];
+  let headerPending = map.hasHeader;
 
-  for (let index = start; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (line === undefined) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const raw = lines[index] ?? "";
+    if (raw.trim().length === 0) {
       continue;
     }
-    const cells = splitCsvLine(line);
-    const date = toIsoDate(cell(cells, map.date), map.dateOrder);
-    if (!date) {
+    if (headerPending) {
+      headerPending = false;
       continue;
     }
-    const amount = rowAmount(cells, map, minorDigits);
-    if (amount === null) {
-      continue;
-    }
-    const bankId = cell(cells, map.bankId).trim();
-    rows.push({
-      date,
-      description: cell(cells, map.description).trim(),
-      amount,
-      bankId: bankId.length > 0 ? bankId : null,
-    });
 
-    if (map.balance != null) {
-      const balance = parseMinorAmount(cell(cells, map.balance), minorDigits);
-      if (balance !== null) {
-        balances.push({
-          date,
-          balance: applySign(balance, map.balanceSign ?? map.signConvention),
-          index,
-        });
-      }
+    const parsed = readRow(splitCsvLine(raw), map, minorDigits);
+    if (!parsed.ok) {
+      unreadable.push({ line: index + 1, raw, reason: parsed.reason });
+      continue;
+    }
+    rows.push(parsed.row);
+    if (parsed.balance !== null) {
+      balances.push({ date: parsed.row.date, balance: parsed.balance, index });
     }
   }
 
@@ -177,6 +225,7 @@ export function parseCsvStatement(text: string, map: ColumnMap, minorDigits: num
   const end = closing(balances, newestFirst);
   return {
     rows,
+    unreadable,
     closingBalance: end?.balance ?? null,
     closingDate: end?.date ?? null,
   };

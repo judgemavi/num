@@ -1,7 +1,10 @@
 import { documentSchema, errorSchema } from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { bodyLimit } from "hono/body-limit";
 import type { Db } from "../db";
 import { deleteDocument, readDocumentFile, uploadDocument } from "../services/documents";
+
+const maxUploadBytes = 20 * 1024 * 1024;
 
 const errorResponse = {
   description: "The request is not valid",
@@ -37,6 +40,7 @@ const uploadRoute = createRoute({
       content: { "application/json": { schema: documentSchema } },
     },
     400: errorResponse,
+    413: errorResponse,
   },
 });
 
@@ -82,6 +86,14 @@ function responseBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
 }
 
 export function registerDocuments(app: OpenAPIHono, db: Db, dataDir: string) {
+  app.use(
+    "/api/documents",
+    bodyLimit({
+      maxSize: maxUploadBytes,
+      onError: (c) => c.json({ code: "document_too_large" as const, params: {} }, 413),
+    }),
+  );
+
   app.openapi(uploadRoute, async (c) => {
     const { file } = c.req.valid("form");
     const document = uploadDocument(db, dataDir, {

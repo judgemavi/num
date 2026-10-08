@@ -1,46 +1,76 @@
-const amountPattern = /^(\d+)(?:\.(\d+))?$/;
+import type { DecimalSeparator } from "@num/shared";
 
-export function parseMinorAmount(raw: string, digits: number): number | null {
+export type AmountProblem = "amount_unreadable" | "too_many_decimals" | "amount_too_large";
+
+export type AmountRead =
+  | { kind: "empty" }
+  | { kind: "value"; minor: number }
+  | { kind: "error"; reason: AmountProblem };
+
+const numberPattern = /^(\d+)(?:\.(\d+))?$/;
+
+function invalid(reason: AmountProblem): AmountRead {
+  return { kind: "error", reason };
+}
+
+export function readMinorAmount(raw: string, digits: number, decimal: DecimalSeparator): AmountRead {
   if (!Number.isInteger(digits) || digits < 0 || digits > 8) {
     throw new Error("Minor unit digits are not valid");
   }
 
-  let text = raw.trim();
-  if (text.length === 0) {
-    return null;
+  if (raw.trim().length === 0) {
+    return { kind: "empty" };
   }
 
   let negative = false;
-  if (text.startsWith("(") && text.endsWith(")")) {
-    negative = true;
-    text = text.slice(1, -1).trim();
+  let text = raw.replace(/[^\d.,+\-()]/g, "");
+  if (!/\d/.test(text)) {
+    return invalid("amount_unreadable");
   }
 
-  text = text.replace(/[$£€\s]/g, "").replace(/,/g, "");
+  if (text.startsWith("(") && text.endsWith(")") && text.length > 2) {
+    negative = true;
+    text = text.slice(1, -1);
+  }
   if (text.startsWith("+")) {
     text = text.slice(1);
-  }
-  if (text.startsWith("-")) {
+  } else if (text.startsWith("-")) {
     negative = !negative;
     text = text.slice(1);
   }
+  if (/[+\-()]/.test(text)) {
+    return invalid("amount_unreadable");
+  }
 
-  const match = amountPattern.exec(text);
-  if (!match) {
-    return null;
+  if (decimal === ".") {
+    text = text.replace(/,/g, "");
+  } else {
+    text = text.replace(/\./g, "");
+    const parts = text.split(",");
+    if (parts.length > 2) {
+      return invalid("amount_unreadable");
+    }
+    text = parts.length === 2 ? `${parts[0] ?? ""}.${parts[1] ?? ""}` : text;
+  }
+  if (text.split(".").length > 2) {
+    return invalid("amount_unreadable");
+  }
+
+  const match = numberPattern.exec(text);
+  if (!match?.[1]) {
+    return invalid("amount_unreadable");
   }
 
   const fraction = match[2] ?? "";
   if (fraction.length > digits) {
-    throw new Error("Amount has too many decimal places");
+    return invalid("too_many_decimals");
   }
 
   const scaled = BigInt(`${match[1]}${fraction.padEnd(digits, "0")}`);
-  const max = BigInt(Number.MAX_SAFE_INTEGER);
-  if (scaled > max) {
-    throw new Error("Amount is too large");
+  if (scaled > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return invalid("amount_too_large");
   }
 
   const minor = Number(scaled);
-  return negative ? -minor : minor;
+  return { kind: "value", minor: negative ? -minor : minor };
 }

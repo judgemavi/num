@@ -88,10 +88,12 @@ export {
 export {
   columnMapSchema,
   dateOrders,
+  decimalSeparators,
   presetSchema,
   signConventions,
   type ColumnMap,
   type DateOrder,
+  type DecimalSeparator,
   type Preset,
   type SignConvention,
 } from "./statement";

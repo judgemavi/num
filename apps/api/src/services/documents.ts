@@ -72,6 +72,39 @@ function findByHash(db: Db, hash: string): DocumentRow | undefined {
   return db.select().from(documents).where(eq(documents.hash, hash)).get();
 }
 
+function restoreDocument(db: Db, row: DocumentRow, input: WriteInput): Document {
+  const at = input.at ?? utcNow();
+  let restored: DocumentRow | undefined;
+  write(db, { source: input.source, at }, (tx) => {
+    const current = tx.select().from(documents).where(eq(documents.id, row.id)).get();
+    if (!current) {
+      throw new ServiceError("document_not_found", 404);
+    }
+    if (current.deletedAt) {
+      tx.update(documents).set({ deletedAt: null }).where(eq(documents.id, current.id)).run();
+    }
+    restored = { ...current, deletedAt: null };
+    tx.audit({
+      entity: "documents",
+      entityId: current.id,
+      action: "restore",
+      before: snapshot(current),
+      after: snapshot(restored),
+    });
+  });
+  if (!restored) {
+    throw new ServiceError("document_not_found", 404);
+  }
+  return toDocument(restored);
+}
+
+function sameDocument(db: Db, row: DocumentRow, input: WriteInput): Document {
+  if (row.deletedAt) {
+    return restoreDocument(db, row, input);
+  }
+  return toDocument(row);
+}
+
 export function uploadDocument(
   db: Db,
   dataDir: string,
@@ -80,7 +113,7 @@ export function uploadDocument(
   const hash = sha256(input.bytes);
   const existing = findByHash(db, hash);
   if (existing) {
-    return toDocument(existing);
+    return sameDocument(db, existing, input);
   }
 
   const row: DocumentRow = {
@@ -110,7 +143,7 @@ export function uploadDocument(
   } catch (error) {
     const saved = findByHash(db, hash);
     if (saved && isHashConflict(error)) {
-      return toDocument(saved);
+      return sameDocument(db, saved, input);
     }
     throw error;
   }
