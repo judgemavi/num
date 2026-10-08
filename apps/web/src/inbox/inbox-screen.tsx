@@ -2,6 +2,7 @@ import {
   accountListSchema,
   categoryListSchema,
   currencyUpdateSchema,
+  fundingPositionSchema,
   inboxSchema,
   merchantListSchema,
   planListSchema,
@@ -30,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { FundPaycheck } from "@/buckets/fund-paycheck";
 import { TransactionDialog } from "@/transactions/transaction-dialog";
 
 type ReasonAsk =
@@ -41,6 +43,7 @@ export function InboxScreen() {
   const queryClient = useQueryClient();
   const [showDismissed, setShowDismissed] = useState(false);
   const [hand, setHand] = useState<Extract<InboxItem, { kind: "import_unreadable" }> | null>(null);
+  const [paycheckId, setPaycheckId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [ask, setAsk] = useState<ReasonAsk | null>(null);
   const [reason, setReason] = useState("");
@@ -82,6 +85,16 @@ export function InboxScreen() {
   const plans = useQuery({
     queryKey: ["plans", "inbox"],
     queryFn: () => loadAllPages("/api/recurring", planListSchema, { archived: false, sort: "name", dir: "asc" }),
+  });
+  const position = useQuery({
+    queryKey: ["funding-position", asOf],
+    queryFn: async () => {
+      const result = await apiRequest(`/api/funding/position?asOf=${asOf}`, fundingPositionSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
+    },
   });
   const tags = useQuery({
     queryKey: ["tags", "inbox"],
@@ -200,6 +213,8 @@ export function InboxScreen() {
                 setAsk({ mode: "dismiss", itemKey });
               }}
               onAddByHand={(item) => setHand(item)}
+              onFundPaycheck={(incomeTransactionId) => setPaycheckId(incomeTransactionId)}
+              unassigned={position.data?.unassigned ?? 0}
               onRestore={(itemKey) => {
                 void restoreItem(itemKey).then((result) => {
                   if (!result.ok) {
@@ -237,6 +252,22 @@ export function InboxScreen() {
           </ul>
         </SidePanel>
       </div>
+      <Dialog open={paycheckId !== null} onOpenChange={(open) => { if (!open) setPaycheckId(null); }}>
+        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
+          {paycheckId ? (
+            <FundPaycheck
+              currency={bookCurrency}
+              asOf={asOf}
+              incomeTransactionId={paycheckId}
+              onClose={() => setPaycheckId(null)}
+              onSaved={() => {
+                setPaycheckId(null);
+                refresh();
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
       {hand && tags.isSuccess ? (
         <TransactionDialog
           draft="new"

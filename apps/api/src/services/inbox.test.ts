@@ -55,7 +55,7 @@ function account(db: Db, name: string) {
     institution: null,
     kind: "chequing",
     openingDate: "2026-01-01",
-    openingBalance: 0,
+    openingBalance: 1_000_000,
     ...saved,
   });
 }
@@ -198,7 +198,7 @@ test("each inbox kind appears and leaves after its action", () => {
       ...saved,
     });
     pay(sample.db, cash.id, "2026-03-08", -4200, "Dining out", dining.id);
-    createBucketEvent(sample.db, spare.id, { kind: "fund", amount: 5000, date: "2026-03-01", ...saved });
+    createBucketEvent(sample.db, spare.id, { kind: "fund", amount: 5000, date: "2026-03-01", asOf, ...saved });
     const marchKey = `bucket_overspent:${meals.id}:2026-03`;
     expect(keys(sample.db, "bucket_overspent")).toEqual([marchKey]);
     dismissInboxItem(sample.db, asOf, marchKey, "Later", saved);

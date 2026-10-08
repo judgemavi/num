@@ -21,11 +21,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 type FundPaycheckProps = {
   currency: string;
   asOf: string;
+  incomeTransactionId?: string;
   onClose: () => void;
   onSaved: () => void;
 };
 
-export function FundPaycheck({ currency, asOf, onClose, onSaved }: FundPaycheckProps) {
+export function FundPaycheck({ currency, asOf, incomeTransactionId, onClose, onSaved }: FundPaycheckProps) {
   const [chosen, setChosen] = useState<string | null>(null);
   const paychecks = useQuery({
     queryKey: ["funding-paychecks"],
@@ -37,7 +38,7 @@ export function FundPaycheck({ currency, asOf, onClose, onSaved }: FundPaycheckP
       return result.data.items;
     },
   });
-  const selected = chosen ?? paychecks.data?.[0]?.incomeTransactionId ?? null;
+  const selected = chosen ?? incomeTransactionId ?? paychecks.data?.[0]?.incomeTransactionId ?? null;
   const proposal = useQuery({
     queryKey: ["funding-proposal", selected, asOf],
     enabled: selected !== null,

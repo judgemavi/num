@@ -4,6 +4,7 @@ import { Temporal, unreadableRowSchema, type InboxItem } from "@num/shared";
 import { and, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { listOverspent } from "./buckets";
+import { listFundingPaychecks } from "./funding-book";
 import { uncategorizedItems } from "./inbox-uncategorized";
 import { recurringSignals } from "./recurring-view";
 import { listPromotionCandidates, listTransferPairs } from "./suggestions";
@@ -225,6 +226,18 @@ function overspentItems(db: Db, asOf: string): InboxItem[] {
   }));
 }
 
+function paycheckItems(db: Db): InboxItem[] {
+  return listFundingPaychecks(db).items.map((item) => ({
+    kind: "paycheck_funding" as const,
+    itemKey: `paycheck_funding:${item.incomeTransactionId}`,
+    date: item.date,
+    incomeTransactionId: item.incomeTransactionId,
+    dueDate: item.dueDate,
+    amount: item.amount,
+    payee: item.payee,
+  }));
+}
+
 function unreadableItems(db: Db): InboxItem[] {
   const batches = db
     .select({
@@ -303,6 +316,7 @@ export function collectInbox(db: Db, asOf: string): {
     ...transferItems(db, asOf),
     ...promotionItems(db),
     ...overspentItems(db, asOf),
+    ...paycheckItems(db),
     ...unreadableItems(db),
   ];
   return {

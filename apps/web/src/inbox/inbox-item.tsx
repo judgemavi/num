@@ -1,10 +1,11 @@
 import type { Bucket, Category, InboxItem, Plan } from "@num/shared";
-import { AlertTriangle, ArrowLeftRight, FileWarning, Repeat, Tag, TrendingUp, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Banknote, FileWarning, Repeat, Tag, TrendingUp, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import {
   acceptPair,
   coverOverspent,
   createProposedPlan,
+  fundFromUnassigned,
   linkOccurrence,
   promoteRule,
   resolveReview,
@@ -28,6 +29,8 @@ type InboxItemRowProps = {
   onSkip: (planId: string, dueDate: string) => void;
   onDismiss: (itemKey: string) => void;
   onAddByHand: (item: Extract<InboxItem, { kind: "import_unreadable" }>) => void;
+  onFundPaycheck: (incomeTransactionId: string) => void;
+  unassigned: number;
   onRestore?: (itemKey: string) => void;
   dismissedReason?: string;
   onDone: () => void;
@@ -45,6 +48,7 @@ const icons: Record<InboxItem["kind"], LucideIcon> = {
   promote_rule: Tag,
   bucket_overspent: AlertTriangle,
   import_unreadable: FileWarning,
+  paycheck_funding: Banknote,
 };
 
 function Choice({
@@ -75,6 +79,8 @@ export function InboxItemRow({
   onSkip,
   onDismiss,
   onAddByHand,
+  onFundPaycheck,
+  unassigned,
   onRestore,
   dismissedReason,
   onDone,
@@ -97,7 +103,6 @@ export function InboxItemRow({
     item.kind === "bucket_overspent"
       ? buckets.filter((bucket) => bucket.id !== item.bucketId && bucket.balance >= -item.balance && bucket.archivedAt === null)
       : [];
-  const sourceId = item.kind === "bucket_overspent" ? choice || (sources[0]?.id ?? "") : "";
 
   async function run(action: () => Promise<{ ok: boolean; code?: string }>) {
     setPending(true);
@@ -184,15 +189,30 @@ export function InboxItemRow({
     };
   } else if (item.kind === "import_unreadable") {
     primary = { label: "Add by hand", disabled: false, run: () => onAddByHand(item) };
+  } else if (item.kind === "paycheck_funding") {
+    primary = { label: "Fund buckets", disabled: false, run: () => onFundPaycheck(item.incomeTransactionId) };
   } else if (item.kind === "bucket_overspent") {
-    choices = sources.map((bucket) => ({
-      id: bucket.id,
-      label: `${bucket.name} · ${formatMoney(currency, bucket.balance)} left`,
-    }));
+    const need = -item.balance;
+    const fromUnassigned = Math.min(need, Math.max(0, unassigned));
+    choices = [
+      ...(fromUnassigned > 0
+        ? [{ id: "unassigned", label: `Unassigned · ${formatMoney(currency, unassigned)}` }]
+        : []),
+      ...sources.map((bucket) => ({
+        id: bucket.id,
+        label: `${bucket.name} · ${formatMoney(currency, bucket.balance)} left`,
+      })),
+    ];
+    const selected = choice || (choices[0]?.id ?? "");
     primary = {
-      label: sourceId ? `Cover from ${names.bucket(sourceId)}` : "Cover it",
-      disabled: sourceId.length === 0,
-      run: () => void run(() => coverOverspent(item.bucketId, sourceId, asOf)),
+      label: selected === "unassigned" ? "Cover from Unassigned" : selected ? `Cover from ${names.bucket(selected)}` : "Cover it",
+      disabled: selected.length === 0,
+      run: () =>
+        void run(() =>
+          selected === "unassigned"
+            ? fundFromUnassigned(item.bucketId, fromUnassigned, asOf)
+            : coverOverspent(item.bucketId, selected, asOf),
+        ),
     };
   }
 

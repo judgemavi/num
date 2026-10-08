@@ -132,6 +132,10 @@ export function coverOverspent(bucketId: string, fromBucketId: string, date: str
   return apiRequest(`/api/buckets/${bucketId}/cover`, bucketEventSchema, json({ fromBucketId, date }));
 }
 
+export function fundFromUnassigned(bucketId: string, amount: number, asOf: string) {
+  return apiRequest(`/api/buckets/${bucketId}/events?asOf=${asOf}`, bucketEventSchema, json({ kind: "fund", amount, date: asOf }));
+}
+
 export function dismissItem(asOf: string, itemKey: string, reason: string) {
   return apiRequest(`/api/inbox/dismissals?asOf=${asOf}`, inboxRestoreSchema, json({ itemKey, reason }));
 }

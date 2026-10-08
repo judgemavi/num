@@ -28,6 +28,7 @@ export const inboxKinds = [
   "promote_rule",
   "bucket_overspent",
   "import_unreadable",
+  "paycheck_funding",
 ] as const;
 
 export type InboxKind = (typeof inboxKinds)[number];
@@ -126,6 +127,15 @@ export const inboxItemSchema = z.discriminatedUnion("kind", [
     line: z.number().int(),
     raw: z.string(),
     reason: z.enum(unreadableReasons),
+  }),
+  z.object({
+    kind: z.literal("paycheck_funding"),
+    itemKey,
+    date: isoDateSchema,
+    incomeTransactionId: z.uuid(),
+    dueDate: isoDateSchema,
+    amount: cents,
+    payee: z.string(),
   }),
 ]);
 

@@ -14,6 +14,7 @@ const kindHue: Record<InboxKind, Hue | "attention"> = {
   transfer_pair: "butter",
   import_unreadable: "butter",
   bucket_overspent: "attention",
+  paycheck_funding: "mint",
 };
 
 export function inboxHue(kind: InboxKind): Hue | "attention" {
@@ -61,6 +62,8 @@ export function inboxError(code: string): string {
       return "That bucket is no longer over.";
     case "bucket_short":
       return "That bucket does not have enough to cover this.";
+    case "fund_over_unassigned":
+      return "Unassigned does not have enough to cover this.";
     case "inbox_item_not_found":
       return "That item is no longer in the inbox.";
     case "occurrence_taken":
@@ -102,6 +105,8 @@ export function itemTitle(item: InboxItem, names: Names, currency: string): stri
       return `${names.bucket(item.bucketId)} is over by ${formatMoney(currency, Math.abs(item.balance))}`;
     case "import_unreadable":
       return "A statement row could not be read";
+    case "paycheck_funding":
+      return "Fund this paycheck";
   }
 }
 
@@ -127,5 +132,7 @@ export function itemWhy(item: InboxItem, names: Names, currency: string): string
       return "Cover it from another bucket.";
     case "import_unreadable":
       return `${names.account(item.accountId)} · line ${item.line}. ${unreadableLabel(item.reason as UnreadableReason)}`;
+    case "paycheck_funding":
+      return `${item.payee} · ${shortDate(item.date)} · ${formatMoney(currency, item.amount)}`;
   }
 }
