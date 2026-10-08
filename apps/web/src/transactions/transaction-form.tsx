@@ -77,6 +77,9 @@ export function TransactionForm({
   const [choice, setChoice] = useState<WhatChoice>(choiceOf(transaction, categories));
   const [categoryId, setCategoryId] = useState<string | null>(transaction?.lines[0]?.categoryId ?? null);
   const [transferAccountId, setTransferAccountId] = useState<string | null>(transaction?.lines[0]?.transferAccountId ?? null);
+  const [linesEdited, setLinesEdited] = useState(
+    () => transaction !== null && (transaction.lines.length > 1 || transaction.lines.some((line) => line.categoryId !== null || line.transferAccountId !== null)),
+  );
   const [lines, setLines] = useState<SplitLine[]>(() =>
     transaction && transaction.lines.length > 1
       ? linesOf(currency, transaction, fromMinorUnits(currency, Math.abs(transaction.amount)), moneyDirection(transaction.amount))
@@ -258,7 +261,9 @@ export function TransactionForm({
         />
       )}
       <MortgageSplitWatch
-        enabled={!transaction && !moneyLocked}
+        enabled={!reconciled && !linesEdited}
+        edited={linesEdited}
+        choice={choice}
         fromAccountId={accountId}
         toAccountId={transferAccountId}
         date={date}
@@ -268,7 +273,7 @@ export function TransactionForm({
         onPrefill={(prefill) => {
           setChoice("split");
           setLines(prefill.lines);
-          if (prefill.total !== null) {
+          if (!transaction && prefill.total !== null) {
             setAmount(prefill.total);
           }
           setNotice("Num put the principal and interest from the schedule in the lines. You can change the amounts.");
@@ -294,7 +299,10 @@ export function TransactionForm({
         }}
         transferLocked={reconciled || amountLocked}
         lines={lines}
-        onLines={setLines}
+        onLines={(next) => {
+          setLinesEdited(true);
+          setLines(next);
+        }}
         amountsLocked={reconciled || amountLocked}
         currency={currency}
         totalMinor={totalMinor}

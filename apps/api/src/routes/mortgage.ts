@@ -98,7 +98,10 @@ export function registerMortgage(app: OpenAPIHono, db: Db) {
   app.openapi(viewRoute, (c) => {
     const { id } = c.req.valid("param");
     const query = c.req.valid("query");
-    return c.json(mortgageAccountView(db, id, query.asOf, query.extra), 200);
+    return c.json(
+      mortgageAccountView(db, id, query.asOf, { extra: query.extra, lumpSum: query.lumpSum, lumpDate: query.lumpDate }),
+      200,
+    );
   });
   app.openapi(prefillRoute, (c) => {
     const query = c.req.valid("query");

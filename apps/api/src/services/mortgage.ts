@@ -134,11 +134,18 @@ export function saveMortgageTerms(db: Db, accountId: string, input: MortgageTerm
   });
 }
 
-export function mortgageAccountView(db: Db, accountId: string, asOf: string, extra: number | undefined): MortgageView {
+export function mortgageAccountView(
+  db: Db,
+  accountId: string,
+  asOf: string,
+  options: { extra?: number; lumpSum?: number; lumpDate?: string },
+): MortgageView {
   const terms = getMortgageTerms(db, accountId);
   const checkpoints = activeValuations(db, accountId);
   const schedule = mortgageSchedule(terms, checkpoints);
-  const effect = extra && extra > 0 ? mortgageExtraEffect(terms, checkpoints, extra) : null;
+  const perPayment = options.extra ?? 0;
+  const lump = options.lumpSum && options.lumpSum > 0 && options.lumpDate ? { date: options.lumpDate, amount: options.lumpSum } : null;
+  const effect = perPayment > 0 || lump ? mortgageExtraEffect(terms, checkpoints, { perPayment, lumpSum: lump }) : null;
   return {
     balance: mortgageBalanceAsOf(terms, checkpoints, asOf),
     rateMilliPct: terms.rateMilliPct,
@@ -150,7 +157,9 @@ export function mortgageAccountView(db: Db, accountId: string, asOf: string, ext
     nextPayments: mortgageNextPayments(schedule, asOf, 6),
     extra: effect
       ? {
-          amount: extra ?? 0,
+          amount: perPayment,
+          lumpSum: lump?.amount ?? null,
+          lumpDate: lump?.date ?? null,
           payoffDate: effect.payoffDate,
           interestSaved: effect.interestSaved,
         }
@@ -158,24 +167,36 @@ export function mortgageAccountView(db: Db, accountId: string, asOf: string, ext
   };
 }
 
-export function mortgagePrefill(db: Db, fromAccountId: string, toAccountId: string, date: string): MortgagePrefill | null {
-  const account = db.select().from(accounts).where(eq(accounts.id, toAccountId)).get();
+function mortgagePaidFrom(db: Db, fromAccountId: string): string | null {
+  const rows = db.select().from(mortgageTerms).where(eq(mortgageTerms.paymentAccountId, fromAccountId)).all();
+  if (rows.length !== 1) {
+    return null;
+  }
+  return rows[0]?.accountId ?? null;
+}
+
+export function mortgagePrefill(db: Db, fromAccountId: string, toAccountId: string | undefined, date: string): MortgagePrefill | null {
+  const targetId = toAccountId ?? mortgagePaidFrom(db, fromAccountId);
+  if (!targetId) {
+    return null;
+  }
+  const account = db.select().from(accounts).where(eq(accounts.id, targetId)).get();
   if (!account || account.kind !== "mortgage") {
     return null;
   }
-  const row = db.select().from(mortgageTerms).where(eq(mortgageTerms.accountId, toAccountId)).get();
+  const row = db.select().from(mortgageTerms).where(eq(mortgageTerms.accountId, targetId)).get();
   if (!row) {
     return null;
   }
   const split = mortgageSplitForDate({
     terms: snapshot(row),
-    valuations: activeValuations(db, toAccountId),
+    valuations: activeValuations(db, targetId),
     date,
     fromAccountId,
-    toAccountId,
+    toAccountId: targetId,
   });
   if (!split || split.payment < 1) {
     return null;
   }
-  return split;
+  return { ...split, mortgageAccountId: targetId };
 }

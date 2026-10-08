@@ -39,6 +39,11 @@ export type MortgageValuation = {
   balance: number;
 };
 
+export type MortgageLumpSum = {
+  date: string;
+  amount: number;
+};
+
 export type MortgageLoan = {
   principal: number;
   principalAsOf: string;
@@ -48,6 +53,7 @@ export type MortgageLoan = {
   paymentFrequency: PaymentFrequency;
   firstPaymentDate: string;
   extraPerPayment?: number;
+  lumpSum?: MortgageLumpSum | null;
 };
 
 export type MortgagePaymentRow = {
@@ -155,8 +161,12 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
   const regular = mortgagePeriodRate(loan.rateMilliPct, loan.compounding, frequency);
   const extra = loan.extraPerPayment ?? 0;
   const due = loan.paymentAmount + extra;
+  const lump = loan.lumpSum ?? null;
   if (!Number.isSafeInteger(due) || due < 1) {
     throw new Error("Payment amount is not a safe integer");
+  }
+  if (lump && (!Number.isSafeInteger(lump.amount) || lump.amount < 1)) {
+    throw new Error("Lump sum is not a safe integer");
   }
   const checkpoints = sortedValuations(valuations);
   let balance = loan.principal;
@@ -166,41 +176,60 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
       balance = owed(valuation.balance);
     }
   }
+  if (lump && lump.date === loan.principalAsOf) {
+    balance = Math.max(0, balance - lump.amount);
+  }
   const payments: MortgagePaymentRow[] = [];
   let totalInterest = 0;
   let nonAmortizing = false;
+  let payoffOn: string | null = null;
   let cursor = 0;
+  let lumpUsed = lump?.date === loan.principalAsOf;
   const limit = 50 * periods;
   for (let index = 0; index < limit && balance > 0; index += 1) {
     const date = mortgagePaymentDate(loan.firstPaymentDate, index, frequency);
-    let rate = index === 0 ? chargeRate(regular, periods, previous, date, frequency) : regular;
-    while (cursor < checkpoints.length && checkpoints[cursor].date <= date) {
+    while (cursor < checkpoints.length && checkpoints[cursor].date < date) {
       const valuation = checkpoints[cursor];
       cursor += 1;
       if (valuation.date <= previous) {
         continue;
       }
       balance = owed(valuation.balance);
-      if (valuation.date < date) {
-        previous = valuation.date;
-        rate = chargeRate(regular, periods, previous, date, frequency);
-      } else {
-        rate = regular;
+      previous = valuation.date;
+    }
+    if (lump && !lumpUsed && lump.date > previous && lump.date < date) {
+      balance = Math.max(0, balance - lump.amount);
+      lumpUsed = true;
+      previous = lump.date;
+      if (balance === 0) {
+        payoffOn = lump.date;
+        break;
       }
     }
+    const rate = chargeRate(regular, periods, previous, date, frequency);
     const interest = Math.round(balance * rate);
-    if (interest >= due) {
+    const sameDayLump = lump && !lumpUsed && lump.date === date ? lump.amount : 0;
+    const payable = due + sameDayLump;
+    if (interest >= payable) {
       nonAmortizing = true;
       break;
     }
-    const payment = Math.min(due, balance + interest);
+    const payment = Math.min(payable, balance + interest);
     const principal = payment - interest;
     balance -= principal;
+    if (sameDayLump > 0) {
+      lumpUsed = true;
+    }
     totalInterest += interest;
     if (![balance, interest, payment, principal, totalInterest].every(Number.isSafeInteger)) {
       throw new Error("Schedule amount is not a safe integer");
     }
     payments.push({ date, payment, principal, interest, balance });
+    if (cursor < checkpoints.length && checkpoints[cursor].date === date) {
+      balance = owed(checkpoints[cursor].balance);
+      payments[payments.length - 1].balance = balance;
+      cursor += 1;
+    }
     previous = date;
     if (balance === 0) {
       break;
@@ -209,7 +238,7 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
   const paidOff = balance === 0;
   return {
     payments,
-    payoffDate: paidOff ? (payments.at(-1)?.date ?? loan.principalAsOf) : null,
+    payoffDate: paidOff ? (payoffOn ?? payments.at(-1)?.date ?? loan.principalAsOf) : null,
     totalInterest,
     remaining: balance,
     nonAmortizing,
@@ -220,20 +249,24 @@ export function mortgageBalanceAsOf(loan: MortgageLoan, valuations: MortgageValu
   if (asOf < loan.principalAsOf) {
     return loan.principal;
   }
+  const checkpoints = sortedValuations(valuations);
+  const onDate = checkpoints.filter((valuation) => valuation.date === asOf);
+  if (onDate.length > 0) {
+    return owed(onDate[onDate.length - 1].balance);
+  }
   const schedule = mortgageSchedule(loan, valuations);
   let balance = loan.principal;
-  for (const valuation of sortedValuations(valuations)) {
+  for (const valuation of checkpoints) {
     if (valuation.date === loan.principalAsOf) {
       balance = owed(valuation.balance);
     }
   }
-  const paid = schedule.payments.filter((row) => row.date <= asOf);
-  const lastPaid = paid.at(-1);
+  const lastPaid = schedule.payments.filter((row) => row.date <= asOf).at(-1);
   if (lastPaid) {
     balance = lastPaid.balance;
   }
   let latest = lastPaid?.date ?? loan.principalAsOf;
-  for (const valuation of sortedValuations(valuations)) {
+  for (const valuation of checkpoints) {
     if (valuation.date > latest && valuation.date <= asOf) {
       balance = owed(valuation.balance);
       latest = valuation.date;
@@ -249,17 +282,31 @@ export function mortgageNextPayments(schedule: MortgageSchedule, asOf: string, c
 export function mortgageExtraEffect(
   loan: MortgageLoan,
   valuations: MortgageValuation[],
-  extraPerPayment: number,
+  extra: { perPayment: number; lumpSum: MortgageLumpSum | null },
 ): { payoffDate: string | null; interestSaved: number | null } {
   const base = mortgageSchedule(loan, valuations);
-  const extra = mortgageSchedule({ ...loan, extraPerPayment }, valuations);
-  if (base.payoffDate === null || extra.payoffDate === null) {
-    return { payoffDate: extra.payoffDate, interestSaved: null };
+  const scenario = mortgageSchedule(
+    { ...loan, extraPerPayment: extra.perPayment, lumpSum: extra.lumpSum },
+    valuations,
+  );
+  if (base.payoffDate === null || scenario.payoffDate === null) {
+    return { payoffDate: scenario.payoffDate, interestSaved: null };
   }
   return {
-    payoffDate: extra.payoffDate,
-    interestSaved: base.totalInterest - extra.totalInterest,
+    payoffDate: scenario.payoffDate,
+    interestSaved: base.totalInterest - scenario.totalInterest,
   };
+}
+
+export function mortgagePrefillLines(
+  interest: number,
+  scheduledPrincipal: number,
+  total: number | null,
+): { principal: number; interest: number } {
+  if (total === null) {
+    return { principal: scheduledPrincipal, interest };
+  }
+  return { interest, principal: total - interest };
 }
 
 export function mortgageSplitForDate(input: {
@@ -273,7 +320,7 @@ export function mortgageSplitForDate(input: {
     return null;
   }
   const schedule = mortgageSchedule(input.terms, input.valuations);
-  const row = schedule.payments.find((payment) => payment.date === input.date);
+  const row = schedule.payments.filter((payment) => payment.date <= input.date).at(-1);
   if (!row) {
     return null;
   }
@@ -304,7 +351,9 @@ export const mortgageViewSchema = z.object({
   nextPayments: z.array(mortgagePaymentSchema),
   extra: z
     .object({
-      amount: positiveCents,
+      amount: cents,
+      lumpSum: cents.nullable(),
+      lumpDate: isoDateSchema.nullable(),
       payoffDate: isoDateSchema.nullable(),
       interestSaved: z.number().int().nullable(),
     })
@@ -315,17 +364,28 @@ export const mortgagePrefillSchema = z.object({
   principal: cents,
   interest: cents,
   interestCategoryId: z.uuid(),
+  mortgageAccountId: z.uuid(),
   payment: positiveCents,
 });
 
-export const mortgageViewQuerySchema = z.object({
-  asOf: isoDateSchema,
-  extra: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
-});
+export const mortgageViewQuerySchema = z
+  .object({
+    asOf: isoDateSchema,
+    extra: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+    lumpSum: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+    lumpDate: isoDateSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    const hasAmount = (value.lumpSum ?? 0) > 0;
+    const hasDate = value.lumpDate !== undefined;
+    if (hasAmount !== hasDate) {
+      ctx.addIssue({ code: "custom", path: ["lumpDate"] });
+    }
+  });
 
 export const mortgagePrefillQuerySchema = z.object({
   fromAccountId: z.uuid(),
-  toAccountId: z.uuid(),
+  toAccountId: z.uuid().optional(),
   date: isoDateSchema,
 });
 

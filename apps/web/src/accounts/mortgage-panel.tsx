@@ -20,15 +20,23 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
   const { openEditor } = useEditors();
   const asOf = localAsOf();
   const [extraText, setExtraText] = useState("");
+  const [lumpText, setLumpText] = useState("");
+  const [lumpDateText, setLumpDateText] = useState("");
   const [extra, setExtra] = useState(0);
+  const [lumpSum, setLumpSum] = useState(0);
+  const [lumpDate, setLumpDate] = useState("");
   const [extraError, setExtraError] = useState<string | null>(null);
 
   const view = useQuery({
-    queryKey: ["mortgage-view", accountId, asOf, extra],
+    queryKey: ["mortgage-view", accountId, asOf, extra, lumpSum, lumpDate],
     queryFn: async () => {
       const params = new URLSearchParams({ asOf });
       if (extra > 0) {
         params.set("extra", String(extra));
+      }
+      if (lumpSum > 0 && lumpDate.length > 0) {
+        params.set("lumpSum", String(lumpSum));
+        params.set("lumpDate", lumpDate);
       }
       const result = await apiRequest(`/api/accounts/${accountId}/mortgage?${params.toString()}`, mortgageViewSchema);
       if (!result.ok) {
@@ -67,22 +75,37 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
   const row = view.data;
   const rate = `${milliPctToPercent(row.rateMilliPct)}%`;
 
-  function showExtra() {
-    setExtraError(null);
-    if (extraText.trim().length === 0) {
-      setExtra(0);
-      return;
+  function readExtra(text: string): number | null {
+    if (text.trim().length === 0) {
+      return 0;
     }
     try {
-      const minor = toMinorUnits(currency, extraText.trim());
+      const minor = toMinorUnits(currency, text.trim());
       if (minor < 0) {
         setExtraError("Enter the extra amount as a positive number.");
-        return;
+        return null;
       }
-      setExtra(minor);
+      return minor;
     } catch {
       setExtraError("Enter the extra amount as a number.");
+      return null;
     }
+  }
+
+  function showExtra() {
+    setExtraError(null);
+    const perPayment = readExtra(extraText);
+    const once = readExtra(lumpText);
+    if (perPayment === null || once === null) {
+      return;
+    }
+    if ((once > 0 && lumpDateText.length === 0) || (once === 0 && lumpDateText.length > 0)) {
+      setExtraError("Enter the one-time extra and its date.");
+      return;
+    }
+    setExtra(perPayment);
+    setLumpSum(once);
+    setLumpDate(lumpDateText);
   }
 
   return (
@@ -121,12 +144,20 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
             ))}
           </ul>
         </div>
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="mortgage-extra">Extra on each payment</FieldLabel>
             <Input id="mortgage-extra" inputMode="decimal" autoComplete="off" value={extraText} onChange={(event) => setExtraText(event.target.value)} />
           </Field>
-          <Button type="button" variant="outline" onClick={showExtra}>Show the effect</Button>
+          <Field>
+            <FieldLabel htmlFor="mortgage-lump">One-time extra</FieldLabel>
+            <Input id="mortgage-lump" inputMode="decimal" autoComplete="off" value={lumpText} onChange={(event) => setLumpText(event.target.value)} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="mortgage-lump-date">Date of the one-time extra</FieldLabel>
+            <Input id="mortgage-lump-date" type="date" value={lumpDateText} onChange={(event) => setLumpDateText(event.target.value)} />
+          </Field>
+          <Button type="button" variant="outline" className="self-end" onClick={showExtra}>Show the effect</Button>
         </div>
         {extraError ? <p className="text-sm">{extraError}</p> : null}
         {row.extra ? (

@@ -5,6 +5,7 @@ import {
   mortgagePaymentCents,
   mortgagePaymentDate,
   mortgagePeriodRate,
+  mortgagePrefillLines,
   mortgageSchedule,
   mortgageSplitForDate,
   type MortgageLoan,
@@ -94,13 +95,34 @@ describe("mortgage schedule", () => {
     expect(schedule.payments.map((row) => [row.date, row.balance])).toEqual([
       ["2024-02-01", 9_000],
       ["2024-03-01", 8_000],
-      ["2024-04-01", 4_000],
-      ["2024-05-01", 3_000],
-      ["2024-06-01", 2_000],
-      ["2024-07-01", 1_000],
-      ["2024-08-01", 0],
+      ["2024-04-01", 5_000],
+      ["2024-05-01", 4_000],
+      ["2024-06-01", 3_000],
+      ["2024-07-01", 2_000],
+      ["2024-08-01", 1_000],
+      ["2024-09-01", 0],
     ]);
+    expect(mortgageBalanceAsOf(terms, [{ date: "2024-04-01", balance: -5_000 }], "2024-04-01")).toBe(5_000);
     expect(mortgageBalanceAsOf(terms, [{ date: "2024-03-15", balance: -6_000 }], "2024-03-20")).toBe(6_000);
+  });
+
+  test("a mid-period valuation with interest replaces the balance and the next interest", () => {
+    const terms: MortgageLoan = {
+      principal: 1_000_000,
+      principalAsOf: "2025-01-01",
+      rateMilliPct: 6_000,
+      compounding: "monthly",
+      paymentAmount: 50_000,
+      paymentFrequency: "monthly",
+      firstPaymentDate: "2025-02-01",
+    };
+    const schedule = mortgageSchedule(terms, [{ date: "2025-02-15", balance: -800_000 }]);
+    expect(schedule.payments[0]).toMatchObject({ date: "2025-02-01", interest: 5_000, principal: 45_000, balance: 955_000 });
+    expect(schedule.payments[1]).toMatchObject({ date: "2025-03-01", interest: 1_839, principal: 48_161, balance: 751_839 });
+    const onPayment = mortgageSchedule(terms, [{ date: "2025-03-01", balance: -700_000 }]);
+    expect(onPayment.payments[1]).toMatchObject({ date: "2025-03-01", interest: 4_775, principal: 45_225, balance: 700_000 });
+    expect(mortgageBalanceAsOf(terms, [{ date: "2025-03-01", balance: -700_000 }], "2025-03-01")).toBe(700_000);
+    expect(onPayment.payments[2]).toMatchObject({ date: "2025-04-01", interest: 3_500 });
   });
 
   test("prefill returns the principal and interest for a payment date", () => {
@@ -141,7 +163,23 @@ describe("mortgage schedule", () => {
         fromAccountId: terms.paymentAccountId,
         toAccountId: terms.accountId,
       }),
+    ).toEqual({
+      principal: 16_921,
+      interest: 41_239,
+      interestCategoryId: terms.interestCategoryId,
+      payment: 58_160,
+    });
+    expect(
+      mortgageSplitForDate({
+        terms,
+        valuations: [],
+        date: "2000-01-15",
+        fromAccountId: terms.paymentAccountId,
+        toAccountId: terms.accountId,
+      }),
     ).toBeNull();
+    expect(mortgagePrefillLines(41_239, 16_921, 70_000)).toEqual({ interest: 41_239, principal: 28_761 });
+    expect(mortgagePrefillLines(41_239, 16_921, 58_160 + 5_000)).toEqual({ interest: 41_239, principal: 21_921 });
     expect(
       mortgageSplitForDate({
         terms,
@@ -153,14 +191,25 @@ describe("mortgage schedule", () => {
     ).toBeNull();
   });
 
-  test("an extra amount on each payment moves the payoff date and saves interest", () => {
-    const terms = loan({ compounding: "semiannual", paymentFrequency: "monthly", paymentAmount: 58_160, rateMilliPct: 5_000 });
+  test("an extra payment and a lump sum have an exact payoff date and interest saved", () => {
+    const terms: MortgageLoan = {
+      principal: 10_000,
+      principalAsOf: "2024-01-01",
+      rateMilliPct: 12_000,
+      compounding: "monthly",
+      paymentAmount: 3_000,
+      paymentFrequency: "monthly",
+      firstPaymentDate: "2024-02-01",
+    };
     const base = mortgageSchedule(terms);
-    const effect = mortgageExtraEffect(terms, [], 10_000);
-    expect(base.payoffDate).not.toBeNull();
-    expect(effect.payoffDate).not.toBeNull();
-    expect(effect.payoffDate! < base.payoffDate!).toBe(true);
-    expect(effect.interestSaved).toBeGreaterThan(0);
+    expect(base.payoffDate).toBe("2024-05-01");
+    expect(base.totalInterest).toBe(225);
+    const extra = mortgageExtraEffect(terms, [], { perPayment: 1_000, lumpSum: null });
+    expect(extra).toEqual({ payoffDate: "2024-04-01", interestSaved: 42 });
+    const lump = mortgageExtraEffect(terms, [], { perPayment: 0, lumpSum: { date: "2024-03-01", amount: 2_000 } });
+    expect(lump).toEqual({ payoffDate: "2024-04-01", interestSaved: 32 });
+    const both = mortgageExtraEffect(terms, [], { perPayment: 1_000, lumpSum: { date: "2024-03-01", amount: 2_000 } });
+    expect(both).toEqual({ payoffDate: "2024-04-01", interestSaved: 62 });
   });
 
   test("twice a month uses two dates in the month", () => {
