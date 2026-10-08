@@ -507,8 +507,15 @@ Only rows without a suggestion go to the Inbox.
    both groups with labels (this also covers returned income).
 The suggestion (§7.3) preselects the choice: a category, or a transfer from a transfer rule.
 
-**Inbox groups by payee.** Uncategorized transactions with the same normalized payee are one Inbox item: payee, count,
-total. The item has one-click suggestion chips and "Other…". "Other…" opens the transaction editor in group mode
+**Inbox groups by payee.** Uncategorized transactions with the same normalized payee in the same account are one Inbox
+item: payee, account, count, total.
+- A group action changes only the group's transactions that are still uncategorized and that the user did not exclude.
+  It skips ineligible rows (split, reconciled money change, other account, categorized meanwhile) and reports them:
+  "Applied to 10 · skipped 2". It never fails the whole group for one row. It keeps an existing merchant unless the
+  user chose one.
+- "Not now" on a group dismisses its current transactions (one key for each transaction line). A new transaction of
+  the same payee shows again.
+- The rule from "Always do this" and the action are one write. The item has one-click suggestion chips and "Other…". "Other…" opens the transaction editor in group mode
 (§14 of docs/design.md). "Review one by one" opens the editor as a queue (Next, Previous, auto-advance after Save).
 
 **Create on the spot.** The editor can create a merchant (name from the payee, for example "SQ *BLUE BOTTLE 0423" →
