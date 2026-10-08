@@ -28,8 +28,9 @@ If a screen or feature does not support one of these loops, do not add it.
 
 1. **Correct money.** Use integer cents for all amounts. Account balances must agree with bank statements.
 2. **Deterministic.** Use rules, history and arithmetic. Do not use ML. The app does not call an LLM.
-3. **No silent changes.** The app does not create, change or delete financial records without a user action.
-   Each suggestion shows its reason. Example: "Rule: NETFLIX → Streaming".
+3. **Money never changes by itself.** The app does not create, change or delete money (amounts, dates, accounts,
+   transfers, splits) without a user action. Labels (category and merchant) can be automatic when the app is sure
+   (§7.3). An automatic label always shows its reason and is easy to correct. Example: "Learned from Mar 12".
 4. **Reversible.** The user can undo imports and funding. The user can open a closed month again.
    The user can restore archived accounts, categories, tags, merchants, rules, plans and buckets.
    The audit log records each of these actions.
@@ -387,7 +388,6 @@ It stores the forecast of the on-budget total for the last day of the month (§8
 | `bufferAmount` | 0 | Lowest safe balance for "safe to spend" |
 | `emergencyFundMonths` | 3 | Hygiene check |
 | `staleImportDays` | 10 | Hygiene check |
-| `promoteAfter` | 3 | Confirmations before a rule suggestion |
 | `recurringGraceDays` | 3 | Date window for recurring links |
 
 ## 6. Calculated values
@@ -485,13 +485,27 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
 
 **Suggestion order.** The first result that the app finds is the suggestion. Each suggestion shows its reason.
 1. Rules, in order of priority. Rules for one account come before global rules.
-2. Payee history: the last 10 categorized transactions with the same normalized payee.
-   If 80% or more have the same category, suggest it.
-3. The default category of the merchant.
+2. Learned payee: the user confirmations for the same normalized payee (the last 10). A confirmation is a category or
+   merchant that the user chose or accepted (not one that the app set automatically).
+   - All agree (1 or more): the app is **sure**.
+   - 80% or more agree: a **suggestion** only.
+   - Less: nothing (the payee has a conflict).
+3. The default category of the merchant (a suggestion only).
 4. No result: the line is uncategorized. It goes to the Inbox.
 
-On import, the app applies steps 1–3. The transaction stays `open`. It shows in "Review recent".
-Only rows without a suggestion go to the Inbox.
+**Automatic labels (decision 0015).**
+- When the app is sure (a rule, or a learned payee where all confirmations agree), it sets the category and merchant
+  automatically, on import and on the payee's other uncategorized transactions.
+- **Learn from the first answer.** When the user confirms a category or merchant for a payee, the app applies it at once
+  to that payee's other uncategorized single-line transactions (one write, audited), and to future imports.
+- An automatic label stores its reason on the transaction: `autoReason` (`rule | learned`) and `autoSourceId`
+  (the rule, or the confirmed transaction). The UI shows it ("Rule: NETFLIX", "Learned from Mar 12").
+  Transactions has an "Automatic" filter. When the user changes or confirms the label, `autoReason` is cleared and the
+  change counts as a confirmation.
+- If a new confirmation disagrees with the earlier ones, the payee is no longer sure: the app stops automatic labels for
+  it and its next transactions go to the Inbox with a suggestion.
+- Transfers are never automatic. A transfer rule or evidence only preselects Transfer in the editor.
+- Splits are never changed automatically.
 
 **What is this?** The choices follow the direction of the money (decision 0014):
 - Money out: **Spending** (default) · Transfer · Split.
@@ -507,24 +521,16 @@ Only rows without a suggestion go to the Inbox.
    both groups with labels (this also covers returned income).
 The suggestion (§7.3) preselects the choice: a category, or a transfer from a transfer rule.
 
-**Inbox groups by payee.** Uncategorized transactions with the same normalized payee in the same account are one Inbox
-item: payee, account, count, total.
-- A group action changes only the group's transactions that are still uncategorized and that the user did not exclude.
-  It skips ineligible rows (split, reconciled money change, other account, categorized meanwhile) and reports them:
-  "Applied to 10 · skipped 2". It never fails the whole group for one row. It keeps an existing merchant unless the
-  user chose one.
-- "Not now" on a group dismisses its current transactions (one key for each transaction line). A new transaction of
-  the same payee shows again.
-- The rule from "Always do this" and the action are one write. The item has one-click suggestion chips and "Other…". "Other…" opens the transaction editor in group mode
-(§14 of docs/design.md). "Review one by one" opens the editor as a queue (Next, Previous, auto-advance after Save).
+**Inbox, one row for each transaction.** The Inbox shows each transaction that the app cannot categorize. "Review one by
+one" opens the editor as a queue (Next, Previous, auto-advance after Save). The editor's group mode stays available for
+bulk edits that the user starts (for example from a selection on Transactions).
 
 **Create on the spot.** The editor can create a merchant (name from the payee, for example "SQ *BLUE BOTTLE 0423" →
 "Blue Bottle"), a category, a group and a tag without leaving the flow. "Always do this for <payee>" creates a rule
 (match type editable) and applies it to that payee's other uncategorized transactions after it shows the count.
 
-**Promote to rule.** The user confirms the same normalized payee with the same merchant and category (or transfer account)
-`promoteAfter` times. If no rule exists for it, the Inbox suggests a rule.
-If the user accepts, the app creates an `exact` rule with `origin` = `promoted`.
+**Rules and learning.** Learning replaces the "promote to rule" Inbox item. The user can still make a rule
+("Always do this for <payee>", or Settings). A rule wins over learning and over a conflict.
 
 **Transfer detection.** An imported row can have an opposite amount to an unlinked row in a different on-budget account,
 within ±3 days. Then the Inbox suggests a transfer pair. The user accepts with one click.
