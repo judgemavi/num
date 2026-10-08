@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isoDateSchema } from "./date";
+import { asOfQuerySchema, isoDateSchema } from "./date";
 import { amountModes, planFrequencies } from "./recurring-calc";
 import { suggestionSchema } from "./suggest";
 import { unreadableReasons } from "./statement";
@@ -124,6 +124,7 @@ export const inboxItemSchema = z.discriminatedUnion("kind", [
     batchId: z.uuid(),
     accountId: z.uuid(),
     line: z.number().int(),
+    raw: z.string(),
     reason: z.enum(unreadableReasons),
   }),
 ]);
@@ -133,12 +134,26 @@ export const inboxImportSchema = z.object({
   lastImportAt: z.string().refine(isUtcTimestamp).nullable(),
 });
 
+export const inboxQuerySchema = asOfQuerySchema.extend({
+  dismissed: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .optional()
+    .transform((value) => value === true || value === "true"),
+});
+
+export const inboxDismissalReasonSchema = z.object({
+  itemKey,
+  reason: z.string(),
+});
+
 export const inboxSchema = z.object({
   asOf: isoDateSchema,
   count: z.number().int().nonnegative(),
+  dismissedCount: z.number().int().nonnegative(),
   staleImportDays: z.number().int().nonnegative(),
   items: z.array(inboxItemSchema),
   imports: z.array(inboxImportSchema),
+  dismissalReasons: z.array(inboxDismissalReasonSchema),
 });
 
 export const inboxDismissSchema = z.object({

@@ -1,7 +1,8 @@
-import { asOfQuerySchema, errorSchema, inboxDismissSchema, inboxRestoreSchema, inboxSchema } from "@num/shared";
+import { asOfQuerySchema, errorSchema, inboxDismissSchema, inboxQuerySchema, inboxRestoreSchema, inboxSchema } from "@num/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { dismissInboxItem, listInbox, restoreInboxItem } from "../services/inbox";
+import { autoLink } from "../services/recurring-view";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -11,7 +12,7 @@ const errorResponse = {
 const listRoute = createRoute({
   method: "get",
   path: "/api/inbox",
-  request: { query: asOfQuerySchema },
+  request: { query: inboxQuerySchema },
   responses: {
     200: { description: "Inbox items for this date", content: { "application/json": { schema: inboxSchema } } },
     400: errorResponse,
@@ -52,7 +53,15 @@ const restoreRoute = createRoute({
 });
 
 export function registerInbox(app: OpenAPIHono, db: Db) {
-  app.openapi(listRoute, (c) => c.json(listInbox(db, c.req.valid("query").asOf), 200));
+  app.openapi(listRoute, (c) => {
+    const query = c.req.valid("query");
+    try {
+      autoLink(db, query.asOf, { source: "ui" });
+    } catch (error) {
+      console.error("Recurring auto-link failed", error);
+    }
+    return c.json(listInbox(db, query.asOf, query.dismissed), 200);
+  });
   app.openapi(dismissRoute, (c) => {
     const body = c.req.valid("json");
     return c.json(dismissInboxItem(db, c.req.valid("query").asOf, body.itemKey, body.reason, { source: "ui" }), 200);

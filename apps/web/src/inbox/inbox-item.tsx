@@ -27,6 +27,9 @@ type InboxItemRowProps = {
   buckets: Bucket[];
   onSkip: (planId: string, dueDate: string) => void;
   onDismiss: (itemKey: string) => void;
+  onAddByHand: (item: Extract<InboxItem, { kind: "import_unreadable" }>) => void;
+  onRestore?: (itemKey: string) => void;
+  dismissedReason?: string;
   onDone: () => void;
   onError: (code: string) => void;
 };
@@ -71,6 +74,9 @@ export function InboxItemRow({
   buckets,
   onSkip,
   onDismiss,
+  onAddByHand,
+  onRestore,
+  dismissedReason,
   onDone,
   onError,
 }: InboxItemRowProps) {
@@ -176,6 +182,8 @@ export function InboxItemRow({
       disabled: false,
       run: () => void run(() => promoteRule(item.payee, item.merchantId, item.categoryId)),
     };
+  } else if (item.kind === "import_unreadable") {
+    primary = { label: "Add by hand", disabled: false, run: () => onAddByHand(item) };
   } else if (item.kind === "bucket_overspent") {
     choices = sources.map((bucket) => ({
       id: bucket.id,
@@ -203,24 +211,34 @@ export function InboxItemRow({
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold">{itemTitle(item, names, currency)}</h3>
           <p className="text-sm text-muted-foreground">{itemWhy(item, names, currency)}</p>
+          {dismissedReason ? <p className="text-sm text-muted-foreground">Reason: {dismissedReason}</p> : null}
         </div>
         <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
-          {extra ? (
-            <Button type="button" variant="outline" disabled={pending} onClick={extra.run}>
-              {extra.label}
+          {dismissedReason && onRestore ? (
+            <Button type="button" disabled={pending} onClick={() => onRestore(item.itemKey)}>
+              Restore
             </Button>
           ) : null}
-          {primary ? (
-            <Button type="button" disabled={pending || primary.disabled} onClick={primary.run}>
-              {primary.label}
-            </Button>
-          ) : null}
-          <Button type="button" variant="ghost" disabled={pending} onClick={() => onDismiss(item.itemKey)}>
-            Not now
-          </Button>
+          {dismissedReason ? null : (
+            <>
+              {extra ? (
+                <Button type="button" variant="outline" disabled={pending} onClick={extra.run}>
+                  {extra.label}
+                </Button>
+              ) : null}
+              {primary ? (
+                <Button type="button" disabled={pending || primary.disabled} onClick={primary.run}>
+                  {primary.label}
+                </Button>
+              ) : null}
+              <Button type="button" variant="ghost" disabled={pending} onClick={() => onDismiss(item.itemKey)}>
+                Not now
+              </Button>
+            </>
+          )}
         </div>
       </div>
-      {item.kind === "uncategorized" ? (
+      {!dismissedReason && item.kind === "uncategorized" ? (
         <label className="mt-3 grid max-w-sm gap-1 pl-13 text-sm font-semibold">
           Category
           <select
@@ -237,7 +255,7 @@ export function InboxItemRow({
           </select>
         </label>
       ) : null}
-      {choices.length > 0 ? (
+      {!dismissedReason && choices.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2 pl-13">
           {choices.map((option) => (
             <Choice key={option.id} pressed={(choice || choices[0]?.id) === option.id} onClick={() => setChoice(option.id)}>

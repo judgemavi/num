@@ -59,6 +59,10 @@ function loadTxns(db: Db, ids: readonly string[]): Map<string, TxnRef> {
   return found;
 }
 
+function shiftDate(date: string, days: number): string {
+  return Temporal.PlainDate.from(date).add({ days }).toString();
+}
+
 function reviewItems(db: Db): InboxItem[] {
   const rows = db
     .select({
@@ -72,23 +76,39 @@ function reviewItems(db: Db): InboxItem[] {
     .innerJoin(importBatches, eq(importBatches.id, importRows.batchId))
     .where(and(eq(importRows.outcome, "needs_review"), eq(importRows.active, true), isNull(importBatches.undoneAt)))
     .all();
+  if (rows.length === 0) {
+    return [];
+  }
+  let minDate = rows[0]?.date ?? "";
+  let maxDate = minDate;
+  const accountIds = new Set<string>();
+  for (const row of rows) {
+    accountIds.add(row.accountId);
+    if (row.date < minDate) {
+      minDate = row.date;
+    }
+    if (row.date > maxDate) {
+      maxDate = row.date;
+    }
+  }
+  const pool = db
+    .select(txnColumns)
+    .from(transactions)
+    .where(
+      and(
+        inArray(transactions.accountId, [...accountIds]),
+        isNull(transactions.deletedAt),
+        isNull(transactions.importRowId),
+        gte(transactions.date, shiftDate(minDate, -3)),
+        lte(transactions.date, shiftDate(maxDate, 3)),
+      ),
+    )
+    .all();
   return rows.map((row) => {
-    const start = Temporal.PlainDate.from(row.date).subtract({ days: 3 }).toString();
-    const end = Temporal.PlainDate.from(row.date).add({ days: 3 }).toString();
-    const candidates = db
-      .select(txnColumns)
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.accountId, row.accountId),
-          eq(transactions.amount, row.amount),
-          isNull(transactions.deletedAt),
-          isNull(transactions.importRowId),
-          gte(transactions.date, start),
-          lte(transactions.date, end),
-        ),
-      )
-      .all()
+    const start = shiftDate(row.date, -3);
+    const end = shiftDate(row.date, 3);
+    const candidates = pool
+      .filter((item) => item.accountId === row.accountId && item.amount === row.amount && item.date >= start && item.date <= end)
       .sort((left, right) => (left.date < right.date ? -1 : left.date > right.date ? 1 : left.id < right.id ? -1 : 1));
     return {
       kind: "import_review" as const,
@@ -198,7 +218,7 @@ function promotionItems(db: Db): InboxItem[] {
 function overspentItems(db: Db, asOf: string): InboxItem[] {
   return listOverspent(db).items.map((item) => ({
     kind: "bucket_overspent" as const,
-    itemKey: `bucket_overspent:${item.id}`,
+    itemKey: `bucket_overspent:${item.id}:${asOf.slice(0, 7)}`,
     date: asOf,
     bucketId: item.id,
     balance: item.balance,
@@ -239,6 +259,7 @@ function unreadableItems(db: Db): InboxItem[] {
         batchId: batch.id,
         accountId: batch.accountId,
         line: row.data.line,
+        raw: row.data.raw,
         reason: row.data.reason,
       });
     }

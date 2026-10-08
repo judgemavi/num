@@ -135,3 +135,7 @@ export function coverOverspent(bucketId: string, fromBucketId: string, date: str
 export function dismissItem(asOf: string, itemKey: string, reason: string) {
   return apiRequest(`/api/inbox/dismissals?asOf=${asOf}`, inboxRestoreSchema, json({ itemKey, reason }));
 }
+
+export function restoreItem(itemKey: string) {
+  return apiRequest("/api/inbox/dismissals/restore", inboxRestoreSchema, json({ itemKey }));
+}

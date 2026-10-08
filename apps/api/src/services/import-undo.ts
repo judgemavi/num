@@ -1,11 +1,11 @@
-import { auditLog, importBatches, importRows, transactions } from "@num/db";
+import { auditLog, importBatches, importRows, occurrenceLinks, transactions } from "@num/db";
 import { utcNow, type ImportUndo, type UndoBlockReason } from "@num/shared";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { presentBatch } from "./import-read";
 import { auditTransaction, readTransaction, type TxRow } from "./transaction-record";
-import { write, type AuditSource } from "./write";
+import { write, type AuditSource, type WriteTx } from "./write";
 
 function editedAfterImport(db: Db, transactionId: string): boolean {
   const rows = db
@@ -32,6 +32,26 @@ function blockReason(txn: TxRow | undefined, db: Db): UndoBlockReason | "removed
     return "edited";
   }
   return null;
+}
+
+function clearOccurrenceLinks(tx: WriteTx, transactionId: string): void {
+  const links = tx.select().from(occurrenceLinks).where(eq(occurrenceLinks.transactionId, transactionId)).all();
+  for (const link of links) {
+    tx.delete(occurrenceLinks).where(eq(occurrenceLinks.id, link.id)).run();
+    tx.audit({
+      entity: "occurrence_links",
+      entityId: link.id,
+      action: "delete",
+      before: {
+        planId: link.planId,
+        dueDate: link.dueDate,
+        transactionId: link.transactionId,
+        skipped: link.skipped,
+        reason: link.reason,
+      },
+      after: null,
+    });
+  }
 }
 
 export function undoImportBatch(db: Db, id: string, input: { source: AuditSource; at?: string }): ImportUndo {
@@ -92,6 +112,7 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
         continue;
       }
       const before = readTransaction(tx, row.transactionId);
+      clearOccurrenceLinks(tx, row.transactionId);
       tx.update(transactions).set({ deletedAt: at }).where(eq(transactions.id, row.transactionId)).run();
       tx.update(importRows).set({ active: false }).where(eq(importRows.id, row.id)).run();
       auditTransaction(tx, row.transactionId, "delete", before, readTransaction(tx, row.transactionId));
@@ -112,6 +133,10 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
       tx.update(importRows).set({ active: false, transactionId: null }).where(eq(importRows.id, row.id)).run();
     }
     for (const rowId of dropIds) {
+      const row = tx.select().from(importRows).where(eq(importRows.id, rowId)).get();
+      if (row?.transactionId) {
+        clearOccurrenceLinks(tx, row.transactionId);
+      }
       tx.update(importRows).set({ active: false }).where(eq(importRows.id, rowId)).run();
     }
     const stillActive = tx

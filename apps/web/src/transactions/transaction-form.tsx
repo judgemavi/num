@@ -39,6 +39,8 @@ type TransactionFormProps = {
   categories: Category[];
   tags: Tag[];
   merchants: Merchant[];
+  rawLine?: string;
+  initialAccountId?: string;
   onClose: () => void;
   onSaved: () => void;
   onDelete: () => void;
@@ -83,13 +85,17 @@ export function TransactionForm({
   categories,
   tags,
   merchants,
+  rawLine,
+  initialAccountId,
   onClose,
   onSaved,
   onDelete,
 }: TransactionFormProps) {
   const locked = transaction?.status === "reconciled";
   const payeeLocked = transaction?.source === "import";
-  const [accountId, setAccountId] = useState(transaction?.accountId ?? accounts.find((item) => !item.archivedAt)?.id ?? "");
+  const [accountId, setAccountId] = useState(
+    transaction?.accountId ?? initialAccountId ?? accounts.find((item) => !item.archivedAt)?.id ?? "",
+  );
   const [date, setDate] = useState(transaction?.date ?? Temporal.Now.plainDateISO().toString());
   const [payee, setPayee] = useState(transaction?.payeeRaw ?? "");
   const [amount, setAmount] = useState(transaction ? fromMinorUnits(currency, transaction.amount) : "");
@@ -206,6 +212,12 @@ export function TransactionForm({
             : "Enter the payee, the amount and the lines."}
         </DialogDescription>
       </DialogHeader>
+      {rawLine ? (
+        <p className="rounded-xl bg-sunken px-3 py-2 text-sm break-all">
+          <span className="font-semibold">Statement line. </span>
+          {rawLine}
+        </p>
+      ) : null}
       {locked ? (
         <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, notes, category, memo and tags can change.</p>
       ) : null}

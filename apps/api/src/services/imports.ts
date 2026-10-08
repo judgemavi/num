@@ -256,7 +256,11 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     columnMap: resolved.columnMap,
   });
   if (input.asOf) {
-    autoLink(db, input.asOf, { source: input.source, at, accountId: account.id });
+    try {
+      autoLink(db, input.asOf, { source: input.source, at, accountId: account.id });
+    } catch (error) {
+      console.error("Recurring auto-link failed after import", error);
+    }
   }
   return { kind: "batch", alreadyImported: false, ...batch };
 }

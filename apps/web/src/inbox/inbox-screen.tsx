@@ -5,6 +5,8 @@ import {
   inboxSchema,
   merchantListSchema,
   planListSchema,
+  tagListSchema,
+  type InboxItem,
   type Plan,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,7 +15,7 @@ import { useState } from "react";
 import { ImportDialog } from "@/accounts/import-dialog";
 import { localAsOf } from "@/as-of";
 import { loadBuckets } from "@/buckets/query";
-import { dismissItem, skipOccurrence } from "@/inbox/actions";
+import { dismissItem, restoreItem, skipOccurrence } from "@/inbox/actions";
 import { importAge, inboxError, inboxKicker } from "@/inbox/format";
 import { InboxItemRow } from "@/inbox/inbox-item";
 import { loadAllPages } from "@/settings/load-all-pages";
@@ -28,15 +30,17 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-
-const asOf = localAsOf();
+import { TransactionDialog } from "@/transactions/transaction-dialog";
 
 type ReasonAsk =
   | { mode: "dismiss"; itemKey: string }
   | { mode: "skip"; planId: string; dueDate: string };
 
 export function InboxScreen() {
+  const asOf = localAsOf();
   const queryClient = useQueryClient();
+  const [showDismissed, setShowDismissed] = useState(false);
+  const [hand, setHand] = useState<Extract<InboxItem, { kind: "import_unreadable" }> | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [ask, setAsk] = useState<ReasonAsk | null>(null);
   const [reason, setReason] = useState("");
@@ -44,9 +48,9 @@ export function InboxScreen() {
   const [pending, setPending] = useState(false);
 
   const inbox = useQuery({
-    queryKey: ["inbox", asOf],
+    queryKey: ["inbox", asOf, showDismissed],
     queryFn: async () => {
-      const result = await apiRequest(`/api/inbox?asOf=${asOf}`, inboxSchema);
+      const result = await apiRequest(`/api/inbox?asOf=${asOf}${showDismissed ? "&dismissed=true" : ""}`, inboxSchema);
       if (!result.ok) {
         throw new Error(result.code);
       }
@@ -78,6 +82,11 @@ export function InboxScreen() {
   const plans = useQuery({
     queryKey: ["plans", "inbox"],
     queryFn: () => loadAllPages("/api/recurring", planListSchema, { archived: false, sort: "name", dir: "asc" }),
+  });
+  const tags = useQuery({
+    queryKey: ["tags", "inbox"],
+    enabled: hand !== null,
+    queryFn: () => loadAllPages("/api/tags", tagListSchema, { archived: false, sort: "name", dir: "asc" }),
   });
   const buckets = useQuery({
     queryKey: ["buckets", "inbox"],
@@ -117,7 +126,10 @@ export function InboxScreen() {
   const categoryRows = categories.data?.items ?? [];
   const bucketRows = buckets.data?.items ?? [];
   const count = inbox.data?.count ?? 0;
-  const caughtUp = inbox.data !== undefined && count === 0;
+  const dismissedCount = inbox.data?.dismissedCount ?? 0;
+  const reasons = new Map((inbox.data?.dismissalReasons ?? []).map((row) => [row.itemKey, row.reason]));
+  const caughtUp = inbox.data !== undefined && !showDismissed && count === 0;
+  const dismissedEmpty = showDismissed && inbox.data !== undefined && inbox.data.items.length === 0;
   const imports = [...(inbox.data?.imports ?? [])].sort((left, right) => {
     const leftName = accountNames.get(left.accountId) ?? "";
     const rightName = accountNames.get(right.accountId) ?? "";
@@ -150,8 +162,11 @@ export function InboxScreen() {
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <ListCard label="Needs you">
           <div className="flex items-center gap-2 border-b px-5 py-3.5">
-            <h2 className="text-base font-bold">Needs you</h2>
-            {count > 0 ? <Badge variant="count">{count}</Badge> : null}
+            <h2 className="text-base font-bold">{showDismissed ? "Dismissed" : "Needs you"}</h2>
+            {!showDismissed && count > 0 ? <Badge variant="count">{count}</Badge> : null}
+            <Button type="button" variant="ghost" className="ml-auto" onClick={() => setShowDismissed((value) => !value)}>
+              {showDismissed ? "Needs you" : `Dismissed${dismissedCount > 0 ? ` (${dismissedCount})` : ""}`}
+            </Button>
           </div>
           {inbox.isPending ? <p className="px-5 py-6 text-muted-foreground">Loading the inbox.</p> : null}
           {inbox.isError ? (
@@ -164,6 +179,7 @@ export function InboxScreen() {
           ) : null}
           {actionError ? <p className="px-5 py-3 text-sm text-attn">{actionError}</p> : null}
           {caughtUp ? <p className="px-5 py-6 text-muted-foreground">All caught up.</p> : null}
+          {dismissedEmpty ? <p className="px-5 py-6 text-muted-foreground">No dismissed items.</p> : null}
           {inbox.data?.items.map((item) => (
             <InboxItemRow
               key={item.itemKey}
@@ -183,6 +199,18 @@ export function InboxScreen() {
                 setReason("");
                 setAsk({ mode: "dismiss", itemKey });
               }}
+              onAddByHand={(item) => setHand(item)}
+              onRestore={(itemKey) => {
+                void restoreItem(itemKey).then((result) => {
+                  if (!result.ok) {
+                    setActionError(inboxError(result.code));
+                    return;
+                  }
+                  setActionError(null);
+                  refresh();
+                });
+              }}
+              dismissedReason={showDismissed ? reasons.get(item.itemKey) : undefined}
               onDone={() => {
                 setActionError(null);
                 refresh();
@@ -209,6 +237,30 @@ export function InboxScreen() {
           </ul>
         </SidePanel>
       </div>
+      {hand && tags.isSuccess ? (
+        <TransactionDialog
+          draft="new"
+          currency={bookCurrency}
+          accounts={accounts.data?.items ?? []}
+          categories={categoryRows}
+          tags={tags.data.items}
+          merchants={merchants.data?.items ?? []}
+          rawLine={hand.raw}
+          initialAccountId={hand.accountId}
+          onClose={() => setHand(null)}
+          onSaved={() => {
+            const itemKey = hand.itemKey;
+            setHand(null);
+            void dismissItem(asOf, itemKey, "added_manually").then((result) => {
+              if (!result.ok) {
+                setActionError(inboxError(result.code));
+              }
+              refresh();
+            });
+          }}
+          onDelete={() => setHand(null)}
+        />
+      ) : null}
       <ImportDialog
         open={importOpen}
         account={null}

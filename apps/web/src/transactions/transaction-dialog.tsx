@@ -12,6 +12,8 @@ type TransactionDialogProps = {
   categories: Category[];
   tags: Tag[];
   merchants: Merchant[];
+  rawLine?: string;
+  initialAccountId?: string;
   onClose: () => void;
   onSaved: () => void;
   onDelete: (transaction: Transaction) => void;
@@ -32,6 +34,8 @@ export function TransactionDialog({
   categories,
   tags,
   merchants,
+  rawLine,
+  initialAccountId,
   onClose,
   onSaved,
   onDelete,
@@ -85,6 +89,8 @@ export function TransactionDialog({
             categories={categories}
             tags={tags}
             merchants={merchants}
+            rawLine={rawLine}
+            initialAccountId={initialAccountId}
             onClose={onClose}
             onSaved={onSaved}
             onDelete={() => {

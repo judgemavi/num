@@ -23,16 +23,22 @@ function compareItems(left: InboxItem, right: InboxItem): number {
   return left.itemKey > right.itemKey ? 1 : 0;
 }
 
-export function listInbox(db: Db, asOf: string): Inbox {
+export function listInbox(db: Db, asOf: string, dismissed = false): Inbox {
   const collected = collectInbox(db, asOf);
-  const hidden = new Set(db.select({ itemKey: inboxDismissals.itemKey }).from(inboxDismissals).all().map((row) => row.itemKey));
-  const items = collected.items.filter((item) => !hidden.has(item.itemKey)).sort(compareItems);
+  const dismissalRows = db.select().from(inboxDismissals).all();
+  const hidden = new Set(dismissalRows.map((row) => row.itemKey));
+  const reason = new Map(dismissalRows.map((row) => [row.itemKey, row.reason]));
+  const open = collected.items.filter((item) => !hidden.has(item.itemKey));
+  const closed = collected.items.filter((item) => hidden.has(item.itemKey));
+  const items = (dismissed ? closed : open).sort(compareItems);
   return {
     asOf,
-    count: items.length,
+    count: open.length,
+    dismissedCount: closed.length,
     staleImportDays: collected.staleImportDays,
     items,
     imports: collected.imports,
+    dismissalReasons: dismissed ? items.map((item) => ({ itemKey: item.itemKey, reason: reason.get(item.itemKey) ?? "" })) : [],
   };
 }
 

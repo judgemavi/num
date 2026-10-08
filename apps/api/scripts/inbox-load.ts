@@ -54,6 +54,36 @@ for (let index = 0; index < count; index += 1) {
   insertTransaction.run(id, accountId, date, amount, merchantId, payee, normalizePayee(payee));
   insertLine.run(crypto.randomUUID(), id, amount, index % 17 === 0 ? null : (categories[index % categories.length] ?? null));
 }
+
+const documentId = crypto.randomUUID();
+const batchId = crypto.randomUUID();
+sqlite.prepare(
+  `insert into documents (id, filename, hash, mime_type, storage_path, uploaded_at, deleted_at)
+   values (?, 'review.csv', ?, 'text/csv', ?, '2024-06-16T12:00:00Z', null)`,
+).run(documentId, crypto.randomUUID().replaceAll("-", ""), `uploads/${documentId}`);
+sqlite.prepare(
+  `insert into import_batches (
+    id, account_id, document_id, proposal_id, parser, period_start, period_end,
+    closing_balance, closing_date, unreadable_json, created_at, undone_at
+  ) values (?, ?, ?, null, 'csv', '2024-06-15', '2024-06-15', null, null, '[]', '2024-06-16T12:00:00Z', null)`,
+).run(batchId, accountA, documentId);
+const insertReview = sqlite.prepare(
+  `insert into import_rows (
+    id, batch_id, account_id, row_index, date, amount, payee_raw, bank_id, identity, outcome, transaction_id, active
+  ) values (?, ?, ?, ?, '2024-06-15', -2500, 'Review row', null, ?, 'needs_review', null, 1)`,
+);
+for (let index = 0; index < 24; index += 1) {
+  insertReview.run(crypto.randomUUID(), batchId, accountA, index, `review:${batchId}:${index}`);
+}
+const insertPlan = sqlite.prepare(
+  `insert into recurring_plans (
+    id, name, kind, account_id, expected_amount, tolerance, amount_mode, category_id, transfer_account_id,
+    merchant_id, start_date, freq, interval, month_day, business_day_shift, end_date, active, funds_buckets, archived_at
+  ) values (?, ?, 'bill', ?, -1500, 100, 'fixed', null, null, ?, '2025-01-15', 'monthly', 1, 15, 'none', null, 1, 0, null)`,
+);
+for (let index = 0; index < 6; index += 1) {
+  insertPlan.run(crypto.randomUUID(), `Plan ${index}`, index % 2 === 0 ? accountA : accountB, merchants[index] ?? null);
+}
 sqlite.exec("commit");
 sqlite.exec("analyze");
 
