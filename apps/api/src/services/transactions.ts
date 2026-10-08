@@ -1,5 +1,5 @@
 import { accounts, categories, merchants, tags, transactions } from "@num/db";
-import { utcNow, type Transaction, type TransactionCreate, type TransactionUpdate } from "@num/shared";
+import { utcNow, type Transaction } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -11,6 +11,7 @@ import {
   recordSource,
   toTransaction,
   type Header,
+  type TransactionBody,
   type TxRow,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
@@ -42,10 +43,13 @@ function assertPayee(existing: { source: string; payeeRaw: string }, payeeRaw: s
   }
 }
 
-function assertAccount(tx: WriteTx, id: string): void {
-  const row = tx.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, id)).get();
+function assertAccount(tx: WriteTx, id: string, previousId: string | null): void {
+  const row = tx.select({ archivedAt: accounts.archivedAt }).from(accounts).where(eq(accounts.id, id)).get();
   if (!row) {
     throw new ServiceError("account_not_found", 404);
+  }
+  if (row.archivedAt !== null && id !== previousId) {
+    throw new ServiceError("account_archived", 409);
   }
 }
 
@@ -82,12 +86,17 @@ function assertMerchant(tx: WriteTx, id: string | null): void {
   }
 }
 
-function assertReferences(tx: WriteTx, header: Header, lines: NormalizedLine[]): void {
-  assertAccount(tx, header.accountId);
+function assertReferences(
+  tx: WriteTx,
+  header: Header,
+  lines: NormalizedLine[],
+  previous: { accountId: string | null; transferAccountId: string | null },
+): void {
+  assertAccount(tx, header.accountId, previous.accountId);
   assertMerchant(tx, header.merchantId);
   for (const line of lines) {
     if (line.transferAccountId) {
-      assertAccount(tx, line.transferAccountId);
+      assertAccount(tx, line.transferAccountId, previous.transferAccountId);
     }
     if (line.categoryId) {
       assertCategory(tx, line.categoryId);
@@ -106,7 +115,7 @@ export function getTransaction(db: Db, id: string): Transaction | null {
   return toTransaction(row, loadLines(db, id));
 }
 
-export function createTransaction(db: Db, input: TransactionCreate & WriteInput): Transaction {
+export function createTransaction(db: Db, input: TransactionBody & WriteInput): Transaction {
   const header = headerFrom(input);
   const lines = input.lines.map(normalizeLine);
   const source = recordSource(input.source);
@@ -114,7 +123,7 @@ export function createTransaction(db: Db, input: TransactionCreate & WriteInput)
   let created: Transaction | undefined;
   write(db, { source: input.source, at: input.at }, (tx) => {
     assertLineShape(header.accountId, header.amount, lines);
-    assertReferences(tx, header, lines);
+    assertReferences(tx, header, lines, { accountId: null, transferAccountId: null });
     tx.insert(transactions)
       .values({
         id,
@@ -139,7 +148,7 @@ export function createTransaction(db: Db, input: TransactionCreate & WriteInput)
   return created;
 }
 
-export function updateTransaction(db: Db, id: string, input: TransactionUpdate & WriteInput): Transaction {
+export function updateTransaction(db: Db, id: string, input: TransactionBody & WriteInput): Transaction {
   const at = input.at ?? utcNow();
   const header = headerFrom(input);
   const lines = input.lines.map(normalizeLine);
@@ -152,7 +161,8 @@ export function updateTransaction(db: Db, id: string, input: TransactionUpdate &
     assertMutable(existing, peer);
     assertPayee(existing, header.payeeRaw);
     assertLineShape(header.accountId, header.amount, lines);
-    assertReferences(tx, header, lines);
+    const previousTarget = existingLines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null;
+    assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
     if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {
       applyMirrorEdit(tx, existing, existingLines, peer, peerLines, header, lines);
     } else {

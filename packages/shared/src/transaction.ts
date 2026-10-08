@@ -6,6 +6,10 @@ export const transactionStatuses = ["open", "cleared", "reconciled"] as const;
 
 export type TransactionStatus = (typeof transactionStatuses)[number];
 
+export const transactionInputStatuses = ["open", "cleared"] as const;
+
+export type TransactionInputStatus = (typeof transactionInputStatuses)[number];
+
 export const transactionSources = ["import", "manual", "mcp"] as const;
 
 export type TransactionSource = (typeof transactionSources)[number];
@@ -38,7 +42,7 @@ const transactionFields = {
   merchantId: z.uuid().nullable().optional(),
   notes: optionalText,
   payeeRaw: z.string().trim().min(1),
-  status: z.enum(transactionStatuses),
+  status: z.enum(transactionInputStatuses),
   lines: z.array(transactionLineInputSchema).min(1),
 };
 

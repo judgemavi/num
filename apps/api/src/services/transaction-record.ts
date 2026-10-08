@@ -1,14 +1,17 @@
 import { transactions } from "@num/db";
 import {
+  transactionInputStatuses,
   transactionSources,
   transactionStatuses,
   type Transaction,
   type TransactionCreate,
+  type TransactionInputStatus,
   type TransactionSource,
   type TransactionStatus,
 } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
+import { ServiceError } from "../service-error";
 import { loadLines, type StoredLine } from "./transaction-lines";
 import { blankToNull, requireText } from "./transaction-rules";
 import type { WriteTx } from "./write";
@@ -23,8 +26,10 @@ export type Header = {
   merchantId: string | null;
   notes: string | null;
   payeeRaw: string;
-  status: TransactionStatus;
+  status: TransactionInputStatus;
 };
+
+export type TransactionBody = Omit<TransactionCreate, "status"> & { status: string };
 
 function asStatus(value: string): TransactionStatus {
   if (!(transactionStatuses as readonly string[]).includes(value)) {
@@ -47,7 +52,14 @@ export function recordSource(source: "ui" | TransactionSource): TransactionSourc
   return source;
 }
 
-export function headerFrom(input: TransactionCreate): Header {
+function inputStatus(status: string): TransactionInputStatus {
+  if ((transactionInputStatuses as readonly string[]).includes(status)) {
+    return status as TransactionInputStatus;
+  }
+  throw new ServiceError("transaction_status_invalid", 400);
+}
+
+export function headerFrom(input: TransactionBody): Header {
   return {
     accountId: input.accountId,
     date: input.date,
@@ -55,7 +67,7 @@ export function headerFrom(input: TransactionCreate): Header {
     merchantId: input.merchantId ?? null,
     notes: blankToNull(input.notes),
     payeeRaw: requireText(input.payeeRaw, "payeeRaw"),
-    status: input.status,
+    status: inputStatus(input.status),
   };
 }
 

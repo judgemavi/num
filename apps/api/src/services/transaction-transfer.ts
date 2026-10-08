@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import { replaceLines, type StoredLine } from "./transaction-lines";
 import { auditTransaction, readTransaction, toTransaction, type Header, type TxRow } from "./transaction-record";
-import { lineTotal, transferLine, type NormalizedLine } from "./transaction-rules";
+import { transferLine, type NormalizedLine } from "./transaction-rules";
 import type { WriteTx } from "./write";
 
 export function insertMirror(
@@ -25,7 +25,7 @@ export function insertMirror(
       merchantId: header.merchantId,
       notes: header.notes,
       payeeRaw: header.payeeRaw,
-      status: header.status,
+      status: "open",
       source,
       importRowId: null,
       transferPeerId: sourceId,
@@ -99,26 +99,20 @@ export function applyMirrorEdit(
   if (lines.length !== 1 || !line || line.transferAccountId !== peer.accountId) {
     throw new ServiceError("mirror_one_line", 400);
   }
+  if (header.amount !== existing.amount) {
+    throw new ServiceError("mirror_amount_locked", 409);
+  }
   const sourceLine = peerLines.find((item) => item.transferAccountId === existing.accountId);
   if (!sourceLine) {
     throw new Error("Transfer line is missing");
   }
   const before = toTransaction(existing, existingLines);
   const peerBefore = toTransaction(peer, peerLines);
-  const sourceLineAmount = -header.amount;
-  const peerAmount = lineTotal(
-    peerLines.map((item) => ({
-      amount: item.id === sourceLine.id ? sourceLineAmount : item.amount,
-    })),
-  );
   tx.update(transactions).set(header).where(eq(transactions.id, existing.id)).run();
   replaceLines(tx, existing.id, lines);
-  tx.update(transactions)
-    .set({ date: header.date, amount: peerAmount })
-    .where(eq(transactions.id, peer.id))
-    .run();
+  tx.update(transactions).set({ date: header.date }).where(eq(transactions.id, peer.id)).run();
   tx.update(transactionLines)
-    .set({ amount: sourceLineAmount, transferAccountId: header.accountId })
+    .set({ transferAccountId: header.accountId })
     .where(eq(transactionLines.id, sourceLine.id))
     .run();
   auditTransaction(tx, existing.id, "update", before, readTransaction(tx, existing.id));

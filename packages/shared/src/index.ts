@@ -82,6 +82,7 @@ export {
 export { isUtcTimestamp, utcNow } from "./time";
 export {
   transactionCreateSchema,
+  transactionInputStatuses,
   transactionLineInputSchema,
   transactionLineSchema,
   transactionSchema,
@@ -90,6 +91,7 @@ export {
   transactionUpdateSchema,
   type Transaction,
   type TransactionCreate,
+  type TransactionInputStatus,
   type TransactionLine,
   type TransactionLineInput,
   type TransactionSource,
