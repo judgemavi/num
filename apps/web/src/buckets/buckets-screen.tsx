@@ -10,28 +10,23 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { ActivityList } from "@/buckets/activity-list";
 import { BucketForm } from "@/buckets/bucket-form";
-import { BucketBar } from "@/buckets/bucket-bar";
+import { BucketRow } from "@/buckets/bucket-row";
 import { BucketFilterBar } from "@/buckets/filters";
-import { barLabel, bucketDetail, bucketError, bucketTarget, today } from "@/buckets/format";
+import { bucketError, today } from "@/buckets/format";
 import { formatMoney } from "@/money";
-import { BucketGlyph } from "@/buckets/icons";
 import { MoveMoney } from "@/buckets/move-money";
 import { loadBuckets } from "@/buckets/query";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
-import { type Hue } from "@/components/hue";
-import { IconTile } from "@/components/icon-tile";
 import { JarsIllustration } from "@/components/illustrations";
-import { ListCard, ListGroup, ListRow, listAmt, listName } from "@/components/list-card";
+import { ListCard, ListGroup } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
-import { RowMenu } from "@/components/row-menu";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { SidePanel } from "@/components/side-panel";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
@@ -94,6 +89,7 @@ export function BucketsScreen() {
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["buckets"] });
+    await queryClient.invalidateQueries({ queryKey: ["bucket-events"] });
   }
 
   async function confirmPending() {
@@ -207,6 +203,7 @@ export function BucketsScreen() {
         </p>
       ) : null}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
+        <div className="grid gap-5">
         <ListCard label="All buckets">
           {rows.length === 0 ? (
             <p className="px-5 py-5 text-muted-foreground">{search.archived ? "No archived buckets." : "No buckets yet."}</p>
@@ -247,6 +244,8 @@ export function BucketsScreen() {
             })
           )}
         </ListCard>
+        <ActivityList currency={bookCurrency} buckets={search.archived ? [...(sources.data?.items ?? []), ...rows] : rows} onDone={() => void refresh()} />
+        </div>
         <SidePanel title="Overspent" text="Move money from another bucket to cover it.">
           {overspent.data.length === 0 ? <p className="text-sm text-muted-foreground">No bucket is overspent.</p> : null}
           {overspent.data.map((item) => {
@@ -321,8 +320,8 @@ export function BucketsScreen() {
             <AlertDialogTitle>{pending?.archivedAt ? "Restore this bucket?" : "Archive this bucket?"}</AlertDialogTitle>
             <AlertDialogDescription>
               {pending?.archivedAt
-                ? "The bucket returns to the active list. Its balance stays the same."
-                : "The bucket leaves the active list. You can restore it later. Its balance stays the same."}
+                ? "The bucket returns to the active list. Its categories are not put back."
+                : "The balance must be zero. Categories leave this bucket. You can restore the bucket later."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -332,62 +331,5 @@ export function BucketsScreen() {
         </AlertDialogContent>
       </AlertDialog>
     </>
-  );
-}
-
-function BucketRow({
-  bucket,
-  currency,
-  onOpen,
-  onMove,
-  onArchive,
-}: {
-  bucket: Bucket;
-  currency: string;
-  onOpen: () => void;
-  onMove: () => void;
-  onArchive: () => void;
-}) {
-  const over = bucket.balance < 0;
-  const target = bucketTarget(bucket);
-  return (
-    <ListRow onOpen={onOpen}>
-      <IconTile hue={bucket.color as Hue}>
-        <BucketGlyph name={bucket.icon} />
-      </IconTile>
-      <div className={listName}>
-        {bucket.name}
-        {bucket.essential ? <Badge variant="neutral">Essential</Badge> : null}
-        <small>{bucketDetail(bucket, currency)}</small>
-      </div>
-      <div className="w-36 shrink-0 max-md:basis-full">
-        <BucketBar hue={bucket.color as Hue} balance={bucket.balance} target={target} label={barLabel(bucket, currency)} />
-      </div>
-      <div className={`${listAmt} ${over ? "text-attn" : ""}`}>
-        {over ? (
-          <>
-            Over by <Amount currency={currency} minor={-bucket.balance} />
-          </>
-        ) : bucket.kind === "spending" ? (
-          <>
-            <Amount currency={currency} minor={bucket.balance} /> left
-            <small>of <Amount currency={currency} minor={target} /></small>
-          </>
-        ) : (
-          <>
-            <Amount currency={currency} minor={bucket.balance} />
-            <small>of <Amount currency={currency} minor={target} /></small>
-          </>
-        )}
-      </div>
-      <RowMenu label={`Actions for ${bucket.name}`}>
-        <DropdownMenuItem className="min-h-11" onSelect={onMove}>
-          Move money
-        </DropdownMenuItem>
-        <DropdownMenuItem className="min-h-11" onSelect={onArchive}>
-          {bucket.archivedAt ? "Restore" : "Archive"}
-        </DropdownMenuItem>
-      </RowMenu>
-    </ListRow>
   );
 }

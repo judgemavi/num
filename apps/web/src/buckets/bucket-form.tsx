@@ -1,6 +1,4 @@
 import {
-  bucketColors,
-  bucketIcons,
   bucketSchema,
   bucketWriteSchema,
   categoryListSchema,
@@ -16,14 +14,12 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { bucketError, colorLabel, iconLabel } from "@/buckets/format";
-import { BucketGlyph } from "@/buckets/icons";
+import { BucketPickers } from "@/buckets/bucket-pickers";
+import { bucketError } from "@/buckets/format";
 import { loadBuckets } from "@/buckets/query";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { ChoiceCard } from "@/components/choice-card";
-import { hueColor, type Hue } from "@/components/hue";
-import { IconTile } from "@/components/icon-tile";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -240,45 +236,7 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onCl
           )}
         </>
       ) : null}
-      <Field>
-        <FieldLabel>Colour</FieldLabel>
-        <div className="flex flex-wrap gap-2">
-          {bucketColors.map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={color === item}
-              aria-label={colorLabel(item)}
-              className="size-11 rounded-full border-2"
-              style={{
-                background: hueColor[item].fill,
-                borderColor: color === item ? hueColor[item].glyph : "transparent",
-              }}
-              onClick={() => setColor(item)}
-            />
-          ))}
-        </div>
-        {current ? null : <FieldDescription>The suggested colour is the next one in the rotation.</FieldDescription>}
-      </Field>
-      <Field>
-        <FieldLabel>Icon</FieldLabel>
-        <div className="flex flex-wrap gap-2">
-          {bucketIcons.map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={icon === item}
-              aria-label={iconLabel(item)}
-              className={`rounded-[10px] ${icon === item ? "ring-3 ring-primary" : ""}`}
-              onClick={() => setIcon(item)}
-            >
-              <IconTile hue={color as Hue}>
-                <BucketGlyph name={item} />
-              </IconTile>
-            </button>
-          ))}
-        </div>
-      </Field>
+      <BucketPickers color={color} icon={icon} suggest={current === null} onColor={setColor} onIcon={setIcon} />
       <CategoryField
         categories={choices}
         selected={categoryIds}

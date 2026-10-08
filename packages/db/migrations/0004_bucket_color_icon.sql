@@ -59,7 +59,7 @@ CREATE TABLE `__new_buckets` (
       ))
 );
 --> statement-breakpoint
-INSERT INTO `__new_buckets`("id", "name", "kind", "priority", "essential", "color", "icon", "archived_at", "refill_to", "amount", "due_date", "repeat", "target", "target_date", "fixed_amount") SELECT "id", "name", "kind", "priority", "essential", 'sky', 'shopping-cart', "archived_at", "refill_to", "amount", "due_date", "repeat", "target", "target_date", "fixed_amount" FROM `buckets`;--> statement-breakpoint
+INSERT INTO `__new_buckets`("id", "name", "kind", "priority", "essential", "color", "icon", "archived_at", "refill_to", "amount", "due_date", "repeat", "target", "target_date", "fixed_amount") SELECT "id", "name", "kind", "priority", "essential", CASE (("row_number"() OVER (ORDER BY "id")) - 1) % 6 WHEN 0 THEN 'sky' WHEN 1 THEN 'mint' WHEN 2 THEN 'lilac' WHEN 3 THEN 'butter' WHEN 4 THEN 'pink' ELSE 'teal' END, 'shopping-cart', "archived_at", "refill_to", "amount", "due_date", "repeat", "target", "target_date", "fixed_amount" FROM `buckets`;--> statement-breakpoint
 DROP TABLE `buckets`;--> statement-breakpoint
 ALTER TABLE `__new_buckets` RENAME TO `buckets`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;

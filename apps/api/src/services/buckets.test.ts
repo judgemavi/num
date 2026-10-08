@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bucketEvents, fundingRuns, migrateDatabase, openDatabase } from "@num/db";
+import { bucketCategories, bucketEvents, fundingRuns, migrateDatabase, openDatabase } from "@num/db";
 import type { ErrorCode } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
@@ -9,7 +9,7 @@ import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { coverBucket, createBucketEvent, undoBucketEvent } from "./bucket-events";
-import { createBucket, readBucket, updateBucket } from "./buckets";
+import { archiveBucket, createBucket, readBucket, updateBucket } from "./buckets";
 import { createCategory } from "./categories";
 import { createTransaction, deleteTransaction } from "./transactions";
 
@@ -157,27 +157,6 @@ test("bucket balance is funds, moves, releases and category lines", () => {
   }
 });
 
-test("a refund increases the bucket balance", () => {
-  const book = tempDatabase();
-  try {
-    const account = createAccount(book.db, {
-      name: "Cash",
-      kind: "chequing",
-      openingDate: "2026-01-01",
-      openingBalance: 0,
-      ...saved,
-    });
-    const groceries = expense(book.db, "Groceries");
-    const food = spending(book.db, "Groceries", [groceries.id]);
-    purchase(book.db, account.id, groceries.id, -1_000);
-    expect(readBucket(book.db, food.id).balance).toBe(-1_000);
-    purchase(book.db, account.id, groceries.id, 250, "2026-03-02");
-    expect(readBucket(book.db, food.id).balance).toBe(-750);
-  } finally {
-    book.close();
-  }
-});
-
 test("a card purchase lowers the bucket and a card payment does not", () => {
   const book = tempDatabase();
   try {
@@ -267,6 +246,141 @@ test("only an expense category can be in a bucket", () => {
   try {
     const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
     expectCode(() => spending(book.db, "Pay", [pay.id]), "category_not_expense");
+  } finally {
+    book.close();
+  }
+});
+
+test("undo is rejected for a funding-run event", () => {
+  const book = tempDatabase();
+  try {
+    const account = createAccount(book.db, {
+      name: "Cash",
+      kind: "chequing",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      ...saved,
+    });
+    const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
+    const food = spending(book.db, "Groceries", []);
+    const income = purchase(book.db, account.id, pay.id, 100);
+    const runId = crypto.randomUUID();
+    const eventId = crypto.randomUUID();
+    book.db
+      .insert(fundingRuns)
+      .values({ id: runId, incomeTransactionId: income.id, date: "2026-03-01", createdAt: at, undoneAt: null })
+      .run();
+    book.db
+      .insert(bucketEvents)
+      .values({
+        id: eventId,
+        kind: "fund",
+        bucketId: food.id,
+        otherBucketId: null,
+        amount: 100,
+        date: "2026-03-01",
+        note: null,
+        fundingRunId: runId,
+        undoneAt: null,
+      })
+      .run();
+    expectCode(() => undoBucketEvent(book.db, food.id, eventId, saved), "event_funding_run");
+    expect(book.db.select().from(bucketEvents).where(eq(bucketEvents.id, eventId)).get()?.undoneAt).toBeNull();
+    expect(readBucket(book.db, food.id).balance).toBe(100);
+  } finally {
+    book.close();
+  }
+});
+
+test("archive needs a zero balance and removes category mappings", () => {
+  const book = tempDatabase();
+  try {
+    const groceries = expense(book.db, "Groceries");
+    const funded = spending(book.db, "Funded", []);
+    createBucketEvent(book.db, funded.id, { kind: "fund", amount: 500, date: "2026-03-01", ...saved });
+    expectCode(() => archiveBucket(book.db, funded.id, saved), "bucket_balance");
+    expect(readBucket(book.db, funded.id).archivedAt).toBeNull();
+
+    const empty = spending(book.db, "Empty", [groceries.id]);
+    const archived = archiveBucket(book.db, empty.id, saved);
+    expect(archived.archivedAt).toBe(at);
+    expect(archived.categoryIds).toEqual([]);
+    expect(book.db.select().from(bucketCategories).where(eq(bucketCategories.bucketId, empty.id)).all()).toEqual([]);
+  } finally {
+    book.close();
+  }
+});
+
+test("kind fields that do not match the kind are rejected", () => {
+  const book = tempDatabase();
+  try {
+    expectCode(
+      () =>
+        createBucket(book.db, {
+          name: "Mixed",
+          kind: "spending",
+          priority: 1,
+          essential: false,
+          color: "sky",
+          icon: "shopping-cart",
+          categoryIds: [],
+          refillTo: 100,
+          amount: 50,
+          dueDate: null,
+          repeat: null,
+          target: null,
+          targetDate: null,
+          fixedAmount: null,
+          ...saved,
+        }),
+      "bucket_fields_invalid",
+    );
+    expectCode(
+      () =>
+        createBucket(book.db, {
+          name: "Both",
+          kind: "goal",
+          priority: 1,
+          essential: false,
+          color: "lilac",
+          icon: "plane",
+          categoryIds: [],
+          refillTo: null,
+          amount: null,
+          dueDate: null,
+          repeat: null,
+          target: 100,
+          targetDate: "2027-06-01",
+          fixedAmount: 20,
+          ...saved,
+        }),
+      "bucket_fields_invalid",
+    );
+  } finally {
+    book.close();
+  }
+});
+
+test("cover rejects the same bucket, a bucket that is not overspent, and a short source", () => {
+  const book = tempDatabase();
+  try {
+    const account = createAccount(book.db, {
+      name: "Cash",
+      kind: "chequing",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      ...saved,
+    });
+    const dining = expense(book.db, "Dining");
+    const meals = spending(book.db, "Dining", [dining.id]);
+    const food = spending(book.db, "Groceries", []);
+    createBucketEvent(book.db, food.id, { kind: "fund", amount: 1_000, date: "2026-03-01", ...saved });
+    expectCode(() => coverBucket(book.db, meals.id, { fromBucketId: meals.id, date: "2026-03-02", ...saved }), "bucket_same");
+    expectCode(() => coverBucket(book.db, food.id, { fromBucketId: meals.id, date: "2026-03-02", ...saved }), "bucket_not_overspent");
+    purchase(book.db, account.id, dining.id, -4_200);
+    expectCode(() => coverBucket(book.db, meals.id, { fromBucketId: food.id, date: "2026-03-02", ...saved }), "bucket_short");
+    expect(readBucket(book.db, meals.id).balance).toBe(-4_200);
+    expect(readBucket(book.db, food.id).balance).toBe(1_000);
   } finally {
     book.close();
   }

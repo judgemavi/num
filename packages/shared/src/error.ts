@@ -63,6 +63,8 @@ export const errorCodes = [
   "bucket_same",
   "bucket_not_overspent",
   "bucket_short",
+  "bucket_balance",
+  "event_funding_run",
   "category_not_expense",
   "category_in_bucket",
   "event_not_found",

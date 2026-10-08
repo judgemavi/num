@@ -3,6 +3,7 @@ import {
   bucketColors,
   bucketIcons,
   bucketKinds,
+  kindFieldsValid,
   nextBucketColor,
   sinkingRepeats,
   utcNow,
@@ -74,21 +75,7 @@ function asRepeat(value: string | null): SinkingRepeat | null {
 }
 
 function assertKindFields(input: BucketWrite) {
-  if (input.kind === "spending") {
-    if (input.refillTo === null) {
-      throw new ServiceError("bucket_fields_invalid", 400);
-    }
-    return;
-  }
-  if (input.kind === "sinking") {
-    if (input.amount === null || input.dueDate === null || input.repeat === null) {
-      throw new ServiceError("bucket_fields_invalid", 400);
-    }
-    return;
-  }
-  const dated = input.targetDate !== null;
-  const fixed = input.fixedAmount !== null;
-  if (input.target === null || dated === fixed) {
+  if (!kindFieldsValid(input)) {
     throw new ServiceError("bucket_fields_invalid", 400);
   }
 }
@@ -343,7 +330,12 @@ export function archiveBucket(db: Db, id: string, input: WriteInput): Bucket {
     if (existing.archivedAt) {
       throw new ServiceError("bucket_archived", 409);
     }
+    const balance = bucketBalances(tx).get(id) ?? 0;
+    if (balance !== 0) {
+      throw new ServiceError("bucket_balance", 409);
+    }
     const categoryIds = categoryIdsFor(tx, id);
+    tx.delete(bucketCategories).where(eq(bucketCategories.bucketId, id)).run();
     const next = { ...existing, archivedAt: at };
     tx.update(buckets).set({ archivedAt: at }).where(eq(buckets.id, id)).run();
     tx.audit({
@@ -351,7 +343,7 @@ export function archiveBucket(db: Db, id: string, input: WriteInput): Bucket {
       entityId: id,
       action: "archive",
       before: snapshot(existing, categoryIds),
-      after: snapshot(next, categoryIds),
+      after: snapshot(next, []),
     });
   });
   return readBucket(db, id);

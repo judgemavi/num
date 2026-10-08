@@ -1,6 +1,6 @@
 import { bucketEvents, buckets } from "@num/db";
 import { isIsoDate, utcNow, type BucketCover, type BucketEvent, type BucketEventCreate, type BucketEventKind } from "@num/shared";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
@@ -119,6 +119,9 @@ export function undoBucketEvent(db: Db, bucketId: string, eventId: string, input
     if (existing.undoneAt) {
       throw new ServiceError("event_undone", 409);
     }
+    if (existing.fundingRunId) {
+      throw new ServiceError("event_funding_run", 409);
+    }
     const next = { ...existing, undoneAt: at };
     tx.update(bucketEvents).set({ undoneAt: at }).where(eq(bucketEvents.id, eventId)).run();
     tx.audit({
@@ -134,6 +137,17 @@ export function undoBucketEvent(db: Db, bucketId: string, eventId: string, input
     throw new Error("Undo did not return an event");
   }
   return undone;
+}
+
+export function listBucketEvents(db: Db): { items: BucketEvent[] } {
+  const rows = db.select().from(bucketEvents).where(isNull(bucketEvents.undoneAt)).all();
+  rows.sort((left, right) => {
+    if (left.date !== right.date) {
+      return left.date < right.date ? 1 : -1;
+    }
+    return left.id < right.id ? 1 : -1;
+  });
+  return { items: rows.map(toEvent) };
 }
 
 export function coverBucket(db: Db, bucketId: string, input: BucketCover & WriteInput): BucketEvent {

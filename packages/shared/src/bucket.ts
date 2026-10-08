@@ -72,7 +72,7 @@ const bucketFields = {
   fixedAmount: cents.nullable(),
 };
 
-function kindFieldsValid(value: {
+export function kindFieldsValid(value: {
   kind: BucketKind;
   refillTo: number | null;
   amount: number | null;
@@ -156,6 +156,10 @@ export const bucketEventSchema = z.object({
   note: z.string().nullable(),
   fundingRunId: z.uuid().nullable(),
   undoneAt: z.string().refine(isUtcTimestamp).nullable(),
+});
+
+export const bucketEventListSchema = z.object({
+  items: z.array(bucketEventSchema),
 });
 
 export const bucketEventCreateSchema = z

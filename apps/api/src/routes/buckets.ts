@@ -1,6 +1,7 @@
 import {
   bucketCoverSchema,
   bucketEventCreateSchema,
+  bucketEventListSchema,
   bucketEventSchema,
   bucketListQuerySchema,
   bucketListSchema,
@@ -11,7 +12,7 @@ import {
 } from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { coverBucket, createBucketEvent, undoBucketEvent } from "../services/bucket-events";
+import { coverBucket, createBucketEvent, listBucketEvents, undoBucketEvent } from "../services/bucket-events";
 import { archiveBucket, createBucket, listBuckets, listOverspent, restoreBucket, updateBucket } from "../services/buckets";
 
 const errorResponse = {
@@ -42,6 +43,17 @@ const listRoute = createRoute({
       content: { "application/json": { schema: bucketListSchema } },
     },
     400: errorResponse,
+  },
+});
+
+const eventsRoute = createRoute({
+  method: "get",
+  path: "/api/buckets/events",
+  responses: {
+    200: {
+      description: "Bucket events that still count",
+      content: { "application/json": { schema: bucketEventListSchema } },
+    },
   },
 });
 
@@ -171,6 +183,7 @@ const coverRoute = createRoute({
 
 export function registerBuckets(app: OpenAPIHono, db: Db) {
   app.openapi(listRoute, (c) => c.json(listBuckets(db, c.req.valid("query")), 200));
+  app.openapi(eventsRoute, (c) => c.json(listBucketEvents(db), 200));
   app.openapi(overspentRoute, (c) => c.json(listOverspent(db), 200));
   app.openapi(createRouteDef, (c) => c.json(createBucket(db, { ...c.req.valid("json"), source: "ui" }), 200));
   app.openapi(updateRoute, (c) => {

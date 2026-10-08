@@ -114,6 +114,12 @@ export function bucketError(code: ErrorCode): string {
   if (code === "bucket_short") {
     return "That bucket does not have enough to cover this.";
   }
+  if (code === "bucket_balance") {
+    return "The balance must be zero before you archive this bucket.";
+  }
+  if (code === "event_funding_run") {
+    return "This event belongs to a paycheck. Undo the paycheck to undo it.";
+  }
   if (code === "bucket_fields_invalid" || code === "invalid_body") {
     return "Check the bucket fields.";
   }
