@@ -21,12 +21,15 @@ function json(body: unknown): RequestInit {
   };
 }
 
-export function applyInboxGroup(transactionIds: string[], suggestion: Suggestion) {
+export function applyInboxGroup(accountId: string, transactionIds: string[], suggestion: Suggestion) {
   return apiRequest("/api/inbox/groups", inboxGroupApplyResultSchema, json({
+    accountId,
     transactionIds,
+    excludedIds: [],
     categoryId: suggestion.transferAccountId ? null : suggestion.categoryId,
     transferAccountId: suggestion.transferAccountId,
     merchantId: suggestion.transferAccountId ? null : suggestion.merchantId,
+    rule: null,
   }));
 }
 
@@ -117,10 +120,10 @@ export function fundFromUnassigned(bucketId: string, amount: number, asOf: strin
   return apiRequest(`/api/buckets/${bucketId}/events?asOf=${asOf}`, bucketEventSchema, json({ kind: "fund", amount, date: asOf }));
 }
 
-export function dismissItem(asOf: string, itemKey: string, reason: string) {
-  return apiRequest(`/api/inbox/dismissals?asOf=${asOf}`, inboxRestoreSchema, json({ itemKey, reason }));
+export function dismissItem(asOf: string, itemKeys: string[], reason: string) {
+  return apiRequest(`/api/inbox/dismissals?asOf=${asOf}`, inboxRestoreSchema, json({ itemKeys, reason }));
 }
 
-export function restoreItem(itemKey: string) {
-  return apiRequest("/api/inbox/dismissals/restore", inboxRestoreSchema, json({ itemKey }));
+export function restoreItem(itemKeys: string[]) {
+  return apiRequest("/api/inbox/dismissals/restore", inboxRestoreSchema, json({ itemKeys }));
 }

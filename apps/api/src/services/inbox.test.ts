@@ -13,7 +13,8 @@ import { createCategory } from "./categories";
 import { undoImportBatch } from "./import-undo";
 import { importStatement } from "./imports";
 import { resolveImportReview } from "./import-review";
-import { dismissInboxItem, listInbox, restoreInboxItem } from "./inbox";
+import { dismissInboxItems, listInbox, restoreInboxItems } from "./inbox";
+import { uncategorizedLineKey } from "@num/shared";
 import { createPlan, updatePlan } from "./recurring-plans";
 import { linkOccurrence, skipOccurrence } from "./recurring-links";
 import { acceptTransferPair, promotePayee } from "./suggestions";
@@ -124,7 +125,7 @@ test("each inbox kind appears and leaves after its action", () => {
     const stream = merchant(sample.db, "Stream Co");
 
     const open = pay(sample.db, cash.id, "2026-03-02", -6400, "Corner market", null);
-    expect(keys(sample.db, "uncategorized")).toEqual([`uncategorized:${normalizePayee(open.payeeRaw)}`]);
+    expect(keys(sample.db, "uncategorized")).toEqual([`uncategorized:${cash.id}:${normalizePayee(open.payeeRaw)}`]);
     updateTransaction(sample.db, open.id, {
       accountId: open.accountId,
       date: open.date,
@@ -202,9 +203,9 @@ test("each inbox kind appears and leaves after its action", () => {
     createBucketEvent(sample.db, spare.id, { kind: "fund", amount: 5000, date: "2026-03-01", asOf, ...saved });
     const marchKey = `bucket_overspent:${meals.id}:2026-03`;
     expect(keys(sample.db, "bucket_overspent")).toEqual([marchKey]);
-    dismissInboxItem(sample.db, asOf, marchKey, "Later", saved);
+    dismissInboxItems(sample.db, asOf, [marchKey], "Later", saved);
     expect(listInbox(sample.db, "2026-04-20").items.some((item) => item.itemKey === `bucket_overspent:${meals.id}:2026-04`)).toBe(true);
-    restoreInboxItem(sample.db, marchKey, saved);
+    restoreInboxItems(sample.db, [marchKey], saved);
     coverBucket(sample.db, meals.id, { fromBucketId: spare.id, date: asOf, ...saved });
     expect(keys(sample.db, "bucket_overspent")).toEqual([]);
 
@@ -316,7 +317,7 @@ test("each inbox kind appears and leaves after its action", () => {
     const unreadable = listInbox(sample.db, asOf).items.find((item) => item.kind === "import_unreadable");
     expect(unreadable?.kind).toBe("import_unreadable");
     if (unreadable) {
-      dismissInboxItem(sample.db, asOf, unreadable.itemKey, "Cannot repair the row", saved);
+      dismissInboxItems(sample.db, asOf, [unreadable.itemKey], "Cannot repair the row", saved);
     }
     expect(keys(sample.db, "import_unreadable")).toEqual([]);
   } finally {
@@ -329,12 +330,32 @@ test("dismiss hides an item and un-dismiss shows it", () => {
   try {
     const cash = account(sample.db, "Cash");
     const open = pay(sample.db, cash.id, "2026-03-04", -100, "Needs a category", null);
-    const itemKey = `uncategorized:${normalizePayee(open.payeeRaw)}`;
+    const itemKey = `uncategorized:${cash.id}:${normalizePayee(open.payeeRaw)}`;
+    const lineKey = uncategorizedLineKey(open.lines[0]?.id ?? "");
     expect(keys(sample.db, "uncategorized")).toEqual([itemKey]);
-    dismissInboxItem(sample.db, asOf, itemKey, "Later", saved);
+    dismissInboxItems(sample.db, asOf, [lineKey], "Later", saved);
     expect(keys(sample.db, "uncategorized")).toEqual([]);
-    restoreInboxItem(sample.db, itemKey, saved);
+    restoreInboxItems(sample.db, [lineKey], saved);
     expect(keys(sample.db, "uncategorized")).toEqual([itemKey]);
+  } finally {
+    sample.close();
+  }
+});
+
+test("a group dismissal hides only the current lines", () => {
+  const sample = book();
+  try {
+    const cash = account(sample.db, "Cash");
+    const first = pay(sample.db, cash.id, "2026-03-01", -100, "Blue Bottle", null);
+    const second = pay(sample.db, cash.id, "2026-03-02", -200, "SQ *BLUE BOTTLE", null);
+    const lineKeys = [first, second].flatMap((item) => item.lines.map((line) => uncategorizedLineKey(line.id)));
+    dismissInboxItems(sample.db, asOf, lineKeys, "Later", saved);
+    expect(keys(sample.db, "uncategorized")).toEqual([]);
+    const third = pay(sample.db, cash.id, "2026-03-03", -300, "blue bottle", null);
+    const open = listInbox(sample.db, asOf).items.filter((item) => item.kind === "uncategorized");
+    expect(open.map((item) => (item.kind === "uncategorized" ? item.transactionIds : []))).toEqual([[third.id]]);
+    const closed = listInbox(sample.db, asOf, true).items.filter((item) => item.kind === "uncategorized");
+    expect(closed[0]?.kind === "uncategorized" ? closed[0].transactionIds.sort() : []).toEqual([first.id, second.id].sort());
   } finally {
     sample.close();
   }

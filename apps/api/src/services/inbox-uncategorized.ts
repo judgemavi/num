@@ -4,8 +4,10 @@ import {
   groupByPayee,
   suggestCategorization,
   uncategorizedItemKey,
+  uncategorizedLineKey,
   type HistoryRow,
   type InboxItem,
+  type PayeeGroup,
   type PayeeGroupRow,
   type Suggestion,
 } from "@num/shared";
@@ -121,9 +123,43 @@ function historyFor(db: Db, payees: readonly string[]): Map<string, HistoryRow[]
   return grouped;
 }
 
-export function uncategorizedItems(db: Db): InboxItem[] {
+function toItems(
+  groups: PayeeGroup[],
+  rows: PayeeGroupRow[],
+  context: { rules: ReturnType<typeof toRule>[]; history: Map<string, HistoryRow[]>; merchants: Parameters<typeof alternateSuggestion>[0]["merchants"] },
+): InboxItem[] {
+  return groups.map((group) => {
+    const sample = rows.find((row) => row.accountId === group.accountId && row.payee === group.payee);
+    const next = sample
+      ? alternateSuggestion({
+          accountId: group.accountId,
+          rawPayee: sample.payeeRaw,
+          rules: context.rules,
+          history: context.history.get(group.payee) ?? [],
+          merchants: context.merchants,
+        })
+      : null;
+    return {
+      kind: "uncategorized" as const,
+      itemKey: uncategorizedItemKey(group.accountId, group.payee),
+      date: group.date,
+      accountId: group.accountId,
+      payee: group.payee,
+      payeeRaw: group.payeeRaw,
+      count: group.count,
+      total: group.total,
+      transactionIds: group.transactionIds,
+      lineIds: group.lineIds,
+      suggestion: group.suggestion,
+      next,
+    };
+  });
+}
+
+export function uncategorizedInbox(db: Db, hidden: ReadonlySet<string>): { open: InboxItem[]; closed: InboxItem[] } {
   const rows = db.all<{
     transactionId: string;
+    lineId: string;
     accountId: string;
     date: string;
     amount: number;
@@ -132,22 +168,20 @@ export function uncategorizedItems(db: Db): InboxItem[] {
   }>(sql`
     select
       t.id as transactionId,
+      l.id as lineId,
       t.account_id as accountId,
       t.date as date,
       t.amount as amount,
       t.payee_raw as payeeRaw,
       t.payee_normalized as payee
-    from transactions t
-    where t.deleted_at is null
-      and exists (
-        select 1 from transaction_lines l
-        where l.transaction_id = t.id
-          and l.category_id is null
-          and l.transfer_account_id is null
-      )
+    from transaction_lines l
+    inner join transactions t on t.id = l.transaction_id
+    where l.category_id is null
+      and l.transfer_account_id is null
+      and t.deleted_at is null
   `);
   if (rows.length === 0) {
-    return [];
+    return { open: [], closed: [] };
   }
   const payees = [...new Set(rows.map((row) => row.payee).filter((payee) => payee.length > 0))];
   const history = historyFor(db, payees);
@@ -177,6 +211,8 @@ export function uncategorizedItems(db: Db): InboxItem[] {
     }
     return {
       transactionId: row.transactionId,
+      lineId: row.lineId,
+      accountId: row.accountId,
       date: row.date,
       amount: row.amount,
       payeeRaw: row.payeeRaw,
@@ -184,28 +220,11 @@ export function uncategorizedItems(db: Db): InboxItem[] {
       suggestion,
     };
   });
-  return groupByPayee(grouped).map((group) => {
-    const sample = rows.find((row) => row.transactionId === group.transactionIds[0] && row.payee === group.payee);
-    const next = sample
-      ? alternateSuggestion({
-          accountId: sample.accountId,
-          rawPayee: sample.payeeRaw,
-          rules: ruleRows,
-          history: history.get(group.payee) ?? [],
-          merchants: merchantRows,
-        })
-      : null;
-    return {
-      kind: "uncategorized" as const,
-      itemKey: uncategorizedItemKey(group.payee),
-      date: group.date,
-      payee: group.payee,
-      payeeRaw: group.payeeRaw,
-      count: group.count,
-      total: group.total,
-      transactionIds: group.transactionIds,
-      suggestion: group.suggestion,
-      next,
-    };
-  });
+  const context = { rules: ruleRows, history, merchants: merchantRows };
+  const openRows = grouped.filter((row) => !hidden.has(uncategorizedLineKey(row.lineId)));
+  const closedRows = grouped.filter((row) => hidden.has(uncategorizedLineKey(row.lineId)));
+  return {
+    open: toItems(groupByPayee(openRows), openRows, context),
+    closed: toItems(groupByPayee(closedRows), closedRows, context),
+  };
 }

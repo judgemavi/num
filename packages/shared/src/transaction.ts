@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { accountKinds } from "./account";
 import { isoDateSchema } from "./date";
+import { skippedRowSchema } from "./inbox";
+import { ruleMatches } from "./rule";
 import { listQuerySchema, pagedResponseSchema } from "./list";
 import { isUtcTimestamp } from "./time";
 
@@ -52,6 +54,16 @@ export const transactionCreateSchema = z.object(transactionFields);
 
 export const transactionUpdateSchema = z.object(transactionFields);
 
+export const transactionWriteSchema = transactionUpdateSchema.extend({
+  rule: z
+    .object({
+      payee: z.string().trim().min(1).max(200),
+      match: z.enum(ruleMatches),
+      pattern: z.string().trim().min(1).max(200),
+    })
+    .optional(),
+});
+
 export const transactionSchema = z.object({
   id: z.uuid(),
   accountId: z.uuid(),
@@ -68,6 +80,11 @@ export const transactionSchema = z.object({
   mirror: z.boolean(),
   deletedAt: z.string().refine(isUtcTimestamp).nullable(),
   lines: z.array(transactionLineSchema),
+});
+
+export const transactionSaveResultSchema = transactionSchema.extend({
+  applied: z.number().int().nonnegative().optional(),
+  skipped: z.array(skippedRowSchema).optional(),
 });
 
 function blankQuery(value: unknown): unknown {

@@ -32,6 +32,7 @@ export function InboxScreen() {
   const { openEditor } = useEditors();
   const [showDismissed, setShowDismissed] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const inbox = useQuery({
     queryKey: ["inbox", asOf, showDismissed],
@@ -148,6 +149,7 @@ export function InboxScreen() {
               </Button>
             </div>
           ) : null}
+          {notice ? <p className="px-5 py-3 text-sm" role="status">{notice}</p> : null}
           {actionError ? <p className="px-5 py-3 text-sm text-attn">{actionError}</p> : null}
           {caughtUp ? <p className="px-5 py-6 text-muted-foreground">All caught up.</p> : null}
           {dismissedEmpty ? <p className="px-5 py-6 text-muted-foreground">No dismissed items.</p> : null}
@@ -169,8 +171,8 @@ export function InboxScreen() {
                   }
                 });
               }}
-              onDismiss={(itemKey) => {
-                void openEditor("inboxReason", { mode: "dismiss", itemKey, asOf }).then((id) => {
+              onDismiss={(itemKeys) => {
+                void openEditor("inboxReason", { mode: "dismiss", itemKeys, asOf }).then((id) => {
                   if (id) {
                     refresh();
                   }
@@ -181,7 +183,7 @@ export function InboxScreen() {
                   if (!id) {
                     return;
                   }
-                  void dismissItem(asOf, item.itemKey, "added_manually").then((result) => {
+                  void dismissItem(asOf, [item.itemKey], "added_manually").then((result) => {
                     if (!result.ok) {
                       setActionError(inboxError(result.code));
                     }
@@ -199,8 +201,8 @@ export function InboxScreen() {
                 void openEditor("fundPaycheck", { incomeTransactionId }).then(() => refresh());
               }}
               unassigned={position.data?.unassigned ?? 0}
-              onRestore={(itemKey) => {
-                void restoreItem(itemKey).then((result) => {
+              onRestore={(itemKeys) => {
+                void restoreItem(itemKeys).then((result) => {
                   if (!result.ok) {
                     setActionError(inboxError(result.code));
                     return;
@@ -214,6 +216,7 @@ export function InboxScreen() {
                 setActionError(null);
                 refresh();
               }}
+              onNotice={setNotice}
               onError={(code) => setActionError(inboxError(code))}
             />
           ))}

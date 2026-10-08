@@ -14,7 +14,7 @@ import { applyRule, previewRuleApply } from "./rule-apply";
 import { archiveMerchant, createMerchant } from "./merchants";
 import { createPlan } from "./recurring-plans";
 import { archiveRule, createRule, restoreRule } from "./rules";
-import { listPromotionCandidates, listTransferPairs, promotePayee, suggestForPayee } from "./suggestions";
+import { listPromotionCandidates, listTransferPairs, suggestForPayee } from "./suggestions";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
@@ -413,7 +413,7 @@ test("apply a transfer rule links the opposite row", () => {
   }
 });
 
-test("promote counts transfers and creates a transfer rule", () => {
+test("a transfer does not keep a merchant", () => {
   const { db, close } = tempDatabase();
   try {
     const chequing = createAccount(db, {
@@ -448,24 +448,9 @@ test("promote counts transfers and creates a transfer rule", () => {
         at,
       });
     }
-    const ready = listPromotionCandidates(db).items.find((item) => item.transferAccountId === visa.id);
-    expect(ready).toMatchObject({
-      payee: "VISA PAYMENT",
-      merchantId: shop.id,
-      categoryId: null,
-      transferAccountId: visa.id,
-      count: 3,
-    });
-    const rule = promotePayee(db, {
-      payee: "VISA PAYMENT",
-      merchantId: shop.id,
-      transferAccountId: visa.id,
-      source: "ui",
-      at,
-    });
-    expect(rule.transferAccountId).toBe(visa.id);
-    expect(rule.categoryId).toBeNull();
-    expect(rule.origin).toBe("promoted");
+    const payments = db.select().from(transactions).all().filter((row) => row.payeeRaw === "VISA PAYMENT");
+    expect(payments.every((row) => row.merchantId === null)).toBe(true);
+    expect(listPromotionCandidates(db).items.find((item) => item.transferAccountId === visa.id)).toBeUndefined();
   } finally {
     close();
   }

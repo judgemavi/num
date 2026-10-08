@@ -5,7 +5,6 @@ import {
   merchantForChoice,
   moneyDirection,
   normalizePayee,
-  payeeRuleResultSchema,
   transactionSchema,
   type Account,
   type Category,
@@ -19,7 +18,7 @@ import { LoadError, LoadingLine } from "@/editors/load-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FieldError } from "@/components/ui/field";
+import { FieldError, FieldLabel } from "@/components/ui/field";
 import { apiRequest } from "@/request";
 import { formatMoney as formatDisplayMoney } from "@/money";
 import { PayeeRuleField } from "@/transactions/payee-rule-field";
@@ -104,6 +103,7 @@ function GroupForm({
   const [ruleMatch, setRuleMatch] = useState<"exact" | "prefix" | "contains">("exact");
   const [rulePattern, setRulePattern] = useState(normalizePayee(transactions[0]?.payeeRaw ?? ""));
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const included = transactions.filter((item) => !excluded.includes(item.id));
   const total = included.reduce((sum, item) => sum + item.amount, 0);
@@ -130,36 +130,26 @@ function GroupForm({
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        transactionIds: included.map((item) => item.id),
+        accountId,
+        transactionIds: transactions.map((item) => item.id),
+        excludedIds: excluded,
         categoryId: choice === "transfer" ? null : categoryId,
         transferAccountId: choice === "transfer" ? transferAccountId : null,
-        merchantId: merchantForChoice(choice, merchantId),
+        merchantId: choice === "transfer" ? null : merchantId,
+        rule:
+          always && rulePattern.trim().length > 0
+            ? { payee: normalizePayee(payee), match: ruleMatch, pattern: rulePattern.trim() }
+            : null,
       }),
     });
+    setSaving(false);
     if (!result.ok) {
-      setSaving(false);
       setError(transactionError(result.code));
       return;
     }
-    if (always) {
-      const rule = await apiRequest("/api/inbox/payee-rules", payeeRuleResultSchema, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          payee: normalizePayee(payee),
-          match: ruleMatch,
-          pattern: rulePattern.trim(),
-          merchantId: merchantForChoice(choice, merchantId),
-          categoryId: choice === "transfer" ? null : categoryId,
-          transferAccountId: choice === "transfer" ? transferAccountId : null,
-          exceptIds: included.map((item) => item.id),
-        }),
-      });
-      if (!rule.ok) {
-        setSaving(false);
-        setError(transactionError(rule.code));
-        return;
-      }
+    if (result.data.skipped.length > 0) {
+      setNotice(`Applied to ${result.data.applied} · skipped ${result.data.skipped.length}`);
+      return;
     }
     onSaved(included[0]?.id ?? "");
   }
@@ -188,9 +178,9 @@ function GroupForm({
                 setExcluded((current) => (value === true ? current.filter((id) => id !== item.id) : [...current, item.id]));
               }}
             />
-            <label htmlFor={`keep-${item.id}`} className="text-sm">
+            <FieldLabel htmlFor={`keep-${item.id}`} className="text-sm font-normal">
               {item.date} · {item.payeeRaw} · {formatDisplayMoney(currency, item.amount)}
-            </label>
+            </FieldLabel>
           </li>
         ))}
       </ul>
@@ -226,7 +216,8 @@ function GroupForm({
       />
       <PayeeRuleField
         payee={payee}
-        exceptId={included.map((item) => item.id).join(",")}
+        accountId={accountId}
+        exceptIds={transactions.map((item) => item.id).join(",")}
         enabled={always}
         onEnabled={setAlways}
         match={ruleMatch}
@@ -234,14 +225,21 @@ function GroupForm({
         pattern={rulePattern}
         onPattern={setRulePattern}
       />
+      {notice ? <p role="status">{notice}</p> : null}
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={saveDisabled}>
-          {saving ? "Saving" : "Save"}
-        </Button>
+        {notice ? (
+          <Button type="button" onClick={() => onSaved(included[0]?.id ?? "")}>
+            Done
+          </Button>
+        ) : (
+          <Button type="submit" disabled={saveDisabled}>
+            {saving ? "Saving" : "Save"}
+          </Button>
+        )}
       </DialogFooter>
     </form>
   );

@@ -50,7 +50,7 @@ export function InboxReasonEditor({ props, onClose, onSaved }: { props: EditorIn
     setSaving(true);
     const result = skip
       ? await skipOccurrence(props.planId, props.dueDate, reason.trim())
-      : await dismissItem(props.asOf, props.itemKey, reason.trim());
+      : await dismissItem(props.asOf, props.itemKeys, reason.trim());
     setSaving(false);
     if (!result.ok) {
       setError(inboxError(result.code));

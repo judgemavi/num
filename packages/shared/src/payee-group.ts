@@ -2,6 +2,8 @@ import type { Suggestion } from "./suggest";
 
 export type PayeeGroupRow = {
   transactionId: string;
+  lineId: string;
+  accountId: string;
   date: string;
   amount: number;
   payeeRaw: string;
@@ -11,11 +13,13 @@ export type PayeeGroupRow = {
 
 export type PayeeGroup = {
   payee: string;
+  accountId: string;
   payeeRaw: string;
   date: string;
   count: number;
   total: number;
   transactionIds: string[];
+  lineIds: string[];
   suggestion: Suggestion;
 };
 
@@ -32,16 +36,19 @@ function later(left: PayeeGroupRow, right: PayeeGroupRow): PayeeGroupRow {
   return left.transactionId > right.transactionId ? left : right;
 }
 
-/** One inbox item per normalized payee. The item key is the payee. */
+/** One inbox item per normalized payee in one account. */
 export function groupByPayee(rows: readonly PayeeGroupRow[]): PayeeGroup[] {
   const groups = new Map<string, PayeeGroupRow[]>();
   for (const row of rows) {
-    const current = groups.get(row.payee) ?? [];
+    const key = `${row.accountId}\0${row.payee}`;
+    const current = groups.get(key) ?? [];
     current.push(row);
-    groups.set(row.payee, current);
+    groups.set(key, current);
   }
   const items: PayeeGroup[] = [];
-  for (const [payee, members] of groups) {
+  for (const members of groups.values()) {
+    const payee = members[0]?.payee ?? "";
+    const accountId = members[0]?.accountId ?? "";
     const byId = new Map<string, PayeeGroupRow>();
     for (const member of members) {
       const previous = byId.get(member.transactionId);
@@ -75,21 +82,31 @@ export function groupByPayee(rows: readonly PayeeGroupRow[]): PayeeGroup[] {
       if (left.date !== right.date) {
         return left.date < right.date ? 1 : -1;
       }
-      return left.transactionId < right.transactionId ? 1 : left.transactionId > right.transactionId ? 1 : 0;
+      if (left.transactionId === right.transactionId) {
+        return 0;
+      }
+      return left.transactionId < right.transactionId ? 1 : -1;
     });
+    const lineIds = members.map((member) => member.lineId).sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
     items.push({
       payee,
+      accountId,
       payeeRaw: latest.payeeRaw,
       date: latest.date,
       count: unique.length,
       total: unique.reduce((sum, member) => sum + member.amount, 0),
       transactionIds: unique.map((member) => member.transactionId),
+      lineIds,
       suggestion: best.suggestion,
     });
   }
   return items;
 }
 
-export function uncategorizedItemKey(payee: string): string {
-  return `uncategorized:${payee}`;
+export function uncategorizedLineKey(lineId: string): string {
+  return `uncategorized:${lineId}`;
+}
+
+export function uncategorizedItemKey(accountId: string, payee: string): string {
+  return `uncategorized:${accountId}:${payee}`;
 }

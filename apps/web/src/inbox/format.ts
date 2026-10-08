@@ -115,7 +115,7 @@ export function itemWhy(item: InboxItem, names: Names, currency: string): string
     case "import_review":
       return `${shortDate(item.date)} · ${names.account(item.accountId)} · ${formatMoney(currency, item.amount)}`;
     case "uncategorized":
-      return `${item.count} ${item.count === 1 ? "transaction" : "transactions"} · ${formatMoney(currency, Math.abs(item.total))}`;
+      return `${names.account(item.accountId)} · ${item.count} ${item.count === 1 ? "transaction" : "transactions"} · ${formatMoney(currency, Math.abs(item.total))}`;
     case "recurring_changed":
       return `Charged ${shortDate(item.date)}. Update the plan?`;
     case "recurring_missed":

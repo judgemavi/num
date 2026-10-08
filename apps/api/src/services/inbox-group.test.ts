@@ -1,20 +1,19 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditLog, migrateDatabase, openDatabase, settings } from "@num/db";
+import { auditLog, migrateDatabase, openDatabase, rules, settings, transactions } from "@num/db";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
-import { applyInboxGroup, createPayeeRule } from "./inbox-group";
-import { listInbox } from "./inbox";
+import { applyInboxGroup, saveTransactionWithRule } from "./inbox-group";
 import { createMerchant } from "./merchants";
-import { getRule } from "./rules";
-import { createTransaction, getTransaction } from "./transactions";
+import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const at = "2026-10-08T15:00:00Z";
 const saved = { source: "ui" as const, at };
+const missingCategory = "99999999-9999-4999-8999-999999999999";
 
 function book() {
   const dir = mkdtempSync(join(tmpdir(), "num-inbox-group-"));
@@ -31,7 +30,7 @@ function book() {
   };
 }
 
-function pay(db: Db, accountId: string, date: string, amount: number, payee: string, merchantId: string | null = null) {
+function pay(db: Db, accountId: string, date: string, amount: number, payee: string, merchantId: string | null = null, lines?: { amount: number; categoryId: string | null }[]) {
   return createTransaction(db, {
     accountId,
     date,
@@ -39,12 +38,18 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
     payeeRaw: payee,
     merchantId,
     status: "open",
-    lines: [{ amount, categoryId: null, memo: null, transferAccountId: null, tagIds: [] }],
+    lines: (lines ?? [{ amount, categoryId: null }]).map((line) => ({
+      amount: line.amount,
+      categoryId: line.categoryId,
+      memo: null,
+      transferAccountId: null,
+      tagIds: [],
+    })),
     ...saved,
   });
 }
 
-test("a payee group applies in one write", () => {
+test("unticked rows stay out of the rule, and a failure writes nothing", () => {
   const sample = book();
   try {
     const cash = createAccount(sample.db, {
@@ -56,48 +61,51 @@ test("a payee group applies in one write", () => {
       ...saved,
     });
     const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
-    const first = pay(sample.db, cash.id, "2026-03-01", -400, "Blue Bottle");
-    const second = pay(sample.db, cash.id, "2026-03-02", -420, "SQ *BLUE BOTTLE");
-    const other = pay(sample.db, cash.id, "2026-03-03", -100, "Shell");
-    const grouped = listInbox(sample.db, "2026-03-20").items.filter((item) => item.kind === "uncategorized");
-    const bottle = grouped.find((item) => item.kind === "uncategorized" && item.payee === "BLUE BOTTLE");
-    expect(bottle?.kind === "uncategorized" ? bottle.count : 0).toBe(2);
-    expect(bottle?.kind === "uncategorized" ? bottle.transactionIds : []).toEqual([second.id, first.id]);
-
-    const missing = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const kept = pay(sample.db, cash.id, "2026-03-01", -400, "Blue Bottle");
+    const other = pay(sample.db, cash.id, "2026-03-02", -420, "SQ *BLUE BOTTLE");
+    const excluded = pay(sample.db, cash.id, "2026-03-03", -430, "blue bottle");
+    const applyAt = "2026-10-08T17:00:00Z";
     expect(() =>
       applyInboxGroup(sample.db, {
-        transactionIds: [first.id, missing],
-        categoryId: food.id,
+        accountId: cash.id,
+        transactionIds: [kept.id, excluded.id],
+        excludedIds: [excluded.id],
+        categoryId: missingCategory,
         transferAccountId: null,
         merchantId: null,
+        rule: { payee: "BLUE BOTTLE", match: "exact", pattern: "BLUE BOTTLE" },
         source: "ui",
-        at: "2026-10-08T16:00:00Z",
+        at: applyAt,
       }),
     ).toThrow();
-    expect(getTransaction(sample.db, first.id)?.lines[0]?.categoryId).toBeNull();
+    expect(getTransaction(sample.db, kept.id)?.lines[0]?.categoryId).toBeNull();
+    expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBeNull();
+    expect(getTransaction(sample.db, excluded.id)?.lines[0]?.categoryId).toBeNull();
+    expect(sample.db.select().from(rules).all()).toHaveLength(0);
+    expect(sample.db.select().from(auditLog).where(eq(auditLog.at, applyAt)).all()).toHaveLength(0);
 
-    const applyAt = "2026-10-08T17:00:00Z";
     const result = applyInboxGroup(sample.db, {
-      transactionIds: [first.id, second.id],
+      accountId: cash.id,
+      transactionIds: [kept.id, excluded.id],
+      excludedIds: [excluded.id],
       categoryId: food.id,
       transferAccountId: null,
       merchantId: null,
+      rule: { payee: "BLUE BOTTLE", match: "contains", pattern: "BOTTLE" },
       source: "ui",
-      at: applyAt,
+      at: "2026-10-08T18:00:00Z",
     });
     expect(result.applied).toBe(2);
-    expect(getTransaction(sample.db, first.id)?.lines[0]?.categoryId).toBe(food.id);
-    expect(getTransaction(sample.db, second.id)?.lines[0]?.categoryId).toBe(food.id);
-    expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBeNull();
-    const audits = sample.db.select().from(auditLog).where(eq(auditLog.at, applyAt)).all();
-    expect(audits.filter((row) => row.entity === "transactions")).toHaveLength(2);
+    expect(getTransaction(sample.db, kept.id)?.lines[0]?.categoryId).toBe(food.id);
+    expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBe(food.id);
+    expect(getTransaction(sample.db, excluded.id)?.lines[0]?.categoryId).toBeNull();
+    expect(sample.db.select().from(rules).all()[0]?.pattern).toBe("BOTTLE");
   } finally {
     sample.close();
   }
 });
 
-test("a transfer apply clears the merchant", () => {
+test("a categorized row, a split and a reconciled transfer are skipped", () => {
   const sample = book();
   try {
     const cash = createAccount(sample.db, {
@@ -116,26 +124,106 @@ test("a transfer apply clears the merchant", () => {
       openingBalance: 0,
       ...saved,
     });
-    const shop = createMerchant(sample.db, { name: "Cafe", defaultCategoryId: null, ...saved });
-    const row = pay(sample.db, cash.id, "2026-03-01", -500, "Move", shop.id);
-    applyInboxGroup(sample.db, {
-      transactionIds: [row.id],
+    const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
+    const open = pay(sample.db, cash.id, "2026-03-01", -400, "Cafe");
+    const done = pay(sample.db, cash.id, "2026-03-02", -100, "Cafe");
+    updateTransaction(sample.db, done.id, {
+      accountId: cash.id,
+      date: done.date,
+      amount: done.amount,
+      payeeRaw: done.payeeRaw,
+      merchantId: null,
+      notes: null,
+      status: "open",
+      lines: [{ amount: done.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
+      ...saved,
+    });
+    const split = pay(sample.db, cash.id, "2026-03-03", -300, "Cafe", null, [
+      { amount: -200, categoryId: null },
+      { amount: -100, categoryId: null },
+    ]);
+    const locked = pay(sample.db, cash.id, "2026-03-04", -50, "Cafe");
+    sample.db.update(transactions).set({ status: "reconciled" }).where(eq(transactions.id, locked.id)).run();
+    const result = applyInboxGroup(sample.db, {
+      accountId: cash.id,
+      transactionIds: [open.id, done.id, split.id, locked.id],
+      excludedIds: [],
       categoryId: null,
       transferAccountId: savings.id,
-      merchantId: shop.id,
+      merchantId: null,
+      rule: null,
       source: "ui",
-      at: "2026-10-08T18:00:00Z",
+      at: "2026-10-08T19:00:00Z",
     });
-    const savedRow = getTransaction(sample.db, row.id);
-    expect(savedRow?.merchantId).toBeNull();
-    expect(savedRow?.lines[0]?.transferAccountId).toBe(savings.id);
-    expect(savedRow?.lines[0]?.categoryId).toBeNull();
+    expect(result.applied).toBe(1);
+    expect(result.skipped.map((row) => row.reason).sort()).toEqual(["categorized", "reconciled", "split"]);
+    expect(getTransaction(sample.db, open.id)?.lines[0]?.transferAccountId).toBe(savings.id);
+    expect(getTransaction(sample.db, done.id)?.lines[0]?.categoryId).toBe(food.id);
+    expect(getTransaction(sample.db, split.id)?.lines).toHaveLength(2);
+    expect(getTransaction(sample.db, locked.id)?.lines[0]?.transferAccountId).toBeNull();
   } finally {
     sample.close();
   }
 });
 
-test("a payee rule applies to the other uncategorized rows", () => {
+test("a group keeps an existing merchant and a transfer clears it on PATCH", () => {
+  const sample = book();
+  try {
+    const cash = createAccount(sample.db, {
+      name: "Cash",
+      institution: null,
+      kind: "chequing",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      ...saved,
+    });
+    const savings = createAccount(sample.db, {
+      name: "Savings",
+      institution: null,
+      kind: "savings",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      ...saved,
+    });
+    const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
+    const shop = createMerchant(sample.db, { name: "Cafe", defaultCategoryId: null, ...saved });
+    const row = pay(sample.db, cash.id, "2026-03-01", -500, "Cafe", shop.id);
+    applyInboxGroup(sample.db, {
+      accountId: cash.id,
+      transactionIds: [row.id],
+      excludedIds: [],
+      categoryId: food.id,
+      transferAccountId: null,
+      merchantId: null,
+      rule: null,
+      source: "ui",
+      at: "2026-10-08T20:00:00Z",
+    });
+    expect(getTransaction(sample.db, row.id)?.merchantId).toBe(shop.id);
+    expect(getTransaction(sample.db, row.id)?.lines[0]?.categoryId).toBe(food.id);
+    const current = getTransaction(sample.db, row.id);
+    if (!current) {
+      throw new Error("missing");
+    }
+    const transferred = updateTransaction(sample.db, row.id, {
+      accountId: current.accountId,
+      date: current.date,
+      amount: current.amount,
+      payeeRaw: current.payeeRaw,
+      merchantId: shop.id,
+      notes: null,
+      status: "open",
+      lines: [{ amount: current.amount, categoryId: null, memo: null, transferAccountId: savings.id, tagIds: [] }],
+      ...saved,
+    });
+    expect(transferred.merchantId).toBeNull();
+    expect(transferred.lines[0]?.transferAccountId).toBe(savings.id);
+  } finally {
+    sample.close();
+  }
+});
+
+test("a rule does not fill a split, and the save with the rule is one write", () => {
   const sample = book();
   try {
     const cash = createAccount(sample.db, {
@@ -147,28 +235,49 @@ test("a payee rule applies to the other uncategorized rows", () => {
       ...saved,
     });
     const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
-    const kept = pay(sample.db, cash.id, "2026-03-01", -400, "Blue Bottle");
+    const current = pay(sample.db, cash.id, "2026-03-01", -400, "Blue Bottle");
     const other = pay(sample.db, cash.id, "2026-03-02", -420, "SQ *BLUE BOTTLE");
-    const third = pay(sample.db, cash.id, "2026-03-03", -430, "blue bottle");
-    const shell = pay(sample.db, cash.id, "2026-03-04", -100, "Shell");
-    const result = createPayeeRule(sample.db, {
-      payee: "BLUE BOTTLE",
-      match: "contains",
-      pattern: "BOTTLE",
+    const split = pay(sample.db, cash.id, "2026-03-03", -300, "blue bottle", null, [
+      { amount: -200, categoryId: null },
+      { amount: -100, categoryId: null },
+    ]);
+    const ruleAt = "2026-10-08T21:00:00Z";
+    expect(() =>
+      saveTransactionWithRule(sample.db, current.id, {
+        accountId: cash.id,
+        date: current.date,
+        amount: current.amount,
+        payeeRaw: current.payeeRaw,
+        merchantId: null,
+        notes: null,
+        status: "open",
+        lines: [{ amount: current.amount, categoryId: missingCategory, memo: null, transferAccountId: null, tagIds: [] }],
+        rule: { payee: "BLUE BOTTLE", match: "exact", pattern: "BLUE BOTTLE" },
+        source: "ui",
+        at: ruleAt,
+      }),
+    ).toThrow();
+    expect(getTransaction(sample.db, current.id)?.lines[0]?.categoryId).toBeNull();
+    expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBeNull();
+    expect(sample.db.select().from(auditLog).where(eq(auditLog.at, ruleAt)).all()).toHaveLength(0);
+
+    const savedRow = saveTransactionWithRule(sample.db, current.id, {
+      accountId: cash.id,
+      date: current.date,
+      amount: current.amount,
+      payeeRaw: current.payeeRaw,
       merchantId: null,
-      categoryId: food.id,
-      transferAccountId: null,
-      exceptIds: [kept.id],
+      notes: null,
+      status: "open",
+      lines: [{ amount: current.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
+      rule: { payee: "BLUE BOTTLE", match: "exact", pattern: "BLUE BOTTLE" },
       source: "ui",
-      at: "2026-10-08T19:00:00Z",
+      at: "2026-10-08T22:00:00Z",
     });
-    expect(result.applied).toBe(2);
-    expect(getRule(sample.db, result.ruleId).match).toBe("contains");
-    expect(getRule(sample.db, result.ruleId).pattern).toBe("BOTTLE");
-    expect(getTransaction(sample.db, kept.id)?.lines[0]?.categoryId).toBeNull();
+    expect(savedRow.lines[0]?.categoryId).toBe(food.id);
+    expect(savedRow.skipped.map((row) => row.id)).toEqual([split.id]);
     expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBe(food.id);
-    expect(getTransaction(sample.db, third.id)?.lines[0]?.categoryId).toBe(food.id);
-    expect(getTransaction(sample.db, shell.id)?.lines[0]?.categoryId).toBeNull();
+    expect(getTransaction(sample.db, split.id)?.lines.every((line) => line.categoryId === null)).toBe(true);
   } finally {
     sample.close();
   }

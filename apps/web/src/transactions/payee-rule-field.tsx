@@ -14,7 +14,8 @@ const matchLabel: Record<RuleMatch, string> = {
 
 type PayeeRuleFieldProps = {
   payee: string;
-  exceptId: string | null;
+  accountId: string;
+  exceptIds: string;
   enabled: boolean;
   onEnabled: (enabled: boolean) => void;
   match: RuleMatch;
@@ -23,15 +24,15 @@ type PayeeRuleFieldProps = {
   onPattern: (pattern: string) => void;
 };
 
-export function PayeeRuleField({ payee, exceptId, enabled, onEnabled, match, onMatch, pattern, onPattern }: PayeeRuleFieldProps) {
+export function PayeeRuleField({ payee, accountId, exceptIds, enabled, onEnabled, match, onMatch, pattern, onPattern }: PayeeRuleFieldProps) {
   const normalized = normalizePayee(payee);
   const count = useQuery({
-    queryKey: ["payee-count", normalized, exceptId],
-    enabled: enabled && normalized.length > 0,
+    queryKey: ["payee-count", normalized, accountId, exceptIds],
+    enabled: enabled && normalized.length > 0 && accountId.length > 0,
     queryFn: async () => {
-      const params = new URLSearchParams({ payee: normalized });
-      if (exceptId) {
-        params.set("except", exceptId);
+      const params = new URLSearchParams({ payee: normalized, accountId });
+      if (exceptIds.length > 0) {
+        params.set("except", exceptIds);
       }
       const result = await apiRequest(`/api/inbox/payee-count?${params.toString()}`, payeeCountSchema);
       if (!result.ok) {

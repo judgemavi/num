@@ -27,15 +27,16 @@ type InboxItemRowProps = {
   categories: Category[];
   buckets: Bucket[];
   onSkip: (planId: string, dueDate: string) => void;
-  onDismiss: (itemKey: string) => void;
+  onDismiss: (itemKeys: string[]) => void;
   onAddByHand: (item: Extract<InboxItem, { kind: "import_unreadable" }>) => void;
   onOpenGroup: (transactionIds: string[]) => void;
   onReviewQueue: (transactionIds: string[]) => void;
   onFundPaycheck: (incomeTransactionId: string) => void;
   unassigned: number;
-  onRestore?: (itemKey: string) => void;
+  onRestore?: (itemKeys: string[]) => void;
   dismissedReason?: string;
   onDone: () => void;
+  onNotice: (text: string) => void;
   onError: (code: string) => void;
 };
 
@@ -88,6 +89,7 @@ export function InboxItemRow({
   onRestore,
   dismissedReason,
   onDone,
+  onNotice,
   onError,
 }: InboxItemRowProps) {
   const [pending, setPending] = useState(false);
@@ -223,7 +225,7 @@ export function InboxItemRow({
         </div>
         <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
           {dismissedReason && onRestore ? (
-            <Button type="button" disabled={pending} onClick={() => onRestore(item.itemKey)}>
+            <Button type="button" disabled={pending} onClick={() => onRestore(item.kind === "uncategorized" ? item.lineIds.map((lineId) => `uncategorized:${lineId}`) : [item.itemKey])}>
               Restore
             </Button>
           ) : null}
@@ -239,7 +241,12 @@ export function InboxItemRow({
                   {primary.label}
                 </Button>
               ) : null}
-              <Button type="button" variant="ghost" disabled={pending} onClick={() => onDismiss(item.itemKey)}>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => onDismiss(item.kind === "uncategorized" ? item.lineIds.map((lineId) => `uncategorized:${lineId}`) : [item.itemKey])}
+              >
                 Not now
               </Button>
             </>
@@ -261,7 +268,15 @@ export function InboxItemRow({
                 type="button"
                 variant={index === 0 ? "default" : "outline"}
                 disabled={pending}
-                onClick={() => void run(() => applyInboxGroup(item.transactionIds, suggestion))}
+                onClick={() =>
+                  void run(async () => {
+                    const result = await applyInboxGroup(item.accountId, item.transactionIds, suggestion);
+                    if (result.ok && result.data.skipped.length > 0) {
+                      onNotice(`Applied to ${result.data.applied} · skipped ${result.data.skipped.length}`);
+                    }
+                    return result;
+                  })
+                }
               >
                 {label}
               </Button>

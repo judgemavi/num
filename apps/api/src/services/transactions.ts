@@ -143,33 +143,46 @@ export function getTransaction(db: Db, id: string): Transaction | null {
   return toTransaction(row, loadLines(db, id));
 }
 
-export function createTransaction(db: Db, input: TransactionBody & WriteInput): Transaction {
+function headerFor(input: TransactionBody, lines: ReturnType<typeof normalizeLine>[]): Header {
   const header = headerFrom(input);
+  if (lines.some((line) => line.transferAccountId !== null)) {
+    return { ...header, merchantId: null };
+  }
+  return header;
+}
+
+export function insertTransaction(tx: WriteTx, input: TransactionBody, source: AuditSource): Transaction {
   const lines = input.lines.map(normalizeLine);
-  const source = recordSource(input.source);
+  const header = headerFor(input, lines);
+  const recordSourceName = recordSource(source);
   const id = crypto.randomUUID();
+  assertLineShape(header.accountId, header.amount, lines);
+  assertReferences(tx, header, lines, { accountId: null, transferAccountId: null });
+  tx.insert(transactions)
+    .values({
+      id,
+      ...header,
+      source: recordSourceName,
+      importRowId: null,
+      transferPeerId: null,
+      mirror: false,
+      deletedAt: null,
+    })
+    .run();
+  replaceLines(tx, id, lines);
+  const line = lines.find((item) => item.transferAccountId !== null);
+  if (line?.transferAccountId) {
+    attachTransfer(tx, id, header, recordSourceName, line);
+  }
+  auditTransaction(tx, id, "create", null, readTransaction(tx, id));
+  return readTransaction(tx, id);
+}
+
+export function createTransaction(db: Db, input: TransactionBody & WriteInput): Transaction {
+  const at = input.at ?? utcNow();
   let created: Transaction | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
-    assertLineShape(header.accountId, header.amount, lines);
-    assertReferences(tx, header, lines, { accountId: null, transferAccountId: null });
-    tx.insert(transactions)
-      .values({
-        id,
-        ...header,
-        source,
-        importRowId: null,
-        transferPeerId: null,
-        mirror: false,
-        deletedAt: null,
-      })
-      .run();
-    replaceLines(tx, id, lines);
-    const line = lines.find((item) => item.transferAccountId !== null);
-    if (line?.transferAccountId) {
-      attachTransfer(tx, id, header, source, line);
-    }
-    auditTransaction(tx, id, "create", null, readTransaction(tx, id));
-    created = readTransaction(tx, id);
+  write(db, { source: input.source, at }, (tx) => {
+    created = insertTransaction(tx, input, input.source);
   });
   if (!created) {
     throw new Error("Create did not return a transaction");
@@ -178,8 +191,8 @@ export function createTransaction(db: Db, input: TransactionBody & WriteInput): 
 }
 
 export function applyTransactionUpdate(tx: WriteTx, id: string, input: TransactionBody, at: string): Transaction {
-  const header = headerFrom(input);
   const lines = input.lines.map(normalizeLine);
+  const header = headerFor(input, lines);
   const existing = requireActive(tx, id);
   const existingLines = loadLines(tx, id);
   const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;

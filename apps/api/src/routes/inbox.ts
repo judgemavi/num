@@ -9,13 +9,11 @@ import {
   inboxSchema,
   payeeCountQuerySchema,
   payeeCountSchema,
-  payeeRuleResultSchema,
-  payeeRuleSchema,
 } from "@num/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { dismissInboxItem, listInbox, restoreInboxItem } from "../services/inbox";
-import { applyInboxGroup, countOtherUncategorized, createPayeeRule } from "../services/inbox-group";
+import { dismissInboxItems, listInbox, restoreInboxItems } from "../services/inbox";
+import { applyInboxGroup, countOtherUncategorized } from "../services/inbox-group";
 import { autoLink } from "../services/recurring-view";
 
 const errorResponse = {
@@ -78,18 +76,6 @@ const groupRoute = createRoute({
   },
 });
 
-const payeeRuleRoute = createRoute({
-  method: "post",
-  path: "/api/inbox/payee-rules",
-  request: { body: { required: true, content: { "application/json": { schema: payeeRuleSchema } } } },
-  responses: {
-    200: { description: "The rule and the other payee rows", content: { "application/json": { schema: payeeRuleResultSchema } } },
-    400: errorResponse,
-    404: errorResponse,
-    409: errorResponse,
-  },
-});
-
 const payeeCountRoute = createRoute({
   method: "get",
   path: "/api/inbox/payee-count",
@@ -109,10 +95,9 @@ function exceptIds(except: string | undefined): string[] {
 
 export function registerInbox(app: OpenAPIHono, db: Db) {
   app.openapi(groupRoute, (c) => c.json(applyInboxGroup(db, { ...c.req.valid("json"), source: "ui" }), 200));
-  app.openapi(payeeRuleRoute, (c) => c.json(createPayeeRule(db, { ...c.req.valid("json"), source: "ui" }), 200));
   app.openapi(payeeCountRoute, (c) => {
     const query = c.req.valid("query");
-    return c.json({ count: countOtherUncategorized(db, query.payee, exceptIds(query.except)) }, 200);
+    return c.json({ count: countOtherUncategorized(db, query.payee, query.accountId, exceptIds(query.except)) }, 200);
   });
   app.openapi(listRoute, (c) => {
     const query = c.req.valid("query");
@@ -125,7 +110,7 @@ export function registerInbox(app: OpenAPIHono, db: Db) {
   });
   app.openapi(dismissRoute, (c) => {
     const body = c.req.valid("json");
-    return c.json(dismissInboxItem(db, c.req.valid("query").asOf, body.itemKey, body.reason, { source: "ui" }), 200);
+    return c.json(dismissInboxItems(db, c.req.valid("query").asOf, body.itemKeys, body.reason, { source: "ui" }), 200);
   });
-  app.openapi(restoreRoute, (c) => c.json(restoreInboxItem(db, c.req.valid("json").itemKey, { source: "ui" }), 200));
+  app.openapi(restoreRoute, (c) => c.json(restoreInboxItems(db, c.req.valid("json").itemKeys, { source: "ui" }), 200));
 }

@@ -108,4 +108,5 @@ test("the category kind follows the choice", () => {
 test("merchant name comes from the payee", () => {
   expect(merchantNameFromPayee("SQ *BLUE BOTTLE 0423")).toBe("Blue Bottle");
   expect(merchantNameFromPayee("sq *  blue bottle")).toBe("Blue Bottle");
+  expect(merchantNameFromPayee("POS 0423")).toBe("");
 });

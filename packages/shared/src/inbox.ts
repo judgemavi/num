@@ -49,11 +49,13 @@ export const inboxItemSchema = z.discriminatedUnion("kind", [
     kind: z.literal("uncategorized"),
     itemKey,
     date: isoDateSchema,
+    accountId: z.uuid(),
     payee: z.string(),
     payeeRaw: z.string(),
     count: z.number().int().positive(),
     total: cents,
     transactionIds: z.array(z.uuid()).min(1),
+    lineIds: z.array(z.uuid()).min(1),
     suggestion: suggestionSchema,
     next: suggestionSchema.nullable(),
   }),
@@ -170,12 +172,16 @@ export const inboxSchema = z.object({
 });
 
 export const inboxDismissSchema = z.object({
-  itemKey,
+  itemKeys: z.array(itemKey).min(1).max(500),
   reason: z.string().trim().min(1).max(500),
 });
 
 export const inboxRestoreSchema = z.object({
-  itemKey,
+  itemKeys: z.array(itemKey).min(1).max(500),
+});
+
+export const inboxKeysSchema = z.object({
+  itemKeys: z.array(itemKey).min(1).max(500),
 });
 
 export const importReviewResultSchema = z.object({
@@ -198,38 +204,42 @@ export const transferPairAcceptSchema = z.object({
   rightId: z.uuid(),
 });
 
+export const groupSkipReasons = ["split", "reconciled", "other_account", "categorized"] as const;
+
+export type GroupSkipReason = (typeof groupSkipReasons)[number];
+
+export const skippedRowSchema = z.object({
+  id: z.uuid(),
+  reason: z.enum(groupSkipReasons),
+});
+
+export const categorizationRuleSchema = z.object({
+  payee: z.string().trim().min(1).max(200),
+  match: z.enum(ruleMatches),
+  pattern: z.string().trim().min(1).max(200),
+});
+
 export const inboxGroupApplySchema = z
   .object({
+    accountId: z.uuid(),
     transactionIds: z.array(z.uuid()).min(1).max(500),
+    excludedIds: z.array(z.uuid()).max(500),
     categoryId: z.uuid().nullable(),
     transferAccountId: z.uuid().nullable(),
     merchantId: z.uuid().nullable(),
+    rule: categorizationRuleSchema.nullable(),
   })
   .refine((value) => (value.categoryId === null) !== (value.transferAccountId === null));
 
 export const inboxGroupApplyResultSchema = z.object({
   applied: z.number().int().nonnegative(),
-});
-
-export const payeeRuleSchema = z
-  .object({
-    payee: z.string().trim().min(1).max(200),
-    match: z.enum(ruleMatches),
-    pattern: z.string().trim().min(1).max(200),
-    merchantId: z.uuid().nullable(),
-    categoryId: z.uuid().nullable(),
-    transferAccountId: z.uuid().nullable(),
-    exceptIds: z.array(z.uuid()).max(500),
-  })
-  .refine((value) => (value.categoryId === null) !== (value.transferAccountId === null));
-
-export const payeeRuleResultSchema = z.object({
-  ruleId: z.uuid(),
-  applied: z.number().int().nonnegative(),
+  skipped: z.array(skippedRowSchema),
+  ruleId: z.uuid().nullable(),
 });
 
 export const payeeCountQuerySchema = z.object({
   payee: z.string().trim().min(1).max(200),
+  accountId: z.uuid(),
   except: z.string().optional(),
 });
 
@@ -242,4 +252,5 @@ export type Inbox = z.infer<typeof inboxSchema>;
 export type InboxDismiss = z.infer<typeof inboxDismissSchema>;
 export type ImportReviewResolve = z.infer<typeof importReviewResolveSchema>;
 export type InboxGroupApply = z.infer<typeof inboxGroupApplySchema>;
-export type PayeeRuleCreate = z.infer<typeof payeeRuleSchema>;
+export type CategorizationRule = z.infer<typeof categorizationRuleSchema>;
+export type GroupSkip = z.infer<typeof skippedRowSchema>;

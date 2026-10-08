@@ -24,7 +24,7 @@ export type EditorInput = {
   assignMoney: { bucketId: string; kind: "fund" | "release" };
   moveMoney: { fromId: string | null };
   inboxReason:
-    | { mode: "dismiss"; itemKey: string; asOf: string }
+    | { mode: "dismiss"; itemKeys: string[]; asOf: string }
     | { mode: "skip"; planId: string; dueDate: string; asOf: string };
   importInfo: Pick<ImportBatch, "filename" | "counts" | "unreadable">;
   mergeMerchant: { merchantId: string };

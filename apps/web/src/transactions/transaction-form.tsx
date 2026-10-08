@@ -6,12 +6,10 @@ import {
   merchantForChoice,
   moneyDirection,
   normalizePayee,
-  payeeRuleResultSchema,
+  transactionSaveResultSchema,
+  transactionWriteSchema,
   signedAmount,
   Temporal,
-  transactionCreateSchema,
-  transactionSchema,
-  transactionUpdateSchema,
   type Account,
   type Category,
   type Merchant,
@@ -94,6 +92,8 @@ export function TransactionForm({
   const [patternTouched, setPatternTouched] = useState(false);
   const [touched, setTouched] = useState(alreadyChosen(transaction));
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const hintAmount = signedTotal(currency, imported, transaction, amount, direction);
@@ -202,23 +202,32 @@ export function TransactionForm({
       setError(caught instanceof Error ? caught.message : "Check the transaction fields.");
       return;
     }
+    if (always && choice !== "split") {
+      if ((choice === "transfer" && !transferAccountId) || (choice !== "transfer" && !categoryId) || rulePattern.trim().length === 0) {
+        setError("Choose a category or account for the rule.");
+        return;
+      }
+    }
     const body = {
       accountId,
       date,
       amount: totalMinor,
-      merchantId,
+      merchantId: merchantForChoice(choice, merchantId),
       notes: notes.trim().length === 0 ? null : notes.trim(),
       payeeRaw: payee.trim(),
       status: reconciled ? "open" : cleared ? "cleared" : "open",
       lines: built,
+      ...(always && choice !== "split"
+        ? { rule: { payee: normalizePayee(payee), match: ruleMatch, pattern: rulePattern.trim() } }
+        : {}),
     };
-    const parsed = (transaction ? transactionUpdateSchema : transactionCreateSchema).safeParse(body);
+    const parsed = transactionWriteSchema.safeParse(body);
     if (!parsed.success) {
       setError("Check the transaction fields.");
       return;
     }
     setSaving(true);
-    const result = await apiRequest(transaction ? `/api/transactions/${transaction.id}` : "/api/transactions", transactionSchema, {
+    const result = await apiRequest(transaction ? `/api/transactions/${transaction.id}` : "/api/transactions", transactionSaveResultSchema, {
       method: transaction ? "PATCH" : "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(parsed.data),
@@ -228,30 +237,11 @@ export function TransactionForm({
       setError(transactionError(result.code));
       return;
     }
-    if (always && normalizePayee(payee).length > 0 && choice !== "split") {
-      if ((choice === "transfer" && !transferAccountId) || (choice !== "transfer" && !categoryId) || rulePattern.trim().length === 0) {
-        setSaving(false);
-        setError("Choose a category or account for the rule.");
-        return;
-      }
-      const rule = await apiRequest("/api/inbox/payee-rules", payeeRuleResultSchema, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          payee: normalizePayee(payee),
-          match: ruleMatch,
-          pattern: rulePattern.trim(),
-          merchantId: merchantForChoice(choice, merchantId),
-          categoryId: choice === "transfer" ? null : categoryId,
-          transferAccountId: choice === "transfer" ? transferAccountId : null,
-          exceptIds: [result.data.id],
-        }),
-      });
-      if (!rule.ok) {
-        setSaving(false);
-        setError(transactionError(rule.code));
-        return;
-      }
+    const skipped = result.data.skipped?.length ?? 0;
+    if (skipped > 0) {
+      setNotice(`Applied to ${result.data.applied ?? 0} · skipped ${skipped}`);
+      setSavedId(result.data.id);
+      return;
     }
     onSaved(result.data.id);
   }
@@ -339,9 +329,11 @@ export function TransactionForm({
         payee={payee}
         suggestion={suggestion}
       />
+      {choice === "split" ? null : (
       <PayeeRuleField
         payee={payee}
-        exceptId={transaction?.id ?? null}
+        accountId={accountId}
+        exceptIds={transaction?.id ?? ""}
         enabled={always}
         onEnabled={setAlways}
         match={ruleMatch}
@@ -352,6 +344,7 @@ export function TransactionForm({
           setRulePattern(value);
         }}
       />
+      )}
       <MoreDetails
         open={more}
         onOpenChange={setMore}
@@ -367,6 +360,7 @@ export function TransactionForm({
         onCleared={setCleared}
         clearedLocked={reconciled}
       />
+      {notice ? <p role="status">{notice}</p> : null}
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
         {transaction && !reconciled ? (
@@ -383,9 +377,15 @@ export function TransactionForm({
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={saveDisabled}>
-          {saving ? "Saving" : "Save"}
-        </Button>
+        {savedId ? (
+          <Button type="button" onClick={() => onSaved(savedId)}>
+            Done
+          </Button>
+        ) : (
+          <Button type="submit" disabled={saveDisabled}>
+            {saving ? "Saving" : "Save"}
+          </Button>
+        )}
       </DialogFooter>
     </form>
   );

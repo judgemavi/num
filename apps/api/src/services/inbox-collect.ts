@@ -5,7 +5,6 @@ import { and, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { listOverspent } from "./buckets";
 import { listFundingPaychecks } from "./funding-book";
-import { uncategorizedItems } from "./inbox-uncategorized";
 import { recurringSignals } from "./recurring-view";
 import { listPromotionCandidates, listTransferPairs } from "./suggestions";
 
@@ -312,7 +311,6 @@ export function collectInbox(db: Db, asOf: string): {
 } {
   const items = [
     ...reviewItems(db),
-    ...uncategorizedItems(db),
     ...recurringItems(db, asOf),
     ...transferItems(db, asOf),
     ...promotionItems(db),

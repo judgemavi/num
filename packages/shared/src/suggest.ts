@@ -133,7 +133,7 @@ function rankedCategories(rows: HistoryRow[]): { categoryId: string; merchantId:
       if (left.date !== right.date) {
         return left.date < right.date ? 1 : -1;
       }
-      return left.id < right.id ? 1 : left.id > right.id ? 1 : 0;
+      return left.id < right.id ? 1 : left.id > right.id ? -1 : 0;
     })
     .slice(0, 10);
   const counts = new Map<string, { categoryId: string; merchantId: string | null; count: number }>();

@@ -202,7 +202,7 @@ export {
 } from "./merchant";
 export { merchantNameFromPayee, normalizePayee, storedPayee } from "./payee";
 export { oppositeTransferAccount, transferHintQuerySchema, transferHintSchema } from "./transfer-hint";
-export { groupByPayee, uncategorizedItemKey, type PayeeGroup, type PayeeGroupRow } from "./payee-group";
+export { groupByPayee, uncategorizedItemKey, uncategorizedLineKey, type PayeeGroup, type PayeeGroupRow } from "./payee-group";
 export {
   categoryKindForChoice,
   choiceForCategory,
@@ -364,21 +364,25 @@ export {
   inboxItemSchema,
   inboxKinds,
   inboxRestoreSchema,
+  categorizationRuleSchema,
+  groupSkipReasons,
   inboxGroupApplyResultSchema,
   inboxGroupApplySchema,
+  inboxKeysSchema,
   inboxSchema,
   payeeCountQuerySchema,
   payeeCountSchema,
-  payeeRuleResultSchema,
-  payeeRuleSchema,
+  skippedRowSchema,
   transferPairAcceptSchema,
+  type CategorizationRule,
+  type GroupSkip,
+  type GroupSkipReason,
   type ImportReviewResolve,
   type Inbox,
   type InboxDismiss,
   type InboxGroupApply,
   type InboxItem,
   type InboxKind,
-  type PayeeRuleCreate,
 } from "./inbox";
 export {
   transactionCreateSchema,
@@ -388,11 +392,13 @@ export {
   transactionListItemSchema,
   transactionListQuerySchema,
   transactionListSchema,
+  transactionSaveResultSchema,
   transactionSchema,
+  transactionUpdateSchema,
+  transactionWriteSchema,
   transactionSortColumns,
   transactionSources,
   transactionStatuses,
-  transactionUpdateSchema,
   type Transaction,
   type TransactionCreate,
   type TransactionInputStatus,

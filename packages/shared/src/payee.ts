@@ -103,5 +103,9 @@ export function merchantNameFromPayee(description: string): string {
   while (words.length > 1 && /\d/.test(words[words.length - 1] ?? "")) {
     words.pop();
   }
-  return words.map(titleWord).join(" ");
+  const name = words.map(titleWord).join(" ");
+  if (!/\p{L}/u.test(name)) {
+    return "";
+  }
+  return name;
 }
