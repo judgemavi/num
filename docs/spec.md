@@ -109,6 +109,7 @@ Rules:
   The user can change it.
 - Card fields (only for `credit_card`): `creditLimit?`, `statementDay?` (1–31), `dueDay?` (1–31),
   `paymentPolicy` (`full | fixed | manual`), `fixedPayment?`.
+- Import fields: `importPreset?` (a preset ID) and `columnMap?` (JSON, §7.2). The app saves them after the first import.
 - `interestRateMilliPct?` is for savings, cards and loans. It is for information and for payoff calculations.
 - Balance of a transaction account = `openingBalance` + the sum of the transaction amounts in the account.
 - Balance of an `investment` or `property` account = the latest valuation (§5.10) + the transactions after the valuation date.
@@ -384,15 +385,18 @@ The user can create, edit and archive accounts.
 
 ### 7.2 Import (CSV)
 
-1. The user uploads a file. The app stores it as a Document.
+1. The user uploads a file (maximum 20 MB). The app stores it as a Document.
    If a document with the same hash exists, show its batch. Do not import again.
+   If that document is deleted, restore it (audited).
 2. The app selects the parser for the account:
    - **OFX/QFX parser.** It uses the bank transaction ID (`FITID`) as `bankId`. It reads the closing balance (`LEDGERBAL`).
    - **CSV parser with a column map.** The column map gives the columns for date, description, amount
-     (or debit and credit), balance and bank ID, plus the date order and the sign convention.
+     (or debit and credit), balance and bank ID, plus the date order, the sign convention and the decimal separator (`.` or `,`).
      The app saves the map on the account.
    - **Bank presets** are column maps stored as data files in `presets/`. Example: a TD credit card preset.
      A contributor adds a bank with a preset file and a synthetic test file. A preset does not contain code.
+   - A parser never drops a row silently. It returns each row that it cannot read, with the line number, the raw text
+     and a reason code. The batch summary shows these rows.
 3. The app calculates the `identity` of each row. If an active row has the same identity, the outcome is `duplicate`.
 4. If not, the app looks for a match: a transaction in the same account, with the same amount,
    a date within ±3 days, and no import row.
