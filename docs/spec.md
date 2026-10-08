@@ -199,9 +199,11 @@ Rule fields:
 - `match`: `exact | prefix | contains`. There are no regex rules (decision 0012).
 - `pattern`: the rule compares it with the **normalized payee** (§7.3).
 - `accountId?`: if it is set, the rule applies only to this account.
-- `merchantId?`, `categoryId?`, `priority`
+- `merchantId?`, `categoryId?`, `transferAccountId?`, `priority`
 - `origin`: `manual | promoted`
-- A rule must set `merchantId`, `categoryId` or both.
+- A rule must set `merchantId`, `categoryId`, `transferAccountId`, or a merchant with one of the others.
+  A rule cannot set both `categoryId` and `transferAccountId`.
+- A transfer rule suggests a transfer to that account (example: "TD VISA PAYMENT" → transfer to Visa Card).
 
 Rules make suggestions. §7.3 tells how the import uses them.
 A change to a rule does not change existing transactions.
@@ -457,7 +459,16 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
 On import, the app applies steps 1–3. The transaction stays `open`. It shows in "Review recent".
 Only rows without a suggestion go to the Inbox.
 
-**Promote to rule.** The user confirms the same normalized payee with the same merchant and category
+**What is this?** An uncategorized transaction in the Inbox offers three choices:
+1. **Spending or income:** a category. Money in shows income categories first; money out shows expense categories first.
+   All categories are available (a refund is money in to an expense category).
+2. **Transfer:** the other account. If that account has an unlinked transaction with the opposite amount within ±3 days,
+   the app links the two (no new mirror). If not, the app creates the mirror transaction. A later import of the other
+   account matches the mirror (§7.2 step 4).
+3. **Split:** opens the transaction editor (several lines, for example a mortgage payment).
+The suggestion (§7.3) preselects the choice: a category, or a transfer from a transfer rule.
+
+**Promote to rule.** The user confirms the same normalized payee with the same merchant and category (or transfer account)
 `promoteAfter` times. If no rule exists for it, the Inbox suggests a rule.
 If the user accepts, the app creates an `exact` rule with `origin` = `promoted`.
 
