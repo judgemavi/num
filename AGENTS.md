@@ -52,9 +52,10 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
   - Short lists of options: `Select`.
   - Long lists of options: Combobox (`Command` + `Popover`).
   - Create and edit: `Dialog`.
-  - Lists of records: `Table`.
+  - Lists of records: ListCard rows (`docs/design.md` §6). `Table` only for the Transactions list.
   - Confirmations: `AlertDialog`.
 - Do not use native `<select>`, `<label>` or custom-styled inputs.
+- Follow `docs/design.md` for every UI change: tokens, type, page pattern and components. Do not add other colours or fonts.
 - The web app imports only `packages/shared`. Do not import `packages/db` or API code in the web app.
 - Use `Temporal.PlainDate` for calendar dates. Do not use `Date` for calendar dates.
 - Lists: one shared Zod query schema for the URL and the API. Follow decision 0004.

@@ -239,6 +239,7 @@ Buckets are virtual. A bucket is a label on on-budget money. Buckets do not move
 
 Fields:
 - `name`, `kind` (`spending | sinking | goal`), `priority`, `essential` (boolean), `archivedAt?`
+- `color` (`sky | mint | lilac | butter | pink | teal`) and `icon` (a name from a fixed icon set). Decision 0009.
 - `categoryIds[]`: each expense category is in a maximum of one bucket.
 
 Settings for each kind:

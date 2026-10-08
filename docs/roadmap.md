@@ -48,6 +48,12 @@ Goal: accounts and transactions are correct.
 | 1.3 Transactions | Transactions, lines, mirror transfers, status (§5.4). | Tests: lines must sum to the amount. Edit and delete of a transfer update both sides in one DB transaction. Self-transfer is rejected. Reconciled records cannot change. Mortgage payment with principal transfer and interest line is correct. |
 | 1.4 Transactions screen | List with server pagination, search, filters (account, category, merchant, tag, date, uncategorized) and sort. URL state = API query (decision 0004). Detail, edit lines. Formatting with `Intl` in the browser. | Owner check: URL reload, back and forward keep the state. Locales `fr-CA` and `en-US` format correctly. With 50,000 transactions in the DB, each filtered page of 50 loads in less than 200 ms on the NUC. |
 
+## Design
+
+| Slice | Contents | Acceptance criteria |
+|---|---|---|
+| D.1 Design system | `docs/design.md` (decision 0009). Tokens in `index.css` mapped to shadcn variables. Self-hosted Archivo. Shell: desktop sidebar with nav groups and phone bottom tabs with the More sheet. Components in `apps/web/src/components/`: PageHeader, SummaryStrip, ListCard (group header, row), SidePanel, Amount, IconTile, Progress, SplitBar, Chip, Pill, Count, Choice cards, Reveal, Disclosure, the 4 illustrations. Restyle setup, Accounts (grouped list, net worth strip, new account dialog with the kind picker of §9) and Settings. | Owner check against `docs/design/signal-reference.html`: same tokens, type, spacing and patterns. No request to Google Fonts. Layout works at 390px. Touch targets ≥ 44px. No hand edits in `components/ui/`. No tests (UI only). |
+
 ## Phase 2 — Capture
 
 Goal: imports are safe and the Inbox works.
