@@ -454,6 +454,13 @@ within ±3 days. Then the Inbox suggests a transfer pair. The user accepts with 
   - 3 or more transactions.
   - Gaps that agree with weekly, biweekly, monthly or yearly, within ±3 days.
   - Amounts within 10% of their median.
+- **Time windows** (they keep the work small and the Inbox calm):
+  - Link candidates: occurrences from the later of `startDate` and `asOf` − 13 months.
+  - Missed: only occurrences in the last 35 days. Older unlinked occurrences show in the plan history.
+    The user can skip them, but they are not Inbox items.
+  - Detection: only transactions from the last 18 months. Look only for the most recent run of regular
+    transactions for each merchant (the run that ends at the merchant's latest transaction).
+  - Read only the transactions inside these windows from the database. Do not load all transactions.
 - Plans do not create transactions.
 
 ### 7.5 Reconcile and close
