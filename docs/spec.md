@@ -287,18 +287,19 @@ For a mortgage, a valuation replaces the calculated balance from its date.
 ### 5.11 Import batch and import row
 
 Batch fields: `accountId`, `documentId?`, `proposalId?`, `parser`, `periodStart`, `periodEnd`, `closingBalance?`, `closingDate?`,
-`createdAt`, `undoneAt?`.
+`unreadableJson` (the unreadable rows: line, raw text, reason), `createdAt`, `undoneAt?`.
 - A batch has a document (file upload) or a proposal (MCP, §12). It must have one of them, not both.
 
 Row fields: `batchId`, `rowIndex`, `date`, `amount`, `payeeRaw`, `bankId?`, `identity`,
-`outcome` (`created | matched | duplicate | ignored`), `transactionId?`.
+`outcome` (`created | matched | needs_review | duplicate | ignored`), `transactionId?`.
+- `needs_review`: more than one match candidate. The row holds its identity. The Inbox shows it. The user's decision changes it to `matched` or `created`.
 
 Identity:
 - If the bank gives a transaction ID: `identity` = `bank:<bankId>`.
 - If not: `identity` = `fp:<hash(accountId, date, amount, normalizedPayee, n)>`.
   `n` is the position of the row among rows with the same date, amount and payee **in the same file**.
 - There is a unique index on (`accountId`, `identity`) for active rows.
-  An active row has the outcome `created`, `matched` or `ignored`, and its batch is not undone.
+  An active row has the outcome `created`, `matched`, `needs_review` or `ignored`, and its batch is not undone.
   A `duplicate` row is never active, because it has the same identity as an earlier row.
   An `ignored` row is active. Thus, an ignored row does not come back when the user imports the file again.
 
@@ -423,6 +424,9 @@ If the user imports the same file again, or a file with overlapping dates, the a
 4. Removes the city and province at the end.
 5. Replaces many spaces with one space.
 
+When it is not sure, the function keeps a word. Two different merchants with the same normalized payee is worse than
+two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), but keep the word before it.
+
 **Suggestion order.** The first result that the app finds is the suggestion. Each suggestion shows its reason.
 1. Rules, in order of priority. Rules for one account come before global rules.
 2. Payee history: the last 10 categorized transactions with the same normalized payee.
@@ -468,7 +472,8 @@ within ±3 days. Then the Inbox suggests a transfer pair. The user accepts with 
 **Checkpoint.**
 1. The user enters the statement date and balance. Or, the import supplies them.
 2. If the balances are not equal, the app shows the difference.
-   It also shows possible causes: uncleared transactions, possible duplicates, date ranges with no imports.
+   It also shows possible causes: uncleared transactions within 7 days of the date, possible duplicates (same amount
+   within 3 days), date ranges of 7 or more days with no transactions.
 3. The user cannot force a checkpoint when the balances are not equal.
 
 **Unlock.** The user can unlock a checkpoint to edit reconciled transactions. The audit log records the unlock.
