@@ -173,6 +173,16 @@ Rules:
   - A transfer line must not target its own account.
   - A transaction has a maximum of one transfer line.
   - The mirror transaction has one line. Its `transferAccountId` is the account of the source transaction.
+  - A transaction has `mirror` (boolean). It is true only for a mirror that the app created.
+    When an import matches a mirror (§7.2 step 4), `mirror` becomes false: the bank now supports it.
+  - Two existing transactions can also be linked as a transfer pair (§7.3). Neither is a mirror.
+  - Unlink (the user removes the transfer, or changes it to a category):
+    - A peer with `mirror` = true is deleted.
+    - A peer with `mirror` = false is never deleted. Its transfer link is cleared and its line becomes uncategorized
+      (it shows in the Inbox again).
+  - A change to the date, amount or target of a transfer updates the peer only when the peer is a mirror.
+    If the peer is not a mirror, the app unlinks the pair instead. The app never rewrites imported bank data.
+  - Deleting one side of a pair: a mirror peer is deleted with it; a non-mirror peer is unlinked.
   - The mirror has its own `status`. A new mirror starts as `open`.
   - If the source transaction has more than one line, the user cannot change the mirror amount.
     The user changes the amount on the source transaction.
