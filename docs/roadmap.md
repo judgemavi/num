@@ -35,7 +35,7 @@ Goal: an empty app that is safe to deploy, for the owner and for other people.
 | 0.2 Schema baseline | Drizzle schema for all entities in §5. One baseline migration. | Fresh DB creates. `PRAGMA integrity_check` = ok. `PRAGMA foreign_key_check` is empty. Migrations run two times without change. |
 | 0.4 API conventions | `asOf` validation, error codes, audit log writer (§4, §11). | `@hono/zod-openapi` route pattern and OpenAPI document. Shared list-query schema and paged response (decision 0004). Tests: a date-dependent route without `asOf` → 400. Each write service creates one audit row with `before` and `after`. `sort` with an unknown column → 400. |
 | 0.5 Setup | First-run setup: currency, default category set (§7.0). Currency minor units from ISO 4217. | Tests: setup runs only one time. Currency cannot change after the first transaction. Minor-unit conversion is correct for JPY (0), CAD (2) and KWD (3). |
-| 0.6 Deploy | Dockerfile, pre-migrate backup, optional Litestream, optional uploads copy, "Download backup", `docs/self-hosting.md` (generic Docker + example: Coolify with Cloudflare Tunnel and Access). | A person can install with only `docs/self-hosting.md`. The guide starts with the access warning (decision 0006). Owner check: from the LAN and from the internet, the app port and any Coolify-generated URL do not respond. The subdomain without a Cloudflare Access login does not show the app or MCP. Owner deploys to the NUC with stop-first. Owner does a test restore from backup to a new volume. The app starts. |
+| 0.6 Backups | Pre-migrate backup (spec §13): a consistent copy before pending migrations, keep the last 10, no copy of a new empty database. "Download backup" on Settings → Backup: one archive with a consistent database copy and `uploads/`. | Tests: copy only when a migration is pending; retention of 10; the archive contains a readable database. |
 
 ## Phase 1 — Ledger core
 
@@ -94,6 +94,12 @@ Goal: recurring plans, buckets and paycheck funding.
 |---|---|---|
 | 5.1 Forecast | Known and estimated series, card payments, safe to spend, accuracy record (§8, §6). | Tests: card purchase moves cash on the due day only. Bucket spending is not counted two times. Outliers are not included. Accuracy record is stored one time for each month. Variable income uses the median. |
 | 5.2 Mortgage | Terms, schedule, payment prefill, payoff, extra payment, valuations (§5.2, §5.10, §9). | Public tests with synthetic loans: monthly and semiannual compounding, weekly, biweekly and monthly payments, compared with values from a published lender calculator. Owner check in the UI: the owner enters the real mortgage terms and compares the schedule with a lender statement. |
+
+## Deploy (when hosting is decided)
+
+| Slice | Contents | Acceptance criteria |
+|---|---|---|
+| X.1 Deploy | Decision 0011. Docker image, optional off-site backup (for example Litestream), `docs/self-hosting.md` with the access warning (decision 0006) and the owner's chosen hosting as one example. | A person can install with only `docs/self-hosting.md`. The owner deploys, does a test restore, and checks that the app is not reachable without the access proxy. |
 
 ## Phase 6 — MCP and cutover
 

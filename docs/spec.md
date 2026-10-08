@@ -610,8 +610,7 @@ To correct other records, the user edits them. The audit log records each edit.
 - **Hosting:** One Docker image. It runs on any Docker host. `docs/self-hosting.md` tells how to install it.
   - Use one instance only.
   - Use **stop-first** deploys. Two containers must not use the same database.
-  - The owner's instance: Coolify on a Fedora NUC, Cloudflare Tunnel, Cloudflare Access, Cloudflare MCP portal.
-    This is an example in the docs. The code does not require Cloudflare.
+  - The owner's hosting is not decided yet (decision 0011). The code does not require any one host or proxy.
 - **Access control is outside the app (decision 0006).** Num has no login, no users and no tokens.
   - The operator must run Num on a private network, with no public port.
   - The operator must put an authenticating proxy in front of all remote access.
