@@ -19,16 +19,8 @@
       "warn",
       {
         "allowConstantExport": true,
-        "allowExportNames": ["Route", "buttonVariants", "useSidebar"]
+        "allowExportNames": ["Route", "buttonVariants"]
       }
     ]
-  },
-  "overrides": [
-    {
-      "files": ["src/hooks/use-mobile.ts"],
-      "rules": {
-        "react/set-state-in-effect": "off"
-      }
-    }
-  ]
+  }
 }

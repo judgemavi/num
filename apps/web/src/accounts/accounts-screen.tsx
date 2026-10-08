@@ -1,16 +1,25 @@
-import {
-  accountListSchema,
-  accountSchema,
-  currencyUpdateSchema,
-  type Account,
-  type AccountListQuery,
-} from "@num/shared";
+import { accountClass, accountListSchema, accountSchema, currencyUpdateSchema, type Account } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
+import { useState } from "react";
 import { AccountForm } from "@/accounts/account-form";
-import { accountError, formatBalance, kindLabel } from "@/accounts/format";
+import { AccountIcon } from "@/accounts/account-icon";
+import { accountCountLabel, accountDetail, accountError, formatBalance, formatMoney, kindLabel } from "@/accounts/format";
+import { groupAccounts, groupHue, groupLabel, worthOf } from "@/accounts/groups";
+import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
+import { Amount } from "@/components/amount";
+import { Button } from "@/components/button";
+import { Chip } from "@/components/chip";
+import { Fact, SummaryStrip } from "@/components/summary-strip";
+import { IconTile } from "@/components/icon-tile";
+import { BalanceScaleIllustration } from "@/components/illustrations";
+import { ListCard, ListGroup, ListRow } from "@/components/list-card";
+import { PageHeader } from "@/components/page-header";
+import { Pill } from "@/components/pill";
+import { SidePanel } from "@/components/side-panel";
+import { SplitBar } from "@/components/split-bar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,41 +30,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { hueColor } from "@/components/hue";
 
 const accountsRoute = getRouteApi("/accounts");
-
-function accountPath(search: AccountListQuery): string {
-  const params = new URLSearchParams();
-  if (search.page !== 1) {
-    params.set("page", String(search.page));
-  }
-  if (search.pageSize !== 50) {
-    params.set("pageSize", String(search.pageSize));
-  }
-  if (search.sort) {
-    params.set("sort", search.sort);
-  }
-  if (search.dir) {
-    params.set("dir", search.dir);
-  }
-  if (search.archived) {
-    params.set("archived", "true");
-  }
-  const text = params.toString();
-  return text.length === 0 ? "/api/accounts" : `/api/accounts?${text}`;
-}
 
 export function AccountsScreen() {
   const queryClient = useQueryClient();
@@ -77,25 +55,9 @@ export function AccountsScreen() {
   });
 
   const accounts = useQuery({
-    queryKey: ["accounts", search],
-    queryFn: async () => {
-      const result = await apiRequest(accountPath(search), accountListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
+    queryKey: ["accounts", search.archived],
+    queryFn: () => loadAllPages("/api/accounts", accountListSchema, search.archived),
   });
-
-  useEffect(() => {
-    if (!accounts.data) {
-      return;
-    }
-    const lastPage = Math.max(1, Math.ceil(accounts.data.total / accounts.data.pageSize));
-    if (search.page > lastPage) {
-      void navigate({ search: { ...search, page: lastPage }, replace: true });
-    }
-  }, [accounts.data, navigate, search]);
 
   async function restore(account: Account) {
     const result = await apiRequest(`/api/accounts/${account.id}/restore`, accountSchema, { method: "POST" });
@@ -126,11 +88,11 @@ export function AccountsScreen() {
   }
 
   if (currency.isPending || accounts.isPending) {
-    return <p className="text-muted-foreground">Loading accounts.</p>;
+    return <p className="muted">Loading accounts.</p>;
   }
   if (currency.isError || accounts.isError || !currency.data) {
     return (
-      <div className="flex flex-col items-start gap-4">
+      <div className="stack">
         <p>The accounts did not load.</p>
         <Button
           type="button"
@@ -146,117 +108,139 @@ export function AccountsScreen() {
   }
 
   const bookCurrency = currency.data;
-  const page = accounts.data;
-  const rows = page?.items ?? [];
-  const lastPage = page ? Math.max(1, Math.ceil(page.total / page.pageSize)) : 1;
+  const rows = accounts.data?.items ?? [];
+  const groups = groupAccounts(rows);
+  const worth = worthOf(rows);
+  const cards = rows.filter((account) => account.kind === "credit_card");
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
-        <Field orientation="horizontal" className="w-auto">
-          <Switch
-            id="show-archived"
-            checked={search.archived}
-            onCheckedChange={(checked) => {
-              void navigate({
-                search: { ...search, archived: checked === true, page: 1 },
-              });
-            }}
+    <>
+      <PageHeader
+        kicker={search.archived ? "Archived" : accountCountLabel(rows.length)}
+        title="Accounts"
+        actions={
+          <>
+            <Chip
+              pressed={search.archived}
+              onClick={() => {
+                void navigate({ search: { ...search, archived: !search.archived, page: 1 } });
+              }}
+            >
+              Show archived
+            </Chip>
+            <Button type="button" onClick={() => setDraft("new")}>
+              <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
+              Add account
+            </Button>
+          </>
+        }
+      />
+      <SummaryStrip
+        tint="accounts"
+        label={search.archived ? "Archived balances" : "Net worth"}
+        amount={<Amount currency={bookCurrency} minor={worth.total} owed hero />}
+        hint={search.archived ? "These accounts are not in the active list." : "What you have, minus what you owe."}
+        facts={
+          <>
+            <Fact label="What you have">
+              <Amount currency={bookCurrency} minor={worth.have} />
+            </Fact>
+            <Fact label="What you owe">
+              <Amount currency={bookCurrency} minor={worth.owe} />
+            </Fact>
+          </>
+        }
+        extra={
+          <SplitBar
+            label={`You have ${formatMoney(bookCurrency, worth.have)} and owe ${formatMoney(bookCurrency, worth.owe)}`}
+            segments={[
+              { key: "have", label: "What you have", color: "var(--primary)", value: Math.max(0, worth.have), amount: <Amount currency={bookCurrency} minor={worth.have} /> },
+              { key: "owe", label: "What you owe", color: hueColor.sky.glyph, value: worth.owe, amount: <Amount currency={bookCurrency} minor={worth.owe} /> },
+            ]}
           />
-          <FieldLabel htmlFor="show-archived">Show archived</FieldLabel>
-        </Field>
-        <Button type="button" onClick={() => setDraft("new")}>
-          New account
-        </Button>
-      </div>
+        }
+        illustration={<BalanceScaleIllustration />}
+      />
       {actionError ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="alert">
           {actionError}
         </p>
       ) : null}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Kind</TableHead>
-            <TableHead className="text-right">Balance</TableHead>
-            <TableHead>State</TableHead>
-            <TableHead className="sr-only">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="text-muted-foreground">
-                {search.archived ? "No archived accounts." : "No accounts yet."}
-              </TableCell>
-            </TableRow>
+      <div className="cols">
+        <ListCard label="All accounts">
+          {groups.length === 0 ? (
+            <p className="empty">{search.archived ? "No archived accounts." : "No accounts yet."}</p>
           ) : (
-            rows.map((account) => (
-              <TableRow key={account.id}>
-                <TableCell>{account.name}</TableCell>
-                <TableCell>{kindLabel(account.kind)}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatBalance(bookCurrency, account.kind, account.balance)}
-                </TableCell>
-                <TableCell>{account.archivedAt ? "Archived" : "Active"}</TableCell>
-                <TableCell className="text-right">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setDraft(account)}>
-                    Edit
-                  </Button>
-                  {account.archivedAt ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="ml-2"
-                      onClick={() => void restore(account)}
-                    >
-                      Restore
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="ml-2"
-                      onClick={() => setArchiveTarget(account)}
-                    >
-                      Archive
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
+            groups.map((group) => (
+              <div key={group.id}>
+                <ListGroup
+                  label={groupLabel[group.id]}
+                  aside={<Amount currency={bookCurrency} minor={group.total} owed={group.id === "loans"} />}
+                />
+                {group.items.map((account) => {
+                  const detail = accountDetail(account);
+                  return (
+                    <ListRow key={account.id}>
+                      <IconTile hue={groupHue[group.id]}>
+                        <AccountIcon kind={account.kind} />
+                      </IconTile>
+                      <div className="list-name">
+                        {account.name}
+                        {account.institution ? <small>{account.institution}</small> : null}
+                      </div>
+                      <div className="list-meta">
+                        {account.archivedAt ? <Pill tone="attention">Archived</Pill> : kindLabel(account.kind)}
+                      </div>
+                      <div className="list-amt">
+                        <Amount currency={bookCurrency} minor={account.balance} owed={accountClass(account.kind) === "liability"} />
+                        {detail ? <small>{detail}</small> : null}
+                      </div>
+                      <div className="list-acts">
+                        <Button type="button" variant="outline" onClick={() => setDraft(account)}>
+                          Edit
+                        </Button>
+                        {account.archivedAt ? (
+                          <Button type="button" variant="outline" onClick={() => void restore(account)}>
+                            Restore
+                          </Button>
+                        ) : (
+                          <Button type="button" variant="destructive" onClick={() => setArchiveTarget(account)}>
+                            Archive
+                          </Button>
+                        )}
+                      </div>
+                    </ListRow>
+                  );
+                })}
+              </div>
             ))
           )}
-        </TableBody>
-      </Table>
-      {page && page.total > page.pageSize ? (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={search.page <= 1}
-            onClick={() => {
-              void navigate({ search: { ...search, page: search.page - 1 } });
-            }}
-          >
-            Previous
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={search.page >= lastPage}
-            onClick={() => {
-              void navigate({ search: { ...search, page: search.page + 1 } });
-            }}
-          >
-            Next
-          </Button>
+        </ListCard>
+        <div className="stack">
+          {cards.length === 0 ? (
+            <SidePanel title="Card statements" text="Add a credit card to see what you owe and the due day." />
+          ) : (
+            <ListCard label="Card statements" title="Card statements">
+              {cards.map((account) => (
+                <ListRow key={account.id} simple>
+                  <div className="list-name">
+                    {account.name}
+                    <small>
+                      {account.dueDay === null ? "No due day" : `Due day ${account.dueDay}`}
+                      {account.paymentPolicy === "full" ? " · pays the full statement" : ""}
+                    </small>
+                  </div>
+                  <div className="list-amt">
+                    <Amount currency={bookCurrency} minor={account.balance} owed />
+                  </div>
+                </ListRow>
+              ))}
+            </ListCard>
+          )}
         </div>
-      ) : null}
+      </div>
       <Dialog open={draft !== null} onOpenChange={(open) => !open && setDraft(null)}>
-        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto sm:max-w-md">
+        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
           {draft !== null ? (
             <AccountForm
               key={draft === "new" ? "new" : draft.id}
@@ -290,6 +274,6 @@ export function AccountsScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }

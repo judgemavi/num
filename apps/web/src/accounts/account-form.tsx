@@ -16,19 +16,18 @@ import {
   type PaymentPolicy,
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
-import { accountError, kindLabel, policyLabel } from "@/accounts/format";
+import { accountError, dayOptionLabel, policyLabel } from "@/accounts/format";
+import { KindPicker } from "@/accounts/kind-picker";
+import { sameClassKinds } from "@/accounts/groups";
 import { apiRequest } from "@/request";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Button } from "@/components/button";
+import { Disclosure } from "@/components/disclosure";
+import { Reveal } from "@/components/reveal";
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 
 type AccountFormProps = {
   currency: string;
@@ -36,6 +35,9 @@ type AccountFormProps = {
   onClose: () => void;
   onSaved: () => void;
 };
+
+const days = Array.from({ length: 31 }, (_, index) => index + 1);
+const none = "none";
 
 function readAmount(currency: string, text: string, label: string): number {
   try {
@@ -97,16 +99,10 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
   const [institution, setInstitution] = useState(account?.institution ?? "");
   const [kind, setKind] = useState<AccountKind>(account?.kind ?? "chequing");
   const [onBudget, setOnBudget] = useState(account?.onBudget ?? true);
-  const [openingDate, setOpeningDate] = useState(
-    account?.openingDate ?? Temporal.Now.plainDateISO().toString(),
-  );
-  const [openingBalance, setOpeningBalance] = useState(
-    account ? fromMinorUnits(currency, account.openingBalance) : "",
-  );
+  const [openingDate, setOpeningDate] = useState(account?.openingDate ?? Temporal.Now.plainDateISO().toString());
+  const [openingBalance, setOpeningBalance] = useState(account ? fromMinorUnits(currency, account.openingBalance) : "");
   const [creditLimit, setCreditLimit] = useState(
-    account?.creditLimit === null || account?.creditLimit === undefined
-      ? ""
-      : fromMinorUnits(currency, account.creditLimit),
+    account?.creditLimit === null || account?.creditLimit === undefined ? "" : fromMinorUnits(currency, account.creditLimit),
   );
   const [statementDay, setStatementDay] = useState(
     account?.statementDay === null || account?.statementDay === undefined ? "" : String(account.statementDay),
@@ -116,9 +112,7 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
   );
   const [paymentPolicy, setPaymentPolicy] = useState<PaymentPolicy | null>(account?.paymentPolicy ?? null);
   const [fixedPayment, setFixedPayment] = useState(
-    account?.fixedPayment === null || account?.fixedPayment === undefined
-      ? ""
-      : fromMinorUnits(currency, account.fixedPayment),
+    account?.fixedPayment === null || account?.fixedPayment === undefined ? "" : fromMinorUnits(currency, account.fixedPayment),
   );
   const [interestRate, setInterestRate] = useState(
     account?.interestRateMilliPct === null || account?.interestRateMilliPct === undefined
@@ -127,10 +121,8 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  const kinds = account
-    ? accountKinds.filter((item) => accountClass(item) === accountClass(account.kind))
-    : accountKinds;
+  const liability = accountClass(kind) === "liability";
+  const allowed = account ? sameClassKinds(account.kind) : accountKinds;
 
   function changeKind(value: string) {
     if (!isKind(value)) {
@@ -166,8 +158,7 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
               statementDay: readDay(statementDay, "the statement day"),
               dueDay: readDay(dueDay, "the due day"),
               paymentPolicy,
-              fixedPayment:
-                paymentPolicy === "fixed" ? readAmount(currency, fixedPayment, "the fixed payment") : null,
+              fixedPayment: paymentPolicy === "fixed" ? readAmount(currency, fixedPayment, "the fixed payment") : null,
             }
           : {
               creditLimit: null,
@@ -182,7 +173,7 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
         kind,
         onBudget,
         openingDate,
-        openingBalance: readAmount(currency, openingBalance, "the opening balance"),
+        openingBalance: readAmount(currency, openingBalance, liability ? "the amount you owed" : "the balance"),
         interestRateMilliPct: allowsInterestRate(kind) ? readInterest(interestRate) : null,
         ...card,
       };
@@ -216,91 +207,54 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
     }
   }
 
+  const moreLabel = kind === "credit_card" ? "More options: credit limit, interest rate, budget" : allowsInterestRate(kind) ? "More options: interest rate, budget" : "More options: budget";
+
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{account ? "Edit account" : "New account"}</DialogTitle>
+        <DialogTitle>{account ? "Edit account" : "Add an account"}</DialogTitle>
         <DialogDescription>
           {account ? "Change the details of this account." : "Add an account to the book."}
         </DialogDescription>
       </DialogHeader>
-      <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
+      <form className="form-grid" onSubmit={(event) => void onSubmit(event)}>
         <Field>
           <FieldLabel htmlFor="account-name">Name</FieldLabel>
           <Input id="account-name" value={name} required onChange={(event) => setName(event.target.value)} />
         </Field>
         <Field>
           <FieldLabel htmlFor="account-institution">Institution</FieldLabel>
-          <Input
-            id="account-institution"
-            value={institution}
-            onChange={(event) => setInstitution(event.target.value)}
-          />
+          <Input id="account-institution" value={institution} onChange={(event) => setInstitution(event.target.value)} />
         </Field>
-        <Field>
-          <FieldLabel htmlFor="account-kind">Kind</FieldLabel>
-          <Select value={kind} onValueChange={changeKind}>
-            <SelectTrigger id="account-kind" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {kinds.map((item) => (
-                <SelectItem key={item} value={item}>
-                  {kindLabel(item)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field orientation="horizontal">
-          <Checkbox
-            id="on-budget"
-            checked={onBudget}
-            onCheckedChange={(checked) => setOnBudget(checked === true)}
-          />
-          <FieldContent>
-            <FieldLabel htmlFor="on-budget">On budget</FieldLabel>
-            <FieldDescription>You can assign money in this account to buckets.</FieldDescription>
-          </FieldContent>
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="opening-date">Opening date</FieldLabel>
-          <Input
-            id="opening-date"
-            type="date"
-            value={openingDate}
-            required
-            onChange={(event) => setOpeningDate(event.target.value)}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="opening-balance">Opening balance</FieldLabel>
-          <Input
-            id="opening-balance"
-            inputMode="decimal"
-            autoComplete="off"
-            value={openingBalance}
-            required
-            onChange={(event) => setOpeningBalance(event.target.value)}
-          />
-        </Field>
-        {allowsInterestRate(kind) ? (
+        <KindPicker kind={kind} allowed={allowed} onChange={changeKind} />
+        <div className="two">
           <Field>
-            <FieldLabel htmlFor="interest-rate">Interest rate (%)</FieldLabel>
+            <FieldLabel htmlFor="opening-balance">{liability ? "Amount you owed" : "Balance"}</FieldLabel>
             <Input
-              id="interest-rate"
+              id="opening-balance"
               inputMode="decimal"
               autoComplete="off"
-              value={interestRate}
-              placeholder="6.875"
-              onChange={(event) => setInterestRate(event.target.value)}
+              value={openingBalance}
+              required
+              onChange={(event) => setOpeningBalance(event.target.value)}
             />
           </Field>
-        ) : null}
+          <Field>
+            <FieldLabel htmlFor="opening-date">On this date</FieldLabel>
+            <Input id="opening-date" type="date" value={openingDate} required onChange={(event) => setOpeningDate(event.target.value)} />
+          </Field>
+        </div>
+        <p className="hint" style={{ marginTop: 0 }}>
+          Use a balance from a statement. Num counts forward from this date.
+        </p>
         {kind === "credit_card" ? (
-          <>
+          <Reveal title="Card details">
+            <div className="two">
+              <DayField id="statement-day" label="Statement ends on" value={statementDay} onChange={setStatementDay} />
+              <DayField id="due-day" label="Payment is due on" value={dueDay} onChange={setDueDay} />
+            </div>
             <Field>
-              <FieldLabel htmlFor="payment-policy">Card payment</FieldLabel>
+              <FieldLabel htmlFor="payment-policy">How you pay</FieldLabel>
               <Select
                 value={paymentPolicy ?? undefined}
                 onValueChange={(value) => {
@@ -325,34 +279,6 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
                 </SelectContent>
               </Select>
             </Field>
-            <Field>
-              <FieldLabel htmlFor="credit-limit">Credit limit</FieldLabel>
-              <Input
-                id="credit-limit"
-                inputMode="decimal"
-                autoComplete="off"
-                value={creditLimit}
-                onChange={(event) => setCreditLimit(event.target.value)}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="statement-day">Statement day</FieldLabel>
-              <Input
-                id="statement-day"
-                inputMode="numeric"
-                value={statementDay}
-                onChange={(event) => setStatementDay(event.target.value)}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="due-day">Due day</FieldLabel>
-              <Input
-                id="due-day"
-                inputMode="numeric"
-                value={dueDay}
-                onChange={(event) => setDueDay(event.target.value)}
-              />
-            </Field>
             {paymentPolicy === "fixed" ? (
               <Field>
                 <FieldLabel htmlFor="fixed-payment">Fixed payment</FieldLabel>
@@ -366,18 +292,75 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
                 />
               </Field>
             ) : null}
-          </>
+          </Reveal>
         ) : null}
+        <Disclosure label={moreLabel}>
+          <div className="form-grid">
+            {kind === "credit_card" ? (
+              <Field>
+                <FieldLabel htmlFor="credit-limit">Credit limit</FieldLabel>
+                <Input
+                  id="credit-limit"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={creditLimit}
+                  onChange={(event) => setCreditLimit(event.target.value)}
+                />
+              </Field>
+            ) : null}
+            {allowsInterestRate(kind) ? (
+              <Field>
+                <FieldLabel htmlFor="interest-rate">Interest rate (%)</FieldLabel>
+                <Input
+                  id="interest-rate"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={interestRate}
+                  placeholder="6.875"
+                  onChange={(event) => setInterestRate(event.target.value)}
+                />
+              </Field>
+            ) : null}
+            <div className="switch-row">
+              <div>
+                <FieldLabel htmlFor="on-budget">On budget</FieldLabel>
+                <FieldDescription>You can assign money in this account to buckets.</FieldDescription>
+              </div>
+              <Switch id="on-budget" checked={onBudget} onCheckedChange={(checked) => setOnBudget(checked === true)} />
+            </div>
+          </div>
+        </Disclosure>
         {error ? <FieldError>{error}</FieldError> : null}
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" disabled={saving}>
-            {saving ? "Saving account" : "Save account"}
+            {saving ? "Saving account" : account ? "Save account" : "Add account"}
           </Button>
         </DialogFooter>
       </form>
     </>
+  );
+}
+
+function DayField({ id, label, value, onChange }: { id: string; label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <Select value={value === "" ? none : value} onValueChange={(next) => onChange(next === none ? "" : next)}>
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue placeholder="Not set" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={none}>Not set</SelectItem>
+          {days.map((day) => (
+            <SelectItem key={day} value={String(day)}>
+              {dayOptionLabel(day)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
   );
 }

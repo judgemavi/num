@@ -15,11 +15,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/button";
+import { Chip } from "@/components/chip";
+import { ListCard, ListRow } from "@/components/list-card";
+import { Pill } from "@/components/pill";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function TagsPanel() {
   const queryClient = useQueryClient();
@@ -93,69 +93,49 @@ export function TagsPanel() {
   const rows = tags.data?.items ?? [];
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold">Tags</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <Field orientation="horizontal" className="w-auto">
-            <Switch id="show-archived-tags" checked={archived} onCheckedChange={(checked) => setArchived(checked === true)} />
-            <FieldLabel htmlFor="show-archived-tags">Show archived</FieldLabel>
-          </Field>
+    <ListCard
+      label="Tags"
+      title="Tags"
+      actions={
+        <>
+          <Chip pressed={archived} onClick={() => setArchived((value) => !value)}>
+            Show archived
+          </Chip>
           <Button type="button" onClick={() => setDraft("new")}>
             New tag
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
       {actionError ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="alert">
           {actionError}
         </p>
       ) : null}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>State</TableHead>
-            <TableHead className="sr-only">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={3} className="text-muted-foreground">
-                {archived ? "No archived tags." : "No tags yet."}
-              </TableCell>
-            </TableRow>
-          ) : (
-            rows.map((tag) => (
-              <TableRow key={tag.id}>
-                <TableCell>{tag.name}</TableCell>
-                <TableCell>{tag.archivedAt ? "Archived" : "Active"}</TableCell>
-                <TableCell className="text-right">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setDraft(tag)}>
-                    Rename
-                  </Button>
-                  {tag.archivedAt ? (
-                    <Button type="button" variant="outline" size="sm" className="ml-2" onClick={() => void restore(tag)}>
-                      Restore
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="ml-2"
-                      onClick={() => setArchiveTarget(tag)}
-                    >
-                      Archive
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+      {rows.length === 0 ? (
+        <p className="empty">{archived ? "No archived tags." : "No tags yet."}</p>
+      ) : (
+        rows.map((tag) => (
+          <ListRow key={tag.id} simple>
+            <div className="list-name">{tag.name}</div>
+            <div className="list-meta">{tag.archivedAt ? <Pill tone="attention">Archived</Pill> : "Active"}</div>
+            <div className="list-acts">
+              <Button type="button" variant="outline" onClick={() => setDraft(tag)}>
+                Rename
+              </Button>
+              {tag.archivedAt ? (
+                <Button type="button" variant="outline" onClick={() => void restore(tag)}>
+                  Restore
+                </Button>
+              ) : (
+                <Button type="button" variant="destructive" onClick={() => setArchiveTarget(tag)}>
+                  Archive
+                </Button>
+              )}
+            </div>
+          </ListRow>
+        ))
+      )}
       <Dialog open={draft !== null} onOpenChange={(open) => !open && setDraft(null)}>
         <DialogContent>
           {draft ? (
@@ -189,6 +169,6 @@ export function TagsPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </ListCard>
   );
 }

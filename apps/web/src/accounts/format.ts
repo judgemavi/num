@@ -1,9 +1,11 @@
 import {
   accountClass,
-  minorUnitDigits,
+  milliPctToPercent,
+  type Account,
   type AccountKind,
   type PaymentPolicy,
 } from "@num/shared";
+import { formatMoney } from "@/money";
 
 const kindLabels: Record<AccountKind, string> = {
   chequing: "Chequing",
@@ -33,34 +35,57 @@ export function policyLabel(policy: PaymentPolicy): string {
   return policyLabels[policy];
 }
 
-function minorToNumber(minor: number, digits: number): number {
-  const sign = minor < 0 ? -1 : 1;
-  const text = Math.abs(minor).toString().padStart(digits + 1, "0");
-  if (digits === 0) {
-    return sign * Number(text);
-  }
-  const whole = text.slice(0, -digits);
-  const fraction = text.slice(-digits);
-  return sign * Number(`${whole}.${fraction}`);
-}
-
-export function formatMoney(currency: string, minor: number): string {
-  const digits = minorUnitDigits(currency);
-  if (digits === undefined) {
-    throw new Error("Unknown currency");
-  }
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }).format(minorToNumber(minor, digits));
-}
+export { formatMoney };
 
 export function formatBalance(currency: string, kind: AccountKind, balance: number): string {
   const owed = accountClass(kind) === "liability" && balance < 0;
   const formatted = formatMoney(currency, owed ? -balance : balance);
   return owed ? `Owed ${formatted}` : formatted;
+}
+
+export function accountCountLabel(count: number): string {
+  if (count === 0) {
+    return "No accounts";
+  }
+  if (count === 1) {
+    return "1 account";
+  }
+  return `${count} accounts`;
+}
+
+export function accountDetail(account: Account): string | null {
+  if (account.kind === "savings" && account.interestRateMilliPct !== null) {
+    return `Earns ${milliPctToPercent(account.interestRateMilliPct)}% a year`;
+  }
+  if ((account.kind === "loan" || account.kind === "mortgage") && account.interestRateMilliPct !== null) {
+    return `${milliPctToPercent(account.interestRateMilliPct)}% a year`;
+  }
+  if (account.kind === "credit_card") {
+    const parts: string[] = [];
+    if (account.paymentPolicy) {
+      parts.push(policyLabel(account.paymentPolicy));
+    }
+    if (account.dueDay !== null) {
+      parts.push(`due day ${account.dueDay}`);
+    }
+    return parts.length === 0 ? null : parts.join(" · ");
+  }
+  return null;
+}
+
+export function dayOptionLabel(day: number): string {
+  const mod100 = day % 100;
+  let suffix = "th";
+  if (mod100 < 11 || mod100 > 13) {
+    if (day % 10 === 1) {
+      suffix = "st";
+    } else if (day % 10 === 2) {
+      suffix = "nd";
+    } else if (day % 10 === 3) {
+      suffix = "rd";
+    }
+  }
+  return `${day}${suffix} of the month`;
 }
 
 export function accountError(code: string): string {

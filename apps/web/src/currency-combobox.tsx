@@ -1,7 +1,7 @@
 import { currencyCodes, type CurrencyCode } from "@num/shared";
 import { ChevronsUpDown } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/button";
 import {
   Command,
   CommandEmpty,
@@ -46,7 +46,7 @@ export function CurrencyCombobox({ id, value, invalid = false, onChange }: Curre
           role="combobox"
           aria-expanded={open}
           aria-invalid={invalid}
-          className="h-11 w-full justify-between font-normal"
+          className="control-input h-11 w-full justify-between font-normal"
         >
           <span className="truncate">{value ? currencyLabel(value, names) : "Select a currency"}</span>
           <ChevronsUpDown />

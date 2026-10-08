@@ -24,11 +24,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/button";
+import { ListCard, ListGroup, ListRow } from "@/components/list-card";
+import { Pill } from "@/components/pill";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Chip } from "@/components/chip";
 
 type GroupDialog = { kind: "create" } | { kind: "rename"; group: CategoryGroup };
 type Confirm = { kind: "archive"; category: Category } | { kind: "delete"; group: CategoryGroup };
@@ -177,26 +177,30 @@ export function CategoriesPanel() {
   ];
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold">Categories</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <Field orientation="horizontal" className="w-auto">
-            <Switch id="show-archived-categories" checked={archived} onCheckedChange={(checked) => setArchived(checked === true)} />
-            <FieldLabel htmlFor="show-archived-categories">Show archived</FieldLabel>
-          </Field>
+    <ListCard
+      label="Categories"
+      title="Categories"
+      actions={
+        <>
+          <Chip pressed={archived} onClick={() => setArchived((value) => !value)}>
+            Show archived
+          </Chip>
           <Button type="button" variant="outline" onClick={() => setGroupDialog({ kind: "create" })}>
             New group
           </Button>
           <Button type="button" onClick={() => setCategoryDraft("new")}>
             New category
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
       {actionError ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="alert">
           {actionError}
         </p>
+      ) : null}
+      {sections.every((section) => section.rows.length === 0 && section.group === null) && groupRows.length === 0 ? (
+        <p className="empty">No categories.</p>
       ) : null}
       {sections.map((section, index) => {
         const group = section.group;
@@ -204,90 +208,64 @@ export function CategoriesPanel() {
           return null;
         }
         return (
-        <div key={section.id} className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-medium">{section.title}</h3>
-            {group ? (
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" size="sm" disabled={index === 0} onClick={() => void moveGroup(group, -1)}>
-                  Move up
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={index === groupRows.length - 1}
-                  onClick={() => void moveGroup(group, 1)}
-                >
-                  Move down
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => setGroupDialog({ kind: "rename", group })}>
-                  Rename
-                </Button>
-                <Button type="button" variant="destructive" size="sm" onClick={() => setConfirm({ kind: "delete", group })}>
-                  Delete
-                </Button>
-              </div>
-            ) : null}
-          </div>
-          {archived && section.rows.length === 0 ? null : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Kind</TableHead>
-                <TableHead>Essential</TableHead>
-                <TableHead>State</TableHead>
-                <TableHead className="sr-only">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {section.rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground">
-                    No categories.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                section.rows.map((category) => (
-                  <TableRow key={category.id}>
-                    <TableCell>{category.name}</TableCell>
-                    <TableCell>{kindLabel(category.kind)}</TableCell>
-                    <TableCell>{category.kind === "expense" && category.essential ? "Yes" : "No"}</TableCell>
-                    <TableCell>{category.archivedAt ? "Archived" : "Active"}</TableCell>
-                    <TableCell className="text-right">
-                      <Button type="button" variant="outline" size="sm" onClick={() => setCategoryDraft(category)}>
-                        Edit
+          <div key={section.id}>
+            <ListGroup
+              label={section.title}
+              aside={
+                group ? (
+                  <span className="list-acts">
+                    <Button type="button" variant="outline" disabled={index === 0} onClick={() => void moveGroup(group, -1)}>
+                      Move up
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={index === groupRows.length - 1}
+                      onClick={() => void moveGroup(group, 1)}
+                    >
+                      Move down
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setGroupDialog({ kind: "rename", group })}>
+                      Rename
+                    </Button>
+                    <Button type="button" variant="destructive" onClick={() => setConfirm({ kind: "delete", group })}>
+                      Delete
+                    </Button>
+                  </span>
+                ) : null
+              }
+            />
+            {archived && section.rows.length === 0 ? null : section.rows.length === 0 ? (
+              <p className="empty">No categories.</p>
+            ) : (
+              section.rows.map((category) => (
+                <ListRow key={category.id} simple>
+                  <div className="list-name">
+                    {category.name}
+                    {category.archivedAt ? <small>Archived</small> : null}
+                  </div>
+                  <div className="list-meta">{kindLabel(category.kind)}</div>
+                  <div className="list-meta">
+                    {category.kind === "expense" && category.essential ? <Pill>Essential</Pill> : "Not essential"}
+                  </div>
+                  <div className="list-acts">
+                    <Button type="button" variant="outline" onClick={() => setCategoryDraft(category)}>
+                      Edit
+                    </Button>
+                    {category.archivedAt ? (
+                      <Button type="button" variant="outline" onClick={() => void restoreCategory(category)}>
+                        Restore
                       </Button>
-                      {category.archivedAt ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="ml-2"
-                          onClick={() => void restoreCategory(category)}
-                        >
-                          Restore
-                        </Button>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          className="ml-2"
-                          onClick={() => setConfirm({ kind: "archive", category })}
-                        >
-                          Archive
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-          )}
-        </div>
+                    ) : (
+                      <Button type="button" variant="destructive" onClick={() => setConfirm({ kind: "archive", category })}>
+                        Archive
+                      </Button>
+                    )}
+                  </div>
+                </ListRow>
+              ))
+            )}
+          </div>
         );
       })}
       <Dialog open={groupDialog !== null} onOpenChange={(open) => !open && setGroupDialog(null)}>
@@ -344,6 +322,6 @@ export function CategoriesPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </ListCard>
   );
 }

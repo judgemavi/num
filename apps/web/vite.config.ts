@@ -7,6 +7,9 @@ import { defineConfig } from "vite";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 
+const webPort = Number(process.env.WEB_PORT ?? "5173");
+const apiPort = process.env.API_PORT ?? "3000";
+
 export default defineConfig({
   plugins: [
     tanstackRouter({
@@ -24,10 +27,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: Number.isInteger(webPort) && webPort > 0 ? webPort : 5173,
+    strictPort: process.env.WEB_PORT !== undefined,
     proxy: {
       "/api": {
-        target: "http://localhost:3000",
+        target: `http://127.0.0.1:${apiPort}`,
         changeOrigin: true,
       },
     },

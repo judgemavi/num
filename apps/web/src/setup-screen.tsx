@@ -2,9 +2,10 @@ import { currencyCodes, setupRequestSchema, setupResultSchema, type CategorySet,
 import { useState, type FormEvent } from "react";
 import { CurrencyCombobox } from "@/currency-combobox";
 import { apiRequest } from "@/request";
-import { Button } from "@/components/ui/button";
-import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Button } from "@/components/button";
+import { ChoiceCard } from "@/components/choice-card";
+import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { RadioGroup } from "@/components/ui/radio-group";
 
 type SetupScreenProps = {
   onDone: () => void;
@@ -67,20 +68,19 @@ export function SetupScreen({ onDone }: SetupScreenProps) {
   }
 
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-md flex-col justify-center px-4 py-10">
-      <h1 className="text-2xl font-semibold">Set up your book</h1>
-      <p className="mt-2 text-muted-foreground">
-        Choose the currency for this book. You cannot change it after you add a transaction.
+    <main className="setup">
+      <p className="brand" style={{ padding: 0 }}>
+        <span className="brand-mark" aria-hidden="true">
+          N
+        </span>
+        Num
       </p>
-      <form className="mt-8 flex flex-col gap-6" onSubmit={(event) => void onSubmit(event)}>
+      <h1 className="title display">Set up your book</h1>
+      <p className="muted">Choose the currency for this book. You cannot change it after you add a transaction.</p>
+      <form className="form-grid" onSubmit={(event) => void onSubmit(event)}>
         <Field data-invalid={error !== null && currency.length === 0}>
           <FieldLabel htmlFor="currency">Currency</FieldLabel>
-          <CurrencyCombobox
-            id="currency"
-            value={currency}
-            invalid={error !== null && currency.length === 0}
-            onChange={setCurrency}
-          />
+          <CurrencyCombobox id="currency" value={currency} invalid={error !== null && currency.length === 0} onChange={setCurrency} />
         </Field>
         <FieldSet>
           <FieldLegend variant="label">Categories</FieldLegend>
@@ -93,28 +93,14 @@ export function SetupScreen({ onDone }: SetupScreenProps) {
               }
             }}
           >
-            <Field orientation="horizontal">
-              <RadioGroupItem id="categories-default" value="default" />
-              <FieldContent>
-                <FieldLabel htmlFor="categories-default">Common categories</FieldLabel>
-                <FieldDescription>A short list you can change later.</FieldDescription>
-              </FieldContent>
-            </Field>
-            <Field orientation="horizontal">
-              <RadioGroupItem id="categories-none" value="none" />
-              <FieldContent>
-                <FieldLabel htmlFor="categories-none">No categories</FieldLabel>
-                <FieldDescription>Start with an empty list.</FieldDescription>
-              </FieldContent>
-            </Field>
+            <div className="kinds">
+              <ChoiceCard value="default" title="Common categories" description="A short list you can change later." />
+              <ChoiceCard value="none" title="No categories" description="Start with an empty list." />
+            </div>
           </RadioGroup>
         </FieldSet>
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
-        <Button type="submit" className="h-11" disabled={saving}>
+        {error ? <FieldError>{error}</FieldError> : null}
+        <Button type="submit" disabled={saving}>
           {saving ? "Saving setup" : "Save setup"}
         </Button>
       </form>
