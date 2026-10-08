@@ -157,6 +157,25 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 
 **Full height:** the app shell fills the viewport height. The desktop sidebar is full height and stays in place when the page scrolls.
 
+## 6a. Transaction editor
+
+One shared "What is this?" component. The transaction dialog uses it as its core. The Inbox uses the same component inline.
+
+Dialog order, top to bottom:
+1. **Money out / Money in** (ToggleGroup) and **Amount** as a positive number. The sign comes from the toggle.
+   Never ask the user to type a minus sign. For an imported transaction, show this section as a read-only summary:
+   date · account · money out/in amount · bank text.
+2. **Account** and **Date** on one row (manual transactions only).
+3. **What is this?** (ToggleGroup): Spending or income | Transfer | Split.
+   - Spending or income: category Combobox (income categories first for money in, expense first for money out).
+   - Transfer: "To account" / "From account" Combobox (spec §7.3: link an existing match or create the mirror).
+   - Split: line rows (amount, then category or account) and a live "$X left to assign". Save is disabled until it is 0.
+4. **Merchant** Combobox, with the suggestion and its reason.
+5. **More details** (Collapsible, closed): notes, tags, bank text, "Cleared" checkbox. No "status" word in the UI.
+6. Footer: Save (primary). Delete goes in a More menu with AlertDialog.
+
+The Inbox shows section 3 and the merchant inline, with one primary action (Save) and "More…" that opens the dialog.
+
 ## 7. Illustrations
 
 Four small duotone illustrations, one for each tinted summary strip: payday (Inbox), balance scale (Accounts),
