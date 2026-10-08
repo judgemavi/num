@@ -44,7 +44,7 @@ Goal: accounts and transactions are correct.
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
 | 1.1 Accounts | Account CRUD, kinds, class, onBudget, card fields, balances (§5.1, §7.1). | Tests: balance = opening + transactions, for transaction accounts and valuation accounts. Kind change across class is rejected. |
-| 1.2 Categories and tags | Categories, groups, tags (§5.3, §5.5). | Tests: refund decreases spending. Transfers are not spending or income. |
+| 1.2 Categories and tags | Categories, groups, tags (§5.3, §5.5). | Tests: kind change only for an unused category. Group delete moves its categories to no group. Archive and restore. |
 | 1.3 Transactions | Transactions, lines, mirror transfers, status (§5.4). | Tests: lines must sum to the amount. Edit and delete of a transfer update both sides in one DB transaction. Self-transfer is rejected. Reconciled records cannot change. Mortgage payment with principal transfer and interest line is correct. |
 | 1.4 Transactions screen | List with server pagination, search, filters (account, category, merchant, tag, date, uncategorized) and sort. URL state = API query (decision 0004). Detail, edit lines. Formatting with `Intl` in the browser. | Owner check: URL reload, back and forward keep the state. Locales `fr-CA` and `en-US` format correctly. With 50,000 transactions in the DB, each filtered page of 50 loads in less than 200 ms on the NUC. |
 
@@ -77,7 +77,7 @@ Goal: recurring plans, buckets and paycheck funding.
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
 | 4.1 Month close | Close rules, summary, open again (§7.5). | Tests: a missing checkpoint blocks the close. Open Inbox items block the close. Reopen needs a reason. |
-| 4.2 Insights | Month story, category, merchant and tag reports, trends, net worth (§9). | Tests: month story calculations (changes against the 3-month median, savings rate). Net worth at month end. |
+| 4.2 Insights | Month story, category, merchant and tag reports, trends, net worth (§9). | Tests: refund decreases spending. Transfers are not spending or income. Month story calculations (changes against the 3-month median, savings rate). Net worth at month end. |
 | 4.3 Hygiene panel | All checks in §10. | One test for each check: pass case and fail case. |
 
 ## Phase 5 — Forecast and mortgage

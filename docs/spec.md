@@ -31,6 +31,7 @@ If a screen or feature does not support one of these loops, do not add it.
 3. **No silent changes.** The app does not create, change or delete financial records without a user action.
    Each suggestion shows its reason. Example: "Rule: NETFLIX → Streaming".
 4. **Reversible.** The user can undo imports and funding. The user can open a closed month again.
+   The user can restore archived accounts, categories, tags, merchants, rules, plans and buckets.
    The audit log records each of these actions.
 5. **Exceptions only.** The user works on the Inbox. The user does not examine each transaction.
 6. **Plain language.** The UI does not use accounting words. Do not show "debit", "credit", "equity", "split" or "ledger".
@@ -137,6 +138,8 @@ The terms do not create transactions.
 - Category fields: `name`, `kind` (`income | expense`), `groupId?`, `essential` (boolean, only for expense), `archivedAt?`.
   The name is unique. The comparison ignores case.
 - Group fields: `name`, `sortOrder`. Groups are only for display.
+- The user can delete a group. After a confirmation, its categories move to no group.
+- The user can change the kind of a category only when no transaction line uses it and it is not in a bucket.
 - **Spending** = the sum of the lines in expense categories.
   A refund is a positive line in an expense category. A refund decreases spending.
 - **Income** = the sum of the lines in income categories.
