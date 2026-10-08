@@ -35,7 +35,7 @@ Goal: an empty app that is safe to deploy, for the owner and for other people.
 | 0.2 Schema baseline | Drizzle schema for all entities in §5. One baseline migration. | Fresh DB creates. `PRAGMA integrity_check` = ok. `PRAGMA foreign_key_check` is empty. Migrations run two times without change. |
 | 0.4 API conventions | `asOf` validation, error codes, audit log writer (§4, §11). | `@hono/zod-openapi` route pattern and OpenAPI document. Shared list-query schema and paged response (decision 0004). Tests: a date-dependent route without `asOf` → 400. Each write service creates one audit row with `before` and `after`. `sort` with an unknown column → 400. |
 | 0.5 Setup | First-run setup: currency, default category set (§7.0). Currency minor units from ISO 4217. | Tests: setup runs only one time. Currency cannot change after the first transaction. Minor-unit conversion is correct for JPY (0), CAD (2) and KWD (3). |
-| 0.6 Backups | Pre-migrate backup (spec §13): a consistent copy before pending migrations, keep the last 10, no copy of a new empty database. "Download backup" on Settings → Backup: one archive with a consistent database copy and `uploads/`. | Tests: copy only when a migration is pending; retention of 10; the archive contains a readable database. |
+| 0.6 Backups (on hold: needs discussion, decision 0011) | Pre-migrate backup (spec §13): a consistent copy before pending migrations, keep the last 10, no copy of a new empty database. "Download backup" on Settings → Backup: one archive with a consistent database copy and `uploads/`. | Tests: copy only when a migration is pending; retention of 10; the archive contains a readable database. |
 
 ## Phase 1 — Ledger core
 

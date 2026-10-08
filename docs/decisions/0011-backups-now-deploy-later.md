@@ -2,7 +2,7 @@
 
 Writing standard: ASD-STE100.
 
-Status: accepted
+Status: on hold (needs discussion with the owner)
 Date: 2026-10-07
 
 ## Context
@@ -12,10 +12,10 @@ Date: 2026-10-07
 
 ## Decision
 
-- Slice 0.6 contains only backups: the pre-migrate copy and "Download backup".
+- Backups (slice 0.6) and deployment (slice X.1) wait for a discussion with the owner.
 - Deployment (Docker image, off-site backup, self-hosting guide) is a separate slice, X.1.
   It starts when the owner decides the hosting.
 
 ## Consequences
 
-- The Docker and self-hosting work from the first 0.6 attempt is kept on a parked branch for slice X.1.
+- The first 0.6 attempt (backups, Docker, self-hosting guide) is kept on the local branch `park/x.1-deploy-draft`.
