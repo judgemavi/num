@@ -1,7 +1,7 @@
 import { errorSchema, tagCreateSchema, tagListQuerySchema, tagListSchema, tagSchema, tagUpdateSchema } from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { archiveTag, createTag, listTags, updateTag } from "../services/tags";
+import { archiveTag, createTag, listTags, restoreTag, updateTag } from "../services/tags";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -69,6 +69,20 @@ const updateRoute = createRoute({
   },
 });
 
+const restoreRoute = createRoute({
+  method: "post",
+  path: "/api/tags/{id}/restore",
+  request: { params: idParams },
+  responses: {
+    200: {
+      description: "The restored tag",
+      content: { "application/json": { schema: tagSchema } },
+    },
+    404: errorResponse,
+    409: errorResponse,
+  },
+});
+
 const archiveRoute = createRoute({
   method: "post",
   path: "/api/tags/{id}/archive",
@@ -97,5 +111,9 @@ export function registerTags(app: OpenAPIHono, db: Db) {
   app.openapi(archiveRoute, (c) => {
     const { id } = c.req.valid("param");
     return c.json(archiveTag(db, id, { source: "ui" }), 200);
+  });
+  app.openapi(restoreRoute, (c) => {
+    const { id } = c.req.valid("param");
+    return c.json(restoreTag(db, id, { source: "ui" }), 200);
   });
 }

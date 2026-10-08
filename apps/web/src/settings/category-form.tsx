@@ -8,7 +8,7 @@ import {
   type CategoryKind,
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
-import { categoryError, kindLabel } from "@/settings/format";
+import { categoryError } from "@/settings/format";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,9 +43,9 @@ export function CategoryForm({ category, groups, onClose, onSaved }: CategoryFor
     event.preventDefault();
     const body = {
       name,
+      kind,
       groupId: groupId === noGroup ? null : groupId,
       essential: expense ? essential : false,
-      ...(category ? {} : { kind }),
     };
     const parsed = (category ? categoryUpdateSchema : categoryCreateSchema).safeParse(body);
     if (!parsed.success) {
@@ -76,7 +76,9 @@ export function CategoryForm({ category, groups, onClose, onSaved }: CategoryFor
       <DialogHeader>
         <DialogTitle>{category ? "Edit category" : "New category"}</DialogTitle>
         <DialogDescription>
-          {category ? "Change the name, the group, or whether it is essential." : "Add a category for income or expenses."}
+          {category
+            ? "Change the name, the kind, the group, or whether it is essential."
+            : "Add a category for income or expenses."}
         </DialogDescription>
       </DialogHeader>
       <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
@@ -86,30 +88,26 @@ export function CategoryForm({ category, groups, onClose, onSaved }: CategoryFor
         </Field>
         <Field>
           <FieldLabel htmlFor="category-kind">Kind</FieldLabel>
-          {category ? (
-            <p id="category-kind">{kindLabel(category.kind)}</p>
-          ) : (
-            <Select
-              value={kind}
-              onValueChange={(value) => {
-                if (!isKind(value)) {
-                  return;
-                }
-                setKind(value);
-                if (value === "income") {
-                  setEssential(false);
-                }
-              }}
-            >
-              <SelectTrigger id="category-kind" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="expense">Expense</SelectItem>
-                <SelectItem value="income">Income</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
+          <Select
+            value={kind}
+            onValueChange={(value) => {
+              if (!isKind(value)) {
+                return;
+              }
+              setKind(value);
+              if (value === "income") {
+                setEssential(false);
+              }
+            }}
+          >
+            <SelectTrigger id="category-kind" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="expense">Expense</SelectItem>
+              <SelectItem value="income">Income</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
         <Field>
           <FieldLabel htmlFor="category-group">Group</FieldLabel>

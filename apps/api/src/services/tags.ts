@@ -143,3 +143,30 @@ export function archiveTag(db: Db, id: string, input: WriteInput): Tag {
   }
   return archived;
 }
+
+export function restoreTag(db: Db, id: string, input: WriteInput): Tag {
+  let restored: Tag | undefined;
+  write(db, { source: input.source, at: input.at }, (tx) => {
+    const existing = tx.select().from(tags).where(eq(tags.id, id)).get();
+    if (!existing) {
+      throw new ServiceError("tag_not_found", 404);
+    }
+    if (!existing.archivedAt) {
+      throw new ServiceError("tag_not_archived", 409);
+    }
+    const next = { ...existing, archivedAt: null };
+    tx.update(tags).set({ archivedAt: null }).where(eq(tags.id, id)).run();
+    tx.audit({
+      entity: "tags",
+      entityId: id,
+      action: "restore",
+      before: snapshot(existing),
+      after: snapshot(next),
+    });
+    restored = toTag(next);
+  });
+  if (!restored) {
+    throw new Error("Restore did not return a tag");
+  }
+  return restored;
+}

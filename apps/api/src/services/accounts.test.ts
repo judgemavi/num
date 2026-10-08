@@ -5,7 +5,7 @@ import { migrateDatabase, openDatabase, transactions, valuations } from "@num/db
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
-import { archiveAccount, createAccount, listAccounts, updateAccount } from "./accounts";
+import { archiveAccount, createAccount, listAccounts, restoreAccount, updateAccount } from "./accounts";
 import type { AccountCreate, AccountKind, AccountUpdate, ErrorCode } from "@num/shared";
 
 function tempDatabase() {
@@ -251,6 +251,11 @@ test("the account list shows active accounts unless archived is requested", () =
     const archived = listAccounts(book.db, { page: 1, pageSize: 50, archived: true });
     expect(archived.total).toBe(1);
     expect(archived.items.map((item) => item.name)).toEqual(["Closed account"]);
+
+    const restored = restoreAccount(book.db, closed.id, { source: "ui", at });
+    expect(restored.archivedAt).toBeNull();
+    expect(listAccounts(book.db, { page: 1, pageSize: 50, archived: false }).total).toBe(2);
+    expectCode(() => restoreAccount(book.db, closed.id, { source: "ui", at }), "account_not_archived");
   } finally {
     book.close();
   }

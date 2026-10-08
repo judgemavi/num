@@ -22,6 +22,7 @@ import {
   listCategories,
   listCategoryGroups,
   reorderCategoryGroups,
+  restoreCategory,
   updateCategory,
   updateCategoryGroup,
 } from "../services/categories";
@@ -98,7 +99,6 @@ const deleteGroupRoute = createRoute({
       content: { "application/json": { schema: categoryGroupDeleteSchema } },
     },
     404: errorResponse,
-    409: errorResponse,
   },
 });
 
@@ -174,6 +174,20 @@ const updateCategoryRoute = createRoute({
   },
 });
 
+const restoreCategoryRoute = createRoute({
+  method: "post",
+  path: "/api/categories/{id}/restore",
+  request: { params: idParams },
+  responses: {
+    200: {
+      description: "The restored category",
+      content: { "application/json": { schema: categorySchema } },
+    },
+    404: errorResponse,
+    409: errorResponse,
+  },
+});
+
 const archiveCategoryRoute = createRoute({
   method: "post",
   path: "/api/categories/{id}/archive",
@@ -222,5 +236,9 @@ export function registerCategories(app: OpenAPIHono, db: Db) {
   app.openapi(archiveCategoryRoute, (c) => {
     const { id } = c.req.valid("param");
     return c.json(archiveCategory(db, id, { source: "ui" }), 200);
+  });
+  app.openapi(restoreCategoryRoute, (c) => {
+    const { id } = c.req.valid("param");
+    return c.json(restoreCategory(db, id, { source: "ui" }), 200);
   });
 }

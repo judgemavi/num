@@ -1,4 +1,4 @@
-import { categories, categoryGroups } from "@num/db";
+import { bucketCategories, categories, categoryGroups, transactionLines } from "@num/db";
 import {
   categoryKinds,
   utcNow,
@@ -111,22 +111,29 @@ function assertEssential(kind: CategoryKind, essential: boolean) {
   }
 }
 
+function assertKindChange(tx: WriteTx, id: string, current: CategoryKind, next: CategoryKind) {
+  if (current === next) {
+    return;
+  }
+  const line = tx.select({ id: transactionLines.id }).from(transactionLines).where(eq(transactionLines.categoryId, id)).get();
+  const bucket = tx
+    .select({ categoryId: bucketCategories.categoryId })
+    .from(bucketCategories)
+    .where(eq(bucketCategories.categoryId, id))
+    .get();
+  if (line || bucket) {
+    throw new ServiceError("category_kind_locked", 409);
+  }
+}
+
 export function listCategoryGroups(db: Db): { items: CategoryGroup[] } {
-  const items = db
-    .select()
-    .from(categoryGroups)
-    .all()
-    .map(toGroup)
-    .sort((left, right) => {
-      if (left.sortOrder !== right.sortOrder) {
-        return left.sortOrder - right.sortOrder;
-      }
-      const name = compareName(left.name, right.name);
-      if (name !== 0) {
-        return name;
-      }
-      return compareText(left.id, right.id);
-    });
+  const items = db.select().from(categoryGroups).all().map(toGroup);
+  items.sort((left, right) => {
+    if (left.sortOrder !== right.sortOrder) {
+      return left.sortOrder - right.sortOrder;
+    }
+    return compareName(left.name, right.name) || compareText(left.id, right.id);
+  });
   return { items };
 }
 
@@ -187,9 +194,17 @@ export function deleteCategoryGroup(db: Db, id: string, input: WriteInput): void
     if (!existing) {
       throw new ServiceError("group_not_found", 404);
     }
-    const used = tx.select({ id: categories.id }).from(categories).where(eq(categories.groupId, id)).get();
-    if (used) {
-      throw new ServiceError("group_in_use", 409);
+    const members = tx.select().from(categories).where(eq(categories.groupId, id)).all();
+    for (const category of members) {
+      const next = { ...category, groupId: null };
+      tx.update(categories).set({ groupId: null }).where(eq(categories.id, category.id)).run();
+      tx.audit({
+        entity: "categories",
+        entityId: category.id,
+        action: "update",
+        before: categorySnapshot(category),
+        after: categorySnapshot(next),
+      });
     }
     tx.delete(categoryGroups).where(eq(categoryGroups.id, id)).run();
     tx.audit({
@@ -296,19 +311,20 @@ export function updateCategory(db: Db, id: string, input: CategoryUpdate & Write
       throw new ServiceError("category_not_found", 404);
     }
     const kind = asKind(existing.kind);
-    assertEssential(kind, input.essential);
+    assertKindChange(tx, id, kind, input.kind);
+    assertEssential(input.kind, input.essential);
     assertGroup(tx, input.groupId);
     const name = input.name.trim();
     assertCategoryName(tx, name, id);
     const next = {
       name,
-      kind: existing.kind,
+      kind: input.kind,
       groupId: input.groupId,
       essential: input.essential,
       archivedAt: existing.archivedAt,
     };
     tx.update(categories)
-      .set({ name: next.name, groupId: next.groupId, essential: next.essential })
+      .set({ name: next.name, kind: next.kind, groupId: next.groupId, essential: next.essential })
       .where(eq(categories.id, id))
       .run();
     tx.audit({
@@ -352,4 +368,31 @@ export function archiveCategory(db: Db, id: string, input: WriteInput): Category
     throw new Error("Archive did not return a category");
   }
   return archived;
+}
+
+export function restoreCategory(db: Db, id: string, input: WriteInput): Category {
+  let restored: Category | undefined;
+  write(db, { source: input.source, at: input.at }, (tx) => {
+    const existing = tx.select().from(categories).where(eq(categories.id, id)).get();
+    if (!existing) {
+      throw new ServiceError("category_not_found", 404);
+    }
+    if (!existing.archivedAt) {
+      throw new ServiceError("category_not_archived", 409);
+    }
+    const next = { ...existing, archivedAt: null };
+    tx.update(categories).set({ archivedAt: null }).where(eq(categories.id, id)).run();
+    tx.audit({
+      entity: "categories",
+      entityId: id,
+      action: "restore",
+      before: categorySnapshot(existing),
+      after: categorySnapshot(next),
+    });
+    restored = toCategory(next);
+  });
+  if (!restored) {
+    throw new Error("Restore did not return a category");
+  }
+  return restored;
 }

@@ -9,7 +9,7 @@ import {
 } from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { archiveAccount, createAccount, listAccounts, updateAccount } from "../services/accounts";
+import { archiveAccount, createAccount, listAccounts, restoreAccount, updateAccount } from "../services/accounts";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -97,6 +97,24 @@ const updateRoute = createRoute({
   },
 });
 
+const restoreRoute = createRoute({
+  method: "post",
+  path: "/api/accounts/{id}/restore",
+  request: { params: idParams },
+  responses: {
+    200: {
+      description: "The restored account",
+      content: {
+        "application/json": {
+          schema: accountSchema,
+        },
+      },
+    },
+    404: errorResponse,
+    409: errorResponse,
+  },
+});
+
 const archiveRoute = createRoute({
   method: "post",
   path: "/api/accounts/{id}/archive",
@@ -144,5 +162,10 @@ export function registerAccounts(app: OpenAPIHono, db: Db) {
     const body = c.req.valid("json");
     const { id } = c.req.valid("param");
     return c.json(archiveAccount(db, id, { confirm: body.confirm, source: "ui" }), 200);
+  });
+
+  app.openapi(restoreRoute, (c) => {
+    const { id } = c.req.valid("param");
+    return c.json(restoreAccount(db, id, { source: "ui" }), 200);
   });
 }

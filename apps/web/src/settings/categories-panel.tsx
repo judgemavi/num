@@ -103,6 +103,16 @@ export function CategoriesPanel() {
     await refresh();
   }
 
+  async function restoreCategory(category: Category) {
+    const result = await apiRequest(`/api/categories/${category.id}/restore`, categorySchema, { method: "POST" });
+    if (!result.ok) {
+      setActionError(categoryError(result.code));
+      return;
+    }
+    setActionError(null);
+    await refresh();
+  }
+
   async function confirmAction() {
     if (!confirm) {
       return;
@@ -249,7 +259,17 @@ export function CategoriesPanel() {
                       <Button type="button" variant="outline" size="sm" onClick={() => setCategoryDraft(category)}>
                         Edit
                       </Button>
-                      {category.archivedAt ? null : (
+                      {category.archivedAt ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="ml-2"
+                          onClick={() => void restoreCategory(category)}
+                        >
+                          Restore
+                        </Button>
+                      ) : (
                         <Button
                           type="button"
                           variant="destructive"
@@ -312,7 +332,7 @@ export function CategoriesPanel() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirm?.kind === "delete"
-                ? `Delete ${confirm.group.name}. You can delete a group only when it has no categories.`
+                ? `Delete ${confirm.group.name}. Categories in this group move to no group.`
                 : `Archive ${confirm?.kind === "archive" ? confirm.category.name : "this category"}. It leaves the active list.`}
             </AlertDialogDescription>
           </AlertDialogHeader>

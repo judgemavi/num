@@ -52,6 +52,16 @@ export function TagsPanel() {
     return null;
   }
 
+  async function restore(tag: Tag) {
+    const result = await apiRequest(`/api/tags/${tag.id}/restore`, tagSchema, { method: "POST" });
+    if (!result.ok) {
+      setActionError(tagError(result.code));
+      return;
+    }
+    setActionError(null);
+    await refresh();
+  }
+
   async function confirmArchive() {
     if (!archiveTarget) {
       return;
@@ -125,7 +135,11 @@ export function TagsPanel() {
                   <Button type="button" variant="outline" size="sm" onClick={() => setDraft(tag)}>
                     Rename
                   </Button>
-                  {tag.archivedAt ? null : (
+                  {tag.archivedAt ? (
+                    <Button type="button" variant="outline" size="sm" className="ml-2" onClick={() => void restore(tag)}>
+                      Restore
+                    </Button>
+                  ) : (
                     <Button
                       type="button"
                       variant="destructive"

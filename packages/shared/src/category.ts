@@ -59,11 +59,14 @@ export const categoryCreateSchema = z
   })
   .refine((value) => value.kind === "expense" || value.essential !== true, { path: ["essential"] });
 
-export const categoryUpdateSchema = z.object({
-  name: nameSchema,
-  groupId: z.uuid().nullable(),
-  essential: z.boolean(),
-});
+export const categoryUpdateSchema = z
+  .object({
+    name: nameSchema,
+    kind: z.enum(categoryKinds),
+    groupId: z.uuid().nullable(),
+    essential: z.boolean(),
+  })
+  .refine((value) => value.kind === "expense" || value.essential !== true, { path: ["essential"] });
 
 export const categoryListQuerySchema = listQuerySchema(["name", "kind"]).extend(archivedQuery);
 

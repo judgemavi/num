@@ -97,6 +97,16 @@ export function AccountsScreen() {
     }
   }, [accounts.data, navigate, search]);
 
+  async function restore(account: Account) {
+    const result = await apiRequest(`/api/accounts/${account.id}/restore`, accountSchema, { method: "POST" });
+    if (!result.ok) {
+      setActionError(accountError(result.code));
+      return;
+    }
+    setActionError(null);
+    await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+  }
+
   async function confirmArchive() {
     if (!archiveTarget) {
       return;
@@ -194,7 +204,17 @@ export function AccountsScreen() {
                   <Button type="button" variant="outline" size="sm" onClick={() => setDraft(account)}>
                     Edit
                   </Button>
-                  {account.archivedAt ? null : (
+                  {account.archivedAt ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="ml-2"
+                      onClick={() => void restore(account)}
+                    >
+                      Restore
+                    </Button>
+                  ) : (
                     <Button
                       type="button"
                       variant="destructive"

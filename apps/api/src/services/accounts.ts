@@ -13,6 +13,7 @@ import {
 } from "@num/shared";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
+import { integerSum } from "../integer-sum";
 import { ServiceError } from "../service-error";
 import {
   accountBalance,
@@ -48,25 +49,6 @@ function asPolicy(value: string | null): PaymentPolicy | null {
     throw new Error("Unknown payment policy");
   }
   return value as PaymentPolicy;
-}
-
-function integerSum(value: unknown): number {
-  if (typeof value === "number" && Number.isSafeInteger(value)) {
-    return value;
-  }
-  if (typeof value === "bigint") {
-    const max = BigInt(Number.MAX_SAFE_INTEGER);
-    if (value <= max && value >= -max) {
-      return Number(value);
-    }
-  }
-  if (typeof value === "string" && /^-?\d+$/.test(value)) {
-    const parsed = Number(value);
-    if (Number.isSafeInteger(parsed)) {
-      return parsed;
-    }
-  }
-  throw new Error("Sum is not an integer");
 }
 
 function readSum(row: { total: unknown } | undefined): number {
@@ -381,4 +363,32 @@ export function archiveAccount(
     throw new Error("Archive did not return an account");
   }
   return archived;
+}
+
+export function restoreAccount(db: Db, id: string, input: WriteInput): Account {
+  let restored: Account | undefined;
+  write(db, { source: input.source, at: input.at }, (tx) => {
+    const existing = tx.select().from(accounts).where(eq(accounts.id, id)).get();
+    if (!existing) {
+      throw new ServiceError("account_not_found", 404);
+    }
+    if (!existing.archivedAt) {
+      throw new ServiceError("account_not_archived", 409);
+    }
+    const kind = asKind(existing.kind);
+    const next = { ...existing, archivedAt: null };
+    tx.update(accounts).set({ archivedAt: null }).where(eq(accounts.id, id)).run();
+    tx.audit({
+      entity: "accounts",
+      entityId: id,
+      action: "restore",
+      before: snapshot(existing),
+      after: snapshot(next),
+    });
+    restored = toAccount(next, balanceFor(tx, { id, kind, openingBalance: existing.openingBalance }));
+  });
+  if (!restored) {
+    throw new Error("Restore did not return an account");
+  }
+  return restored;
 }

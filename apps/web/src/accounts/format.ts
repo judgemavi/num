@@ -77,6 +77,8 @@ export function accountError(code: string): string {
       return "That account is not in the book.";
     case "account_archived":
       return "This account is already archived.";
+    case "account_not_archived":
+      return "This account is already active.";
     case "invalid_body":
       return "Check the account fields.";
     default:
