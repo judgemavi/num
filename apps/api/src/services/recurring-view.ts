@@ -2,18 +2,20 @@ import { occurrenceLinks, recurringPlans, settings, transactions } from "@num/db
 import {
   Temporal,
   detectPlans,
-  isMissed,
+  isInboxMissed,
+  linkWindowStart,
   matchLinks,
   occurrenceDates,
   variableAmounts,
   withinTolerance,
+  type DetectionTransaction,
   type Occurrence,
   type OccurrenceStatus,
   type OpenOccurrence,
   type PlanSchedule,
   type RecurringSignals,
 } from "@num/shared";
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { write, type AuditSource } from "./write";
@@ -68,18 +70,72 @@ function activePlans(db: Db): PlanRow[] {
     .filter((row) => row.active && row.archivedAt === null);
 }
 
-function liveTransactions(db: Db): TxnRow[] {
+function transactionsByIds(db: Db, ids: readonly string[]): Map<string, TxnRow> {
+  const found = new Map<string, TxnRow>();
+  for (let index = 0; index < ids.length; index += 400) {
+    const slice = ids.slice(index, index + 400);
+    if (slice.length === 0) {
+      continue;
+    }
+    const rows = db
+      .select({
+        id: transactions.id,
+        accountId: transactions.accountId,
+        date: transactions.date,
+        amount: transactions.amount,
+        merchantId: transactions.merchantId,
+      })
+      .from(transactions)
+      .where(and(inArray(transactions.id, slice), isNull(transactions.deletedAt)))
+      .all();
+    for (const row of rows) {
+      found.set(row.id, row);
+    }
+  }
+  return found;
+}
+
+function transactionsForAccounts(db: Db, accountIds: readonly string[], from: string, to: string): TxnRow[] {
+  const rows: TxnRow[] = [];
+  for (const accountId of accountIds) {
+    rows.push(
+      ...db
+        .select({
+          id: transactions.id,
+          accountId: transactions.accountId,
+          date: transactions.date,
+          amount: transactions.amount,
+          merchantId: transactions.merchantId,
+        })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.accountId, accountId),
+            gte(transactions.date, from),
+            lte(transactions.date, to),
+            isNull(transactions.deletedAt),
+          ),
+        )
+        .all(),
+    );
+  }
+  return rows;
+}
+
+function detectionTransactions(db: Db, asOf: string): DetectionTransaction[] {
+  const since = Temporal.PlainDate.from(asOf).subtract({ months: 18 }).toString();
   return db
     .select({
       id: transactions.id,
       accountId: transactions.accountId,
+      merchantId: transactions.merchantId,
       date: transactions.date,
       amount: transactions.amount,
-      merchantId: transactions.merchantId,
     })
     .from(transactions)
-    .where(isNull(transactions.deletedAt))
-    .all();
+    .where(and(isNotNull(transactions.merchantId), gte(transactions.date, since), lte(transactions.date, asOf), isNull(transactions.deletedAt)))
+    .all()
+    .flatMap((row) => (row.merchantId ? [{ ...row, merchantId: row.merchantId }] : []));
 }
 
 function requirePlan(db: Db, id: string): PlanRow {
@@ -127,7 +183,7 @@ function statusFor(
     }
     return "linked";
   }
-  if (row.active && isMissed(dueDate, asOf, grace)) {
+  if (row.active && isInboxMissed(dueDate, asOf, grace)) {
     return "missed";
   }
   return "open";
@@ -138,7 +194,10 @@ export function listOccurrences(db: Db, planId: string, asOf: string) {
   const grace = graceDays(db);
   const links = db.select().from(occurrenceLinks).where(eq(occurrenceLinks.planId, planId)).all();
   const byDue = new Map(links.map((link) => [link.dueDate, link]));
-  const txns = new Map(liveTransactions(db).map((txn) => [txn.id, txn]));
+  const txns = transactionsByIds(
+    db,
+    links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])),
+  );
   const actuals = amountsByDue(links, txns, asOf);
   const amounts =
     row.amountMode === "variable" ? variableAmounts(actuals, row.expectedAmount) : { forecast: row.expectedAmount, safe: row.expectedAmount };
@@ -158,18 +217,13 @@ export function listOccurrences(db: Db, planId: string, asOf: string) {
   return { forecastAmount: amounts.forecast, safeAmount: amounts.safe, items };
 }
 
-function openOccurrences(rows: PlanRow[], links: LinkRow[], txns: TxnRow[], asOf: string, grace: number): OpenOccurrence[] {
+function openOccurrences(rows: PlanRow[], links: LinkRow[], asOf: string, grace: number): OpenOccurrence[] {
   const linked = new Set(links.map((link) => `${link.planId}|${link.dueDate}`));
-  let latest = asOf;
-  for (const txn of txns) {
-    if (txn.date > latest) {
-      latest = txn.date;
-    }
-  }
-  const limit = Temporal.PlainDate.from(latest).add({ days: grace }).toString();
+  const limit = Temporal.PlainDate.from(asOf).add({ days: grace }).toString();
   const occurrences: OpenOccurrence[] = [];
   for (const row of rows) {
-    for (const date of occurrenceDates(scheduleOf(row), limit)) {
+    const from = linkWindowStart(row.startDate, asOf);
+    for (const date of occurrenceDates(scheduleOf(row), limit, from)) {
       if (linked.has(`${row.id}|${date.dueDate}`)) {
         continue;
       }
@@ -186,14 +240,22 @@ function openOccurrences(rows: PlanRow[], links: LinkRow[], txns: TxnRow[], asOf
   return occurrences;
 }
 
+function linkTransactions(db: Db, plans: PlanRow[], asOf: string, grace: number): TxnRow[] {
+  const accountIds = [...new Set(plans.map((row) => row.accountId))];
+  const from = Temporal.PlainDate.from(asOf).subtract({ months: 13 }).subtract({ days: grace }).toString();
+  const to = Temporal.PlainDate.from(asOf).add({ days: grace * 2 }).toString();
+  return transactionsForAccounts(db, accountIds, from, to);
+}
+
 export function recurringSignals(db: Db, asOf: string): RecurringSignals {
   const plans = activePlans(db);
   const links = db.select().from(occurrenceLinks).all();
-  const txns = liveTransactions(db);
-  const txnById = new Map(txns.map((txn) => [txn.id, txn]));
   const grace = graceDays(db);
+  const linkedIds = links.flatMap((link) => (link.transactionId ? [link.transactionId] : []));
+  const txnById = transactionsByIds(db, linkedIds);
   const changed: RecurringSignals["changed"] = [];
   const missed: RecurringSignals["missed"] = [];
+  const missedFrom = Temporal.PlainDate.from(asOf).subtract({ days: 35 }).toString();
   for (const row of plans) {
     const planLinks = links.filter((link) => link.planId === row.id);
     const byDue = new Map(planLinks.map((link) => [link.dueDate, link]));
@@ -215,35 +277,31 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
         });
       }
     }
-    for (const date of occurrenceDates(scheduleOf(row), asOf)) {
-      if (byDue.has(date.dueDate) || !isMissed(date.dueDate, asOf, grace)) {
+    for (const date of occurrenceDates(scheduleOf(row), asOf, missedFrom)) {
+      if (byDue.has(date.dueDate) || !isInboxMissed(date.dueDate, asOf, grace)) {
         continue;
       }
       missed.push({ planId: row.id, dueDate: date.dueDate });
     }
   }
-  const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
-  const ambiguous = matchLinks(
-    openOccurrences(plans, links, txns, asOf, grace),
-    txns.filter((txn) => !taken.has(txn.id)),
-    grace,
-  ).ambiguous;
+  const taken = new Set(linkedIds);
+  const candidates = linkTransactions(db, plans, asOf, grace).filter((txn) => !taken.has(txn.id));
+  const ambiguous = matchLinks(openOccurrences(plans, links, asOf, grace), candidates, grace).ambiguous;
   const covered = new Set(plans.filter((row) => row.merchantId).map((row) => `${row.accountId}|${row.merchantId}`));
-  const proposals = detectPlans(
-    txns.flatMap((txn) => (txn.merchantId ? [{ ...txn, merchantId: txn.merchantId }] : [])),
-  ).filter((proposal) => !covered.has(`${proposal.accountId}|${proposal.merchantId}`));
+  const proposals = detectPlans(detectionTransactions(db, asOf), asOf).filter(
+    (proposal) => !covered.has(`${proposal.accountId}|${proposal.merchantId}`),
+  );
   return { changed, missed, ambiguous, proposals };
 }
 
 export function autoLink(db: Db, asOf: string, input: WriteInput): { linked: number } {
   const plans = activePlans(db);
   const links = db.select().from(occurrenceLinks).all();
-  const txns = liveTransactions(db);
   const grace = graceDays(db);
   const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
   const unique = matchLinks(
-    openOccurrences(plans, links, txns, asOf, grace),
-    txns.filter((txn) => !taken.has(txn.id)),
+    openOccurrences(plans, links, asOf, grace),
+    linkTransactions(db, plans, asOf, grace).filter((txn) => !taken.has(txn.id)),
     grace,
   ).unique;
   if (unique.length === 0) {

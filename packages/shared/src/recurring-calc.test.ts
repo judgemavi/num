@@ -1,18 +1,18 @@
 import { expect, test } from "bun:test";
 import {
   applyBusinessDayShift,
-  detectPlans,
+  isInboxMissed,
   isLinkCandidate,
   matchLinks,
   medianMinor,
   occurrenceAt,
   occurrenceDates,
   variableAmounts,
-  type DetectionTransaction,
   type LinkTransaction,
   type OpenOccurrence,
   type PlanSchedule,
 } from "./recurring-calc";
+import { detectPlans, type DetectionTransaction } from "./recurring-detect";
 
 const monthly: PlanSchedule = {
   startDate: "2026-01-31",
@@ -124,6 +124,42 @@ test("detection needs 3 transactions, regular gaps within 3 days, and amounts wi
   expect(year[0]).toMatchObject({ freq: "yearly", interval: 1 });
 });
 
+test("an old regular run that stopped is not proposed", () => {
+  expect(
+    detectPlans([
+      txn("a", "2024-01-15", 1000),
+      txn("b", "2024-02-15", 1000),
+      txn("c", "2024-03-15", 1000),
+      txn("d", "2024-06-02", 1000),
+    ]),
+  ).toEqual([]);
+});
+
+test("detection uses the latest run and ignores history older than 18 months", () => {
+  const found = detectPlans([
+    txn("a", "2024-01-15", 5000),
+    txn("b", "2024-02-15", 5000),
+    txn("c", "2024-03-15", 5000),
+    txn("d", "2024-04-15", 5000),
+    txn("e", "2026-01-05", 1000),
+    txn("f", "2026-01-12", 1000),
+    txn("g", "2026-01-19", 1000),
+  ]);
+  expect(found).toHaveLength(1);
+  expect(found[0]).toMatchObject({ freq: "weekly", interval: 1, transactionIds: ["e", "f", "g"] });
+
+  expect(
+    detectPlans(
+      [
+        txn("a", "2024-01-15", 1000),
+        txn("b", "2024-02-15", 1000),
+        txn("c", "2024-03-15", 1000),
+      ],
+      "2026-10-07",
+    ),
+  ).toEqual([]);
+});
+
 function occurrence(planId: string, dueDate: string, merchantId: string | null = null): OpenOccurrence {
   return {
     planId,
@@ -138,6 +174,13 @@ function occurrence(planId: string, dueDate: string, merchantId: string | null =
 function payment(id: string, date: string, amount = -1699, merchantId: string | null = "merchant-1"): LinkTransaction {
   return { id, accountId: "account-1", date, amount, merchantId };
 }
+
+test("an old unlinked occurrence is not missed", () => {
+  expect(isInboxMissed("2024-01-15", "2026-10-07", 3)).toBe(false);
+  expect(isInboxMissed("2026-09-01", "2026-10-07", 3)).toBe(false);
+  expect(isInboxMissed("2026-09-10", "2026-10-07", 3)).toBe(true);
+  expect(isInboxMissed("2026-10-05", "2026-10-07", 3)).toBe(false);
+});
 
 test("auto-link matches one candidate and leaves every other case open", () => {
   const plan = occurrence("plan-1", "2026-03-02", "merchant-1");

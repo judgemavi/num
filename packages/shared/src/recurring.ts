@@ -1,13 +1,8 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { listQuerySchema, pagedResponseSchema } from "./list";
-import {
-  amountModes,
-  businessDayShifts,
-  planFrequencies,
-  planKinds,
-  type PlanProposal,
-} from "./recurring-calc";
+import { amountModes, businessDayShifts, planFrequencies, planKinds } from "./recurring-calc";
+import { type PlanProposal } from "./recurring-detect";
 import { isUtcTimestamp } from "./time";
 
 const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);

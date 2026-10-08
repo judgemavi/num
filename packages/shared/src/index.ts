@@ -133,9 +133,10 @@ export {
   applyBusinessDayShift,
   businessDayShifts,
   dayDistance,
-  detectPlans,
   isLinkCandidate,
+  isInboxMissed,
   isMissed,
+  linkWindowStart,
   matchLinks,
   medianMinor,
   occurrenceAt,
@@ -146,13 +147,13 @@ export {
   withinTolerance,
   type AmountMode,
   type BusinessDayShift,
-  type DetectionTransaction,
   type LinkTransaction,
   type OpenOccurrence,
   type PlanFrequency,
   type PlanKind,
   type PlanSchedule,
 } from "./recurring-calc";
+export { detectPlans, type DetectionTransaction } from "./recurring-detect";
 export { isUtcTimestamp, utcNow } from "./time";
 export {
   transactionCreateSchema,

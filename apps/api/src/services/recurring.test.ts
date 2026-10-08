@@ -224,3 +224,33 @@ test("a variable plan uses the last 6 actuals and does not report a changed amou
     close();
   }
 });
+
+test("an old unlinked occurrence is not missed", () => {
+  const { db, close } = tempDatabase();
+  try {
+    const chequing = account(db);
+    const plan = createPlan(db, {
+      name: "Old bill",
+      kind: "bill",
+      accountId: chequing.id,
+      expectedAmount: -1000,
+      tolerance: 0,
+      amountMode: "fixed",
+      startDate: "2024-01-15",
+      freq: "monthly",
+      interval: 1,
+      monthDay: 15,
+      businessDayShift: "none",
+      active: true,
+      fundsBuckets: false,
+      source: "ui",
+      at,
+    });
+    const missed = recurringSignals(db, "2026-10-07").missed.filter((item) => item.planId === plan.id);
+    expect(missed.map((item) => item.dueDate)).toEqual(["2026-09-15"]);
+    const history = listOccurrences(db, plan.id, "2026-10-07").items.find((item) => item.dueDate === "2024-01-15");
+    expect(history?.status).toBe("open");
+  } finally {
+    close();
+  }
+});
