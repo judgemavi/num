@@ -21,11 +21,16 @@ function json(body: unknown): RequestInit {
   };
 }
 
-export async function saveCategory(
+export async function saveUncategorized(
   transactionId: string,
-  lineId: string,
-  categoryId: string,
   merchantId: string | null,
+  lines: {
+    amount: number;
+    memo: string | null;
+    categoryId: string | null;
+    transferAccountId: string | null;
+    tagIds: string[];
+  }[],
 ): Promise<ApiResult<Transaction>> {
   const current = await apiRequest(`/api/transactions/${transactionId}`, transactionSchema);
   if (!current.ok) {
@@ -40,16 +45,10 @@ export async function saveCategory(
       date: txn.date,
       amount: txn.amount,
       payeeRaw: txn.payeeRaw,
-      merchantId: txn.merchantId ?? merchantId,
+      merchantId,
       notes: txn.notes,
       status: txn.status === "cleared" ? "cleared" : "open",
-      lines: txn.lines.map((line) => ({
-        amount: line.amount,
-        memo: line.memo,
-        categoryId: line.id === lineId ? categoryId : line.categoryId,
-        transferAccountId: line.transferAccountId,
-        tagIds: line.tagIds,
-      })),
+      lines,
     }),
   });
 }

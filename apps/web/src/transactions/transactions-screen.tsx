@@ -23,16 +23,6 @@ import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TransactionFilterBar } from "@/transactions/filters";
 import { formatDate, statusLabel, transactionError } from "@/transactions/format";
@@ -57,7 +47,6 @@ export function TransactionsScreen() {
   const search = transactionsRoute.useSearch();
   const navigate = transactionsRoute.useNavigate();
   const [draft, setDraft] = useState<string | "new" | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const currency = useQuery({
@@ -134,17 +123,13 @@ export function TransactionsScreen() {
     });
   }
 
-  async function confirmDelete() {
-    if (!deleteTarget) {
-      return;
-    }
-    const result = await apiRequest(`/api/transactions/${deleteTarget.id}`, transactionSchema, { method: "DELETE" });
+  async function deleteTransaction(transaction: Transaction) {
+    const result = await apiRequest(`/api/transactions/${transaction.id}`, transactionSchema, { method: "DELETE" });
     if (!result.ok) {
       setActionError(transactionError(result.code));
       return;
     }
     setActionError(null);
-    setDeleteTarget(null);
     setDraft(null);
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
   }
@@ -337,27 +322,9 @@ export function TransactionsScreen() {
             setActionError(null);
             void queryClient.invalidateQueries({ queryKey: ["transactions"] });
           }}
-          onDelete={(transaction) => setDeleteTarget(transaction)}
+          onDelete={(transaction) => void deleteTransaction(transaction)}
         />
       ) : null}
-      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget?.transferPeerId
-                ? "This also deletes the other side of the transfer."
-                : "The transaction leaves the list."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => void confirmDelete()}>
-              Delete transaction
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

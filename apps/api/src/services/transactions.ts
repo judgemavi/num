@@ -15,7 +15,7 @@ import {
   type TxRow,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
-import { applyMirrorEdit, applySourceEdit, insertMirror } from "./transaction-transfer";
+import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
@@ -165,7 +165,7 @@ export function createTransaction(db: Db, input: TransactionBody & WriteInput): 
     replaceLines(tx, id, lines);
     const line = lines.find((item) => item.transferAccountId !== null);
     if (line?.transferAccountId) {
-      insertMirror(tx, id, header, source, line.transferAccountId, line);
+      attachTransfer(tx, id, header, source, line);
     }
     auditTransaction(tx, id, "create", null, readTransaction(tx, id));
     created = readTransaction(tx, id);

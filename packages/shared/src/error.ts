@@ -53,6 +53,7 @@ export const errorCodes = [
   "rule_not_archived",
   "rule_pattern_invalid",
   "rule_target_required",
+  "rule_targets_conflict",
   "promotion_not_ready",
   "document_not_found",
   "document_too_large",

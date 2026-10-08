@@ -1,4 +1,4 @@
-import type { Bucket, Category, InboxItem, Plan } from "@num/shared";
+import type { Account, Bucket, Category, InboxItem, Merchant, Plan } from "@num/shared";
 import { AlertTriangle, ArrowLeftRight, Banknote, FileWarning, Repeat, Tag, TrendingUp, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import {
@@ -9,9 +9,9 @@ import {
   linkOccurrence,
   promoteRule,
   resolveReview,
-  saveCategory,
   updatePlanAmount,
 } from "@/inbox/actions";
+import { UncategorizedEditor } from "@/inbox/uncategorized-editor";
 import { inboxHue, itemTitle, itemWhy } from "@/inbox/format";
 import { IconTile } from "@/components/icon-tile";
 import { Button } from "@/components/ui/button";
@@ -22,13 +22,16 @@ type InboxItemRowProps = {
   currency: string;
   asOf: string;
   accounts: Map<string, string>;
+  accountList: Account[];
   plans: Map<string, Plan>;
   merchants: Map<string, string>;
+  merchantList: Merchant[];
   categories: Category[];
   buckets: Bucket[];
   onSkip: (planId: string, dueDate: string) => void;
   onDismiss: (itemKey: string) => void;
   onAddByHand: (item: Extract<InboxItem, { kind: "import_unreadable" }>) => void;
+  onOpenTransaction: (transactionId: string) => void;
   onFundPaycheck: (incomeTransactionId: string) => void;
   unassigned: number;
   onRestore?: (itemKey: string) => void;
@@ -72,13 +75,16 @@ export function InboxItemRow({
   currency,
   asOf,
   accounts,
+  accountList,
   plans,
   merchants,
+  merchantList,
   categories,
   buckets,
   onSkip,
   onDismiss,
   onAddByHand,
+  onOpenTransaction,
   onFundPaycheck,
   unassigned,
   onRestore,
@@ -97,8 +103,6 @@ export function InboxItemRow({
   };
   const Icon = icons[item.kind];
   const hue = inboxHue(item.kind);
-  const suggested = item.kind === "uncategorized" ? (item.suggestion.categoryId ?? "") : "";
-  const categoryId = item.kind === "uncategorized" ? choice || suggested : "";
   const sources =
     item.kind === "bucket_overspent"
       ? buckets.filter((bucket) => bucket.id !== item.bucketId && bucket.balance >= -item.balance && bucket.archivedAt === null)
@@ -131,20 +135,6 @@ export function InboxItemRow({
       run: () => void run(() => resolveReview(item, selected)),
     };
     extra = { label: "Add as new", run: () => void run(() => resolveReview(item, null)) };
-  } else if (item.kind === "uncategorized") {
-    primary = {
-      label: categoryId ? `Save as ${names.category(categoryId)}` : "Save category",
-      disabled: categoryId.length === 0,
-      run: () =>
-        void run(() =>
-          saveCategory(
-            item.transactionId,
-            item.lineId,
-            categoryId,
-            item.suggestion.categoryId === categoryId ? item.suggestion.merchantId : null,
-          ),
-        ),
-    };
   } else if (item.kind === "recurring_changed") {
     const plan = plans.get(item.planId);
     primary = {
@@ -259,21 +249,16 @@ export function InboxItemRow({
         </div>
       </div>
       {!dismissedReason && item.kind === "uncategorized" ? (
-        <label className="mt-3 grid max-w-sm gap-1 pl-13 text-sm font-semibold">
-          Category
-          <select
-            className="h-11 rounded-xl border border-input bg-card px-3 font-normal"
-            value={categoryId}
-            onChange={(event) => setChoice(event.target.value)}
-          >
-            <option value="">Choose a category</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <UncategorizedEditor
+          item={item}
+          currency={currency}
+          accounts={accountList}
+          categories={categories}
+          merchants={merchantList}
+          onMore={() => onOpenTransaction(item.transactionId)}
+          onDone={onDone}
+          onError={onError}
+        />
       ) : null}
       {!dismissedReason && choices.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2 pl-13">

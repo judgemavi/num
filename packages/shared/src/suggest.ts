@@ -11,6 +11,7 @@ export type SuggestionReason = (typeof suggestionReasons)[number];
 export const suggestionSchema = z.object({
   merchantId: z.uuid().nullable(),
   categoryId: z.uuid().nullable(),
+  transferAccountId: z.uuid().nullable(),
   reason: z.enum(suggestionReasons),
 });
 
@@ -64,7 +65,7 @@ export type MerchantChoice = {
   archivedAt: string | null;
 };
 
-const none: Suggestion = { merchantId: null, categoryId: null, reason: "none" };
+const none: Suggestion = { merchantId: null, categoryId: null, transferAccountId: null, reason: "none" };
 
 function agreedId(ids: (string | null)[]): string | null {
   const counts = new Map<string, number>();
@@ -131,15 +132,25 @@ export function suggestCategorization(input: {
   }
   const rule = chooseRule(input.rules, payee, input.accountId);
   if (rule) {
-    return { merchantId: rule.merchantId, categoryId: rule.categoryId, reason: "rule" };
+    return {
+      merchantId: rule.merchantId,
+      categoryId: rule.transferAccountId ? null : rule.categoryId,
+      transferAccountId: rule.transferAccountId,
+      reason: "rule",
+    };
   }
   const history = historySuggestion(input.history.filter((row) => normalizePayee(row.payeeRaw) === payee));
   if (history) {
-    return { merchantId: history.merchantId, categoryId: history.categoryId, reason: "payee_history" };
+    return { merchantId: history.merchantId, categoryId: history.categoryId, transferAccountId: null, reason: "payee_history" };
   }
   const merchant = merchantDefault(input.merchants, payee);
   if (merchant?.defaultCategoryId) {
-    return { merchantId: merchant.id, categoryId: merchant.defaultCategoryId, reason: "merchant_default" };
+    return {
+      merchantId: merchant.id,
+      categoryId: merchant.defaultCategoryId,
+      transferAccountId: null,
+      reason: "merchant_default",
+    };
   }
   return none;
 }
@@ -216,6 +227,37 @@ function pairAmount(group: TransferCandidate[]): TransferPair[] {
     }
   }
   return pairs;
+}
+
+export type TransferMatchRow = {
+  id: string;
+  date: string;
+  amount: number;
+  lineCount: number;
+  reconciled: boolean;
+};
+
+/** One unlinked opposite transaction within ±3 days. The closest date wins. */
+export function chooseTransferMatch(
+  rows: TransferMatchRow[],
+  input: { date: string; lineAmount: number },
+): string | null {
+  const wanted = -input.lineAmount;
+  const open = rows.filter(
+    (row) =>
+      row.amount === wanted &&
+      row.lineCount === 1 &&
+      !row.reconciled &&
+      dayDistance(row.date, input.date) <= 3,
+  );
+  open.sort((left, right) => {
+    const distance = dayDistance(left.date, input.date) - dayDistance(right.date, input.date);
+    if (distance !== 0) {
+      return distance;
+    }
+    return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+  });
+  return open[0]?.id ?? null;
 }
 
 export function transferPairs(rows: TransferCandidate[], asOf: string): TransferPair[] {

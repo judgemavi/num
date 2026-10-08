@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { validRulePattern, type RulePattern } from "./rule";
-import { promotionCandidates, suggestCategorization, transferPairs, type HistoryRow, type MerchantChoice } from "./suggest";
+import { chooseTransferMatch, promotionCandidates, suggestCategorization, transferPairs, type HistoryRow, type MerchantChoice, type TransferMatchRow } from "./suggest";
 
 const account = "account-1";
 const otherAccount = "account-2";
@@ -14,6 +14,7 @@ function rule(patch: Partial<RulePattern> & Pick<RulePattern, "id" | "pattern">)
     accountId: null,
     merchantId: merchant,
     categoryId: coffee,
+    transferAccountId: null,
     priority: 0,
     archivedAt: null,
     ...patch,
@@ -39,7 +40,7 @@ test("suggestion order uses a scoped rule before a global rule", () => {
     history: [],
     merchants: [],
   });
-  expect(result).toEqual({ merchantId: merchant, categoryId: coffee, reason: "rule" });
+  expect(result).toEqual({ merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "rule" });
 });
 
 test("a higher priority wins inside the same scope", () => {
@@ -53,7 +54,7 @@ test("a higher priority wins inside the same scope", () => {
     history: [],
     merchants,
   });
-  expect(result).toEqual({ merchantId: null, categoryId: coffee, reason: "rule" });
+  expect(result).toEqual({ merchantId: null, categoryId: coffee, transferAccountId: null, reason: "rule" });
 });
 
 test("payee history wins when 80 percent of the last 10 agree", () => {
@@ -87,7 +88,7 @@ test("history below 80 percent falls through to the merchant default", () => {
     history: rows,
     merchants,
   });
-  expect(result).toEqual({ merchantId: merchant, categoryId: coffee, reason: "merchant_default" });
+  expect(result).toEqual({ merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "merchant_default" });
 });
 
 test("no match returns none", () => {
@@ -98,7 +99,7 @@ test("no match returns none", () => {
     history: [history("h1", "2026-01-01", null)],
     merchants: [{ id: merchant, name: "Starbucks", defaultCategoryId: null, archivedAt: null }],
   });
-  expect(result).toEqual({ merchantId: null, categoryId: null, reason: "none" });
+  expect(result).toEqual({ merchantId: null, categoryId: null, transferAccountId: null, reason: "none" });
 });
 
 test("a rule blocks later suggestion steps", () => {
@@ -109,7 +110,7 @@ test("a rule blocks later suggestion steps", () => {
     history: [history("h1", "2026-01-01", groceries)],
     merchants,
   });
-  expect(result).toEqual({ merchantId: merchant, categoryId: null, reason: "rule" });
+  expect(result).toEqual({ merchantId: merchant, categoryId: null, transferAccountId: null, reason: "rule" });
 });
 
 test("promote after the confirmation count when no rule covers the payee", () => {
@@ -145,6 +146,34 @@ test("transfer pairs stay inside 90 days and use each transaction once", () => {
     asOf,
   );
   expect(pairs).toEqual([{ leftId: "in-near", rightId: "out" }]);
+});
+
+test("a transfer rule suggests that account and blocks a category", () => {
+  const visa = "account-visa";
+  const result = suggestCategorization({
+    accountId: account,
+    rawPayee: "TD VISA PAYMENT",
+    rules: [rule({ id: "visa", pattern: "TD VISA PAYMENT", categoryId: null, transferAccountId: visa })],
+    history: [history("h1", "2026-01-01", coffee)],
+    merchants,
+  });
+  expect(result).toEqual({ merchantId: merchant, categoryId: null, transferAccountId: visa, reason: "rule" });
+});
+
+function matchRow(patch: Partial<TransferMatchRow> & Pick<TransferMatchRow, "id" | "date">): TransferMatchRow {
+  return { amount: 5_000, lineCount: 1, reconciled: false, ...patch };
+}
+
+test("a transfer match is the closest unlinked opposite row within 3 days", () => {
+  const rows = [
+    matchRow({ id: "far", date: "2026-04-05" }),
+    matchRow({ id: "near", date: "2026-04-02" }),
+    matchRow({ id: "locked", date: "2026-04-01", reconciled: true }),
+    matchRow({ id: "split", date: "2026-04-01", lineCount: 2 }),
+    matchRow({ id: "same", date: "2026-04-01" }),
+  ];
+  expect(chooseTransferMatch(rows, { date: "2026-04-01", lineAmount: -5_000 })).toBe("same");
+  expect(chooseTransferMatch([matchRow({ id: "wide", date: "2026-04-05" })], { date: "2026-04-01", lineAmount: -5_000 })).toBeNull();
 });
 
 test("a rule pattern must contain text", () => {

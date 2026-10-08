@@ -29,6 +29,7 @@ export {
   toMinorUnits,
   type CurrencyCode,
 } from "./currency";
+export { moneyDirection, moneyDirections, signedAmount, type MoneyDirection } from "./amount-sign";
 export {
   categoryCreateSchema,
   categoryGroupCreateSchema,
@@ -190,6 +191,7 @@ export {
   chooseRule,
   patternHits,
   ruleCoversPayee,
+  ruleTargetsOk,
   ruleApplyPreviewSchema,
   ruleCreateSchema,
   ruleListQuerySchema,
@@ -209,6 +211,7 @@ export {
   type RuleUpdate,
 } from "./rule";
 export {
+  chooseTransferMatch,
   promotionAcceptSchema,
   promotionCandidates,
   promotionListSchema,
@@ -222,6 +225,7 @@ export {
   transferPairs,
   type HistoryRow,
   type MerchantChoice,
+  type TransferMatchRow,
   type Promotion,
   type Suggestion,
   type SuggestionReason,

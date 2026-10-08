@@ -35,6 +35,7 @@ export function RuleForm({ rule, accounts, categories, merchants, onClose, onSav
   const [accountId, setAccountId] = useState<string | null>(rule?.accountId ?? null);
   const [merchantId, setMerchantId] = useState<string | null>(rule?.merchantId ?? null);
   const [categoryId, setCategoryId] = useState<string | null>(rule?.categoryId ?? null);
+  const [transferAccountId, setTransferAccountId] = useState<string | null>(rule?.transferAccountId ?? null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -44,8 +45,12 @@ export function RuleForm({ rule, accounts, categories, merchants, onClose, onSav
       setError("Enter a pattern.");
       return;
     }
-    if (!merchantId && !categoryId) {
-      setError("Choose a merchant, a category, or both.");
+    if (categoryId && transferAccountId) {
+      setError("A rule cannot have a category and a transfer.");
+      return;
+    }
+    if (!merchantId && !categoryId && !transferAccountId) {
+      setError("Choose a merchant, a category, a transfer account, or a merchant with one of the others.");
       return;
     }
     const priorityNumber = Number(priority);
@@ -64,6 +69,7 @@ export function RuleForm({ rule, accounts, categories, merchants, onClose, onSav
         accountId,
         merchantId,
         categoryId,
+        transferAccountId,
       }),
     });
     setSaving(false);
@@ -120,7 +126,12 @@ export function RuleForm({ rule, accounts, categories, merchants, onClose, onSav
           options={accounts.map((account) => ({ id: account.id, label: account.name }))}
           placeholder="Every account"
           emptyLabel="Every account"
-          onChange={setAccountId}
+          onChange={(id) => {
+            setAccountId(id);
+            if (id && id === transferAccountId) {
+              setTransferAccountId(null);
+            }
+          }}
         />
       </Field>
       <Field>
@@ -142,8 +153,32 @@ export function RuleForm({ rule, accounts, categories, merchants, onClose, onSav
           options={categories.map((item) => ({ id: item.id, label: item.name }))}
           placeholder="No category"
           emptyLabel="No category"
-          onChange={setCategoryId}
+          onChange={(id) => {
+            setCategoryId(id);
+            if (id) {
+              setTransferAccountId(null);
+            }
+          }}
         />
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="rule-transfer">Transfer account</FieldLabel>
+        <OptionCombobox
+          id="rule-transfer"
+          value={transferAccountId}
+          options={accounts
+            .filter((account) => account.id !== accountId)
+            .map((account) => ({ id: account.id, label: account.name }))}
+          placeholder="No transfer"
+          emptyLabel="No transfer"
+          onChange={(id) => {
+            setTransferAccountId(id);
+            if (id) {
+              setCategoryId(null);
+            }
+          }}
+        />
+        <FieldDescription>A transfer rule suggests a transfer to this account.</FieldDescription>
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>

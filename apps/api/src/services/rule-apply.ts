@@ -4,7 +4,9 @@ import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { requireRule } from "./rules";
+import { attachTransfer } from "./transaction-transfer";
 import { auditTransaction, readTransaction } from "./transaction-record";
+import { replaceLines } from "./transaction-lines";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
@@ -17,6 +19,8 @@ type ApplyRow = {
   date: string;
   payeeRaw: string;
   amount: number;
+  accountId: string;
+  status: string;
   merchantId: string | null;
   lineId: string;
   categoryId: string | null;
@@ -44,6 +48,8 @@ function eligible(db: Db, rule: ReturnType<typeof requireRule>): ApplyRow[] {
       t.date as date,
       t.payee_raw as payeeRaw,
       t.amount as amount,
+      t.account_id as accountId,
+      t.status as status,
       t.merchant_id as merchantId,
       l.id as lineId,
       l.category_id as categoryId
@@ -57,6 +63,9 @@ function eligible(db: Db, rule: ReturnType<typeof requireRule>): ApplyRow[] {
     order by t.date desc, t.id desc
   `);
   return rows.filter((row) => {
+    if (rule.transferAccountId) {
+      return row.status !== "reconciled" && row.accountId !== rule.transferAccountId;
+    }
     if (rule.merchantId && row.merchantId !== rule.merchantId) {
       return true;
     }
@@ -84,13 +93,37 @@ export function previewRuleApply(db: Db, id: string): RuleApplyPreview {
   return previewOf(eligible(db, rule));
 }
 
-function applyOne(tx: WriteTx, row: ApplyRow, merchantId: string | null, categoryId: string | null) {
+function applyOne(tx: WriteTx, row: ApplyRow, rule: ReturnType<typeof requireRule>) {
   const before = readTransaction(tx, row.id);
-  if (merchantId && row.merchantId !== merchantId) {
+  if (rule.transferAccountId) {
+    const merchantId = rule.merchantId ?? before.merchantId;
+    const line = {
+      amount: before.amount,
+      memo: before.lines[0]?.memo ?? null,
+      categoryId: null,
+      transferAccountId: rule.transferAccountId,
+      tagIds: before.lines[0]?.tagIds ?? [],
+    };
     tx.update(transactions).set({ merchantId }).where(eq(transactions.id, row.id)).run();
+    replaceLines(tx, row.id, [line]);
+    attachTransfer(tx, row.id, {
+      accountId: before.accountId,
+      date: before.date,
+      amount: before.amount,
+      merchantId,
+      notes: before.notes,
+      payeeRaw: before.payeeRaw,
+      payeeNormalized: before.payeeNormalized,
+      status: before.status === "cleared" ? "cleared" : "open",
+    }, before.source, line);
+    auditTransaction(tx, row.id, "update", before, readTransaction(tx, row.id));
+    return;
   }
-  if (categoryId && row.categoryId !== categoryId) {
-    tx.update(transactionLines).set({ categoryId }).where(eq(transactionLines.id, row.lineId)).run();
+  if (rule.merchantId && row.merchantId !== rule.merchantId) {
+    tx.update(transactions).set({ merchantId: rule.merchantId }).where(eq(transactions.id, row.id)).run();
+  }
+  if (rule.categoryId && row.categoryId !== rule.categoryId) {
+    tx.update(transactionLines).set({ categoryId: rule.categoryId }).where(eq(transactionLines.id, row.lineId)).run();
   }
   auditTransaction(tx, row.id, "update", before, readTransaction(tx, row.id));
 }
@@ -108,7 +141,7 @@ export function applyRule(db: Db, id: string, input: WriteInput): RuleApplyPrevi
   }
   write(db, { source: input.source, at: input.at }, (tx) => {
     for (const txn of rows) {
-      applyOne(tx, txn, rule.merchantId, rule.categoryId);
+      applyOne(tx, txn, rule);
     }
     tx.audit({
       entity: "rules",

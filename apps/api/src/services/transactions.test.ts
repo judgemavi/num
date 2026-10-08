@@ -338,3 +338,43 @@ test("a mortgage payment splits principal and interest", () => {
     book.close();
   }
 });
+
+test("a transfer links an opposite row within 3 days and mirrors when none matches", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db, "Chequing", "chequing");
+    const visa = account(book.db, "Visa", "savings");
+    const incoming = createTransaction(book.db, entry(visa.id, 5_000, [{ amount: 5_000 }], "2026-04-02"));
+    const outgoing = createTransaction(
+      book.db,
+      entry(chequing.id, -5_000, [{ amount: -5_000, transferAccountId: visa.id }], "2026-04-01"),
+    );
+    expect(outgoing.transferPeerId).toBe(incoming.id);
+    const linked = getTransaction(book.db, incoming.id);
+    expect(linked?.transferPeerId).toBe(outgoing.id);
+    expect(linked?.amount).toBe(5_000);
+    expect(linked?.lines[0]?.transferAccountId).toBe(chequing.id);
+
+    const far = createTransaction(book.db, entry(visa.id, 800, [{ amount: 800 }], "2026-05-01"));
+    const tooFar = createTransaction(
+      book.db,
+      entry(chequing.id, -800, [{ amount: -800, transferAccountId: visa.id }], "2026-05-05"),
+    );
+    expect(tooFar.transferPeerId).not.toBe(far.id);
+    expect(getTransaction(book.db, far.id)?.transferPeerId).toBeNull();
+    const mirror = requirePeer(book.db, tooFar);
+    expect(mirror.accountId).toBe(visa.id);
+    expect(mirror.amount).toBe(800);
+
+    const held = createTransaction(book.db, entry(visa.id, 100, [{ amount: 100 }], "2026-06-01"));
+    book.sqlite.query("update transactions set status = 'reconciled' where id = ?").run(held.id);
+    const aroundHeld = createTransaction(
+      book.db,
+      entry(chequing.id, -100, [{ amount: -100, transferAccountId: visa.id }], "2026-06-01"),
+    );
+    expect(aroundHeld.transferPeerId).not.toBe(held.id);
+    expect(getTransaction(book.db, held.id)?.transferPeerId).toBeNull();
+  } finally {
+    book.close();
+  }
+});

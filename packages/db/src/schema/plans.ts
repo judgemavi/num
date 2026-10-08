@@ -22,6 +22,7 @@ export const rules = sqliteTable(
     accountId: text("account_id").references(() => accounts.id),
     merchantId: text("merchant_id").references(() => merchants.id),
     categoryId: text("category_id").references(() => categories.id),
+    transferAccountId: text("transfer_account_id").references(() => accounts.id),
     priority: integer("priority").notNull(),
     origin: text("origin").notNull(),
     archivedAt: text("archived_at"),
@@ -31,7 +32,17 @@ export const rules = sqliteTable(
     check("rules_origin", oneOf(table.origin, ruleOrigins)),
     check(
       "rules_target",
-      sql`${table.merchantId} is not null or ${table.categoryId} is not null`,
+      sql`(
+        ${table.categoryId} is null or ${table.transferAccountId} is null
+      ) and (
+        ${table.merchantId} is not null
+        or ${table.categoryId} is not null
+        or ${table.transferAccountId} is not null
+      ) and (
+        ${table.transferAccountId} is null
+        or ${table.accountId} is null
+        or ${table.transferAccountId} <> ${table.accountId}
+      )`,
     ),
   ],
 );

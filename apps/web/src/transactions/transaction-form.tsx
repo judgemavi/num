@@ -1,5 +1,8 @@
 import {
   fromMinorUnits,
+  moneyDirection,
+  signedAmount,
+  suggestionSchema,
   Temporal,
   toMinorUnits,
   transactionCreateSchema,
@@ -8,28 +11,21 @@ import {
   type Account,
   type Category,
   type Merchant,
+  type MoneyDirection,
   type Tag,
   type Transaction,
-  type TransactionInputStatus,
 } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
-import {
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { transactionError } from "@/transactions/format";
-import { emptyLine, lineAmountError, lineAmounts, type LineDraft } from "@/transactions/line-draft";
-import { LineEditor } from "@/transactions/line-editor";
-import { OptionCombobox } from "@/transactions/option-combobox";
-import { SuggestionHint } from "@/transactions/suggestion-hint";
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FieldError } from "@/components/ui/field";
+import { formatMoney } from "@/money";
+import { formatDate, transactionError } from "@/transactions/format";
+import { DeleteMenu, MoneySection, MoreDetails } from "@/transactions/transaction-parts";
+import { splitRemainder, type SplitLine, type WhatChoice } from "@/transactions/what-choice";
+import { WhatIsThis } from "@/transactions/what-is-this";
 
 type TransactionFormProps = {
   currency: string;
@@ -46,35 +42,51 @@ type TransactionFormProps = {
   onDelete: () => void;
 };
 
-function readAmount(currency: string, text: string): number {
+function readPositive(currency: string, text: string): number {
+  let minor: number;
   try {
-    return toMinorUnits(currency, text.trim());
+    minor = toMinorUnits(currency, text.trim());
   } catch (error) {
     if (error instanceof Error && error.message === "Amount has too many decimal places") {
       throw new Error("The amount has too many decimal places.");
     }
     throw new Error("Enter the amount as a number.");
   }
-}
-
-function linesFrom(currency: string, transaction: Transaction | null): LineDraft[] {
-  if (!transaction) {
-    const line = emptyLine(currency);
-    line.amount = "";
-    return [line];
+  if (minor < 0) {
+    throw new Error("Enter a positive amount.");
   }
-  return transaction.lines.map((line) => ({
-    key: line.id,
-    amount: fromMinorUnits(currency, line.amount),
-    memo: line.memo ?? "",
-    categoryId: line.categoryId,
-    transferAccountId: line.transferAccountId,
-    tagIds: [...line.tagIds],
-  }));
+  return minor;
 }
 
-function isStatus(value: string): value is TransactionInputStatus {
-  return value === "open" || value === "cleared";
+function choiceOf(transaction: Transaction | null): WhatChoice {
+  if (!transaction) {
+    return "spending";
+  }
+  if (transaction.lines.length > 1) {
+    return "split";
+  }
+  return transaction.lines[0]?.transferAccountId ? "transfer" : "spending";
+}
+
+function linesOf(currency: string, transaction: Transaction | null, amountText: string): SplitLine[] {
+  if (transaction && transaction.lines.length > 1) {
+    return transaction.lines.map((line) => ({
+      key: line.id,
+      amount: fromMinorUnits(currency, Math.abs(line.amount)),
+      categoryId: line.categoryId,
+      transferAccountId: line.transferAccountId,
+    }));
+  }
+  const first = transaction?.lines[0];
+  return [
+    {
+      key: first?.id ?? crypto.randomUUID(),
+      amount: amountText,
+      categoryId: first?.categoryId ?? null,
+      transferAccountId: null,
+    },
+    { key: crypto.randomUUID(), amount: "", categoryId: null, transferAccountId: null },
+  ];
 }
 
 export function TransactionForm({
@@ -91,109 +103,179 @@ export function TransactionForm({
   onSaved,
   onDelete,
 }: TransactionFormProps) {
-  const locked = transaction?.status === "reconciled";
-  const payeeLocked = transaction?.source === "import";
+  const reconciled = transaction?.status === "reconciled";
+  const imported = transaction?.source === "import";
+  const moneyLocked = reconciled || amountLocked || imported;
   const [accountId, setAccountId] = useState(
     transaction?.accountId ?? initialAccountId ?? accounts.find((item) => !item.archivedAt)?.id ?? "",
   );
   const [date, setDate] = useState(transaction?.date ?? Temporal.Now.plainDateISO().toString());
+  const [direction, setDirection] = useState<MoneyDirection>(transaction ? moneyDirection(transaction.amount) : "out");
+  const [amount, setAmount] = useState(transaction ? fromMinorUnits(currency, Math.abs(transaction.amount)) : "");
   const [payee, setPayee] = useState(transaction?.payeeRaw ?? "");
-  const [amount, setAmount] = useState(transaction ? fromMinorUnits(currency, transaction.amount) : "");
   const [notes, setNotes] = useState(transaction?.notes ?? "");
-  const [status, setStatus] = useState<TransactionInputStatus>(
-    transaction?.status === "cleared" || transaction?.status === "reconciled" ? "cleared" : "open",
-  );
+  const [cleared, setCleared] = useState(transaction?.status === "cleared" || transaction?.status === "reconciled");
   const [merchantId, setMerchantId] = useState<string | null>(transaction?.merchantId ?? null);
-  const [lines, setLines] = useState<LineDraft[]>(() => linesFrom(currency, transaction));
-  const [linkAmount, setLinkAmount] = useState(transaction === null || transaction.lines.length === 1);
+  const [choice, setChoice] = useState<WhatChoice>(choiceOf(transaction));
+  const [categoryId, setCategoryId] = useState<string | null>(transaction?.lines[0]?.categoryId ?? null);
+  const [transferAccountId, setTransferAccountId] = useState<string | null>(transaction?.lines[0]?.transferAccountId ?? null);
+  const [lines, setLines] = useState<SplitLine[]>(() =>
+    transaction && transaction.lines.length > 1
+      ? linesOf(currency, transaction, fromMinorUnits(currency, Math.abs(transaction.amount)))
+      : [],
+  );
+  const [tagIds, setTagIds] = useState<string[]>(() => [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])]);
+  const [more, setMore] = useState(false);
+  const [touched, setTouched] = useState(transaction !== null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const accountOptions = accounts
-    .filter((account) => account.archivedAt === null || account.id === accountId)
-    .map((account) => ({
-      id: account.id,
-      label: account.archivedAt ? `${account.name} (archived)` : account.name,
-    }));
-  const transferOptions = accounts
-    .filter((account) => account.id !== accountId && (account.archivedAt === null || lines.some((line) => line.transferAccountId === account.id)))
-    .map((account) => ({
-      id: account.id,
-      label: account.archivedAt ? `${account.name} (archived)` : account.name,
-    }));
+  const suggestion = useQuery({
+    queryKey: ["suggestion", accountId, payee],
+    enabled: accountId.length > 0 && payee.trim().length > 0,
+    queryFn: async () => {
+      const params = new URLSearchParams({ accountId, payee });
+      const result = await apiRequest(`/api/suggestions?${params.toString()}`, suggestionSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
+    },
+  });
 
-  function changeAmount(text: string) {
-    setAmount(text);
-    if (linkAmount && lines.length === 1 && lines[0]) {
-      setLines([{ ...lines[0], amount: text }]);
+  const suggestionKey =
+    suggestion.data && suggestion.data.reason !== "none"
+      ? `${suggestion.data.transferAccountId ?? ""}|${suggestion.data.categoryId ?? ""}|${suggestion.data.merchantId ?? ""}`
+      : null;
+  const [seenSuggestion, setSeenSuggestion] = useState<string | null>(null);
+  if (!touched && suggestionKey && suggestionKey !== seenSuggestion && suggestion.data) {
+    setSeenSuggestion(suggestionKey);
+    if (suggestion.data.transferAccountId) {
+      setChoice("transfer");
+      setTransferAccountId(suggestion.data.transferAccountId);
+    } else if (suggestion.data.categoryId) {
+      setChoice("spending");
+      setCategoryId(suggestion.data.categoryId);
+    }
+    if (suggestion.data.merchantId) {
+      setMerchantId(suggestion.data.merchantId);
     }
   }
 
-  function changeLines(next: LineDraft[]) {
-    setLinkAmount(false);
-    setLines(next);
+  const accountName = accounts.find((item) => item.id === accountId)?.name ?? "Account";
+  const accountOptions = accounts
+    .filter((account) => account.archivedAt === null || account.id === accountId)
+    .map((account) => ({ id: account.id, label: account.archivedAt ? `${account.name} (archived)` : account.name }));
+  const transferOptions = accounts
+    .filter((account) => account.id !== accountId && (account.archivedAt === null || account.id === transferAccountId || lines.some((line) => line.transferAccountId === account.id)))
+    .map((account) => ({ id: account.id, label: account.archivedAt ? `${account.name} (archived)` : account.name }));
+  const merchantOptions = merchants.map((merchant) => ({ id: merchant.id, label: merchant.name }));
+  const totalMinor = (() => {
+    if (imported && transaction) {
+      return transaction.amount;
+    }
+    if (amount.trim().length === 0) {
+      return null;
+    }
+    try {
+      return signedAmount(direction, readPositive(currency, amount));
+    } catch {
+      return null;
+    }
+  })();
+  const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, direction, totalMinor, lines) : null;
+  const saveDisabled =
+    saving ||
+    accountId.length === 0 ||
+    totalMinor === null ||
+    (choice === "transfer" && !transferAccountId) ||
+    (choice === "split" && left !== 0);
+
+  function choose(next: WhatChoice) {
+    setTouched(true);
+    setChoice(next);
+    if (next === "split") {
+      setLines((current) =>
+        current.length > 1
+          ? current
+          : [
+              { key: crypto.randomUUID(), amount, categoryId, transferAccountId: null },
+              { key: crypto.randomUUID(), amount: "", categoryId: null, transferAccountId: null },
+            ],
+      );
+    }
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    const amountProblem = lineAmountError(currency, lines);
-    if (amountProblem) {
-      setError(amountProblem);
+    if (payee.trim().length === 0) {
+      setError("Enter the bank text.");
+      setMore(true);
       return;
     }
-    let body: unknown;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      setError("Choose a date.");
+      return;
+    }
+    if (totalMinor === null) {
+      setError("Enter a positive amount.");
+      return;
+    }
+    if (choice === "transfer" && !transferAccountId) {
+      setError("Choose the other account.");
+      return;
+    }
+    if (choice === "split" && left !== 0) {
+      setError("Assign the whole amount.");
+      return;
+    }
+    const memoAt = (index: number) => transaction?.lines[index]?.memo ?? null;
+    let built;
     try {
-      if (payee.trim().length === 0) {
-        setError("Enter a payee.");
-        return;
-      }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        setError("Choose a date.");
-        return;
-      }
-      body = {
-        accountId,
-        date,
-        amount: readAmount(currency, amount),
-        merchantId,
-        notes: notes.trim().length === 0 ? null : notes.trim(),
-        payeeRaw: payee,
-        status: transaction?.status === "reconciled" ? "open" : status,
-        lines: lines.map((line, index) => ({
-          amount: lineAmounts(currency, lines)[index],
-          memo: line.memo.trim().length === 0 ? null : line.memo.trim(),
-          categoryId: line.categoryId,
-          transferAccountId: line.transferAccountId,
-          tagIds: line.tagIds,
-        })),
-      };
+      built =
+        choice === "split"
+          ? lines.map((line, index) => ({
+              amount: signedAmount(direction, readPositive(currency, line.amount)),
+              memo: memoAt(index),
+              categoryId: line.categoryId,
+              transferAccountId: line.transferAccountId,
+              tagIds,
+            }))
+          : [
+              {
+                amount: totalMinor,
+                memo: memoAt(0),
+                categoryId: choice === "spending" ? categoryId : null,
+                transferAccountId: choice === "transfer" ? transferAccountId : null,
+                tagIds,
+              },
+            ];
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Check the transaction fields.");
       return;
     }
-
+    const body = {
+      accountId,
+      date,
+      amount: totalMinor,
+      merchantId,
+      notes: notes.trim().length === 0 ? null : notes.trim(),
+      payeeRaw: payee.trim(),
+      status: reconciled ? "open" : cleared ? "cleared" : "open",
+      lines: built,
+    };
     const parsed = (transaction ? transactionUpdateSchema : transactionCreateSchema).safeParse(body);
     if (!parsed.success) {
       setError("Check the transaction fields.");
       return;
     }
-    const lineTotal = parsed.data.lines.reduce((sum, line) => sum + line.amount, 0);
-    if (lineTotal !== parsed.data.amount) {
-      setError("The lines must add up to the amount.");
-      return;
-    }
-
     setSaving(true);
-    const result = await apiRequest(
-      transaction ? `/api/transactions/${transaction.id}` : "/api/transactions",
-      transactionSchema,
-      {
-        method: transaction ? "PATCH" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(parsed.data),
-      },
-    );
+    const result = await apiRequest(transaction ? `/api/transactions/${transaction.id}` : "/api/transactions", transactionSchema, {
+      method: transaction ? "PATCH" : "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsed.data),
+    });
     setSaving(false);
     if (!result.ok) {
       setError(transactionError(result.code));
@@ -202,14 +284,14 @@ export function TransactionForm({
     onSaved();
   }
 
+  const summary = `${formatDate(date)} · ${accountName} · ${direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(imported && transaction ? transaction.amount : (totalMinor ?? 0)))} · ${payee}`;
+
   return (
     <form onSubmit={(event) => void onSubmit(event)} className="grid gap-4">
       <DialogHeader>
         <DialogTitle>{transaction ? "Edit transaction" : "New transaction"}</DialogTitle>
         <DialogDescription>
-          {amountLocked
-            ? "This side follows the other account. Change the amount there."
-            : "Enter the payee, the amount and the lines."}
+          {amountLocked ? "This side follows the other account. Change the amount there." : "Say where the money went."}
         </DialogDescription>
       </DialogHeader>
       {rawLine ? (
@@ -218,105 +300,87 @@ export function TransactionForm({
           {rawLine}
         </p>
       ) : null}
-      {locked ? (
-        <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, notes, category, memo and tags can change.</p>
+      {reconciled ? (
+        <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, notes, category and tags can change.</p>
       ) : null}
-      <Field data-invalid={error !== null || undefined}>
-        <FieldLabel htmlFor="txn-account">Account</FieldLabel>
-        <OptionCombobox
-          id="txn-account"
-          value={accountId || null}
-          options={accountOptions}
-          placeholder="Choose an account"
-          disabled={locked || accounts.length === 0}
-          onChange={(id) => {
-            if (id) {
-              setAccountId(id);
+      {imported ? (
+        <p className="text-sm">{summary}</p>
+      ) : (
+        <MoneySection
+          direction={direction}
+          onDirection={setDirection}
+          amount={amount}
+          onAmount={setAmount}
+          moneyLocked={moneyLocked}
+          accountId={accountId}
+          accountOptions={accountOptions}
+          onAccount={(id) => {
+            setAccountId(id);
+            if (transferAccountId === id) {
+              setTransferAccountId(null);
             }
           }}
+          accountLocked={reconciled}
+          date={date}
+          onDate={setDate}
         />
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="txn-date">Date</FieldLabel>
-        <Input id="txn-date" type="date" value={date} disabled={locked} onChange={(event) => setDate(event.target.value)} required />
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="txn-payee">Payee</FieldLabel>
-        <Input id="txn-payee" value={payee} disabled={payeeLocked} onChange={(event) => setPayee(event.target.value)} />
-        {payeeLocked ? <FieldDescription>The bank text stays as it was imported.</FieldDescription> : null}
-        <SuggestionHint accountId={accountId} payee={payee} merchants={merchants} categories={categories} />
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="txn-amount">Amount</FieldLabel>
-        <Input
-          id="txn-amount"
-          inputMode="decimal"
-          value={amount}
-          disabled={locked || amountLocked}
-          onChange={(event) => changeAmount(event.target.value)}
-        />
-        <FieldDescription>Use a minus sign for money out. Example: -12.50</FieldDescription>
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="txn-merchant">Merchant</FieldLabel>
-        <OptionCombobox
-          id="txn-merchant"
-          value={merchantId}
-          options={merchants.map((merchant) => ({ id: merchant.id, label: merchant.name }))}
-          placeholder="No merchant"
-          emptyLabel="No merchant"
-          onChange={setMerchantId}
-        />
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="txn-notes">Notes</FieldLabel>
-        <Textarea id="txn-notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="txn-status">Status</FieldLabel>
-        {transaction?.status === "reconciled" ? (
-          <Input id="txn-status" value="Reconciled" disabled />
-        ) : (
-          <Select
-            value={status}
-            onValueChange={(value) => {
-              if (isStatus(value)) {
-                setStatus(value);
-              }
-            }}
-          >
-            <SelectTrigger id="txn-status" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="open">Open</SelectItem>
-              <SelectItem value="cleared">Cleared</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
-      </Field>
-      <LineEditor
-        currency={currency}
-        lines={lines}
-        categories={categories}
-        tags={tags}
-        transferOptions={transferOptions}
-        disabled={false}
-        amountLocked={locked || amountLocked}
+      )}
+      <WhatIsThis
+        idPrefix="txn"
+        direction={direction}
+        choice={choice}
+        onChoice={choose}
+        choiceLocked={reconciled || amountLocked}
+        categoryId={categoryId}
+        onCategoryId={(id) => {
+          setTouched(true);
+          setCategoryId(id);
+        }}
         categoryLocked={amountLocked}
-        onChange={changeLines}
+        allowEmptyCategory
+        transferAccountId={transferAccountId}
+        onTransferAccountId={(id) => {
+          setTouched(true);
+          setTransferAccountId(id);
+        }}
+        transferLocked={reconciled || amountLocked}
+        lines={lines}
+        onLines={setLines}
+        amountsLocked={reconciled || amountLocked}
+        currency={currency}
+        totalMinor={totalMinor}
+        categories={categories}
+        accounts={transferOptions}
+        merchants={merchantOptions}
+        merchantId={merchantId}
+        onMerchantId={(id) => {
+          setTouched(true);
+          setMerchantId(id);
+        }}
+        suggestion={suggestion.data ?? null}
+      />
+      <MoreDetails
+        open={more}
+        onOpenChange={setMore}
+        notes={notes}
+        onNotes={setNotes}
+        tags={tags}
+        tagIds={tagIds}
+        onTags={setTagIds}
+        payee={payee}
+        onPayee={setPayee}
+        payeeLocked={imported}
+        cleared={cleared}
+        onCleared={setCleared}
+        clearedLocked={reconciled}
       />
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
-        {transaction && !locked ? (
-          <Button type="button" variant="destructive" className="sm:mr-auto" onClick={onDelete}>
-            Delete
-          </Button>
-        ) : null}
+        {transaction && !reconciled ? <DeleteMenu transfer={transaction.transferPeerId !== null} onDelete={onDelete} /> : null}
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={saving || accountId.length === 0}>
+        <Button type="submit" disabled={saveDisabled}>
           {saving ? "Saving" : "Save"}
         </Button>
       </DialogFooter>

@@ -15,7 +15,7 @@ import { archiveMerchant, createMerchant } from "./merchants";
 import { createPlan } from "./recurring-plans";
 import { archiveRule, createRule, restoreRule } from "./rules";
 import { listPromotionCandidates, listTransferPairs, suggestForPayee } from "./suggestions";
-import { createTransaction } from "./transactions";
+import { createTransaction, getTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
 
@@ -235,6 +235,7 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
     expect(suggestForPayee(db, account.id, "TST*CAFE")).toEqual({
       merchantId: shop.id,
       categoryId: category.id,
+      transferAccountId: null,
       reason: "rule",
     });
 
@@ -265,6 +266,94 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
     expect(listTransferPairs(db, "2026-04-03").items).toEqual([
       { leftId: inId < outId ? inId : outId, rightId: inId < outId ? outId : inId },
     ]);
+  } finally {
+    close();
+  }
+});
+
+test("a transfer rule cannot also set a category", () => {
+  const { db, close } = tempDatabase();
+  try {
+    const visa = createAccount(db, {
+      name: "Visa",
+      institution: null,
+      kind: "savings",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      source: "ui",
+      at,
+    });
+    const coffee = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
+    expect(() =>
+      createRule(db, {
+        match: "exact",
+        pattern: "VISA PAYMENT",
+        categoryId: coffee.id,
+        transferAccountId: visa.id,
+        priority: 0,
+        source: "ui",
+        at,
+      }),
+    ).toThrow(ServiceError);
+  } finally {
+    close();
+  }
+});
+
+test("apply a transfer rule links the opposite row", () => {
+  const { db, close } = tempDatabase();
+  try {
+    const chequing = createAccount(db, {
+      name: "Chequing",
+      institution: null,
+      kind: "chequing",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      source: "ui",
+      at,
+    });
+    const visa = createAccount(db, {
+      name: "Visa",
+      institution: null,
+      kind: "savings",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      source: "ui",
+      at,
+    });
+    const payment = createTransaction(db, {
+      accountId: chequing.id,
+      date: "2026-05-01",
+      amount: -4_000,
+      payeeRaw: "VISA PAYMENT",
+      status: "open",
+      lines: [{ amount: -4_000 }],
+      source: "ui",
+      at,
+    });
+    const card = createTransaction(db, {
+      accountId: visa.id,
+      date: "2026-05-02",
+      amount: 4_000,
+      payeeRaw: "Payment thank you",
+      status: "open",
+      lines: [{ amount: 4_000 }],
+      source: "ui",
+      at,
+    });
+    const rule = createRule(db, {
+      match: "exact",
+      pattern: "VISA PAYMENT",
+      transferAccountId: visa.id,
+      priority: 1,
+      source: "ui",
+      at,
+    });
+    expect(suggestForPayee(db, chequing.id, "VISA PAYMENT").transferAccountId).toBe(visa.id);
+    applyRule(db, rule.id, { source: "ui", at });
+    expect(getTransaction(db, payment.id)?.transferPeerId).toBe(card.id);
+    expect(getTransaction(db, card.id)?.transferPeerId).toBe(payment.id);
+    expect(getTransaction(db, card.id)?.lines[0]?.transferAccountId).toBe(chequing.id);
   } finally {
     close();
   }

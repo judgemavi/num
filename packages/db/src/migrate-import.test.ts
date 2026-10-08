@@ -26,12 +26,10 @@ test("migration 0006 keeps a transaction linked to an import row", () => {
   const dir = mkdtempSync(join(tmpdir(), "num-import-migrate-"));
   const folder = join(dir, "migrations");
   cpSync(source, folder, { recursive: true });
-  rmSync(join(folder, "0006_account_import_fields.sql"));
-  rmSync(join(folder, "meta", "0006_snapshot.json"));
   const journal = JSON.parse(readFileSync(join(folder, "meta", "_journal.json"), "utf8")) as {
     entries: { tag: string }[];
   };
-  journal.entries = journal.entries.filter((entry) => entry.tag !== "0006_account_import_fields");
+  journal.entries = journal.entries.filter((entry) => entry.tag < "0006");
   writeFileSync(join(folder, "meta", "_journal.json"), JSON.stringify(journal, null, 2));
 
   const sqlite = openDatabase(join(dir, "num.sqlite"));

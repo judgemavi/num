@@ -1,7 +1,8 @@
 import { transactionLines, transactions } from "@num/db";
-import { eq } from "drizzle-orm";
+import { chooseTransferMatch } from "@num/shared";
+import { eq, sql } from "drizzle-orm";
 import { ServiceError } from "../service-error";
-import { replaceLines, type StoredLine } from "./transaction-lines";
+import { loadLines, replaceLines, type StoredLine } from "./transaction-lines";
 import { auditTransaction, readTransaction, toTransaction, type Header, type TxRow } from "./transaction-record";
 import { transferLine, type NormalizedLine } from "./transaction-rules";
 import type { WriteTx } from "./write";
@@ -44,6 +45,73 @@ export function insertMirror(
   ]);
   tx.update(transactions).set({ transferPeerId: id }).where(eq(transactions.id, sourceId)).run();
   auditTransaction(tx, id, "create", null, readTransaction(tx, id));
+}
+
+function linkMatch(tx: WriteTx, sourceId: string, sourceAccountId: string, matchId: string): void {
+  const match = tx.select().from(transactions).where(eq(transactions.id, matchId)).get();
+  if (!match || match.deletedAt || match.transferPeerId) {
+    throw new Error("Transfer match is missing");
+  }
+  const matchLines = loadLines(tx, matchId);
+  const before = toTransaction(match, matchLines);
+  const line = matchLines[0];
+  tx.update(transactions).set({ transferPeerId: matchId }).where(eq(transactions.id, sourceId)).run();
+  tx.update(transactions).set({ transferPeerId: sourceId }).where(eq(transactions.id, matchId)).run();
+  replaceLines(tx, matchId, [
+    {
+      amount: match.amount,
+      memo: line?.memo ?? null,
+      categoryId: null,
+      transferAccountId: sourceAccountId,
+      tagIds: line?.tagIds ?? [],
+    },
+  ]);
+  auditTransaction(tx, matchId, "update", before, readTransaction(tx, matchId));
+}
+
+function findTransferMatch(tx: WriteTx, input: { sourceId: string; targetAccountId: string; date: string; lineAmount: number }): string | null {
+  const rows = tx.all<{ id: string; date: string; amount: number; status: string; lineCount: number }>(sql`
+    select
+      t.id as id,
+      t.date as date,
+      t.amount as amount,
+      t.status as status,
+      (select count(*) from transaction_lines l where l.transaction_id = t.id) as lineCount
+    from transactions t
+    where t.deleted_at is null
+      and t.transfer_peer_id is null
+      and t.id <> ${input.sourceId}
+      and t.account_id = ${input.targetAccountId}
+      and t.amount = ${-input.lineAmount}
+  `);
+  return chooseTransferMatch(
+    rows.map((row) => ({
+      id: row.id,
+      date: row.date,
+      amount: row.amount,
+      lineCount: Number(row.lineCount),
+      reconciled: row.status === "reconciled",
+    })),
+    { date: input.date, lineAmount: input.lineAmount },
+  );
+}
+
+export function attachTransfer(tx: WriteTx, sourceId: string, header: Header, source: string, line: NormalizedLine): void {
+  const target = line.transferAccountId;
+  if (!target) {
+    throw new Error("Transfer line is missing");
+  }
+  const matchId = findTransferMatch(tx, {
+    sourceId,
+    targetAccountId: target,
+    date: header.date,
+    lineAmount: line.amount,
+  });
+  if (matchId) {
+    linkMatch(tx, sourceId, header.accountId, matchId);
+    return;
+  }
+  insertMirror(tx, sourceId, header, source, target, line);
 }
 
 function unlinkMirror(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: StoredLine[], at: string): void {
@@ -144,7 +212,7 @@ export function applySourceEdit(
   if (peer) {
     rewriteMirror(tx, existing, peer, peerLines, header, line);
   } else {
-    insertMirror(tx, existing.id, header, existing.source, line.transferAccountId, line);
+    attachTransfer(tx, existing.id, header, existing.source, line);
   }
   auditTransaction(tx, existing.id, "update", before, readTransaction(tx, existing.id));
 }

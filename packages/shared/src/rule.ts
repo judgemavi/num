@@ -24,11 +24,22 @@ const ruleFields = {
   accountId: z.uuid().nullable(),
   merchantId: z.uuid().nullable(),
   categoryId: z.uuid().nullable(),
+  transferAccountId: z.uuid().nullable(),
   priority: prioritySchema,
 };
 
-function hasTarget(value: { merchantId: string | null; categoryId: string | null }): boolean {
-  return value.merchantId !== null || value.categoryId !== null;
+export function ruleTargetsOk(value: {
+  merchantId?: string | null;
+  categoryId?: string | null;
+  transferAccountId?: string | null;
+}): boolean {
+  const merchantId = value.merchantId ?? null;
+  const categoryId = value.categoryId ?? null;
+  const transferAccountId = value.transferAccountId ?? null;
+  if (categoryId !== null && transferAccountId !== null) {
+    return false;
+  }
+  return merchantId !== null || categoryId !== null || transferAccountId !== null;
 }
 
 export const ruleSchema = z.object({
@@ -45,11 +56,12 @@ export const ruleCreateSchema = z
     accountId: z.uuid().nullable().optional(),
     merchantId: z.uuid().nullable().optional(),
     categoryId: z.uuid().nullable().optional(),
+    transferAccountId: z.uuid().nullable().optional(),
     priority: prioritySchema,
   })
-  .refine((value) => value.merchantId != null || value.categoryId != null);
+  .refine(ruleTargetsOk);
 
-export const ruleUpdateSchema = z.object(ruleFields).refine(hasTarget);
+export const ruleUpdateSchema = z.object(ruleFields).refine(ruleTargetsOk);
 
 export const ruleListQuerySchema = listQuerySchema(["priority", "pattern"]).extend(archivedQuery);
 export const ruleListSchema = pagedResponseSchema(ruleSchema);
@@ -79,6 +91,7 @@ export type RulePattern = {
   accountId: string | null;
   merchantId: string | null;
   categoryId: string | null;
+  transferAccountId: string | null;
   priority: number;
   archivedAt: string | null;
 };

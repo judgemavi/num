@@ -7,6 +7,7 @@ import {
   merchantListSchema,
   planListSchema,
   tagListSchema,
+  transactionSchema,
   type InboxItem,
   type Plan,
 } from "@num/shared";
@@ -43,6 +44,7 @@ export function InboxScreen() {
   const queryClient = useQueryClient();
   const [showDismissed, setShowDismissed] = useState(false);
   const [hand, setHand] = useState<Extract<InboxItem, { kind: "import_unreadable" }> | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [paycheckId, setPaycheckId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [ask, setAsk] = useState<ReasonAsk | null>(null);
@@ -98,7 +100,7 @@ export function InboxScreen() {
   });
   const tags = useQuery({
     queryKey: ["tags", "inbox"],
-    enabled: hand !== null,
+    enabled: hand !== null || editId !== null,
     queryFn: () => loadAllPages("/api/tags", tagListSchema, { archived: false, sort: "name", dir: "asc" }),
   });
   const buckets = useQuery({
@@ -200,8 +202,10 @@ export function InboxScreen() {
               currency={bookCurrency}
               asOf={asOf}
               accounts={accountNames}
+              accountList={accounts.data?.items ?? []}
               plans={planRows}
               merchants={merchantNames}
+              merchantList={merchants.data?.items ?? []}
               categories={categoryRows}
               buckets={bucketRows}
               onSkip={(planId, dueDate) => {
@@ -213,6 +217,7 @@ export function InboxScreen() {
                 setAsk({ mode: "dismiss", itemKey });
               }}
               onAddByHand={(item) => setHand(item)}
+              onOpenTransaction={(transactionId) => setEditId(transactionId)}
               onFundPaycheck={(incomeTransactionId) => setPaycheckId(incomeTransactionId)}
               unassigned={position.data?.unassigned ?? 0}
               onRestore={(itemKey) => {
@@ -268,6 +273,31 @@ export function InboxScreen() {
           ) : null}
         </DialogContent>
       </Dialog>
+      {editId && tags.isSuccess ? (
+        <TransactionDialog
+          draft={editId}
+          currency={bookCurrency}
+          accounts={accounts.data?.items ?? []}
+          categories={categoryRows}
+          tags={tags.data.items}
+          merchants={merchants.data?.items ?? []}
+          onClose={() => setEditId(null)}
+          onSaved={() => {
+            setEditId(null);
+            refresh();
+          }}
+          onDelete={(transaction) => {
+            void apiRequest(`/api/transactions/${transaction.id}`, transactionSchema, { method: "DELETE" }).then((result) => {
+              if (!result.ok) {
+                setActionError(inboxError(result.code));
+                return;
+              }
+              setEditId(null);
+              refresh();
+            });
+          }}
+        />
+      ) : null}
       {hand && tags.isSuccess ? (
         <TransactionDialog
           draft="new"

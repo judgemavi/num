@@ -67,7 +67,11 @@ export function ruleError(code: string): string {
     case "rule_pattern_invalid":
       return "Enter a pattern.";
     case "rule_target_required":
-      return "Choose a merchant, a category, or both.";
+      return "Choose a merchant, a category, a transfer account, or a merchant with one of the others.";
+    case "rule_targets_conflict":
+      return "A rule cannot have a category and a transfer.";
+    case "transfer_same_account":
+      return "A transfer must go to a different account.";
     case "rule_not_found":
       return "That rule is not in the book.";
     case "rule_archived":

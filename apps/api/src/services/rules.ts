@@ -28,6 +28,7 @@ export type RuleInput = {
   accountId?: string | null;
   merchantId?: string | null;
   categoryId?: string | null;
+  transferAccountId?: string | null;
   priority: number;
   origin?: RuleOrigin;
 };
@@ -48,6 +49,7 @@ function snapshot(row: {
   accountId: string | null;
   merchantId: string | null;
   categoryId: string | null;
+  transferAccountId: string | null;
   priority: number;
   origin: string;
   archivedAt: string | null;
@@ -58,6 +60,7 @@ function snapshot(row: {
     accountId: row.accountId,
     merchantId: row.merchantId,
     categoryId: row.categoryId,
+    transferAccountId: row.transferAccountId,
     priority: row.priority,
     origin: row.origin,
     archivedAt: row.archivedAt,
@@ -86,6 +89,7 @@ export function toRule(row: RuleRow): Rule {
     accountId: row.accountId,
     merchantId: row.merchantId,
     categoryId: row.categoryId,
+    transferAccountId: row.transferAccountId,
     priority: row.priority,
     origin: asOrigin(row.origin),
     archivedAt: row.archivedAt,
@@ -124,9 +128,20 @@ function assertMerchant(tx: WriteTx, id: string | null) {
   }
 }
 
-function assertTarget(merchantId: string | null, categoryId: string | null) {
-  if (merchantId === null && categoryId === null) {
+function assertTarget(
+  merchantId: string | null,
+  categoryId: string | null,
+  transferAccountId: string | null,
+  accountId: string | null,
+) {
+  if (categoryId !== null && transferAccountId !== null) {
+    throw new ServiceError("rule_targets_conflict", 400);
+  }
+  if (merchantId === null && categoryId === null && transferAccountId === null) {
     throw new ServiceError("rule_target_required", 400);
+  }
+  if (transferAccountId !== null && accountId !== null && transferAccountId === accountId) {
+    throw new ServiceError("transfer_same_account", 400);
   }
 }
 
@@ -161,14 +176,17 @@ export function listRules(db: Db, query: RuleListQuery) {
 function fields(input: RuleInput, origin: RuleOrigin, archivedAt: string | null) {
   const merchantId = input.merchantId ?? null;
   const categoryId = input.categoryId ?? null;
-  assertTarget(merchantId, categoryId);
+  const transferAccountId = input.transferAccountId ?? null;
+  const accountId = input.accountId ?? null;
+  assertTarget(merchantId, categoryId, transferAccountId, accountId);
   assertPattern(input.match, input.pattern);
   return {
     match: input.match,
     pattern: input.pattern.trim(),
-    accountId: input.accountId ?? null,
+    accountId,
     merchantId,
     categoryId,
+    transferAccountId,
     priority: input.priority,
     origin,
     archivedAt,
@@ -180,6 +198,7 @@ export function createRule(db: Db, input: RuleCreate & WriteInput & { origin?: R
   const row = { id, ...fields(input, input.origin ?? "manual", null) };
   write(db, { source: input.source, at: input.at }, (tx) => {
     assertAccount(tx, row.accountId);
+    assertAccount(tx, row.transferAccountId);
     assertMerchant(tx, row.merchantId);
     assertActiveCategory(tx, row.categoryId);
     tx.insert(rules).values(row).run();
@@ -197,6 +216,7 @@ export function updateRule(db: Db, id: string, input: RuleUpdate & WriteInput): 
     }
     const next = fields({ ...input, origin: asOrigin(existing.origin) }, asOrigin(existing.origin), existing.archivedAt);
     assertAccount(tx, next.accountId);
+    assertAccount(tx, next.transferAccountId);
     assertMerchant(tx, next.merchantId);
     assertActiveCategory(tx, next.categoryId);
     tx.update(rules)
@@ -206,6 +226,7 @@ export function updateRule(db: Db, id: string, input: RuleUpdate & WriteInput): 
         accountId: next.accountId,
         merchantId: next.merchantId,
         categoryId: next.categoryId,
+        transferAccountId: next.transferAccountId,
         priority: next.priority,
       })
       .where(eq(rules.id, id))
