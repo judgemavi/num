@@ -108,7 +108,7 @@ export function WhatIsThis({
   suggestion,
 }: WhatIsThisProps) {
   const transferLabel = direction === "out" ? "To account" : "From account";
-  const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, direction, totalMinor, lines) : choice === "split" ? null : 0;
+  const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, lines) : choice === "split" ? null : 0;
   const hint = suggestion ? suggestionText(suggestion, merchants, categories, accounts) : null;
 
   function updateLine(key: string, patch: Partial<SplitLine>) {
@@ -166,7 +166,24 @@ export function WhatIsThis({
       {choice === "split" ? (
         <div className="grid gap-3">
           {lines.map((line, index) => (
-            <div key={line.key} className="grid gap-3 sm:grid-cols-[8rem_1fr_1fr]">
+            <div key={line.key} className="grid gap-3 sm:grid-cols-[auto_8rem_1fr_1fr]">
+              <Field>
+                <FieldLabel>Line {index + 1}</FieldLabel>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  value={line.direction}
+                  disabled={amountsLocked}
+                  onValueChange={(value) => {
+                    if (value === "out" || value === "in") {
+                      updateLine(line.key, { direction: value });
+                    }
+                  }}
+                >
+                  <ToggleGroupItem value="out">Money out</ToggleGroupItem>
+                  <ToggleGroupItem value="in">Money in</ToggleGroupItem>
+                </ToggleGroup>
+              </Field>
               <Field>
                 <FieldLabel htmlFor={`${idPrefix}-line-${index}-amount`}>Amount</FieldLabel>
                 <Input
@@ -182,7 +199,7 @@ export function WhatIsThis({
                 <OptionCombobox
                   id={`${idPrefix}-line-${index}-category`}
                   value={line.categoryId}
-                  options={categoryOptions(categories, direction, line.categoryId)}
+                  options={categoryOptions(categories, line.direction, line.categoryId)}
                   placeholder="Category"
                   emptyLabel="No category"
                   disabled={categoryLocked}
@@ -202,7 +219,7 @@ export function WhatIsThis({
                 />
               </Field>
               {lines.length > 1 && !amountsLocked ? (
-                <Button type="button" variant="outline" className="sm:col-span-3" onClick={() => onLines(lines.filter((item) => item.key !== line.key))}>
+                <Button type="button" variant="outline" className="sm:col-span-4" onClick={() => onLines(lines.filter((item) => item.key !== line.key))}>
                   Remove line
                 </Button>
               ) : null}
@@ -213,7 +230,7 @@ export function WhatIsThis({
               type="button"
               variant="outline"
               onClick={() =>
-                onLines([...lines, { key: crypto.randomUUID(), amount: "", categoryId: null, transferAccountId: null }])
+                onLines([...lines, { key: crypto.randomUUID(), amount: "", direction, categoryId: null, transferAccountId: null }])
               }
             >
               Add a line

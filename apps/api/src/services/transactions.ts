@@ -159,6 +159,7 @@ export function createTransaction(db: Db, input: TransactionBody & WriteInput): 
         source,
         importRowId: null,
         transferPeerId: null,
+        mirror: false,
         deletedAt: null,
       })
       .run();
@@ -193,7 +194,7 @@ export function updateTransaction(db: Db, id: string, input: TransactionBody & W
     assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
     const savedHeader = existing.status === "reconciled" ? { ...header, status: "reconciled" as const } : header;
     if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {
-      applyMirrorEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines);
+      applyMirrorEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at);
     } else {
       applySourceEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at);
     }
@@ -217,10 +218,26 @@ export function deleteTransaction(db: Db, id: string, input: WriteInput): Transa
     const before = toTransaction(existing, existingLines);
     tx.update(transactions).set({ deletedAt: at }).where(eq(transactions.id, existing.id)).run();
     auditTransaction(tx, existing.id, "delete", before, readTransaction(tx, existing.id));
-    if (peer) {
+    if (peer?.mirror) {
       const peerBefore = toTransaction(peer, peerLines);
       tx.update(transactions).set({ deletedAt: at }).where(eq(transactions.id, peer.id)).run();
       auditTransaction(tx, peer.id, "delete", peerBefore, readTransaction(tx, peer.id));
+    } else if (peer) {
+      const peerBefore = toTransaction(peer, peerLines);
+      tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, existing.id)).run();
+      tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, peer.id)).run();
+      replaceLines(
+        tx,
+        peer.id,
+        peerLines.map((line) => ({
+          amount: line.amount,
+          memo: line.memo,
+          categoryId: line.transferAccountId ? null : line.categoryId,
+          transferAccountId: null,
+          tagIds: line.tagIds,
+        })),
+      );
+      auditTransaction(tx, peer.id, "update", peerBefore, readTransaction(tx, peer.id));
     }
     deleted = readTransaction(tx, existing.id);
   });

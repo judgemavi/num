@@ -175,7 +175,7 @@ export function InboxItemRow({
     primary = {
       label: "Create the rule",
       disabled: false,
-      run: () => void run(() => promoteRule(item.payee, item.merchantId, item.categoryId)),
+      run: () => void run(() => promoteRule(item.payee, item.merchantId, item.categoryId, item.transferAccountId)),
     };
   } else if (item.kind === "import_unreadable") {
     primary = { label: "Add by hand", disabled: false, run: () => onAddByHand(item) };

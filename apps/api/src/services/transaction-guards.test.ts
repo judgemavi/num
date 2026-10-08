@@ -96,11 +96,14 @@ test("a mirror amount change is rejected when the source has more than one line"
     expect(edited.amount).toBe(120_000);
     expect(edited.date).toBe("2026-04-02");
     expect(edited.notes).toBe("Principal");
+    expect(edited.transferPeerId).toBeNull();
     const source = getTransaction(book.db, created.id);
     expect(source?.amount).toBe(-150_000);
-    expect(source?.date).toBe("2026-04-02");
+    expect(source?.date).toBe("2026-04-01");
     expect(source?.notes).toBeNull();
+    expect(source?.transferPeerId).toBeNull();
     expect(source?.lines.map((line) => line.amount)).toEqual([-120_000, -30_000]);
+    expect(source?.lines[0]?.transferAccountId).toBeNull();
 
     const corrected = updateTransaction(
       book.db,
@@ -117,7 +120,9 @@ test("a mirror amount change is rejected when the source has more than one line"
     );
     expect(corrected.amount).toBe(-130_000);
     expect(corrected.status).toBe("cleared");
-    const nextMirror = getTransaction(book.db, mirror.id);
+    const nextMirror = getTransaction(book.db, corrected.transferPeerId ?? "");
+    expect(nextMirror?.id).not.toBe(mirror.id);
+    expect(nextMirror?.mirror).toBe(true);
     expect(nextMirror?.amount).toBe(100_000);
     expect(nextMirror?.status).toBe("open");
     expect(nextMirror?.lines).toHaveLength(1);

@@ -206,11 +206,12 @@ function promotionItems(db: Db): InboxItem[] {
     const digest = createHash("sha256").update(item.payee).digest("hex").slice(0, 32);
     return {
       kind: "promote_rule" as const,
-      itemKey: `promote_rule:${item.merchantId}:${item.categoryId}:${digest}`,
+      itemKey: `promote_rule:${item.merchantId}:${item.categoryId ?? item.transferAccountId}:${digest}`,
       date: null,
       payee: item.payee,
       merchantId: item.merchantId,
       categoryId: item.categoryId,
+      transferAccountId: item.transferAccountId,
       count: item.count,
     };
   });

@@ -32,4 +32,15 @@ CREATE TABLE `__new_rules` (
 INSERT INTO `__new_rules`("id", "match", "pattern", "account_id", "merchant_id", "category_id", "transfer_account_id", "priority", "origin", "archived_at") SELECT "id", "match", "pattern", "account_id", "merchant_id", "category_id", null, "priority", "origin", "archived_at" FROM `rules`;--> statement-breakpoint
 DROP TABLE `rules`;--> statement-breakpoint
 ALTER TABLE `__new_rules` RENAME TO `rules`;--> statement-breakpoint
+ALTER TABLE `transactions` ADD `mirror` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+UPDATE `transactions` SET `mirror` = 1
+WHERE `import_row_id` IS NULL
+  AND `transfer_peer_id` IS NOT NULL
+  AND (SELECT count(*) FROM `transaction_lines` WHERE `transaction_id` = `transactions`.`id`) = 1
+  AND (SELECT count(*) FROM `transaction_lines` WHERE `transaction_id` = `transactions`.`id` AND `transfer_account_id` IS NOT NULL) = 1
+  AND EXISTS (
+    SELECT 1 FROM `transactions` AS `peer`
+    WHERE `peer`.`id` = `transactions`.`transfer_peer_id`
+      AND `peer`.`import_row_id` IS NOT NULL
+  );--> statement-breakpoint
 PRAGMA foreign_keys=ON;

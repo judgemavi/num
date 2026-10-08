@@ -108,7 +108,8 @@ export const inboxItemSchema = z.discriminatedUnion("kind", [
     date: isoDateSchema.nullable(),
     payee: z.string(),
     merchantId: z.uuid(),
-    categoryId: z.uuid(),
+    categoryId: z.uuid().nullable(),
+    transferAccountId: z.uuid().nullable(),
     count: z.number().int(),
   }),
   z.object({

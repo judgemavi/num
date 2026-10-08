@@ -123,8 +123,13 @@ export function acceptPair(asOf: string, leftId: string, rightId: string) {
   return apiRequest(`/api/transfer-pairs?asOf=${asOf}`, transferPairSchema, json({ leftId, rightId }));
 }
 
-export function promoteRule(payee: string, merchantId: string, categoryId: string) {
-  return apiRequest("/api/promotions", ruleSchema, json({ payee, merchantId, categoryId }));
+export function promoteRule(
+  payee: string,
+  merchantId: string,
+  categoryId: string | null,
+  transferAccountId: string | null,
+) {
+  return apiRequest("/api/promotions", ruleSchema, json({ payee, merchantId, categoryId, transferAccountId }));
 }
 
 export function coverOverspent(bucketId: string, fromBucketId: string, date: string) {

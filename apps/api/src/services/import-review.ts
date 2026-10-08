@@ -30,7 +30,7 @@ function requireReview(tx: WriteTx, id: string) {
 }
 
 function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>, suggestion: Suggestion): string {
-  const apply = suggestion.reason === "none" ? null : suggestion;
+  const apply = suggestion.reason !== "none" && suggestion.transferAccountId === null ? suggestion : null;
   const transactionId = crypto.randomUUID();
   const payee = storedPayee(row.payeeRaw);
   tx.insert(transactions)
@@ -47,6 +47,7 @@ function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>, su
       source: "import",
       importRowId: row.id,
       transferPeerId: null,
+      mirror: false,
       deletedAt: null,
     })
     .run();

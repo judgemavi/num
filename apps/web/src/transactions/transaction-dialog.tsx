@@ -93,6 +93,13 @@ export function TransactionDialog({
             initialAccountId={initialAccountId}
             onClose={onClose}
             onSaved={onSaved}
+            deleteKind={
+              transaction.data?.transferPeerId
+                ? peer.data?.mirror
+                  ? "mirror"
+                  : "linked"
+                : "plain"
+            }
             onDelete={() => {
               if (transaction.data) {
                 onDelete(transaction.data);

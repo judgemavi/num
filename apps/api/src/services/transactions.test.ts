@@ -378,3 +378,101 @@ test("a transfer links an opposite row within 3 days and mirrors when none match
     book.close();
   }
 });
+
+test("changing a linked transfer to a category keeps the other row", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db, "Chequing", "chequing");
+    const visa = account(book.db, "Visa", "savings");
+    const food = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
+    const card = createTransaction(book.db, entry(visa.id, 5_000, [{ amount: 5_000 }], "2026-04-02"));
+    const payment = createTransaction(
+      book.db,
+      entry(chequing.id, -5_000, [{ amount: -5_000, transferAccountId: visa.id }], "2026-04-01"),
+    );
+    expect(payment.transferPeerId).toBe(card.id);
+    expect(payment.mirror).toBe(false);
+    expect(getTransaction(book.db, card.id)?.mirror).toBe(false);
+    const edited = updateTransaction(
+      book.db,
+      payment.id,
+      entry(chequing.id, -5_000, [{ amount: -5_000, categoryId: food.id }], "2026-04-01"),
+    );
+    expect(edited.transferPeerId).toBeNull();
+    const peer = getTransaction(book.db, card.id);
+    expect(peer?.deletedAt).toBeNull();
+    expect(peer?.transferPeerId).toBeNull();
+    expect(peer?.amount).toBe(5_000);
+    expect(peer?.lines[0]?.categoryId).toBeNull();
+    expect(peer?.lines[0]?.transferAccountId).toBeNull();
+  } finally {
+    book.close();
+  }
+});
+
+test("deleting one side of a linked pair keeps the other", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db, "Chequing", "chequing");
+    const visa = account(book.db, "Visa", "savings");
+    const card = createTransaction(book.db, entry(visa.id, 5_000, [{ amount: 5_000 }], "2026-04-02"));
+    const payment = createTransaction(
+      book.db,
+      entry(chequing.id, -5_000, [{ amount: -5_000, transferAccountId: visa.id }], "2026-04-01"),
+    );
+    deleteTransaction(book.db, payment.id, saved);
+    const peer = getTransaction(book.db, card.id);
+    expect(peer?.deletedAt).toBeNull();
+    expect(peer?.amount).toBe(5_000);
+    expect(peer?.transferPeerId).toBeNull();
+    expect(getTransaction(book.db, payment.id)?.deletedAt).not.toBeNull();
+  } finally {
+    book.close();
+  }
+});
+
+test("removing a transfer deletes the mirror and keeps a linked row", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db, "Chequing", "chequing");
+    const savings = account(book.db, "Savings", "savings");
+    const food = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
+    const created = createTransaction(
+      book.db,
+      entry(chequing.id, -3_000, [{ amount: -3_000, transferAccountId: savings.id }]),
+    );
+    const mirrorId = created.transferPeerId;
+    if (!mirrorId) {
+      throw new Error("Mirror is missing");
+    }
+    expect(getTransaction(book.db, mirrorId)?.mirror).toBe(true);
+    updateTransaction(book.db, created.id, entry(chequing.id, -3_000, [{ amount: -3_000, categoryId: food.id }]));
+    expect(getTransaction(book.db, mirrorId)?.deletedAt).not.toBeNull();
+  } finally {
+    book.close();
+  }
+});
+
+test("updateTransaction links an existing opposite row", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db, "Chequing", "chequing");
+    const visa = account(book.db, "Visa", "savings");
+    const card = createTransaction(book.db, entry(visa.id, 5_000, [{ amount: 5_000 }], "2026-04-02"));
+    const payment = createTransaction(book.db, entry(chequing.id, -5_000, [{ amount: -5_000 }], "2026-04-01"));
+    const edited = updateTransaction(
+      book.db,
+      payment.id,
+      entry(chequing.id, -5_000, [{ amount: -5_000, transferAccountId: visa.id }], "2026-04-01"),
+    );
+    expect(edited.transferPeerId).toBe(card.id);
+    expect(edited.mirror).toBe(false);
+    const peer = getTransaction(book.db, card.id);
+    expect(peer?.mirror).toBe(false);
+    expect(peer?.transferPeerId).toBe(payment.id);
+    expect(peer?.deletedAt).toBeNull();
+    expect(book.sqlite.query("select count(*) as n from transactions where deleted_at is null").get()).toEqual({ n: 2 });
+  } finally {
+    book.close();
+  }
+});

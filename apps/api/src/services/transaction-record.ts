@@ -87,6 +87,7 @@ export function toTransaction(row: TxRow, lines: StoredLine[]): Transaction {
     source: asSource(row.source),
     importRowId: row.importRowId,
     transferPeerId: row.transferPeerId,
+    mirror: row.mirror,
     deletedAt: row.deletedAt,
     lines,
   };
@@ -105,6 +106,7 @@ function snapshot(record: Transaction) {
     source: record.source,
     importRowId: record.importRowId,
     transferPeerId: record.transferPeerId,
+    mirror: record.mirror,
     deletedAt: record.deletedAt,
     lines: record.lines.map((line) => ({
       id: line.id,

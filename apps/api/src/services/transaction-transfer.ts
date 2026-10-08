@@ -31,6 +31,7 @@ export function insertMirror(
       source,
       importRowId: null,
       transferPeerId: sourceId,
+      mirror: true,
       deletedAt: null,
     })
     .run();
@@ -114,14 +115,30 @@ export function attachTransfer(tx: WriteTx, sourceId: string, header: Header, so
   insertMirror(tx, sourceId, header, source, target, line);
 }
 
-function unlinkMirror(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: StoredLine[], at: string): void {
+function releasePeer(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: StoredLine[], at: string): void {
   const before = toTransaction(peer, peerLines);
   tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, sourceId)).run();
-  tx.update(transactions)
-    .set({ transferPeerId: null, deletedAt: at })
-    .where(eq(transactions.id, peer.id))
-    .run();
-  auditTransaction(tx, peer.id, "delete", before, readTransaction(tx, peer.id));
+  if (peer.mirror) {
+    tx.update(transactions)
+      .set({ transferPeerId: null, deletedAt: at })
+      .where(eq(transactions.id, peer.id))
+      .run();
+    auditTransaction(tx, peer.id, "delete", before, readTransaction(tx, peer.id));
+    return;
+  }
+  tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, peer.id)).run();
+  replaceLines(
+    tx,
+    peer.id,
+    peerLines.map((line) => ({
+      amount: line.amount,
+      memo: line.memo,
+      categoryId: line.transferAccountId ? null : line.categoryId,
+      transferAccountId: null,
+      tagIds: line.tagIds,
+    })),
+  );
+  auditTransaction(tx, peer.id, "update", before, readTransaction(tx, peer.id));
 }
 
 function rewriteMirror(
@@ -163,6 +180,7 @@ export function applyMirrorEdit(
   peerLines: StoredLine[],
   header: Header,
   lines: NormalizedLine[],
+  at: string,
 ): void {
   const line = lines[0];
   if (lines.length !== 1 || !line || line.transferAccountId !== peer.accountId) {
@@ -177,15 +195,20 @@ export function applyMirrorEdit(
   }
   const before = toTransaction(existing, existingLines);
   const peerBefore = toTransaction(peer, peerLines);
+  const moneyChanged = header.date !== existing.date || header.accountId !== existing.accountId;
   tx.update(transactions).set(header).where(eq(transactions.id, existing.id)).run();
   replaceLines(tx, existing.id, lines);
-  tx.update(transactions).set({ date: header.date }).where(eq(transactions.id, peer.id)).run();
-  tx.update(transactionLines)
-    .set({ transferAccountId: header.accountId })
-    .where(eq(transactionLines.id, sourceLine.id))
-    .run();
+  if (peer.mirror) {
+    tx.update(transactions).set({ date: header.date }).where(eq(transactions.id, peer.id)).run();
+    tx.update(transactionLines)
+      .set({ transferAccountId: header.accountId })
+      .where(eq(transactionLines.id, sourceLine.id))
+      .run();
+    auditTransaction(tx, peer.id, "update", peerBefore, readTransaction(tx, peer.id));
+  } else if (moneyChanged) {
+    releasePeer(tx, existing.id, peer, peerLines, at);
+  }
   auditTransaction(tx, existing.id, "update", before, readTransaction(tx, existing.id));
-  auditTransaction(tx, peer.id, "update", peerBefore, readTransaction(tx, peer.id));
 }
 
 export function applySourceEdit(
@@ -204,14 +227,23 @@ export function applySourceEdit(
   const line = transferLine(lines);
   if (!line?.transferAccountId) {
     if (peer) {
-      unlinkMirror(tx, existing.id, peer, peerLines, at);
+      releasePeer(tx, existing.id, peer, peerLines, at);
     }
     auditTransaction(tx, existing.id, "update", before, readTransaction(tx, existing.id));
     return;
   }
-  if (peer) {
+  const previousTarget = existingLines.find((item) => item.transferAccountId)?.transferAccountId ?? null;
+  const moneyChanged =
+    header.date !== existing.date ||
+    header.amount !== existing.amount ||
+    header.accountId !== existing.accountId ||
+    line.transferAccountId !== previousTarget;
+  if (peer?.mirror) {
     rewriteMirror(tx, existing, peer, peerLines, header, line);
-  } else {
+  } else if (peer && moneyChanged) {
+    releasePeer(tx, existing.id, peer, peerLines, at);
+    attachTransfer(tx, existing.id, header, existing.source, line);
+  } else if (!peer) {
     attachTransfer(tx, existing.id, header, existing.source, line);
   }
   auditTransaction(tx, existing.id, "update", before, readTransaction(tx, existing.id));

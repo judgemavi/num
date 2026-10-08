@@ -14,7 +14,7 @@ import { applyRule, previewRuleApply } from "./rule-apply";
 import { archiveMerchant, createMerchant } from "./merchants";
 import { createPlan } from "./recurring-plans";
 import { archiveRule, createRule, restoreRule } from "./rules";
-import { listPromotionCandidates, listTransferPairs, suggestForPayee } from "./suggestions";
+import { listPromotionCandidates, listTransferPairs, promotePayee, suggestForPayee } from "./suggestions";
 import { createTransaction, getTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
@@ -217,7 +217,7 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
       db.insert(transactionLines).values({ id: crypto.randomUUID(), transactionId: id, amount: -400, categoryId: category.id }).run();
     }
     expect(listPromotionCandidates(db).items).toEqual([
-      { payee: "CAFE", merchantId: shop.id, categoryId: category.id, count: 3 },
+      { payee: "CAFE", merchantId: shop.id, categoryId: category.id, transferAccountId: null, count: 3 },
     ]);
     db.insert(settings).values({ key: "promoteAfter", value: "4" }).run();
     expect(listPromotionCandidates(db).items).toEqual([]);
@@ -354,6 +354,64 @@ test("apply a transfer rule links the opposite row", () => {
     expect(getTransaction(db, payment.id)?.transferPeerId).toBe(card.id);
     expect(getTransaction(db, card.id)?.transferPeerId).toBe(payment.id);
     expect(getTransaction(db, card.id)?.lines[0]?.transferAccountId).toBe(chequing.id);
+  } finally {
+    close();
+  }
+});
+
+test("promote counts transfers and creates a transfer rule", () => {
+  const { db, close } = tempDatabase();
+  try {
+    const chequing = createAccount(db, {
+      name: "Chequing",
+      institution: null,
+      kind: "chequing",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      source: "ui",
+      at,
+    });
+    const visa = createAccount(db, {
+      name: "Visa",
+      institution: null,
+      kind: "savings",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      source: "ui",
+      at,
+    });
+    const shop = createMerchant(db, { name: "Visa payment", source: "ui", at });
+    for (let day = 1; day <= 3; day += 1) {
+      createTransaction(db, {
+        accountId: chequing.id,
+        date: `2026-06-0${day}`,
+        amount: -4_000,
+        payeeRaw: "VISA PAYMENT",
+        merchantId: shop.id,
+        status: "open",
+        lines: [{ amount: -4_000, transferAccountId: visa.id }],
+        source: "ui",
+        at,
+      });
+    }
+    const ready = listPromotionCandidates(db).items.find((item) => item.transferAccountId === visa.id);
+    expect(ready).toMatchObject({
+      payee: "VISA PAYMENT",
+      merchantId: shop.id,
+      categoryId: null,
+      transferAccountId: visa.id,
+      count: 3,
+    });
+    const rule = promotePayee(db, {
+      payee: "VISA PAYMENT",
+      merchantId: shop.id,
+      transferAccountId: visa.id,
+      source: "ui",
+      at,
+    });
+    expect(rule.transferAccountId).toBe(visa.id);
+    expect(rule.categoryId).toBeNull();
+    expect(rule.origin).toBe("promoted");
   } finally {
     close();
   }

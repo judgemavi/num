@@ -36,6 +36,7 @@ export const transactions = sqliteTable(
     transferPeerId: text("transfer_peer_id")
       .unique()
       .references((): AnySQLiteColumn => transactions.id),
+    mirror: integer("mirror", { mode: "boolean" }).notNull().default(false),
     deletedAt: text("deleted_at"),
   },
   (table) => [

@@ -87,12 +87,12 @@ function promotionCounts(db: Db, minimum: number): Promotion[] {
   const payees = db.all<{ payee: string }>(sql`
     select distinct payee_normalized as payee
     from transactions
-    where deleted_at is null and merchant_id is not null and payee_normalized != ''
+    where deleted_at is null and mirror = 0 and merchant_id is not null and payee_normalized != ''
   `);
   const recent = (db as unknown as { $client: { prepare(query: string): { all(value: string): { id: string; merchantId: string }[] } } }).$client.prepare(`
     select id, merchant_id as merchantId
     from transactions
-    where deleted_at is null and payee_normalized = ? and merchant_id is not null
+    where deleted_at is null and mirror = 0 and payee_normalized = ? and merchant_id is not null
     order by date desc, id desc
     limit 20
   `);
@@ -105,7 +105,7 @@ function promotionCounts(db: Db, minimum: number): Promotion[] {
       heads.push({ ...head, payee: row.payee });
     }
   }
-  const lines = new Map<string, (string | null)[]>();
+  const lines = new Map<string, { categoryId: string | null; transferAccountId: string | null }[]>();
   for (let index = 0; index < heads.length; index += 400) {
     const group = heads.slice(index, index + 400);
     if (group.length === 0) {
@@ -115,14 +115,14 @@ function promotionCounts(db: Db, minimum: number): Promotion[] {
       group.map((head) => sql`${head.id}`),
       sql`, `,
     );
-    const found = db.all<{ transactionId: string; categoryId: string | null }>(sql`
-      select transaction_id as transactionId, category_id as categoryId
+    const found = db.all<{ transactionId: string; categoryId: string | null; transferAccountId: string | null }>(sql`
+      select transaction_id as transactionId, category_id as categoryId, transfer_account_id as transferAccountId
       from transaction_lines
       where transaction_id in (${list})
     `);
     for (const line of found) {
       const current = lines.get(line.transactionId) ?? [];
-      current.push(line.categoryId);
+      current.push({ categoryId: line.categoryId, transferAccountId: line.transferAccountId });
       lines.set(line.transactionId, current);
     }
   }
@@ -135,21 +135,21 @@ function promotionCounts(db: Db, minimum: number): Promotion[] {
       continue;
     }
     seen.add(head.id);
-    const categories = new Set((lines.get(head.id) ?? []).filter((id): id is string => id !== null));
-    if (categories.size !== 1) {
-      continue;
-    }
-    const categoryId = [...categories][0];
-    if (!categoryId) {
+    const rowLines = lines.get(head.id) ?? [];
+    const categories = new Set(rowLines.map((line) => line.categoryId).filter((id): id is string => id !== null));
+    const transfers = new Set(rowLines.map((line) => line.transferAccountId).filter((id): id is string => id !== null));
+    const categoryId = categories.size === 1 && transfers.size === 0 ? ([...categories][0] ?? null) : null;
+    const transferAccountId = transfers.size === 1 && categories.size === 0 ? ([...transfers][0] ?? null) : null;
+    if ((categoryId === null) === (transferAccountId === null)) {
       continue;
     }
     kept.set(head.payee, count + 1);
-    const key = `${head.payee}\u0000${head.merchantId}\u0000${categoryId}`;
+    const key = `${head.payee}\u0000${head.merchantId}\u0000${categoryId ?? ""}\u0000${transferAccountId ?? ""}`;
     const current = counts.get(key);
     if (current) {
       current.count += 1;
     } else {
-      counts.set(key, { payee: head.payee, merchantId: head.merchantId, categoryId, count: 1 });
+      counts.set(key, { payee: head.payee, merchantId: head.merchantId, categoryId, transferAccountId, count: 1 });
     }
   }
   for (const [payee, total] of scanned) {
@@ -162,14 +162,14 @@ function promotionCounts(db: Db, minimum: number): Promotion[] {
       }
     }
     for (const row of exactPromotion(db, payee)) {
-      counts.set(`${row.payee}\u0000${row.merchantId}\u0000${row.categoryId}`, row);
+      counts.set(`${row.payee}\u0000${row.merchantId}\u0000${row.categoryId ?? ""}\u0000${row.transferAccountId ?? ""}`, row);
     }
   }
   return [...counts.values()].filter((row) => row.count >= minimum);
 }
 
 function exactPromotion(db: Db, payee: string): Promotion[] {
-  return db.all<Promotion>(sql`
+  const categories = db.all<Promotion>(sql`
     with categorized as (
       select
         t.id as id,
@@ -178,18 +178,44 @@ function exactPromotion(db: Db, payee: string): Promotion[] {
       from transactions t
       inner join transaction_lines l on l.transaction_id = t.id
       where t.deleted_at is null
+        and t.mirror = 0
         and t.payee_normalized = ${payee}
         and t.merchant_id is not null
         and l.category_id is not null
+        and l.transfer_account_id is null
       group by t.id
       having count(distinct l.category_id) = 1
       order by t.date desc, t.id desc
       limit 10
     )
-    select ${payee} as payee, merchantId, categoryId, count(*) as count
+    select ${payee} as payee, merchantId, categoryId, null as transferAccountId, count(*) as count
     from categorized
     group by merchantId, categoryId
-  `).map((row) => ({ ...row, count: Number(row.count) }));
+  `);
+  const transfers = db.all<Promotion>(sql`
+    with linked as (
+      select
+        t.id as id,
+        t.merchant_id as merchantId,
+        min(l.transfer_account_id) as transferAccountId
+      from transactions t
+      inner join transaction_lines l on l.transaction_id = t.id
+      where t.deleted_at is null
+        and t.mirror = 0
+        and t.payee_normalized = ${payee}
+        and t.merchant_id is not null
+        and l.transfer_account_id is not null
+        and l.category_id is null
+      group by t.id
+      having count(distinct l.transfer_account_id) = 1
+      order by t.date desc, t.id desc
+      limit 10
+    )
+    select ${payee} as payee, merchantId, null as categoryId, transferAccountId, count(*) as count
+    from linked
+    group by merchantId, transferAccountId
+  `);
+  return [...categories, ...transfers].map((row) => ({ ...row, count: Number(row.count) }));
 }
 
 export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[] } {
@@ -216,11 +242,20 @@ export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[]
 
 export function promotePayee(
   db: Db,
-  input: { payee: string; merchantId: string; categoryId: string } & WriteInput,
+  input: { payee: string; merchantId: string; categoryId?: string | null; transferAccountId?: string | null } & WriteInput,
 ) {
   const payee = normalizePayee(input.payee);
+  const categoryId = input.categoryId ?? null;
+  const transferAccountId = input.transferAccountId ?? null;
+  if ((categoryId === null) === (transferAccountId === null)) {
+    throw new ServiceError("promotion_not_ready", 409);
+  }
   const ready = listPromotionCandidates(db).items.some(
-    (item) => item.payee === payee && item.merchantId === input.merchantId && item.categoryId === input.categoryId,
+    (item) =>
+      item.payee === payee &&
+      item.merchantId === input.merchantId &&
+      item.categoryId === categoryId &&
+      item.transferAccountId === transferAccountId,
   );
   if (!ready) {
     throw new ServiceError("promotion_not_ready", 409);
@@ -229,7 +264,8 @@ export function promotePayee(
     match: "exact",
     pattern: payee,
     merchantId: input.merchantId,
-    categoryId: input.categoryId,
+    categoryId,
+    transferAccountId,
     priority: 0,
     origin: "promoted",
     source: input.source,

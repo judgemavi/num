@@ -9,6 +9,7 @@ import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { importStatement, listImportBatches } from "./imports";
 import { undoImportBatch } from "./import-undo";
+import { createRule } from "./rules";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
@@ -330,6 +331,86 @@ test("a column map is saved after the first import", () => {
     const again = book.db.select().from(accounts).where(eq(accounts.id, book.account.id)).get();
     expect(again?.columnMap).toBe(saved?.columnMap);
     expect(listImportBatches(book.db, book.account.id).items).toHaveLength(2);
+  } finally {
+    book.close();
+  }
+});
+
+test("a later import matches a mirror and clears the mirror flag", () => {
+  const book = tempBook();
+  try {
+    const savings = createAccount(book.db, {
+      name: "Savings",
+      institution: null,
+      kind: "savings",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      source: "ui",
+      at,
+    });
+    const payment = createTransaction(book.db, {
+      accountId: book.account.id,
+      date: "2026-01-02",
+      amount: -500,
+      payeeRaw: "Visa payment",
+      status: "open",
+      lines: [{ amount: -500, transferAccountId: savings.id }],
+      source: "ui",
+      at,
+    });
+    const mirrorId = payment.transferPeerId;
+    if (!mirrorId) {
+      throw new Error("Mirror is missing");
+    }
+    expect(getTransaction(book.db, mirrorId)?.mirror).toBe(true);
+    const result = importCsv(book.db, book.dir, savings.id, "savings.csv", ["01/02/2026,CARD PAYMENT,5.00"]);
+    expect(result.kind).toBe("batch");
+    if (result.kind !== "batch") {
+      return;
+    }
+    expect(result.counts.matched).toBe(1);
+    expect(result.counts.created).toBe(0);
+    const matched = getTransaction(book.db, mirrorId);
+    expect(matched?.mirror).toBe(false);
+    expect(matched?.importRowId).not.toBeNull();
+    expect(matched?.deletedAt).toBeNull();
+    expect(activeCount(book.db)).toBe(2);
+  } finally {
+    book.close();
+  }
+});
+
+test("a transfer suggestion at import does not create a transfer", () => {
+  const book = tempBook();
+  try {
+    const visa = createAccount(book.db, {
+      name: "Visa",
+      institution: null,
+      kind: "savings",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      source: "ui",
+      at,
+    });
+    createRule(book.db, {
+      match: "exact",
+      pattern: "VISA PAYMENT",
+      transferAccountId: visa.id,
+      priority: 1,
+      source: "ui",
+      at,
+    });
+    const result = importCsv(book.db, book.dir, book.account.id, "chequing.csv", ["01/05/2026,VISA PAYMENT,-8.00"]);
+    expect(result.kind).toBe("batch");
+    expect(activeCount(book.db)).toBe(1);
+    const row = book.db.select().from(transactions).where(isNull(transactions.deletedAt)).all()[0];
+    if (!row) {
+      throw new Error("Imported row is missing");
+    }
+    const saved = getTransaction(book.db, row.id);
+    expect(saved?.transferPeerId).toBeNull();
+    expect(saved?.lines[0]?.transferAccountId).toBeNull();
+    expect(saved?.lines[0]?.categoryId).toBeNull();
   } finally {
     book.close();
   }

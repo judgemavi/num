@@ -127,7 +127,9 @@ export function itemWhy(item: InboxItem, names: Names, currency: string): string
     case "transfer_pair":
       return `${shortDate(item.left.date)} ${names.account(item.left.accountId)} and ${shortDate(item.right.date)} ${names.account(item.right.accountId)}. A transfer is not spending.`;
     case "promote_rule":
-      return `${names.merchant(item.merchantId)} · ${names.category(item.categoryId)} · ${item.count} times`;
+      return item.transferAccountId
+        ? `${names.merchant(item.merchantId)} · ${names.account(item.transferAccountId)} · ${item.count} times`
+        : `${names.merchant(item.merchantId)} · ${names.category(item.categoryId ?? "")} · ${item.count} times`;
     case "bucket_overspent":
       return "Cover it from another bucket.";
     case "import_unreadable":

@@ -65,6 +65,7 @@ export const transactionSchema = z.object({
   source: z.enum(transactionSources),
   importRowId: z.uuid().nullable(),
   transferPeerId: z.uuid().nullable(),
+  mirror: z.boolean(),
   deletedAt: z.string().refine(isUtcTimestamp).nullable(),
   lines: z.array(transactionLineSchema),
 });

@@ -71,6 +71,7 @@ function EditorBody({
       ? txn.lines.map((itemLine) => ({
           key: itemLine.id,
           amount: fromMinorUnits(currency, Math.abs(itemLine.amount)),
+          direction: moneyDirection(itemLine.amount),
           categoryId: itemLine.categoryId,
           transferAccountId: itemLine.transferAccountId,
         }))
@@ -78,10 +79,11 @@ function EditorBody({
           {
             key: crypto.randomUUID(),
             amount: fromMinorUnits(currency, Math.abs(txn.amount)),
+            direction,
             categoryId: line?.categoryId ?? suggestion?.categoryId ?? null,
             transferAccountId: null,
           },
-          { key: crypto.randomUUID(), amount: "", categoryId: null, transferAccountId: null },
+          { key: crypto.randomUUID(), amount: "", direction, categoryId: null, transferAccountId: null },
         ],
   );
   const [pending, setPending] = useState(false);
@@ -89,7 +91,7 @@ function EditorBody({
     .filter((account) => account.id !== txn.accountId && account.archivedAt === null)
     .map((account) => ({ id: account.id, label: account.name }));
   const merchantOptions = merchants.map((merchant) => ({ id: merchant.id, label: merchant.name }));
-  const left = choice === "split" ? splitRemainder(currency, direction, txn.amount, lines) : 0;
+  const left = choice === "split" ? splitRemainder(currency, txn.amount, lines) : 0;
   const disabled =
     (choice === "spending" && !categoryId) || (choice === "transfer" && !transferAccountId) || (choice === "split" && left !== 0);
 
@@ -100,10 +102,11 @@ function EditorBody({
         {
           key: crypto.randomUUID(),
           amount: fromMinorUnits(currency, Math.abs(txn.amount)),
+          direction,
           categoryId,
           transferAccountId: null,
         },
-        { key: crypto.randomUUID(), amount: "", categoryId: null, transferAccountId: null },
+        { key: crypto.randomUUID(), amount: "", direction, categoryId: null, transferAccountId: null },
       ]);
     }
   }
@@ -113,7 +116,7 @@ function EditorBody({
     const built =
       choice === "split"
         ? lines.map((itemLine) => ({
-            amount: signedAmount(direction, positive(currency, itemLine.amount)),
+            amount: signedAmount(itemLine.direction, positive(currency, itemLine.amount)),
             memo: null,
             categoryId: itemLine.categoryId,
             transferAccountId: itemLine.transferAccountId,

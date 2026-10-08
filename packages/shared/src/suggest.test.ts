@@ -116,7 +116,7 @@ test("a rule blocks later suggestion steps", () => {
 test("promote after the confirmation count when no rule covers the payee", () => {
   const rows = [1, 2, 3].map((day) => history(`c${day}`, `2026-04-0${day}`, coffee));
   expect(promotionCandidates(rows, [], 3)).toEqual([
-    { payee: "STARBUCKS", merchantId: merchant, categoryId: coffee, count: 3 },
+    { payee: "STARBUCKS", merchantId: merchant, categoryId: coffee, transferAccountId: null, count: 3 },
   ]);
   expect(promotionCandidates(rows.slice(0, 2), [], 3)).toEqual([]);
   expect(promotionCandidates(rows, [rule({ id: "covers", pattern: "star", match: "prefix" })], 3)).toEqual([]);
@@ -174,6 +174,17 @@ test("a transfer match is the closest unlinked opposite row within 3 days", () =
   ];
   expect(chooseTransferMatch(rows, { date: "2026-04-01", lineAmount: -5_000 })).toBe("same");
   expect(chooseTransferMatch([matchRow({ id: "wide", date: "2026-04-05" })], { date: "2026-04-01", lineAmount: -5_000 })).toBeNull();
+});
+
+test("promote counts a confirmed transfer", () => {
+  const visa = "account-visa";
+  const rows = [1, 2, 3].map((day) => ({
+    ...history(`t${day}`, `2026-04-0${day}`, null),
+    transferAccountId: visa,
+  }));
+  expect(promotionCandidates(rows, [], 3)).toEqual([
+    { payee: "STARBUCKS", merchantId: merchant, categoryId: null, transferAccountId: visa, count: 3 },
+  ]);
 });
 
 test("a rule pattern must contain text", () => {

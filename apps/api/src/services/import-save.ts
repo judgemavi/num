@@ -43,7 +43,7 @@ function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: Pla
   const transactionId = crypto.randomUUID();
   const payee = storedPayee(row.payeeRaw);
   const suggestion = row.suggestion;
-  const apply = suggestion !== null && suggestion.reason !== "none";
+  const apply = suggestion !== null && suggestion.reason !== "none" && suggestion.transferAccountId === null;
   tx.insert(importRows)
     .values({
       id: rowId,
@@ -74,6 +74,7 @@ function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: Pla
       source: "import",
       importRowId: rowId,
       transferPeerId: null,
+      mirror: false,
       deletedAt: null,
     })
     .run();
@@ -115,7 +116,7 @@ function insertMatched(tx: WriteTx, batchId: string, accountId: string, row: Pla
       active: true,
     })
     .run();
-  tx.update(transactions).set({ importRowId: rowId }).where(eq(transactions.id, row.transactionId)).run();
+  tx.update(transactions).set({ importRowId: rowId, mirror: false }).where(eq(transactions.id, row.transactionId)).run();
   auditTransaction(tx, row.transactionId, "update", before, readTransaction(tx, row.transactionId));
 }
 

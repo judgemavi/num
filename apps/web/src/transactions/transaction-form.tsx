@@ -40,6 +40,7 @@ type TransactionFormProps = {
   onClose: () => void;
   onSaved: () => void;
   onDelete: () => void;
+  deleteKind?: "plain" | "mirror" | "linked";
 };
 
 function readPositive(currency: string, text: string): number {
@@ -68,11 +69,12 @@ function choiceOf(transaction: Transaction | null): WhatChoice {
   return transaction.lines[0]?.transferAccountId ? "transfer" : "spending";
 }
 
-function linesOf(currency: string, transaction: Transaction | null, amountText: string): SplitLine[] {
+function linesOf(currency: string, transaction: Transaction | null, amountText: string, direction: MoneyDirection): SplitLine[] {
   if (transaction && transaction.lines.length > 1) {
     return transaction.lines.map((line) => ({
       key: line.id,
       amount: fromMinorUnits(currency, Math.abs(line.amount)),
+      direction: moneyDirection(line.amount),
       categoryId: line.categoryId,
       transferAccountId: line.transferAccountId,
     }));
@@ -82,10 +84,11 @@ function linesOf(currency: string, transaction: Transaction | null, amountText: 
     {
       key: first?.id ?? crypto.randomUUID(),
       amount: amountText,
+      direction,
       categoryId: first?.categoryId ?? null,
       transferAccountId: null,
     },
-    { key: crypto.randomUUID(), amount: "", categoryId: null, transferAccountId: null },
+    { key: crypto.randomUUID(), amount: "", direction, categoryId: null, transferAccountId: null },
   ];
 }
 
@@ -102,6 +105,7 @@ export function TransactionForm({
   onClose,
   onSaved,
   onDelete,
+  deleteKind = "plain",
 }: TransactionFormProps) {
   const reconciled = transaction?.status === "reconciled";
   const imported = transaction?.source === "import";
@@ -121,7 +125,7 @@ export function TransactionForm({
   const [transferAccountId, setTransferAccountId] = useState<string | null>(transaction?.lines[0]?.transferAccountId ?? null);
   const [lines, setLines] = useState<SplitLine[]>(() =>
     transaction && transaction.lines.length > 1
-      ? linesOf(currency, transaction, fromMinorUnits(currency, Math.abs(transaction.amount)))
+      ? linesOf(currency, transaction, fromMinorUnits(currency, Math.abs(transaction.amount)), moneyDirection(transaction.amount))
       : [],
   );
   const [tagIds, setTagIds] = useState<string[]>(() => [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])]);
@@ -183,7 +187,7 @@ export function TransactionForm({
       return null;
     }
   })();
-  const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, direction, totalMinor, lines) : null;
+  const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, lines) : null;
   const saveDisabled =
     saving ||
     accountId.length === 0 ||
@@ -199,8 +203,8 @@ export function TransactionForm({
         current.length > 1
           ? current
           : [
-              { key: crypto.randomUUID(), amount, categoryId, transferAccountId: null },
-              { key: crypto.randomUUID(), amount: "", categoryId: null, transferAccountId: null },
+              { key: crypto.randomUUID(), amount, direction, categoryId, transferAccountId: null },
+              { key: crypto.randomUUID(), amount: "", direction, categoryId: null, transferAccountId: null },
             ],
       );
     }
@@ -236,7 +240,7 @@ export function TransactionForm({
       built =
         choice === "split"
           ? lines.map((line, index) => ({
-              amount: signedAmount(direction, readPositive(currency, line.amount)),
+              amount: signedAmount(line.direction, readPositive(currency, line.amount)),
               memo: memoAt(index),
               categoryId: line.categoryId,
               transferAccountId: line.transferAccountId,
@@ -376,7 +380,7 @@ export function TransactionForm({
       />
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
-        {transaction && !reconciled ? <DeleteMenu transfer={transaction.transferPeerId !== null} onDelete={onDelete} /> : null}
+        {transaction && !reconciled ? <DeleteMenu kind={deleteKind} onDelete={onDelete} /> : null}
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>

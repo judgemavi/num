@@ -1,5 +1,5 @@
 import type { MoneyDirection, Tag } from "@num/shared";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Ellipsis } from "lucide-react";
 import { useState } from "react";
 import {
   AlertDialog,
@@ -188,14 +188,14 @@ export function MoreDetails({
   );
 }
 
-export function DeleteMenu({ transfer, onDelete }: { transfer: boolean; onDelete: () => void }) {
+export function DeleteMenu({ kind, onDelete }: { kind: "plain" | "mirror" | "linked"; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button type="button" variant="ghost">
-            More
+          <Button type="button" variant="ghost" size="icon" aria-label="More">
+            <Ellipsis strokeWidth={1.8} aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -209,7 +209,11 @@ export function DeleteMenu({ transfer, onDelete }: { transfer: boolean; onDelete
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
             <AlertDialogDescription>
-              {transfer ? "This also deletes the other side of the transfer." : "The transaction leaves the list."}
+              {kind === "mirror"
+                ? "This also deletes the other side of the transfer."
+                : kind === "linked"
+                  ? "The other account stays. Its line returns to the Inbox."
+                  : "The transaction leaves the list."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

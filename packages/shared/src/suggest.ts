@@ -20,22 +20,28 @@ export const suggestionQuerySchema = z.object({
   payee: z.string().trim().min(1),
 });
 
-export const promotionSchema = z.object({
-  payee: z.string(),
-  merchantId: z.uuid(),
-  categoryId: z.uuid(),
-  count: z.number().int(),
-});
+export const promotionSchema = z
+  .object({
+    payee: z.string(),
+    merchantId: z.uuid(),
+    categoryId: z.uuid().nullable(),
+    transferAccountId: z.uuid().nullable(),
+    count: z.number().int(),
+  })
+  .refine((value) => (value.categoryId === null) !== (value.transferAccountId === null));
 
 export const promotionListSchema = z.object({
   items: z.array(promotionSchema),
 });
 
-export const promotionAcceptSchema = z.object({
-  payee: z.string().trim().min(1),
-  merchantId: z.uuid(),
-  categoryId: z.uuid(),
-});
+export const promotionAcceptSchema = z
+  .object({
+    payee: z.string().trim().min(1),
+    merchantId: z.uuid(),
+    categoryId: z.uuid().nullable().optional(),
+    transferAccountId: z.uuid().nullable().optional(),
+  })
+  .refine((value) => (value.categoryId ?? null) === null !== ((value.transferAccountId ?? null) === null));
 
 export const transferPairSchema = z.object({
   leftId: z.uuid(),
@@ -56,6 +62,7 @@ export type HistoryRow = {
   payeeRaw: string;
   merchantId: string | null;
   categoryId: string | null;
+  transferAccountId?: string | null;
 };
 
 export type MerchantChoice = {
@@ -165,19 +172,24 @@ export function promotionCandidates(
   }
   const counts = new Map<string, Promotion>();
   for (const row of rows) {
-    if (!row.merchantId || !row.categoryId) {
+    if (!row.merchantId) {
+      continue;
+    }
+    const categoryId = row.transferAccountId ? null : row.categoryId;
+    const transferAccountId = row.categoryId ? null : (row.transferAccountId ?? null);
+    if ((categoryId === null) === (transferAccountId === null)) {
       continue;
     }
     const payee = normalizePayee(row.payeeRaw);
     if (payee.length === 0) {
       continue;
     }
-    const key = `${payee}\0${row.merchantId}\0${row.categoryId}`;
+    const key = `${payee}\0${row.merchantId}\0${categoryId ?? ""}\0${transferAccountId ?? ""}`;
     const current = counts.get(key);
     if (current) {
       current.count += 1;
     } else {
-      counts.set(key, { payee, merchantId: row.merchantId, categoryId: row.categoryId, count: 1 });
+      counts.set(key, { payee, merchantId: row.merchantId, categoryId, transferAccountId, count: 1 });
     }
   }
   return [...counts.values()]

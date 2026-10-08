@@ -2535,6 +2535,14 @@
           "notNull": false,
           "autoincrement": false
         },
+        "mirror": {
+          "name": "mirror",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "text",
