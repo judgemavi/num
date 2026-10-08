@@ -295,3 +295,4 @@ test("safe to spend uses the next paycheck, or 30 days when there is no income p
   expect(safeToSpend(true)).toBe(99_800);
   expect(safeToSpend(false)).toBe(96_800);
 });
+

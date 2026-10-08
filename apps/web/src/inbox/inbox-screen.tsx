@@ -117,7 +117,9 @@ export function InboxScreen() {
     .filter((account) => cashKinds.has(account.kind) && account.archivedAt === null)
     .sort((left, right) => right.balance - left.balance || left.name.localeCompare(right.name))[0];
   const bills = position.data?.billsReserved ?? 0;
-  const kept = (buckets.data?.items ?? []).reduce((sum, bucket) => sum + (bucket.balance > 0 ? bucket.balance : 0), 0);
+  const spendingBuckets = bucketRows
+    .filter((bucket) => bucket.kind === "spending" && bucket.archivedAt === null)
+    .sort((left, right) => left.name.localeCompare(right.name));
   const caughtUp = inbox.data !== undefined && !showDismissed && count === 0;
   const dismissedEmpty = showDismissed && inbox.data !== undefined && inbox.data.items.length === 0;
   const imports = [...(inbox.data?.imports ?? [])].sort((left, right) => {
@@ -166,9 +168,11 @@ export function InboxScreen() {
               <Fact label="Bills before payday">
                 <Amount currency={bookCurrency} minor={bills === 0 ? 0 : -bills} />
               </Fact>
-              <Fact label="Kept in buckets">
-                <Amount currency={bookCurrency} minor={kept === 0 ? 0 : -kept} />
-              </Fact>
+              {spendingBuckets.map((bucket) => (
+                <Fact key={bucket.id} label={bucket.name}>
+                  <Amount currency={bookCurrency} minor={bucket.balance} />
+                </Fact>
+              ))}
             </>
           ) : undefined
         }

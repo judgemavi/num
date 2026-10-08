@@ -4,7 +4,6 @@ import {
   buckets,
   categories,
   checkpoints,
-  forecastSnapshots,
   monthCloses,
   occurrenceLinks,
   recurringPlans,
@@ -27,7 +26,6 @@ import {
   spendDeltas,
   unbucketedMonthly,
   Temporal,
-  utcNow,
   variableAmounts,
   type AccountKind,
   type BusinessDayShift,
@@ -40,8 +38,9 @@ import {
 import { and, eq, gt, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { integerSum } from "../integer-sum";
+import { storeForecastSnapshot } from "./forecast-snapshot";
 import { ServiceError } from "../service-error";
-import { write, type AuditSource } from "./write";
+import { type AuditSource } from "./write";
 
 type PlanRow = typeof recurringPlans.$inferSelect;
 
@@ -172,30 +171,6 @@ function planAmount(plan: PlanRow, links: { planId: string; dueDate: string; tra
   return variableAmounts(actuals, plan.expectedAmount).forecast;
 }
 
-function storeSnapshot(db: Db, month: string, asOf: string, predictedTotal: number, input: WriteInput) {
-  const existing = db.select().from(forecastSnapshots).where(eq(forecastSnapshots.month, month)).get();
-  if (existing) {
-    return;
-  }
-  const at = input.at ?? utcNow();
-  write(db, { source: input.source, at }, (tx) => {
-    const row = {
-      month,
-      asOf,
-      predictedTotal,
-      createdAt: at,
-    };
-    tx.insert(forecastSnapshots).values(row).run();
-    tx.audit({
-      entity: "forecast_snapshot",
-      entityId: month,
-      action: "create",
-      before: null,
-      after: row,
-    });
-  });
-}
-
 export function readForecast(db: Db, asOf: string, input: WriteInput): Forecast {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
@@ -305,7 +280,11 @@ export function readForecast(db: Db, asOf: string, input: WriteInput): Forecast 
       continue;
     }
     const rows = lines.filter(
-      (line) => line.categoryId === categoryId && !linkedTransactions.has(line.transactionId) && months.some((month) => line.date.startsWith(month)),
+      (line) =>
+        line.categoryId === categoryId &&
+        accountIds.has(line.accountId) &&
+        !linkedTransactions.has(line.transactionId) &&
+        months.some((month) => line.date.startsWith(month)),
     );
     const amount = unbucketedMonthly(
       months,
@@ -333,8 +312,8 @@ export function readForecast(db: Db, asOf: string, input: WriteInput): Forecast 
       .from(checkpoints)
       .where(and(eq(checkpoints.accountId, account.id), isNull(checkpoints.unlockedAt)))
       .all();
-    const payments = db.all<{ date: string; accountId: string }>(sql`
-      select t.date as date, peer.account_id as accountId
+    const payments = db.all<{ date: string; amount: number; accountId: string }>(sql`
+      select t.date as date, t.amount as amount, peer.account_id as accountId
       from transactions t
       inner join transactions peer on peer.id = t.transfer_peer_id
       where t.account_id = ${account.id}
@@ -342,13 +321,15 @@ export function readForecast(db: Db, asOf: string, input: WriteInput): Forecast 
         and t.amount > 0
         and peer.deleted_at is null
     `);
-    const paymentAccountId = usualAccount(payments);
+    const fromHistory = usualAccount(payments);
+    const chequing = openAccounts.filter((row) => row.kind === "chequing");
+    const paymentAccountId = fromHistory ?? (chequing.length === 1 ? chequing[0]?.id ?? null : null);
     if (policy !== "manual" && statements.length > 0 && paymentAccountId === null) {
       warnings.push({ code: "no_payment_account", accountId: account.id });
     }
     const schedule = cardForecastSchedule({
       statements,
-      paymentDates: payments.map((row) => row.date),
+      payments: payments.map((row) => ({ date: row.date, amount: row.amount })),
       asOf,
       horizonEnd,
       policy,
@@ -364,6 +345,7 @@ export function readForecast(db: Db, asOf: string, input: WriteInput): Forecast 
     warnings,
     accounts: openAccounts.map((row) => ({
       id: row.id,
+      kind: asKind(row.kind),
       balance: balanceAsOf(db, { id: row.id, kind: asKind(row.kind), openingBalance: row.openingBalance }, asOf),
     })),
     deltas,
@@ -371,6 +353,6 @@ export function readForecast(db: Db, asOf: string, input: WriteInput): Forecast 
   });
   const end = monthEnd(asOf);
   const endIndex = forecast.dates.indexOf(end);
-  storeSnapshot(db, asOf.slice(0, 7), asOf, forecast.total.estimated[endIndex] ?? forecast.total.estimated[0] ?? 0, input);
+  storeForecastSnapshot(db, asOf, forecast.total.estimated[endIndex] ?? forecast.total.estimated[0] ?? 0, input);
   return forecast;
 }

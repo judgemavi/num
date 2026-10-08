@@ -1,6 +1,6 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
-import type { PaymentPolicy } from "./account";
+import type { AccountKind, PaymentPolicy } from "./account";
 import { cardStatements } from "./card-statement";
 import { isoDateSchema } from "./date";
 import { billReserveDays } from "./funding";
@@ -69,12 +69,14 @@ export type ForecastCard = {
   estimatedStatements: { date: string; dueDate: string }[];
 };
 
+const riskKinds = new Set<AccountKind>(["chequing", "savings", "cash"]);
+
 export type ForecastInput = {
   asOf: string;
   bufferAmount: number;
   nextIncomeDate: string | null;
   warnings: { code: ForecastWarningCode; accountId: string }[];
-  accounts: { id: string; balance: number }[];
+  accounts: { id: string; kind: AccountKind; balance: number }[];
   deltas: ForecastDelta[];
   cards: ForecastCard[];
 };
@@ -143,7 +145,7 @@ function dailyShares(total: number, daysInMonth: number): number[] {
 
 export function cardForecastSchedule(input: {
   statements: readonly { date: string; balance: number }[];
-  paymentDates: readonly string[];
+  payments: readonly { date: string; amount: number }[];
   asOf: string;
   horizonEnd: string;
   policy: PaymentPolicy;
@@ -155,7 +157,7 @@ export function cardForecastSchedule(input: {
   }
   const listed = cardStatements({
     statements: input.statements.map((statement) => ({ date: statement.date })),
-    paymentDates: input.paymentDates,
+    paymentDates: input.payments.map((payment) => payment.date),
   });
   const actual = listed.filter((item) => item.code === "statement");
   const latest = actual[actual.length - 1];
@@ -164,13 +166,17 @@ export function cardForecastSchedule(input: {
   }
   const balance = [...input.statements].reverse().find((statement) => statement.date === latest.date)?.balance ?? 0;
   const gap = Temporal.PlainDate.from(latest.date).until(Temporal.PlainDate.from(latest.dueDate), { largestUnit: "day" }).days;
-  const paid = input.paymentDates.some((date) => date > latest.date && date <= input.asOf);
-  let knownPayment: { date: string; amount: number } | null = null;
-  if (!paid && latest.dueDate >= input.asOf && latest.dueDate <= input.horizonEnd) {
-    const amount = input.policy === "fixed" ? (input.fixedPayment ?? 0) : Math.max(0, -balance);
-    if (amount > 0) {
-      knownPayment = { date: latest.dueDate, amount };
+  const paidSince = input.payments.reduce((sum, payment) => {
+    if (payment.date > latest.date && payment.date <= input.asOf) {
+      return sum + payment.amount;
     }
+    return sum;
+  }, 0);
+  const owed = input.policy === "fixed" ? (input.fixedPayment ?? 0) : Math.max(0, -balance);
+  const remaining = Math.max(0, owed - paidSince);
+  let knownPayment: { date: string; amount: number } | null = null;
+  if (remaining > 0 && latest.dueDate >= input.asOf && latest.dueDate <= input.horizonEnd) {
+    knownPayment = { date: latest.dueDate, amount: remaining };
   }
   const estimatedStatements: { date: string; dueDate: string }[] = [];
   let cursor = Temporal.PlainDate.from(latest.date);
@@ -201,21 +207,16 @@ function addTo(bucket: Map<string, number>, accountId: string, amount: number) {
 }
 
 function pay(series: Map<string, number>, cardId: string, paymentAccountId: string | null, scheduled: number) {
-  if (scheduled <= 0 || paymentAccountId === null) {
+  if (scheduled <= 0 || paymentAccountId === null || !series.has(cardId) || !series.has(paymentAccountId)) {
     return;
   }
-  const balance = series.get(cardId);
-  if (balance === undefined) {
-    return;
-  }
+  const balance = series.get(cardId) ?? 0;
   const amount = Math.min(scheduled, Math.max(0, -balance));
   if (amount === 0) {
     return;
   }
   series.set(cardId, balance + amount);
-  if (series.has(paymentAccountId)) {
-    series.set(paymentAccountId, (series.get(paymentAccountId) ?? 0) - amount);
-  }
+  series.set(paymentAccountId, (series.get(paymentAccountId) ?? 0) - amount);
 }
 
 function applyDay(series: Map<string, number>, deltas: Map<string, number>) {
@@ -231,6 +232,7 @@ export function buildForecast(input: ForecastInput): Forecast {
   const dates = forecastDates(input.asOf);
   const indexOf = new Map(dates.map((date, index) => [date, index]));
   const ids = input.accounts.map((account) => account.id);
+  const kinds = new Map(input.accounts.map((account) => [account.id, account.kind]));
   const known = new Map(input.accounts.map((account) => [account.id, account.balance]));
   const estimated = new Map(known);
   const knownDeltas = Array.from({ length: forecastDayCount }, () => new Map<string, number>());
@@ -246,6 +248,14 @@ export function buildForecast(input: ForecastInput): Forecast {
   const knownSeries = new Map<string, number[]>(ids.map((id) => [id, []]));
   const estimatedSeries = new Map<string, number[]>(ids.map((id) => [id, []]));
   const captures = new Map<string, number>();
+  const horizonEnd = dates[dates.length - 1] ?? input.asOf;
+  for (const card of input.cards) {
+    const stale = card.estimatedStatements.filter((statement) => statement.date < input.asOf);
+    const latestStale = stale[stale.length - 1];
+    if (latestStale && latestStale.dueDate >= input.asOf && latestStale.dueDate <= horizonEnd) {
+      captures.set(`${card.accountId}|${latestStale.date}`, estimated.get(card.accountId) ?? 0);
+    }
+  }
 
   for (let day = 0; day < dates.length; day += 1) {
     const date = dates[day] ?? "";
@@ -303,12 +313,15 @@ export function buildForecast(input: ForecastInput): Forecast {
     warnings: input.warnings,
     accounts: ids.map((id) => {
       const estimatedValues = estimatedSeries.get(id) ?? [];
-      const low = Math.min(...estimatedValues);
+      const low = estimatedValues.length === 0 ? 0 : Math.min(...estimatedValues);
+      const kind = kinds.get(id);
       let risk: ForecastRisk | null = null;
-      if (low < 0) {
-        risk = "below_zero";
-      } else if (low < input.bufferAmount) {
-        risk = "below_buffer";
+      if (kind && riskKinds.has(kind)) {
+        if (low < 0) {
+          risk = "below_zero";
+        } else if (low < input.bufferAmount) {
+          risk = "below_buffer";
+        }
       }
       return {
         accountId: id,

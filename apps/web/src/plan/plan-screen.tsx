@@ -5,7 +5,7 @@ import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
 import { PaycheckSplitIllustration } from "@/components/illustrations";
 import { PageHeader } from "@/components/page-header";
-import { SummaryStrip } from "@/components/summary-strip";
+import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -73,6 +73,19 @@ export function PlanScreen() {
             </span>
           }
           hint={shortDate(forecast.data.lowest.date)}
+          facts={
+            <>
+              <Fact label="Safe to spend">
+                <Amount currency={bookCurrency} minor={forecast.data.safeToSpend} />
+              </Fact>
+              <Fact label="Known in 90 days">
+                <Amount currency={bookCurrency} minor={forecast.data.total.known[forecast.data.dates.length - 1] ?? 0} />
+              </Fact>
+              <Fact label="Estimated in 90 days">
+                <Amount currency={bookCurrency} minor={forecast.data.total.estimated[forecast.data.dates.length - 1] ?? 0} />
+              </Fact>
+            </>
+          }
           illustration={<PaycheckSplitIllustration />}
         />
       ) : null}
