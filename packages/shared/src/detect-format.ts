@@ -1,7 +1,21 @@
 import { isIsoDate } from "./date";
-import { columnMapSchema, statementDate, type ColumnMap, type DateOrder, type DecimalSeparator, type Preset } from "./statement";
+import { columnMapSchema, statementDate, type ColumnMap, type DateFormat, type DateOrder, type DecimalSeparator, type Preset } from "./statement";
 
-export type StatementFormat = { kind: "ofx" } | { kind: "preset"; presetId: string } | { kind: "unknown" };
+export type StatementFormat =
+  | { kind: "ofx" }
+  | { kind: "preset"; presetId: string }
+  | { kind: "ambiguous"; candidates: string[] }
+  | { kind: "unknown" };
+
+export function chosenPresetId(format: StatementFormat): string | null {
+  if (format.kind === "preset") {
+    return format.presetId;
+  }
+  if (format.kind === "ambiguous") {
+    return format.candidates[0] ?? null;
+  }
+  return null;
+}
 
 export type ImportAccountChoice = {
   id: string;
@@ -70,11 +84,7 @@ export function detectStatementFormat(filename: string, text: string, presets: r
   if (isOfxFile(filename, text)) {
     return { kind: "ofx" };
   }
-  const presetId = bestPreset(filename, text, presets);
-  if (presetId) {
-    return { kind: "preset", presetId };
-  }
-  return { kind: "unknown" };
+  return detectPreset(text, presets);
 }
 
 export function firstStatementDate(
@@ -86,12 +96,13 @@ export function firstStatementDate(
   if (format.kind === "ofx") {
     return firstOfxDate(text);
   }
-  const map = format.kind === "preset" ? presets.find((preset) => preset.id === format.presetId) : columnMap;
+  const presetId = chosenPresetId(format);
+  const map = presetId ? presets.find((preset) => preset.id === presetId) : columnMap;
   if (!map) {
     return null;
   }
   const rows = sampleCsvRows(text, dateScanLines);
-  const start = dataStart(rows, map);
+  const start = firstDataIndex(rows, map);
   if (start < 0) {
     return null;
   }
@@ -127,16 +138,17 @@ export function guessImportAccount(
   format: StatementFormat,
   presets: readonly Preset[],
 ): string | null {
-  if (format.kind !== "preset") {
+  const presetId = chosenPresetId(format);
+  if (!presetId) {
     return null;
   }
-  const preset = presets.find((item) => item.id === format.presetId);
+  const preset = presets.find((item) => item.id === presetId);
   const signature = preset ? mapSignature(columnMapFromPreset(preset)) : null;
   const matches = accounts.filter((account) => {
     if (account.archivedAt !== null) {
       return false;
     }
-    if (account.importPreset === format.presetId) {
+    if (account.importPreset === presetId) {
       return true;
     }
     return signature !== null && account.columnMap !== null && mapSignature(account.columnMap) === signature;
@@ -144,68 +156,96 @@ export function guessImportAccount(
   return matches.length === 1 ? (matches[0]?.id ?? null) : null;
 }
 
-function bestPreset(filename: string, text: string, presets: readonly Preset[]): string | null {
+function detectPreset(text: string, presets: readonly Preset[]): StatementFormat {
   const rows = sampleCsvRows(text, sampleLines);
-  const fits = presets.flatMap((preset) => {
-    const fit = presetFit(rows, preset);
-    return fit ? [{ id: preset.id, exact: fit.exact }] : [];
-  });
-  if (fits.length === 0) {
-    return null;
+  const fits = presets.filter((preset) => presetFit(rows, preset)).map((preset) => preset.id);
+  const first = fits[0];
+  if (!first) {
+    return { kind: "unknown" };
   }
-  const named = fits.filter((fit) => filenameHasPreset(filename, fit.id));
-  if (named.length === 1) {
-    return named[0]?.id ?? null;
+  if (fits.length === 1) {
+    return { kind: "preset", presetId: first };
   }
-  const exact = fits.filter((fit) => fit.exact);
-  const pool = exact.length > 0 ? exact : fits;
-  return pool.length === 1 ? (pool[0]?.id ?? null) : null;
+  return { kind: "ambiguous", candidates: fits };
 }
 
-function presetFit(rows: string[][], preset: Preset): { exact: boolean } | null {
+function presetFit(rows: string[][], preset: Preset): boolean {
   const start = dataStart(rows, preset);
   if (start < 0) {
-    return null;
+    return false;
   }
   const data = rows.slice(start, start + scoredRows);
   if (data.length === 0) {
-    return null;
+    return false;
   }
   const width = columnWidth(preset);
-  if (!data.every((row) => row.length >= width && rowFits(row, preset))) {
-    return null;
-  }
-  return { exact: data.every((row) => row.length === width) };
+  return data.every((row) => row.length === width && rowFits(row, preset));
 }
 
-function dataStart(
+function firstDataIndex(
   rows: string[][],
   map: { hasHeader: ColumnMap["hasHeader"]; date: number; dateOrder: DateOrder },
 ): number {
   if (rows.length === 0) {
     return -1;
   }
-  const firstDate = statementDate(rows[0]?.[map.date] ?? "", map.dateOrder);
+  const firstIsDate = statementDate(rows[0]?.[map.date] ?? "", map.dateOrder) !== null;
   if (map.hasHeader === true) {
-    if (firstDate !== null) {
+    return firstIsDate || rows.length < 2 ? -1 : 1;
+  }
+  if (map.hasHeader === false) {
+    return firstIsDate ? 0 : -1;
+  }
+  if (firstIsDate) {
+    return 0;
+  }
+  return rows.length > 1 ? 1 : -1;
+}
+
+function dataStart(rows: string[][], preset: Preset): number {
+  if (rows.length === 0) {
+    return -1;
+  }
+  const firstIsDate = dateMatchesFormat(rows[0]?.[preset.date] ?? "", preset.dateFormat);
+  if (preset.hasHeader === true) {
+    if (firstIsDate) {
       return -1;
     }
     return rows.length > 1 ? 1 : -1;
   }
-  if (map.hasHeader === false) {
-    return firstDate !== null ? 0 : -1;
+  if (preset.hasHeader === false) {
+    return firstIsDate ? 0 : -1;
   }
-  if (firstDate !== null) {
+  if (firstIsDate) {
     return 0;
   }
   return rows.length > 1 ? 1 : -1;
 }
 
 function rowFits(row: string[], preset: Preset): boolean {
-  if (statementDate(row[preset.date] ?? "", preset.dateOrder) === null) {
+  if (!dateMatchesFormat(row[preset.date] ?? "", preset.dateFormat)) {
+    return false;
+  }
+  if (preset.card != null && !looksLikeMaskedCard(row[preset.card] ?? "")) {
     return false;
   }
   return amountsFit(row, preset);
+}
+
+function dateMatchesFormat(raw: string, format: DateFormat): boolean {
+  const text = raw.trim();
+  if (format === "iso") {
+    return isIsoDate(text);
+  }
+  if (isIsoDate(text) || !/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/.test(text)) {
+    return false;
+  }
+  return statementDate(text, format) !== null;
+}
+
+function looksLikeMaskedCard(raw: string): boolean {
+  const text = raw.trim();
+  return /[*xX]/.test(text) && /\d{4}/.test(text);
 }
 
 function amountsFit(row: string[], preset: Preset): boolean {
@@ -239,7 +279,7 @@ function looksLikeAmount(raw: string, decimal: DecimalSeparator): boolean {
 }
 
 function columnWidth(preset: Preset): number {
-  const indexes = [preset.date, preset.description, preset.amount, preset.debit, preset.credit, preset.balance, preset.bankId];
+  const indexes = [preset.date, preset.description, preset.amount, preset.debit, preset.credit, preset.balance, preset.bankId, preset.card];
   let width = 1;
   for (const index of indexes) {
     if (index != null && index + 1 > width) {
@@ -247,12 +287,6 @@ function columnWidth(preset: Preset): number {
     }
   }
   return width;
-}
-
-function filenameHasPreset(filename: string, presetId: string): boolean {
-  const key = filename.toLowerCase().replace(/[\s_]+/g, "-");
-  const id = presetId.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?:^|[^a-z0-9])${id}(?:[^a-z0-9]|$)`).test(key);
 }
 
 function contentLines(text: string): string[] {

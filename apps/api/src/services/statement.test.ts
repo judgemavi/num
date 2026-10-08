@@ -12,8 +12,8 @@ function fixture(name: string): string {
 
 const digits = 2;
 
-test("TD chequing preset reads dates, signs and the closing balance", () => {
-  const result = parseCsvStatement(fixture("td-chequing.csv"), loadPreset("td-chequing"), digits);
+test("TD chequing or savings preset reads a chequing file", () => {
+  const result = parseCsvStatement(fixture("td-chequing.csv"), loadPreset("td-bank-account"), digits);
   expect(result.rows).toEqual([
     { date: "2026-01-02", description: "NORTH MARKET, UNIT 1", amount: -1250, bankId: null },
     { date: "2026-01-03", description: "PAY DEPOSIT", amount: 20000, bankId: null },
@@ -23,8 +23,8 @@ test("TD chequing preset reads dates, signs and the closing balance", () => {
   expect(result.closingDate).toBe("2026-01-04");
 });
 
-test("TD savings preset reads dates, signs and the closing balance", () => {
-  const result = parseCsvStatement(fixture("td-savings.csv"), loadPreset("td-savings"), digits);
+test("TD chequing or savings preset reads a savings file", () => {
+  const result = parseCsvStatement(fixture("td-savings.csv"), loadPreset("td-bank-account"), digits);
   expect(result.rows).toEqual([
     { date: "2026-03-15", description: "PAY DEPOSIT", amount: 5000, bankId: null },
     { date: "2026-03-16", description: "NORTH MARKET", amount: -840, bankId: null },

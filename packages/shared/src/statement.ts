@@ -27,6 +27,10 @@ export const dateOrders = ["dmy", "mdy"] as const;
 
 export type DateOrder = (typeof dateOrders)[number];
 
+export const dateFormats = ["iso", "mdy", "dmy"] as const;
+
+export type DateFormat = (typeof dateFormats)[number];
+
 export const decimalSeparators = [".", ","] as const;
 
 export type DecimalSeparator = (typeof decimalSeparators)[number];
@@ -96,6 +100,8 @@ export const presetSchema = z
   .object({
     id: z.string().trim().min(1),
     name: z.string().trim().min(1),
+    dateFormat: z.enum(dateFormats),
+    card: columnSchema.optional(),
     ...columnMapFields,
   })
   .refine(hasAmountColumn);

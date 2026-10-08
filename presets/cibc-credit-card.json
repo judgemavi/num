@@ -1,6 +1,8 @@
 {
   "id": "cibc-credit-card",
   "name": "CIBC credit card",
+  "dateFormat": "iso",
+  "card": 4,
   "hasHeader": "auto",
   "date": 0,
   "description": 1,

@@ -62,7 +62,7 @@ export function dateFor(
   if (text.length === 0) {
     return null;
   }
-  if (format.kind === "ofx" || format.kind === "preset") {
+  if (format.kind === "ofx" || format.kind === "preset" || format.kind === "ambiguous") {
     return firstStatementDate(text, format, presets);
   }
   if (columnMap) {
@@ -108,6 +108,9 @@ export function syncImportRows(
 export function sameFormat(left: StatementFormat, right: StatementFormat): boolean {
   if (left.kind === "preset" && right.kind === "preset") {
     return left.presetId === right.presetId;
+  }
+  if (left.kind === "ambiguous" && right.kind === "ambiguous") {
+    return left.candidates.join("\n") === right.candidates.join("\n");
   }
   return left.kind === right.kind;
 }

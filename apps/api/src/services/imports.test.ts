@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { accounts, auditLog, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
@@ -8,6 +8,7 @@ import { eq, isNull } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { importStatement, listImportBatches } from "./imports";
+import { presetsDirectory } from "./presets";
 import { undoImportBatch } from "./import-undo";
 import { createRule } from "./rules";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
@@ -411,6 +412,28 @@ test("a transfer suggestion at import does not create a transfer", () => {
     expect(saved?.transferPeerId).toBeNull();
     expect(saved?.lines[0]?.transferAccountId).toBeNull();
     expect(saved?.lines[0]?.categoryId).toBeNull();
+  } finally {
+    book.close();
+  }
+});
+
+test("a saved preset that no longer exists uses detection", () => {
+  const book = tempBook();
+  try {
+    book.db.update(accounts).set({ importPreset: "td-chequing" }).where(eq(accounts.id, book.account.id)).run();
+    const bytes = new TextEncoder().encode(readFileSync(join(presetsDirectory(), "fixtures", "td-chequing.csv"), "utf8"));
+    const result = importStatement(book.db, book.dir, {
+      source: "import",
+      at,
+      accountId: book.account.id,
+      filename: "accountactivity.csv",
+      mimeType: "text/csv",
+      bytes,
+    });
+    expect(result.kind).toBe("batch");
+    if (result.kind === "batch") {
+      expect(result.counts.created).toBe(3);
+    }
   } finally {
     book.close();
   }

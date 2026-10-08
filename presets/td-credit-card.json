@@ -1,6 +1,7 @@
 {
   "id": "td-credit-card",
   "name": "TD credit card",
+  "dateFormat": "mdy",
   "hasHeader": "auto",
   "date": 0,
   "description": 1,

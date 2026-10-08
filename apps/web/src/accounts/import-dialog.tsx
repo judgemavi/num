@@ -1,5 +1,6 @@
 import {
   accountListSchema,
+  chosenPresetId,
   firstStatementDate,
   guessImportAccount,
   orderByFirstDate,
@@ -205,8 +206,9 @@ function ImportForm({
     body.set("file", row.file);
     body.set("accountId", row.accountId);
     body.set("asOf", localAsOf());
-    if (row.format.kind === "preset") {
-      body.set("presetId", row.format.presetId);
+    const presetId = chosenPresetId(row.format);
+    if (presetId) {
+      body.set("presetId", presetId);
     }
     if (row.columnMap) {
       body.set("columnMap", JSON.stringify(row.columnMap));

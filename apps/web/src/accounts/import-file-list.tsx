@@ -5,7 +5,7 @@ import { formatImportDate, importCountText, unreadableLabel } from "@/accounts/i
 import { rowNeedsColumnMap, totalCounts } from "@/accounts/import-prepare";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type ImportFileRow = {
@@ -36,6 +36,9 @@ function formatChoice(format: StatementFormat): string {
   }
   if (format.kind === "preset") {
     return format.presetId;
+  }
+  if (format.kind === "ambiguous") {
+    return format.candidates[0] ?? columnsValue;
   }
   return columnsValue;
 }
@@ -149,6 +152,9 @@ export function ImportFileList({
                     <SelectItem value={columnsValue}>Set columns</SelectItem>
                   </SelectContent>
                 </Select>
+                {row.format.kind === "ambiguous" ? (
+                  <FieldDescription>More than one format fits. Choose one.</FieldDescription>
+                ) : null}
               </Field>
               <Field>
                 <FieldLabel>Account</FieldLabel>

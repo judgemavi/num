@@ -1,6 +1,7 @@
 {
-  "id": "td-savings",
-  "name": "TD savings",
+  "id": "td-bank-account",
+  "name": "TD chequing or savings",
+  "dateFormat": "iso",
   "hasHeader": "auto",
   "date": 0,
   "description": 1,

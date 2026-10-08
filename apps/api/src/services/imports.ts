@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { accounts, documents, importBatches, importRows, settings, transactions } from "@num/db";
 import {
+  chosenPresetId,
+  detectStatementFormat,
   isOfxFile,
   minorUnitDigits,
   sampleCsvRows,
@@ -69,6 +71,29 @@ function presetMap(id: string): ColumnMap {
   }
 }
 
+function savedOrDetectedPreset(
+  filename: string,
+  text: string,
+  importPreset: string | null,
+): { presetId: string; map: ColumnMap } | null {
+  if (!importPreset) {
+    return null;
+  }
+  try {
+    return { presetId: importPreset, map: loadPreset(importPreset) };
+  } catch {
+    const presetId = chosenPresetId(detectStatementFormat(filename, text, loadPresets()));
+    if (!presetId) {
+      return null;
+    }
+    try {
+      return { presetId, map: loadPreset(presetId) };
+    } catch {
+      return null;
+    }
+  }
+}
+
 function resolveParse(
   filename: string,
   text: string,
@@ -95,18 +120,18 @@ function resolveParse(
   if (isOfxFile(filename, text)) {
     return { parser: "ofx", statement: parseOfxStatement(text, digits), presetId: null, columnMap: null };
   }
-  const presetId = account.importPreset;
-  if (presetId) {
+  const saved = savedOrDetectedPreset(filename, text, account.importPreset);
+  if (saved) {
     return {
       parser: "csv",
-      statement: parseCsvStatement(text, presetMap(presetId), digits),
-      presetId,
+      statement: parseCsvStatement(text, saved.map, digits),
+      presetId: saved.presetId,
       columnMap: null,
     };
   }
-  const saved = readColumnMap(account.columnMap);
-  if (saved) {
-    return { parser: "csv", statement: parseCsvStatement(text, saved, digits), presetId: null, columnMap: null };
+  const columnMap = readColumnMap(account.columnMap);
+  if (columnMap) {
+    return { parser: "csv", statement: parseCsvStatement(text, columnMap, digits), presetId: null, columnMap: null };
   }
   const rows = previewRows(text);
   if (rows.length === 0) {
