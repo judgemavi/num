@@ -429,6 +429,17 @@ The user can create, edit and archive accounts.
 
 If the user imports the same file again, or a file with overlapping dates, the app must not create duplicate transactions.
 
+**Several files at once:**
+- The user can choose or drop several files. Each file is one row: file name, detected format, account, status.
+- The app detects the format of each file: OFX, or the preset whose layout fits (column count, date format, header).
+  The user can change it.
+- If exactly one account uses the detected format (`importPreset` or `columnMap`), the app selects that account.
+  Otherwise the user selects it. "Use this account for all files" is available.
+- "Import all" imports the files in order of their first date, oldest first.
+- Each file is its own batch, with its own undo. If one file fails, the other files still import, and its row shows the reason.
+- A file that is already imported shows "already imported" and imports nothing.
+- The summary shows the counts for each file and a total.
+
 **Imports view** (Accounts → Imports):
 - All import batches, newest first: date, file name, account, period, status (`imported | undone | needs_you`),
   and the counts (created, matched, duplicate, needs review, unreadable). `needs_you` means rows need review
