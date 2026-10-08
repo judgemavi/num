@@ -1,5 +1,5 @@
 import { Search, X } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentProps, type ReactNode } from "react";
 import { usePhone } from "@/components/use-phone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,9 +42,9 @@ type FilterBarProps = {
   sort?: FilterSort;
 };
 
-function FiltersButton({ count }: { count: number }) {
+function FiltersButton({ count, ...props }: { count: number } & ComponentProps<typeof Button>) {
   return (
-    <Button type="button" variant="secondary" className="shrink-0">
+    <Button type="button" variant="secondary" className="shrink-0" {...props}>
       Filters
       {count > 0 ? <Badge variant="neutral">{count}</Badge> : null}
     </Button>
