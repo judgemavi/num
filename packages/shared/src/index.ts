@@ -353,6 +353,24 @@ export {
   type PlanSchedule,
 } from "./recurring-calc";
 export { detectPlans, type DetectionTransaction } from "./recurring-detect";
+export {
+  buildForecast,
+  cardForecastSchedule,
+  forecastDates,
+  forecastDayCount,
+  forecastRisks,
+  forecastSchema,
+  forecastWarningCodes,
+  monthEnd,
+  spendDeltas,
+  unbucketedMonthly,
+  type Forecast,
+  type ForecastCard,
+  type ForecastDelta,
+  type ForecastInput,
+  type ForecastRisk,
+  type ForecastWarningCode,
+} from "./forecast";
 export { isUtcTimestamp, utcNow } from "./time";
 export {
   importReviewResolveSchema,

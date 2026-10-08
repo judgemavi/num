@@ -1,4 +1,4 @@
-import { Temporal, type InboxItem, type InboxKind, type PlanFrequency, type UnreadableReason } from "@num/shared";
+import { Temporal, billReserveDays, type InboxItem, type InboxKind, type PlanFrequency, type UnreadableReason } from "@num/shared";
 import { unreadableLabel } from "@/accounts/import-format";
 import type { Hue } from "@/components/hue";
 import { formatMoney } from "@/money";
@@ -23,6 +23,31 @@ export function inboxHue(kind: InboxKind): Hue | "attention" {
 
 export function shortDate(iso: string): string {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric" });
+}
+
+function perDay(amount: number, days: number): number {
+  if (days <= 0) {
+    return amount;
+  }
+  const negative = amount < 0;
+  const magnitude = Math.abs(amount);
+  const quotient = Math.floor(magnitude / days);
+  const remainder = magnitude % days;
+  const rounded = remainder * 2 >= days ? quotient + 1 : quotient;
+  return negative ? -rounded : rounded;
+}
+
+export function paydayHint(currency: string, asOf: string, nextIncome: string | null, safe: number): string {
+  if (nextIncome === null) {
+    return `No paycheck on the plan · next ${billReserveDays} days · about ${formatMoney(currency, perDay(safe, billReserveDays))} a day`;
+  }
+  const days = Temporal.PlainDate.from(asOf).until(Temporal.PlainDate.from(nextIncome), { largestUnit: "day" }).days;
+  const when = Temporal.PlainDate.from(nextIncome).toLocaleString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+  return `Payday is ${when} · about ${formatMoney(currency, perDay(safe, days))} a day`;
 }
 
 export function inboxKicker(asOf: string): string {

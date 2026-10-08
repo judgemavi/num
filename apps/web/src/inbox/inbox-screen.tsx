@@ -2,6 +2,7 @@ import {
   accountListSchema,
   categoryListSchema,
   currencyUpdateSchema,
+  forecastSchema,
   fundingPositionSchema,
   inboxSchema,
   merchantListSchema,
@@ -15,7 +16,7 @@ import { localAsOf } from "@/as-of";
 import { useEditors } from "@/editors/editor-api";
 import { loadBuckets } from "@/buckets/query";
 import { dismissItem, restoreItem } from "@/inbox/actions";
-import { importAge, inboxError, inboxKicker } from "@/inbox/format";
+import { importAge, inboxError, inboxKicker, paydayHint } from "@/inbox/format";
 import { InboxItemRow } from "@/inbox/inbox-item";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
@@ -23,7 +24,8 @@ import { PaydayIllustration } from "@/components/illustrations";
 import { ListCard } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { SidePanel } from "@/components/side-panel";
-import { SummaryStrip } from "@/components/summary-strip";
+import { Amount } from "@/components/amount";
+import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 export function InboxScreen() {
@@ -84,6 +86,16 @@ export function InboxScreen() {
     queryKey: ["buckets", "inbox"],
     queryFn: () => loadBuckets({ archived: false, sort: "name", dir: "asc" }),
   });
+  const forecast = useQuery({
+    queryKey: ["forecast", asOf],
+    queryFn: async () => {
+      const result = await apiRequest(`/api/forecast?asOf=${asOf}`, forecastSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
+    },
+  });
 
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: ["inbox"] });
@@ -100,6 +112,12 @@ export function InboxScreen() {
   const count = inbox.data?.count ?? 0;
   const dismissedCount = inbox.data?.dismissedCount ?? 0;
   const reasons = new Map((inbox.data?.dismissalReasons ?? []).map((row) => [row.itemKey, row.reason]));
+  const cashKinds = new Set(["chequing", "savings", "cash"]);
+  const primary = [...(accounts.data?.items ?? [])]
+    .filter((account) => cashKinds.has(account.kind) && account.archivedAt === null)
+    .sort((left, right) => right.balance - left.balance || left.name.localeCompare(right.name))[0];
+  const bills = position.data?.billsReserved ?? 0;
+  const kept = (buckets.data?.items ?? []).reduce((sum, bucket) => sum + (bucket.balance > 0 ? bucket.balance : 0), 0);
   const caughtUp = inbox.data !== undefined && !showDismissed && count === 0;
   const dismissedEmpty = showDismissed && inbox.data !== undefined && inbox.data.items.length === 0;
   const imports = [...(inbox.data?.imports ?? [])].sort((left, right) => {
@@ -122,13 +140,38 @@ export function InboxScreen() {
       />
       <SummaryStrip
         tint="inbox"
-        label="Needs you"
+        label="Safe to spend until payday"
         amount={
-          <p className="font-display text-[60px] leading-[0.9] font-extrabold [font-stretch:72%] max-md:text-5xl">
-            {caughtUp ? "All caught up" : count}
-          </p>
+          forecast.data ? (
+            <Amount currency={bookCurrency} minor={forecast.data.safeToSpend} hero />
+          ) : (
+            <p className="font-display text-[60px] leading-[0.9] font-extrabold [font-stretch:72%] max-md:text-5xl">…</p>
+          )
         }
-        hint={caughtUp ? "Nothing needs a decision." : undefined}
+        hint={
+          forecast.data
+            ? paydayHint(bookCurrency, asOf, forecast.data.nextIncomeDate, forecast.data.safeToSpend)
+            : forecast.isError
+              ? "The forecast did not load."
+              : "Loading the forecast."
+        }
+        facts={
+          forecast.data ? (
+            <>
+              {primary ? (
+                <Fact label={`In ${primary.name}`}>
+                  <Amount currency={bookCurrency} minor={primary.balance} />
+                </Fact>
+              ) : null}
+              <Fact label="Bills before payday">
+                <Amount currency={bookCurrency} minor={bills === 0 ? 0 : -bills} />
+              </Fact>
+              <Fact label="Kept in buckets">
+                <Amount currency={bookCurrency} minor={kept === 0 ? 0 : -kept} />
+              </Fact>
+            </>
+          ) : undefined
+        }
         illustration={<PaydayIllustration />}
       />
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
