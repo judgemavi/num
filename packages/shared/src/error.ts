@@ -81,6 +81,12 @@ export const errorCodes = [
   "category_in_bucket",
   "event_not_found",
   "event_undone",
+  "paycheck_not_found",
+  "funding_run_exists",
+  "funding_over_limit",
+  "funding_lines_invalid",
+  "funding_run_not_found",
+  "funding_run_undone",
   "internal_error",
 ] as const;
 

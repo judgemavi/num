@@ -15,12 +15,16 @@ export function BucketRow({
   currency,
   onOpen,
   onMove,
+  onFund,
+  onRelease,
   onArchive,
 }: {
   bucket: Bucket;
   currency: string;
   onOpen: () => void;
   onMove: () => void;
+  onFund: () => void;
+  onRelease: () => void;
   onArchive: () => void;
 }) {
   const over = bucket.balance < 0;
@@ -57,9 +61,17 @@ export function BucketRow({
       </div>
       <RowMenu label={`Actions for ${bucket.name}`}>
         {bucket.archivedAt ? null : (
-          <DropdownMenuItem className="min-h-11" onSelect={onMove}>
-            Move money
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem className="min-h-11" onSelect={onFund}>
+              Fund from Unassigned
+            </DropdownMenuItem>
+            <DropdownMenuItem className="min-h-11" onSelect={onRelease}>
+              Release to Unassigned
+            </DropdownMenuItem>
+            <DropdownMenuItem className="min-h-11" onSelect={onMove}>
+              Move money
+            </DropdownMenuItem>
+          </>
         )}
         <DropdownMenuItem className="min-h-11" onSelect={onArchive}>
           {bucket.archivedAt ? "Restore" : "Archive"}

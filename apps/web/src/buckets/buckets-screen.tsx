@@ -2,6 +2,7 @@ import {
   bucketEventSchema,
   bucketSchema,
   currencyUpdateSchema,
+  fundingPositionSchema,
   overspentListSchema,
   type Bucket,
   type BucketKind,
@@ -11,8 +12,12 @@ import { getRouteApi } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { ActivityList } from "@/buckets/activity-list";
+import { AssignMoney } from "@/buckets/assign-money";
 import { BucketForm } from "@/buckets/bucket-form";
 import { BucketRow } from "@/buckets/bucket-row";
+import { FundPaycheck } from "@/buckets/fund-paycheck";
+import { FundingHistory } from "@/buckets/funding-history";
+import { OverspentPanel } from "@/buckets/overspent-panel";
 import { BucketFilterBar } from "@/buckets/filters";
 import { bucketError, today } from "@/buckets/format";
 import { formatMoney } from "@/money";
@@ -24,10 +29,8 @@ import { JarsIllustration } from "@/components/illustrations";
 import { ListCard, ListGroup } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
-import { SidePanel } from "@/components/side-panel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,6 +59,9 @@ export function BucketsScreen() {
   const [pending, setPending] = useState<Bucket | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [coverFrom, setCoverFrom] = useState<Record<string, string>>({});
+  const [fundOpen, setFundOpen] = useState(false);
+  const [assign, setAssign] = useState<{ bucket: Bucket; kind: "fund" | "release" } | null>(null);
+  const asOf = today();
 
   const currency = useQuery({
     queryKey: ["book-currency"],
@@ -70,6 +76,16 @@ export function BucketsScreen() {
   const board = useQuery({
     queryKey: ["buckets", search],
     queryFn: () => loadBuckets(search),
+  });
+  const position = useQuery({
+    queryKey: ["funding-position", asOf],
+    queryFn: async () => {
+      const result = await apiRequest(`/api/funding/position?asOf=${asOf}`, fundingPositionSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
+    },
   });
   const overspent = useQuery({
     queryKey: ["buckets", "overspent"],
@@ -90,6 +106,10 @@ export function BucketsScreen() {
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["buckets"] });
     await queryClient.invalidateQueries({ queryKey: ["bucket-events"] });
+    await queryClient.invalidateQueries({ queryKey: ["funding-position"] });
+    await queryClient.invalidateQueries({ queryKey: ["funding-paychecks"] });
+    await queryClient.invalidateQueries({ queryKey: ["funding-proposal"] });
+    await queryClient.invalidateQueries({ queryKey: ["funding-runs"] });
   }
 
   async function confirmPending() {
@@ -127,10 +147,10 @@ export function BucketsScreen() {
     await refresh();
   }
 
-  if (currency.isPending || board.isPending || overspent.isPending) {
+  if (currency.isPending || board.isPending || overspent.isPending || position.isPending) {
     return <p className="text-muted-foreground">Loading buckets.</p>;
   }
-  if (currency.isError || board.isError || overspent.isError || !currency.data || !board.data || !overspent.data) {
+  if (currency.isError || board.isError || overspent.isError || position.isError || !currency.data || !board.data || !overspent.data || !position.data) {
     return (
       <div className="grid content-start gap-5">
         <p>The buckets did not load.</p>
@@ -140,6 +160,7 @@ export function BucketsScreen() {
             void currency.refetch();
             void board.refetch();
             void overspent.refetch();
+            void position.refetch();
           }}
         >
           Try again
@@ -164,6 +185,9 @@ export function BucketsScreen() {
         title="Buckets"
         actions={
           <>
+            <Button type="button" variant="secondary" onClick={() => setFundOpen(true)}>
+              Fund this paycheck
+            </Button>
             <Button type="button" variant="secondary" onClick={() => setMoveFrom(null)}>
               Move money
             </Button>
@@ -187,6 +211,9 @@ export function BucketsScreen() {
         hint={`of ${formatMoney(bookCurrency, spendingTarget)} across ${spending.length} spending ${spending.length === 1 ? "bucket" : "buckets"}`}
         facts={
           <>
+            <Fact label="Unassigned">
+              <Amount currency={bookCurrency} minor={position.data.unassigned} className="text-lg" />
+            </Fact>
             <Fact label="In all buckets">
               <Amount currency={bookCurrency} minor={allBalances} className="text-lg" />
             </Fact>
@@ -237,51 +264,33 @@ export function BucketsScreen() {
                     }
                   />
                   {items.map((bucket) => (
-                    <BucketRow key={bucket.id} bucket={bucket} currency={bookCurrency} onOpen={() => setDraft(bucket)} onMove={() => setMoveFrom(bucket.id)} onArchive={() => setPending(bucket)} />
+                    <BucketRow
+                      key={bucket.id}
+                      bucket={bucket}
+                      currency={bookCurrency}
+                      onOpen={() => setDraft(bucket)}
+                      onMove={() => setMoveFrom(bucket.id)}
+                      onFund={() => setAssign({ bucket, kind: "fund" })}
+                      onRelease={() => setAssign({ bucket, kind: "release" })}
+                      onArchive={() => setPending(bucket)}
+                    />
                   ))}
                 </div>
               );
             })
           )}
         </ListCard>
+        <FundingHistory currency={bookCurrency} onDone={() => void refresh()} />
         <ActivityList currency={bookCurrency} buckets={search.archived ? [...(sources.data?.items ?? []), ...rows] : rows} onDone={() => void refresh()} />
         </div>
-        <SidePanel title="Overspent" text="Move money from another bucket to cover it.">
-          {overspent.data.length === 0 ? <p className="text-sm text-muted-foreground">No bucket is overspent.</p> : null}
-          {overspent.data.map((item) => {
-            const need = -item.balance;
-            const options = pool.filter((bucket) => bucket.id !== item.id && bucket.balance >= need);
-            return (
-              <div key={item.id} className="grid gap-2 border-t pt-3 first:border-t-0 first:pt-0">
-                <p className="font-semibold">
-                  {item.name}
-                  <span className="mt-0.5 block text-sm font-normal text-attn">Over by <Amount currency={bookCurrency} minor={need} /></span>
-                </p>
-                {options.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No other bucket can cover this.</p>
-                ) : (
-                  <div className="grid gap-2">
-                    <Select value={coverFrom[item.id]} onValueChange={(value) => setCoverFrom((current) => ({ ...current, [item.id]: value }))}>
-                      <SelectTrigger aria-label={`Cover ${item.name} from`} className="w-full">
-                        <SelectValue placeholder="Cover from" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {options.map((bucket) => (
-                          <SelectItem key={bucket.id} value={bucket.id}>
-                            {bucket.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button type="button" disabled={!coverFrom[item.id]} onClick={() => void cover(item.id)}>
-                      Cover
-                    </Button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </SidePanel>
+        <OverspentPanel
+          currency={bookCurrency}
+          items={overspent.data}
+          pool={pool}
+          coverFrom={coverFrom}
+          onCoverFrom={(id, bucketId) => setCoverFrom((current) => ({ ...current, [id]: bucketId }))}
+          onCover={(id) => void cover(id)}
+        />
       </div>
       <Dialog open={draft !== null} onOpenChange={(open) => { if (!open) setDraft(null); }}>
         <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
@@ -294,6 +303,37 @@ export function BucketsScreen() {
               onClose={() => setDraft(null)}
               onSaved={() => {
                 setDraft(null);
+                void refresh();
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={fundOpen} onOpenChange={(open) => { if (!open) setFundOpen(false); }}>
+        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
+          {fundOpen ? (
+            <FundPaycheck
+              currency={bookCurrency}
+              asOf={asOf}
+              onClose={() => setFundOpen(false)}
+              onSaved={() => {
+                setFundOpen(false);
+                void refresh();
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={assign !== null} onOpenChange={(open) => { if (!open) setAssign(null); }}>
+        <DialogContent>
+          {assign ? (
+            <AssignMoney
+              currency={bookCurrency}
+              bucket={assign.bucket}
+              kind={assign.kind}
+              onClose={() => setAssign(null)}
+              onSaved={() => {
+                setAssign(null);
                 void refresh();
               }}
             />

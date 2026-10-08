@@ -120,6 +120,24 @@ export function bucketError(code: ErrorCode): string {
   if (code === "event_funding_run") {
     return "This event belongs to a paycheck. Undo the paycheck to undo it.";
   }
+  if (code === "paycheck_not_found") {
+    return "That paycheck is not ready to fund.";
+  }
+  if (code === "funding_run_exists") {
+    return "This paycheck is already funded. Undo that funding first.";
+  }
+  if (code === "funding_over_limit") {
+    return "That is more than this paycheck can assign.";
+  }
+  if (code === "funding_lines_invalid") {
+    return "Check the amounts.";
+  }
+  if (code === "funding_run_not_found") {
+    return "That funding was not found. Refresh the page.";
+  }
+  if (code === "funding_run_undone") {
+    return "That funding is already undone.";
+  }
   if (code === "bucket_fields_invalid" || code === "invalid_body") {
     return "Check the bucket fields.";
   }
