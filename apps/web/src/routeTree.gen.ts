@@ -17,6 +17,7 @@ import { Route as PlanRouteImport } from './routes/plan'
 import { Route as RecurringRouteImport } from './routes/recurring'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TransactionsRouteImport } from './routes/transactions'
+import { Route as AccountsAccountIdRouteImport } from './routes/accounts_.$accountId'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsBackupRouteImport } from './routes/settings/backup'
 import { Route as SettingsCategoriesRouteImport } from './routes/settings/categories'
@@ -63,6 +64,11 @@ const TransactionsRoute = TransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountsAccountIdRoute = AccountsAccountIdRouteImport.update({
+  id: '/accounts_/$accountId',
+  path: '/accounts/$accountId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/recurring': typeof RecurringRoute
   '/settings': typeof SettingsRouteWithChildren
   '/transactions': typeof TransactionsRoute
+  '/accounts/$accountId': typeof AccountsAccountIdRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/plan': typeof PlanRoute
   '/recurring': typeof RecurringRoute
   '/transactions': typeof TransactionsRoute
+  '/accounts/$accountId': typeof AccountsAccountIdRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/recurring': typeof RecurringRoute
   '/settings': typeof SettingsRouteWithChildren
   '/transactions': typeof TransactionsRoute
+  '/accounts_/$accountId': typeof AccountsAccountIdRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
     | '/recurring'
     | '/settings'
     | '/transactions'
+    | '/accounts/$accountId'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/plan'
     | '/recurring'
     | '/transactions'
+    | '/accounts/$accountId'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/recurring'
     | '/settings'
     | '/transactions'
+    | '/accounts_/$accountId'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
@@ -190,6 +202,7 @@ export interface RootRouteChildren {
   RecurringRoute: typeof RecurringRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   TransactionsRoute: typeof TransactionsRoute
+  AccountsAccountIdRoute: typeof AccountsAccountIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -248,6 +261,13 @@ declare module '@tanstack/react-router' {
       path: '/transactions'
       fullPath: '/transactions'
       preLoaderRoute: typeof TransactionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/accounts_/$accountId': {
+      id: '/accounts_/$accountId'
+      path: '/accounts/$accountId'
+      fullPath: '/accounts/$accountId'
+      preLoaderRoute: typeof AccountsAccountIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/': {
@@ -317,6 +337,7 @@ const rootRouteChildren: RootRouteChildren = {
   RecurringRoute: RecurringRoute,
   SettingsRoute: SettingsRouteWithChildren,
   TransactionsRoute: TransactionsRoute,
+  AccountsAccountIdRoute: AccountsAccountIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

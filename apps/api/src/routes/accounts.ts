@@ -9,7 +9,7 @@ import {
 } from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { archiveAccount, createAccount, listAccounts, restoreAccount, updateAccount } from "../services/accounts";
+import { archiveAccount, createAccount, getAccount, listAccounts, restoreAccount, updateAccount } from "../services/accounts";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -115,6 +115,23 @@ const restoreRoute = createRoute({
   },
 });
 
+const readRoute = createRoute({
+  method: "get",
+  path: "/api/accounts/{id}",
+  request: { params: idParams },
+  responses: {
+    200: {
+      description: "One account and its balance",
+      content: {
+        "application/json": {
+          schema: accountSchema,
+        },
+      },
+    },
+    404: errorResponse,
+  },
+});
+
 const archiveRoute = createRoute({
   method: "post",
   path: "/api/accounts/{id}/archive",
@@ -146,6 +163,11 @@ const archiveRoute = createRoute({
 
 export function registerAccounts(app: OpenAPIHono, db: Db) {
   app.openapi(listRoute, (c) => c.json(listAccounts(db, c.req.valid("query")), 200));
+
+  app.openapi(readRoute, (c) => {
+    const { id } = c.req.valid("param");
+    return c.json(getAccount(db, id), 200);
+  });
 
   app.openapi(createRouteDef, (c) => {
     const body = c.req.valid("json");

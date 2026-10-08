@@ -1,6 +1,6 @@
 import { accountClass, accountListSchema, accountSchema, currencyUpdateSchema, type Account } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { AccountForm } from "@/accounts/account-form";
@@ -41,6 +41,7 @@ export function AccountsScreen() {
   const queryClient = useQueryClient();
   const search = accountsRoute.useSearch();
   const navigate = accountsRoute.useNavigate();
+  const openAccount = useNavigate();
   const [draft, setDraft] = useState<Account | "new" | null>(null);
   const [pending, setPending] = useState<Account | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -180,7 +181,16 @@ export function AccountsScreen() {
                 {group.items.map((account) => {
                   const detail = accountDetail(account);
                   return (
-                    <ListRow key={account.id} onOpen={() => setDraft(account)}>
+                    <ListRow
+                      key={account.id}
+                      onOpen={() => {
+                        void openAccount({
+                          to: "/accounts/$accountId",
+                          params: { accountId: account.id },
+                          search: { page: 1, reconcile: false },
+                        });
+                      }}
+                    >
                       <IconTile hue={groupHue[group.id]}>
                         <AccountIcon kind={account.kind} />
                       </IconTile>
@@ -196,6 +206,21 @@ export function AccountsScreen() {
                         {detail ? <small>{detail}</small> : null}
                       </div>
                       <RowMenu label={`Actions for ${account.name}`}>
+                        <DropdownMenuItem className="min-h-11" onSelect={() => setDraft(account)}>
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onSelect={() => {
+                            void openAccount({
+                              to: "/accounts/$accountId",
+                              params: { accountId: account.id },
+                              search: { page: 1, reconcile: true },
+                            });
+                          }}
+                        >
+                          Reconcile
+                        </DropdownMenuItem>
                         <DropdownMenuItem className="min-h-11" onSelect={() => setPending(account)}>
                           {account.archivedAt ? "Restore" : "Archive"}
                         </DropdownMenuItem>

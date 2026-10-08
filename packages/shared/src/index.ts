@@ -59,6 +59,24 @@ export {
   type TagListQuery,
   type TagUpdate,
 } from "./category";
+export {
+  accountActivityQuerySchema,
+  checkpointCompareSchema,
+  checkpointCreateSchema,
+  checkpointHelpSchema,
+  checkpointListSchema,
+  checkpointSchema,
+  clearanceResultSchema,
+  clearanceSchema,
+  closingHintSchema,
+  type AccountActivityQuery,
+  type Checkpoint,
+  type CheckpointCompare,
+  type CheckpointCreate,
+  type CheckpointHelp,
+  type Clearance,
+  type ClosingHint,
+} from "./checkpoint";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
 export { documentSchema, type Document } from "./document";
 export { errorCodes, errorSchema, type ErrorBody, type ErrorCode } from "./error";

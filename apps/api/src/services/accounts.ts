@@ -1,4 +1,4 @@
-import { accounts, transactions, valuations } from "@num/db";
+import { accounts } from "@num/db";
 import {
   accountKinds,
   defaultOnBudget,
@@ -11,26 +11,17 @@ import {
   type PaymentPolicy,
   utcNow,
 } from "@num/shared";
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
 import { ServiceError } from "../service-error";
-import {
-  accountBalance,
-  assertCanArchive,
-  assertSameClass,
-  cardFields,
-  interestRate,
-  type CardFields,
-} from "./account-rules";
-import { write, type AuditSource, type WriteTx } from "./write";
+import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
+import { assertCanArchive, assertSameClass, cardFields, interestRate, type CardFields } from "./account-rules";
+import { write, type AuditSource } from "./write";
 
 type WriteInput = {
   source: AuditSource;
   at?: string;
 };
-
-type Reader = Db | WriteTx;
 
 type AccountRow = typeof accounts.$inferSelect;
 
@@ -49,80 +40,6 @@ function asPolicy(value: string | null): PaymentPolicy | null {
     throw new Error("Unknown payment policy");
   }
   return value as PaymentPolicy;
-}
-
-function readSum(row: { total: unknown } | undefined): number {
-  if (!row) {
-    return 0;
-  }
-  return integerSum(row.total);
-}
-
-function transactionTotals(db: Reader): Map<string, number> {
-  const rows = db
-    .select({
-      accountId: transactions.accountId,
-      total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)`,
-    })
-    .from(transactions)
-    .where(isNull(transactions.deletedAt))
-    .groupBy(transactions.accountId)
-    .all();
-  const totals = new Map<string, number>();
-  for (const row of rows) {
-    totals.set(row.accountId, integerSum(row.total));
-  }
-  return totals;
-}
-
-function sumAfter(db: Reader, accountId: string, date: string): number {
-  const row = db
-    .select({
-      total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)`,
-    })
-    .from(transactions)
-    .where(
-      and(eq(transactions.accountId, accountId), isNull(transactions.deletedAt), gt(transactions.date, date)),
-    )
-    .get();
-  return readSum(row);
-}
-
-function latestValuations(db: Reader): Map<string, { date: string; balance: number }> {
-  const rows = db
-    .select({
-      accountId: valuations.accountId,
-      date: valuations.date,
-      balance: valuations.balance,
-    })
-    .from(valuations)
-    .where(isNull(valuations.deletedAt))
-    .all();
-  const latest = new Map<string, { date: string; balance: number }>();
-  for (const row of rows) {
-    const current = latest.get(row.accountId);
-    if (!current || row.date > current.date) {
-      latest.set(row.accountId, { date: row.date, balance: row.balance });
-    }
-  }
-  return latest;
-}
-
-function balanceFor(
-  db: Reader,
-  row: { id: string; kind: AccountKind; openingBalance: number },
-  totals?: Map<string, number>,
-  latest?: Map<string, { date: string; balance: number }>,
-): number {
-  const valuation = (latest ?? latestValuations(db)).get(row.id) ?? null;
-  return accountBalance({
-    kind: row.kind,
-    openingBalance: row.openingBalance,
-    transactionTotal: (totals ?? transactionTotals(db)).get(row.id) ?? 0,
-    valuation: valuation
-      ? { balance: valuation.balance, transactionsAfter: sumAfter(db, row.id, valuation.date) }
-      : null,
-  });
 }
 
 function blankToNull(value: string | null | undefined): string | null {
@@ -239,7 +156,7 @@ export function listAccounts(db: Db, query: AccountListQuery) {
     .filter((row) => (query.archived ? row.archivedAt !== null : row.archivedAt === null));
   const totals = transactionTotals(db);
   const latest = latestValuations(db);
-  const items = rows.map((row) => toAccount(row, balanceFor(db, { ...row, kind: asKind(row.kind) }, totals, latest)));
+  const items = rows.map((row) => toAccount(row, balanceOf(db, { ...row, kind: asKind(row.kind) }, totals, latest)));
   const sort = query.sort ?? "name";
   const dir = query.dir === "desc" ? -1 : 1;
   items.sort((left, right) => {
@@ -321,7 +238,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
     });
     updated = toAccount(
       { id, ...next },
-      balanceFor(tx, { id, kind: input.kind, openingBalance: next.openingBalance }),
+      balanceOf(tx, { id, kind: input.kind, openingBalance: next.openingBalance }),
     );
   });
   if (!updated) {
@@ -346,7 +263,7 @@ export function archiveAccount(
       throw new ServiceError("account_archived", 409);
     }
     const kind = asKind(existing.kind);
-    const balance = balanceFor(tx, { id, kind, openingBalance: existing.openingBalance });
+    const balance = balanceOf(tx, { id, kind, openingBalance: existing.openingBalance });
     assertCanArchive(balance, input.confirm);
     const next = { ...existing, archivedAt: at };
     tx.update(accounts).set({ archivedAt: at }).where(eq(accounts.id, id)).run();
@@ -385,10 +302,18 @@ export function restoreAccount(db: Db, id: string, input: WriteInput): Account {
       before: snapshot(existing),
       after: snapshot(next),
     });
-    restored = toAccount(next, balanceFor(tx, { id, kind, openingBalance: existing.openingBalance }));
+    restored = toAccount(next, balanceOf(tx, { id, kind, openingBalance: existing.openingBalance }));
   });
   if (!restored) {
     throw new Error("Restore did not return an account");
   }
   return restored;
+}
+
+export function getAccount(db: Db, id: string): Account {
+  const row = db.select().from(accounts).where(eq(accounts.id, id)).get();
+  if (!row) {
+    throw new ServiceError("account_not_found", 404);
+  }
+  return toAccount(row, balanceOf(db, { id: row.id, kind: asKind(row.kind), openingBalance: row.openingBalance }));
 }
