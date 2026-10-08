@@ -36,7 +36,7 @@ function editValueOf(kind: EditorKind, props: EditorInput[EditorKind]): string |
   }
   if (kind === "transaction") {
     const transaction = props as EditorInput["transaction"];
-    if ((transaction.groupIds?.length ?? 0) > 0 || (transaction.queueIds?.length ?? 0) > 0) {
+    if ((transaction.groupIds?.length ?? 0) > 0) {
       return null;
     }
   }

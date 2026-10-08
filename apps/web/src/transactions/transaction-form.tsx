@@ -46,6 +46,8 @@ type TransactionFormProps = {
   onSaved: (id: string) => void;
   onDelete: () => Promise<string | null>;
   deleteKind?: "plain" | "mirror" | "linked";
+  decisions?: { itemKey: string; text: string }[];
+  onUndoDecision?: (itemKey: string) => void;
 };
 
 export function TransactionForm({
@@ -62,6 +64,8 @@ export function TransactionForm({
   onSaved,
   onDelete,
   deleteKind = "plain",
+  decisions = [],
+  onUndoDecision,
 }: TransactionFormProps) {
   const reconciled = transaction?.status === "reconciled";
   const imported = transaction?.source === "import";
@@ -124,7 +128,13 @@ export function TransactionForm({
   const transferOptions = accounts
     .filter((account) => account.id !== accountId && (account.archivedAt === null || account.id === transferAccountId || lines.some((line) => line.transferAccountId === account.id)))
     .map((account) => ({ id: account.id, label: account.archivedAt ? `${account.name} (archived)` : account.name }));
-  const merchantOptions = merchants.map((merchant) => ({ id: merchant.id, label: merchant.name }));
+  const merchantOptions = merchants
+    .filter((merchant) => merchant.archivedAt === null || merchant.id === merchantId)
+    .map((merchant) => ({ id: merchant.id, label: merchant.name }));
+  const archivedMerchants = merchants.filter((merchant) => merchant.archivedAt).map((merchant) => ({ id: merchant.id, label: merchant.name }));
+  const archivedAccounts = accounts
+    .filter((account) => account.archivedAt !== null && account.id !== accountId)
+    .map((account) => ({ id: account.id, label: account.name }));
   const totalMinor = hintAmount;
   const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, lines) : null;
   const saveDisabled =
@@ -235,6 +245,16 @@ export function TransactionForm({
           {amountLocked ? "This side follows the other account. Change the amount there." : "Say where the money went."}
         </DialogDescription>
       </DialogHeader>
+      {decisions.map((row) => (
+        <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
+          <span>{row.text}</span>
+          {onUndoDecision ? (
+            <Button type="button" variant="outline" onClick={() => onUndoDecision(row.itemKey)}>
+              Undo
+            </Button>
+          ) : null}
+        </p>
+      ))}
       {rawLine ? (
         <p className="rounded-xl bg-sunken px-3 py-2 text-sm break-all">
           <span className="font-semibold">Statement line. </span>
@@ -327,7 +347,9 @@ export function TransactionForm({
         totalMinor={totalMinor}
         categories={categories}
         accounts={transferOptions}
+        archivedAccounts={archivedAccounts}
         merchants={merchantOptions}
+        archivedMerchants={archivedMerchants}
         merchantId={merchantId}
         onMerchantId={(id) => {
           setTouched(true);

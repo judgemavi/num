@@ -8,7 +8,6 @@ export type EditorInput = {
     rawLine?: string;
     initialAccountId?: string;
     groupIds?: string[];
-    queueIds?: string[];
   };
   account: { id: string | null; name?: string };
   category: { id: string | null; name?: string; kind?: CategoryKind };
@@ -24,9 +23,6 @@ export type EditorInput = {
   fundPaycheck: { incomeTransactionId?: string };
   assignMoney: { bucketId: string; kind: "fund" | "release" };
   moveMoney: { fromId: string | null };
-  inboxReason:
-    | { mode: "dismiss"; itemKeys: string[]; asOf: string }
-    | { mode: "skip"; planId: string; dueDate: string; asOf: string };
   importInfo: Pick<ImportBatch, "filename" | "counts" | "unreadable">;
   mergeMerchant: { merchantId: string };
   applyRule: { ruleId: string };

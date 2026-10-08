@@ -62,7 +62,7 @@ export function useTags() {
 export function useMerchants() {
   return useQuery({
     queryKey: ["merchants", "options"],
-    queryFn: async () => (await loadAllPages("/api/merchants", merchantListSchema, { archived: false })).items as Merchant[],
+    queryFn: () => activeAndArchived<Merchant>("/api/merchants", merchantListSchema),
   });
 }
 

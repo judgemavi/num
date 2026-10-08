@@ -30,13 +30,13 @@ export function importBatchStatus(input: {
   needsReview: number;
   batchId: string;
   unreadableLines: readonly number[];
-  dismissedKeys: ReadonlySet<string>;
+  decidedKeys: ReadonlySet<string>;
 }): ImportViewStatus {
   if (input.undoneAt !== null) {
     return "undone";
   }
   const unreadableOpen = input.unreadableLines.some(
-    (line) => !input.dismissedKeys.has(`import_unreadable:${input.batchId}:${line}`),
+    (line) => !input.decidedKeys.has(`import_unreadable:${input.batchId}:${line}`),
   );
   if (input.needsReview > 0 || unreadableOpen) {
     return "needs_you";
@@ -166,10 +166,14 @@ export const importDetailRowSchema = z.object({
 
 export type ImportDetailRow = z.infer<typeof importDetailRowSchema>;
 
+export const importDetailUnreadableSchema = unreadableRowSchema.extend({
+  decision: z.enum(["not_a_transaction"]).nullable(),
+});
+
 export const importDetailSchema = z.object({
   item: importViewItemSchema,
   rows: z.array(importDetailRowSchema),
-  unreadable: z.array(unreadableRowSchema),
+  unreadable: z.array(importDetailUnreadableSchema),
 });
 
 export type ImportDetail = z.infer<typeof importDetailSchema>;

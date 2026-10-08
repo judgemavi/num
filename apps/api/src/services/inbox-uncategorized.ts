@@ -56,7 +56,7 @@ function toItem(
   };
 }
 
-export function uncategorizedInbox(db: Db, hidden: ReadonlySet<string>): { open: InboxItem[]; closed: InboxItem[] } {
+export function uncategorizedInbox(db: Db, hidden: ReadonlySet<string>): InboxItem[] {
   const rows = db.all<Row>(sql`
     select
       t.id as transactionId,
@@ -74,7 +74,7 @@ export function uncategorizedInbox(db: Db, hidden: ReadonlySet<string>): { open:
     group by t.id
   `);
   if (rows.length === 0) {
-    return { open: [], closed: [] };
+    return [];
   }
   const payees = [...new Set(rows.map((row) => row.payee).filter((payee) => payee.length > 0))];
   const history = historyFor(db, payees);
@@ -104,8 +104,5 @@ export function uncategorizedInbox(db: Db, hidden: ReadonlySet<string>): { open:
     }
     return toItem(row, suggestion, { rules: ruleRows, history: history.get(row.payee) ?? [], merchants: merchantRows });
   });
-  return {
-    open: items.filter((item) => item.kind === "uncategorized" && !hidden.has(item.itemKey)),
-    closed: items.filter((item) => item.kind === "uncategorized" && hidden.has(item.itemKey)),
-  };
+  return items.filter((item) => !hidden.has(item.itemKey));
 }

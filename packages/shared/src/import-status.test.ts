@@ -9,7 +9,7 @@ test("import status is undone, needs you, or imported", () => {
     needsReview: 0,
     batchId,
     unreadableLines: [] as number[],
-    dismissedKeys: new Set<string>(),
+    decidedKeys: new Set<string>(),
   };
 
   expect(importBatchStatus(open)).toBe("imported");
@@ -19,7 +19,7 @@ test("import status is undone, needs you, or imported", () => {
     importBatchStatus({
       ...open,
       unreadableLines: [4],
-      dismissedKeys: new Set([`import_unreadable:${batchId}:4`]),
+      decidedKeys: new Set([`import_unreadable:${batchId}:4`]),
     }),
   ).toBe("imported");
   expect(importBatchStatus({ ...open, undoneAt: "2026-04-01T00:00:00Z", needsReview: 2, unreadableLines: [4] })).toBe(

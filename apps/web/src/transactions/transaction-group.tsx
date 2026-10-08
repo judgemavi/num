@@ -114,6 +114,13 @@ function GroupForm({
   const transferOptions = accounts
     .filter((account) => account.id !== accountId && account.archivedAt === null)
     .map((account) => ({ id: account.id, label: account.name }));
+  const archivedAccounts = accounts
+    .filter((account) => account.archivedAt !== null && account.id !== accountId)
+    .map((account) => ({ id: account.id, label: account.name }));
+  const merchantOptions = merchants
+    .filter((merchant) => merchant.archivedAt === null || merchant.id === merchantId)
+    .map((merchant) => ({ id: merchant.id, label: merchant.name }));
+  const archivedMerchants = merchants.filter((merchant) => merchant.archivedAt).map((merchant) => ({ id: merchant.id, label: merchant.name }));
   const saveDisabled = saving || included.length === 0 || (choice === "transfer" && !transferAccountId);
 
   async function save() {
@@ -208,7 +215,9 @@ function GroupForm({
         totalMinor={total}
         categories={categories}
         accounts={transferOptions}
-        merchants={merchants.map((merchant) => ({ id: merchant.id, label: merchant.name }))}
+        archivedAccounts={archivedAccounts}
+        merchants={merchantOptions}
+        archivedMerchants={archivedMerchants}
         merchantId={merchantId}
         onMerchantId={setMerchantId}
         payee={payee}

@@ -11,8 +11,6 @@ import { importCountText, unreadableLabel } from "@/accounts/import-format";
 import type { EditorInput } from "@/editors/editor-types";
 import { useMerchants, useRecord } from "@/editors/lookups";
 import { LoadError, LoadingLine } from "@/editors/load-state";
-import { dismissItem, skipOccurrence } from "@/inbox/actions";
-import { inboxError } from "@/inbox/format";
 import { planError } from "@/recurring/format";
 import { formatDate } from "@/transactions/format";
 import { SkipNext } from "@/recurring/skip-next";
@@ -34,59 +32,6 @@ function useRefresh(keys: string[][]) {
       await queryClient.invalidateQueries({ queryKey: key });
     }
   };
-}
-
-export function InboxReasonEditor({ props, onClose, onSaved }: { props: EditorInput["inboxReason"] } & Finish) {
-  const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const queryClient = useQueryClient();
-  const skip = props.mode === "skip";
-
-  async function submit() {
-    if (reason.trim().length === 0) {
-      return;
-    }
-    setSaving(true);
-    const result = skip
-      ? await skipOccurrence(props.planId, props.dueDate, reason.trim())
-      : await dismissItem(props.asOf, props.itemKeys, reason.trim());
-    setSaving(false);
-    if (!result.ok) {
-      setError(inboxError(result.code));
-      return;
-    }
-    await queryClient.invalidateQueries({ queryKey: ["inbox"] });
-    await queryClient.invalidateQueries({ queryKey: ["plans"] });
-    onSaved("ok");
-  }
-
-  return (
-    <form
-      className="grid gap-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void submit();
-      }}
-    >
-      <DialogHeader>
-        <DialogTitle>{skip ? "Skip this occurrence" : "Not now"}</DialogTitle>
-      </DialogHeader>
-      <Field>
-        <FieldLabel htmlFor="inbox-reason">Reason</FieldLabel>
-        <Input id="inbox-reason" value={reason} onChange={(event) => setReason(event.target.value)} />
-      </Field>
-      {error ? <FieldError>{error}</FieldError> : null}
-      <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={saving || reason.trim().length === 0}>
-          {skip ? "Skip" : "Dismiss"}
-        </Button>
-      </DialogFooter>
-    </form>
-  );
 }
 
 export function ImportInfoEditor({ props, onClose }: { props: EditorInput["importInfo"]; onClose: () => void }) {

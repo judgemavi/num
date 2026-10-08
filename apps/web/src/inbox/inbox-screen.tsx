@@ -15,7 +15,7 @@ import { useState } from "react";
 import { localAsOf } from "@/as-of";
 import { useEditors } from "@/editors/editor-api";
 import { loadBuckets } from "@/buckets/query";
-import { dismissItem, restoreItem } from "@/inbox/actions";
+import { acceptUnreadable, decideItem } from "@/inbox/actions";
 import { importAge, inboxError, inboxKicker, paydayHint } from "@/inbox/format";
 import { InboxItemRow } from "@/inbox/inbox-item";
 import { loadAllPages } from "@/settings/load-all-pages";
@@ -32,14 +32,13 @@ export function InboxScreen() {
   const asOf = localAsOf();
   const queryClient = useQueryClient();
   const { openEditor } = useEditors();
-  const [showDismissed, setShowDismissed] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const inbox = useQuery({
-    queryKey: ["inbox", asOf, showDismissed],
+    queryKey: ["inbox", asOf],
     queryFn: async () => {
-      const result = await apiRequest(`/api/inbox?asOf=${asOf}${showDismissed ? "&dismissed=true" : ""}`, inboxSchema);
+      const result = await apiRequest(`/api/inbox?asOf=${asOf}`, inboxSchema);
       if (!result.ok) {
         throw new Error(result.code);
       }
@@ -110,8 +109,6 @@ export function InboxScreen() {
   const categoryRows = categories.data?.items ?? [];
   const bucketRows = buckets.data?.items ?? [];
   const count = inbox.data?.count ?? 0;
-  const dismissedCount = inbox.data?.dismissedCount ?? 0;
-  const reasons = new Map((inbox.data?.dismissalReasons ?? []).map((row) => [row.itemKey, row.reason]));
   const cashKinds = new Set(["chequing", "savings", "cash"]);
   const primary = [...(accounts.data?.items ?? [])]
     .filter((account) => cashKinds.has(account.kind) && account.archivedAt === null)
@@ -120,8 +117,7 @@ export function InboxScreen() {
   const spendingBuckets = bucketRows
     .filter((bucket) => bucket.kind === "spending" && bucket.archivedAt === null)
     .sort((left, right) => left.name.localeCompare(right.name));
-  const caughtUp = inbox.data !== undefined && !showDismissed && count === 0;
-  const dismissedEmpty = showDismissed && inbox.data !== undefined && inbox.data.items.length === 0;
+  const caughtUp = inbox.data !== undefined && count === 0;
   const imports = [...(inbox.data?.imports ?? [])].sort((left, right) => {
     const leftName = accountNames.get(left.accountId) ?? "";
     const rightName = accountNames.get(right.accountId) ?? "";
@@ -181,26 +177,8 @@ export function InboxScreen() {
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <ListCard label="Needs you">
           <div className="flex items-center gap-2 border-b px-5 py-3.5">
-            <h2 className="text-base font-bold">{showDismissed ? "Dismissed" : "Needs you"}</h2>
-            {!showDismissed && count > 0 ? <Badge variant="count">{count}</Badge> : null}
-            {!showDismissed && (inbox.data?.items.some((item) => item.kind === "uncategorized") ?? false) ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="ml-auto"
-                onClick={() => {
-                  const ids = (inbox.data?.items ?? [])
-                    .filter((item) => item.kind === "uncategorized")
-                    .map((item) => item.transactionId);
-                  void openEditor("transaction", { id: ids[0] ?? null, queueIds: ids }).then(() => refresh());
-                }}
-              >
-                Review one by one
-              </Button>
-            ) : null}
-            <Button type="button" variant="ghost" className={showDismissed || !(inbox.data?.items.some((item) => item.kind === "uncategorized")) ? "ml-auto" : ""} onClick={() => setShowDismissed((value) => !value)}>
-              {showDismissed ? "Needs you" : `Dismissed${dismissedCount > 0 ? ` (${dismissedCount})` : ""}`}
-            </Button>
+            <h2 className="text-base font-bold">Needs you</h2>
+            {count > 0 ? <Badge variant="count">{count}</Badge> : null}
           </div>
           {inbox.isPending ? <p className="px-5 py-6 text-muted-foreground">Loading the inbox.</p> : null}
           {inbox.isError ? (
@@ -214,7 +192,6 @@ export function InboxScreen() {
           {notice ? <p className="px-5 py-3 text-sm" role="status">{notice}</p> : null}
           {actionError ? <p className="px-5 py-3 text-sm text-attn">{actionError}</p> : null}
           {caughtUp ? <p className="px-5 py-6 text-muted-foreground">All caught up.</p> : null}
-          {dismissedEmpty ? <p className="px-5 py-6 text-muted-foreground">No dismissed items.</p> : null}
           {inbox.data?.items.map((item) => (
             <InboxItemRow
               key={item.itemKey}
@@ -227,25 +204,26 @@ export function InboxScreen() {
               categories={categoryRows}
               buckets={bucketRows}
               onSkip={(planId, dueDate) => {
-                void openEditor("inboxReason", { mode: "skip", planId, dueDate, asOf }).then((id) => {
+                void openEditor("skipOccurrence", { planId, dueDate }).then((id) => {
                   if (id) {
                     refresh();
                   }
                 });
               }}
-              onDismiss={(itemKeys) => {
-                void openEditor("inboxReason", { mode: "dismiss", itemKeys, asOf }).then((id) => {
-                  if (id) {
-                    refresh();
-                  }
-                });
+              onLink={(planId, dueDate) => {
+                const plan = planRows.get(planId);
+                if (!plan) {
+                  return;
+                }
+                void openEditor("linkOccurrence", { planId, accountId: plan.accountId, dueDate }).then(() => refresh());
               }}
+              onDecide={(itemKey, decision) => decideItem(asOf, itemKey, decision)}
               onAddByHand={(item) => {
                 void openEditor("transaction", { id: null, rawLine: item.raw, initialAccountId: item.accountId }).then((id) => {
                   if (!id) {
                     return;
                   }
-                  void dismissItem(asOf, [item.itemKey], "added_manually").then((result) => {
+                  void acceptUnreadable(asOf, item.itemKey).then((result) => {
                     if (!result.ok) {
                       setActionError(inboxError(result.code));
                     }
@@ -260,17 +238,6 @@ export function InboxScreen() {
                 void openEditor("fundPaycheck", { incomeTransactionId }).then(() => refresh());
               }}
               unassigned={position.data?.unassigned ?? 0}
-              onRestore={(itemKeys) => {
-                void restoreItem(itemKeys).then((result) => {
-                  if (!result.ok) {
-                    setActionError(inboxError(result.code));
-                    return;
-                  }
-                  setActionError(null);
-                  refresh();
-                });
-              }}
-              dismissedReason={showDismissed ? reasons.get(item.itemKey) : undefined}
               onDone={() => {
                 setActionError(null);
                 refresh();

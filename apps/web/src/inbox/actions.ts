@@ -1,11 +1,14 @@
 import {
   bucketEventSchema,
   importReviewResultSchema,
+  inboxDecisionSchema,
+  inboxDecisionUndoSchema,
   inboxGroupApplyResultSchema,
-  inboxRestoreSchema,
+  inboxUnreadableAcceptSchema,
   occurrenceLinkSchema,
   planSchema,
   transferPairSchema,
+  type InboxDecisionCode,
   type InboxItem,
   type Plan,
   type Suggestion,
@@ -110,10 +113,14 @@ export function fundFromUnassigned(bucketId: string, amount: number, asOf: strin
   return apiRequest(`/api/buckets/${bucketId}/events?asOf=${asOf}`, bucketEventSchema, json({ kind: "fund", amount, date: asOf }));
 }
 
-export function dismissItem(asOf: string, itemKeys: string[], reason: string) {
-  return apiRequest(`/api/inbox/dismissals?asOf=${asOf}`, inboxRestoreSchema, json({ itemKeys, reason }));
+export function decideItem(asOf: string, itemKey: string, decision: InboxDecisionCode) {
+  return apiRequest(`/api/inbox/decisions?asOf=${asOf}`, inboxDecisionSchema, json({ itemKey, decision }));
 }
 
-export function restoreItem(itemKeys: string[]) {
-  return apiRequest("/api/inbox/dismissals/restore", inboxRestoreSchema, json({ itemKeys }));
+export function undoDecision(itemKey: string) {
+  return apiRequest("/api/inbox/decisions/undo", inboxDecisionUndoSchema, json({ itemKey }));
+}
+
+export function acceptUnreadable(asOf: string, itemKey: string) {
+  return apiRequest(`/api/inbox/unreadable?asOf=${asOf}`, inboxUnreadableAcceptSchema, json({ itemKey }));
 }

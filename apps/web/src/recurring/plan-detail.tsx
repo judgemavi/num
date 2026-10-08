@@ -1,4 +1,5 @@
 import {
+  inboxDecisionListSchema,
   occurrenceLinkSchema,
   occurrenceListSchema,
   type Occurrence,
@@ -7,6 +8,8 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
+import { undoDecision } from "@/inbox/actions";
+import { decisionText, inboxError } from "@/inbox/format";
 import { formatDate, planError } from "@/recurring/format";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
@@ -43,6 +46,17 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
   const queryClient = useQueryClient();
   const { openEditor } = useEditors();
   const [error, setError] = useState<string | null>(null);
+
+  const decisions = useQuery({
+    queryKey: ["inbox-decisions"],
+    queryFn: async () => {
+      const result = await apiRequest("/api/inbox/decisions", inboxDecisionListSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data.items;
+    },
+  });
 
   const occurrences = useQuery({
     queryKey: ["occurrences", plan.id, asOf],
@@ -84,7 +98,9 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
       return <p className="px-5 py-4 text-sm text-muted-foreground">None.</p>;
     }
     return list.map((item) => {
-      const note = statusText(item);
+      const keptKey = `recurring_changed:${plan.id}:${item.dueDate}`;
+      const kept = decisions.data?.some((row) => row.itemKey === keptKey && row.decision === "keep_plan_amount") ?? false;
+      const note = kept ? decisionText("keep_plan_amount") : statusText(item);
       return (
         <ListRow key={item.dueDate} simple>
           <div className={listName}>
@@ -110,6 +126,24 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
                 Link a transaction
               </DropdownMenuItem>
             )}
+            {kept ? (
+              <DropdownMenuItem
+                className="min-h-11"
+                onSelect={() => {
+                  void undoDecision(keptKey).then(async (result) => {
+                    if (!result.ok) {
+                      setError(inboxError(result.code));
+                      return;
+                    }
+                    setError(null);
+                    await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
+                    await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+                  });
+                }}
+              >
+                Undo
+              </DropdownMenuItem>
+            ) : null}
             {item.status === "skipped" ? (
               <DropdownMenuItem className="min-h-11" onSelect={() => void post(`${item.dueDate}/restore`)}>
                 Restore this occurrence

@@ -13,7 +13,8 @@ import { createCategory } from "./categories";
 import { undoImportBatch } from "./import-undo";
 import { importStatement } from "./imports";
 import { resolveImportReview } from "./import-review";
-import { dismissInboxItems, listInbox, restoreInboxItems } from "./inbox";
+import { decideInboxItem } from "./inbox-decisions";
+import { listInbox } from "./inbox";
 import { createPlan, updatePlan } from "./recurring-plans";
 import { linkOccurrence, skipOccurrence } from "./recurring-links";
 import { acceptTransferPair } from "./suggestions";
@@ -191,9 +192,7 @@ test("each inbox kind appears and leaves after its action", () => {
     createBucketEvent(sample.db, spare.id, { kind: "fund", amount: 5000, date: "2026-03-01", asOf, ...saved });
     const marchKey = `bucket_overspent:${meals.id}:2026-03`;
     expect(keys(sample.db, "bucket_overspent")).toEqual([marchKey]);
-    dismissInboxItems(sample.db, asOf, [marchKey], "Later", saved);
     expect(listInbox(sample.db, "2026-04-20").items.some((item) => item.itemKey === `bucket_overspent:${meals.id}:2026-04`)).toBe(true);
-    restoreInboxItems(sample.db, [marchKey], saved);
     coverBucket(sample.db, meals.id, { fromBucketId: spare.id, date: asOf, ...saved });
     expect(keys(sample.db, "bucket_overspent")).toEqual([]);
 
@@ -305,44 +304,9 @@ test("each inbox kind appears and leaves after its action", () => {
     const unreadable = listInbox(sample.db, asOf).items.find((item) => item.kind === "import_unreadable");
     expect(unreadable?.kind).toBe("import_unreadable");
     if (unreadable) {
-      dismissInboxItems(sample.db, asOf, [unreadable.itemKey], "Cannot repair the row", saved);
+      decideInboxItem(sample.db, asOf, unreadable.itemKey, "not_a_transaction", saved);
     }
     expect(keys(sample.db, "import_unreadable")).toEqual([]);
-  } finally {
-    sample.close();
-  }
-});
-
-test("dismiss hides an item and un-dismiss shows it", () => {
-  const sample = book();
-  try {
-    const cash = account(sample.db, "Cash");
-    const open = pay(sample.db, cash.id, "2026-03-04", -100, "Needs a category", null);
-    const lineKey = uncategorizedLineKey(open.lines[0]?.id ?? "");
-    expect(keys(sample.db, "uncategorized")).toEqual([lineKey]);
-    dismissInboxItems(sample.db, asOf, [lineKey], "Later", saved);
-    expect(keys(sample.db, "uncategorized")).toEqual([]);
-    restoreInboxItems(sample.db, [lineKey], saved);
-    expect(keys(sample.db, "uncategorized")).toEqual([lineKey]);
-  } finally {
-    sample.close();
-  }
-});
-
-test("a group dismissal hides only the current lines", () => {
-  const sample = book();
-  try {
-    const cash = account(sample.db, "Cash");
-    const first = pay(sample.db, cash.id, "2026-03-01", -100, "Blue Bottle", null);
-    const second = pay(sample.db, cash.id, "2026-03-02", -200, "SQ *BLUE BOTTLE", null);
-    const lineKeys = [first, second].flatMap((item) => item.lines.map((line) => uncategorizedLineKey(line.id)));
-    dismissInboxItems(sample.db, asOf, lineKeys, "Later", saved);
-    expect(keys(sample.db, "uncategorized")).toEqual([]);
-    const third = pay(sample.db, cash.id, "2026-03-03", -300, "blue bottle", null);
-    const open = listInbox(sample.db, asOf).items.filter((item) => item.kind === "uncategorized");
-    expect(open.map((item) => (item.kind === "uncategorized" ? item.transactionId : ""))).toEqual([third.id]);
-    const closed = listInbox(sample.db, asOf, true).items.filter((item) => item.kind === "uncategorized");
-    expect(closed.flatMap((item) => (item.kind === "uncategorized" ? [item.transactionId] : [])).sort()).toEqual([first.id, second.id].sort());
   } finally {
     sample.close();
   }

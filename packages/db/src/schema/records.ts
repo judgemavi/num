@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { auditSources, proposalStatuses, settingKeys } from "./codes";
+import { auditSources, inboxDecisionCodes, proposalStatuses, settingKeys } from "./codes";
 import { isoDate, oneOf } from "./sql";
 
 export const monthCloses = sqliteTable(
@@ -52,11 +52,16 @@ export const proposals = sqliteTable(
   ],
 );
 
-export const inboxDismissals = sqliteTable("inbox_dismissals", {
-  itemKey: text("item_key").primaryKey(),
-  reason: text("reason").notNull(),
-  dismissedAt: text("dismissed_at").notNull(),
-});
+export const inboxDecisions = sqliteTable(
+  "inbox_decisions",
+  {
+    itemKey: text("item_key").primaryKey(),
+    decision: text("decision").notNull(),
+    reason: text("reason"),
+    decidedAt: text("decided_at").notNull(),
+  },
+  (table) => [check("inbox_decisions_decision", oneOf(table.decision, inboxDecisionCodes))],
+);
 
 export const forecastSnapshots = sqliteTable(
   "forecast_snapshots",

@@ -3,7 +3,6 @@ import type { EditorInput, EditorKind } from "@/editors/editor-types";
 import {
   ApplyRuleEditor,
   ImportInfoEditor,
-  InboxReasonEditor,
   LinkOccurrenceEditor,
   MergeEditor,
   SkipNextEditor,
@@ -61,8 +60,6 @@ export function EditorBody({ kind, props, onClose, onSaved }: BodyProps) {
       return <AssignEditor props={props as EditorInput["assignMoney"]} onClose={onClose} onSaved={onSaved} />;
     case "moveMoney":
       return <MoveEditor props={props as EditorInput["moveMoney"]} onClose={onClose} onSaved={onSaved} />;
-    case "inboxReason":
-      return <InboxReasonEditor props={props as EditorInput["inboxReason"]} onClose={onClose} onSaved={onSaved} />;
     case "importInfo":
       return <ImportInfoEditor props={props as EditorInput["importInfo"]} onClose={onClose} />;
     case "mergeMerchant":

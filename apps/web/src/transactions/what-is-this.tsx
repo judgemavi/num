@@ -11,6 +11,7 @@ import {
 } from "@num/shared";
 import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
+import { useRestoreNamed } from "@/editors/restore-named";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -48,7 +49,9 @@ type WhatIsThisProps = {
   totalMinor: number | null;
   categories: Category[];
   accounts: Option[];
+  archivedAccounts?: Option[];
   merchants: Option[];
+  archivedMerchants?: Option[];
   merchantId: string | null;
   onMerchantId: (id: string | null) => void;
   payee: string;
@@ -126,13 +129,16 @@ export function WhatIsThis({
   totalMinor,
   categories,
   accounts,
+  archivedAccounts = [],
   merchants,
+  archivedMerchants = [],
   merchantId,
   onMerchantId,
   payee,
   suggestion,
 }: WhatIsThisProps) {
   const { openEditor } = useEditors();
+  const restoreNamed = useRestoreNamed();
   const [extraMerchants, setExtraMerchants] = useState<Option[]>([]);
   const [extraCategories, setExtraCategories] = useState<Category[]>([]);
   const [extraAccounts, setExtraAccounts] = useState<Option[]>([]);
@@ -145,6 +151,26 @@ export function WhatIsThis({
   const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, lines) : choice === "split" ? null : 0;
   const hint = suggestion && choice !== "transfer" ? suggestionText(suggestion, merchantOptions, allCategories, accountOptions) : null;
   const suggestedMerchant = merchantNameFromPayee(payee);
+  const categoryKind = categoryKindForChoice(choice);
+  const archivedCategoryOptions = categories
+    .filter((category) => category.archivedAt !== null && (choice === "split" || category.kind === categoryKind))
+    .map((category) => ({ id: category.id, label: category.name }));
+
+  function restoreCategory(id: string, onPicked: (id: string) => void) {
+    void restoreNamed(`/api/categories/${id}/restore`).then((restored) => {
+      if (restored) {
+        onPicked(restored);
+      }
+    });
+  }
+
+  function restoreAccount(id: string, onPicked: (id: string) => void) {
+    void restoreNamed(`/api/accounts/${id}/restore`).then((restored) => {
+      if (restored) {
+        onPicked(restored);
+      }
+    });
+  }
 
   function updateLine(key: string, patch: Partial<SplitLine>) {
     onLines(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
@@ -198,6 +224,8 @@ export function WhatIsThis({
               noun: "category",
               onCreate: (name) => createCategory(name, onCategoryId),
             }}
+            archived={archivedCategoryOptions}
+            onRestore={(id) => restoreCategory(id, onCategoryId)}
             onChange={onCategoryId}
           />
         </Field>
@@ -223,6 +251,8 @@ export function WhatIsThis({
                 });
               },
             }}
+            archived={archivedAccounts}
+            onRestore={(id) => restoreAccount(id, onTransferAccountId)}
             onChange={onTransferAccountId}
           />
         </Field>
@@ -271,6 +301,8 @@ export function WhatIsThis({
                     emptyLabel="No category"
                     disabled={categoryLocked}
                     create={{ noun: "category", onCreate: (name) => createCategory(name, (id) => updateLine(line.key, { categoryId: id, transferAccountId: null })) }}
+                    archived={archivedCategoryOptions}
+                    onRestore={(id) => restoreCategory(id, (restored) => updateLine(line.key, { categoryId: restored, transferAccountId: null }))}
                     onChange={(id) => updateLine(line.key, { categoryId: id, transferAccountId: id ? null : line.transferAccountId })}
                   />
                 </Field>
@@ -295,6 +327,8 @@ export function WhatIsThis({
                         });
                       },
                     }}
+                    archived={archivedAccounts}
+                    onRestore={(id) => restoreAccount(id, (restored) => updateLine(line.key, { transferAccountId: restored, categoryId: null }))}
                     onChange={(id) => updateLine(line.key, { transferAccountId: id, categoryId: id ? null : line.categoryId })}
                   />
                 </Field>
@@ -341,6 +375,14 @@ export function WhatIsThis({
                   onMerchantId(id);
                 });
               },
+            }}
+            archived={archivedMerchants}
+            onRestore={(id) => {
+              void restoreNamed(`/api/merchants/${id}/restore`).then((restored) => {
+                if (restored) {
+                  onMerchantId(restored);
+                }
+              });
             }}
             onChange={onMerchantId}
           />

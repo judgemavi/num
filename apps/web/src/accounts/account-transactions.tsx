@@ -6,6 +6,7 @@ import { ListCard, ListRow } from "@/components/list-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { apiRequest } from "@/request";
 import { formatDate, statusLabel } from "@/transactions/format";
 import { transactionPath } from "@/transactions/query";
@@ -135,16 +136,16 @@ export function AccountTransactions({ accountId, currency, page, onPage }: Accou
       ) : null}
       {selectable.length > 0 ? (
         <div className="flex min-h-11 items-center gap-3 border-b px-5">
-          <label className="flex min-h-11 items-center gap-3 text-sm font-semibold">
+          <Field orientation="horizontal" className="min-h-11">
             <Checkbox
+              id="select-page"
               checked={
                 selectedOnPage.length === 0 ? false : selectedOnPage.length === selectable.length ? true : "indeterminate"
               }
               onCheckedChange={(value) => togglePage(value === true)}
-              aria-label="Select transactions on this page"
             />
-            Select transactions on this page
-          </label>
+            <FieldLabel htmlFor="select-page">Select transactions on this page</FieldLabel>
+          </Field>
         </div>
       ) : null}
       {rows.map((row) => (
@@ -197,9 +198,12 @@ function TransactionLine({
       {locked ? (
         <span className="size-11 shrink-0" />
       ) : (
-        <label className="flex size-11 shrink-0 items-center justify-center">
-          <Checkbox checked={checked} onCheckedChange={(value) => onChecked(value === true)} aria-label={`Select ${row.payeeRaw}`} />
-        </label>
+        <Field orientation="horizontal" className="size-11 shrink-0 justify-center">
+          <Checkbox id={`select-${row.id}`} checked={checked} onCheckedChange={(value) => onChecked(value === true)} />
+          <FieldLabel htmlFor={`select-${row.id}`} className="sr-only">
+            Select {row.payeeRaw}
+          </FieldLabel>
+        </Field>
       )}
       <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
         {row.payeeRaw}

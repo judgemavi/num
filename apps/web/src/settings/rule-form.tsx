@@ -139,7 +139,7 @@ export function RuleForm({ rule, accounts, categories, merchants, onClose, onSav
         <OptionCombobox
           id="rule-merchant"
           value={merchantId}
-          options={merchants.map((item) => ({ id: item.id, label: item.name }))}
+          options={merchants.filter((item) => item.archivedAt === null || item.id === merchantId).map((item) => ({ id: item.id, label: item.name }))}
           placeholder="No merchant"
           emptyLabel="No merchant"
           onChange={setMerchantId}

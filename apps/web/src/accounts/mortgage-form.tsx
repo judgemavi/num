@@ -14,6 +14,7 @@ import {
 import { useState, type FormEvent } from "react";
 import { compoundingLabels, frequencyLabels, mortgageError } from "@/accounts/mortgage-format";
 import { useEditors } from "@/editors/editor-api";
+import { useRestoreNamed } from "@/editors/restore-named";
 import { apiRequest } from "@/request";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,7 @@ function isFrequency(value: string): value is PaymentFrequency {
 
 export function MortgageForm({ accountId, currency, terms, accounts, categories, onClose, onSaved }: MortgageFormProps) {
   const { openEditor } = useEditors();
+  const restoreNamed = useRestoreNamed();
   const [principal, setPrincipal] = useState(terms ? fromMinorUnits(currency, terms.principal) : "");
   const [principalAsOf, setPrincipalAsOf] = useState(terms?.principalAsOf ?? "");
   const [rate, setRate] = useState(terms ? milliPctToPercent(terms.rateMilliPct) : "");
@@ -96,6 +98,15 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
     .map((account) => ({ id: account.id, label: account.name }));
   const interestOptions = categories
     .filter((category) => category.kind === "expense" && (category.archivedAt === null || category.id === interestCategoryId))
+    .map((category) => ({ id: category.id, label: category.name }));
+  const archivedAccounts = accounts
+    .filter((account) => account.archivedAt !== null && account.id !== accountId)
+    .map((account) => ({ id: account.id, label: account.name }));
+  const archivedProperties = accounts
+    .filter((account) => account.archivedAt !== null && account.kind === "property")
+    .map((account) => ({ id: account.id, label: account.name }));
+  const archivedInterest = categories
+    .filter((category) => category.archivedAt !== null && category.kind === "expense")
     .map((category) => ({ id: category.id, label: category.name }));
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -233,6 +244,12 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
                 });
               },
             }}
+            archived={archivedAccounts}
+            onRestore={(id) => {
+              void restoreNamed(`/api/accounts/${id}/restore`).then((restored) => {
+                if (restored) setPaymentAccountId(restored);
+              });
+            }}
             onChange={setPaymentAccountId}
           />
         </Field>
@@ -250,6 +267,12 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
                   if (id) setInterestCategoryId(id);
                 });
               },
+            }}
+            archived={archivedInterest}
+            onRestore={(id) => {
+              void restoreNamed(`/api/categories/${id}/restore`).then((restored) => {
+                if (restored) setInterestCategoryId(restored);
+              });
             }}
             onChange={setInterestCategoryId}
           />
@@ -269,6 +292,12 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
                   if (id) setPropertyAccountId(id);
                 });
               },
+            }}
+            archived={archivedProperties}
+            onRestore={(id) => {
+              void restoreNamed(`/api/accounts/${id}/restore`).then((restored) => {
+                if (restored) setPropertyAccountId(restored);
+              });
             }}
             onChange={setPropertyAccountId}
           />

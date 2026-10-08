@@ -1,6 +1,10 @@
-import { categoryKindForChoice, merchantSchema, type Category, type Merchant } from "@num/shared";
+import { categoryKindForChoice, inboxDecisionListSchema, merchantSchema, type Category, type Merchant } from "@num/shared";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { useEditors } from "@/editors/editor-api";
+import { useRestoreNamed } from "@/editors/restore-named";
+import { undoDecision } from "@/inbox/actions";
+import { decisionText } from "@/inbox/format";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -24,10 +28,24 @@ export function MerchantForm({ merchant, initialName, categories, onClose, onSav
   const [saving, setSaving] = useState(false);
   const [extra, setExtra] = useState<Category[]>([]);
   const { openEditor } = useEditors();
-  const categoryOptions = [...categories, ...extra.filter((item) => !categories.some((category) => category.id === item.id))].map((category) => ({
-    id: category.id,
-    label: category.name,
-  }));
+  const restoreNamed = useRestoreNamed();
+  const queryClient = useQueryClient();
+  const decisions = useQuery({
+    queryKey: ["inbox-decisions", merchant?.id],
+    enabled: merchant !== null,
+    queryFn: async () => {
+      const result = await apiRequest("/api/inbox/decisions", inboxDecisionListSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data.items.filter((row) => row.decision === "not_recurring" && merchant !== null && row.itemKey.includes(`:${merchant.id}:`));
+    },
+  });
+  const allCategories = [...categories, ...extra.filter((item) => !categories.some((category) => category.id === item.id))];
+  const categoryOptions = allCategories
+    .filter((category) => category.archivedAt === null || category.id === categoryId)
+    .map((category) => ({ id: category.id, label: category.name }));
+  const archivedCategories = allCategories.filter((category) => category.archivedAt).map((category) => ({ id: category.id, label: category.name }));
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -55,6 +73,25 @@ export function MerchantForm({ merchant, initialName, categories, onClose, onSav
         <DialogTitle>{merchant ? "Edit merchant" : "New merchant"}</DialogTitle>
         <DialogDescription>The default category is used when no rule and no payee history match.</DialogDescription>
       </DialogHeader>
+      {(decisions.data ?? []).map((row) => (
+        <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
+          <span>{decisionText(row.decision)}</span>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              void undoDecision(row.itemKey).then(async (result) => {
+                if (result.ok) {
+                  await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
+                  await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+                }
+              });
+            }}
+          >
+            Undo
+          </Button>
+        </p>
+      ))}
       <Field data-invalid={error !== null || undefined}>
         <FieldLabel htmlFor="merchant-name">Name</FieldLabel>
         <Input id="merchant-name" value={name} onChange={(event) => setName(event.target.value)} />
@@ -67,6 +104,14 @@ export function MerchantForm({ merchant, initialName, categories, onClose, onSav
           options={categoryOptions}
           placeholder="No default category"
           emptyLabel="No default category"
+          archived={archivedCategories}
+          onRestore={(id) => {
+            void restoreNamed(`/api/categories/${id}/restore`).then((restored) => {
+              if (restored) {
+                setCategoryId(restored);
+              }
+            });
+          }}
           create={{
             noun: "category",
             onCreate: (typed) => {

@@ -1,4 +1,4 @@
-import { Temporal, billReserveDays, type InboxItem, type InboxKind, type PlanFrequency, type UnreadableReason } from "@num/shared";
+import { Temporal, billReserveDays, type InboxDecisionCode, type InboxItem, type InboxKind, type PlanFrequency, type UnreadableReason } from "@num/shared";
 import { unreadableLabel } from "@/accounts/import-format";
 import type { Hue } from "@/components/hue";
 import { formatMoney } from "@/money";
@@ -72,6 +72,21 @@ export function importAge(asOf: string, lastImportAt: string | null, staleDays: 
   return { label, stale: age > staleDays };
 }
 
+export function decisionText(code: InboxDecisionCode): string {
+  switch (code) {
+    case "not_transfer":
+      return "Not a transfer";
+    case "keep_plan_amount":
+      return "Kept the plan amount";
+    case "not_recurring":
+      return "Not a repeating payment";
+    case "keep_unassigned":
+      return "Kept in Unassigned";
+    case "not_a_transaction":
+      return "Not a transaction";
+  }
+}
+
 export function inboxError(code: string): string {
   switch (code) {
     case "import_match_invalid":
@@ -88,6 +103,8 @@ export function inboxError(code: string): string {
       return "Unassigned does not have enough to cover this.";
     case "inbox_item_not_found":
       return "That item is no longer in the inbox.";
+    case "decision_not_found":
+      return "That decision is already undone.";
     case "occurrence_taken":
       return "That occurrence already has a decision.";
     case "transaction_reconciled":

@@ -200,6 +200,7 @@ export {
   type MerchantListQuery,
   type MerchantUpdate,
 } from "./merchant";
+export { archivedNameMatch, type NamedId } from "./name-match";
 export { merchantNameFromPayee, normalizePayee, storedPayee } from "./payee";
 export { oppositeTransferAccount, transferHintQuerySchema, transferHintSchema } from "./transfer-hint";
 export { uncategorizedLineKey } from "./payee";
@@ -379,13 +380,16 @@ export { isUtcTimestamp, utcNow } from "./time";
 export {
   importReviewResolveSchema,
   importReviewResultSchema,
-  inboxDismissSchema,
-  inboxDismissalReasonSchema,
+  inboxDecisionCodes,
+  inboxDecisionCreateSchema,
+  inboxDecisionListSchema,
+  inboxDecisionSchema,
+  inboxDecisionUndoSchema,
   inboxImportSchema,
   inboxQuerySchema,
   inboxItemSchema,
   inboxKinds,
-  inboxRestoreSchema,
+  inboxUnreadableAcceptSchema,
   categorizationRuleSchema,
   groupSkipReasons,
   inboxGroupApplyResultSchema,
@@ -401,7 +405,8 @@ export {
   type GroupSkipReason,
   type ImportReviewResolve,
   type Inbox,
-  type InboxDismiss,
+  type InboxDecision,
+  type InboxDecisionCode,
   type InboxGroupApply,
   type InboxItem,
   type InboxKind,

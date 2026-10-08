@@ -33,6 +33,16 @@ export const inboxKinds = [
 
 export type InboxKind = (typeof inboxKinds)[number];
 
+export const inboxDecisionCodes = [
+  "not_transfer",
+  "keep_plan_amount",
+  "not_recurring",
+  "keep_unassigned",
+  "not_a_transaction",
+] as const;
+
+export type InboxDecisionCode = (typeof inboxDecisionCodes)[number];
+
 export const inboxItemSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("import_review"),
@@ -137,35 +147,38 @@ export const inboxImportSchema = z.object({
   lastImportAt: z.string().refine(isUtcTimestamp).nullable(),
 });
 
-export const inboxQuerySchema = asOfQuerySchema.extend({
-  dismissed: z
-    .union([z.boolean(), z.enum(["true", "false"])])
-    .optional()
-    .transform((value) => value === true || value === "true"),
-});
-
-export const inboxDismissalReasonSchema = z.object({
-  itemKey,
-  reason: z.string(),
-});
+export const inboxQuerySchema = asOfQuerySchema;
 
 export const inboxSchema = z.object({
   asOf: isoDateSchema,
   count: z.number().int().nonnegative(),
-  dismissedCount: z.number().int().nonnegative(),
   staleImportDays: z.number().int().nonnegative(),
   items: z.array(inboxItemSchema),
   imports: z.array(inboxImportSchema),
-  dismissalReasons: z.array(inboxDismissalReasonSchema),
 });
 
-export const inboxDismissSchema = z.object({
-  itemKeys: z.array(itemKey).min(1).max(500),
-  reason: z.string().trim().min(1).max(500),
+export const inboxDecisionSchema = z.object({
+  itemKey,
+  decision: z.enum(inboxDecisionCodes),
+  reason: z.string().nullable(),
+  decidedAt: z.string().refine(isUtcTimestamp),
 });
 
-export const inboxRestoreSchema = z.object({
-  itemKeys: z.array(itemKey).min(1).max(500),
+export const inboxDecisionListSchema = z.object({
+  items: z.array(inboxDecisionSchema),
+});
+
+export const inboxDecisionCreateSchema = z.object({
+  itemKey,
+  decision: z.enum(inboxDecisionCodes),
+});
+
+export const inboxDecisionUndoSchema = z.object({
+  itemKey,
+});
+
+export const inboxUnreadableAcceptSchema = z.object({
+  itemKey,
 });
 
 export const inboxKeysSchema = z.object({
@@ -237,7 +250,7 @@ export const payeeCountSchema = z.object({
 
 export type InboxItem = z.infer<typeof inboxItemSchema>;
 export type Inbox = z.infer<typeof inboxSchema>;
-export type InboxDismiss = z.infer<typeof inboxDismissSchema>;
+export type InboxDecision = z.infer<typeof inboxDecisionSchema>;
 export type ImportReviewResolve = z.infer<typeof importReviewResolveSchema>;
 export type InboxGroupApply = z.infer<typeof inboxGroupApplySchema>;
 export type CategorizationRule = z.infer<typeof categorizationRuleSchema>;

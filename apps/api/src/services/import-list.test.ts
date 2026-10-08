@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { importBatches, importRows, inboxDismissals, migrateDatabase, openDatabase, settings } from "@num/db";
+import { importBatches, importRows, inboxDecisions, migrateDatabase, openDatabase, settings } from "@num/db";
 import { columnMapSchema, type ColumnMap, type ImportViewQuery } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -108,11 +108,12 @@ test("the import list filters by account, status and date", () => {
     book.db.update(importBatches).set({ unreadableJson: unreadable }).where(eq(importBatches.id, dismissed)).run();
     book.db.update(importBatches).set({ unreadableJson: unreadable }).where(eq(importBatches.id, openUnreadable)).run();
     book.db
-      .insert(inboxDismissals)
+      .insert(inboxDecisions)
       .values({
         itemKey: `import_unreadable:${dismissed}:2`,
-        reason: "Leave it",
-        dismissedAt: "2026-04-05T12:00:00Z",
+        decision: "not_a_transaction",
+        reason: null,
+        decidedAt: "2026-04-05T12:00:00Z",
       })
       .run();
 

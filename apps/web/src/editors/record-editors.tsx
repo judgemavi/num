@@ -56,7 +56,6 @@ export function TransactionRecord({ props, onClose, onSaved }: { props: EditorIn
       rawLine={props.rawLine}
       initialAccountId={props.initialAccountId}
       groupIds={props.groupIds}
-      queueIds={props.queueIds}
       onClose={onClose}
       onSaved={onSaved}
     />

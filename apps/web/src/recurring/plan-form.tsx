@@ -281,7 +281,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, onC
               <OptionCombobox
                 id="plan-merchant"
                 value={merchantId}
-                options={merchants.map((item) => ({ id: item.id, label: item.name }))}
+                options={merchants.filter((item) => item.archivedAt === null || item.id === merchantId).map((item) => ({ id: item.id, label: item.name }))}
                 placeholder="Any merchant"
                 emptyLabel="Any merchant"
                 onChange={setMerchantId}

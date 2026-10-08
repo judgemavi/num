@@ -1,5 +1,5 @@
-import type { Bucket, Category, InboxItem, Plan } from "@num/shared";
-import { AlertTriangle, ArrowLeftRight, Banknote, FileWarning, Repeat, Tag, TrendingUp, type LucideIcon } from "lucide-react";
+import type { Bucket, Category, InboxDecisionCode, InboxItem, Plan } from "@num/shared";
+import { AlertTriangle, ArrowLeftRight, Banknote, ChevronRight, FileWarning, Repeat, Tag, TrendingUp, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import {
   acceptPair,
@@ -26,13 +26,12 @@ type InboxItemRowProps = {
   categories: Category[];
   buckets: Bucket[];
   onSkip: (planId: string, dueDate: string) => void;
-  onDismiss: (itemKeys: string[]) => void;
+  onLink: (planId: string, dueDate: string) => void;
+  onDecide: (itemKey: string, decision: InboxDecisionCode) => Promise<{ ok: boolean; code?: string }>;
   onAddByHand: (item: Extract<InboxItem, { kind: "import_unreadable" }>) => void;
   onOpenTransaction: (transactionId: string) => void;
   onFundPaycheck: (incomeTransactionId: string) => void;
   unassigned: number;
-  onRestore?: (itemKeys: string[]) => void;
-  dismissedReason?: string;
   onDone: () => void;
   onNotice: (text: string) => void;
   onError: (code: string) => void;
@@ -77,13 +76,12 @@ export function InboxItemRow({
   categories,
   buckets,
   onSkip,
-  onDismiss,
+  onLink,
+  onDecide,
   onAddByHand,
   onOpenTransaction,
   onFundPaycheck,
   unassigned,
-  onRestore,
-  dismissedReason,
   onDone,
   onNotice,
   onError,
@@ -117,6 +115,7 @@ export function InboxItemRow({
 
   let primary: { label: string; disabled: boolean; run: () => void } | null = null;
   let extra: { label: string; run: () => void } | null = null;
+  let no: { label: string; run: () => void } | null = null;
   let choices: { id: string; label: string }[] = [];
 
   if (item.kind === "import_review") {
@@ -142,8 +141,10 @@ export function InboxItemRow({
         }
       },
     };
+    no = { label: "Keep the plan amount", run: () => void run(() => onDecide(item.itemKey, "keep_plan_amount")) };
   } else if (item.kind === "recurring_missed") {
-    primary = { label: "Skip this time", disabled: false, run: () => onSkip(item.planId, item.dueDate) };
+    primary = { label: "Link a transaction", disabled: false, run: () => onLink(item.planId, item.dueDate) };
+    no = { label: "Skip", run: () => onSkip(item.planId, item.dueDate) };
   } else if (item.kind === "recurring_ambiguous") {
     choices = item.transactions.map((txn) => ({
       id: txn.id,
@@ -161,23 +162,25 @@ export function InboxItemRow({
       disabled: false,
       run: () => void run(() => createProposedPlan(item, names.merchant(item.merchantId))),
     };
+    no = { label: "Not recurring", run: () => void run(() => onDecide(item.itemKey, "not_recurring")) };
   } else if (item.kind === "transfer_pair") {
     primary = {
       label: "Yes, a transfer",
       disabled: false,
       run: () => void run(() => acceptPair(asOf, item.left.id, item.right.id)),
     };
+    no = { label: "Not a transfer", run: () => void run(() => onDecide(item.itemKey, "not_transfer")) };
   } else if (item.kind === "import_unreadable") {
     primary = { label: "Add by hand", disabled: false, run: () => onAddByHand(item) };
+    no = { label: "Not a transaction", run: () => void run(() => onDecide(item.itemKey, "not_a_transaction")) };
   } else if (item.kind === "paycheck_funding") {
     primary = { label: "Fund buckets", disabled: false, run: () => onFundPaycheck(item.incomeTransactionId) };
+    no = { label: "Keep it unassigned", run: () => void run(() => onDecide(item.itemKey, "keep_unassigned")) };
   } else if (item.kind === "bucket_overspent") {
     const need = -item.balance;
     const fromUnassigned = Math.min(need, Math.max(0, unassigned));
     choices = [
-      ...(fromUnassigned > 0
-        ? [{ id: "unassigned", label: `Unassigned · ${formatMoney(currency, unassigned)}` }]
-        : []),
+      ...(fromUnassigned > 0 ? [{ id: "unassigned", label: `Unassigned · ${formatMoney(currency, unassigned)}` }] : []),
       ...sources.map((bucket) => ({
         id: bucket.id,
         label: `${bucket.name} · ${formatMoney(currency, bucket.balance)} left`,
@@ -189,95 +192,92 @@ export function InboxItemRow({
       disabled: selected.length === 0,
       run: () =>
         void run(() =>
-          selected === "unassigned"
-            ? fundFromUnassigned(item.bucketId, fromUnassigned, asOf)
-            : coverOverspent(item.bucketId, selected, asOf),
+          selected === "unassigned" ? fundFromUnassigned(item.bucketId, fromUnassigned, asOf) : coverOverspent(item.bucketId, selected, asOf),
         ),
     };
   }
 
+  const body = (
+    <>
+      {hue === "attention" ? (
+        <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-attn-soft text-attn" aria-hidden="true">
+          <Icon strokeWidth={1.8} />
+        </span>
+      ) : (
+        <IconTile hue={hue}>
+          <Icon strokeWidth={1.8} />
+        </IconTile>
+      )}
+      <div className="min-w-0 flex-1 text-left">
+        <h3 className="font-semibold">{itemTitle(item, names, currency)}</h3>
+        <p className="text-sm text-muted-foreground">{itemWhy(item, names, currency)}</p>
+      </div>
+    </>
+  );
+
   return (
     <article className="border-t px-5 py-4 first:border-t-0">
       <div className="flex flex-wrap items-start gap-3">
-        {hue === "attention" ? (
-          <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-attn-soft text-attn" aria-hidden="true">
-            <Icon strokeWidth={1.8} />
-          </span>
+        {item.kind === "uncategorized" ? (
+          <button type="button" className="flex min-w-0 flex-1 items-start gap-3" onClick={() => onOpenTransaction(item.transactionId)}>
+            {body}
+            <ChevronRight className="mt-1 size-5 shrink-0" aria-hidden="true" />
+          </button>
         ) : (
-          <IconTile hue={hue}>
-            <Icon strokeWidth={1.8} />
-          </IconTile>
+          body
         )}
-        <div className="min-w-0 flex-1">
-          <h3 className="font-semibold">{itemTitle(item, names, currency)}</h3>
-          <p className="text-sm text-muted-foreground">{itemWhy(item, names, currency)}</p>
-          {dismissedReason ? <p className="text-sm text-muted-foreground">Reason: {dismissedReason}</p> : null}
-        </div>
         <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
-          {dismissedReason && onRestore ? (
-            <Button type="button" disabled={pending} onClick={() => onRestore([item.itemKey])}>
-              Restore
+          {extra ? (
+            <Button type="button" variant="outline" disabled={pending} onClick={extra.run}>
+              {extra.label}
             </Button>
           ) : null}
-          {dismissedReason ? null : (
-            <>
-              {extra ? (
-                <Button type="button" variant="outline" disabled={pending} onClick={extra.run}>
-                  {extra.label}
-                </Button>
-              ) : null}
-              {primary ? (
-                <Button type="button" disabled={pending || primary.disabled} onClick={primary.run}>
-                  {primary.label}
-                </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={pending}
-                onClick={() => onDismiss([item.itemKey])}
-              >
-                Not now
-              </Button>
-            </>
-          )}
+          {primary ? (
+            <Button type="button" disabled={pending || primary.disabled} onClick={primary.run}>
+              {primary.label}
+            </Button>
+          ) : null}
+          {no ? (
+            <Button type="button" variant="ghost" disabled={pending} onClick={no.run}>
+              {no.label}
+            </Button>
+          ) : null}
         </div>
       </div>
-      {!dismissedReason && item.kind === "uncategorized" ? (
+      {item.kind === "uncategorized" ? (
         <div className="mt-3 flex flex-wrap gap-2 pl-13">
-          {[item.suggestion, item.next].filter((suggestion) => suggestion && (suggestion.categoryId || suggestion.transferAccountId)).map((suggestion, index) => {
-            if (!suggestion) {
-              return null;
-            }
-            const label = suggestion.transferAccountId
-              ? `Transfer · ${names.account(suggestion.transferAccountId)}`
-              : names.category(suggestion.categoryId ?? "");
-            return (
-              <Button
-                key={`${suggestion.categoryId ?? ""}-${suggestion.transferAccountId ?? ""}-${index}`}
-                type="button"
-                variant={index === 0 ? "default" : "outline"}
-                disabled={pending}
-                onClick={() =>
-                  void run(async () => {
-                    const result = await applyInboxGroup(item.accountId, [item.transactionId], suggestion);
-                    if (result.ok && result.data.skipped.length > 0) {
-                      onNotice(`Applied to ${result.data.applied} · skipped ${result.data.skipped.length}`);
-                    }
-                    return result;
-                  })
-                }
-              >
-                {label}
-              </Button>
-            );
-          })}
-          <Button type="button" variant="outline" disabled={pending} onClick={() => onOpenTransaction(item.transactionId)}>
-            Other…
-          </Button>
+          {[item.suggestion, item.next]
+            .filter((suggestion) => suggestion && (suggestion.categoryId || suggestion.transferAccountId))
+            .map((suggestion, index) => {
+              if (!suggestion) {
+                return null;
+              }
+              const label = suggestion.transferAccountId
+                ? `Transfer · ${names.account(suggestion.transferAccountId)}`
+                : names.category(suggestion.categoryId ?? "");
+              return (
+                <Button
+                  key={`${suggestion.categoryId ?? ""}-${suggestion.transferAccountId ?? ""}-${index}`}
+                  type="button"
+                  variant={index === 0 ? "default" : "outline"}
+                  disabled={pending}
+                  onClick={() =>
+                    void run(async () => {
+                      const result = await applyInboxGroup(item.accountId, [item.transactionId], suggestion);
+                      if (result.ok && result.data.skipped.length > 0) {
+                        onNotice(`Applied to ${result.data.applied} · skipped ${result.data.skipped.length}`);
+                      }
+                      return result;
+                    })
+                  }
+                >
+                  {label}
+                </Button>
+              );
+            })}
         </div>
       ) : null}
-      {!dismissedReason && choices.length > 0 ? (
+      {choices.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2 pl-13">
           {choices.map((option) => (
             <Choice key={option.id} pressed={(choice || choices[0]?.id) === option.id} onClick={() => setChoice(option.id)}>

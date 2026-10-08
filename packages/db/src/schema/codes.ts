@@ -71,6 +71,14 @@ export const importOutcomes = ["created", "matched", "needs_review", "duplicate"
 
 export const proposalStatuses = ["pending", "approved", "rejected"] as const;
 
+export const inboxDecisionCodes = [
+  "not_transfer",
+  "keep_plan_amount",
+  "not_recurring",
+  "keep_unassigned",
+  "not_a_transaction",
+] as const;
+
 export const auditSources = ["ui", "import", "mcp"] as const;
 
 export const autoReasons = ["rule", "learned"] as const;

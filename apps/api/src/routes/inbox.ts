@@ -1,18 +1,22 @@
 import {
   asOfQuerySchema,
   errorSchema,
-  inboxDismissSchema,
+  inboxDecisionCreateSchema,
+  inboxDecisionListSchema,
+  inboxDecisionSchema,
+  inboxDecisionUndoSchema,
   inboxGroupApplyResultSchema,
   inboxGroupApplySchema,
   inboxQuerySchema,
-  inboxRestoreSchema,
   inboxSchema,
+  inboxUnreadableAcceptSchema,
   payeeCountQuerySchema,
   payeeCountSchema,
 } from "@num/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { dismissInboxItems, listInbox, restoreInboxItems } from "../services/inbox";
+import { acceptUnreadableLine, decideInboxItem, decisionRows, undoInboxDecision } from "../services/inbox-decisions";
+import { listInbox } from "../services/inbox";
 import { applyInboxGroup, countOtherUncategorized } from "../services/inbox-group";
 import { autoLink } from "../services/recurring-view";
 
@@ -31,34 +35,50 @@ const listRoute = createRoute({
   },
 });
 
-const dismissRoute = createRoute({
+const decisionsRoute = createRoute({
+  method: "get",
+  path: "/api/inbox/decisions",
+  responses: {
+    200: { description: "Recorded inbox decisions", content: { "application/json": { schema: inboxDecisionListSchema } } },
+  },
+});
+
+const decideRoute = createRoute({
   method: "post",
-  path: "/api/inbox/dismissals",
+  path: "/api/inbox/decisions",
   request: {
     query: asOfQuerySchema,
-    body: { required: true, content: { "application/json": { schema: inboxDismissSchema } } },
+    body: { required: true, content: { "application/json": { schema: inboxDecisionCreateSchema } } },
   },
   responses: {
-    200: {
-      description: "The dismissed item",
-      content: { "application/json": { schema: inboxRestoreSchema } },
-    },
+    200: { description: "The recorded decision", content: { "application/json": { schema: inboxDecisionSchema } } },
     400: errorResponse,
     404: errorResponse,
   },
 });
 
-const restoreRoute = createRoute({
+const undoRoute = createRoute({
   method: "post",
-  path: "/api/inbox/dismissals/restore",
+  path: "/api/inbox/decisions/undo",
   request: {
-    body: { required: true, content: { "application/json": { schema: inboxRestoreSchema } } },
+    body: { required: true, content: { "application/json": { schema: inboxDecisionUndoSchema } } },
   },
   responses: {
-    200: {
-      description: "The restored item",
-      content: { "application/json": { schema: inboxRestoreSchema } },
-    },
+    200: { description: "The undone decision", content: { "application/json": { schema: inboxDecisionUndoSchema } } },
+    400: errorResponse,
+    404: errorResponse,
+  },
+});
+
+const acceptRoute = createRoute({
+  method: "post",
+  path: "/api/inbox/unreadable",
+  request: {
+    query: asOfQuerySchema,
+    body: { required: true, content: { "application/json": { schema: inboxUnreadableAcceptSchema } } },
+  },
+  responses: {
+    200: { description: "The unreadable row was added by hand", content: { "application/json": { schema: inboxUnreadableAcceptSchema } } },
     400: errorResponse,
     404: errorResponse,
   },
@@ -99,6 +119,16 @@ export function registerInbox(app: OpenAPIHono, db: Db) {
     const query = c.req.valid("query");
     return c.json({ count: countOtherUncategorized(db, query.payee, query.accountId, exceptIds(query.except)) }, 200);
   });
+  app.openapi(decisionsRoute, (c) => c.json({ items: decisionRows(db) }, 200));
+  app.openapi(decideRoute, (c) => {
+    const body = c.req.valid("json");
+    return c.json(decideInboxItem(db, c.req.valid("query").asOf, body.itemKey, body.decision, { source: "ui" }), 200);
+  });
+  app.openapi(undoRoute, (c) => c.json(undoInboxDecision(db, c.req.valid("json").itemKey, { source: "ui" }), 200));
+  app.openapi(acceptRoute, (c) => {
+    const body = c.req.valid("json");
+    return c.json(acceptUnreadableLine(db, c.req.valid("query").asOf, body.itemKey, { source: "ui" }), 200);
+  });
   app.openapi(listRoute, (c) => {
     const query = c.req.valid("query");
     try {
@@ -106,11 +136,6 @@ export function registerInbox(app: OpenAPIHono, db: Db) {
     } catch (error) {
       console.error("Recurring auto-link failed", error);
     }
-    return c.json(listInbox(db, query.asOf, query.dismissed), 200);
+    return c.json(listInbox(db, query.asOf), 200);
   });
-  app.openapi(dismissRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(dismissInboxItems(db, c.req.valid("query").asOf, body.itemKeys, body.reason, { source: "ui" }), 200);
-  });
-  app.openapi(restoreRoute, (c) => c.json(restoreInboxItems(db, c.req.valid("json").itemKeys, { source: "ui" }), 200));
 }

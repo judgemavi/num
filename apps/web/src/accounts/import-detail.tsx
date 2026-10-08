@@ -23,6 +23,8 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
+import { undoDecision } from "@/inbox/actions";
+import { inboxError } from "@/inbox/format";
 
 const detailRoute = getRouteApi("/accounts_/imports_/$importId");
 
@@ -167,8 +169,30 @@ export function ImportDetailScreen() {
               <p>Line {row.line}</p>
               <small>{unreadableLabel(row.reason)}</small>
               <small className="break-all">{row.raw}</small>
+              {row.decision === "not_a_transaction" ? <small>Not a transaction</small> : null}
             </div>
-            <Badge variant="attention">Unreadable</Badge>
+            {row.decision === "not_a_transaction" ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  void undoDecision(`import_unreadable:${importId}:${row.line}`).then(async (result) => {
+                    if (!result.ok) {
+                      setError(inboxError(result.code));
+                      return;
+                    }
+                    setError(null);
+                    await queryClient.invalidateQueries({ queryKey: ["import-detail", importId] });
+                    await queryClient.invalidateQueries({ queryKey: ["import-view"] });
+                    await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+                  });
+                }}
+              >
+                Undo
+              </Button>
+            ) : (
+              <Badge variant="attention">Unreadable</Badge>
+            )}
           </ListRow>
         ))}
       </ListCard>

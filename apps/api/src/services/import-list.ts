@@ -1,4 +1,4 @@
-import { accounts, documents, importBatches, importRows, inboxDismissals, transactions } from "@num/db";
+import { accounts, documents, importBatches, importRows, inboxDecisions, transactions } from "@num/db";
 import {
   importBatchStatus,
   type ImportDetail,
@@ -71,7 +71,7 @@ function withinDates(createdAt: string, query: ImportViewQuery): boolean {
 }
 
 function loadItems(db: Db): ImportViewItem[] {
-  const dismissed = new Set(db.select({ itemKey: inboxDismissals.itemKey }).from(inboxDismissals).all().map((row) => row.itemKey));
+  const decided = new Set(db.select({ itemKey: inboxDecisions.itemKey }).from(inboxDecisions).all().map((row) => row.itemKey));
   const batches = db
     .select({
       id: importBatches.id,
@@ -114,7 +114,7 @@ function loadItems(db: Db): ImportViewItem[] {
         needsReview: counts.needsReview,
         batchId: batch.id,
         unreadableLines: unreadable.map((row) => row.line),
-        dismissedKeys: dismissed,
+        decidedKeys: decided,
       }),
       counts: { ...counts, unreadable: unreadable.length },
     };
@@ -224,9 +224,13 @@ export function getImportDetail(db: Db, id: string): ImportDetail {
     };
   });
 
+  const decided = new Set(db.select({ itemKey: inboxDecisions.itemKey }).from(inboxDecisions).all().map((row) => row.itemKey));
   return {
     item,
     rows: detailRows,
-    unreadable: readUnreadable(batch.unreadableJson),
+    unreadable: readUnreadable(batch.unreadableJson).map((row) => ({
+      ...row,
+      decision: decided.has(`import_unreadable:${batch.id}:${row.line}`) ? ("not_a_transaction" as const) : null,
+    })),
   };
 }

@@ -1,3 +1,4 @@
+import { archivedNameMatch } from "@num/shared";
 import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,11 @@ type CreateAction = {
   onCreate: (name: string) => void;
 };
 
+type ArchivedMatch = {
+  id: string;
+  label: string;
+};
+
 type OptionComboboxProps = {
   id: string;
   value: string | null;
@@ -29,6 +35,8 @@ type OptionComboboxProps = {
   emptyLabel?: string;
   disabled?: boolean;
   create?: CreateAction;
+  archived?: ArchivedMatch[];
+  onRestore?: (id: string) => void;
   onChange: (id: string | null) => void;
 };
 
@@ -58,6 +66,8 @@ export function OptionCombobox({
   emptyLabel,
   disabled = false,
   create,
+  archived,
+  onRestore,
   onChange,
 }: OptionComboboxProps) {
   const [open, setOpen] = useState(false);
@@ -67,7 +77,12 @@ export function OptionCombobox({
   const createName = query.length > 0 ? query : (create?.suggestedName?.trim() ?? "");
   const pool = groups ? groups.flatMap((group) => group.options) : options;
   const exact = pool.some((option) => sameName(option.label, createName));
-  const showCreate = Boolean(create) && createName.length > 0 && !exact;
+  const archivedHit = archivedNameMatch(
+    createName,
+    pool.map((option) => option.label),
+    (archived ?? []).map((item) => ({ id: item.id, name: item.label })),
+  );
+  const showCreate = Boolean(create) && createName.length > 0 && !exact && archivedHit === null;
 
   function pick(next: string | null) {
     onChange(next);
@@ -116,6 +131,20 @@ export function OptionCombobox({
                 ))}
               </CommandGroup>
             )}
+            {archivedHit && onRestore ? (
+              <CommandGroup>
+                <CommandItem
+                  value={`restore-${archivedHit.id}`}
+                  onSelect={() => {
+                    onRestore(archivedHit.id);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  Restore '{archivedHit.name}'
+                </CommandItem>
+              </CommandGroup>
+            ) : null}
             {showCreate && create ? (
               <CommandGroup>
                 <CommandItem

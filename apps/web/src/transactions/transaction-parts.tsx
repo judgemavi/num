@@ -2,6 +2,7 @@ import type { MoneyDirection, Tag } from "@num/shared";
 import { ChevronRight, Ellipsis } from "lucide-react";
 import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
+import { useRestoreNamed } from "@/editors/restore-named";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -121,6 +122,7 @@ export function MoreDetails({
   clearedLocked: boolean;
 }) {
   const { openEditor } = useEditors();
+  const restoreNamed = useRestoreNamed();
   const [created, setCreated] = useState<Tag[]>([]);
   const allTags = [...tags, ...created.filter((tag) => !tags.some((item) => item.id === tag.id))];
   const selected = allTags.filter((tag) => tagIds.includes(tag.id));
@@ -156,6 +158,14 @@ export function MoreDetails({
                   onTags([...tagIds, id]);
                 });
               },
+            }}
+            archived={allTags.filter((tag) => tag.archivedAt).map((tag) => ({ id: tag.id, label: tag.name }))}
+            onRestore={(id) => {
+              void restoreNamed(`/api/tags/${id}/restore`).then((restored) => {
+                if (restored) {
+                  onTags([...tagIds, restored]);
+                }
+              });
             }}
             onChange={(tagId) => {
               if (tagId) {

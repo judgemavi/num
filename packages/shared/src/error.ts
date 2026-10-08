@@ -97,7 +97,7 @@ export const errorCodes = [
   "fund_over_unassigned",
   "release_over_balance",
   "inbox_item_not_found",
-  "dismissal_not_found",
+  "decision_not_found",
   "import_review_not_found",
   "import_match_invalid",
   "transfer_pair_not_found",
