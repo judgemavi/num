@@ -170,6 +170,11 @@ Rules:
   - A transfer line must not target its own account.
   - A transaction has a maximum of one transfer line.
   - The mirror transaction has one line. Its `transferAccountId` is the account of the source transaction.
+  - The mirror has its own `status`. A new mirror starts as `open`.
+  - If the source transaction has more than one line, the user cannot change the mirror amount.
+    The user changes the amount on the source transaction.
+- The user and the API can set `status` to `open` or `cleared` only. Only a checkpoint sets `reconciled` (§5.13).
+- The user cannot add a transaction to an archived account, or move a transaction to an archived account.
 - A mortgage payment is one chequing transaction with two lines:
   - A transfer line for the principal. The target is the mortgage account.
   - An expense line for the interest. The category is the interest category.
