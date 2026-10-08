@@ -19,7 +19,7 @@
       "warn",
       {
         "allowConstantExport": true,
-        "allowExportNames": ["Route", "buttonVariants", "badgeVariants", "toggleVariants", "useSidebar"]
+        "allowExportNames": ["Route", "buttonVariants", "badgeVariants", "toggleVariants", "useSidebar", "tabsListVariants"]
       }
     ]
   },

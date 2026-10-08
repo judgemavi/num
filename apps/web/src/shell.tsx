@@ -62,7 +62,7 @@ function NavItem({
 
 function AppSidebar({ pathname, inboxCount }: { pathname: string; inboxCount?: number }) {
   return (
-    <Sidebar collapsible="none" className="hidden border-r bg-card md:flex">
+    <Sidebar collapsible="none" className="hidden h-svh shrink-0 border-r bg-card md:flex">
       <SidebarHeader className="px-3 pt-5">
         <Link to="/" aria-label="Num home" className="font-display flex items-center gap-2.5 px-3 text-2xl leading-none font-extrabold [font-stretch:72%]">
           <span className="grid size-7 place-items-center rounded-lg bg-foreground text-base text-background" aria-hidden="true">
@@ -172,9 +172,9 @@ function PhoneTabs({ pathname, inboxCount }: { pathname: string; inboxCount?: nu
 function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   return (
-    <SidebarProvider className="min-h-svh bg-background">
+    <SidebarProvider className="h-svh overflow-hidden bg-background">
       <AppSidebar pathname={pathname} />
-      <SidebarInset className="bg-background">
+      <SidebarInset className="min-h-0 overflow-y-auto bg-background">
         <main className="grid content-start gap-5 px-4 pt-2 pb-[calc(96px+env(safe-area-inset-bottom))] md:px-8 md:py-7 md:pb-9">
           <Outlet />
         </main>

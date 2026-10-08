@@ -18,14 +18,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { ListCard, ListRow } from "@/components/list-card";
-import { Badge } from "@/components/ui/badge";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { RowMenu } from "@/components/row-menu";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export function TagsPanel() {
   const queryClient = useQueryClient();
   const [archived, setArchived] = useState(false);
   const [draft, setDraft] = useState<Tag | "new" | null>(null);
-  const [archiveTarget, setArchiveTarget] = useState<Tag | null>(null);
+  const [pending, setPending] = useState<Tag | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const tags = useQuery({
@@ -52,27 +53,18 @@ export function TagsPanel() {
     return null;
   }
 
-  async function restore(tag: Tag) {
-    const result = await apiRequest(`/api/tags/${tag.id}/restore`, tagSchema, { method: "POST" });
+  async function confirmPending() {
+    if (!pending) {
+      return;
+    }
+    const path = pending.archivedAt ? "restore" : "archive";
+    const result = await apiRequest(`/api/tags/${pending.id}/${path}`, tagSchema, { method: "POST" });
     if (!result.ok) {
       setActionError(tagError(result.code));
       return;
     }
     setActionError(null);
-    await refresh();
-  }
-
-  async function confirmArchive() {
-    if (!archiveTarget) {
-      return;
-    }
-    const result = await apiRequest(`/api/tags/${archiveTarget.id}/archive`, tagSchema, { method: "POST" });
-    if (!result.ok) {
-      setActionError(tagError(result.code));
-      return;
-    }
-    setActionError(null);
-    setArchiveTarget(null);
+    setPending(null);
     await refresh();
   }
 
@@ -116,23 +108,16 @@ export function TagsPanel() {
         <p className="px-5 py-5 text-muted-foreground">{archived ? "No archived tags." : "No tags yet."}</p>
       ) : (
         rows.map((tag) => (
-          <ListRow key={tag.id} simple>
-            <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">{tag.name}</div>
-            <div className="hidden w-40 shrink-0 text-[13px] text-muted-foreground md:block">{tag.archivedAt ? <Badge variant="attention">Archived</Badge> : "Active"}</div>
-            <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
-              <Button type="button" variant="outline" onClick={() => setDraft(tag)}>
-                Rename
-              </Button>
-              {tag.archivedAt ? (
-                <Button type="button" variant="outline" onClick={() => void restore(tag)}>
-                  Restore
-                </Button>
-              ) : (
-                <Button type="button" variant="destructive" onClick={() => setArchiveTarget(tag)}>
-                  Archive
-                </Button>
-              )}
+          <ListRow key={tag.id} simple onOpen={() => setDraft(tag)}>
+            <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
+              {tag.name}
+              {tag.archivedAt ? <small>Archived</small> : null}
             </div>
+            <RowMenu label={`Actions for ${tag.name}`}>
+              <DropdownMenuItem className="min-h-11" onSelect={() => setPending(tag)}>
+                {tag.archivedAt ? "Restore" : "Archive"}
+              </DropdownMenuItem>
+            </RowMenu>
           </ListRow>
         ))
       )}
@@ -153,18 +138,20 @@ export function TagsPanel() {
           ) : null}
         </DialogContent>
       </Dialog>
-      <AlertDialog open={archiveTarget !== null} onOpenChange={(open) => !open && setArchiveTarget(null)}>
+      <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archive this tag?</AlertDialogTitle>
+            <AlertDialogTitle>{pending?.archivedAt ? "Restore this tag?" : "Archive this tag?"}</AlertDialogTitle>
             <AlertDialogDescription>
-              Archive {archiveTarget?.name ?? "this tag"}. It leaves the active list.
+              {pending?.archivedAt
+                ? `Restore ${pending.name}. It returns to the active list.`
+                : `Archive ${pending?.name ?? "this tag"}. It leaves the active list.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => void confirmArchive()}>
-              Archive tag
+            <AlertDialogAction onClick={() => void confirmPending()}>
+              {pending?.archivedAt ? "Restore tag" : "Archive tag"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

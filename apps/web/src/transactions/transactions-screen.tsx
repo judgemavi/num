@@ -288,19 +288,28 @@ export function TransactionsScreen() {
             </TableHead>
             <TableHead>Status</TableHead>
             {showBalance ? <TableHead className="text-right">Balance</TableHead> : null}
-            <TableHead className="sr-only">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={showBalance ? 7 : 6} className="text-muted-foreground">
+              <TableCell colSpan={showBalance ? 6 : 5} className="text-muted-foreground">
                 {hasFilters(search) ? "No transactions match." : "No transactions yet."}
               </TableCell>
             </TableRow>
           ) : (
             rows.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow
+                key={row.id}
+                className="cursor-pointer"
+                tabIndex={0}
+                onClick={() => setDraft(row.id)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+                  event.preventDefault();
+                  setDraft(row.id);
+                }}
+              >
                 <TableCell>{formatDate(row.date)}</TableCell>
                 <TableCell>{row.accountName}</TableCell>
                 <TableCell>
@@ -311,7 +320,7 @@ export function TransactionsScreen() {
                   <Amount currency={bookCurrency} minor={row.amount} />
                 </TableCell>
                 <TableCell>
-                  <Badge variant={row.status === "open" ? "neutral" : "positive"}>{statusLabel(row.status)}</Badge>
+                  {row.status === "open" ? null : <Badge variant="positive">{statusLabel(row.status)}</Badge>}
                 </TableCell>
                 {showBalance ? (
                   <TableCell className="text-right">
@@ -320,11 +329,6 @@ export function TransactionsScreen() {
                     )}
                   </TableCell>
                 ) : null}
-                <TableCell className="text-right">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setDraft(row.id)}>
-                    Edit
-                  </Button>
-                </TableCell>
               </TableRow>
             ))
           )}

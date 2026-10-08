@@ -17,6 +17,8 @@ import { IconTile } from "@/components/icon-tile";
 import { BalanceScaleIllustration } from "@/components/illustrations";
 import { ListCard, ListGroup, ListRow } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { SidePanel } from "@/components/side-panel";
 import { SplitBar } from "@/components/split-bar";
@@ -40,7 +42,7 @@ export function AccountsScreen() {
   const search = accountsRoute.useSearch();
   const navigate = accountsRoute.useNavigate();
   const [draft, setDraft] = useState<Account | "new" | null>(null);
-  const [archiveTarget, setArchiveTarget] = useState<Account | null>(null);
+  const [pending, setPending] = useState<Account | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const currency = useQuery({
@@ -59,31 +61,28 @@ export function AccountsScreen() {
     queryFn: () => loadAllPages("/api/accounts", accountListSchema, search.archived),
   });
 
-  async function restore(account: Account) {
-    const result = await apiRequest(`/api/accounts/${account.id}/restore`, accountSchema, { method: "POST" });
+  async function confirmPending() {
+    if (!pending) {
+      return;
+    }
+    const restoring = pending.archivedAt !== null;
+    const result = await apiRequest(
+      `/api/accounts/${pending.id}/${restoring ? "restore" : "archive"}`,
+      accountSchema,
+      restoring
+        ? { method: "POST" }
+        : {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ confirm: true }),
+          },
+    );
     if (!result.ok) {
       setActionError(accountError(result.code));
       return;
     }
     setActionError(null);
-    await queryClient.invalidateQueries({ queryKey: ["accounts"] });
-  }
-
-  async function confirmArchive() {
-    if (!archiveTarget) {
-      return;
-    }
-    const result = await apiRequest(`/api/accounts/${archiveTarget.id}/archive`, accountSchema, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ confirm: true }),
-    });
-    if (!result.ok) {
-      setActionError(accountError(result.code));
-      return;
-    }
-    setActionError(null);
-    setArchiveTarget(null);
+    setPending(null);
     await queryClient.invalidateQueries({ queryKey: ["accounts"] });
   }
 
@@ -181,7 +180,7 @@ export function AccountsScreen() {
                 {group.items.map((account) => {
                   const detail = accountDetail(account);
                   return (
-                    <ListRow key={account.id}>
+                    <ListRow key={account.id} onOpen={() => setDraft(account)}>
                       <IconTile hue={groupHue[group.id]}>
                         <AccountIcon kind={account.kind} />
                       </IconTile>
@@ -196,20 +195,11 @@ export function AccountsScreen() {
                         <Amount currency={bookCurrency} minor={account.balance} owed={accountClass(account.kind) === "liability"} />
                         {detail ? <small>{detail}</small> : null}
                       </div>
-                      <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
-                        <Button type="button" variant="outline" onClick={() => setDraft(account)}>
-                          Edit
-                        </Button>
-                        {account.archivedAt ? (
-                          <Button type="button" variant="outline" onClick={() => void restore(account)}>
-                            Restore
-                          </Button>
-                        ) : (
-                          <Button type="button" variant="destructive" onClick={() => setArchiveTarget(account)}>
-                            Archive
-                          </Button>
-                        )}
-                      </div>
+                      <RowMenu label={`Actions for ${account.name}`}>
+                        <DropdownMenuItem className="min-h-11" onSelect={() => setPending(account)}>
+                          {account.archivedAt ? "Restore" : "Archive"}
+                        </DropdownMenuItem>
+                      </RowMenu>
                     </ListRow>
                   );
                 })}
@@ -257,20 +247,22 @@ export function AccountsScreen() {
           ) : null}
         </DialogContent>
       </Dialog>
-      <AlertDialog open={archiveTarget !== null} onOpenChange={(open) => !open && setArchiveTarget(null)}>
+      <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archive this account?</AlertDialogTitle>
+            <AlertDialogTitle>{pending?.archivedAt ? "Restore this account?" : "Archive this account?"}</AlertDialogTitle>
             <AlertDialogDescription>
-              {archiveTarget && archiveTarget.balance !== 0
-                ? `${archiveTarget.name} has a balance of ${formatBalance(bookCurrency, archiveTarget.kind, archiveTarget.balance)}. Archive it only if you mean to.`
-                : `Archive ${archiveTarget?.name ?? "this account"}. It leaves the active list.`}
+              {pending?.archivedAt
+                ? `Restore ${pending.name}. It returns to the active list.`
+                : pending && pending.balance !== 0
+                  ? `${pending.name} has a balance of ${formatBalance(bookCurrency, pending.kind, pending.balance)}. Archive it only if you mean to.`
+                  : `Archive ${pending?.name ?? "this account"}. It leaves the active list.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => void confirmArchive()}>
-              Archive account
+            <AlertDialogAction onClick={() => void confirmPending()}>
+              {pending?.archivedAt ? "Restore account" : "Archive account"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

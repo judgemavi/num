@@ -10,7 +10,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CategoryForm } from "@/settings/category-form";
-import { categoryError, kindLabel } from "@/settings/format";
+import { categoryError } from "@/settings/format";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { NameForm } from "@/settings/name-form";
 import { apiRequest } from "@/request";
@@ -29,9 +29,14 @@ import { ListCard, ListGroup, ListRow } from "@/components/list-card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Toggle } from "@/components/ui/toggle";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { RowMenu } from "@/components/row-menu";
 
 type GroupDialog = { kind: "create" } | { kind: "rename"; group: CategoryGroup };
-type Confirm = { kind: "archive"; category: Category } | { kind: "delete"; group: CategoryGroup };
+type Confirm =
+  | { kind: "archive"; category: Category }
+  | { kind: "restore"; category: Category }
+  | { kind: "delete"; group: CategoryGroup };
 
 export function CategoriesPanel() {
   const queryClient = useQueryClient();
@@ -103,22 +108,20 @@ export function CategoriesPanel() {
     await refresh();
   }
 
-  async function restoreCategory(category: Category) {
-    const result = await apiRequest(`/api/categories/${category.id}/restore`, categorySchema, { method: "POST" });
-    if (!result.ok) {
-      setActionError(categoryError(result.code));
-      return;
-    }
-    setActionError(null);
-    await refresh();
-  }
-
   async function confirmAction() {
     if (!confirm) {
       return;
     }
     if (confirm.kind === "archive") {
       const result = await apiRequest(`/api/categories/${confirm.category.id}/archive`, categorySchema, {
+        method: "POST",
+      });
+      if (!result.ok) {
+        setActionError(categoryError(result.code));
+        return;
+      }
+    } else if (confirm.kind === "restore") {
+      const result = await apiRequest(`/api/categories/${confirm.category.id}/restore`, categorySchema, {
         method: "POST",
       });
       if (!result.ok) {
@@ -213,25 +216,24 @@ export function CategoriesPanel() {
               label={section.title}
               aside={
                 group ? (
-                  <span className="flex flex-wrap justify-end gap-2 max-md:w-full">
-                    <Button type="button" variant="outline" disabled={index === 0} onClick={() => void moveGroup(group, -1)}>
+                  <RowMenu label={`Actions for ${group.name}`}>
+                    <DropdownMenuItem className="min-h-11" disabled={index === 0} onSelect={() => void moveGroup(group, -1)}>
                       Move up
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="min-h-11"
                       disabled={index === groupRows.length - 1}
-                      onClick={() => void moveGroup(group, 1)}
+                      onSelect={() => void moveGroup(group, 1)}
                     >
                       Move down
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => setGroupDialog({ kind: "rename", group })}>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="min-h-11" onSelect={() => setGroupDialog({ kind: "rename", group })}>
                       Rename
-                    </Button>
-                    <Button type="button" variant="destructive" onClick={() => setConfirm({ kind: "delete", group })}>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="min-h-11" onSelect={() => setConfirm({ kind: "delete", group })}>
                       Delete
-                    </Button>
-                  </span>
+                    </DropdownMenuItem>
+                  </RowMenu>
                 ) : null
               }
             />
@@ -239,29 +241,23 @@ export function CategoriesPanel() {
               <p className="px-5 py-5 text-muted-foreground">No categories.</p>
             ) : (
               section.rows.map((category) => (
-                <ListRow key={category.id} simple>
+                <ListRow key={category.id} simple onOpen={() => setCategoryDraft(category)}>
                   <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
                     {category.name}
                     {category.archivedAt ? <small>Archived</small> : null}
                   </div>
-                  <div className="hidden w-40 shrink-0 text-[13px] text-muted-foreground md:block">{kindLabel(category.kind)}</div>
-                  <div className="hidden w-40 shrink-0 text-[13px] text-muted-foreground md:block">
-                    {category.kind === "expense" && category.essential ? <Badge variant="neutral">Essential</Badge> : "Not essential"}
-                  </div>
-                  <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
-                    <Button type="button" variant="outline" onClick={() => setCategoryDraft(category)}>
-                      Edit
-                    </Button>
+                  {category.kind === "expense" && category.essential ? <Badge variant="neutral">Essential</Badge> : null}
+                  <RowMenu label={`Actions for ${category.name}`}>
                     {category.archivedAt ? (
-                      <Button type="button" variant="outline" onClick={() => void restoreCategory(category)}>
+                      <DropdownMenuItem className="min-h-11" onSelect={() => setConfirm({ kind: "restore", category })}>
                         Restore
-                      </Button>
+                      </DropdownMenuItem>
                     ) : (
-                      <Button type="button" variant="destructive" onClick={() => setConfirm({ kind: "archive", category })}>
+                      <DropdownMenuItem className="min-h-11" onSelect={() => setConfirm({ kind: "archive", category })}>
                         Archive
-                      </Button>
+                      </DropdownMenuItem>
                     )}
-                  </div>
+                  </RowMenu>
                 </ListRow>
               ))
             )}
@@ -306,18 +302,24 @@ export function CategoriesPanel() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirm?.kind === "delete" ? "Delete this group?" : "Archive this category?"}
+              {confirm?.kind === "delete"
+                ? "Delete this group?"
+                : confirm?.kind === "restore"
+                  ? "Restore this category?"
+                  : "Archive this category?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirm?.kind === "delete"
                 ? `Delete ${confirm.group.name}. Categories in this group move to no group.`
-                : `Archive ${confirm?.kind === "archive" ? confirm.category.name : "this category"}. It leaves the active list.`}
+                : confirm?.kind === "restore"
+                  ? `Restore ${confirm.category.name}. It returns to the active list.`
+                  : `Archive ${confirm?.kind === "archive" ? confirm.category.name : "this category"}. It leaves the active list.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => void confirmAction()}>
-              {confirm?.kind === "delete" ? "Delete group" : "Archive category"}
+            <AlertDialogAction onClick={() => void confirmAction()}>
+              {confirm?.kind === "delete" ? "Delete group" : confirm?.kind === "restore" ? "Restore category" : "Archive category"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

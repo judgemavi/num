@@ -11,9 +11,9 @@ type ListCardProps = {
 export function ListCard({ label, title, actions, children }: ListCardProps) {
   return (
     <Card aria-label={label} className="gap-0 py-0">
-      {title ? (
+      {title || actions ? (
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b px-5 py-3.5">
-          <CardTitle className="text-base font-bold">{title}</CardTitle>
+          {title ? <CardTitle className="text-base font-bold">{title}</CardTitle> : <span />}
           {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
         </CardHeader>
       ) : null}
@@ -31,10 +31,33 @@ export function ListGroup({ label, aside }: { label: string; aside?: ReactNode }
   );
 }
 
-export function ListRow({ simple = false, children }: { simple?: boolean; children: ReactNode }) {
+export function ListRow({
+  simple = false,
+  onOpen,
+  children,
+}: {
+  simple?: boolean;
+  onOpen?: () => void;
+  children: ReactNode;
+}) {
   return (
     <div
-      className={`flex items-center gap-3.5 border-t px-5 py-2 first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary max-md:flex-wrap ${simple ? "min-h-12" : "min-h-[60px]"}`}
+      className={`flex items-center gap-3.5 border-t px-5 py-2 first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary max-md:flex-wrap ${simple ? "min-h-12" : "min-h-[60px]"} ${onOpen ? "cursor-pointer" : ""}`}
+      tabIndex={onOpen ? 0 : undefined}
+      onClick={onOpen}
+      onKeyDown={
+        onOpen
+          ? (event) => {
+              if (event.target !== event.currentTarget) {
+                return;
+              }
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpen();
+              }
+            }
+          : undefined
+      }
     >
       {children}
     </div>
