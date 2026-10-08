@@ -9,6 +9,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
+import { useEditors } from "@/editors/editor-host";
 import { FilterBar } from "@/components/filter-bar";
 import { sortChoice } from "@/components/sort-choice";
 import { ListCard, ListRow, listName } from "@/components/list-card";
@@ -16,23 +17,11 @@ import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { apiRequest } from "@/request";
-import { CategoryForm } from "@/settings/category-form";
 import { categoryError } from "@/settings/format";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { SettingsBack } from "@/settings/settings-nav";
@@ -41,7 +30,6 @@ const categoriesRoute = getRouteApi("/settings/categories");
 const anyGroup = "any";
 
 type Draft = { group: string; archived: boolean };
-type Confirm = { kind: "archive" | "restore"; category: Category };
 
 const sortOptions = [
   { value: "name:asc", label: "Name, A to Z" },
@@ -79,9 +67,8 @@ export function CategoriesPage() {
   const queryClient = useQueryClient();
   const search = categoriesRoute.useSearch();
   const navigate = categoriesRoute.useNavigate();
+  const { openEditor, confirm } = useEditors();
   const [draft, setDraft] = useState<Draft>(() => draftFrom(search));
-  const [categoryDraft, setCategoryDraft] = useState<Category | "new" | null>(null);
-  const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const groups = useQuery({
@@ -115,18 +102,14 @@ export function CategoriesPage() {
     await queryClient.invalidateQueries({ queryKey: ["categories"] });
   }
 
-  async function confirmAction() {
-    if (!confirm) {
-      return;
-    }
-    const path = confirm.kind === "archive" ? "archive" : "restore";
-    const result = await apiRequest(`/api/categories/${confirm.category.id}/${path}`, categorySchema, { method: "POST" });
+  async function archiveCategory(category: Category, restore: boolean) {
+    const path = restore ? "restore" : "archive";
+    const result = await apiRequest(`/api/categories/${category.id}/${path}`, categorySchema, { method: "POST" });
     if (!result.ok) {
       setActionError(categoryError(result.code));
       return;
     }
     setActionError(null);
-    setConfirm(null);
     await refresh();
   }
 
@@ -163,7 +146,7 @@ export function CategoriesPage() {
         kicker="Settings"
         title="Categories"
         actions={
-          <Button type="button" onClick={() => setCategoryDraft("new")}>
+          <Button type="button" onClick={() => void openEditor("category", { id: null })}>
             New category
           </Button>
         }
@@ -233,7 +216,7 @@ export function CategoriesPage() {
           <p className="px-5 py-5 text-muted-foreground">{search.archived ? "No archived categories." : "No categories."}</p>
         ) : (
           rows.map((category) => (
-            <ListRow key={category.id} simple onOpen={() => setCategoryDraft(category)}>
+            <ListRow key={category.id} simple onOpen={() => void openEditor("category", { id: category.id })}>
               <div className={listName}>
                 {category.name}
                 <small>{category.groupId ? (groupName.get(category.groupId) ?? "No group") : "No group"}</small>
@@ -242,7 +225,20 @@ export function CategoriesPage() {
               <RowMenu label={`Actions for ${category.name}`}>
                 <DropdownMenuItem
                   className="min-h-11"
-                  onSelect={() => setConfirm({ kind: category.archivedAt ? "restore" : "archive", category })}
+                  onSelect={() => {
+                    const restore = category.archivedAt !== null;
+                    void confirm({
+                      title: restore ? "Restore this category?" : "Archive this category?",
+                      description: restore
+                        ? `Restore ${category.name}. It returns to the active list.`
+                        : `Archive ${category.name}. It leaves the active list.`,
+                      confirmLabel: restore ? "Restore category" : "Archive category",
+                    }).then((ok) => {
+                      if (ok) {
+                        void archiveCategory(category, restore);
+                      }
+                    });
+                  }}
                 >
                   {category.archivedAt ? "Restore" : "Archive"}
                 </DropdownMenuItem>
@@ -251,41 +247,6 @@ export function CategoriesPage() {
           ))
         )}
       </ListCard>
-      <Dialog open={categoryDraft !== null} onOpenChange={(open) => !open && setCategoryDraft(null)}>
-        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto sm:max-w-md">
-          {categoryDraft !== null ? (
-            <CategoryForm
-              key={categoryDraft === "new" ? "new-category" : categoryDraft.id}
-              category={categoryDraft === "new" ? null : categoryDraft}
-              groups={groupRows}
-              onClose={() => setCategoryDraft(null)}
-              onSaved={() => {
-                setCategoryDraft(null);
-                setActionError(null);
-                void refresh();
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirm?.kind === "restore" ? "Restore this category?" : "Archive this category?"}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirm?.kind === "restore"
-                ? `Restore ${confirm.category.name}. It returns to the active list.`
-                : `Archive ${confirm?.category.name ?? "this category"}. It leaves the active list.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void confirmAction()}>
-              {confirm?.kind === "restore" ? "Restore category" : "Archive category"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

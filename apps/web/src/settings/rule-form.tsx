@@ -21,7 +21,7 @@ type RuleFormProps = {
   categories: Category[];
   merchants: Merchant[];
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (id: string) => void;
 };
 
 function isMatch(value: string): value is RuleMatch {
@@ -77,7 +77,7 @@ export function RuleForm({ rule, accounts, categories, merchants, onClose, onSav
       setError(ruleError(result.code));
       return;
     }
-    onSaved();
+    onSaved(result.data.id);
   }
 
   return (

@@ -15,7 +15,7 @@ import {
 } from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { archivePlan, createPlan, listPlans, restorePlan, updatePlan } from "../services/recurring-plans";
+import { archivePlan, createPlan, getPlan, listPlans, restorePlan, updatePlan } from "../services/recurring-plans";
 import { linkOccurrence, restoreSkip, skipOccurrence, unlinkOccurrence } from "../services/recurring-links";
 import { autoLink, listOccurrences, recurringSignals } from "../services/recurring-view";
 
@@ -170,9 +170,20 @@ const signalsRoute = createRoute({
   },
 });
 
+const readRoute = createRoute({
+  method: "get",
+  path: "/api/recurring/{id}",
+  request: { params: idParams },
+  responses: {
+    200: { description: "One recurring plan", content: { "application/json": { schema: planSchema } } },
+    404: errorResponse,
+  },
+});
+
 export function registerRecurring(app: OpenAPIHono, db: Db) {
   app.openapi(listRoute, (c) => c.json(listPlans(db, c.req.valid("query")), 200));
   app.openapi(signalsRoute, (c) => c.json(recurringSignals(db, c.req.valid("query").asOf), 200));
+  app.openapi(readRoute, (c) => c.json(getPlan(db, c.req.valid("param").id), 200));
   app.openapi(autoLinkRoute, (c) => c.json(autoLink(db, c.req.valid("query").asOf, { source: "ui" }), 200));
   app.openapi(createRouteDef, (c) => c.json(createPlan(db, { ...c.req.valid("json"), source: "ui" }), 200));
   app.openapi(updateRoute, (c) => {

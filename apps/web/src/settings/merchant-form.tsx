@@ -12,7 +12,7 @@ type MerchantFormProps = {
   merchant: Merchant | null;
   categories: Category[];
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (id: string) => void;
 };
 
 export function MerchantForm({ merchant, categories, onClose, onSaved }: MerchantFormProps) {
@@ -38,7 +38,7 @@ export function MerchantForm({ merchant, categories, onClose, onSaved }: Merchan
       setError(merchantError(result.code));
       return;
     }
-    onSaved();
+    onSaved(result.data.id);
   }
 
   return (

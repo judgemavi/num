@@ -10,7 +10,7 @@ import {
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { mergeMerchants } from "../services/merchant-merge";
-import { archiveMerchant, createMerchant, listMerchants, restoreMerchant, updateMerchant } from "../services/merchants";
+import { archiveMerchant, createMerchant, getMerchant, listMerchants, restoreMerchant, updateMerchant } from "../services/merchants";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -93,8 +93,19 @@ const mergeRoute = createRoute({
   },
 });
 
+const readRoute = createRoute({
+  method: "get",
+  path: "/api/merchants/{id}",
+  request: { params: idParams },
+  responses: {
+    200: { description: "One merchant", content: { "application/json": { schema: merchantSchema } } },
+    404: errorResponse,
+  },
+});
+
 export function registerMerchants(app: OpenAPIHono, db: Db) {
   app.openapi(listRoute, (c) => c.json(listMerchants(db, c.req.valid("query")), 200));
+  app.openapi(readRoute, (c) => c.json(getMerchant(db, c.req.valid("param").id), 200));
   app.openapi(createRouteDef, (c) => c.json(createMerchant(db, { ...c.req.valid("json"), source: "ui" }), 200));
   app.openapi(updateRoute, (c) => {
     const { id } = c.req.valid("param");

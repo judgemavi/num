@@ -12,34 +12,20 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
+import { useEditors } from "@/editors/editor-host";
 import { FilterBar } from "@/components/filter-bar";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
 import { sortChoice } from "@/components/sort-choice";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/request";
 import { merchantError, ruleError } from "@/settings/format";
 import { loadAllPages } from "@/settings/load-all-pages";
-import { MerchantForm } from "@/settings/merchant-form";
-import { MergeDialog } from "@/settings/merge-dialog";
-import { RuleApplyDialog } from "@/settings/rule-apply-dialog";
-import { RuleForm } from "@/settings/rule-form";
 import { SettingsBack } from "@/settings/settings-nav";
 
 const merchantsRoute = getRouteApi("/settings/merchants");
@@ -62,21 +48,13 @@ export function MerchantsPage() {
   const queryClient = useQueryClient();
   const search = merchantsRoute.useSearch();
   const navigate = merchantsRoute.useNavigate();
+  const { openEditor, confirm } = useEditors();
   const [archived, setArchived] = useState(search.archived);
-  const [merchantDraft, setMerchantDraft] = useState<Merchant | "new" | null>(null);
-  const [ruleDraft, setRuleDraft] = useState<Rule | "new" | null>(null);
-  const [pending, setPending] = useState<{ kind: "merchant" | "rule"; row: Merchant | Rule } | null>(null);
-  const [mergeSource, setMergeSource] = useState<Merchant | null>(null);
-  const [applyTarget, setApplyTarget] = useState<Rule | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const merchants = useQuery({
     queryKey: ["merchants", search],
     queryFn: () => loadAllPages("/api/merchants", merchantListSchema, { archived: search.archived, sort: search.sort, dir: search.dir }),
-  });
-  const activeMerchants = useQuery({
-    queryKey: ["merchants", "active-options"],
-    queryFn: () => loadAllPages("/api/merchants", merchantListSchema, { archived: false }),
   });
   const rules = useQuery({
     queryKey: ["rules", search.archived],
@@ -102,28 +80,37 @@ export function MerchantsPage() {
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
   }
 
-  async function confirmPending() {
-    if (!pending) {
-      return;
-    }
-    const path = pending.row.archivedAt ? "restore" : "archive";
+  async function archiveRow(kind: "merchant" | "rule", row: Merchant | Rule) {
+    const path = row.archivedAt ? "restore" : "archive";
     const result =
-      pending.kind === "merchant"
-        ? await apiRequest(`/api/merchants/${pending.row.id}/${path}`, merchantSchema, { method: "POST" })
-        : await apiRequest(`/api/rules/${pending.row.id}/${path}`, ruleSchema, { method: "POST" });
+      kind === "merchant"
+        ? await apiRequest(`/api/merchants/${row.id}/${path}`, merchantSchema, { method: "POST" })
+        : await apiRequest(`/api/rules/${row.id}/${path}`, ruleSchema, { method: "POST" });
     if (!result.ok) {
-      setActionError(pending.kind === "merchant" ? merchantError(result.code) : ruleError(result.code));
+      setActionError(kind === "merchant" ? merchantError(result.code) : ruleError(result.code));
       return;
     }
     setActionError(null);
-    setPending(null);
     await refresh();
   }
 
-  if (merchants.isPending || rules.isPending || categories.isPending || accounts.isPending || activeMerchants.isPending) {
+  function askArchive(kind: "merchant" | "rule", row: Merchant | Rule) {
+    const restore = row.archivedAt !== null;
+    void confirm({
+      title: restore ? "Restore this record?" : "Archive this record?",
+      description: restore ? "It returns to the active list." : "It leaves the active list. You can restore it later.",
+      confirmLabel: restore ? "Restore" : "Archive",
+    }).then((ok) => {
+      if (ok) {
+        void archiveRow(kind, row);
+      }
+    });
+  }
+
+  if (merchants.isPending || rules.isPending || categories.isPending || accounts.isPending) {
     return <p className="text-muted-foreground">Loading merchants and rules.</p>;
   }
-  if (merchants.isError || rules.isError || categories.isError || accounts.isError || activeMerchants.isError) {
+  if (merchants.isError || rules.isError || categories.isError || accounts.isError) {
     return (
       <div className="flex flex-col items-start gap-4">
         <p>Merchants and rules did not load.</p>
@@ -134,7 +121,6 @@ export function MerchantsPage() {
             void rules.refetch();
             void categories.refetch();
             void accounts.refetch();
-            void activeMerchants.refetch();
           }}
         >
           Try again
@@ -155,7 +141,7 @@ export function MerchantsPage() {
         kicker="Settings"
         title="Merchants and rules"
         actions={
-          <Button type="button" onClick={() => setMerchantDraft("new")}>
+          <Button type="button" onClick={() => void openEditor("merchant", { id: null })}>
             New merchant
           </Button>
         }
@@ -194,100 +180,19 @@ export function MerchantsPage() {
         rows={merchantRows}
         archived={search.archived}
         categoryName={categoryName}
-        onOpen={setMerchantDraft}
-        onArchive={(row) => setPending({ kind: "merchant", row })}
-        onMerge={setMergeSource}
+        onOpen={(row) => void openEditor("merchant", { id: row.id })}
+        onArchive={(row) => askArchive("merchant", row)}
+        onMerge={(row) => void openEditor("mergeMerchant", { merchantId: row.id })}
       />
       <RuleList
         rows={ruleRows}
         archived={search.archived}
         accountName={accountName}
-        onOpen={setRuleDraft}
-        onArchive={(row) => setPending({ kind: "rule", row })}
-        onApply={setApplyTarget}
-        onCreate={() => setRuleDraft("new")}
+        onOpen={(row) => void openEditor("rule", { id: row.id })}
+        onArchive={(row) => askArchive("rule", row)}
+        onApply={(row) => void openEditor("applyRule", { ruleId: row.id })}
+        onCreate={() => void openEditor("rule", { id: null })}
       />
-      <Dialog open={merchantDraft !== null} onOpenChange={(open) => !open && setMerchantDraft(null)}>
-        <DialogContent>
-          {merchantDraft ? (
-            <MerchantForm
-              key={merchantDraft === "new" ? "new-merchant" : merchantDraft.id}
-              merchant={merchantDraft === "new" ? null : merchantDraft}
-              categories={categories.data.items}
-              onClose={() => setMerchantDraft(null)}
-              onSaved={() => {
-                setMerchantDraft(null);
-                void refresh();
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={ruleDraft !== null} onOpenChange={(open) => !open && setRuleDraft(null)}>
-        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
-          {ruleDraft ? (
-            <RuleForm
-              key={ruleDraft === "new" ? "new-rule" : ruleDraft.id}
-              rule={ruleDraft === "new" ? null : ruleDraft}
-              accounts={accounts.data.items}
-              categories={categories.data.items}
-              merchants={activeMerchants.data.items}
-              onClose={() => setRuleDraft(null)}
-              onSaved={() => {
-                setRuleDraft(null);
-                void refresh();
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={mergeSource !== null} onOpenChange={(open) => !open && setMergeSource(null)}>
-        <DialogContent>
-          {mergeSource ? (
-            <MergeDialog
-              source={mergeSource}
-              merchants={activeMerchants.data.items}
-              onClose={() => setMergeSource(null)}
-              onMerged={() => {
-                setMergeSource(null);
-                void refresh();
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={applyTarget !== null} onOpenChange={(open) => !open && setApplyTarget(null)}>
-        <DialogContent>
-          {applyTarget ? (
-            <RuleApplyDialog
-              rule={applyTarget}
-              onClose={() => setApplyTarget(null)}
-              onApplied={() => {
-                setApplyTarget(null);
-                void refresh();
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{pending?.row.archivedAt ? "Restore this record?" : "Archive this record?"}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pending?.row.archivedAt
-                ? "It returns to the active list."
-                : "It leaves the active list. You can restore it later."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void confirmPending()}>
-              {pending?.row.archivedAt ? "Restore" : "Archive"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

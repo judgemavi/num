@@ -10,7 +10,6 @@ import {
   milliPctToPercent,
   percentToMilliPct,
   toMinorUnits,
-  Temporal,
   type Account,
   type AccountKind,
   type PaymentPolicy,
@@ -21,11 +20,10 @@ import { KindPicker } from "@/accounts/kind-picker";
 import { sameClassKinds } from "@/accounts/groups";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
-import { Reveal } from "@/components/reveal";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -34,7 +32,7 @@ type AccountFormProps = {
   currency: string;
   account: Account | null;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (id: string) => void;
 };
 
 function readAmount(currency: string, text: string, label: string): number {
@@ -75,7 +73,7 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
   const [institution, setInstitution] = useState(account?.institution ?? "");
   const [kind, setKind] = useState<AccountKind>(account?.kind ?? "chequing");
   const [onBudget, setOnBudget] = useState(account?.onBudget ?? true);
-  const [openingDate, setOpeningDate] = useState(account?.openingDate ?? Temporal.Now.plainDateISO().toString());
+  const [openingDate, setOpeningDate] = useState(account?.openingDate ?? "");
   const [openingBalance, setOpeningBalance] = useState(account ? fromMinorUnits(currency, account.openingBalance) : "");
   const [paymentPolicy, setPaymentPolicy] = useState<PaymentPolicy | null>(account?.paymentPolicy ?? null);
   const [fixedPayment, setFixedPayment] = useState(
@@ -130,8 +128,10 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
         institution: institution.trim().length === 0 ? null : institution.trim(),
         kind,
         onBudget,
-        openingDate,
-        openingBalance: readAmount(currency, openingBalance, liability ? "the amount you owed" : "the balance"),
+        ...(openingDate.trim().length === 0 ? {} : { openingDate }),
+        ...(openingBalance.trim().length === 0
+          ? {}
+          : { openingBalance: readAmount(currency, openingBalance, liability ? "the amount you owed" : "the balance") }),
         interestRateMilliPct: allowsInterestRate(kind) ? readInterest(interestRate) : null,
         ...card,
       };
@@ -157,15 +157,13 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
         setError(accountError(result.code));
         return;
       }
-      onSaved();
+      onSaved(result.data.id);
     } catch {
       setError("The account did not save. Try again.");
     } finally {
       setSaving(false);
     }
   }
-
-  const moreLabel = allowsInterestRate(kind) ? "More options: interest rate, budget" : "More options: budget";
 
   return (
     <>
@@ -193,20 +191,19 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
               inputMode="decimal"
               autoComplete="off"
               value={openingBalance}
-              required
               onChange={(event) => setOpeningBalance(event.target.value)}
             />
           </Field>
           <Field>
             <FieldLabel htmlFor="opening-date">On this date</FieldLabel>
-            <Input id="opening-date" type="date" value={openingDate} required onChange={(event) => setOpeningDate(event.target.value)} />
+            <Input id="opening-date" type="date" value={openingDate} onChange={(event) => setOpeningDate(event.target.value)} />
           </Field>
         </div>
         <p className="text-sm text-muted-foreground" style={{ marginTop: 0 }}>
-          Use a balance from a statement. Num counts forward from this date.
+          Leave the balance blank to start at 0. Leave the date blank to use today. Num counts forward from this date.
         </p>
         {kind === "credit_card" ? (
-          <Reveal title="Card details">
+          <>
             <Field>
               <FieldLabel htmlFor="payment-policy">How you pay</FieldLabel>
               <Select
@@ -246,12 +243,12 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
                 />
               </Field>
             ) : null}
-          </Reveal>
+          </>
         ) : null}
         <Collapsible>
           <CollapsibleTrigger className="group flex min-h-11 items-center gap-1.5 font-semibold text-primary">
             <ChevronRight className="size-5 transition-transform group-data-[state=open]:rotate-90" aria-hidden="true" strokeWidth={1.8} />
-            {moreLabel}
+            More details
           </CollapsibleTrigger>
           <CollapsibleContent>
           <div className="grid gap-4">
@@ -269,10 +266,7 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
               </Field>
             ) : null}
             <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-              <div>
-                <FieldLabel htmlFor="on-budget">On budget</FieldLabel>
-                <FieldDescription>You can assign money in this account to buckets.</FieldDescription>
-              </div>
+              <FieldLabel htmlFor="on-budget">Use this account's money in my budget</FieldLabel>
               <Switch id="on-budget" checked={onBudget} onCheckedChange={(checked) => setOnBudget(checked === true)} />
             </div>
           </div>

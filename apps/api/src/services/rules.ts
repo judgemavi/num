@@ -145,6 +145,14 @@ function assertTarget(
   }
 }
 
+export function getRule(db: Db, id: string): Rule {
+  const row = db.select().from(rules).where(eq(rules.id, id)).get();
+  if (!row) {
+    throw new ServiceError("rule_not_found", 404);
+  }
+  return toRule(row);
+}
+
 export function listRules(db: Db, query: RuleListQuery) {
   const rows = db
     .select()

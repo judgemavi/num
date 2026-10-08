@@ -49,6 +49,14 @@ function assertTagName(tx: WriteTx, name: string, exceptId?: string) {
   }
 }
 
+export function getTag(db: Db, id: string): Tag {
+  const row = db.select().from(tags).where(eq(tags.id, id)).get();
+  if (!row) {
+    throw new ServiceError("tag_not_found", 404);
+  }
+  return toTag(row);
+}
+
 export function listTags(db: Db, query: TagListQuery) {
   const rows = db
     .select()

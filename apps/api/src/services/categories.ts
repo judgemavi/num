@@ -137,6 +137,22 @@ function assertKindChange(tx: WriteTx, id: string, current: CategoryKind, next: 
   }
 }
 
+export function getCategoryGroup(db: Db, id: string): CategoryGroup {
+  const row = db.select().from(categoryGroups).where(eq(categoryGroups.id, id)).get();
+  if (!row) {
+    throw new ServiceError("group_not_found", 404);
+  }
+  return toGroup(row);
+}
+
+export function getCategory(db: Db, id: string): Category {
+  const row = db.select().from(categories).where(eq(categories.id, id)).get();
+  if (!row) {
+    throw new ServiceError("category_not_found", 404);
+  }
+  return toCategory(row);
+}
+
 export function listCategoryGroups(db: Db): { items: CategoryGroup[] } {
   const items = db.select().from(categoryGroups).all().map(toGroup);
   items.sort((left, right) => compareName(left.name, right.name) || compareText(left.id, right.id));

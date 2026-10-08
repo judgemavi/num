@@ -38,8 +38,8 @@ type TransactionFormProps = {
   rawLine?: string;
   initialAccountId?: string;
   onClose: () => void;
-  onSaved: () => void;
-  onDelete: () => void;
+  onSaved: (id: string) => void;
+  onDelete: () => Promise<string | null>;
   deleteKind?: "plain" | "mirror" | "linked";
 };
 
@@ -285,7 +285,7 @@ export function TransactionForm({
       setError(transactionError(result.code));
       return;
     }
-    onSaved();
+    onSaved(result.data.id);
   }
 
   const summary = `${formatDate(date)} · ${accountName} · ${direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(imported && transaction ? transaction.amount : (totalMinor ?? 0)))} · ${payee}`;
@@ -380,7 +380,17 @@ export function TransactionForm({
       />
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
-        {transaction && !reconciled ? <DeleteMenu kind={deleteKind} onDelete={onDelete} /> : null}
+        {transaction && !reconciled ? (
+          <DeleteMenu
+            kind={deleteKind}
+            onDelete={async () => {
+              const message = await onDelete();
+              if (message) {
+                setError(message);
+              }
+            }}
+          />
+        ) : null}
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>

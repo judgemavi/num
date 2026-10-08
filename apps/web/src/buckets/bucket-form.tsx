@@ -44,7 +44,7 @@ type BucketFormProps = {
   nextColor: BucketColor;
   suggestedPriority: number;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (id: string) => void;
 };
 
 type GoalMode = "date" | "paycheck";
@@ -149,7 +149,7 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onCl
         setError(bucketError(result.code));
         return;
       }
-      onSaved();
+      onSaved(result.data.id);
     } catch {
       setError("The bucket did not save. Try again.");
     } finally {

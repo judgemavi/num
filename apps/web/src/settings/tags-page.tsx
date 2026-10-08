@@ -2,30 +2,19 @@ import { tagListSchema, tagSchema, type Tag, type TagListQuery } from "@num/shar
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
+import { useEditors } from "@/editors/editor-host";
 import { FilterBar } from "@/components/filter-bar";
 import { sortChoice } from "@/components/sort-choice";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/request";
 import { tagError } from "@/settings/format";
 import { loadAllPages } from "@/settings/load-all-pages";
-import { NameForm } from "@/settings/name-form";
 import { SettingsBack } from "@/settings/settings-nav";
 
 const tagsRoute = getRouteApi("/settings/tags");
@@ -46,9 +35,8 @@ export function TagsPage() {
   const queryClient = useQueryClient();
   const search = tagsRoute.useSearch();
   const navigate = tagsRoute.useNavigate();
+  const { openEditor, confirm } = useEditors();
   const [archived, setArchived] = useState(search.archived);
-  const [draft, setDraft] = useState<Tag | "new" | null>(null);
-  const [pending, setPending] = useState<Tag | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const tags = useQuery({
@@ -64,33 +52,14 @@ export function TagsPage() {
     await queryClient.invalidateQueries({ queryKey: ["tags"] });
   }
 
-  async function saveTag(name: string) {
-    const current = draft !== "new" && draft !== null ? draft : null;
-    const result = await apiRequest(current ? `/api/tags/${current.id}` : "/api/tags", tagSchema, {
-      method: current ? "PATCH" : "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    if (!result.ok) {
-      return tagError(result.code);
-    }
-    setActionError(null);
-    await refresh();
-    return null;
-  }
-
-  async function confirmPending() {
-    if (!pending) {
-      return;
-    }
-    const path = pending.archivedAt ? "restore" : "archive";
-    const result = await apiRequest(`/api/tags/${pending.id}/${path}`, tagSchema, { method: "POST" });
+  async function archiveTag(tag: Tag) {
+    const path = tag.archivedAt ? "restore" : "archive";
+    const result = await apiRequest(`/api/tags/${tag.id}/${path}`, tagSchema, { method: "POST" });
     if (!result.ok) {
       setActionError(tagError(result.code));
       return;
     }
     setActionError(null);
-    setPending(null);
     await refresh();
   }
 
@@ -117,7 +86,7 @@ export function TagsPage() {
         kicker="Settings"
         title="Tags"
         actions={
-          <Button type="button" onClick={() => setDraft("new")}>
+          <Button type="button" onClick={() => void openEditor("tag", { id: null })}>
             New tag
           </Button>
         }
@@ -157,10 +126,26 @@ export function TagsPage() {
           <p className="px-5 py-5 text-muted-foreground">{search.archived ? "No archived tags." : "No tags yet."}</p>
         ) : (
           rows.map((tag) => (
-            <ListRow key={tag.id} simple onOpen={() => setDraft(tag)}>
+            <ListRow key={tag.id} simple onOpen={() => void openEditor("tag", { id: tag.id })}>
               <div className={listName}>{tag.name}</div>
               <RowMenu label={`Actions for ${tag.name}`}>
-                <DropdownMenuItem className="min-h-11" onSelect={() => setPending(tag)}>
+                <DropdownMenuItem
+                  className="min-h-11"
+                  onSelect={() => {
+                    const restore = tag.archivedAt !== null;
+                    void confirm({
+                      title: restore ? "Restore this tag?" : "Archive this tag?",
+                      description: restore
+                        ? `Restore ${tag.name}. It returns to the active list.`
+                        : `Archive ${tag.name}. It leaves the active list.`,
+                      confirmLabel: restore ? "Restore tag" : "Archive tag",
+                    }).then((ok) => {
+                      if (ok) {
+                        void archiveTag(tag);
+                      }
+                    });
+                  }}
+                >
                   {tag.archivedAt ? "Restore" : "Archive"}
                 </DropdownMenuItem>
               </RowMenu>
@@ -168,41 +153,6 @@ export function TagsPage() {
           ))
         )}
       </ListCard>
-      <Dialog open={draft !== null} onOpenChange={(open) => !open && setDraft(null)}>
-        <DialogContent>
-          {draft ? (
-            <NameForm
-              key={draft === "new" ? "new-tag" : draft.id}
-              title={draft === "new" ? "New tag" : "Rename tag"}
-              description="Use a tag for a trip or a project."
-              label="Name"
-              submitLabel={draft === "new" ? "Add tag" : "Save tag"}
-              savingLabel="Saving tag"
-              initialName={draft === "new" ? "" : draft.name}
-              onClose={() => setDraft(null)}
-              onSubmit={saveTag}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{pending?.archivedAt ? "Restore this tag?" : "Archive this tag?"}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pending?.archivedAt
-                ? `Restore ${pending.name}. It returns to the active list.`
-                : `Archive ${pending?.name ?? "this tag"}. It leaves the active list.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void confirmPending()}>
-              {pending?.archivedAt ? "Restore tag" : "Archive tag"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

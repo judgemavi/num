@@ -14,7 +14,7 @@ import {
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { coverBucket, createBucketEvent, listBucketEvents, undoBucketEvent } from "../services/bucket-events";
-import { archiveBucket, createBucket, listBuckets, listOverspent, restoreBucket, updateBucket } from "../services/buckets";
+import { archiveBucket, createBucket, listBuckets, listOverspent, readBucket, restoreBucket, updateBucket } from "../services/buckets";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -183,10 +183,21 @@ const coverRoute = createRoute({
   },
 });
 
+const readRoute = createRoute({
+  method: "get",
+  path: "/api/buckets/{id}",
+  request: { params: idParams },
+  responses: {
+    200: { description: "One bucket and its balance", content: { "application/json": { schema: bucketSchema } } },
+    404: errorResponse,
+  },
+});
+
 export function registerBuckets(app: OpenAPIHono, db: Db) {
   app.openapi(listRoute, (c) => c.json(listBuckets(db, c.req.valid("query")), 200));
   app.openapi(eventsRoute, (c) => c.json(listBucketEvents(db), 200));
   app.openapi(overspentRoute, (c) => c.json(listOverspent(db), 200));
+  app.openapi(readRoute, (c) => c.json(readBucket(db, c.req.valid("param").id), 200));
   app.openapi(createRouteDef, (c) => c.json(createBucket(db, { ...c.req.valid("json"), source: "ui" }), 200));
   app.openapi(updateRoute, (c) => {
     const { id } = c.req.valid("param");

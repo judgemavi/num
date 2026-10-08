@@ -23,7 +23,7 @@ type CategoryFormProps = {
   category: Category | null;
   groups: CategoryGroup[];
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (id: string) => void;
 };
 
 function isKind(value: string): value is CategoryKind {
@@ -63,7 +63,7 @@ export function CategoryForm({ category, groups, onClose, onSaved }: CategoryFor
         setError(categoryError(result.code));
         return;
       }
-      onSaved();
+      onSaved(result.data.id);
     } catch {
       setError("The change did not save. Try again.");
     } finally {

@@ -5,18 +5,16 @@ import {
   merchantListSchema,
   tagListSchema,
   transactionListSchema,
-  transactionSchema,
   type Account,
   type Category,
   type Tag,
-  type Transaction,
   type TransactionListQuery,
   accountClass,
 } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { Amount } from "@/components/amount";
@@ -25,9 +23,9 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TransactionFilterBar } from "@/transactions/filters";
-import { formatDate, statusLabel, transactionError } from "@/transactions/format";
+import { formatDate, statusLabel } from "@/transactions/format";
 import { hasFilters, transactionPath } from "@/transactions/query";
-import { TransactionDialog } from "@/transactions/transaction-dialog";
+import { useEditors } from "@/editors/editor-host";
 
 const transactionsRoute = getRouteApi("/transactions");
 
@@ -43,11 +41,9 @@ async function loadNamed<T extends { id: string }>(
 }
 
 export function TransactionsScreen() {
-  const queryClient = useQueryClient();
   const search = transactionsRoute.useSearch();
   const navigate = transactionsRoute.useNavigate();
-  const [draft, setDraft] = useState<string | "new" | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const { openEditor } = useEditors();
 
   const currency = useQuery({
     queryKey: ["book-currency"],
@@ -123,17 +119,6 @@ export function TransactionsScreen() {
     });
   }
 
-  async function deleteTransaction(transaction: Transaction) {
-    const result = await apiRequest(`/api/transactions/${transaction.id}`, transactionSchema, { method: "DELETE" });
-    if (!result.ok) {
-      setActionError(transactionError(result.code));
-      return;
-    }
-    setActionError(null);
-    setDraft(null);
-    await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-  }
-
   const pending =
     currency.isPending || transactions.isPending || accounts.isPending || categories.isPending || tags.isPending || merchants.isPending;
   if (pending) {
@@ -196,7 +181,7 @@ export function TransactionsScreen() {
         kicker={page.total === 1 ? "1 transaction" : `${page.total} transactions`}
         title="Transactions"
         actions={
-          <Button type="button" disabled={accounts.data.every((account) => account.archivedAt)} onClick={() => setDraft("new")}>
+          <Button type="button" disabled={accounts.data.every((account) => account.archivedAt)} onClick={() => void openEditor("transaction", { id: null })}>
             <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
             New transaction
           </Button>
@@ -210,11 +195,6 @@ export function TransactionsScreen() {
         tags={tags.data}
         onChange={changeFilters}
       />
-      {actionError ? (
-        <p role="alert" className="text-sm text-attn">
-          {actionError}
-        </p>
-      ) : null}
       <div className="overflow-hidden rounded-[16px] border border-border bg-card">
       <Table>
         <TableHeader>
@@ -252,11 +232,11 @@ export function TransactionsScreen() {
                 key={row.id}
                 className="cursor-pointer"
                 tabIndex={0}
-                onClick={() => setDraft(row.id)}
+                onClick={() => void openEditor("transaction", { id: row.id })}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
                   event.preventDefault();
-                  setDraft(row.id);
+                  void openEditor("transaction", { id: row.id });
                 }}
               >
                 <TableCell>{formatDate(row.date)}</TableCell>
@@ -307,23 +287,6 @@ export function TransactionsScreen() {
             Next
           </Button>
         </div>
-      ) : null}
-      {draft ? (
-        <TransactionDialog
-          draft={draft}
-          currency={bookCurrency}
-          accounts={accounts.data}
-          categories={categories.data}
-          tags={tags.data}
-          merchants={merchants.data}
-          onClose={() => setDraft(null)}
-          onSaved={() => {
-            setDraft(null);
-            setActionError(null);
-            void queryClient.invalidateQueries({ queryKey: ["transactions"] });
-          }}
-          onDelete={(transaction) => void deleteTransaction(transaction)}
-        />
       ) : null}
     </>
   );

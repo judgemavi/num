@@ -1,16 +1,7 @@
 import type { MoneyDirection, Tag } from "@num/shared";
 import { ChevronRight, Ellipsis } from "lucide-react";
 import { useState } from "react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { useEditors } from "@/editors/editor-host";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -189,41 +180,34 @@ export function MoreDetails({
 }
 
 export function DeleteMenu({ kind, onDelete }: { kind: "plain" | "mirror" | "linked"; onDelete: () => void }) {
-  const [open, setOpen] = useState(false);
+  const { confirm } = useEditors();
+  const description =
+    kind === "mirror"
+      ? "This also deletes the other side of the transfer."
+      : kind === "linked"
+        ? "The other account stays. Its line returns to the Inbox."
+        : "The transaction leaves the list.";
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button type="button" variant="ghost" size="icon" aria-label="More">
-            <Ellipsis strokeWidth={1.8} aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem className="min-h-11" onSelect={() => setOpen(true)}>
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {kind === "mirror"
-                ? "This also deletes the other side of the transfer."
-                : kind === "linked"
-                  ? "The other account stays. Its line returns to the Inbox."
-                  : "The transaction leaves the list."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-            <AlertDialogAction type="button" onClick={onDelete}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="ghost" size="icon" aria-label="More">
+          <Ellipsis strokeWidth={1.8} aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          className="min-h-11"
+          onSelect={() => {
+            void confirm({ title: "Delete this transaction?", description, confirmLabel: "Delete" }).then((ok) => {
+              if (ok) {
+                onDelete();
+              }
+            });
+          }}
+        >
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

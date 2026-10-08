@@ -38,7 +38,7 @@ type PlanFormProps = {
   categories: Category[];
   merchants: Merchant[];
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (id: string) => void;
 };
 
 function isPlan(draft: PlanDraft): draft is Plan {
@@ -139,7 +139,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, onC
         setError(planError(result.code));
         return;
       }
-      onSaved();
+      onSaved(result.data.id);
     } catch {
       setError("The plan did not save. Try again.");
     } finally {

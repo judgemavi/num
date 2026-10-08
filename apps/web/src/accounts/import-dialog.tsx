@@ -20,33 +20,9 @@ import { localAsOf } from "@/as-of";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-type ImportDialogProps = {
-  open: boolean;
-  account: Account | null;
-  onOpenChange: (open: boolean) => void;
-  onImported: () => void;
-};
-
-export function ImportDialog({ open, account, onOpenChange, onImported }: ImportDialogProps) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(44rem,calc(100%-2rem))] w-[min(52rem,calc(100%-2rem))] max-w-[52rem]">
-        {open ? (
-          <ImportForm
-            key={account?.id ?? "none"}
-            account={account}
-            onClose={() => onOpenChange(false)}
-            onImported={onImported}
-          />
-        ) : null}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ImportForm({
+export function ImportForm({
   account,
   onClose,
   onImported,

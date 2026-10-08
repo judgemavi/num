@@ -4,6 +4,7 @@ import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Ellipsis, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { localAsOf } from "@/as-of";
+import { EditorHost } from "@/editors/editor-host";
 import { moreNav, phoneMoreNav, primaryNav, settingsNav, type NavPath } from "@/nav";
 import { apiRequest } from "@/request";
 import { SetupScreen } from "@/setup-screen";
@@ -224,5 +225,9 @@ export function RootLayout() {
   if (!setup.data.complete) {
     return <SetupScreen onDone={() => void setup.refetch()} />;
   }
-  return <AppShell />;
+  return (
+    <EditorHost>
+      <AppShell />
+    </EditorHost>
+  );
 }

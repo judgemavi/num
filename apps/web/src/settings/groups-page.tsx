@@ -1,29 +1,16 @@
-import { categoryGroupDeleteSchema, categoryGroupListSchema, categoryGroupSchema, categoryListSchema, type CategoryGroup } from "@num/shared";
+import { categoryGroupDeleteSchema, categoryGroupListSchema, categoryListSchema, type CategoryGroup } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useEditors } from "@/editors/editor-host";
 import { categoryError } from "@/settings/format";
 import { loadAllPages } from "@/settings/load-all-pages";
-import { NameForm } from "@/settings/name-form";
 import { SettingsBack } from "@/settings/settings-nav";
 import { apiRequest } from "@/request";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-
-type GroupDialog = { kind: "create" } | { kind: "rename"; group: CategoryGroup };
 
 function countLabel(count: number) {
   return count === 1 ? "1 category" : `${count} categories`;
@@ -31,8 +18,7 @@ function countLabel(count: number) {
 
 export function GroupsPage() {
   const queryClient = useQueryClient();
-  const [groupDialog, setGroupDialog] = useState<GroupDialog | null>(null);
-  const [confirm, setConfirm] = useState<CategoryGroup | null>(null);
+  const { openEditor, confirm } = useEditors();
   const [actionError, setActionError] = useState<string | null>(null);
 
   const groups = useQuery({
@@ -60,32 +46,13 @@ export function GroupsPage() {
     await queryClient.invalidateQueries({ queryKey: ["categories"] });
   }
 
-  async function saveGroup(name: string) {
-    const renaming = groupDialog?.kind === "rename" ? groupDialog.group : null;
-    const result = await apiRequest(renaming ? `/api/category-groups/${renaming.id}` : "/api/category-groups", categoryGroupSchema, {
-      method: renaming ? "PATCH" : "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    if (!result.ok) {
-      return categoryError(result.code);
-    }
-    setActionError(null);
-    await refresh();
-    return null;
-  }
-
-  async function deleteGroup() {
-    if (!confirm) {
-      return;
-    }
-    const result = await apiRequest(`/api/category-groups/${confirm.id}`, categoryGroupDeleteSchema, { method: "DELETE" });
+  async function deleteGroup(group: CategoryGroup) {
+    const result = await apiRequest(`/api/category-groups/${group.id}`, categoryGroupDeleteSchema, { method: "DELETE" });
     if (!result.ok) {
       setActionError(categoryError(result.code));
       return;
     }
     setActionError(null);
-    setConfirm(null);
     await refresh();
   }
 
@@ -125,7 +92,7 @@ export function GroupsPage() {
         kicker="Settings"
         title="Groups"
         actions={
-          <Button type="button" onClick={() => setGroupDialog({ kind: "create" })}>
+          <Button type="button" onClick={() => void openEditor("group", { id: null })}>
             New group
           </Button>
         }
@@ -140,13 +107,26 @@ export function GroupsPage() {
           <p className="px-5 py-5 text-muted-foreground">No groups.</p>
         ) : (
           rows.map((group) => (
-            <ListRow key={group.id} simple onOpen={() => setGroupDialog({ kind: "rename", group })}>
+            <ListRow key={group.id} simple onOpen={() => void openEditor("group", { id: group.id })}>
               <div className={listName}>
                 {group.name}
                 <small>{countLabel(counts.get(group.id) ?? 0)}</small>
               </div>
               <RowMenu label={`Actions for ${group.name}`}>
-                <DropdownMenuItem className="min-h-11" onSelect={() => setConfirm(group)}>
+                <DropdownMenuItem
+                  className="min-h-11"
+                  onSelect={() => {
+                    void confirm({
+                      title: "Delete this group?",
+                      description: `Delete ${group.name}. Categories in this group move to no group.`,
+                      confirmLabel: "Delete group",
+                    }).then((ok) => {
+                      if (ok) {
+                        void deleteGroup(group);
+                      }
+                    });
+                  }}
+                >
                   Delete
                 </DropdownMenuItem>
               </RowMenu>
@@ -154,37 +134,6 @@ export function GroupsPage() {
           ))
         )}
       </ListCard>
-      <Dialog open={groupDialog !== null} onOpenChange={(open) => !open && setGroupDialog(null)}>
-        <DialogContent>
-          {groupDialog ? (
-            <NameForm
-              key={groupDialog.kind === "rename" ? groupDialog.group.id : "new-group"}
-              title={groupDialog.kind === "rename" ? "Rename group" : "New group"}
-              description="A group only organizes categories."
-              label="Name"
-              submitLabel={groupDialog.kind === "rename" ? "Save group" : "Add group"}
-              savingLabel="Saving group"
-              initialName={groupDialog.kind === "rename" ? groupDialog.group.name : ""}
-              onClose={() => setGroupDialog(null)}
-              onSubmit={saveGroup}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this group?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirm ? `Delete ${confirm.name}. Categories in this group move to no group.` : "Categories in this group move to no group."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void deleteGroup()}>Delete group</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

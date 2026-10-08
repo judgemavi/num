@@ -10,7 +10,7 @@ import {
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { applyRule, previewRuleApply } from "../services/rule-apply";
-import { archiveRule, createRule, listRules, restoreRule, updateRule } from "../services/rules";
+import { archiveRule, createRule, getRule, listRules, restoreRule, updateRule } from "../services/rules";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -100,8 +100,19 @@ const applyRoute = createRoute({
   },
 });
 
+const readRoute = createRoute({
+  method: "get",
+  path: "/api/rules/{id}",
+  request: { params: idParams },
+  responses: {
+    200: { description: "One rule", content: { "application/json": { schema: ruleSchema } } },
+    404: errorResponse,
+  },
+});
+
 export function registerRules(app: OpenAPIHono, db: Db) {
   app.openapi(listRoute, (c) => c.json(listRules(db, c.req.valid("query")), 200));
+  app.openapi(readRoute, (c) => c.json(getRule(db, c.req.valid("param").id), 200));
   app.openapi(createRouteDef, (c) => c.json(createRule(db, { ...c.req.valid("json"), source: "ui" }), 200));
   app.openapi(updateRoute, (c) => {
     const { id } = c.req.valid("param");

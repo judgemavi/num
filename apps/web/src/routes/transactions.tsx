@@ -1,11 +1,14 @@
 import { transactionListQuerySchema, type TransactionListQuery } from "@num/shared";
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
+import { withEdit } from "@/editors/page-search";
 import { TransactionsScreen } from "@/transactions/transactions-screen";
 
+type Search = TransactionListQuery & { edit?: string };
+
 export const Route = createFileRoute("/transactions")({
-  validateSearch: (search: Record<string, unknown>): TransactionListQuery => transactionListQuerySchema.parse(search),
+  validateSearch: (search: Record<string, unknown>): Search => withEdit(transactionListQuerySchema, search),
   search: {
-    middlewares: [stripSearchParams<TransactionListQuery>({ page: 1, pageSize: 50, uncategorized: false })],
+    middlewares: [stripSearchParams<Search>({ page: 1, pageSize: 50, uncategorized: false, edit: undefined })],
   },
   component: TransactionsScreen,
 });

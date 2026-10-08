@@ -74,6 +74,14 @@ export function assertActiveCategory(tx: WriteTx, id: string | null) {
   }
 }
 
+export function getMerchant(db: Db, id: string): Merchant {
+  const row = db.select().from(merchants).where(eq(merchants.id, id)).get();
+  if (!row) {
+    throw new ServiceError("merchant_not_found", 404);
+  }
+  return toMerchant(row);
+}
+
 export function listMerchants(db: Db, query: MerchantListQuery) {
   const rows = db
     .select()

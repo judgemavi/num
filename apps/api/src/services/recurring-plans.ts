@@ -227,6 +227,14 @@ function requirePlan(tx: WriteTx, id: string): PlanRow {
   return row;
 }
 
+export function getPlan(db: Db, id: string): Plan {
+  const row = db.select().from(recurringPlans).where(eq(recurringPlans.id, id)).get();
+  if (!row) {
+    throw new ServiceError("plan_not_found", 404);
+  }
+  return toPlan(row);
+}
+
 export function listPlans(db: Db, query: PlanListQuery) {
   const rows = db
     .select()

@@ -18,6 +18,8 @@ import {
   createCategory,
   createCategoryGroup,
   deleteCategoryGroup,
+  getCategory,
+  getCategoryGroup,
   listCategories,
   listCategoryGroups,
   restoreCategory,
@@ -184,8 +186,29 @@ const archiveCategoryRoute = createRoute({
   },
 });
 
+const readGroupRoute = createRoute({
+  method: "get",
+  path: "/api/category-groups/{id}",
+  request: { params: idParams },
+  responses: {
+    200: { description: "One category group", content: { "application/json": { schema: categoryGroupSchema } } },
+    404: errorResponse,
+  },
+});
+
+const readCategoryRoute = createRoute({
+  method: "get",
+  path: "/api/categories/{id}",
+  request: { params: idParams },
+  responses: {
+    200: { description: "One category", content: { "application/json": { schema: categorySchema } } },
+    404: errorResponse,
+  },
+});
+
 export function registerCategories(app: OpenAPIHono, db: Db) {
   app.openapi(listGroupsRoute, (c) => c.json(listCategoryGroups(db), 200));
+  app.openapi(readGroupRoute, (c) => c.json(getCategoryGroup(db, c.req.valid("param").id), 200));
   app.openapi(createGroupRoute, (c) => {
     const body = c.req.valid("json");
     return c.json(createCategoryGroup(db, { ...body, source: "ui" }), 200);
@@ -202,6 +225,7 @@ export function registerCategories(app: OpenAPIHono, db: Db) {
   });
 
   app.openapi(listCategoriesRoute, (c) => c.json(listCategories(db, c.req.valid("query")), 200));
+  app.openapi(readCategoryRoute, (c) => c.json(getCategory(db, c.req.valid("param").id), 200));
   app.openapi(createCategoryRoute, (c) => {
     const body = c.req.valid("json");
     return c.json(createCategory(db, { ...body, source: "ui" }), 200);
