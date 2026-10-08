@@ -27,12 +27,12 @@ If a screen or feature does not support one of these loops, do not add it.
 ## 2. Principles
 
 1. **Correct money.** Use integer cents for all amounts. Account balances must agree with bank statements.
-2. **Deterministic.** Use rules, history and arithmetic. Do not use ML. The app does not call an LLM.
+2. **Deterministic.** Use schedules, history, text similarity and arithmetic (confidence scores, §7.3). Do not use ML. The app does not call an LLM.
 3. **Money never changes by itself.** The app does not create, change or delete money (amounts, dates, accounts,
    transfers, splits) without a user action. Labels (category and merchant) can be automatic when the app is sure
    (§7.3). An automatic label always shows its reason and is easy to correct. Example: "Learned from Mar 12".
 4. **Reversible.** The user can undo imports and funding. The user can open a closed month again.
-   The user can restore archived accounts, categories, tags, merchants, rules, plans and buckets.
+   The user can restore archived accounts, categories, tags, merchants, recurring items and buckets.
    The audit log records each of these actions.
 5. **Exceptions only.** The user works on the Inbox. The user does not examine each transaction.
 6. **Plain language.** The UI does not use accounting words. Do not show "debit", "credit", "equity", "split" or "ledger".
@@ -89,7 +89,7 @@ The owner finds information about unknown merchants with Claude through MCP.
 - **Rates:** Interest rates are integers in thousandths of a percent (`MilliPct`). Example: 6.875% = `6875`.
   The user types a percent with a maximum of 3 decimal places.
 - **IDs:** Use UUID text.
-- **Delete:** Use a soft delete (`deletedAt`) for financial records. You can archive configuration records (rules, plans, buckets).
+- **Delete:** Use a soft delete (`deletedAt`) for financial records. You can archive configuration records (recurring items, buckets).
 - **Audit:** Each change writes one `audit_log` row (§11).
 
 ## 5. Entities
@@ -209,26 +209,13 @@ Fields: `name`, `archivedAt?`. The name is unique. The comparison ignores case. 
 
 Use tags for trips and projects. Example: "Italy Vacation 2026". Reports can filter and add totals by tag.
 
-### 5.6 Merchant and rule
+### 5.6 Merchant
 
-Merchant fields: `name`, `defaultCategoryId?`, `archivedAt?`. The name is unique. The comparison ignores case.
+Fields: `name`, `defaultCategoryId?`, `archivedAt?`. The name is unique. The comparison ignores case.
 
-Rule fields:
-- `match`: `exact | prefix | contains`. There are no regex rules (decision 0012).
-- `pattern`: the rule compares it with the **normalized payee** (§7.3).
-- `accountId?`: if it is set, the rule applies only to this account.
-- `merchantId?`, `categoryId?`, `transferAccountId?`, `priority`
-- `origin`: `manual | promoted`
-- A rule must set `merchantId`, `categoryId`, `transferAccountId`, or a merchant with one of the others.
-  A rule cannot set both `categoryId` and `transferAccountId`.
-- A transfer rule suggests a transfer to that account (example: "TD VISA PAYMENT" → transfer to Visa Card).
+There are no rules (decision 0017). Matching uses recurring items, learning, similarity and confidence (§7.3).
 
-Rules make suggestions. §7.3 tells how the import uses them.
-A change to a rule does not change existing transactions.
-To change existing transactions, the user selects "Apply to existing". The app shows a preview first.
-"Apply to existing" changes only transactions with exactly one non-transfer line. It never changes split transactions.
-
-### 5.7 Recurring plan
+### 5.7 Recurring item
 
 A recurring plan is a payment or deposit that the user expects on a schedule.
 
@@ -401,6 +388,7 @@ It stores the forecast of the on-budget total for the last day of the month (§8
 | `emergencyFundMonths` | 3 | Hygiene check |
 | `staleImportDays` | 10 | Hygiene check |
 | `recurringGraceDays` | 3 | Date window for recurring links |
+| `autoConfidence` | `balanced` | `careful` (0.95), `balanced` (0.85) or `eager` (0.75): when labels become automatic |
 
 ## 6. Calculated values
 
@@ -495,31 +483,41 @@ If the user imports the same file again, or a file with overlapping dates, the a
 When it is not sure, the function keeps a word. Two different merchants with the same normalized payee is worse than
 two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), but keep the word before it.
 
-**Suggestion order.** The first result that the app finds is the suggestion. Each suggestion shows its reason.
-1. Rules, in order of priority. Rules for one account come before global rules.
-2. Learned payee: the user confirmations for the same normalized payee (the last 10). A confirmation is a category or
-   merchant that the user chose or accepted (not one that the app set automatically).
-   - All agree (1 or more): the app is **sure**.
-   - 80% or more agree: a **suggestion** only.
-   - Less: the payee has a conflict. The most recent confirmation is a suggestion only.
-3. The default category of the merchant (a suggestion only).
-4. No result: the line is uncategorized. It goes to the Inbox.
+**Matching with confidence (decision 0017).** For each transaction line, the app collects candidates
+(category + merchant) from these signals. Each signal gives a confidence from 0 to 1 and a reason code:
 
-**Automatic labels (decision 0015).**
-- When the app is sure (a rule, or a learned payee where all confirmations agree), it sets the category and merchant
-  automatically: on import (only the rows of that import, so undo removes them all), and after a user confirmation on
-  the payee's other uncategorized transactions. It keeps a merchant that the user set.
-- **Learn from the first answer.** When the user confirms a category or merchant for a payee, the app applies it at once
-  to that payee's other uncategorized single-line transactions (one write, audited), and to future imports.
-- An automatic label stores its reason on the transaction: `autoReason` (`rule | learned`) and `autoSourceId`
-  (the rule, or the confirmed transaction). The UI shows it ("Rule: NETFLIX", "Learned from Mar 12").
-  Transactions has an "Automatic" filter. A confirmation is: the user changes the category or merchant, or clicks
-  "Looks right" on an automatic label. Then `autoReason` is cleared. Other edits (notes, tags) are not confirmations.
-- When a transaction becomes a transfer or a split, `autoReason` and `autoSourceId` are cleared.
-- If a new confirmation disagrees with the earlier ones, the payee is no longer sure: the app stops automatic labels for
-  it and its next transactions go to the Inbox with a suggestion.
-- Transfers are never automatic. A transfer rule or evidence only preselects Transfer in the editor.
-- Splits are never changed automatically.
+| Signal | Confidence |
+|---|---|
+| Recurring link (exactly one matching occurrence, §7.4) | 0.99 |
+| Learned payee + amount (the normalized payee and the same amount, ±1%) | learned formula |
+| Learned payee | learned formula × 0.95 |
+| Similar payee: character-trigram cosine similarity ≥ 0.80 to a payee with confirmations | similarity × that payee's learned confidence |
+| Merchant default category | 0.60 |
+
+Learned formula: a = recency-weighted confirmations for the candidate, t = recency-weighted confirmations for the key.
+Each confirmation weighs half as much as the next more recent one. confidence = (a + 0.15) / (t + 0.3) × (1 − 0.5^(n+1)),
+where n = number of confirmations for the key. (One confirmation ≈ 0.85; three that agree ≈ 0.95.)
+A confirmation is a category or merchant that the user chose or accepted ("Looks right"), not one that the app set.
+
+Combining: signals for the same candidate combine as 1 − Π(1 − cᵢ). The best candidate must lead the second by ≥ 0.2;
+otherwise it is a suggestion only.
+
+Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default, Eager 0.75):
+- confidence ≥ `autoConfidence` and a clear lead: **automatic**.
+- confidence ≥ 0.60: **suggestion** in the Inbox (preselected).
+- less: Inbox without a suggestion.
+
+**Automatic labels.**
+- The app sets category and merchant automatically on import (only the rows of that import, so undo removes them all),
+  and after each user confirmation on the other uncategorized transactions whose confidence is now above the threshold.
+  It keeps a merchant that the user set.
+- An automatic label stores `autoReason` (the strongest signal code), `autoConfidence` (0–1000) and `autoSourceId`.
+  The UI shows the confidence and the reasons: "94% sure · Recurring: Rent · learned from 4 answers".
+  The Transactions "Automatic" filter can sort by confidence (lowest first).
+- A confirmation clears `autoReason`. Other edits (notes, tags) are not confirmations.
+- When a transaction becomes a transfer or a split, the automatic fields are cleared.
+- Transfers are never automatic (evidence only preselects Transfer). Splits are never automatic, except the mortgage split
+  of a recurring mortgage item (§5.2, the user created the item).
 
 **What is this?** The choices follow the direction of the money (decision 0014):
 - Money out: **Spending** (default) · Transfer · Split.
@@ -528,25 +526,21 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
 1. **Spending** and **Refund:** an expense category. The list shows only expense categories.
    **Income:** an income category. The list shows only income categories.
 2. **Transfer:** the other account. The app preselects Transfer only on evidence: an opposite transaction in another
-   account within ±3 days, or a transfer rule. A transfer has no merchant. If that account has an unlinked transaction with the opposite amount within ±3 days,
+   account within ±3 days, or a learned transfer for that payee. A transfer has no merchant. If that account has an unlinked transaction with the opposite amount within ±3 days,
    the app links the two (no new mirror). If not, the app creates the mirror transaction. A later import of the other
    account matches the mirror (§7.2 step 4).
 3. **Split:** several lines, for example a mortgage payment. Each line has its own direction, and its category list shows
    both groups with labels (this also covers returned income).
-The suggestion (§7.3) preselects the choice: a category, or a transfer from a transfer rule.
+The best candidate (§7.3) preselects the choice: a category, or a learned transfer.
 
 **Inbox, one row for each transaction.** The Inbox shows each transaction that the app cannot categorize. The whole row
 opens the transaction editor (a chevron at the right shows this). Suggestion chips on the row apply with one click.
 The editor's group mode stays available for bulk edits that the user starts (for example from a selection on Transactions).
 
-**Create on the spot.** The editor can create a merchant (name from the payee, for example "SQ *BLUE BOTTLE 0423" →
-"Blue Bottle"), a category, a group and a tag without leaving the flow. "Make a rule" in the editor opens an inline rule
-builder: match type and text (prefilled from the payee), scope (all accounts or this account), the values from the current
-choices, and a live preview (matches, and how many uncategorized transactions will change, with their bank text).
-"More options" opens the full rule editor. Save and rule are one write.
-
-**Rules and learning.** Learning replaces the "promote to rule" Inbox item. The user can still make a rule
-("Make a rule" in the editor, or Settings). A rule wins over learning and over a conflict.
+**Create on the spot.** Every picker of user-managed things shows "+ Create new <thing>" as its first option (decision 0018).
+Choosing it opens that entity's form inline below the picker (the same form component as in Settings or Accounts).
+Save creates the record, selects it and closes the section. A merchant name is suggested from the payee
+("SQ *BLUE BOTTLE 0423" → "Blue Bottle").
 
 **Transfer detection.** An imported row can have an opposite amount to an unlinked row in a different on-budget account,
 within ±3 days. Then the Inbox suggests a transfer pair. The user accepts with one click.
@@ -696,7 +690,6 @@ Undo is available for:
 - Import batch.
 - Funding run.
 - Bucket move.
-- Rule "Apply to existing".
 - Checkpoint (unlock).
 - Month close (open again).
 
@@ -711,7 +704,6 @@ To correct other records, the user edits them. The audit log records each edit.
   - `propose_transactions`: for example, rows from a PDF statement, with the closing balance.
   - `propose_categorization`
   - `propose_merchant`
-  - `propose_rule`
   - `propose_valuation`
 - Proposals show in the Inbox. Approval uses the same code as the UI.
 - Proposed transactions go through import matching and duplicate checks (§7.2), the same as a CSV.
@@ -765,6 +757,6 @@ There are 8 screens.
 | Insights | Month story, categories, merchants, tags, net worth, mortgage, hygiene panel |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports (§7.2). |
 | Recurring | Plans, occurrences, links, skips |
-| Settings | Subpages: Groups, Categories, Tags, Backup. Later: Merchants and rules, Preferences. |
+| Settings | Subpages: Groups, Categories, Tags, Merchants, Matching (`autoConfidence`), Backup. |
 
 The first-run setup screen (§7.0) is not one of the 8 screens. It shows only one time.

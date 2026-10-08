@@ -172,8 +172,6 @@ Order, top to bottom:
    - Transfer: "To account" / "From account" Combobox (link an existing match or create the mirror). No merchant.
    - Split: line rows (direction, amount, then category or account) and a live "$X left to assign". Save is disabled until it is 0.
 4. **Merchant** Combobox, with the suggestion and its reason. Hidden for Transfer.
-5. **Make a rule** (Collapsible): "When the bank text [contains ▾] [text] in [all accounts ▾] then set <current choices>",
-   live preview "Matches N · M uncategorized will change" with the matches' bank text, and "More options" (full rule editor).
 6. **More details** (Collapsible, closed): notes, tags, bank text, "Cleared" checkbox. No "status" word in the UI.
 7. Footer: Save (primary). Delete goes in a More menu (shared confirm).
 
@@ -185,19 +183,20 @@ An automatic label shows its reason ("Rule: NETFLIX", "Learned from Mar 12").
 
 ## 6b. Shared editors and the dialog host
 
-- One editor component for each entity: Transaction, Account, Category, Group, Tag, Merchant, Rule, Bucket, Plan.
+- One editor component for each entity: Transaction, Account, Category, Group, Tag, Merchant, Bucket, Recurring.
+  Each editor is built from one form component. The same form is used in a dialog and inline (create on the spot).
   The same editor creates and edits, on every screen.
 - One dialog host at the app root. Screens call `openEditor(kind, props)`. Screens do not render their own dialogs.
   Only the open editor exists in the page.
 - An editor loads its own data when it opens (by ID, through the query cache). List rows carry only what they show.
-- Editors stack: an editor can open another editor and get the new ID back (create on the spot).
+- Editors do not stack. Only one top-level editor is open at a time (decision 0018).
 - One shared `confirm()` (AlertDialog) for every confirmation.
 - The URL shows the open single-record editor (`?edit=transaction:<id>`). Back closes it. Group mode stays in memory.
 
-**Create on the spot:** every picker of user-managed things (categories, groups, tags, merchants, accounts) offers
-"Create …" when the typed name does not exist. It shows a case-insensitive existing match first.
-A new category takes its kind from the current choice; its group picker can create a group; it offers
-"Add to a bucket" (optional).
+**Create on the spot:** the first option of every picker of user-managed things (categories, groups, tags,
+merchants, accounts) is "+ Create new <thing>". Choosing it expands that entity's form inline below the picker, prefilled
+with the typed text. Save creates, selects and collapses; Cancel collapses. Inline forms nest at most two levels (category
+form → "+ Create new group"). An archived match shows "Restore 'X'".
 
 ## 7. Illustrations
 
