@@ -6,6 +6,7 @@ import { registerCategories } from "./routes/categories";
 import { healthRoute } from "./routes/health";
 import { registerSetup } from "./routes/setup";
 import { registerTags } from "./routes/tags";
+import { registerTransactions } from "./routes/transactions";
 import { ServiceError } from "./service-error";
 import { validationHook } from "./validation";
 import { hasFileExtension, webFile, webIndex } from "./web-files";
@@ -31,6 +32,7 @@ export function createApp(db: Db) {
   registerAccounts(app, db);
   registerCategories(app, db);
   registerTags(app, db);
+  registerTransactions(app, db);
 
   app.doc("/api/openapi.json", {
     openapi: "3.0.0",

@@ -29,6 +29,17 @@ export const errorCodes = [
   "tag_archived",
   "tag_not_archived",
   "tag_name_taken",
+  "transaction_not_found",
+  "transaction_reconciled",
+  "lines_required",
+  "lines_sum_mismatch",
+  "line_target_conflict",
+  "transfer_same_account",
+  "transfer_line_limit",
+  "mirror_one_line",
+  "payee_raw_locked",
+  "merchant_not_found",
+  "merchant_archived",
   "internal_error",
 ] as const;
 

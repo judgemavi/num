@@ -80,3 +80,19 @@ export {
   type CategorySet,
 } from "./setup";
 export { isUtcTimestamp, utcNow } from "./time";
+export {
+  transactionCreateSchema,
+  transactionLineInputSchema,
+  transactionLineSchema,
+  transactionSchema,
+  transactionSources,
+  transactionStatuses,
+  transactionUpdateSchema,
+  type Transaction,
+  type TransactionCreate,
+  type TransactionLine,
+  type TransactionLineInput,
+  type TransactionSource,
+  type TransactionStatus,
+  type TransactionUpdate,
+} from "./transaction";
