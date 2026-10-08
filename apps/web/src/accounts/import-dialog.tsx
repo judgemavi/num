@@ -290,6 +290,7 @@ function ImportForm({
     if (rowsRef.current.some((row) => row.phase === "done")) {
       onImported();
       await queryClient.invalidateQueries({ queryKey: ["imports"] });
+      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     }
     setFinished(true);
     pendingRef.current = false;

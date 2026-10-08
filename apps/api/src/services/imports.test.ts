@@ -439,3 +439,65 @@ test("a saved preset that no longer exists uses detection", () => {
   }
 });
 
+test("the first import with a running balance suggests the opening balance", () => {
+  const book = tempBook();
+  try {
+    const withBalance = columnMapSchema.parse({ ...map, balance: 3 });
+    const first = importStatement(book.db, book.dir, {
+      source: "import",
+      at,
+      accountId: book.account.id,
+      filename: "january.csv",
+      mimeType: "text/csv",
+      bytes: csv(["01/02/2026,NORTH MARKET,-12.50,1487.50", "01/04/2026,PAY DEPOSIT,200.00,1687.50"], true),
+      columnMap: withBalance,
+    });
+    expect(first.kind).toBe("batch");
+    if (first.kind !== "batch") {
+      return;
+    }
+    expect(first.openingSuggestion).toEqual({ amount: 150_000, date: "2026-01-01" });
+
+    const card = createAccount(book.db, {
+      name: "Card",
+      institution: null,
+      kind: "credit_card",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      paymentPolicy: "full",
+      source: "ui",
+      at,
+    });
+    const cardMap = columnMapSchema.parse({ ...withBalance, balanceSign: "inverted" });
+    const cardImport = importStatement(book.db, book.dir, {
+      source: "import",
+      at,
+      accountId: card.id,
+      filename: "card.csv",
+      mimeType: "text/csv",
+      bytes: csv(["01/05/2026,NORTH MARKET,-24.00,80.00"], true),
+      columnMap: cardMap,
+    });
+    expect(cardImport.kind).toBe("batch");
+    if (cardImport.kind === "batch") {
+      expect(cardImport.openingSuggestion).toEqual({ amount: -5_600, date: "2026-01-04" });
+    }
+
+    const second = importStatement(book.db, book.dir, {
+      source: "import",
+      at,
+      accountId: book.account.id,
+      filename: "february.csv",
+      mimeType: "text/csv",
+      bytes: csv(["02/02/2026,CITY TRANSIT,-3.25,1684.25"], true),
+      columnMap: withBalance,
+    });
+    expect(second.kind).toBe("batch");
+    if (second.kind === "batch") {
+      expect(second.openingSuggestion).toBeNull();
+    }
+  } finally {
+    book.close();
+  }
+});
+

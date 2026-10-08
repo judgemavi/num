@@ -1,4 +1,5 @@
 import {
+  cardStatementListSchema,
   checkpointCompareSchema,
   checkpointCreateSchema,
   checkpointListSchema,
@@ -17,6 +18,7 @@ import {
   listCheckpoints,
   unlockCheckpoint,
 } from "../services/checkpoints";
+import { listCardStatements } from "../services/card-statements";
 import { setClearance } from "../services/transaction-clearance";
 
 const errorResponse = {
@@ -139,8 +141,24 @@ const clearanceRoute = createRoute({
   },
 });
 
+const statementsRoute = createRoute({
+  method: "get",
+  path: "/api/accounts/{id}/statements",
+  request: { params: accountParams },
+  responses: {
+    200: {
+      description: "Card statements and the estimated next statement",
+      content: { "application/json": { schema: cardStatementListSchema } },
+    },
+    400: errorResponse,
+    404: errorResponse,
+  },
+});
+
 export function registerCheckpoints(app: OpenAPIHono, db: Db) {
   app.openapi(listRoute, (c) => c.json(listCheckpoints(db, c.req.valid("param").id), 200));
+
+  app.openapi(statementsRoute, (c) => c.json(listCardStatements(db, c.req.valid("param").id), 200));
 
   app.openapi(compareRoute, (c) => {
     const { id } = c.req.valid("param");

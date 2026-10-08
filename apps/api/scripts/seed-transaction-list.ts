@@ -39,8 +39,8 @@ sqlite.exec("begin");
 const insertAccount = sqlite.prepare(
   `insert into accounts (
     id, name, institution, kind, on_budget, opening_date, opening_balance,
-    archived_at, credit_limit, statement_day, due_day, payment_policy, fixed_payment, interest_rate_milli_pct
-  ) values (?, ?, null, 'chequing', 1, '2016-01-01', ?, null, null, null, null, null, null, null)`,
+    archived_at, payment_policy, fixed_payment, interest_rate_milli_pct
+  ) values (?, ?, null, 'chequing', 1, '2016-01-01', ?, null, null, null, null)`,
 );
 insertAccount.run(accountA, "Account A", 250_000);
 insertAccount.run(accountB, "Account B", 0);

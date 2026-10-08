@@ -128,5 +128,5 @@ export function parseOfxStatement(text: string, minorDigits: number): ParsedStat
     }
   }
 
-  return { rows, unreadable, closingBalance, closingDate };
+  return { rows, unreadable, closingBalance, closingDate, firstRow: null };
 }

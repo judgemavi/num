@@ -16,7 +16,7 @@ import {
   type PaymentPolicy,
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
-import { accountError, dayOptionLabel, policyLabel } from "@/accounts/format";
+import { accountError, policyLabel } from "@/accounts/format";
 import { KindPicker } from "@/accounts/kind-picker";
 import { sameClassKinds } from "@/accounts/groups";
 import { apiRequest } from "@/request";
@@ -37,9 +37,6 @@ type AccountFormProps = {
   onSaved: () => void;
 };
 
-const days = Array.from({ length: 31 }, (_, index) => index + 1);
-const none = "none";
-
 function readAmount(currency: string, text: string, label: string): number {
   try {
     return toMinorUnits(currency, text.trim());
@@ -49,28 +46,6 @@ function readAmount(currency: string, text: string, label: string): number {
     }
     throw new Error(`Enter ${label} as a number.`);
   }
-}
-
-function readOptionalAmount(currency: string, text: string, label: string): number | null {
-  if (text.trim().length === 0) {
-    return null;
-  }
-  return readAmount(currency, text, label);
-}
-
-function readDay(text: string, label: string): number | null {
-  const trimmed = text.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-  if (!/^\d{1,2}$/.test(trimmed)) {
-    throw new Error(`Enter ${label} as a day from 1 to 31.`);
-  }
-  const day = Number(trimmed);
-  if (day < 1 || day > 31) {
-    throw new Error(`Enter ${label} as a day from 1 to 31.`);
-  }
-  return day;
 }
 
 function readInterest(text: string): number | null {
@@ -102,15 +77,6 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
   const [onBudget, setOnBudget] = useState(account?.onBudget ?? true);
   const [openingDate, setOpeningDate] = useState(account?.openingDate ?? Temporal.Now.plainDateISO().toString());
   const [openingBalance, setOpeningBalance] = useState(account ? fromMinorUnits(currency, account.openingBalance) : "");
-  const [creditLimit, setCreditLimit] = useState(
-    account?.creditLimit === null || account?.creditLimit === undefined ? "" : fromMinorUnits(currency, account.creditLimit),
-  );
-  const [statementDay, setStatementDay] = useState(
-    account?.statementDay === null || account?.statementDay === undefined ? "" : String(account.statementDay),
-  );
-  const [dueDay, setDueDay] = useState(
-    account?.dueDay === null || account?.dueDay === undefined ? "" : String(account.dueDay),
-  );
   const [paymentPolicy, setPaymentPolicy] = useState<PaymentPolicy | null>(account?.paymentPolicy ?? null);
   const [fixedPayment, setFixedPayment] = useState(
     account?.fixedPayment === null || account?.fixedPayment === undefined ? "" : fromMinorUnits(currency, account.fixedPayment),
@@ -133,9 +99,6 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
     setOnBudget(defaultOnBudget(value));
     if (value !== "credit_card") {
       setPaymentPolicy(null);
-      setCreditLimit("");
-      setStatementDay("");
-      setDueDay("");
       setFixedPayment("");
     }
     if (!allowsInterestRate(value)) {
@@ -155,16 +118,10 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
       const card =
         kind === "credit_card"
           ? {
-              creditLimit: readOptionalAmount(currency, creditLimit, "the credit limit"),
-              statementDay: readDay(statementDay, "the statement day"),
-              dueDay: readDay(dueDay, "the due day"),
               paymentPolicy,
               fixedPayment: paymentPolicy === "fixed" ? readAmount(currency, fixedPayment, "the fixed payment") : null,
             }
           : {
-              creditLimit: null,
-              statementDay: null,
-              dueDay: null,
               paymentPolicy: null,
               fixedPayment: null,
             };
@@ -208,7 +165,7 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
     }
   }
 
-  const moreLabel = kind === "credit_card" ? "More options: credit limit, interest rate, budget" : allowsInterestRate(kind) ? "More options: interest rate, budget" : "More options: budget";
+  const moreLabel = allowsInterestRate(kind) ? "More options: interest rate, budget" : "More options: budget";
 
   return (
     <>
@@ -250,10 +207,6 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
         </p>
         {kind === "credit_card" ? (
           <Reveal title="Card details">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <DayField id="statement-day" label="Statement ends on" value={statementDay} onChange={setStatementDay} />
-              <DayField id="due-day" label="Payment is due on" value={dueDay} onChange={setDueDay} />
-            </div>
             <Field>
               <FieldLabel htmlFor="payment-policy">How you pay</FieldLabel>
               <Select
@@ -302,18 +255,6 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
           </CollapsibleTrigger>
           <CollapsibleContent>
           <div className="grid gap-4">
-            {kind === "credit_card" ? (
-              <Field>
-                <FieldLabel htmlFor="credit-limit">Credit limit</FieldLabel>
-                <Input
-                  id="credit-limit"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  value={creditLimit}
-                  onChange={(event) => setCreditLimit(event.target.value)}
-                />
-              </Field>
-            ) : null}
             {allowsInterestRate(kind) ? (
               <Field>
                 <FieldLabel htmlFor="interest-rate">Interest rate (%)</FieldLabel>
@@ -348,26 +289,5 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
         </DialogFooter>
       </form>
     </>
-  );
-}
-
-function DayField({ id, label, value, onChange }: { id: string; label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Select value={value === "" ? none : value} onValueChange={(next) => onChange(next === none ? "" : next)}>
-        <SelectTrigger id={id} className="w-full">
-          <SelectValue placeholder="Not set" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={none}>Not set</SelectItem>
-          {days.map((day) => (
-            <SelectItem key={day} value={String(day)}>
-              {dayOptionLabel(day)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </Field>
   );
 }

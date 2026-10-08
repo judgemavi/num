@@ -20,6 +20,7 @@ import { planImportRows } from "./import-plan";
 import { batchForDocument, presentBatch } from "./import-read";
 import { saveImportBatch } from "./import-save";
 import { parseCsvStatement } from "./parse-csv";
+import { importOpeningSuggestion } from "./opening-suggestion";
 import { parseOfxStatement } from "./parse-ofx";
 import { loadPreset, loadPresets } from "./presets";
 import { autoLink } from "./recurring-view";
@@ -188,7 +189,7 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
       if (stored.deletedAt) {
         restoreDocument(db, stored.id, { source: input.source, at });
       }
-      return { kind: "batch", alreadyImported: true, ...presentBatch(db, existing) };
+      return { kind: "batch", alreadyImported: true, openingSuggestion: null, ...presentBatch(db, existing) };
     }
   }
 
@@ -259,6 +260,11 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     uploadedAt: at,
     deletedAt: null,
   };
+  const openingSuggestion = importOpeningSuggestion(
+    db,
+    account.id,
+    resolved.parser === "csv" ? resolved.statement.firstRow : null,
+  );
   const batch = saveImportBatch(db, {
     source: input.source,
     at,
@@ -285,5 +291,5 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
       console.error("Recurring auto-link failed after import", error);
     }
   }
-  return { kind: "batch", alreadyImported: false, ...batch };
+  return { kind: "batch", alreadyImported: false, openingSuggestion, ...batch };
 }

@@ -272,10 +272,7 @@ export function AccountsScreen() {
                 <ListRow key={account.id} simple>
                   <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
                     {account.name}
-                    <small>
-                      {account.dueDay === null ? "No due day" : `Due day ${account.dueDay}`}
-                      {account.paymentPolicy === "full" ? " · pays the full statement" : ""}
-                    </small>
+                    <small>{account.paymentPolicy === "full" ? "Pays the full statement" : ""}</small>
                   </div>
                   <div className="ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
                     <Amount currency={bookCurrency} minor={account.balance} owed />

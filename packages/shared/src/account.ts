@@ -33,7 +33,7 @@ const liabilityKinds = new Set<AccountKind>(["credit_card", "mortgage", "loan", 
 
 const budgetKinds = new Set<AccountKind>(["chequing", "savings", "cash", "credit_card"]);
 
-const interestKinds = new Set<AccountKind>(["savings", "credit_card", "loan"]);
+const interestKinds = new Set<AccountKind>(["savings", "loan"]);
 
 export function accountClass(kind: AccountKind): AccountClass {
   return liabilityKinds.has(kind) ? "liability" : "asset";
@@ -51,17 +51,12 @@ const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX
 
 const nonNegativeCentsSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
-const daySchema = z.number().int().min(1).max(31);
-
 const accountFields = {
   name: z.string().trim().min(1),
   institution: z.string().trim().min(1).nullable().optional(),
   kind: z.enum(accountKinds),
-  openingDate: isoDateSchema,
-  openingBalance: centsSchema,
-  creditLimit: nonNegativeCentsSchema.nullable().optional(),
-  statementDay: daySchema.nullable().optional(),
-  dueDay: daySchema.nullable().optional(),
+  openingDate: isoDateSchema.optional(),
+  openingBalance: centsSchema.optional(),
   paymentPolicy: z.enum(paymentPolicies).nullable().optional(),
   fixedPayment: nonNegativeCentsSchema.nullable().optional(),
   interestRateMilliPct: interestRateMilliPctSchema.nullable().optional(),
@@ -90,9 +85,6 @@ export const accountSchema = z.object({
   openingDate: isoDateSchema,
   openingBalance: centsSchema,
   archivedAt: z.string().refine(isUtcTimestamp).nullable(),
-  creditLimit: nonNegativeCentsSchema.nullable(),
-  statementDay: daySchema.nullable(),
-  dueDay: daySchema.nullable(),
   paymentPolicy: z.enum(paymentPolicies).nullable(),
   fixedPayment: nonNegativeCentsSchema.nullable(),
   interestRateMilliPct: interestRateMilliPctSchema.nullable(),

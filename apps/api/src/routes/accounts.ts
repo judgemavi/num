@@ -6,10 +6,11 @@ import {
   accountUpdateSchema,
   archiveAccountSchema,
   errorSchema,
+  openingSuggestionSchema,
 } from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { archiveAccount, createAccount, getAccount, listAccounts, restoreAccount, updateAccount } from "../services/accounts";
+import { applyOpeningSuggestion, archiveAccount, createAccount, getAccount, listAccounts, restoreAccount, updateAccount } from "../services/accounts";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -161,6 +162,34 @@ const archiveRoute = createRoute({
   },
 });
 
+const openingRoute = createRoute({
+  method: "post",
+  path: "/api/accounts/{id}/opening",
+  request: {
+    params: idParams,
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: openingSuggestionSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "The account after the opening balance is set",
+      content: {
+        "application/json": {
+          schema: accountSchema,
+        },
+      },
+    },
+    400: errorResponse,
+    404: errorResponse,
+  },
+});
+
 export function registerAccounts(app: OpenAPIHono, db: Db) {
   app.openapi(listRoute, (c) => c.json(listAccounts(db, c.req.valid("query")), 200));
 
@@ -189,5 +218,11 @@ export function registerAccounts(app: OpenAPIHono, db: Db) {
   app.openapi(restoreRoute, (c) => {
     const { id } = c.req.valid("param");
     return c.json(restoreAccount(db, id, { source: "ui" }), 200);
+  });
+
+  app.openapi(openingRoute, (c) => {
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
+    return c.json(applyOpeningSuggestion(db, id, { amount: body.amount, date: body.date, source: "ui" }), 200);
   });
 }

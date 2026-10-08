@@ -69,3 +69,59 @@ test("migration 0006 keeps a transaction linked to an import row", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("migration 0008 drops card fields and clears a credit card interest rate", () => {
+  const dir = mkdtempSync(join(tmpdir(), "num-card-migrate-"));
+  const folder = join(dir, "migrations");
+  cpSync(source, folder, { recursive: true });
+  const journal = JSON.parse(readFileSync(join(folder, "meta", "_journal.json"), "utf8")) as {
+    entries: { tag: string }[];
+  };
+  journal.entries = journal.entries.filter((entry) => entry.tag < "0008");
+  writeFileSync(join(folder, "meta", "_journal.json"), JSON.stringify(journal, null, 2));
+
+  const sqlite = openDatabase(join(dir, "num.sqlite"));
+  try {
+    applyMigrations(sqlite, folder);
+    sqlite.exec(`
+      insert into accounts (
+        id, name, kind, on_budget, opening_date, opening_balance,
+        credit_limit, statement_day, due_day, payment_policy, fixed_payment, interest_rate_milli_pct
+      ) values
+        ('card', 'Card', 'credit_card', 1, '2026-01-01', -5000, 250000, 12, 7, 'full', null, 19990),
+        ('save', 'Savings', 'savings', 1, '2026-01-01', 10000, null, null, null, null, null, 150);
+      insert into transactions (id, account_id, date, amount, payee_raw, payee_normalized, status, source)
+      values ('txn', 'card', '2026-02-02', -2400, 'NORTH MARKET', 'NORTH MARKET', 'open', 'import');
+      insert into checkpoints (id, account_id, date, statement_balance, created_at)
+      values ('point', 'card', '2026-02-28', -7400, '2026-03-01T16:00:00.000Z');
+    `);
+
+    cpSync(join(source, "0008_card_statement_fields.sql"), join(folder, "0008_card_statement_fields.sql"));
+    cpSync(join(source, "meta", "0008_snapshot.json"), join(folder, "meta", "0008_snapshot.json"));
+    cpSync(join(source, "meta", "_journal.json"), join(folder, "meta", "_journal.json"));
+    applyMigrations(sqlite, folder);
+
+    const columns = sqlite.query("select name from pragma_table_info('accounts')").all() as { name: string }[];
+    expect(columns.map((column) => column.name)).not.toContain("statement_day");
+    expect(columns.map((column) => column.name)).not.toContain("due_day");
+    expect(columns.map((column) => column.name)).not.toContain("credit_limit");
+    expect(sqlite.query("select interest_rate_milli_pct from accounts where id = 'card'").get()).toEqual({
+      interest_rate_milli_pct: null,
+    });
+    expect(sqlite.query("select interest_rate_milli_pct, opening_balance from accounts where id = 'save'").get()).toEqual({
+      interest_rate_milli_pct: 150,
+      opening_balance: 10000,
+    });
+    expect(sqlite.query("select payment_policy from accounts where id = 'card'").get()).toEqual({
+      payment_policy: "full",
+    });
+    expect(sqlite.query("select amount from transactions where id = 'txn'").get()).toEqual({ amount: -2400 });
+    expect(sqlite.query("select statement_balance from checkpoints where id = 'point'").get()).toEqual({
+      statement_balance: -7400,
+    });
+    expect(sqlite.query("pragma foreign_key_check").all()).toEqual([]);
+  } finally {
+    sqlite.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

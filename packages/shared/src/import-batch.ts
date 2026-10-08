@@ -2,6 +2,7 @@ import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { listQuerySchema, pagedResponseSchema } from "./list";
 import { isUtcTimestamp } from "./time";
+import { openingSuggestionSchema } from "./opening";
 import { presetSchema, unreadableRowSchema } from "./statement";
 
 const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
@@ -74,6 +75,7 @@ export const importPresetListSchema = z.object({
 export const importedBatchSchema = importBatchSchema.extend({
   kind: z.literal("batch"),
   alreadyImported: z.boolean(),
+  openingSuggestion: openingSuggestionSchema.nullable(),
 });
 
 export const importPreviewSchema = z.object({

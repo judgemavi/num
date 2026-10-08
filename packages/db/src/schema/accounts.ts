@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { check, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { accountKinds, compounding, paymentFrequencies, paymentPolicies } from "./codes";
 import { categories } from "./categories";
-import { isoDate, nullOrDayOfMonth, nullOrOneOf, oneOf } from "./sql";
+import { isoDate, nullOrOneOf, oneOf } from "./sql";
 
 export const accounts = sqliteTable(
   "accounts",
@@ -15,9 +15,6 @@ export const accounts = sqliteTable(
     openingDate: text("opening_date").notNull(),
     openingBalance: integer("opening_balance").notNull(),
     archivedAt: text("archived_at"),
-    creditLimit: integer("credit_limit"),
-    statementDay: integer("statement_day"),
-    dueDay: integer("due_day"),
     paymentPolicy: text("payment_policy"),
     fixedPayment: integer("fixed_payment"),
     interestRateMilliPct: integer("interest_rate_milli_pct"),
@@ -27,8 +24,6 @@ export const accounts = sqliteTable(
   (table) => [
     check("accounts_kind", oneOf(table.kind, accountKinds)),
     check("accounts_opening_date", isoDate(table.openingDate)),
-    check("accounts_statement_day", nullOrDayOfMonth(table.statementDay)),
-    check("accounts_due_day", nullOrDayOfMonth(table.dueDay)),
     check("accounts_payment_policy", nullOrOneOf(table.paymentPolicy, paymentPolicies)),
     check(
       "accounts_interest_rate",
@@ -42,9 +37,6 @@ export const accounts = sqliteTable(
         and (${table.paymentPolicy} <> 'fixed' or ${table.fixedPayment} is not null)
       ) or (
         ${table.kind} <> 'credit_card'
-        and ${table.creditLimit} is null
-        and ${table.statementDay} is null
-        and ${table.dueDay} is null
         and ${table.paymentPolicy} is null
         and ${table.fixedPayment} is null
       )`,

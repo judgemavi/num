@@ -16,7 +16,3 @@ export function isoDate(column: SQLWrapper): SQL {
 export function nullOrIsoDate(column: SQLWrapper): SQL {
   return sql`(${column} is null or ${isoDate(column)})`;
 }
-
-export function nullOrDayOfMonth(column: SQLWrapper): SQL {
-  return sql`(${column} is null or (${column} between 1 and 31))`;
-}

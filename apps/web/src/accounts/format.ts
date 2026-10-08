@@ -65,27 +65,9 @@ export function accountDetail(account: Account): string | null {
     if (account.paymentPolicy) {
       parts.push(policyLabel(account.paymentPolicy));
     }
-    if (account.dueDay !== null) {
-      parts.push(`due day ${account.dueDay}`);
-    }
     return parts.length === 0 ? null : parts.join(" · ");
   }
   return null;
-}
-
-export function dayOptionLabel(day: number): string {
-  const mod100 = day % 100;
-  let suffix = "th";
-  if (mod100 < 11 || mod100 > 13) {
-    if (day % 10 === 1) {
-      suffix = "st";
-    } else if (day % 10 === 2) {
-      suffix = "nd";
-    } else if (day % 10 === 3) {
-      suffix = "rd";
-    }
-  }
-  return `${day}${suffix} of the month`;
 }
 
 export function accountError(code: string): string {

@@ -15,9 +15,16 @@ export type UnreadableRow = {
   reason: UnreadableReason;
 };
 
+export type StatementOpeningRow = {
+  date: string;
+  amount: number;
+  balance: number;
+};
+
 export type ParsedStatement = {
   rows: StatementRow[];
   unreadable: UnreadableRow[];
   closingBalance: number | null;
   closingDate: string | null;
+  firstRow: StatementOpeningRow | null;
 };

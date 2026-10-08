@@ -204,6 +204,7 @@ export type TransferCandidate = {
   date: string;
   amount: number;
   linked: boolean;
+  imported: boolean;
 };
 
 function pairAmount(group: TransferCandidate[]): TransferPair[] {
@@ -230,6 +231,9 @@ function pairAmount(group: TransferCandidate[]): TransferPair[] {
         break;
       }
       if (used.has(other.id) || other.accountId === row.accountId || other.amount !== -row.amount) {
+        continue;
+      }
+      if (!row.imported && !other.imported) {
         continue;
       }
       used.add(other.id);

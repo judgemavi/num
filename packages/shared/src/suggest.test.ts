@@ -131,21 +131,41 @@ test("transfer pairs stay inside 90 days and use each transaction once", () => {
   const asOf = "2026-06-10";
   const pairs = transferPairs(
     [
-      { id: "old-out", accountId: account, onBudget: true, date: "2026-03-11", amount: -5000, linked: false },
-      { id: "old-in", accountId: otherAccount, onBudget: true, date: "2026-03-11", amount: 5000, linked: false },
-      { id: "out", accountId: account, onBudget: true, date: "2026-06-01", amount: -2000, linked: false },
-      { id: "in-near", accountId: otherAccount, onBudget: true, date: "2026-06-03", amount: 2000, linked: false },
-      { id: "in-extra", accountId: otherAccount, onBudget: true, date: "2026-06-04", amount: 2000, linked: false },
-      { id: "wide-out", accountId: account, onBudget: true, date: "2026-06-01", amount: -800, linked: false },
-      { id: "wide-in", accountId: otherAccount, onBudget: true, date: "2026-06-05", amount: 800, linked: false },
-      { id: "off-out", accountId: "off", onBudget: false, date: "2026-06-02", amount: -100, linked: false },
-      { id: "off-in", accountId: otherAccount, onBudget: true, date: "2026-06-02", amount: 100, linked: false },
-      { id: "linked", accountId: account, onBudget: true, date: "2026-06-02", amount: -50, linked: true },
-      { id: "linked-in", accountId: otherAccount, onBudget: true, date: "2026-06-02", amount: 50, linked: false },
+      { id: "old-out", accountId: account, onBudget: true, date: "2026-03-11", amount: -5000, linked: false, imported: true },
+      { id: "old-in", accountId: otherAccount, onBudget: true, date: "2026-03-11", amount: 5000, linked: false, imported: false },
+      { id: "out", accountId: account, onBudget: true, date: "2026-06-01", amount: -2000, linked: false, imported: true },
+      { id: "in-near", accountId: otherAccount, onBudget: true, date: "2026-06-03", amount: 2000, linked: false, imported: false },
+      { id: "in-extra", accountId: otherAccount, onBudget: true, date: "2026-06-04", amount: 2000, linked: false, imported: true },
+      { id: "wide-out", accountId: account, onBudget: true, date: "2026-06-01", amount: -800, linked: false, imported: true },
+      { id: "wide-in", accountId: otherAccount, onBudget: true, date: "2026-06-05", amount: 800, linked: false, imported: true },
+      { id: "off-out", accountId: "off", onBudget: false, date: "2026-06-02", amount: -100, linked: false, imported: true },
+      { id: "off-in", accountId: otherAccount, onBudget: true, date: "2026-06-02", amount: 100, linked: false, imported: true },
+      { id: "linked", accountId: account, onBudget: true, date: "2026-06-02", amount: -50, linked: true, imported: true },
+      { id: "linked-in", accountId: otherAccount, onBudget: true, date: "2026-06-02", amount: 50, linked: false, imported: true },
     ],
     asOf,
   );
   expect(pairs).toEqual([{ leftId: "in-near", rightId: "out" }]);
+});
+
+test("a transfer pair needs one imported row", () => {
+  const asOf = "2026-06-10";
+  const manual = transferPairs(
+    [
+      { id: "out", accountId: account, onBudget: true, date: "2026-06-01", amount: -2000, linked: false, imported: false },
+      { id: "in", accountId: otherAccount, onBudget: true, date: "2026-06-02", amount: 2000, linked: false, imported: false },
+    ],
+    asOf,
+  );
+  expect(manual).toEqual([]);
+  const mixed = transferPairs(
+    [
+      { id: "out", accountId: account, onBudget: true, date: "2026-06-01", amount: -2000, linked: false, imported: true },
+      { id: "in", accountId: otherAccount, onBudget: true, date: "2026-06-02", amount: 2000, linked: false, imported: false },
+    ],
+    asOf,
+  );
+  expect(mixed).toEqual([{ leftId: "in", rightId: "out" }]);
 });
 
 test("a transfer rule suggests that account and blocks a category", () => {

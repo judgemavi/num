@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { accountClass, type AccountKind } from "./account";
 import { isoDateSchema } from "./date";
+import { openingSuggestionSchema } from "./opening";
 import { transactionInputStatuses } from "./transaction";
 import { isUtcTimestamp } from "./time";
 
@@ -57,6 +58,7 @@ export const checkpointCompareSchema = z.object({
   statementBalance: centsSchema,
   difference: centsSchema,
   help: z.array(checkpointHelpSchema),
+  openingSuggestion: openingSuggestionSchema.nullable(),
 });
 
 export const checkpointListSchema = z.object({

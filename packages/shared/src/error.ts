@@ -16,6 +16,7 @@ export const errorCodes = [
   "kind_class_mismatch",
   "archive_confirmation_required",
   "card_fields_invalid",
+  "not_credit_card",
   "interest_rate_invalid",
   "category_not_found",
   "category_archived",

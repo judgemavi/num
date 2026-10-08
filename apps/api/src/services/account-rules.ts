@@ -2,17 +2,11 @@ import { accountClass, allowsInterestRate, type AccountKind, type PaymentPolicy 
 import { ServiceError } from "../service-error";
 
 export type CardFields = {
-  creditLimit: number | null;
-  statementDay: number | null;
-  dueDay: number | null;
   paymentPolicy: PaymentPolicy | null;
   fixedPayment: number | null;
 };
 
 type CardInput = {
-  creditLimit?: number | null;
-  statementDay?: number | null;
-  dueDay?: number | null;
   paymentPolicy?: PaymentPolicy | null;
   fixedPayment?: number | null;
 };
@@ -43,9 +37,6 @@ export function assertCanArchive(balance: number, confirm: boolean): void {
 
 export function cardFields(kind: AccountKind, input: CardInput): CardFields {
   const fields: CardFields = {
-    creditLimit: input.creditLimit ?? null,
-    statementDay: input.statementDay ?? null,
-    dueDay: input.dueDay ?? null,
     paymentPolicy: input.paymentPolicy ?? null,
     fixedPayment: input.fixedPayment ?? null,
   };

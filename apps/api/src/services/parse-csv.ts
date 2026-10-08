@@ -148,6 +148,7 @@ function closing(rows: BalanceRow[], newestFirst: boolean): BalanceRow | null {
 export function parseCsvStatement(text: string, map: ColumnMap, minorDigits: number): ParsedStatement {
   const lines = stripBom(text).split(/\r?\n/);
   const rows: StatementRow[] = [];
+  const rowBalances: (number | null)[] = [];
   const unreadable: UnreadableRow[] = [];
   const balances: BalanceRow[] = [];
   const header = headerIndex(lines, map);
@@ -164,6 +165,7 @@ export function parseCsvStatement(text: string, map: ColumnMap, minorDigits: num
       continue;
     }
     rows.push(parsed.row);
+    rowBalances.push(parsed.balance);
     if (parsed.balance !== null) {
       balances.push({ date: parsed.row.date, balance: parsed.balance, index });
     }
@@ -176,5 +178,33 @@ export function parseCsvStatement(text: string, map: ColumnMap, minorDigits: num
     unreadable,
     closingBalance: end?.balance ?? null,
     closingDate: end?.date ?? null,
+    firstRow: earliestRow(rows, rowBalances, newestFirst),
   };
+}
+
+function earliestRow(
+  rows: StatementRow[],
+  rowBalances: readonly (number | null)[],
+  newestFirst: boolean,
+): { date: string; amount: number; balance: number } | null {
+  if (rows.length === 0) {
+    return null;
+  }
+  let best = 0;
+  for (let index = 1; index < rows.length; index += 1) {
+    const row = rows[index];
+    const current = rows[best];
+    if (!row || !current) {
+      continue;
+    }
+    if (row.date < current.date || (row.date === current.date && newestFirst)) {
+      best = index;
+    }
+  }
+  const row = rows[best];
+  const balance = rowBalances[best];
+  if (!row || balance === null || balance === undefined) {
+    return null;
+  }
+  return { date: row.date, amount: row.amount, balance };
 }

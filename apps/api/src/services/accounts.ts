@@ -1,8 +1,10 @@
-import { accounts } from "@num/db";
+import { accounts, transactions } from "@num/db";
 import {
   accountKinds,
+  dayBefore,
   defaultOnBudget,
   paymentPolicies,
+  Temporal,
   type Account,
   type AccountCreate,
   type AccountKind,
@@ -11,13 +13,13 @@ import {
   type PaymentPolicy,
   utcNow,
 } from "@num/shared";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
 import { assertCanArchive, assertSameClass, cardFields, interestRate, type CardFields } from "./account-rules";
 import { accountAuditSnapshot, readColumnMap } from "./account-snapshot";
-import { write, type AuditSource } from "./write";
+import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
   source: AuditSource;
@@ -43,6 +45,35 @@ function asPolicy(value: string | null): PaymentPolicy | null {
   return value as PaymentPolicy;
 }
 
+function creationDate(at: string): string {
+  return Temporal.Instant.from(at).toZonedDateTimeISO("UTC").toPlainDate().toString();
+}
+
+function earliestTransactionDate(db: Db | WriteTx, accountId: string): string | null {
+  const rows = db
+    .select({ date: transactions.date })
+    .from(transactions)
+    .where(and(eq(transactions.accountId, accountId), isNull(transactions.deletedAt)))
+    .all();
+  let earliest: string | null = null;
+  for (const row of rows) {
+    if (earliest === null || row.date < earliest) {
+      earliest = row.date;
+    }
+  }
+  return earliest;
+}
+
+function resolveOpening(db: Db | WriteTx, accountId: string | null, input: { openingDate?: string; openingBalance?: number }, at: string, storedDate: string | null) {
+  const openingBalance = input.openingBalance ?? 0;
+  if (input.openingDate) {
+    return { openingDate: input.openingDate, openingBalance };
+  }
+  const first = accountId === null ? null : earliestTransactionDate(db, accountId);
+  const openingDate = first ? dayBefore(first) : (storedDate ?? creationDate(at));
+  return { openingDate, openingBalance };
+}
+
 function blankToNull(value: string | null | undefined): string | null {
   if (value === undefined || value === null) {
     return null;
@@ -61,9 +92,6 @@ function toAccount(row: AccountRow, balance: number): Account {
     openingDate: row.openingDate,
     openingBalance: row.openingBalance,
     archivedAt: row.archivedAt,
-    creditLimit: row.creditLimit,
-    statementDay: row.statementDay,
-    dueDay: row.dueDay,
     paymentPolicy: asPolicy(row.paymentPolicy),
     fixedPayment: row.fixedPayment,
     interestRateMilliPct: row.interestRateMilliPct,
@@ -92,9 +120,6 @@ function storedFields(input: {
     openingDate: input.openingDate,
     openingBalance: input.openingBalance,
     archivedAt: input.archivedAt,
-    creditLimit: input.card.creditLimit,
-    statementDay: input.card.statementDay,
-    dueDay: input.card.dueDay,
     paymentPolicy: input.card.paymentPolicy,
     fixedPayment: input.card.fixedPayment,
     interestRateMilliPct: input.interestRateMilliPct,
@@ -149,6 +174,8 @@ export function listAccounts(db: Db, query: AccountListQuery) {
 export function createAccount(db: Db, input: AccountCreate & WriteInput): Account {
   const card = cardFields(input.kind, input);
   const rate = interestRate(input.kind, input.interestRateMilliPct);
+  const at = input.at ?? utcNow();
+  const opening = resolveOpening(db, null, input, at, null);
   const id = crypto.randomUUID();
   const row = {
     id,
@@ -157,8 +184,8 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
       institution: blankToNull(input.institution),
       kind: input.kind,
       onBudget: input.onBudget ?? defaultOnBudget(input.kind),
-      openingDate: input.openingDate,
-      openingBalance: input.openingBalance,
+      openingDate: opening.openingDate,
+      openingBalance: opening.openingBalance,
       archivedAt: null,
       card,
       interestRateMilliPct: rate,
@@ -166,7 +193,7 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
     importPreset: null,
     columnMap: null,
   };
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  write(db, { source: input.source, at }, (tx) => {
     tx.insert(accounts).values(row).run();
     tx.audit({
       entity: "accounts",
@@ -180,8 +207,9 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
 }
 
 export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteInput): Account {
+  const at = input.at ?? utcNow();
   let updated: Account | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  write(db, { source: input.source, at }, (tx) => {
     const existing = tx.select().from(accounts).where(eq(accounts.id, id)).get();
     if (!existing) {
       throw new ServiceError("account_not_found", 404);
@@ -190,13 +218,14 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
     assertSameClass(currentKind, input.kind);
     const card = cardFields(input.kind, input);
     const rate = interestRate(input.kind, input.interestRateMilliPct);
+    const opening = resolveOpening(tx, id, input, at, existing.openingDate);
     const next = storedFields({
       name: input.name.trim(),
       institution: blankToNull(input.institution),
       kind: input.kind,
       onBudget: input.onBudget,
-      openingDate: input.openingDate,
-      openingBalance: input.openingBalance,
+      openingDate: opening.openingDate,
+      openingBalance: opening.openingBalance,
       archivedAt: existing.archivedAt,
       card,
       interestRateMilliPct: rate,
@@ -218,6 +247,30 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
     throw new Error("Update did not return an account");
   }
   return updated;
+}
+
+export function applyOpeningSuggestion(
+  db: Db,
+  id: string,
+  input: { amount: number; date: string } & WriteInput,
+): Account {
+  const existing = db.select().from(accounts).where(eq(accounts.id, id)).get();
+  if (!existing) {
+    throw new ServiceError("account_not_found", 404);
+  }
+  return updateAccount(db, id, {
+    name: existing.name,
+    institution: existing.institution,
+    kind: asKind(existing.kind),
+    onBudget: existing.onBudget,
+    openingDate: input.date,
+    openingBalance: input.amount,
+    paymentPolicy: asPolicy(existing.paymentPolicy),
+    fixedPayment: existing.fixedPayment,
+    interestRateMilliPct: existing.interestRateMilliPct,
+    source: input.source,
+    at: input.at,
+  });
 }
 
 export function archiveAccount(

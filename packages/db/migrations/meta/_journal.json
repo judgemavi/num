@@ -57,6 +57,13 @@
       "when": 1791472981804,
       "tag": "0007_rule_transfer_account",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791479456409,
+      "tag": "0008_card_statement_fields",
+      "breakpoints": true
     }
   ]
 }

@@ -301,3 +301,22 @@ test("unlock leaves transactions reconciled when a later checkpoint still covers
     book.close();
   }
 });
+
+test("reconcile suggests an opening balance only when the account has no checkpoint", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db, 1_000);
+    createTransaction(book.db, entry(chequing.id, -200, "2026-02-01"));
+    const open = compareCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 400 });
+    expect(open.difference).not.toBe(0);
+    expect(open.openingSuggestion).toEqual({ amount: 600, date: "2026-01-31" });
+    expect(600 + (open.calculatedBalance - 1_000)).toBe(open.statementBalance);
+
+    createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 800, ...saved });
+    const locked = compareCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 400 });
+    expect(locked.balanced).toBe(false);
+    expect(locked.openingSuggestion).toBeNull();
+  } finally {
+    book.close();
+  }
+});

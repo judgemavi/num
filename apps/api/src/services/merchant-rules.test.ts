@@ -15,7 +15,7 @@ import { archiveMerchant, createMerchant } from "./merchants";
 import { createPlan } from "./recurring-plans";
 import { archiveRule, createRule, restoreRule } from "./rules";
 import { listPromotionCandidates, listTransferPairs, promotePayee, suggestForPayee } from "./suggestions";
-import { createTransaction, getTransaction } from "./transactions";
+import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
 
@@ -250,7 +250,7 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
           amount: -2500,
           ...storedPayee("Transfer out"),
           status: "open",
-          source: "manual",
+          source: "import",
         },
         {
           id: inId,
@@ -265,6 +265,60 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
       .run();
     expect(listTransferPairs(db, "2026-04-03").items).toEqual([
       { leftId: inId < outId ? inId : outId, rightId: inId < outId ? outId : inId },
+    ]);
+  } finally {
+    close();
+  }
+});
+
+test("promotions ignore categories that the import suggested", () => {
+  const { db, close } = tempDatabase();
+  try {
+    const account = createAccount(db, {
+      name: "Chequing",
+      institution: null,
+      kind: "chequing",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      source: "ui",
+      at,
+    });
+    const category = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
+    const shop = createMerchant(db, { name: "Cafe", defaultCategoryId: category.id, source: "ui", at });
+    const ids: string[] = [];
+    for (let day = 1; day <= 3; day += 1) {
+      const id = crypto.randomUUID();
+      ids.push(id);
+      db.insert(transactions)
+        .values({
+          id,
+          accountId: account.id,
+          date: `2026-05-0${day}`,
+          amount: -400,
+          merchantId: shop.id,
+          ...storedPayee("SQ *CAFE"),
+          status: "open",
+          source: "import",
+        })
+        .run();
+      db.insert(transactionLines).values({ id: crypto.randomUUID(), transactionId: id, amount: -400, categoryId: category.id }).run();
+    }
+    expect(listPromotionCandidates(db).items).toEqual([]);
+    for (const id of ids) {
+      updateTransaction(db, id, {
+        accountId: account.id,
+        date: `2026-05-0${ids.indexOf(id) + 1}`,
+        amount: -400,
+        payeeRaw: "SQ *CAFE",
+        merchantId: shop.id,
+        status: "open",
+        lines: [{ amount: -400, categoryId: category.id, transferAccountId: null, memo: null, tagIds: [] }],
+        source: "ui",
+        at,
+      });
+    }
+    expect(listPromotionCandidates(db).items).toEqual([
+      { payee: "CAFE", merchantId: shop.id, categoryId: category.id, transferAccountId: null, count: 3 },
     ]);
   } finally {
     close();

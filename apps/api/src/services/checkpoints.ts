@@ -12,6 +12,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { calculatedBalance } from "./checkpoint-balance";
 import { checkpointHelp } from "./checkpoint-help";
+import { checkpointOpeningSuggestion } from "./opening-suggestion";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -116,6 +117,10 @@ export function compareCheckpoint(
             statementDate: input.date,
             transactions: helpTransactions(db, accountId, account.openingDate, input.date),
           }),
+    openingSuggestion: checkpointOpeningSuggestion(db, account, {
+      calculatedBalance: calculated,
+      statementBalance: input.statementBalance,
+    }),
   };
 }
 

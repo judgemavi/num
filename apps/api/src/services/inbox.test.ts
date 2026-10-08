@@ -139,6 +139,7 @@ test("each inbox kind appears and leaves after its action", () => {
     expect(keys(sample.db, "uncategorized")).toEqual([]);
 
     const left = pay(sample.db, cash.id, "2026-03-05", -50000, "Move", food.id);
+    sample.db.update(transactions).set({ source: "import" }).where(eq(transactions.id, left.id)).run();
     const right = pay(sample.db, savings.id, "2026-03-06", 50000, "Move", food.id);
     const pairKey = left.id < right.id ? `transfer_pair:${left.id}:${right.id}` : `transfer_pair:${right.id}:${left.id}`;
     expect(keys(sample.db, "transfer_pair")).toEqual([pairKey]);

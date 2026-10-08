@@ -83,6 +83,23 @@ export function listPromotionCandidates(db: Db): { items: Promotion[] } {
   };
 }
 
+const confirmedCategory = `
+  (
+    transactions.source <> 'import'
+    or exists (
+      select 1 from audit_log a
+      where a.entity = 'transactions'
+        and a.entity_id = transactions.id
+        and a.source = 'ui'
+        and a.action = 'update'
+        and (
+          ifnull(json_extract(a.before, '$.merchantId'), '') <> ifnull(json_extract(a.after, '$.merchantId'), '')
+          or ifnull(json_extract(a.before, '$.lines'), '') <> ifnull(json_extract(a.after, '$.lines'), '')
+        )
+    )
+  )
+`;
+
 function promotionCounts(db: Db, minimum: number): Promotion[] {
   const payees = db.all<{ payee: string }>(sql`
     select distinct payee_normalized as payee
@@ -93,6 +110,7 @@ function promotionCounts(db: Db, minimum: number): Promotion[] {
     select id, merchant_id as merchantId
     from transactions
     where deleted_at is null and mirror = 0 and payee_normalized = ? and merchant_id is not null
+      and ${confirmedCategory}
     order by date desc, id desc
     limit 20
   `);
@@ -181,6 +199,7 @@ function exactPromotion(db: Db, payee: string): Promotion[] {
         and t.mirror = 0
         and t.payee_normalized = ${payee}
         and t.merchant_id is not null
+        and ${sql.raw(confirmedCategory.replaceAll("transactions.", "t."))}
         and l.category_id is not null
         and l.transfer_account_id is null
       group by t.id
@@ -204,6 +223,7 @@ function exactPromotion(db: Db, payee: string): Promotion[] {
         and t.mirror = 0
         and t.payee_normalized = ${payee}
         and t.merchant_id is not null
+        and ${sql.raw(confirmedCategory.replaceAll("transactions.", "t."))}
         and l.transfer_account_id is not null
         and l.category_id is null
       group by t.id
@@ -220,8 +240,9 @@ function exactPromotion(db: Db, payee: string): Promotion[] {
 
 export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[] } {
   const start = Temporal.PlainDate.from(asOf).subtract({ days: 90 }).toString();
-  const rows = db.all<{ id: string; accountId: string; date: string; amount: number }>(sql`
-    select t.id as id, t.account_id as accountId, t.date as date, t.amount as amount
+  const rows = db.all<{ id: string; accountId: string; date: string; amount: number; imported: number }>(sql`
+    select t.id as id, t.account_id as accountId, t.date as date, t.amount as amount,
+      (t.source = 'import' or t.import_row_id is not null) as imported
     from transactions t
     inner join accounts a on a.id = t.account_id
     where t.deleted_at is null
@@ -234,7 +255,7 @@ export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[]
   `);
   return {
     items: transferPairs(
-      rows.map((row) => ({ ...row, onBudget: true, linked: false })),
+      rows.map((row) => ({ ...row, onBudget: true, linked: false, imported: row.imported === 1 })),
       asOf,
     ),
   };

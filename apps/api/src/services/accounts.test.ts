@@ -155,9 +155,6 @@ test("a kind change across classes is rejected", () => {
       openingDate: cardAccount.openingDate,
       openingBalance: 0,
       paymentPolicy: null,
-      creditLimit: null,
-      statementDay: null,
-      dueDay: null,
       fixedPayment: null,
     };
     const updated = updateAccount(book.db, cardAccount.id, { ...sameClass, source: "ui", at });
@@ -215,9 +212,6 @@ test("card fields belong only to a credit card", () => {
       ...card(),
       paymentPolicy: "fixed",
       fixedPayment: 2_500,
-      creditLimit: 100_000,
-      statementDay: 12,
-      dueDay: 7,
     });
     expect(created.paymentPolicy).toBe("fixed");
     expect(created.fixedPayment).toBe(2_500);
@@ -228,6 +222,10 @@ test("card fields belong only to a credit card", () => {
 
     expectCode(
       () => createAccount(book.db, { ...base("chequing"), interestRateMilliPct: 150 }),
+      "interest_rate_invalid",
+    );
+    expectCode(
+      () => createAccount(book.db, { ...card(), interestRateMilliPct: 150, name: "Card rate" }),
       "interest_rate_invalid",
     );
     const savings = createAccount(book.db, { ...base("savings"), interestRateMilliPct: 150, name: "Savings" });
