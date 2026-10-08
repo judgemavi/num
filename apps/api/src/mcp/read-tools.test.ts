@@ -202,7 +202,7 @@ test("each read tool returns the same data as its service", async () => {
     const merchantQuery = merchantListQuerySchema.parse({});
     const bucketQuery = bucketReadSchema.parse({ asOf, sort: "name" });
     const planQuery = planListQuerySchema.parse({ accountId, kind: "bill" });
-    const inboxQuery = inboxQuerySchema.parse({ asOf, dismissed: false });
+    const inboxQuery = inboxQuerySchema.parse({ asOf });
     const importQuery = importViewQuerySchema.parse({ accountId, from: "2026-01-01" });
 
     expect(dataOf(await callTool(book.db, book.dir, "list_accounts", { sort: "name", dir: "asc" }))).toEqual(
@@ -226,8 +226,8 @@ test("each read tool returns the same data as its service", async () => {
       listOccurrences(book.db, planId, asOf),
     );
     expect(dataOf(await callTool(book.db, book.dir, "get_forecast", { asOf }))).toEqual(readForecastOnly(book.db, asOf));
-    expect(dataOf(await callTool(book.db, book.dir, "list_inbox", { asOf, dismissed: false }))).toEqual(
-      listInbox(book.db, inboxQuery.asOf, inboxQuery.dismissed),
+    expect(dataOf(await callTool(book.db, book.dir, "list_inbox", { asOf }))).toEqual(
+      listInbox(book.db, inboxQuery.asOf),
     );
     expect(dataOf(await callTool(book.db, book.dir, "list_imports", { accountId, from: "2026-01-01" }))).toEqual(
       listImportView(book.db, importQuery),

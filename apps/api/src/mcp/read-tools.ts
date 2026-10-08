@@ -168,7 +168,7 @@ export function registerReadTools(server: McpServer, db: Db) {
     },
     (args) => {
       const query = inboxQuerySchema.parse(args);
-      return listInbox(db, query.asOf, query.dismissed);
+      return listInbox(db, query.asOf);
     },
   );
 
