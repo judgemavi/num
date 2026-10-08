@@ -208,7 +208,9 @@ export function TransactionsScreen() {
   const page = transactions.data;
   const rows = page.items;
   const lastPage = Math.max(1, Math.ceil(page.total / page.pageSize));
-  const showBalance = Boolean(search.accountId);
+  const selectedAccount = accounts.data.find((account) => account.id === search.accountId);
+  const showBalance =
+    selectedAccount !== undefined && selectedAccount.kind !== "investment" && selectedAccount.kind !== "property";
   const sort = search.sort ?? "date";
   const dir = search.dir ?? (search.sort === undefined ? "desc" : "asc");
 

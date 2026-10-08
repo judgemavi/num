@@ -275,3 +275,38 @@ test("running balance includes the opening balance and ignores other accounts an
     fixture.close();
   }
 });
+
+test("running balance is null for an investment account and present for a chequing account", () => {
+  const fixture = book();
+  try {
+    const investment = createAccount(fixture.db, {
+      name: "Fund",
+      kind: "investment",
+      openingDate: "2026-01-01",
+      openingBalance: 5000,
+      ...saved,
+    });
+    add(fixture.db, {
+      accountId: investment.id,
+      date: "2026-02-01",
+      amount: 200,
+      payeeRaw: "Buy units",
+    });
+    add(fixture.db, {
+      accountId: fixture.chequing.id,
+      date: "2026-02-01",
+      amount: -10,
+      payeeRaw: "Fee",
+    });
+
+    const valued = listTransactions(fixture.db, { ...page, accountId: investment.id });
+    expect(valued.items).toHaveLength(1);
+    expect(valued.items[0]?.runningBalance).toBeNull();
+
+    const cash = listTransactions(fixture.db, { ...page, accountId: fixture.chequing.id });
+    expect(cash.items).toHaveLength(1);
+    expect(cash.items[0]?.runningBalance).toBe(990);
+  } finally {
+    fixture.close();
+  }
+});

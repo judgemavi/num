@@ -1,5 +1,6 @@
+import { accounts } from "@num/db";
 import { accountKinds, transactionStatuses, type AccountKind, type TransactionListItem, type TransactionListQuery, type TransactionStatus } from "@num/shared";
-import { sql, type SQL } from "drizzle-orm";
+import { eq, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { integerSum } from "../integer-sum";
 
@@ -106,6 +107,11 @@ function toItem(row: ListRow): TransactionListItem {
   };
 }
 
+function usesTransactionBalance(db: Db, accountId: string): boolean {
+  const row = db.select({ kind: accounts.kind }).from(accounts).where(eq(accounts.id, accountId)).get();
+  return row !== undefined && row.kind !== "investment" && row.kind !== "property";
+}
+
 function fillRunningBalances(db: Db, accountId: string, rows: ListRow[]): void {
   if (rows.length === 0) {
     return;
@@ -169,7 +175,7 @@ export function listTransactions(db: Db, query: TransactionListQuery) {
     order by ${orderSql(query)}
     limit ${query.pageSize} offset ${offset}
   `);
-  if (query.accountId) {
+  if (query.accountId && usesTransactionBalance(db, query.accountId)) {
     fillRunningBalances(db, query.accountId, rows);
   }
   return {
