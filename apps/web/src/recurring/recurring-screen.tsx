@@ -15,7 +15,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Plus, Repeat } from "lucide-react";
 import { useCallback, useState } from "react";
-import { PlanFilterBar } from "@/recurring/filter-bar";
+import { PlanFilters } from "@/recurring/filters";
 import { kindLabel, localAsOf, planError, scheduleLabel } from "@/recurring/format";
 import { PlanDetail } from "@/recurring/plan-detail";
 import { PlanForm, type PlanDraft, type PlanSeed } from "@/recurring/plan-form";
@@ -117,15 +117,15 @@ export function RecurringScreen() {
 
   const accounts = useQuery({
     queryKey: ["accounts", "recurring"],
-    queryFn: () => loadAllPages("/api/accounts", accountListSchema, false),
+    queryFn: () => loadAllPages("/api/accounts", accountListSchema, { archived: false }),
   });
   const categories = useQuery({
     queryKey: ["categories", "recurring"],
-    queryFn: () => loadAllPages("/api/categories", categoryListSchema, false),
+    queryFn: () => loadAllPages("/api/categories", categoryListSchema, { archived: false }),
   });
   const merchants = useQuery({
     queryKey: ["merchants", "recurring"],
-    queryFn: () => loadAllPages("/api/merchants", merchantListSchema, false),
+    queryFn: () => loadAllPages("/api/merchants", merchantListSchema, { archived: false }),
   });
 
   async function refresh() {
@@ -206,7 +206,7 @@ export function RecurringScreen() {
         }
         illustration={<PaydayIllustration />}
       />
-      <PlanFilterBar search={search} accounts={accounts.data?.items ?? []} onChange={changeFilters} />
+      <PlanFilters search={search} accounts={accounts.data?.items ?? []} onChange={changeFilters} />
       {actionError ? (
         <p role="alert" className="text-sm text-attn">
           {actionError}

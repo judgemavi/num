@@ -30,7 +30,3 @@ export function planPath(search: PlanListQuery): string {
   const text = params.toString();
   return `/api/recurring?${text}`;
 }
-
-export function activeFilterCount(search: PlanListQuery): number {
-  return [search.q, search.kind, search.accountId, search.archived ? "archived" : undefined].filter(Boolean).length;
-}
