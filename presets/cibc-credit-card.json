@@ -1,0 +1,11 @@
+{
+  "id": "cibc-credit-card",
+  "name": "CIBC credit card",
+  "hasHeader": true,
+  "date": 0,
+  "description": 1,
+  "debit": 2,
+  "credit": 3,
+  "dateOrder": "mdy",
+  "signConvention": "account"
+}

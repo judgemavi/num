@@ -60,6 +60,7 @@ export {
   type TagUpdate,
 } from "./category";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
+export { documentSchema, type Document } from "./document";
 export { errorCodes, errorSchema, type ErrorBody, type ErrorCode } from "./error";
 export { listQuerySchema, pagedResponseSchema, sortDirections } from "./list";
 export {
@@ -84,6 +85,16 @@ export {
   setupStatusSchema,
   type CategorySet,
 } from "./setup";
+export {
+  columnMapSchema,
+  dateOrders,
+  presetSchema,
+  signConventions,
+  type ColumnMap,
+  type DateOrder,
+  type Preset,
+  type SignConvention,
+} from "./statement";
 export { isUtcTimestamp, utcNow } from "./time";
 export {
   transactionCreateSchema,

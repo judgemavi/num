@@ -1,0 +1,13 @@
+{
+  "id": "td-savings",
+  "name": "TD savings",
+  "hasHeader": true,
+  "date": 0,
+  "description": 1,
+  "debit": 2,
+  "credit": 3,
+  "balance": 4,
+  "dateOrder": "mdy",
+  "signConvention": "account",
+  "balanceSign": "account"
+}

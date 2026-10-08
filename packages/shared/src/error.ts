@@ -42,6 +42,7 @@ export const errorCodes = [
   "payee_raw_locked",
   "merchant_not_found",
   "merchant_archived",
+  "document_not_found",
   "internal_error",
 ] as const;
 

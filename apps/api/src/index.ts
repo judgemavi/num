@@ -1,8 +1,9 @@
 import { migrateDatabase } from "@num/db";
 import { createApp, serveWeb } from "./app";
-import { openAppDb } from "./db";
+import { dataDirectory, openAppDb } from "./db";
 import { listenAddress } from "./listen";
 
+const dataDir = dataDirectory(Bun.env.DATA_DIR);
 const { sqlite, db } = openAppDb(Bun.env.DATA_DIR);
 migrateDatabase(sqlite);
 
@@ -11,7 +12,7 @@ const { hostname, port } = listenAddress({
   PORT: Bun.env.PORT,
 });
 
-const app = serveWeb(createApp(db));
+const app = serveWeb(createApp(db, { dataDir }));
 
 console.log(`Num http://${hostname}:${port}`);
 
