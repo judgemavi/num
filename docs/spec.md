@@ -152,6 +152,7 @@ The terms do not create transactions.
 Transaction fields:
 - `accountId`, `date`, `amount`, `merchantId?`, `notes?`
 - `payeeRaw`: the bank text. Do not change it after import.
+- `payeeNormalized`: `normalizePayee(payeeRaw)`, stored and indexed. The app sets it on each write.
 - `status`: `open | cleared | reconciled`
 - `source`: `import | manual | mcp`
 - `importRowId?`, `transferPeerId?`
@@ -180,7 +181,9 @@ Rules:
 - A mortgage payment is one chequing transaction with two lines:
   - A transfer line for the principal. The target is the mortgage account.
   - An expense line for the interest. The category is the interest category.
-- The user cannot edit or delete a `reconciled` transaction. First, the user must unlock its checkpoint (§7.5).
+- A `reconciled` transaction locks its money fields: date, account, amount, line amounts, transfer targets, and delete.
+  To change them, the user must first unlock its checkpoint (§7.5).
+  Merchant, notes, line categories, memos and tags stay editable (audited). They do not change balances.
 
 ### 5.5 Tag
 
@@ -193,7 +196,7 @@ Use tags for trips and projects. Example: "Italy Vacation 2026". Reports can fil
 Merchant fields: `name`, `defaultCategoryId?`, `archivedAt?`. The name is unique. The comparison ignores case.
 
 Rule fields:
-- `match`: `exact | prefix | contains | regex`
+- `match`: `exact | prefix | contains`. There are no regex rules (decision 0012).
 - `pattern`: the rule compares it with the **normalized payee** (§7.3).
 - `accountId?`: if it is set, the rule applies only to this account.
 - `merchantId?`, `categoryId?`, `priority`
@@ -203,6 +206,7 @@ Rule fields:
 Rules make suggestions. §7.3 tells how the import uses them.
 A change to a rule does not change existing transactions.
 To change existing transactions, the user selects "Apply to existing". The app shows a preview first.
+"Apply to existing" changes only transactions with exactly one non-transfer line. It never changes split transactions.
 
 ### 5.7 Recurring plan
 
@@ -256,6 +260,8 @@ Bucket events (append only):
 - `release`: money from the bucket back to Unassigned.
 - Each event has `amount` (positive), `date`, `note?`, `fundingRunId?`, `undoneAt?`.
 - Undo of an event sets `undoneAt`. The app does not delete events.
+  The user can undo an event that has no `fundingRunId`. Events of a funding run are undone only with the run (§5.9).
+- To archive a bucket, its balance must be 0. Archive removes its category mappings (audited).
 
 Bucket balance = funds + moves in − moves out − releases + the sum of the lines in the bucket's categories.
 Do not count events with `undoneAt`. Do not count events of a funding run with `undoneAt`.
@@ -443,6 +449,7 @@ If the user accepts, the app creates an `exact` rule with `origin` = `promoted`.
 
 **Transfer detection.** An imported row can have an opposite amount to an unlinked row in a different on-budget account,
 within ±3 days. Then the Inbox suggests a transfer pair. The user accepts with one click.
+Look only at unlinked, not deleted transactions from the last 90 days. Each transaction is in a maximum of one pair.
 
 ### 7.4 Recurring
 
