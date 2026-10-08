@@ -1,4 +1,4 @@
-import type { ImportCounts, UnreadableReason, UndoBlockReason } from "@num/shared";
+import type { ImportCounts, ImportRowOutcome, ImportViewStatus, UnreadableReason, UndoBlockReason } from "@num/shared";
 
 const unreadableText: Record<UnreadableReason, string> = {
   date_unreadable: "The date could not be read.",
@@ -43,6 +43,35 @@ export function importCountText(counts: ImportCounts): string {
 
 export function formatImportDate(iso: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(iso));
+}
+
+const outcomeText: Record<ImportRowOutcome, string> = {
+  created: "Created",
+  matched: "Matched",
+  needs_review: "Needs review",
+  duplicate: "Duplicate",
+  ignored: "Ignored",
+};
+
+const statusText: Record<ImportViewStatus, string> = {
+  imported: "Imported",
+  undone: "Undone",
+  needs_you: "Needs you",
+};
+
+export function importOutcomeLabel(outcome: ImportRowOutcome): string {
+  return outcomeText[outcome];
+}
+
+export function importStatusLabel(status: ImportViewStatus): string {
+  return statusText[status];
+}
+
+export function formatImportPeriod(start: string, end: string): string {
+  if (start === end) {
+    return formatStatementDate(start);
+  }
+  return `${formatStatementDate(start)} to ${formatStatementDate(end)}`;
 }
 
 export function formatStatementDate(iso: string): string {

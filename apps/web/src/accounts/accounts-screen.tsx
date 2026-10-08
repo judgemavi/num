@@ -1,6 +1,6 @@
 import { accountClass, accountListSchema, accountSchema, currencyUpdateSchema, type Account } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Upload } from "lucide-react";
 import { useState } from "react";
 import { AccountForm } from "@/accounts/account-form";
@@ -129,6 +129,11 @@ export function AccountsScreen() {
         title="Accounts"
         actions={
           <>
+            <Button type="button" variant="secondary" asChild>
+              <Link to="/accounts/imports" search={{ page: 1, pageSize: 50 }}>
+                Imports
+              </Link>
+            </Button>
             <Button
               type="button"
               variant="secondary"

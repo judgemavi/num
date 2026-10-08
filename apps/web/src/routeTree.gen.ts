@@ -18,12 +18,14 @@ import { Route as RecurringRouteImport } from './routes/recurring'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TransactionsRouteImport } from './routes/transactions'
 import { Route as AccountsAccountIdRouteImport } from './routes/accounts_.$accountId'
+import { Route as AccountsImportsRouteImport } from './routes/accounts_.imports'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsBackupRouteImport } from './routes/settings/backup'
 import { Route as SettingsCategoriesRouteImport } from './routes/settings/categories'
 import { Route as SettingsGroupsRouteImport } from './routes/settings/groups'
 import { Route as SettingsMerchantsRouteImport } from './routes/settings/merchants'
 import { Route as SettingsTagsRouteImport } from './routes/settings/tags'
+import { Route as AccountsImportsImportIdRouteImport } from './routes/accounts_.imports_.$importId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -70,6 +72,11 @@ const AccountsAccountIdRoute = AccountsAccountIdRouteImport.update({
   path: '/accounts/$accountId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountsImportsRoute = AccountsImportsRouteImport.update({
+  id: '/accounts_/imports',
+  path: '/accounts/imports',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -100,6 +107,11 @@ const SettingsTagsRoute = SettingsTagsRouteImport.update({
   path: '/tags',
   getParentRoute: () => SettingsRoute,
 } as any)
+const AccountsImportsImportIdRoute = AccountsImportsImportIdRouteImport.update({
+  id: '/accounts_/imports_/$importId',
+  path: '/accounts/imports/$importId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -111,12 +123,14 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRouteWithChildren
   '/transactions': typeof TransactionsRoute
   '/accounts/$accountId': typeof AccountsAccountIdRoute
+  '/accounts/imports': typeof AccountsImportsRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
   '/settings/': typeof SettingsIndexRoute
+  '/accounts/imports/$importId': typeof AccountsImportsImportIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -127,12 +141,14 @@ export interface FileRoutesByTo {
   '/recurring': typeof RecurringRoute
   '/transactions': typeof TransactionsRoute
   '/accounts/$accountId': typeof AccountsAccountIdRoute
+  '/accounts/imports': typeof AccountsImportsRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
   '/settings': typeof SettingsIndexRoute
+  '/accounts/imports/$importId': typeof AccountsImportsImportIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -145,12 +161,14 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRouteWithChildren
   '/transactions': typeof TransactionsRoute
   '/accounts_/$accountId': typeof AccountsAccountIdRoute
+  '/accounts_/imports': typeof AccountsImportsRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
   '/settings/': typeof SettingsIndexRoute
+  '/accounts_/imports_/$importId': typeof AccountsImportsImportIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -164,12 +182,14 @@ export interface FileRouteTypes {
     | '/settings'
     | '/transactions'
     | '/accounts/$accountId'
+    | '/accounts/imports'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
     | '/settings/merchants'
     | '/settings/tags'
     | '/settings/'
+    | '/accounts/imports/$importId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -180,12 +200,14 @@ export interface FileRouteTypes {
     | '/recurring'
     | '/transactions'
     | '/accounts/$accountId'
+    | '/accounts/imports'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
     | '/settings/merchants'
     | '/settings/tags'
     | '/settings'
+    | '/accounts/imports/$importId'
   id:
     | '__root__'
     | '/'
@@ -197,12 +219,14 @@ export interface FileRouteTypes {
     | '/settings'
     | '/transactions'
     | '/accounts_/$accountId'
+    | '/accounts_/imports'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
     | '/settings/merchants'
     | '/settings/tags'
     | '/settings/'
+    | '/accounts_/imports_/$importId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -215,6 +239,8 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRouteWithChildren
   TransactionsRoute: typeof TransactionsRoute
   AccountsAccountIdRoute: typeof AccountsAccountIdRoute
+  AccountsImportsRoute: typeof AccountsImportsRoute
+  AccountsImportsImportIdRoute: typeof AccountsImportsImportIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -282,6 +308,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountsAccountIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/accounts_/imports': {
+      id: '/accounts_/imports'
+      path: '/accounts/imports'
+      fullPath: '/accounts/imports'
+      preLoaderRoute: typeof AccountsImportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/': {
       id: '/settings/'
       path: '/'
@@ -324,6 +357,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsTagsRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/accounts_/imports_/$importId': {
+      id: '/accounts_/imports_/$importId'
+      path: '/accounts/imports/$importId'
+      fullPath: '/accounts/imports/$importId'
+      preLoaderRoute: typeof AccountsImportsImportIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -359,6 +399,8 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRouteWithChildren,
   TransactionsRoute: TransactionsRoute,
   AccountsAccountIdRoute: AccountsAccountIdRoute,
+  AccountsImportsRoute: AccountsImportsRoute,
+  AccountsImportsImportIdRoute: AccountsImportsImportIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,9 +1,12 @@
 import {
   columnMapSchema,
   errorSchema,
+  importDetailSchema,
   importListSchema,
   importPresetListSchema,
   importResultSchema,
+  importViewListSchema,
+  importViewQuerySchema,
   importReviewResolveSchema,
   importReviewResultSchema,
   importUndoSchema,
@@ -15,6 +18,7 @@ import { bodyLimit } from "hono/body-limit";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { resolveImportReview } from "../services/import-review";
+import { getImportDetail, listImportView } from "../services/import-list";
 import { importStatement, listImportBatches, listImportPresets } from "../services/imports";
 import { undoImportBatch } from "../services/import-undo";
 
@@ -105,6 +109,32 @@ const reviewRoute = createRoute({
   },
 });
 
+const viewRoute = createRoute({
+  method: "get",
+  path: "/api/imports",
+  request: { query: importViewQuerySchema },
+  responses: {
+    200: {
+      description: "One page of import batches",
+      content: { "application/json": { schema: importViewListSchema } },
+    },
+    400: errorResponse,
+  },
+});
+
+const detailRoute = createRoute({
+  method: "get",
+  path: "/api/imports/{id}",
+  request: { params: idParams },
+  responses: {
+    200: {
+      description: "One import and its rows",
+      content: { "application/json": { schema: importDetailSchema } },
+    },
+    404: errorResponse,
+  },
+});
+
 const undoRoute = createRoute({
   method: "post",
   path: "/api/imports/{id}/undo",
@@ -151,6 +181,8 @@ export function registerImports(app: OpenAPIHono, db: Db, dataDir: string) {
   );
 
   app.openapi(presetsRoute, (c) => c.json(listImportPresets(), 200));
+  app.openapi(viewRoute, (c) => c.json(listImportView(db, c.req.valid("query")), 200));
+  app.openapi(detailRoute, (c) => c.json(getImportDetail(db, c.req.valid("param").id), 200));
 
   app.openapi(listRoute, (c) => {
     const { id } = c.req.valid("param");
