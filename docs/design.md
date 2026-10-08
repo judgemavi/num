@@ -192,7 +192,7 @@ An automatic label shows its reason ("Rule: NETFLIX", "Learned from Mar 12").
 - An editor loads its own data when it opens (by ID, through the query cache). List rows carry only what they show.
 - Editors stack: an editor can open another editor and get the new ID back (create on the spot).
 - One shared `confirm()` (AlertDialog) for every confirmation.
-- The URL shows the open single-record editor (`?edit=transaction:<id>`). Back closes it. Group and queue modes stay in memory.
+- The URL shows the open single-record editor (`?edit=transaction:<id>`). Back closes it. Group mode stays in memory.
 
 **Create on the spot:** every picker of user-managed things (categories, groups, tags, merchants, accounts) offers
 "Create …" when the typed name does not exist. It shows a case-insensitive existing match first.

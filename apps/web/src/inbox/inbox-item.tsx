@@ -197,34 +197,42 @@ export function InboxItemRow({
     };
   }
 
-  const body = (
-    <>
-      {hue === "attention" ? (
-        <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-attn-soft text-attn" aria-hidden="true">
-          <Icon strokeWidth={1.8} />
-        </span>
-      ) : (
-        <IconTile hue={hue}>
-          <Icon strokeWidth={1.8} />
-        </IconTile>
-      )}
-      <div className="min-w-0 flex-1 text-left">
-        <h3 className="font-semibold">{itemTitle(item, names, currency)}</h3>
-        <p className="text-sm text-muted-foreground">{itemWhy(item, names, currency)}</p>
-      </div>
-    </>
-  );
+  const title = itemTitle(item, names, currency);
+  const why = itemWhy(item, names, currency);
+  function rowBody(heading: boolean) {
+    return (
+      <>
+        {hue === "attention" ? (
+          <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-attn-soft text-attn" aria-hidden="true">
+            <Icon strokeWidth={1.8} />
+          </span>
+        ) : (
+          <IconTile hue={hue}>
+            <Icon strokeWidth={1.8} />
+          </IconTile>
+        )}
+        <div className="min-w-0 flex-1 text-left">
+          {heading ? <h3 className="font-semibold">{title}</h3> : <span className="block font-semibold">{title}</span>}
+          {heading ? (
+            <p className="text-sm text-muted-foreground">{why}</p>
+          ) : (
+            <span className="block text-sm text-muted-foreground">{why}</span>
+          )}
+        </div>
+      </>
+    );
+  }
 
   return (
     <article className="border-t px-5 py-4 first:border-t-0">
       <div className="flex flex-wrap items-start gap-3">
         {item.kind === "uncategorized" ? (
           <button type="button" className="flex min-w-0 flex-1 items-start gap-3" onClick={() => onOpenTransaction(item.transactionId)}>
-            {body}
+            {rowBody(false)}
             <ChevronRight className="mt-1 size-5 shrink-0" aria-hidden="true" />
           </button>
         ) : (
-          body
+          rowBody(true)
         )}
         <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
           {extra ? (

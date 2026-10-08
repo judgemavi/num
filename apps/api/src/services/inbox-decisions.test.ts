@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { importRows, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
+import { importBatches, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
 import { columnMapSchema, uncategorizedLineKey, type ColumnMap, type InboxDecisionCode } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -9,6 +9,7 @@ import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
+import { readUnreadable } from "./import-read";
 import { importStatement } from "./imports";
 import { acceptUnreadableLine, decideInboxItem, undoInboxDecision } from "./inbox-decisions";
 import { listInbox } from "./inbox";
@@ -199,8 +200,8 @@ test("each no decision hides its inbox item until undo", () => {
       undoInboxDecision(sample.db, unreadable.itemKey, saved);
       acceptUnreadableLine(sample.db, asOf, unreadable.itemKey, saved);
       expect(hasKey(sample.db, asOf, unreadable.itemKey)).toBe(false);
-      const batch = sample.db.select().from(importRows).all();
-      expect(batch.length).toBeGreaterThan(0);
+      const batch = sample.db.select().from(importBatches).where(eq(importBatches.id, unreadable.batchId)).get();
+      expect(readUnreadable(batch?.unreadableJson ?? "[]").some((row) => row.line === unreadable.line)).toBe(false);
     }
 
     const open = pay(sample.db, cash.id, "2026-03-04", -100, "Needs a category", null);

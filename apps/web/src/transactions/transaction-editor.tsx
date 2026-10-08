@@ -141,13 +141,14 @@ function SingleEditor({ id, rawLine, initialAccountId, onClose, onSaved }: Trans
     <TransactionForm
       key={id ?? "new"}
       decisions={notes}
-      onUndoDecision={(itemKey) => {
-        void undoDecision(itemKey).then(async (result) => {
-          if (result.ok) {
-            await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
-            await queryClient.invalidateQueries({ queryKey: ["inbox"] });
-          }
-        });
+      onUndoDecision={async (itemKey) => {
+        const result = await undoDecision(itemKey);
+        if (!result.ok) {
+          return result;
+        }
+        await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
+        await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+        return result;
       }}
       currency={currency.data}
       transaction={id === null ? null : (transaction.data ?? null)}

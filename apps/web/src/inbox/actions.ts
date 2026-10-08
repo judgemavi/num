@@ -66,10 +66,6 @@ export function updatePlanAmount(plan: Plan, expectedAmount: number) {
   });
 }
 
-export function skipOccurrence(planId: string, dueDate: string, reason: string) {
-  return apiRequest(`/api/recurring/${planId}/occurrences/${dueDate}/skip`, occurrenceLinkSchema, json({ reason }));
-}
-
 export function linkOccurrence(planId: string, dueDate: string, transactionId: string) {
   return apiRequest(
     `/api/recurring/${planId}/occurrences/${dueDate}/link`,

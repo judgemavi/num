@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useEditors } from "@/editors/editor-api";
 import { useRestoreNamed } from "@/editors/restore-named";
 import { undoDecision } from "@/inbox/actions";
-import { decisionText } from "@/inbox/format";
+import { decisionText, inboxError } from "@/inbox/format";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -25,6 +25,7 @@ export function MerchantForm({ merchant, initialName, categories, onClose, onSav
   const [name, setName] = useState(merchant?.name ?? initialName ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(merchant?.defaultCategoryId ?? null);
   const [error, setError] = useState<string | null>(null);
+  const [undoError, setUndoError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [extra, setExtra] = useState<Category[]>([]);
   const { openEditor } = useEditors();
@@ -81,10 +82,13 @@ export function MerchantForm({ merchant, initialName, categories, onClose, onSav
             variant="outline"
             onClick={() => {
               void undoDecision(row.itemKey).then(async (result) => {
-                if (result.ok) {
-                  await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
-                  await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+                if (!result.ok) {
+                  setUndoError(inboxError(result.code));
+                  return;
                 }
+                setUndoError(null);
+                await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
+                await queryClient.invalidateQueries({ queryKey: ["inbox"] });
               });
             }}
           >
@@ -92,6 +96,11 @@ export function MerchantForm({ merchant, initialName, categories, onClose, onSav
           </Button>
         </p>
       ))}
+      {undoError ? (
+        <p role="alert" className="text-sm text-attn">
+          {undoError}
+        </p>
+      ) : null}
       <Field data-invalid={error !== null || undefined}>
         <FieldLabel htmlFor="merchant-name">Name</FieldLabel>
         <Input id="merchant-name" value={name} onChange={(event) => setName(event.target.value)} />

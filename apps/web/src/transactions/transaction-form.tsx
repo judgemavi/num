@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FieldError } from "@/components/ui/field";
 import { formatMoney } from "@/money";
+import { inboxError } from "@/inbox/format";
 import { automaticReasonText, formatDate, transactionError } from "@/transactions/format";
 import { MortgageSplitWatch } from "@/transactions/mortgage-split-watch";
 import { DeleteMenu, MoneySection, MoreDetails } from "@/transactions/transaction-parts";
@@ -47,7 +48,7 @@ type TransactionFormProps = {
   onDelete: () => Promise<string | null>;
   deleteKind?: "plain" | "mirror" | "linked";
   decisions?: { itemKey: string; text: string }[];
-  onUndoDecision?: (itemKey: string) => void;
+  onUndoDecision?: (itemKey: string) => Promise<{ ok: boolean; code?: string }>;
 };
 
 export function TransactionForm({
@@ -99,6 +100,7 @@ export function TransactionForm({
   const [patternTouched, setPatternTouched] = useState(false);
   const [touched, setTouched] = useState(alreadyChosen(transaction));
   const [error, setError] = useState<string | null>(null);
+  const [undoError, setUndoError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -249,12 +251,29 @@ export function TransactionForm({
         <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
           <span>{row.text}</span>
           {onUndoDecision ? (
-            <Button type="button" variant="outline" onClick={() => onUndoDecision(row.itemKey)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                void onUndoDecision(row.itemKey).then((result) => {
+                  if (!result.ok) {
+                    setUndoError(inboxError(result.code ?? "internal_error"));
+                    return;
+                  }
+                  setUndoError(null);
+                });
+              }}
+            >
               Undo
             </Button>
           ) : null}
         </p>
       ))}
+      {undoError ? (
+        <p role="alert" className="text-sm text-attn">
+          {undoError}
+        </p>
+      ) : null}
       {rawLine ? (
         <p className="rounded-xl bg-sunken px-3 py-2 text-sm break-all">
           <span className="font-semibold">Statement line. </span>
