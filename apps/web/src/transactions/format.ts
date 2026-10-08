@@ -1,4 +1,4 @@
-import { Temporal, type TransactionStatus } from "@num/shared";
+import { Temporal, type AutoReason, type TransactionStatus } from "@num/shared";
 
 const statusLabels: Record<TransactionStatus, string> = {
   open: "Open",
@@ -12,6 +12,16 @@ export function statusLabel(status: TransactionStatus): string {
 
 export function formatDate(iso: string): string {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { dateStyle: "medium" });
+}
+
+export function automaticReasonText(reason: AutoReason, pattern: string | null, date: string | null): string {
+  if (reason === "rule") {
+    return pattern ? `Rule: ${pattern}` : "Rule";
+  }
+  if (date) {
+    return `Learned from ${Temporal.PlainDate.from(date).toLocaleString(undefined, { month: "short", day: "numeric" })}`;
+  }
+  return "Learned";
 }
 
 export function transactionError(code: string): string {

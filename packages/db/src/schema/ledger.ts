@@ -11,9 +11,9 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { accounts } from "./accounts";
 import { categories, merchants, tags } from "./categories";
-import { transactionSources, transactionStatuses } from "./codes";
+import { autoReasons, transactionSources, transactionStatuses } from "./codes";
 import { importRows } from "./imports";
-import { isoDate, oneOf } from "./sql";
+import { isoDate, nullOrOneOf, oneOf } from "./sql";
 
 export const transactions = sqliteTable(
   "transactions",
@@ -37,12 +37,15 @@ export const transactions = sqliteTable(
       .unique()
       .references((): AnySQLiteColumn => transactions.id),
     mirror: integer("mirror", { mode: "boolean" }).notNull().default(false),
+    autoReason: text("auto_reason"),
+    autoSourceId: text("auto_source_id"),
     deletedAt: text("deleted_at"),
   },
   (table) => [
     check("transactions_date", isoDate(table.date)),
     check("transactions_status", oneOf(table.status, transactionStatuses)),
     check("transactions_source", oneOf(table.source, transactionSources)),
+    check("transactions_auto_reason", nullOrOneOf(table.autoReason, autoReasons)),
     check(
       "transactions_transfer_peer",
       sql`${table.transferPeerId} is null or ${table.transferPeerId} <> ${table.id}`,

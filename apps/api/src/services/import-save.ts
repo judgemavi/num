@@ -1,12 +1,13 @@
 import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { accounts, documents, importBatches, importRows, transactionLines, transactions } from "@num/db";
-import { storedPayee, type ColumnMap, type ImportBatch, type UnreadableRow } from "@num/shared";
+import { storedAutomatic, storedPayee, type ColumnMap, type ImportBatch, type UnreadableRow } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountAuditSnapshot } from "./account-snapshot";
 import { countOutcomes, presentBatch } from "./import-read";
 import type { PlannedImportRow } from "./import-plan";
+import { spreadSureLabels } from "./auto-label";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -38,12 +39,12 @@ type SaveInput = {
   columnMap: ColumnMap | null;
 };
 
-function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: PlannedImportRow): void {
+function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: PlannedImportRow): string {
   const rowId = crypto.randomUUID();
   const transactionId = crypto.randomUUID();
   const payee = storedPayee(row.payeeRaw);
   const suggestion = row.suggestion;
-  const apply = suggestion !== null && suggestion.reason !== "none" && suggestion.transferAccountId === null;
+  const applied = storedAutomatic(suggestion);
   tx.insert(importRows)
     .values({
       id: rowId,
@@ -66,7 +67,7 @@ function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: Pla
       accountId,
       date: row.date,
       amount: row.amount,
-      merchantId: apply ? suggestion.merchantId : null,
+      merchantId: applied.merchantId,
       notes: null,
       payeeRaw: payee.payeeRaw,
       payeeNormalized: payee.payeeNormalized,
@@ -75,6 +76,8 @@ function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: Pla
       importRowId: rowId,
       transferPeerId: null,
       mirror: false,
+      autoReason: applied.autoReason,
+      autoSourceId: applied.autoSourceId,
       deletedAt: null,
     })
     .run();
@@ -84,7 +87,7 @@ function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: Pla
       transactionId,
       amount: row.amount,
       memo: null,
-      categoryId: apply ? suggestion.categoryId : null,
+      categoryId: applied.categoryId,
       transferAccountId: null,
     })
     .run();
@@ -92,6 +95,7 @@ function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: Pla
   auditTransaction(tx, transactionId, "create", null, readTransaction(tx, transactionId), {
     suggestionReason: suggestion?.reason ?? "none",
   });
+  return payee.payeeNormalized;
 }
 
 function insertMatched(tx: WriteTx, batchId: string, accountId: string, row: PlannedImportRow): void {
@@ -234,14 +238,18 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
         undoneAt: null,
       })
       .run();
+    const payees = new Set<string>();
     for (const row of input.rows) {
       if (row.outcome === "created") {
-        insertCreated(tx, batchId, input.accountId, row);
+        payees.add(insertCreated(tx, batchId, input.accountId, row));
       } else if (row.outcome === "matched") {
         insertMatched(tx, batchId, input.accountId, row);
       } else {
         insertPlain(tx, batchId, input.accountId, row);
       }
+    }
+    for (const payee of payees) {
+      spreadSureLabels(tx, payee, new Set());
     }
     saveFormat(tx, input.accountId, input.presetId, input.columnMap);
     const batch = tx.select().from(importBatches).where(eq(importBatches.id, batchId)).get();

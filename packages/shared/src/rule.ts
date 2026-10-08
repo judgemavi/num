@@ -145,6 +145,3 @@ export function chooseRule(rules: RulePattern[], normalizedPayee: string, accoun
   return matched.filter((rule) => rule.accountId === null).sort(byPriority)[0] ?? null;
 }
 
-export function ruleCoversPayee(rules: Pick<RulePattern, "match" | "pattern" | "archivedAt">[], normalizedPayee: string): boolean {
-  return rules.some((rule) => rule.archivedAt === null && patternHits(rule.match, rule.pattern, normalizedPayee));
-}

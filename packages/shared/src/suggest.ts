@@ -2,7 +2,8 @@ import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import { dayDistance } from "./recurring-calc";
 import { normalizePayee } from "./payee";
-import { chooseRule, ruleCoversPayee, type RulePattern } from "./rule";
+import { learnedPayee, type Confirmation } from "./learned";
+import { chooseRule, type RulePattern } from "./rule";
 
 export const suggestionReasons = ["rule", "payee_history", "merchant_default", "none"] as const;
 
@@ -13,35 +14,14 @@ export const suggestionSchema = z.object({
   categoryId: z.uuid().nullable(),
   transferAccountId: z.uuid().nullable(),
   reason: z.enum(suggestionReasons),
+  sure: z.boolean(),
+  sourceId: z.uuid().nullable(),
 });
 
 export const suggestionQuerySchema = z.object({
   accountId: z.uuid(),
   payee: z.string().trim().min(1),
 });
-
-export const promotionSchema = z
-  .object({
-    payee: z.string(),
-    merchantId: z.uuid(),
-    categoryId: z.uuid().nullable(),
-    transferAccountId: z.uuid().nullable(),
-    count: z.number().int(),
-  })
-  .refine((value) => (value.categoryId === null) !== (value.transferAccountId === null));
-
-export const promotionListSchema = z.object({
-  items: z.array(promotionSchema),
-});
-
-export const promotionAcceptSchema = z
-  .object({
-    payee: z.string().trim().min(1),
-    merchantId: z.uuid(),
-    categoryId: z.uuid().nullable().optional(),
-    transferAccountId: z.uuid().nullable().optional(),
-  })
-  .refine((value) => (value.categoryId ?? null) === null !== ((value.transferAccountId ?? null) === null));
 
 export const transferPairSchema = z.object({
   leftId: z.uuid(),
@@ -53,7 +33,6 @@ export const transferPairListSchema = z.object({
 });
 
 export type Suggestion = z.infer<typeof suggestionSchema>;
-export type Promotion = z.infer<typeof promotionSchema>;
 export type TransferPair = z.infer<typeof transferPairSchema>;
 
 export type HistoryRow = {
@@ -72,49 +51,14 @@ export type MerchantChoice = {
   archivedAt: string | null;
 };
 
-const none: Suggestion = { merchantId: null, categoryId: null, transferAccountId: null, reason: "none" };
-
-function agreedId(ids: (string | null)[]): string | null {
-  const counts = new Map<string, number>();
-  for (const id of ids) {
-    if (!id) {
-      continue;
-    }
-    counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
-  let best: string | null = null;
-  let bestCount = 0;
-  for (const [id, count] of counts) {
-    if (count > bestCount) {
-      best = id;
-      bestCount = count;
-    }
-  }
-  if (!best || bestCount / ids.length < 0.8) {
-    return null;
-  }
-  return best;
-}
-
-export function historySuggestion(rows: HistoryRow[]): { merchantId: string | null; categoryId: string } | null {
-  const categorized = rows
-    .filter((row) => row.categoryId !== null)
-    .sort((left, right) => {
-      if (left.date !== right.date) {
-        return left.date < right.date ? 1 : -1;
-      }
-      return left.id < right.id ? 1 : -1;
-    })
-    .slice(0, 10);
-  const categoryId = agreedId(categorized.map((row) => row.categoryId));
-  if (!categoryId) {
-    return null;
-  }
-  return {
-    categoryId,
-    merchantId: agreedId(categorized.map((row) => row.merchantId)),
-  };
-}
+const none: Suggestion = {
+  merchantId: null,
+  categoryId: null,
+  transferAccountId: null,
+  reason: "none",
+  sure: false,
+  sourceId: null,
+};
 
 function merchantDefault(merchants: MerchantChoice[], normalizedPayee: string): MerchantChoice | null {
   const matches = merchants.filter(
@@ -171,11 +115,23 @@ export function suggestCategorization(input: {
       categoryId: rule.transferAccountId ? null : rule.categoryId,
       transferAccountId: rule.transferAccountId,
       reason: "rule",
+      sure: rule.transferAccountId === null && rule.categoryId !== null,
+      sourceId: rule.id,
     };
   }
-  const history = historySuggestion(input.history.filter((row) => normalizePayee(row.payeeRaw) === payee));
-  if (history) {
-    return { merchantId: history.merchantId, categoryId: history.categoryId, transferAccountId: null, reason: "payee_history" };
+  const confirmations: Confirmation[] = input.history
+    .filter((row) => normalizePayee(row.payeeRaw) === payee && row.categoryId !== null && !row.transferAccountId)
+    .map((row) => ({ id: row.id, date: row.date, categoryId: row.categoryId ?? "", merchantId: row.merchantId }));
+  const learned = learnedPayee(confirmations);
+  if (learned.level === "sure" || learned.level === "suggestion") {
+    return {
+      merchantId: learned.merchantId,
+      categoryId: learned.categoryId,
+      transferAccountId: null,
+      reason: "payee_history",
+      sure: learned.level === "sure",
+      sourceId: learned.sourceId,
+    };
   }
   const merchant = merchantDefault(input.merchants, payee);
   if (merchant?.defaultCategoryId) {
@@ -184,6 +140,8 @@ export function suggestCategorization(input: {
       categoryId: merchant.defaultCategoryId,
       transferAccountId: null,
       reason: "merchant_default",
+      sure: false,
+      sourceId: null,
     };
   }
   return none;
@@ -213,6 +171,8 @@ export function alternateSuggestion(input: {
         categoryId: row.categoryId,
         transferAccountId: null,
         reason: "payee_history",
+        sure: false,
+        sourceId: null,
       });
     }
   }
@@ -222,44 +182,11 @@ export function alternateSuggestion(input: {
       categoryId: merchant.defaultCategoryId,
       transferAccountId: null,
       reason: "merchant_default",
+      sure: false,
+      sourceId: null,
     });
   }
   return candidates[0] ?? null;
-}
-
-export function promotionCandidates(
-  rows: HistoryRow[],
-  rules: Pick<RulePattern, "match" | "pattern" | "archivedAt">[],
-  promoteAfter: number,
-): Promotion[] {
-  if (!Number.isInteger(promoteAfter) || promoteAfter < 1) {
-    return [];
-  }
-  const counts = new Map<string, Promotion>();
-  for (const row of rows) {
-    if (!row.merchantId) {
-      continue;
-    }
-    const categoryId = row.transferAccountId ? null : row.categoryId;
-    const transferAccountId = row.categoryId ? null : (row.transferAccountId ?? null);
-    if ((categoryId === null) === (transferAccountId === null)) {
-      continue;
-    }
-    const payee = normalizePayee(row.payeeRaw);
-    if (payee.length === 0) {
-      continue;
-    }
-    const key = `${payee}\0${row.merchantId}\0${categoryId ?? ""}\0${transferAccountId ?? ""}`;
-    const current = counts.get(key);
-    if (current) {
-      current.count += 1;
-    } else {
-      counts.set(key, { payee, merchantId: row.merchantId, categoryId, transferAccountId, count: 1 });
-    }
-  }
-  return [...counts.values()]
-    .filter((item) => item.count >= promoteAfter && !ruleCoversPayee(rules, item.payee))
-    .sort((left, right) => right.count - left.count || (left.payee < right.payee ? -1 : left.payee > right.payee ? 1 : 0));
 }
 
 export type TransferCandidate = {

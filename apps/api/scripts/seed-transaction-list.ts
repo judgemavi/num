@@ -92,7 +92,7 @@ sqlite.exec("commit");
 sqlite.exec("analyze");
 
 const db = createDb(sqlite);
-const base: TransactionListQuery = { page: 1, pageSize: 50, uncategorized: false };
+const base: TransactionListQuery = { page: 1, pageSize: 50, uncategorized: false, automatic: false };
 let failed = false;
 
 let accountTotal = 0;

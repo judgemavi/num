@@ -403,7 +403,9 @@ test("changing a linked transfer to a category keeps the other row", () => {
     expect(peer?.deletedAt).toBeNull();
     expect(peer?.transferPeerId).toBeNull();
     expect(peer?.amount).toBe(5_000);
-    expect(peer?.lines[0]?.categoryId).toBeNull();
+    expect(peer?.autoReason).toBe("learned");
+    expect(peer?.autoSourceId).toBe(payment.id);
+    expect(peer?.lines[0]?.categoryId).toBe(food.id);
     expect(peer?.lines[0]?.transferAccountId).toBeNull();
   } finally {
     book.close();

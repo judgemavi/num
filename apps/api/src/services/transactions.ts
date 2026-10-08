@@ -15,6 +15,7 @@ import {
   type TxRow,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
+import { spreadSureLabels } from "./auto-label";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -22,6 +23,18 @@ type WriteInput = {
   source: AuditSource;
   at?: string;
 };
+
+export type AutoStamp = { autoReason: "rule" | null; autoSourceId: string | null };
+
+const clearedAuto: AutoStamp = { autoReason: null, autoSourceId: null };
+
+function isUserConfirmation(txn: Transaction): boolean {
+  if (txn.mirror || txn.deletedAt !== null || txn.lines.length !== 1) {
+    return false;
+  }
+  const line = txn.lines[0];
+  return line !== undefined && line.categoryId !== null && line.transferAccountId === null;
+}
 
 function requireActive(db: Db | WriteTx, id: string): TxRow {
   const row = db.select().from(transactions).where(eq(transactions.id, id)).get();
@@ -140,7 +153,7 @@ export function getTransaction(db: Db, id: string): Transaction | null {
   if (!row) {
     return null;
   }
-  return toTransaction(row, loadLines(db, id));
+  return toTransaction(db, row, loadLines(db, id));
 }
 
 function headerFor(input: TransactionBody, lines: ReturnType<typeof normalizeLine>[]): Header {
@@ -151,7 +164,7 @@ function headerFor(input: TransactionBody, lines: ReturnType<typeof normalizeLin
   return header;
 }
 
-export function insertTransaction(tx: WriteTx, input: TransactionBody, source: AuditSource): Transaction {
+export function insertTransaction(tx: WriteTx, input: TransactionBody, source: AuditSource, spread = true): Transaction {
   const lines = input.lines.map(normalizeLine);
   const header = headerFor(input, lines);
   const recordSourceName = recordSource(source);
@@ -166,6 +179,8 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
       importRowId: null,
       transferPeerId: null,
       mirror: false,
+      autoReason: null,
+      autoSourceId: null,
       deletedAt: null,
     })
     .run();
@@ -174,8 +189,12 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
   if (line?.transferAccountId) {
     attachTransfer(tx, id, header, recordSourceName, line);
   }
-  auditTransaction(tx, id, "create", null, readTransaction(tx, id));
-  return readTransaction(tx, id);
+  const created = readTransaction(tx, id);
+  auditTransaction(tx, id, "create", null, created);
+  if (spread && isUserConfirmation(created)) {
+    spreadSureLabels(tx, created.payeeNormalized, new Set([created.id]));
+  }
+  return created;
 }
 
 export function createTransaction(db: Db, input: TransactionBody & WriteInput): Transaction {
@@ -190,7 +209,14 @@ export function createTransaction(db: Db, input: TransactionBody & WriteInput): 
   return created;
 }
 
-export function applyTransactionUpdate(tx: WriteTx, id: string, input: TransactionBody, at: string): Transaction {
+export function applyTransactionUpdate(
+  tx: WriteTx,
+  id: string,
+  input: TransactionBody,
+  at: string,
+  automatic?: { reason: "rule"; sourceId: string },
+  spread = true,
+): Transaction {
   const lines = input.lines.map(normalizeLine);
   const header = headerFor(input, lines);
   const existing = requireActive(tx, id);
@@ -203,12 +229,26 @@ export function applyTransactionUpdate(tx: WriteTx, id: string, input: Transacti
   const previousTarget = existingLines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null;
   assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
   const savedHeader = existing.status === "reconciled" ? { ...header, status: "reconciled" as const } : header;
+  const auto: AutoStamp = automatic
+    ? { autoReason: automatic.reason, autoSourceId: automatic.sourceId }
+    : clearedAuto;
   if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {
-    applyMirrorEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at);
+    applyMirrorEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at, auto);
   } else {
-    applySourceEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at);
+    applySourceEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at, auto);
   }
-  return readTransaction(tx, id);
+  const saved = readTransaction(tx, id);
+  if (spread && !automatic && isUserConfirmation(saved)) {
+    spreadSureLabels(tx, saved.payeeNormalized, new Set([saved.id]));
+  }
+  return saved;
+}
+
+export function spreadAfterConfirmation(tx: WriteTx, id: string, alsoExcept: ReadonlySet<string> = new Set()): void {
+  const saved = readTransaction(tx, id);
+  if (saved.autoReason === null && isUserConfirmation(saved)) {
+    spreadSureLabels(tx, saved.payeeNormalized, new Set([saved.id, ...alsoExcept]));
+  }
 }
 
 export function updateTransaction(db: Db, id: string, input: TransactionBody & WriteInput): Transaction {
@@ -232,15 +272,15 @@ export function deleteTransaction(db: Db, id: string, input: WriteInput): Transa
     const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
     const peerLines = peer ? loadLines(tx, peer.id) : [];
     assertDeletable(existing, peer);
-    const before = toTransaction(existing, existingLines);
+    const before = toTransaction(tx, existing, existingLines);
     tx.update(transactions).set({ deletedAt: at }).where(eq(transactions.id, existing.id)).run();
     auditTransaction(tx, existing.id, "delete", before, readTransaction(tx, existing.id));
     if (peer?.mirror) {
-      const peerBefore = toTransaction(peer, peerLines);
+      const peerBefore = toTransaction(tx, peer, peerLines);
       tx.update(transactions).set({ deletedAt: at }).where(eq(transactions.id, peer.id)).run();
       auditTransaction(tx, peer.id, "delete", peerBefore, readTransaction(tx, peer.id));
     } else if (peer) {
-      const peerBefore = toTransaction(peer, peerLines);
+      const peerBefore = toTransaction(tx, peer, peerLines);
       tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, existing.id)).run();
       tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, peer.id)).run();
       replaceLines(

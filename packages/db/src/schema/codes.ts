@@ -73,11 +73,12 @@ export const proposalStatuses = ["pending", "approved", "rejected"] as const;
 
 export const auditSources = ["ui", "import", "mcp"] as const;
 
+export const autoReasons = ["rule", "learned"] as const;
+
 export const settingKeys = [
   "currency",
   "bufferAmount",
   "emergencyFundMonths",
   "staleImportDays",
-  "promoteAfter",
   "recurringGraceDays",
 ] as const;

@@ -1,9 +1,10 @@
-import { transactions } from "@num/db";
+import { rules, transactions } from "@num/db";
 import {
   storedPayee,
   transactionInputStatuses,
   transactionSources,
   transactionStatuses,
+  type AutoReason,
   type Transaction,
   type TransactionCreate,
   type TransactionInputStatus,
@@ -47,6 +48,25 @@ function asSource(value: string): TransactionSource {
   return value as TransactionSource;
 }
 
+function asAutoReason(value: string | null): AutoReason | null {
+  if (value === "rule" || value === "learned") {
+    return value;
+  }
+  return null;
+}
+
+function labelFacts(db: Reader, row: TxRow): { autoPattern: string | null; autoDate: string | null } {
+  if (row.autoReason === "rule" && row.autoSourceId) {
+    const rule = db.select({ pattern: rules.pattern }).from(rules).where(eq(rules.id, row.autoSourceId)).get();
+    return { autoPattern: rule?.pattern ?? null, autoDate: null };
+  }
+  if (row.autoReason === "learned" && row.autoSourceId) {
+    const source = db.select({ date: transactions.date }).from(transactions).where(eq(transactions.id, row.autoSourceId)).get();
+    return { autoPattern: null, autoDate: source?.date ?? null };
+  }
+  return { autoPattern: null, autoDate: null };
+}
+
 export function recordSource(source: "ui" | TransactionSource): TransactionSource {
   if (source === "ui") {
     return "manual";
@@ -73,7 +93,7 @@ export function headerFrom(input: TransactionBody): Header {
   };
 }
 
-export function toTransaction(row: TxRow, lines: StoredLine[]): Transaction {
+export function toTransaction(db: Reader, row: TxRow, lines: StoredLine[]): Transaction {
   return {
     id: row.id,
     accountId: row.accountId,
@@ -88,6 +108,9 @@ export function toTransaction(row: TxRow, lines: StoredLine[]): Transaction {
     importRowId: row.importRowId,
     transferPeerId: row.transferPeerId,
     mirror: row.mirror,
+    autoReason: asAutoReason(row.autoReason),
+    autoSourceId: row.autoSourceId,
+    ...labelFacts(db, row),
     deletedAt: row.deletedAt,
     lines,
   };
@@ -107,6 +130,8 @@ function snapshot(record: Transaction) {
     importRowId: record.importRowId,
     transferPeerId: record.transferPeerId,
     mirror: record.mirror,
+    autoReason: record.autoReason,
+    autoSourceId: record.autoSourceId,
     deletedAt: record.deletedAt,
     lines: record.lines.map((line) => ({
       id: line.id,
@@ -124,7 +149,7 @@ export function readTransaction(db: Reader, id: string): Transaction {
   if (!row) {
     throw new Error("Transaction is missing");
   }
-  return toTransaction(row, loadLines(db, id));
+  return toTransaction(db, row, loadLines(db, id));
 }
 
 export function auditTransaction(

@@ -1,5 +1,5 @@
 import { accounts } from "@num/db";
-import { accountKinds, transactionStatuses, type AccountKind, type TransactionListItem, type TransactionListQuery, type TransactionStatus } from "@num/shared";
+import { accountKinds, transactionStatuses, type AccountKind, type AutoReason, type TransactionListItem, type TransactionListQuery, type TransactionStatus } from "@num/shared";
 import { eq, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { integerSum } from "../integer-sum";
@@ -23,6 +23,9 @@ type ListRow = {
   status: string;
   accountOpening: number;
   runningBalance: number | null;
+  autoReason: string | null;
+  autoPattern: string | null;
+  autoDate: string | null;
 };
 
 function asKind(value: string): AccountKind {
@@ -30,6 +33,13 @@ function asKind(value: string): AccountKind {
     throw new Error("Unknown account kind");
   }
   return value as AccountKind;
+}
+
+function asAutoReason(value: string | null): AutoReason | null {
+  if (value === "rule" || value === "learned") {
+    return value;
+  }
+  return null;
 }
 
 function asStatus(value: string): TransactionStatus {
@@ -80,6 +90,9 @@ function filters(query: TransactionListQuery): SQL {
         and l.transfer_account_id is null
     )`);
   }
+  if (query.automatic) {
+    parts.push(sql`t.auto_reason is not null`);
+  }
   if (query.q) {
     const needle = query.q;
     parts.push(sql`(
@@ -104,6 +117,9 @@ function toItem(row: ListRow): TransactionListItem {
     merchantName: row.merchantName,
     status: asStatus(row.status),
     runningBalance: row.runningBalance === null ? null : integerSum(row.runningBalance),
+    autoReason: asAutoReason(row.autoReason),
+    autoPattern: row.autoPattern,
+    autoDate: row.autoDate,
   };
 }
 
@@ -167,7 +183,10 @@ export function listTransactions(db: Db, query: TransactionListQuery) {
       m.name as merchantName,
       t.status as status,
       a.opening_balance as accountOpening,
-      null as runningBalance
+      null as runningBalance,
+      t.auto_reason as autoReason,
+      case when t.auto_reason = 'rule' then (select r.pattern from rules r where r.id = t.auto_source_id) else null end as autoPattern,
+      case when t.auto_reason = 'learned' then (select s.date from transactions s where s.id = t.auto_source_id) else null end as autoDate
     from transactions t
     join accounts a on a.id = t.account_id
     ${merchantJoin}

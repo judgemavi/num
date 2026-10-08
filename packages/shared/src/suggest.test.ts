@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { validRulePattern, type RulePattern } from "./rule";
-import { chooseTransferMatch, promotionCandidates, suggestCategorization, transferPairs, type HistoryRow, type MerchantChoice, type TransferMatchRow } from "./suggest";
+import { learnedPayee } from "./learned";
+import { chooseTransferMatch, suggestCategorization, transferPairs, type HistoryRow, type MerchantChoice, type TransferMatchRow } from "./suggest";
 
 const account = "account-1";
 const otherAccount = "account-2";
@@ -40,7 +41,7 @@ test("suggestion order uses a scoped rule before a global rule", () => {
     history: [],
     merchants: [],
   });
-  expect(result).toEqual({ merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "rule" });
+  expect(result).toEqual({ merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "rule", sure: true, sourceId: "scoped" });
 });
 
 test("a higher priority wins inside the same scope", () => {
@@ -54,7 +55,7 @@ test("a higher priority wins inside the same scope", () => {
     history: [],
     merchants,
   });
-  expect(result).toEqual({ merchantId: null, categoryId: coffee, transferAccountId: null, reason: "rule" });
+  expect(result).toEqual({ merchantId: null, categoryId: coffee, transferAccountId: null, reason: "rule", sure: true, sourceId: "high" });
 });
 
 test("payee history wins when 80 percent of the last 10 agree", () => {
@@ -72,8 +73,10 @@ test("payee history wins when 80 percent of the last 10 agree", () => {
     merchants: [],
   });
   expect(result.reason).toBe("payee_history");
+  expect(result.sure).toBe(false);
   expect(result.categoryId).toBe(coffee);
   expect(result.merchantId).toBe(merchant);
+  expect(result.sourceId).toBe("h7");
 });
 
 test("history below 80 percent falls through to the merchant default", () => {
@@ -88,7 +91,7 @@ test("history below 80 percent falls through to the merchant default", () => {
     history: rows,
     merchants,
   });
-  expect(result).toEqual({ merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "merchant_default" });
+  expect(result).toEqual({ merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "merchant_default", sure: false, sourceId: null });
 });
 
 test("no match returns none", () => {
@@ -99,7 +102,7 @@ test("no match returns none", () => {
     history: [history("h1", "2026-01-01", null)],
     merchants: [{ id: merchant, name: "Starbucks", defaultCategoryId: null, archivedAt: null }],
   });
-  expect(result).toEqual({ merchantId: null, categoryId: null, transferAccountId: null, reason: "none" });
+  expect(result).toEqual({ merchantId: null, categoryId: null, transferAccountId: null, reason: "none", sure: false, sourceId: null });
 });
 
 test("a rule blocks later suggestion steps", () => {
@@ -110,21 +113,22 @@ test("a rule blocks later suggestion steps", () => {
     history: [history("h1", "2026-01-01", groceries)],
     merchants,
   });
-  expect(result).toEqual({ merchantId: merchant, categoryId: null, transferAccountId: null, reason: "rule" });
+  expect(result).toEqual({ merchantId: merchant, categoryId: null, transferAccountId: null, reason: "rule", sure: false, sourceId: "only-merchant" });
 });
 
-test("promote after the confirmation count when no rule covers the payee", () => {
-  const rows = [1, 2, 3].map((day) => history(`c${day}`, `2026-04-0${day}`, coffee));
-  expect(promotionCandidates(rows, [], 3)).toEqual([
-    { payee: "STARBUCKS", merchantId: merchant, categoryId: coffee, transferAccountId: null, count: 3 },
-  ]);
-  expect(promotionCandidates(rows.slice(0, 2), [], 3)).toEqual([]);
-  expect(promotionCandidates(rows, [rule({ id: "covers", pattern: "star", match: "prefix" })], 3)).toEqual([]);
-  const split = [
-    ...rows,
-    history("d1", "2026-05-01", groceries, "merchant-2"),
+test("one agreement is sure and a disagreement below 80 percent is a conflict", () => {
+  expect(learnedPayee([{ id: "a", date: "2026-03-12", categoryId: coffee, merchantId: merchant }])).toEqual({
+    level: "sure",
+    categoryId: coffee,
+    merchantId: merchant,
+    sourceId: "a",
+    sourceDate: "2026-03-12",
+  });
+  const mixed = [
+    ...Array.from({ length: 7 }, (_, index) => ({ id: `c${index}`, date: `2026-03-${String(index + 1).padStart(2, "0")}`, categoryId: coffee, merchantId: merchant })),
+    ...Array.from({ length: 3 }, (_, index) => ({ id: `g${index}`, date: `2026-02-${String(index + 1).padStart(2, "0")}`, categoryId: groceries, merchantId: null })),
   ];
-  expect(promotionCandidates(split, [], 3).map((item) => item.categoryId)).toEqual([coffee]);
+  expect(learnedPayee(mixed).level).toBe("conflict");
 });
 
 test("transfer pairs stay inside 90 days and use each transaction once", () => {
@@ -177,7 +181,7 @@ test("a transfer rule suggests that account and blocks a category", () => {
     history: [history("h1", "2026-01-01", coffee)],
     merchants,
   });
-  expect(result).toEqual({ merchantId: merchant, categoryId: null, transferAccountId: visa, reason: "rule" });
+  expect(result).toEqual({ merchantId: merchant, categoryId: null, transferAccountId: visa, reason: "rule", sure: false, sourceId: "visa" });
 });
 
 function matchRow(patch: Partial<TransferMatchRow> & Pick<TransferMatchRow, "id" | "date">): TransferMatchRow {
@@ -194,17 +198,6 @@ test("a transfer match is the closest unlinked opposite row within 3 days", () =
   ];
   expect(chooseTransferMatch(rows, { date: "2026-04-01", lineAmount: -5_000 })).toBe("same");
   expect(chooseTransferMatch([matchRow({ id: "wide", date: "2026-04-05" })], { date: "2026-04-01", lineAmount: -5_000 })).toBeNull();
-});
-
-test("promote counts a confirmed transfer", () => {
-  const visa = "account-visa";
-  const rows = [1, 2, 3].map((day) => ({
-    ...history(`t${day}`, `2026-04-0${day}`, null),
-    transferAccountId: visa,
-  }));
-  expect(promotionCandidates(rows, [], 3)).toEqual([
-    { payee: "STARBUCKS", merchantId: merchant, categoryId: null, transferAccountId: visa, count: 3 },
-  ]);
 });
 
 test("a rule pattern must contain text", () => {

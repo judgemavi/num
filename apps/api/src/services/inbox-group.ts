@@ -12,7 +12,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { insertRule } from "./rules";
 import { readTransaction, type TransactionBody } from "./transaction-record";
-import { applyTransactionUpdate, insertTransaction } from "./transactions";
+import { applyTransactionUpdate, insertTransaction, spreadAfterConfirmation } from "./transactions";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
@@ -85,7 +85,7 @@ function bodyFor(transaction: Transaction, patch: Patch): TransactionBody {
   };
 }
 
-function applyOne(tx: WriteTx, id: string, patch: Patch, at: string): GroupSkip | null {
+function applyOne(tx: WriteTx, id: string, patch: Patch, at: string, ruleId: string | null = null): GroupSkip | null {
   let transaction: Transaction;
   try {
     transaction = readTransaction(tx, id);
@@ -99,7 +99,7 @@ function applyOne(tx: WriteTx, id: string, patch: Patch, at: string): GroupSkip 
   if (reason) {
     return { id, reason };
   }
-  applyTransactionUpdate(tx, id, bodyFor(transaction, patch), at);
+  applyTransactionUpdate(tx, id, bodyFor(transaction, patch), at, ruleId ? { reason: "rule", sourceId: ruleId } : undefined, false);
   return null;
 }
 
@@ -145,7 +145,7 @@ function applyRule(
   const skipped: GroupSkip[] = [];
   let applied = 0;
   for (const id of otherIds(tx, payee, patch.accountId, except)) {
-    const skip = applyOne(tx, id, patch, at);
+    const skip = applyOne(tx, id, patch, at, patch.transferAccountId ? null : saved.id);
     if (skip) {
       skipped.push(skip);
     } else {
@@ -178,6 +178,9 @@ export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { 
       applied += rule.applied;
       skipped = [...skipped, ...rule.skipped];
     }
+    for (const id of targets) {
+      spreadAfterConfirmation(tx, id, excluded);
+    }
   });
   return { applied, skipped, ruleId };
 }
@@ -201,12 +204,12 @@ function withRule(db: Db, at: string, source: AuditSource, rule: CategorizationR
   let skipped: GroupSkip[] = [];
   write(db, { source, at }, (tx) => {
     id = run(tx);
-    if (!rule) {
-      return;
+    if (rule) {
+      const result = applyRule(tx, rule, { ...patch, accountId }, new Set([...except, id]), at);
+      applied = result.applied;
+      skipped = result.skipped;
     }
-    const result = applyRule(tx, rule, { ...patch, accountId }, new Set([...except, id]), at);
-    applied = result.applied;
-    skipped = result.skipped;
+    spreadAfterConfirmation(tx, id);
   });
   return { id, applied, skipped };
 }
@@ -231,9 +234,9 @@ export function saveTransactionWithRule(
   }
   const saved = withRule(db, at, input.source, input.rule, input.accountId, [], patch, (tx) => {
     if (id) {
-      return applyTransactionUpdate(tx, id, input, at).id;
+      return applyTransactionUpdate(tx, id, input, at, undefined, false).id;
     }
-    return insertTransaction(tx, input, input.source).id;
+    return insertTransaction(tx, input, input.source, false).id;
   });
   const transaction = readTransaction(db, saved.id);
   return { ...transaction, applied: saved.applied, skipped: saved.skipped };

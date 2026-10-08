@@ -125,19 +125,8 @@ test("a categorized row, a split and a reconciled transfer are skipped", () => {
       ...saved,
     });
     const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
+    const done = pay(sample.db, cash.id, "2026-03-02", -100, "Cafe", null, [{ amount: -100, categoryId: food.id }]);
     const open = pay(sample.db, cash.id, "2026-03-01", -400, "Cafe");
-    const done = pay(sample.db, cash.id, "2026-03-02", -100, "Cafe");
-    updateTransaction(sample.db, done.id, {
-      accountId: cash.id,
-      date: done.date,
-      amount: done.amount,
-      payeeRaw: done.payeeRaw,
-      merchantId: null,
-      notes: null,
-      status: "open",
-      lines: [{ amount: done.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
-      ...saved,
-    });
     const split = pay(sample.db, cash.id, "2026-03-03", -300, "Cafe", null, [
       { amount: -200, categoryId: null },
       { amount: -100, categoryId: null },

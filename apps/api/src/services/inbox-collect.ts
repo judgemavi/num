@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { accounts, importBatches, importRows, settings, transactions } from "@num/db";
 import { Temporal, unreadableRowSchema, type InboxItem } from "@num/shared";
 import { and, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
@@ -6,7 +5,7 @@ import type { Db } from "../db";
 import { listOverspent } from "./buckets";
 import { listFundingPaychecks } from "./funding-book";
 import { recurringSignals } from "./recurring-view";
-import { listPromotionCandidates, listTransferPairs } from "./suggestions";
+import { listTransferPairs } from "./suggestions";
 
 type TxnRef = {
   id: string;
@@ -24,7 +23,7 @@ const txnColumns = {
   payeeRaw: transactions.payeeRaw,
 };
 
-function settingNumber(db: Db, key: "staleImportDays" | "promoteAfter" | "recurringGraceDays", fallback: number): number {
+function settingNumber(db: Db, key: "staleImportDays" | "recurringGraceDays", fallback: number): number {
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
   const value = Number(row?.value ?? String(fallback));
   if (!Number.isInteger(value) || value < 0) {
@@ -200,22 +199,6 @@ function transferItems(db: Db, asOf: string): InboxItem[] {
   return items;
 }
 
-function promotionItems(db: Db): InboxItem[] {
-  return listPromotionCandidates(db).items.map((item) => {
-    const digest = createHash("sha256").update(item.payee).digest("hex").slice(0, 32);
-    return {
-      kind: "promote_rule" as const,
-      itemKey: `promote_rule:${item.merchantId}:${item.categoryId ?? item.transferAccountId}:${digest}`,
-      date: null,
-      payee: item.payee,
-      merchantId: item.merchantId,
-      categoryId: item.categoryId,
-      transferAccountId: item.transferAccountId,
-      count: item.count,
-    };
-  });
-}
-
 function overspentItems(db: Db, asOf: string): InboxItem[] {
   return listOverspent(db).items.map((item) => ({
     kind: "bucket_overspent" as const,
@@ -313,7 +296,6 @@ export function collectInbox(db: Db, asOf: string): {
     ...reviewItems(db),
     ...recurringItems(db, asOf),
     ...transferItems(db, asOf),
-    ...promotionItems(db),
     ...overspentItems(db, asOf),
     ...paycheckItems(db),
     ...unreadableItems(db),

@@ -25,6 +25,7 @@ type Draft = {
   from?: string;
   to?: string;
   uncategorized: boolean;
+  automatic: boolean;
 };
 
 const sortOptions = [
@@ -49,6 +50,7 @@ function draftFrom(search: TransactionListQuery): Draft {
     from: search.from,
     to: search.to,
     uncategorized: search.uncategorized,
+    automatic: search.automatic,
   };
 }
 
@@ -118,6 +120,9 @@ export function TransactionFilterBar({ search, accounts, categories, merchants, 
   if (search.uncategorized) {
     badges.push({ key: "uncategorized", label: "Uncategorized", onRemove: () => onChange({ uncategorized: false }) });
   }
+  if (search.automatic) {
+    badges.push({ key: "automatic", label: "Automatic", onRemove: () => onChange({ automatic: false }) });
+  }
 
   function applyDraft() {
     onChange({
@@ -128,6 +133,7 @@ export function TransactionFilterBar({ search, accounts, categories, merchants, 
       from: draft.from,
       to: draft.to,
       uncategorized: draft.uncategorized,
+      automatic: draft.automatic,
     });
   }
 
@@ -140,6 +146,7 @@ export function TransactionFilterBar({ search, accounts, categories, merchants, 
       from: undefined,
       to: undefined,
       uncategorized: false,
+      automatic: false,
     });
   }
 
@@ -160,7 +167,7 @@ export function TransactionFilterBar({ search, accounts, categories, merchants, 
         }
       }}
       onApply={applyDraft}
-      onClear={() => setDraft({ uncategorized: false })}
+      onClear={() => setDraft({ uncategorized: false, automatic: false })}
       onClearAll={clearFilters}
       sort={{
         id: "transaction-sort",
@@ -240,6 +247,14 @@ export function TransactionFilterBar({ search, accounts, categories, merchants, 
               onCheckedChange={(pressed) => setDraft({ ...draft, uncategorized: pressed })}
             />
             <FieldLabel htmlFor="filter-uncategorized">Uncategorized only</FieldLabel>
+          </Field>
+          <Field orientation="horizontal">
+            <Switch
+              id="filter-automatic"
+              checked={draft.automatic}
+              onCheckedChange={(pressed) => setDraft({ ...draft, automatic: pressed })}
+            />
+            <FieldLabel htmlFor="filter-automatic">Automatic</FieldLabel>
           </Field>
         </>
       }

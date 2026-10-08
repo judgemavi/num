@@ -23,7 +23,7 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TransactionFilterBar } from "@/transactions/filters";
-import { formatDate, statusLabel } from "@/transactions/format";
+import { automaticReasonText, formatDate, statusLabel } from "@/transactions/format";
 import { hasFilters, transactionPath } from "@/transactions/query";
 import { useEditors } from "@/editors/editor-api";
 
@@ -244,6 +244,24 @@ export function TransactionsScreen() {
                 <TableCell>
                   <div>{row.payeeRaw}</div>
                   {row.merchantName ? <div className="text-muted-foreground">{row.merchantName}</div> : null}
+                  {row.autoReason ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {automaticReasonText(row.autoReason, row.autoPattern, row.autoDate)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void openEditor("transaction", { id: row.id });
+                        }}
+                      >
+                        Correct
+                      </Button>
+                    </div>
+                  ) : null}
                 </TableCell>
                 <TableCell className="text-right">
                   <Amount currency={bookCurrency} minor={row.amount} />

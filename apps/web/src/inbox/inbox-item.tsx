@@ -8,7 +8,6 @@ import {
   createProposedPlan,
   fundFromUnassigned,
   linkOccurrence,
-  promoteRule,
   resolveReview,
   updatePlanAmount,
 } from "@/inbox/actions";
@@ -29,8 +28,7 @@ type InboxItemRowProps = {
   onSkip: (planId: string, dueDate: string) => void;
   onDismiss: (itemKeys: string[]) => void;
   onAddByHand: (item: Extract<InboxItem, { kind: "import_unreadable" }>) => void;
-  onOpenGroup: (transactionIds: string[]) => void;
-  onReviewQueue: (transactionIds: string[]) => void;
+  onOpenTransaction: (transactionId: string) => void;
   onFundPaycheck: (incomeTransactionId: string) => void;
   unassigned: number;
   onRestore?: (itemKeys: string[]) => void;
@@ -48,7 +46,6 @@ const icons: Record<InboxItem["kind"], LucideIcon> = {
   recurring_ambiguous: Repeat,
   plan_proposal: Repeat,
   transfer_pair: ArrowLeftRight,
-  promote_rule: Tag,
   bucket_overspent: AlertTriangle,
   import_unreadable: FileWarning,
   paycheck_funding: Banknote,
@@ -82,8 +79,7 @@ export function InboxItemRow({
   onSkip,
   onDismiss,
   onAddByHand,
-  onOpenGroup,
-  onReviewQueue,
+  onOpenTransaction,
   onFundPaycheck,
   unassigned,
   onRestore,
@@ -171,12 +167,6 @@ export function InboxItemRow({
       disabled: false,
       run: () => void run(() => acceptPair(asOf, item.left.id, item.right.id)),
     };
-  } else if (item.kind === "promote_rule") {
-    primary = {
-      label: "Create the rule",
-      disabled: false,
-      run: () => void run(() => promoteRule(item.payee, item.merchantId, item.categoryId, item.transferAccountId)),
-    };
   } else if (item.kind === "import_unreadable") {
     primary = { label: "Add by hand", disabled: false, run: () => onAddByHand(item) };
   } else if (item.kind === "paycheck_funding") {
@@ -225,7 +215,7 @@ export function InboxItemRow({
         </div>
         <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
           {dismissedReason && onRestore ? (
-            <Button type="button" disabled={pending} onClick={() => onRestore(item.kind === "uncategorized" ? item.lineIds.map((lineId) => `uncategorized:${lineId}`) : [item.itemKey])}>
+            <Button type="button" disabled={pending} onClick={() => onRestore([item.itemKey])}>
               Restore
             </Button>
           ) : null}
@@ -245,7 +235,7 @@ export function InboxItemRow({
                 type="button"
                 variant="ghost"
                 disabled={pending}
-                onClick={() => onDismiss(item.kind === "uncategorized" ? item.lineIds.map((lineId) => `uncategorized:${lineId}`) : [item.itemKey])}
+                onClick={() => onDismiss([item.itemKey])}
               >
                 Not now
               </Button>
@@ -270,7 +260,7 @@ export function InboxItemRow({
                 disabled={pending}
                 onClick={() =>
                   void run(async () => {
-                    const result = await applyInboxGroup(item.accountId, item.transactionIds, suggestion);
+                    const result = await applyInboxGroup(item.accountId, [item.transactionId], suggestion);
                     if (result.ok && result.data.skipped.length > 0) {
                       onNotice(`Applied to ${result.data.applied} · skipped ${result.data.skipped.length}`);
                     }
@@ -282,11 +272,8 @@ export function InboxItemRow({
               </Button>
             );
           })}
-          <Button type="button" variant="outline" disabled={pending} onClick={() => onOpenGroup(item.transactionIds)}>
+          <Button type="button" variant="outline" disabled={pending} onClick={() => onOpenTransaction(item.transactionId)}>
             Other…
-          </Button>
-          <Button type="button" variant="ghost" disabled={pending} onClick={() => onReviewQueue(item.transactionIds)}>
-            Review one by one
           </Button>
         </div>
       ) : null}

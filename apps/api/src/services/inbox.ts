@@ -1,5 +1,5 @@
 import { inboxDismissals } from "@num/db";
-import { uncategorizedLineKey, utcNow, type Inbox, type InboxItem } from "@num/shared";
+import { utcNow, type Inbox, type InboxItem } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -43,10 +43,7 @@ export function listInbox(db: Db, asOf: string, dismissed = false): Inbox {
     dismissalReasons: dismissed
       ? items.map((item) => ({
           itemKey: item.itemKey,
-          reason:
-            item.kind === "uncategorized"
-              ? (reason.get(uncategorizedLineKey(item.lineIds[0] ?? "")) ?? "")
-              : (reason.get(item.itemKey) ?? ""),
+          reason: reason.get(item.itemKey) ?? "",
         }))
       : [],
   };
@@ -56,11 +53,6 @@ function visibleKeys(db: Db, asOf: string): Set<string> {
   const keys = new Set<string>();
   for (const item of listInbox(db, asOf).items) {
     keys.add(item.itemKey);
-    if (item.kind === "uncategorized") {
-      for (const lineId of item.lineIds) {
-        keys.add(uncategorizedLineKey(lineId));
-      }
-    }
   }
   return keys;
 }

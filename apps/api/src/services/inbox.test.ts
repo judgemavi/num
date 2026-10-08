@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { auditLog, importRows, merchants, migrateDatabase, occurrenceLinks, openDatabase, settings, transactions } from "@num/db";
-import { columnMapSchema, normalizePayee, type ColumnMap, type InboxKind } from "@num/shared";
+import { columnMapSchema, uncategorizedLineKey, type ColumnMap, type InboxKind } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq, isNull } from "drizzle-orm";
 import { createDb, type Db } from "../db";
@@ -14,10 +14,9 @@ import { undoImportBatch } from "./import-undo";
 import { importStatement } from "./imports";
 import { resolveImportReview } from "./import-review";
 import { dismissInboxItems, listInbox, restoreInboxItems } from "./inbox";
-import { uncategorizedLineKey } from "@num/shared";
 import { createPlan, updatePlan } from "./recurring-plans";
 import { linkOccurrence, skipOccurrence } from "./recurring-links";
-import { acceptTransferPair, promotePayee } from "./suggestions";
+import { acceptTransferPair } from "./suggestions";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
@@ -121,11 +120,10 @@ test("each inbox kind appears and leaves after its action", () => {
     const savings = account(sample.db, "Savings");
     const food = category(sample.db, "Food");
     const dining = category(sample.db, "Dining");
-    const shop = merchant(sample.db, "North Market");
     const stream = merchant(sample.db, "Stream Co");
 
     const open = pay(sample.db, cash.id, "2026-03-02", -6400, "Corner market", null);
-    expect(keys(sample.db, "uncategorized")).toEqual([`uncategorized:${cash.id}:${normalizePayee(open.payeeRaw)}`]);
+    expect(keys(sample.db, "uncategorized")).toEqual([uncategorizedLineKey(open.lines[0]?.id ?? "")]);
     updateTransaction(sample.db, open.id, {
       accountId: open.accountId,
       date: open.date,
@@ -154,16 +152,6 @@ test("each inbox kind appears and leaves after its action", () => {
       expect.objectContaining({ transferAccountId: left.accountId }),
     ]);
     expect(keys(sample.db, "transfer_pair")).toEqual([]);
-
-    for (const date of ["2026-03-01", "2026-03-02", "2026-03-03"]) {
-      pay(sample.db, cash.id, date, -900, "North market", food.id, shop);
-    }
-    const promote = listInbox(sample.db, asOf).items.find((item) => item.kind === "promote_rule");
-    expect(promote?.kind).toBe("promote_rule");
-    if (promote?.kind === "promote_rule") {
-      promotePayee(sample.db, { payee: promote.payee, merchantId: promote.merchantId, categoryId: promote.categoryId, ...saved });
-    }
-    expect(keys(sample.db, "promote_rule")).toEqual([]);
 
     const meals = createBucket(sample.db, {
       name: "Meals",
@@ -330,13 +318,12 @@ test("dismiss hides an item and un-dismiss shows it", () => {
   try {
     const cash = account(sample.db, "Cash");
     const open = pay(sample.db, cash.id, "2026-03-04", -100, "Needs a category", null);
-    const itemKey = `uncategorized:${cash.id}:${normalizePayee(open.payeeRaw)}`;
     const lineKey = uncategorizedLineKey(open.lines[0]?.id ?? "");
-    expect(keys(sample.db, "uncategorized")).toEqual([itemKey]);
+    expect(keys(sample.db, "uncategorized")).toEqual([lineKey]);
     dismissInboxItems(sample.db, asOf, [lineKey], "Later", saved);
     expect(keys(sample.db, "uncategorized")).toEqual([]);
     restoreInboxItems(sample.db, [lineKey], saved);
-    expect(keys(sample.db, "uncategorized")).toEqual([itemKey]);
+    expect(keys(sample.db, "uncategorized")).toEqual([lineKey]);
   } finally {
     sample.close();
   }
@@ -353,9 +340,9 @@ test("a group dismissal hides only the current lines", () => {
     expect(keys(sample.db, "uncategorized")).toEqual([]);
     const third = pay(sample.db, cash.id, "2026-03-03", -300, "blue bottle", null);
     const open = listInbox(sample.db, asOf).items.filter((item) => item.kind === "uncategorized");
-    expect(open.map((item) => (item.kind === "uncategorized" ? item.transactionIds : []))).toEqual([[third.id]]);
+    expect(open.map((item) => (item.kind === "uncategorized" ? item.transactionId : ""))).toEqual([third.id]);
     const closed = listInbox(sample.db, asOf, true).items.filter((item) => item.kind === "uncategorized");
-    expect(closed[0]?.kind === "uncategorized" ? closed[0].transactionIds.sort() : []).toEqual([first.id, second.id].sort());
+    expect(closed.flatMap((item) => (item.kind === "uncategorized" ? [item.transactionId] : [])).sort()).toEqual([first.id, second.id].sort());
   } finally {
     sample.close();
   }

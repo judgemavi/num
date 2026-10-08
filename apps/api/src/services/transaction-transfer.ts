@@ -54,7 +54,7 @@ function linkMatch(tx: WriteTx, sourceId: string, sourceAccountId: string, match
     throw new Error("Transfer match is missing");
   }
   const matchLines = loadLines(tx, matchId);
-  const before = toTransaction(match, matchLines);
+  const before = toTransaction(tx, match, matchLines);
   const line = matchLines[0];
   tx.update(transactions).set({ transferPeerId: matchId }).where(eq(transactions.id, sourceId)).run();
   tx.update(transactions).set({ transferPeerId: sourceId }).where(eq(transactions.id, matchId)).run();
@@ -116,7 +116,7 @@ export function attachTransfer(tx: WriteTx, sourceId: string, header: Header, so
 }
 
 function releasePeer(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: StoredLine[], at: string): void {
-  const before = toTransaction(peer, peerLines);
+  const before = toTransaction(tx, peer, peerLines);
   tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, sourceId)).run();
   if (peer.mirror) {
     tx.update(transactions)
@@ -149,7 +149,7 @@ function rewriteMirror(
   header: Header,
   line: NormalizedLine,
 ): void {
-  const before = toTransaction(peer, peerLines);
+  const before = toTransaction(tx, peer, peerLines);
   const back = peerLines.find((item) => item.transferAccountId === source.accountId);
   const amount = -line.amount;
   const target = line.transferAccountId;
@@ -157,7 +157,7 @@ function rewriteMirror(
     throw new Error("Transfer line is missing");
   }
   tx.update(transactions)
-    .set({ accountId: target, date: header.date, amount })
+    .set({ accountId: target, date: header.date, amount, autoReason: null, autoSourceId: null })
     .where(eq(transactions.id, peer.id))
     .run();
   replaceLines(tx, peer.id, [
@@ -181,6 +181,7 @@ export function applyMirrorEdit(
   header: Header,
   lines: NormalizedLine[],
   at: string,
+  auto: { autoReason: "rule" | null; autoSourceId: string | null },
 ): void {
   const line = lines[0];
   if (lines.length !== 1 || !line || line.transferAccountId !== peer.accountId) {
@@ -193,10 +194,10 @@ export function applyMirrorEdit(
   if (!sourceLine) {
     throw new Error("Transfer line is missing");
   }
-  const before = toTransaction(existing, existingLines);
-  const peerBefore = toTransaction(peer, peerLines);
+  const before = toTransaction(tx, existing, existingLines);
+  const peerBefore = toTransaction(tx, peer, peerLines);
   const moneyChanged = header.date !== existing.date || header.accountId !== existing.accountId;
-  tx.update(transactions).set(header).where(eq(transactions.id, existing.id)).run();
+  tx.update(transactions).set({ ...header, ...auto }).where(eq(transactions.id, existing.id)).run();
   replaceLines(tx, existing.id, lines);
   if (peer.mirror) {
     tx.update(transactions).set({ date: header.date }).where(eq(transactions.id, peer.id)).run();
@@ -220,9 +221,10 @@ export function applySourceEdit(
   header: Header,
   lines: NormalizedLine[],
   at: string,
+  auto: { autoReason: "rule" | null; autoSourceId: string | null },
 ): void {
-  const before = toTransaction(existing, existingLines);
-  tx.update(transactions).set(header).where(eq(transactions.id, existing.id)).run();
+  const before = toTransaction(tx, existing, existingLines);
+  tx.update(transactions).set({ ...header, ...auto }).where(eq(transactions.id, existing.id)).run();
   replaceLines(tx, existing.id, lines);
   const line = transferLine(lines);
   if (!line?.transferAccountId) {

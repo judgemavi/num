@@ -45,7 +45,6 @@ test("setup runs only one time", () => {
       { key: "bufferAmount", value: "0" },
       { key: "currency", value: "CAD" },
       { key: "emergencyFundMonths", value: "3" },
-      { key: "promoteAfter", value: "3" },
       { key: "recurringGraceDays", value: "3" },
       { key: "staleImportDays", value: "10" },
     ]);

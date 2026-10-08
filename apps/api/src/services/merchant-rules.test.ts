@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { merchants, migrateDatabase, openDatabase, recurringPlans, rules, settings, transactionLines, transactions } from "@num/db";
+import { merchants, migrateDatabase, openDatabase, recurringPlans, rules, transactionLines, transactions } from "@num/db";
 import { storedPayee } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
@@ -14,8 +14,8 @@ import { applyRule, previewRuleApply } from "./rule-apply";
 import { archiveMerchant, createMerchant } from "./merchants";
 import { createPlan } from "./recurring-plans";
 import { archiveRule, createRule, restoreRule } from "./rules";
-import { listPromotionCandidates, listTransferPairs, suggestForPayee } from "./suggestions";
-import { createTransaction, getTransaction, updateTransaction } from "./transactions";
+import { listTransferPairs, suggestForPayee } from "./suggestions";
+import { createTransaction, getTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
 
@@ -177,7 +177,7 @@ test("apply to existing skips a split and updates a single line", () => {
   }
 });
 
-test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
+test("a rule suggestion keeps its reason and a transfer pair stays available", () => {
   const { db, close } = tempDatabase();
   try {
     const account = createAccount(db, {
@@ -216,12 +216,6 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
         .run();
       db.insert(transactionLines).values({ id: crypto.randomUUID(), transactionId: id, amount: -400, categoryId: category.id }).run();
     }
-    expect(listPromotionCandidates(db).items).toEqual([
-      { payee: "CAFE", merchantId: shop.id, categoryId: category.id, transferAccountId: null, count: 3 },
-    ]);
-    db.insert(settings).values({ key: "promoteAfter", value: "4" }).run();
-    expect(listPromotionCandidates(db).items).toEqual([]);
-
     createRule(db, {
       match: "exact",
       pattern: "cafe",
@@ -232,11 +226,12 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
       source: "ui",
       at,
     });
-    expect(suggestForPayee(db, account.id, "TST*CAFE")).toEqual({
+    expect(suggestForPayee(db, account.id, "TST*CAFE")).toMatchObject({
       merchantId: shop.id,
       categoryId: category.id,
       transferAccountId: null,
       reason: "rule",
+      sure: true,
     });
 
     const outId = crypto.randomUUID();
@@ -271,59 +266,6 @@ test("promotion uses promoteAfter and a suggestion keeps its reason", () => {
   }
 });
 
-test("promotions ignore categories that the import suggested", () => {
-  const { db, close } = tempDatabase();
-  try {
-    const account = createAccount(db, {
-      name: "Chequing",
-      institution: null,
-      kind: "chequing",
-      openingDate: "2026-01-01",
-      openingBalance: 0,
-      source: "ui",
-      at,
-    });
-    const category = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
-    const shop = createMerchant(db, { name: "Cafe", defaultCategoryId: category.id, source: "ui", at });
-    const ids: string[] = [];
-    for (let day = 1; day <= 3; day += 1) {
-      const id = crypto.randomUUID();
-      ids.push(id);
-      db.insert(transactions)
-        .values({
-          id,
-          accountId: account.id,
-          date: `2026-05-0${day}`,
-          amount: -400,
-          merchantId: shop.id,
-          ...storedPayee("SQ *CAFE"),
-          status: "open",
-          source: "import",
-        })
-        .run();
-      db.insert(transactionLines).values({ id: crypto.randomUUID(), transactionId: id, amount: -400, categoryId: category.id }).run();
-    }
-    expect(listPromotionCandidates(db).items).toEqual([]);
-    for (const id of ids) {
-      updateTransaction(db, id, {
-        accountId: account.id,
-        date: `2026-05-0${ids.indexOf(id) + 1}`,
-        amount: -400,
-        payeeRaw: "SQ *CAFE",
-        merchantId: shop.id,
-        status: "open",
-        lines: [{ amount: -400, categoryId: category.id, transferAccountId: null, memo: null, tagIds: [] }],
-        source: "ui",
-        at,
-      });
-    }
-    expect(listPromotionCandidates(db).items).toEqual([
-      { payee: "CAFE", merchantId: shop.id, categoryId: category.id, transferAccountId: null, count: 3 },
-    ]);
-  } finally {
-    close();
-  }
-});
 
 test("a transfer rule cannot also set a category", () => {
   const { db, close } = tempDatabase();
@@ -450,7 +392,6 @@ test("a transfer does not keep a merchant", () => {
     }
     const payments = db.select().from(transactions).all().filter((row) => row.payeeRaw === "VISA PAYMENT");
     expect(payments.every((row) => row.merchantId === null)).toBe(true);
-    expect(listPromotionCandidates(db).items.find((item) => item.transferAccountId === visa.id)).toBeUndefined();
   } finally {
     close();
   }

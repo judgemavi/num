@@ -257,7 +257,7 @@ test("a created row stores the normalized payee and the suggestion", () => {
       source: "ui",
       at,
     });
-    const merchant = createMerchant(book.db, {
+    createMerchant(book.db, {
       name: "NORTH MARKET",
       defaultCategoryId: category.id,
       source: "ui",
@@ -267,7 +267,8 @@ test("a created row stores the normalized payee and the suggestion", () => {
     expect(result.kind).toBe("batch");
     const txn = book.db.select().from(transactions).all()[0];
     expect(txn?.payeeNormalized).toBe(normalizePayee("NORTH MARKET"));
-    expect(txn?.merchantId).toBe(merchant.id);
+    expect(txn?.merchantId).toBeNull();
+    expect(txn?.autoReason).toBeNull();
     expect(txn?.status).toBe("open");
     const audits = book.db
       .select()
@@ -276,7 +277,7 @@ test("a created row stores the normalized payee and the suggestion", () => {
       .all();
     expect(audits.map((item) => item.action)).toEqual(["create"]);
     expect(audits[0]?.after).toContain("merchant_default");
-    expect(book.db.select().from(transactionLines).all()[0]?.categoryId).toBe(category.id);
+    expect(book.db.select().from(transactionLines).all()[0]?.categoryId).toBeNull();
   } finally {
     book.close();
   }

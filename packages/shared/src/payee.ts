@@ -109,3 +109,7 @@ export function merchantNameFromPayee(description: string): string {
   }
   return name;
 }
+
+export function uncategorizedLineKey(lineId: string): string {
+  return `uncategorized:${lineId}`;
+}

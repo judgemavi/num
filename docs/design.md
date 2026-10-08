@@ -176,12 +176,13 @@ Order, top to bottom:
 6. **More details** (Collapsible, closed): notes, tags, bank text, "Cleared" checkbox. No "status" word in the UI.
 7. Footer: Save (primary). Delete goes in a More menu (shared confirm).
 
-**Group mode:** opened with several transactions (an Inbox payee group). Header: "12 transactions · $84.20".
+**Group mode:** opened with several transactions that the user selected. Header: "12 transactions · $84.20".
 Category, transfer and merchant apply to all; the user can exclude items. Split is not available.
 
-**Queue mode:** "Review one by one" opens the editor with a list. Next, Previous, auto-advance after Save.
+**Queue mode:** "Review one by one" opens the editor with the uncategorized transactions. Next, Previous, auto-advance after Save.
 
-The Inbox item does not contain a form: payee, count, total, suggestion chips (one click), and "Other…" (opens the editor).
+An Inbox row is one transaction: payee, date, amount, suggestion chips (one click), and "Other…" (opens the editor).
+An automatic label shows its reason ("Rule: NETFLIX", "Learned from Mar 12").
 
 ## 6b. Shared editors and the dialog host
 

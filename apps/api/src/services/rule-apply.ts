@@ -104,7 +104,7 @@ function applyOne(tx: WriteTx, row: ApplyRow, rule: ReturnType<typeof requireRul
       transferAccountId: rule.transferAccountId,
       tagIds: before.lines[0]?.tagIds ?? [],
     };
-    tx.update(transactions).set({ merchantId }).where(eq(transactions.id, row.id)).run();
+    tx.update(transactions).set({ merchantId, autoReason: null, autoSourceId: null }).where(eq(transactions.id, row.id)).run();
     replaceLines(tx, row.id, [line]);
     attachTransfer(tx, row.id, {
       accountId: before.accountId,
@@ -119,11 +119,23 @@ function applyOne(tx: WriteTx, row: ApplyRow, rule: ReturnType<typeof requireRul
     auditTransaction(tx, row.id, "update", before, readTransaction(tx, row.id));
     return;
   }
-  if (rule.merchantId && row.merchantId !== rule.merchantId) {
-    tx.update(transactions).set({ merchantId: rule.merchantId }).where(eq(transactions.id, row.id)).run();
-  }
-  if (rule.categoryId && row.categoryId !== rule.categoryId) {
-    tx.update(transactionLines).set({ categoryId: rule.categoryId }).where(eq(transactionLines.id, row.lineId)).run();
+  if (rule.categoryId) {
+    tx.update(transactions)
+      .set({
+        merchantId: rule.merchantId ?? row.merchantId,
+        autoReason: "rule",
+        autoSourceId: rule.id,
+      })
+      .where(eq(transactions.id, row.id))
+      .run();
+    if (row.categoryId !== rule.categoryId) {
+      tx.update(transactionLines).set({ categoryId: rule.categoryId }).where(eq(transactionLines.id, row.lineId)).run();
+    }
+  } else if (rule.merchantId && row.merchantId !== rule.merchantId) {
+    tx.update(transactions)
+      .set({ merchantId: rule.merchantId, autoReason: null, autoSourceId: null })
+      .where(eq(transactions.id, row.id))
+      .run();
   }
   auditTransaction(tx, row.id, "update", before, readTransaction(tx, row.id));
 }

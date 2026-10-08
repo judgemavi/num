@@ -6,7 +6,6 @@ import { formatMoney } from "@/money";
 const kindHue: Record<InboxKind, Hue | "attention"> = {
   import_review: "sky",
   uncategorized: "sky",
-  promote_rule: "sky",
   recurring_changed: "lilac",
   recurring_missed: "lilac",
   recurring_ambiguous: "lilac",
@@ -81,8 +80,6 @@ export function inboxError(code: string): string {
       return "That import row is already decided.";
     case "transfer_pair_not_found":
       return "That transfer is no longer available.";
-    case "promotion_not_ready":
-      return "That payee is not ready for a rule.";
     case "bucket_not_overspent":
       return "That bucket is no longer over.";
     case "bucket_short":
@@ -124,8 +121,6 @@ export function itemTitle(item: InboxItem, names: Names, currency: string): stri
       return `${names.merchant(item.merchantId)} looks like a repeating payment`;
     case "transfer_pair":
       return `Possible transfer, ${formatMoney(currency, Math.abs(item.left.amount))}`;
-    case "promote_rule":
-      return `Save ${item.payee} as a rule`;
     case "bucket_overspent":
       return `${names.bucket(item.bucketId)} is over by ${formatMoney(currency, Math.abs(item.balance))}`;
     case "import_unreadable":
@@ -140,7 +135,7 @@ export function itemWhy(item: InboxItem, names: Names, currency: string): string
     case "import_review":
       return `${shortDate(item.date)} · ${names.account(item.accountId)} · ${formatMoney(currency, item.amount)}`;
     case "uncategorized":
-      return `${names.account(item.accountId)} · ${item.count} ${item.count === 1 ? "transaction" : "transactions"} · ${formatMoney(currency, Math.abs(item.total))}`;
+      return `${shortDate(item.date)} · ${names.account(item.accountId)} · ${formatMoney(currency, item.amount)}`;
     case "recurring_changed":
       return `Charged ${shortDate(item.date)}. Update the plan?`;
     case "recurring_missed":
@@ -151,10 +146,6 @@ export function itemWhy(item: InboxItem, names: Names, currency: string): string
       return `${repeatLabel(item.freq, item.interval)} · ${formatMoney(currency, item.expectedAmount)} · from ${shortDate(item.startDate)}`;
     case "transfer_pair":
       return `${shortDate(item.left.date)} ${names.account(item.left.accountId)} and ${shortDate(item.right.date)} ${names.account(item.right.accountId)}. A transfer is not spending.`;
-    case "promote_rule":
-      return item.transferAccountId
-        ? `${names.merchant(item.merchantId)} · ${names.account(item.transferAccountId)} · ${item.count} times`
-        : `${names.merchant(item.merchantId)} · ${names.category(item.categoryId ?? "")} · ${item.count} times`;
     case "bucket_overspent":
       return "Cover it from another bucket.";
     case "import_unreadable":

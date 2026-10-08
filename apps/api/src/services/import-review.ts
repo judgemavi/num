@@ -1,8 +1,9 @@
 import { importBatches, importRows, transactionLines, transactions } from "@num/db";
-import { storedPayee, Temporal, type ImportReviewResolve, type Suggestion } from "@num/shared";
+import { storedAutomatic, storedPayee, Temporal, type ImportReviewResolve, type Suggestion } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { spreadSureLabels } from "./auto-label";
 import { suggestForPayee } from "./suggestions";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -30,7 +31,7 @@ function requireReview(tx: WriteTx, id: string) {
 }
 
 function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>, suggestion: Suggestion): string {
-  const apply = suggestion.reason !== "none" && suggestion.transferAccountId === null ? suggestion : null;
+  const applied = storedAutomatic(suggestion);
   const transactionId = crypto.randomUUID();
   const payee = storedPayee(row.payeeRaw);
   tx.insert(transactions)
@@ -39,7 +40,9 @@ function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>, su
       accountId: row.accountId,
       date: row.date,
       amount: row.amount,
-      merchantId: apply?.merchantId ?? null,
+      merchantId: applied.merchantId,
+      autoReason: applied.autoReason,
+      autoSourceId: applied.autoSourceId,
       notes: null,
       payeeRaw: payee.payeeRaw,
       payeeNormalized: payee.payeeNormalized,
@@ -57,7 +60,7 @@ function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>, su
       transactionId,
       amount: row.amount,
       memo: null,
-      categoryId: apply?.categoryId ?? null,
+      categoryId: applied.categoryId,
       transferAccountId: null,
     })
     .run();
@@ -65,6 +68,7 @@ function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>, su
   auditTransaction(tx, transactionId, "create", null, readTransaction(tx, transactionId), {
     suggestionReason: suggestion.reason,
   });
+  spreadSureLabels(tx, payee.payeeNormalized, new Set());
   return transactionId;
 }
 

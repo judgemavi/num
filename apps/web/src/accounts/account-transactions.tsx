@@ -50,7 +50,7 @@ export function AccountTransactions({ accountId, currency, page, onPage }: Accou
     queryKey: ["transactions", accountId, page],
     queryFn: async () => {
       const result = await apiRequest(
-        transactionPath({ page, pageSize: 50, accountId, uncategorized: false }),
+        transactionPath({ page, pageSize: 50, accountId, uncategorized: false, automatic: false }),
         transactionListSchema,
       );
       if (!result.ok) {

@@ -202,7 +202,17 @@ export {
 } from "./merchant";
 export { merchantNameFromPayee, normalizePayee, storedPayee } from "./payee";
 export { oppositeTransferAccount, transferHintQuerySchema, transferHintSchema } from "./transfer-hint";
-export { groupByPayee, uncategorizedItemKey, uncategorizedLineKey, type PayeeGroup, type PayeeGroupRow } from "./payee-group";
+export { uncategorizedLineKey } from "./payee";
+export {
+  automaticLabel,
+  autoReasons,
+  learnedPayee,
+  storedAutomatic,
+  type AutomaticLabel,
+  type AutoReason,
+  type Confirmation,
+  type LearnedPayee,
+} from "./learned";
 export {
   categoryKindForChoice,
   choiceForCategory,
@@ -217,7 +227,6 @@ export {
 export {
   chooseRule,
   patternHits,
-  ruleCoversPayee,
   ruleTargetsOk,
   ruleApplyPreviewSchema,
   ruleCreateSchema,
@@ -240,10 +249,6 @@ export {
 export {
   alternateSuggestion,
   chooseTransferMatch,
-  promotionAcceptSchema,
-  promotionCandidates,
-  promotionListSchema,
-  promotionSchema,
   suggestionQuerySchema,
   suggestionReasons,
   suggestionSchema,
@@ -254,7 +259,6 @@ export {
   type HistoryRow,
   type MerchantChoice,
   type TransferMatchRow,
-  type Promotion,
   type Suggestion,
   type SuggestionReason,
   type TransferCandidate,

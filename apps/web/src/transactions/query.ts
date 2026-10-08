@@ -38,6 +38,9 @@ export function transactionPath(search: TransactionListQuery): string {
   if (search.uncategorized) {
     params.set("uncategorized", "true");
   }
+  if (search.automatic) {
+    params.set("automatic", "true");
+  }
   const text = params.toString();
   return text.length === 0 ? "/api/transactions" : `/api/transactions?${text}`;
 }
@@ -51,6 +54,7 @@ export function hasFilters(search: TransactionListQuery): boolean {
       search.tagId ||
       search.from ||
       search.to ||
-      search.uncategorized,
+      search.uncategorized ||
+      search.automatic,
   );
 }

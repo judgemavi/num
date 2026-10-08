@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FieldError } from "@/components/ui/field";
 import { formatMoney } from "@/money";
-import { formatDate } from "@/transactions/format";
+import { automaticReasonText, formatDate } from "@/transactions/format";
 import { MortgageSplitWatch } from "@/transactions/mortgage-split-watch";
 import { DeleteMenu, MoneySection, MoreDetails } from "@/transactions/transaction-parts";
 import { alreadyChosen, choiceOf, linesOf, signedTotal, useApplySuggestion } from "@/transactions/transaction-draft";
@@ -230,6 +230,11 @@ export function TransactionForm({
       ) : null}
       {reconciled ? (
         <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, notes, category and tags can change.</p>
+      ) : null}
+      {transaction?.autoReason ? (
+        <p className="text-sm text-muted-foreground">
+          {automaticReasonText(transaction.autoReason, transaction.autoPattern, transaction.autoDate)}
+        </p>
       ) : null}
       {imported ? (
         <p className="text-sm">{summary}</p>

@@ -4,6 +4,7 @@ import { isoDateSchema } from "./date";
 import { skippedRowSchema } from "./inbox";
 import { ruleMatches } from "./rule";
 import { listQuerySchema, pagedResponseSchema } from "./list";
+import { autoReasons } from "./learned";
 import { isUtcTimestamp } from "./time";
 
 export const transactionStatuses = ["open", "cleared", "reconciled"] as const;
@@ -78,6 +79,10 @@ export const transactionSchema = z.object({
   importRowId: z.uuid().nullable(),
   transferPeerId: z.uuid().nullable(),
   mirror: z.boolean(),
+  autoReason: z.enum(autoReasons).nullable(),
+  autoSourceId: z.uuid().nullable(),
+  autoPattern: z.string().nullable(),
+  autoDate: isoDateSchema.nullable(),
   deletedAt: z.string().refine(isUtcTimestamp).nullable(),
   lines: z.array(transactionLineSchema),
 });
@@ -112,6 +117,10 @@ export const transactionListQuerySchema = listQuerySchema(transactionSortColumns
     .union([z.boolean(), z.enum(["true", "false"])])
     .optional()
     .transform((value) => value === true || value === "true"),
+  automatic: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .optional()
+    .transform((value) => value === true || value === "true"),
 });
 
 export const transactionListItemSchema = z.object({
@@ -126,6 +135,9 @@ export const transactionListItemSchema = z.object({
   merchantName: z.string().nullable(),
   status: z.enum(transactionStatuses),
   runningBalance: centsSchema.nullable(),
+  autoReason: z.enum(autoReasons).nullable(),
+  autoPattern: z.string().nullable(),
+  autoDate: isoDateSchema.nullable(),
 });
 
 export const transactionListSchema = pagedResponseSchema(transactionListItemSchema);

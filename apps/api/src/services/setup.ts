@@ -10,7 +10,6 @@ const settingDefaults = [
   ["bufferAmount", "0"],
   ["emergencyFundMonths", "3"],
   ["staleImportDays", "10"],
-  ["promoteAfter", "3"],
   ["recurringGraceDays", "3"],
 ] as const;
 

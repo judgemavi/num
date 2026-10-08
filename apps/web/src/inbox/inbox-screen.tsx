@@ -183,7 +183,22 @@ export function InboxScreen() {
           <div className="flex items-center gap-2 border-b px-5 py-3.5">
             <h2 className="text-base font-bold">{showDismissed ? "Dismissed" : "Needs you"}</h2>
             {!showDismissed && count > 0 ? <Badge variant="count">{count}</Badge> : null}
-            <Button type="button" variant="ghost" className="ml-auto" onClick={() => setShowDismissed((value) => !value)}>
+            {!showDismissed && (inbox.data?.items.some((item) => item.kind === "uncategorized") ?? false) ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="ml-auto"
+                onClick={() => {
+                  const ids = (inbox.data?.items ?? [])
+                    .filter((item) => item.kind === "uncategorized")
+                    .map((item) => item.transactionId);
+                  void openEditor("transaction", { id: ids[0] ?? null, queueIds: ids }).then(() => refresh());
+                }}
+              >
+                Review one by one
+              </Button>
+            ) : null}
+            <Button type="button" variant="ghost" className={showDismissed || !(inbox.data?.items.some((item) => item.kind === "uncategorized")) ? "ml-auto" : ""} onClick={() => setShowDismissed((value) => !value)}>
               {showDismissed ? "Needs you" : `Dismissed${dismissedCount > 0 ? ` (${dismissedCount})` : ""}`}
             </Button>
           </div>
@@ -238,11 +253,8 @@ export function InboxScreen() {
                   });
                 });
               }}
-              onOpenGroup={(transactionIds) => {
-                void openEditor("transaction", { id: null, groupIds: transactionIds }).then(() => refresh());
-              }}
-              onReviewQueue={(transactionIds) => {
-                void openEditor("transaction", { id: transactionIds[0] ?? null, queueIds: transactionIds }).then(() => refresh());
+              onOpenTransaction={(transactionId) => {
+                void openEditor("transaction", { id: transactionId }).then(() => refresh());
               }}
               onFundPaycheck={(incomeTransactionId) => {
                 void openEditor("fundPaycheck", { incomeTransactionId }).then(() => refresh());
