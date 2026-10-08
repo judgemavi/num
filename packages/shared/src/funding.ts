@@ -24,7 +24,7 @@ export type ReservedBill = {
 export function nextIncomeDate(asOf: string, dates: readonly string[]): string | null {
   let next: string | null = null;
   for (const date of dates) {
-    if (date < asOf) {
+    if (date <= asOf) {
       continue;
     }
     if (next === null || date < next) {
@@ -67,8 +67,11 @@ export function fundingLimit(paycheckAmount: number, free: number): number {
 }
 
 export function roundUpShare(shortfall: number, paychecks: number): number {
-  if (shortfall <= 0 || paychecks <= 0) {
+  if (shortfall <= 0) {
     return 0;
+  }
+  if (paychecks <= 0) {
+    return shortfall;
   }
   return Math.ceil(shortfall / paychecks);
 }

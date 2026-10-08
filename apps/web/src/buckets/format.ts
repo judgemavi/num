@@ -138,6 +138,12 @@ export function bucketError(code: ErrorCode): string {
   if (code === "funding_run_undone") {
     return "That funding is already undone.";
   }
+  if (code === "fund_over_unassigned") {
+    return "That is more than Unassigned.";
+  }
+  if (code === "release_over_balance") {
+    return "That is more than this bucket holds.";
+  }
   if (code === "bucket_fields_invalid" || code === "invalid_body") {
     return "Check the bucket fields.";
   }

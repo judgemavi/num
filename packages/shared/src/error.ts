@@ -87,6 +87,8 @@ export const errorCodes = [
   "funding_lines_invalid",
   "funding_run_not_found",
   "funding_run_undone",
+  "fund_over_unassigned",
+  "release_over_balance",
   "internal_error",
 ] as const;
 

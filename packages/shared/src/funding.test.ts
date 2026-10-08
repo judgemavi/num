@@ -1,16 +1,11 @@
 import { expect, test } from "bun:test";
 import {
-  billsReserved,
-  billReserveDays,
-  addDays,
   fundingProposal,
   roundUpShare,
   unassigned,
   type FundingBucketInput,
   type FundingIncome,
 } from "./funding";
-
-const asOf = "2026-10-01";
 
 function income(planId: string, dueDate: string): FundingIncome {
   return { planId, dueDate };
@@ -73,23 +68,33 @@ function goal(
 
 const october = [income("pay", "2026-10-01"), income("pay", "2026-10-15"), income("pay", "2026-10-29")];
 
-test("bills are reserved until the next funds paycheck, or for 30 days", () => {
-  const bills = [
-    { dueDate: "2026-09-30", amount: -100, linked: false },
-    { dueDate: "2026-10-01", amount: -200, linked: false },
-    { dueDate: "2026-10-10", amount: -300, linked: false },
-    { dueDate: "2026-10-10", amount: -400, linked: true },
-    { dueDate: "2026-10-15", amount: -500, linked: false },
-  ];
-  expect(billsReserved(asOf, bills, "2026-10-15")).toBe(500);
-  const end = addDays(asOf, billReserveDays);
-  expect(end).toBe("2026-10-31");
+test("zero remaining paychecks proposes the whole shortfall", () => {
+  expect(roundUpShare(900, 0)).toBe(900);
+  const incomes = [income("pay", "2026-10-01")];
+  const buckets = [sinking("tax", 1, 100, 1_000, "2026-10-01"), goal("trip", 2, 0, 500, "2026-10-01", null)];
   expect(
-    billsReserved(asOf, [
-      { dueDate: "2026-10-30", amount: -700, linked: false },
-      { dueDate: "2026-10-31", amount: -800, linked: false },
-    ], null),
-  ).toBe(700);
+    fundingProposal({
+      paycheckPlanId: "pay",
+      paycheckDate: "2026-10-01",
+      paycheckAmount: 10_000,
+      unassigned: 10_000,
+      incomes,
+      buckets,
+    }),
+  ).toEqual([
+    { bucketId: "tax", amount: 900 },
+    { bucketId: "trip", amount: 500 },
+  ]);
+  expect(
+    fundingProposal({
+      paycheckPlanId: "pay",
+      paycheckDate: "2026-10-01",
+      paycheckAmount: 10_000,
+      unassigned: 400,
+      incomes,
+      buckets: [buckets[0]!],
+    }),
+  ).toEqual([{ bucketId: "tax", amount: 400 }]);
 });
 
 test("a card purchase does not change Unassigned while the bucket stays positive", () => {

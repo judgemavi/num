@@ -1,9 +1,10 @@
 import { bucketEvents, buckets, fundingRuns, transactions } from "@num/db";
 import { fundingLimit, isIsoDate, utcNow, type FundingRun, type FundingRunCreate } from "@num/shared";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
+import { integerSum } from "../integer-sum";
 import { ServiceError } from "../service-error";
-import { activeFundingRun, fundingPosition, requirePaycheck, runTotals } from "./funding-book";
+import { activeFundingRun, fundingPosition, requirePaycheck } from "./funding-book";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
@@ -25,11 +26,10 @@ function snapshot(row: RunRow, lines: { bucketId: string; amount: number }[]) {
 
 function linesOf(db: WriteTx | Db, runId: string): { bucketId: string; amount: number }[] {
   return db
-    .select()
+    .select({ bucketId: bucketEvents.bucketId, amount: bucketEvents.amount })
     .from(bucketEvents)
-    .all()
-    .filter((event) => event.fundingRunId === runId)
-    .map((event) => ({ bucketId: event.bucketId, amount: event.amount }));
+    .where(eq(bucketEvents.fundingRunId, runId))
+    .all();
 }
 
 function toRun(db: WriteTx | Db, row: RunRow): FundingRun {
@@ -155,6 +155,25 @@ export function undoFundingRun(db: Db, id: string, input: WriteInput): FundingRu
     throw new Error("Undo did not return a funding run");
   }
   return undone;
+}
+
+function runTotals(db: Db): Map<string, number> {
+  const totals = new Map<string, number>();
+  const rows = db
+    .select({
+      fundingRunId: bucketEvents.fundingRunId,
+      total: sql<unknown>`coalesce(sum(${bucketEvents.amount}), 0)`,
+    })
+    .from(bucketEvents)
+    .where(isNotNull(bucketEvents.fundingRunId))
+    .groupBy(bucketEvents.fundingRunId)
+    .all();
+  for (const row of rows) {
+    if (row.fundingRunId) {
+      totals.set(row.fundingRunId, integerSum(row.total));
+    }
+  }
+  return totals;
 }
 
 export function listFundingRuns(db: Db): { items: FundingRun[] } {

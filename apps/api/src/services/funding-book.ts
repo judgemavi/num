@@ -1,4 +1,4 @@
-import { accounts, bucketEvents, buckets, fundingRuns, occurrenceLinks, recurringPlans, transactions } from "@num/db";
+import { accounts, buckets, fundingRuns, occurrenceLinks, recurringPlans, transactions } from "@num/db";
 import {
   accountKinds,
   addDays,
@@ -15,6 +15,7 @@ import {
   planFrequencies,
   positiveBalances,
   unassigned,
+  variableAmounts,
   type AccountKind,
   type BucketKind,
   type BusinessDayShift,
@@ -26,7 +27,7 @@ import {
   type PlanFrequency,
   type PlanSchedule,
 } from "@num/shared";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
@@ -34,6 +35,18 @@ import { bucketBalances, type Reader } from "./bucket-balance";
 
 type PlanRow = typeof recurringPlans.$inferSelect;
 type BucketRow = typeof buckets.$inferSelect;
+type LinkRow = typeof occurrenceLinks.$inferSelect;
+
+type Book = {
+  plans: PlanRow[];
+  links: LinkRow[];
+  skipped: Set<string>;
+  linked: Set<string>;
+  buckets: BucketRow[];
+  balances: Map<string, number>;
+  amounts: Map<string, number>;
+  payees: Map<string, { date: string; payee: string; amount: number }>;
+};
 
 function accountKind(value: string): AccountKind {
   if (!(accountKinds as readonly string[]).includes(value)) {
@@ -73,17 +86,84 @@ function scheduleOf(row: PlanRow): PlanSchedule {
   };
 }
 
-function linkKeys(db: Reader): { skipped: Set<string>; linked: Set<string> } {
+function loadBook(db: Reader): Book {
+  const plans = db.select().from(recurringPlans).all();
+  const links = db.select().from(occurrenceLinks).all();
   const skipped = new Set<string>();
   const linked = new Set<string>();
-  for (const row of db.select().from(occurrenceLinks).all()) {
+  const txnIds: string[] = [];
+  for (const row of links) {
     const key = `${row.planId}|${row.dueDate}`;
     linked.add(key);
     if (row.skipped) {
       skipped.add(key);
     }
+    if (row.transactionId) {
+      txnIds.push(row.transactionId);
+    }
   }
-  return { skipped, linked };
+  const amounts = new Map<string, number>();
+  const payees = new Map<string, { date: string; payee: string; amount: number }>();
+  if (txnIds.length > 0) {
+    const rows = db
+      .select({
+        id: transactions.id,
+        amount: transactions.amount,
+        date: transactions.date,
+        payeeRaw: transactions.payeeRaw,
+        deletedAt: transactions.deletedAt,
+      })
+      .from(transactions)
+      .where(inArray(transactions.id, txnIds))
+      .all();
+    for (const row of rows) {
+      if (row.deletedAt !== null) {
+        continue;
+      }
+      amounts.set(row.id, row.amount);
+      payees.set(row.id, { date: row.date, payee: row.payeeRaw, amount: row.amount });
+    }
+  }
+  return {
+    plans,
+    links,
+    skipped,
+    linked,
+    buckets: db.select().from(buckets).all(),
+    balances: bucketBalances(db),
+    amounts,
+    payees,
+  };
+}
+
+function firstIncomeAfter(plans: PlanRow[], skipped: Set<string>, asOf: string): string | null {
+  const start = addDays(asOf, 1);
+  const horizon = Temporal.PlainDate.from(asOf).add({ years: 1 }).toString();
+  const dates: string[] = [];
+  for (const plan of plans) {
+    for (const date of occurrenceDates(scheduleOf(plan), horizon, start)) {
+      if (skipped.has(`${plan.id}|${date.dueDate}`)) {
+        continue;
+      }
+      dates.push(date.dueDate);
+      break;
+    }
+  }
+  return nextIncomeDate(asOf, dates);
+}
+
+function billAmount(plan: PlanRow, book: Book, asOf: string): number {
+  if (plan.amountMode !== "variable") {
+    return plan.expectedAmount;
+  }
+  const actuals = book.links
+    .filter((link) => link.planId === plan.id && link.transactionId !== null && link.dueDate <= asOf)
+    .sort((left, right) => (left.dueDate < right.dueDate ? 1 : left.dueDate > right.dueDate ? -1 : 0))
+    .flatMap((link) => {
+      const amount = link.transactionId ? book.amounts.get(link.transactionId) : undefined;
+      return amount === undefined ? [] : [amount];
+    });
+  return variableAmounts(actuals, plan.expectedAmount).safe;
 }
 
 function incomePlans(rows: PlanRow[]): PlanRow[] {
@@ -119,44 +199,42 @@ function onBudgetTotal(db: Reader): number {
   return total;
 }
 
-export function fundingPosition(db: Reader, asOf: string): FundingPosition {
+function positionFrom(db: Reader, asOf: string, book: Book): FundingPosition {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
-  const allPlans = db.select().from(recurringPlans).all();
-  const { skipped, linked } = linkKeys(db);
-  const far = addDays(asOf, 40 * 366);
-  const next = nextIncomeDate(
-    asOf,
-    hits(incomePlans(allPlans), asOf, far, skipped).map((item) => item.dueDate),
-  );
+  const next = firstIncomeAfter(incomePlans(book.plans), book.skipped, asOf);
   const end = next ?? addDays(asOf, billReserveDays);
   const last = addDays(end, -1);
   const bills: ReservedBill[] = [];
   if (last >= asOf) {
-    for (const plan of allPlans) {
+    for (const plan of book.plans) {
       if (plan.kind !== "bill" || !plan.active || plan.archivedAt !== null) {
         continue;
       }
+      const amount = billAmount(plan, book, asOf);
       for (const date of occurrenceDates(scheduleOf(plan), last, asOf)) {
         bills.push({
           dueDate: date.dueDate,
-          amount: plan.expectedAmount,
-          linked: linked.has(`${plan.id}|${date.dueDate}`),
+          amount,
+          linked: book.linked.has(`${plan.id}|${date.dueDate}`),
         });
       }
     }
   }
   const reserved = billsReserved(asOf, bills, next);
-  const balances = bucketBalances(db);
   const total = onBudgetTotal(db);
   return {
     asOf,
     onBudgetTotal: total,
     billsReserved: reserved,
-    unassigned: unassigned(total, positiveBalances([...balances.values()]), reserved),
+    unassigned: unassigned(total, positiveBalances([...book.balances.values()]), reserved),
     nextIncomeDate: next,
   };
+}
+
+export function fundingPosition(db: Reader, asOf: string): FundingPosition {
+  return positionFrom(db, asOf, loadBook(db));
 }
 
 export function requirePaycheck(db: Reader, incomeTransactionId: string): FundingPaycheck & { planId: string } {
@@ -192,36 +270,39 @@ export function activeFundingRun(db: Reader, incomeTransactionId: string) {
 }
 
 export function listFundingPaychecks(db: Db): { items: FundingPaycheck[] } {
-  const funded = new Set(
-    db
-      .select()
-      .from(fundingRuns)
-      .all()
-      .filter((run) => run.undoneAt === null)
-      .map((run) => run.incomeTransactionId),
-  );
-  const items: FundingPaycheck[] = [];
-  for (const link of db.select().from(occurrenceLinks).all()) {
-    if (link.skipped || link.transactionId === null || funded.has(link.transactionId)) {
-      continue;
-    }
-    try {
-      const paycheck = requirePaycheck(db, link.transactionId);
-      items.push({
-        incomeTransactionId: paycheck.incomeTransactionId,
-        date: paycheck.date,
-        dueDate: paycheck.dueDate,
-        amount: paycheck.amount,
-        payee: paycheck.payee,
-        amountMode: paycheck.amountMode,
-      });
-    } catch (error) {
-      if (error instanceof ServiceError && error.code === "paycheck_not_found") {
-        continue;
-      }
-      throw error;
-    }
-  }
+  const rows = db
+    .select({
+      incomeTransactionId: transactions.id,
+      date: transactions.date,
+      dueDate: occurrenceLinks.dueDate,
+      amount: transactions.amount,
+      payee: transactions.payeeRaw,
+      amountMode: recurringPlans.amountMode,
+    })
+    .from(occurrenceLinks)
+    .innerJoin(recurringPlans, eq(occurrenceLinks.planId, recurringPlans.id))
+    .innerJoin(transactions, eq(occurrenceLinks.transactionId, transactions.id))
+    .leftJoin(fundingRuns, and(eq(fundingRuns.incomeTransactionId, transactions.id), isNull(fundingRuns.undoneAt)))
+    .where(
+      and(
+        eq(recurringPlans.kind, "income"),
+        eq(recurringPlans.fundsBuckets, true),
+        eq(occurrenceLinks.skipped, false),
+        isNotNull(occurrenceLinks.transactionId),
+        isNull(transactions.deletedAt),
+        gt(transactions.amount, 0),
+        isNull(fundingRuns.id),
+      ),
+    )
+    .all();
+  const items = rows.map((row) => ({
+    incomeTransactionId: row.incomeTransactionId,
+    date: row.date,
+    dueDate: row.dueDate,
+    amount: row.amount,
+    payee: row.payee,
+    amountMode: amountMode(row.amountMode),
+  }));
   items.sort((left, right) => {
     if (left.date !== right.date) {
       return left.date < right.date ? 1 : -1;
@@ -231,38 +312,58 @@ export function listFundingPaychecks(db: Db): { items: FundingPaycheck[] } {
   return { items };
 }
 
-function proposalIncomes(db: Reader, dueDate: string, bucketRows: BucketRow[]): FundingIncome[] {
+function proposalIncomes(book: Book, dueDate: string): FundingIncome[] {
   const month = Temporal.PlainDate.from(dueDate).with({ day: 1 });
   const start = month.toString();
   let end = month.add({ months: 1 }).subtract({ days: 1 }).toString();
-  for (const bucket of bucketRows) {
+  for (const bucket of book.buckets) {
     const date = bucket.dueDate ?? bucket.targetDate;
     if (date && date > end) {
       end = date;
     }
   }
-  return hits(incomePlans(db.select().from(recurringPlans).all()), start, end, linkKeys(db).skipped);
+  return hits(incomePlans(book.plans), start, end, book.skipped);
+}
+
+function paycheckFromBook(book: Book, incomeTransactionId: string): FundingPaycheck & { planId: string } {
+  const link = book.links.find((row) => row.transactionId === incomeTransactionId);
+  const txn = book.payees.get(incomeTransactionId);
+  if (!link || link.skipped || link.transactionId === null || !txn || txn.amount <= 0) {
+    throw new ServiceError("paycheck_not_found", 404);
+  }
+  const plan = book.plans.find((row) => row.id === link.planId);
+  if (!plan || plan.kind !== "income" || !plan.fundsBuckets) {
+    throw new ServiceError("paycheck_not_found", 404);
+  }
+  return {
+    incomeTransactionId,
+    date: txn.date,
+    dueDate: link.dueDate,
+    amount: txn.amount,
+    payee: txn.payee,
+    amountMode: amountMode(plan.amountMode),
+    planId: plan.id,
+  };
 }
 
 export function fundingProposalFor(db: Reader, incomeTransactionId: string, asOf: string): FundingProposal {
-  const paycheck = requirePaycheck(db, incomeTransactionId);
+  const book = loadBook(db);
+  const paycheck = paycheckFromBook(book, incomeTransactionId);
   if (activeFundingRun(db, paycheck.incomeTransactionId)) {
     throw new ServiceError("funding_run_exists", 409);
   }
-  const position = fundingPosition(db, asOf);
-  const bucketRows = db.select().from(buckets).all();
-  const balances = bucketBalances(db);
+  const position = positionFrom(db, asOf, book);
   const lines = fundingProposal({
     paycheckPlanId: paycheck.planId,
     paycheckDate: paycheck.dueDate,
     paycheckAmount: paycheck.amount,
     unassigned: position.unassigned,
-    incomes: proposalIncomes(db, paycheck.dueDate, bucketRows),
-    buckets: bucketRows.map((row) => ({
+    incomes: proposalIncomes(book, paycheck.dueDate),
+    buckets: book.buckets.map((row) => ({
       id: row.id,
       kind: bucketKind(row.kind),
       priority: row.priority,
-      balance: balances.get(row.id) ?? 0,
+      balance: book.balances.get(row.id) ?? 0,
       archived: row.archivedAt !== null,
       refillTo: row.refillTo,
       amount: row.amount,
@@ -272,7 +373,7 @@ export function fundingProposalFor(db: Reader, incomeTransactionId: string, asOf
       fixedAmount: row.fixedAmount,
     })),
   });
-  const names = new Map(bucketRows.map((row) => [row.id, row.name]));
+  const names = new Map(book.buckets.map((row) => [row.id, row.name]));
   return {
     incomeTransactionId: paycheck.incomeTransactionId,
     date: paycheck.date,
@@ -287,15 +388,4 @@ export function fundingProposalFor(db: Reader, incomeTransactionId: string, asOf
       amount: line.amount,
     })),
   };
-}
-
-export function runTotals(db: Reader): Map<string, number> {
-  const totals = new Map<string, number>();
-  for (const event of db.select().from(bucketEvents).all()) {
-    if (!event.fundingRunId) {
-      continue;
-    }
-    totals.set(event.fundingRunId, (totals.get(event.fundingRunId) ?? 0) + event.amount);
-  }
-  return totals;
 }

@@ -51,7 +51,8 @@ export function AssignMoney({ currency, bucket, kind, onClose, onSaved }: Assign
     }
     setSaving(true);
     try {
-      const result = await apiRequest(`/api/buckets/${bucket.id}/events`, bucketEventSchema, {
+      const params = new URLSearchParams({ asOf: today() });
+      const result = await apiRequest(`/api/buckets/${bucket.id}/events?${params.toString()}`, bucketEventSchema, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

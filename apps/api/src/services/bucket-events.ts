@@ -4,11 +4,13 @@ import { eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
+import { fundingPosition } from "./funding-book";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
   source: AuditSource;
   at?: string;
+  asOf?: string;
 };
 
 type EventRow = typeof bucketEvents.$inferSelect;
@@ -80,6 +82,24 @@ export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCr
     requireActiveBucket(tx, bucketId);
     if (otherBucketId) {
       requireActiveBucket(tx, otherBucketId);
+    }
+    if (input.kind === "fund") {
+      if (!input.asOf) {
+        throw new ServiceError("as_of_required", 400);
+      }
+      if (!isIsoDate(input.asOf)) {
+        throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
+      }
+      const free = fundingPosition(tx, input.asOf).unassigned;
+      if (input.amount > free) {
+        throw new ServiceError("fund_over_unassigned", 409);
+      }
+    }
+    if (input.kind === "release") {
+      const balance = bucketBalances(tx).get(bucketId) ?? 0;
+      if (input.amount > balance) {
+        throw new ServiceError("release_over_balance", 409);
+      }
     }
     const row: EventRow = {
       id,

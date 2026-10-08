@@ -83,14 +83,14 @@ test("bucket balance is funds, moves, releases and category lines", () => {
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
-      openingBalance: 0,
+      openingBalance: 100_000,
       ...saved,
     });
     const groceries = expense(book.db, "Groceries");
     const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
     const food = spending(book.db, "Groceries", [groceries.id]);
     const other = spending(book.db, "Other", []);
-    createBucketEvent(book.db, food.id, { kind: "fund", amount: 10_000, date: "2026-03-01", ...saved });
+    createBucketEvent(book.db, food.id, { kind: "fund", amount: 10_000, date: "2026-03-01", asOf: "2026-03-01", ...saved });
     createBucketEvent(book.db, food.id, {
       kind: "move",
       amount: 2_000,
@@ -108,7 +108,7 @@ test("bucket balance is funds, moves, releases and category lines", () => {
     createBucketEvent(book.db, food.id, { kind: "release", amount: 1_000, date: "2026-03-04", ...saved });
     purchase(book.db, account.id, groceries.id, -3_000, "2026-03-05");
     purchase(book.db, account.id, groceries.id, 400, "2026-03-06");
-    const ignored = createBucketEvent(book.db, food.id, { kind: "fund", amount: 9_999, date: "2026-03-07", ...saved });
+    const ignored = createBucketEvent(book.db, food.id, { kind: "fund", amount: 9_999, date: "2026-03-07", asOf: "2026-03-07", ...saved });
     undoBucketEvent(book.db, food.id, ignored.id, saved);
     const removed = purchase(book.db, account.id, groceries.id, -500, "2026-03-08");
     deleteTransaction(book.db, removed.id, saved);
@@ -295,9 +295,16 @@ test("undo is rejected for a funding-run event", () => {
 test("archive needs a zero balance and removes category mappings", () => {
   const book = tempDatabase();
   try {
+    createAccount(book.db, {
+      name: "Cash",
+      kind: "chequing",
+      openingDate: "2026-01-01",
+      openingBalance: 1_000,
+      ...saved,
+    });
     const groceries = expense(book.db, "Groceries");
     const funded = spending(book.db, "Funded", []);
-    createBucketEvent(book.db, funded.id, { kind: "fund", amount: 500, date: "2026-03-01", ...saved });
+    createBucketEvent(book.db, funded.id, { kind: "fund", amount: 500, date: "2026-03-01", asOf: "2026-03-01", ...saved });
     expectCode(() => archiveBucket(book.db, funded.id, saved), "bucket_balance");
     expect(readBucket(book.db, funded.id).archivedAt).toBeNull();
 
@@ -368,13 +375,13 @@ test("cover rejects the same bucket, a bucket that is not overspent, and a short
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
-      openingBalance: 0,
+      openingBalance: 20_000,
       ...saved,
     });
     const dining = expense(book.db, "Dining");
     const meals = spending(book.db, "Dining", [dining.id]);
     const food = spending(book.db, "Groceries", []);
-    createBucketEvent(book.db, food.id, { kind: "fund", amount: 1_000, date: "2026-03-01", ...saved });
+    createBucketEvent(book.db, food.id, { kind: "fund", amount: 1_000, date: "2026-03-01", asOf: "2026-03-01", ...saved });
     expectCode(() => coverBucket(book.db, meals.id, { fromBucketId: meals.id, date: "2026-03-02", ...saved }), "bucket_same");
     expectCode(() => coverBucket(book.db, food.id, { fromBucketId: meals.id, date: "2026-03-02", ...saved }), "bucket_not_overspent");
     purchase(book.db, account.id, dining.id, -4_200);
@@ -389,9 +396,16 @@ test("cover rejects the same bucket, a bucket that is not overspent, and a short
 test("undo of a move sets undoneAt and restores both balances", () => {
   const book = tempDatabase();
   try {
+    createAccount(book.db, {
+      name: "Cash",
+      kind: "chequing",
+      openingDate: "2026-01-01",
+      openingBalance: 10_000,
+      ...saved,
+    });
     const food = spending(book.db, "Groceries", []);
     const other = spending(book.db, "Other", []);
-    createBucketEvent(book.db, food.id, { kind: "fund", amount: 5_000, date: "2026-03-01", ...saved });
+    createBucketEvent(book.db, food.id, { kind: "fund", amount: 5_000, date: "2026-03-01", asOf: "2026-03-01", ...saved });
     const move = createBucketEvent(book.db, food.id, {
       kind: "move",
       amount: 2_000,
@@ -420,14 +434,14 @@ test("cover moves the shortfall from another bucket", () => {
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
-      openingBalance: 0,
+      openingBalance: 20_000,
       ...saved,
     });
     const dining = expense(book.db, "Dining");
     const groceries = expense(book.db, "Groceries");
     const meals = spending(book.db, "Dining", [dining.id]);
     const food = spending(book.db, "Groceries", [groceries.id]);
-    createBucketEvent(book.db, food.id, { kind: "fund", amount: 8_000, date: "2026-03-01", ...saved });
+    createBucketEvent(book.db, food.id, { kind: "fund", amount: 8_000, date: "2026-03-01", asOf: "2026-03-01", ...saved });
     purchase(book.db, account.id, dining.id, -4_200);
     const cover = coverBucket(book.db, meals.id, { fromBucketId: food.id, date: "2026-03-02", ...saved });
     expect(cover.kind).toBe("move");

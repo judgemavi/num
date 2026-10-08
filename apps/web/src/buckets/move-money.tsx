@@ -45,7 +45,8 @@ export function MoveMoney({ currency, buckets, fromId, onClose, onSaved }: MoveM
     }
     setSaving(true);
     try {
-      const result = await apiRequest(`/api/buckets/${from}/events`, bucketEventSchema, {
+      const params = new URLSearchParams({ asOf: today() });
+      const result = await apiRequest(`/api/buckets/${from}/events?${params.toString()}`, bucketEventSchema, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

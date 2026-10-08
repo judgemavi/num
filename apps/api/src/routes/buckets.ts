@@ -1,4 +1,5 @@
 import {
+  asOfQuerySchema,
   bucketCoverSchema,
   bucketEventCreateSchema,
   bucketEventListSchema,
@@ -136,6 +137,7 @@ const eventRoute = createRoute({
   path: "/api/buckets/{id}/events",
   request: {
     params: idParams,
+    query: asOfQuerySchema,
     body: { required: true, content: { "application/json": { schema: bucketEventCreateSchema } } },
   },
   responses: {
@@ -200,7 +202,7 @@ export function registerBuckets(app: OpenAPIHono, db: Db) {
   });
   app.openapi(eventRoute, (c) => {
     const { id } = c.req.valid("param");
-    return c.json(createBucketEvent(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
+    return c.json(createBucketEvent(db, id, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200);
   });
   app.openapi(undoRoute, (c) => {
     const { id, eventId } = c.req.valid("param");

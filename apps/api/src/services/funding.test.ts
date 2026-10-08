@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bucketEvents, fundingRuns, migrateDatabase, openDatabase } from "@num/db";
 import { eq } from "drizzle-orm";
+import type { ErrorCode } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -68,6 +69,26 @@ function plan(
   });
 }
 
+function spend(db: Db, name: string, priority: number, refillTo = 10_000) {
+  return createBucket(db, {
+    name,
+    kind: "spending",
+    priority,
+    essential: false,
+    color: "mint",
+    icon: "shopping-cart",
+    categoryIds: [],
+    refillTo,
+    amount: null,
+    dueDate: null,
+    repeat: null,
+    target: null,
+    targetDate: null,
+    fixedAmount: null,
+    ...saved,
+  });
+}
+
 function money(db: Db, accountId: string, categoryId: string, date: string, amount: number, payeeRaw: string) {
   return createTransaction(db, {
     accountId,
@@ -98,23 +119,7 @@ test("a variable paycheck uses its actual amount", () => {
     });
     const deposit = money(book.db, cash.id, pay.id, "2026-10-01", 25_000, "Payroll");
     linkOccurrence(book.db, paycheck.id, "2026-10-01", deposit.id, saved);
-    const food = createBucket(book.db, {
-      name: "Food",
-      kind: "spending",
-      priority: 1,
-      essential: false,
-      color: "mint",
-      icon: "utensils",
-      categoryIds: [],
-      refillTo: 40_000,
-      amount: null,
-      dueDate: null,
-      repeat: null,
-      target: null,
-      targetDate: null,
-      fixedAmount: null,
-      ...saved,
-    });
+    const food = spend(book.db, "Food", 1, 40_000);
     createBucket(book.db, {
       name: "Trip",
       kind: "goal",
@@ -165,7 +170,7 @@ test("a card purchase does not change Unassigned", () => {
       fixedAmount: null,
       ...saved,
     });
-    createBucketEvent(book.db, food.id, { kind: "fund", amount: 5_000, date: "2026-10-01", ...saved });
+    createBucketEvent(book.db, food.id, { kind: "fund", amount: 5_000, date: "2026-10-01", asOf: "2026-10-01", ...saved });
     expect(fundingPosition(book.db, "2026-10-01").unassigned).toBe(15_000);
     money(book.db, card.id, groceries.id, "2026-10-02", -2_000, "Shop");
     const after = fundingPosition(book.db, "2026-10-02");
@@ -186,7 +191,18 @@ test("a card purchase does not change Unassigned", () => {
   }
 });
 
-test("bills reserved stop at the next funds paycheck, or cover 30 days", () => {
+function expectCode(run: () => void, code: ErrorCode) {
+  try {
+    run();
+  } catch (error) {
+    expect(error).toBeInstanceOf(ServiceError);
+    expect((error as ServiceError).code).toBe(code);
+    return;
+  }
+  throw new Error(`Expected ${code}`);
+}
+
+test("bills are reserved on payday", () => {
   const book = tempDatabase();
   try {
     const cash = account(book.db, "Cash", "chequing", 10_000);
@@ -195,7 +211,7 @@ test("bills reserved stop at the next funds paycheck, or cover 30 days", () => {
       kind: "income",
       accountId: cash.id,
       expectedAmount: 20_000,
-      startDate: "2026-10-15",
+      startDate: "2026-10-01",
       freq: "weekly",
       interval: 2,
       fundsBuckets: true,
@@ -204,74 +220,90 @@ test("bills reserved stop at the next funds paycheck, or cover 30 days", () => {
       name: "Power",
       kind: "bill",
       accountId: cash.id,
-      expectedAmount: -300,
-      startDate: "2026-10-10",
+      expectedAmount: -250,
+      startDate: "2026-10-01",
       freq: "monthly",
       interval: 1,
-      monthDay: 10,
+      monthDay: 1,
       fundsBuckets: false,
     });
     plan(book.db, {
       name: "Rent",
       kind: "bill",
       accountId: cash.id,
-      expectedAmount: -500,
+      expectedAmount: -999,
       startDate: "2026-10-15",
       freq: "monthly",
       interval: 1,
       monthDay: 15,
       fundsBuckets: false,
     });
-    const phone = plan(book.db, {
-      name: "Phone",
-      kind: "bill",
-      accountId: cash.id,
-      expectedAmount: -400,
-      startDate: "2026-10-10",
-      freq: "monthly",
-      interval: 1,
-      monthDay: 10,
-      fundsBuckets: false,
-    });
-    const paid = money(book.db, cash.id, createCategory(book.db, { name: "Phone", kind: "expense", ...saved }).id, "2026-10-10", -400, "Phone Co");
-    linkOccurrence(book.db, phone.id, "2026-10-10", paid.id, saved);
     const reserved = fundingPosition(book.db, "2026-10-01");
     expect(reserved.nextIncomeDate).toBe("2026-10-15");
-    expect(reserved.billsReserved).toBe(300);
-    expect(reserved.onBudgetTotal).toBe(9_600);
-    expect(reserved.unassigned).toBe(9_300);
+    expect(reserved.billsReserved).toBe(250);
   } finally {
     book.close();
   }
 });
 
-test("with no funds paycheck, bills cover the next 30 days", () => {
+test("a variable bill reserves the safe amount", () => {
   const book = tempDatabase();
   try {
-    const cash = account(book.db, "Cash", "chequing", 0);
+    const cash = account(book.db, "Cash", "chequing", 10_000);
+    const power = createCategory(book.db, { name: "Power", kind: "expense", ...saved });
     plan(book.db, {
-      name: "Soon",
+      name: "Pay",
+      kind: "income",
+      accountId: cash.id,
+      expectedAmount: 20_000,
+      startDate: "2026-10-01",
+      freq: "weekly",
+      interval: 2,
+      fundsBuckets: true,
+    });
+    const bill = plan(book.db, {
+      name: "Power",
       kind: "bill",
       accountId: cash.id,
-      expectedAmount: -700,
-      startDate: "2026-10-30",
+      expectedAmount: -1_000,
+      amountMode: "variable",
+      startDate: "2026-07-12",
       freq: "monthly",
       interval: 1,
-      monthDay: 30,
+      monthDay: 12,
       fundsBuckets: false,
     });
-    plan(book.db, {
-      name: "Later",
-      kind: "bill",
-      accountId: cash.id,
-      expectedAmount: -800,
-      startDate: "2026-10-31",
-      freq: "monthly",
-      interval: 1,
-      monthDay: 31,
-      fundsBuckets: false,
-    });
-    expect(fundingPosition(book.db, "2026-10-01").billsReserved).toBe(700);
+    for (const [date, amount] of [
+      ["2026-07-12", -100],
+      ["2026-08-12", -250],
+      ["2026-09-12", -900],
+    ] as const) {
+      const paid = money(book.db, cash.id, power.id, date, amount, "Power Co");
+      linkOccurrence(book.db, bill.id, date, paid.id, saved);
+    }
+    expect(fundingPosition(book.db, "2026-10-08").billsReserved).toBe(900);
+  } finally {
+    book.close();
+  }
+});
+
+test("a fund over Unassigned and a release over the balance are rejected", () => {
+  const book = tempDatabase();
+  try {
+    account(book.db, "Cash", "chequing", 1_000);
+    const food = spend(book.db, "Food", 1);
+    const asOf = "2026-10-08";
+    expectCode(
+      () => createBucketEvent(book.db, food.id, { kind: "fund", amount: 1_001, date: asOf, asOf, ...saved }),
+      "fund_over_unassigned",
+    );
+    createBucketEvent(book.db, food.id, { kind: "fund", amount: 1_000, date: asOf, asOf, ...saved });
+    expectCode(
+      () => createBucketEvent(book.db, food.id, { kind: "release", amount: 1_001, date: asOf, ...saved }),
+      "release_over_balance",
+    );
+    createBucketEvent(book.db, food.id, { kind: "release", amount: 1_000, date: asOf, ...saved });
+    expect(readBucket(book.db, food.id).balance).toBe(0);
   } finally {
     book.close();
   }
@@ -295,40 +327,8 @@ test("undo of a funding run removes every event from the balances", () => {
     });
     const deposit = money(book.db, cash.id, pay.id, "2026-10-01", 50_000, "Payroll");
     linkOccurrence(book.db, paycheck.id, "2026-10-01", deposit.id, saved);
-    const food = createBucket(book.db, {
-      name: "Food",
-      kind: "spending",
-      priority: 1,
-      essential: false,
-      color: "mint",
-      icon: "utensils",
-      categoryIds: [],
-      refillTo: 10_000,
-      amount: null,
-      dueDate: null,
-      repeat: null,
-      target: null,
-      targetDate: null,
-      fixedAmount: null,
-      ...saved,
-    });
-    const fuel = createBucket(book.db, {
-      name: "Fuel",
-      kind: "spending",
-      priority: 2,
-      essential: false,
-      color: "sky",
-      icon: "fuel",
-      categoryIds: [],
-      refillTo: 10_000,
-      amount: null,
-      dueDate: null,
-      repeat: null,
-      target: null,
-      targetDate: null,
-      fixedAmount: null,
-      ...saved,
-    });
+    const food = spend(book.db, "Food", 1);
+    const fuel = spend(book.db, "Fuel", 2);
     const run = createFundingRun(book.db, {
       incomeTransactionId: deposit.id,
       lines: [
