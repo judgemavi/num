@@ -4,12 +4,14 @@ import {
   currencyUpdateSchema,
   forecastSchema,
   fundingPositionSchema,
+  hygieneSchema,
   inboxSchema,
   merchantListSchema,
   planListSchema,
   type Plan,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Upload } from "lucide-react";
 import { useState } from "react";
 import { localAsOf } from "@/as-of";
@@ -35,6 +37,16 @@ export function InboxScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const hygiene = useQuery({
+    queryKey: ["hygiene", asOf],
+    queryFn: async () => {
+      const result = await apiRequest(`/api/hygiene?asOf=${asOf}`, hygieneSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
+    },
+  });
   const inbox = useQuery({
     queryKey: ["inbox", asOf],
     queryFn: async () => {
@@ -118,6 +130,7 @@ export function InboxScreen() {
     .filter((bucket) => bucket.kind === "spending" && bucket.archivedAt === null)
     .sort((left, right) => left.name.localeCompare(right.name));
   const caughtUp = inbox.data !== undefined && count === 0;
+  const hygieneFailed = hygiene.data?.checks.filter((item) => !item.pass).length;
   const imports = [...(inbox.data?.imports ?? [])].sort((left, right) => {
     const leftName = accountNames.get(left.accountId) ?? "";
     const rightName = accountNames.get(right.accountId) ?? "";
@@ -154,23 +167,34 @@ export function InboxScreen() {
               : "Loading the forecast."
         }
         facts={
-          forecast.data ? (
-            <>
-              {primary ? (
-                <Fact label={`In ${primary.name}`}>
-                  <Amount currency={bookCurrency} minor={primary.balance} />
+          <>
+            <Fact label="Hygiene">
+              {hygieneFailed === undefined ? (
+                <span className="text-sm text-muted-foreground">…</span>
+              ) : (
+                <Link to="/insights" className="text-sm font-semibold text-primary">
+                  {hygieneFailed === 0 ? "Clear" : `${hygieneFailed} to fix`}
+                </Link>
+              )}
+            </Fact>
+            {forecast.data ? (
+              <>
+                {primary ? (
+                  <Fact label={`In ${primary.name}`}>
+                    <Amount currency={bookCurrency} minor={primary.balance} />
+                  </Fact>
+                ) : null}
+                <Fact label="Bills before payday">
+                  <Amount currency={bookCurrency} minor={bills === 0 ? 0 : -bills} />
                 </Fact>
-              ) : null}
-              <Fact label="Bills before payday">
-                <Amount currency={bookCurrency} minor={bills === 0 ? 0 : -bills} />
-              </Fact>
-              {spendingBuckets.map((bucket) => (
-                <Fact key={bucket.id} label={bucket.name}>
-                  <Amount currency={bookCurrency} minor={bucket.balance} />
-                </Fact>
-              ))}
-            </>
-          ) : undefined
+                {spendingBuckets.map((bucket) => (
+                  <Fact key={bucket.id} label={bucket.name}>
+                    <Amount currency={bookCurrency} minor={bucket.balance} />
+                  </Fact>
+                ))}
+              </>
+            ) : null}
+          </>
         }
         illustration={<PaydayIllustration />}
       />

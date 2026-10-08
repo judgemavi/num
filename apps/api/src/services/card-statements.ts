@@ -12,6 +12,19 @@ function asKind(value: string): AccountKind {
 }
 
 export function listCardStatements(db: Db, accountId: string): { items: CardStatement[] } {
+  const ledger = cardLedger(db, accountId);
+  return {
+    items: cardStatements({
+      statements: ledger.statements,
+      paymentDates: ledger.payments.map((row) => row.date),
+    }),
+  };
+}
+
+export function cardLedger(db: Db, accountId: string): {
+  statements: { date: string; balance: number; createdAt: string }[];
+  payments: { date: string; amount: number }[];
+} {
   const account = db.select({ id: accounts.id, kind: accounts.kind }).from(accounts).where(eq(accounts.id, accountId)).get();
   if (!account) {
     throw new ServiceError("account_not_found", 404);
@@ -20,12 +33,12 @@ export function listCardStatements(db: Db, accountId: string): { items: CardStat
     throw new ServiceError("not_credit_card", 400);
   }
   const statements = db
-    .select({ date: checkpoints.date })
+    .select({ date: checkpoints.date, balance: checkpoints.statementBalance, createdAt: checkpoints.createdAt })
     .from(checkpoints)
     .where(and(eq(checkpoints.accountId, accountId), isNull(checkpoints.unlockedAt)))
     .all();
-  const payments = db.all<{ date: string }>(sql`
-    select t.date as date
+  const payments = db.all<{ date: string; amount: number }>(sql`
+    select t.date as date, t.amount as amount
     from transactions t
     where t.account_id = ${accountId}
       and t.deleted_at is null
@@ -38,5 +51,5 @@ export function listCardStatements(db: Db, accountId: string): { items: CardStat
         )
       )
   `);
-  return { items: cardStatements({ statements, paymentDates: payments.map((row) => row.date) }) };
+  return { statements, payments };
 }

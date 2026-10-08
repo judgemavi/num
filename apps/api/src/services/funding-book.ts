@@ -11,6 +11,7 @@ import {
   fundingProposal,
   isIsoDate,
   nextIncomeDate,
+  divideHalfAway,
   occurrenceDates,
   planFrequencies,
   positiveBalances,
@@ -235,6 +236,23 @@ function positionFrom(db: Reader, asOf: string, book: Book): FundingPosition {
 
 export function fundingPosition(db: Reader, asOf: string): FundingPosition {
   return positionFrom(db, asOf, loadBook(db));
+}
+
+export function monthlyBills(db: Reader, asOf: string): number {
+  if (!isIsoDate(asOf)) {
+    throw new ServiceError("as_of_invalid", 400, { asOf });
+  }
+  const book = loadBook(db);
+  const end = Temporal.PlainDate.from(asOf).add({ months: 12 }).subtract({ days: 1 }).toString();
+  let total = 0;
+  for (const plan of book.plans) {
+    if (plan.kind !== "bill" || !plan.active || plan.archivedAt !== null) {
+      continue;
+    }
+    const count = occurrenceDates(scheduleOf(plan), end, asOf).length;
+    total += Math.abs(billAmount(plan, book, asOf)) * count;
+  }
+  return divideHalfAway(total, 12);
 }
 
 export function requirePaycheck(db: Reader, incomeTransactionId: string): FundingPaycheck & { planId: string } {

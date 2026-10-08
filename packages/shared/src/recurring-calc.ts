@@ -136,7 +136,7 @@ export function withinTolerance(actual: number, expected: number, tolerance: num
   return Math.abs(actual - expected) <= tolerance;
 }
 
-function roundHalfAwayFromZero(sum: number, divisor: number): number {
+export function divideHalfAway(sum: number, divisor: number): number {
   const negative = sum < 0;
   const magnitude = Math.abs(sum);
   const quotient = Math.floor(magnitude / divisor);
@@ -151,7 +151,7 @@ export function medianMinor(values: readonly number[]): number {
   if (sorted.length % 2 === 1) {
     return sorted[mid] ?? 0;
   }
-  return roundHalfAwayFromZero((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0), 2);
+  return divideHalfAway((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0), 2);
 }
 
 export function variableAmounts(

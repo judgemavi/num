@@ -349,6 +349,7 @@ export {
   applyBusinessDayShift,
   businessDayShifts,
   dayDistance,
+  divideHalfAway,
   isLinkCandidate,
   isInboxMissed,
   isMissed,
@@ -413,6 +414,13 @@ export {
   type StoryMerchant,
   type StoryOccurrence,
 } from "./month";
+export {
+  hygieneCheckSchema,
+  hygieneSchema,
+  inboxAgeDays,
+  type Hygiene,
+  type HygieneCheck,
+} from "./hygiene";
 export {
   importReviewResolveSchema,
   importReviewResultSchema,

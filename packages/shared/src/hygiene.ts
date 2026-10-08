@@ -1,0 +1,131 @@
+import { z } from "zod";
+import { isoDateSchema } from "./date";
+import { monthKeySchema } from "./month";
+
+const cents = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
+const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+
+export const inboxAgeDays = 7;
+
+const emergencyFundCheckSchema = z.object({
+  code: z.literal("emergency_fund"),
+  pass: z.boolean(),
+  source: z.enum(["goals", "savings"]),
+  held: cents,
+  months: nonNegative,
+  monthlyBills: nonNegative,
+  monthlyRefills: nonNegative,
+  need: nonNegative,
+});
+
+const cardPaidSchema = z.object({
+  accountId: z.uuid(),
+  statementDate: isoDateSchema.nullable(),
+  dueDate: isoDateSchema.nullable(),
+  owed: nonNegative,
+  paid: nonNegative,
+  pass: z.boolean(),
+});
+
+const cardsPaidCheckSchema = z.object({
+  code: z.literal("cards_paid"),
+  pass: z.boolean(),
+  items: z.array(cardPaidSchema),
+});
+
+const importFreshSchema = z.object({
+  accountId: z.uuid(),
+  lastImportDate: isoDateSchema.nullable(),
+  ageDays: nonNegative.nullable(),
+  pass: z.boolean(),
+});
+
+const importsCheckSchema = z.object({
+  code: z.literal("imports_current"),
+  pass: z.boolean(),
+  staleImportDays: nonNegative,
+  items: z.array(importFreshSchema),
+});
+
+const monthClosedCheckSchema = z.object({
+  code: z.literal("month_closed"),
+  pass: z.boolean(),
+  month: monthKeySchema,
+  status: z.enum(["open", "ready", "closed", "none"]),
+});
+
+const inboxAgeCheckSchema = z.object({
+  code: z.literal("inbox_age"),
+  pass: z.boolean(),
+  limitDays: z.literal(inboxAgeDays),
+  oldCount: nonNegative,
+  oldestDate: isoDateSchema.nullable(),
+});
+
+const sinkingGapSchema = z.object({
+  planId: z.uuid(),
+  categoryId: z.uuid().nullable(),
+});
+
+const sinkingCheckSchema = z.object({
+  code: z.literal("sinking_funds"),
+  pass: z.boolean(),
+  yearly: nonNegative,
+  missing: z.array(sinkingGapSchema),
+});
+
+const savingsMonthSchema = z.object({
+  month: monthKeySchema,
+  savingsRateMilliPct: z.number().int().nullable(),
+  savings: cents,
+});
+
+const savingsRateCheckSchema = z.object({
+  code: z.literal("savings_rate"),
+  pass: z.boolean(),
+  months: z.array(savingsMonthSchema),
+});
+
+const recurringCheckSchema = z.object({
+  code: z.literal("recurring"),
+  pass: z.boolean(),
+  changed: nonNegative,
+  missed: nonNegative,
+});
+
+const overspentCheckSchema = z.object({
+  code: z.literal("overspent"),
+  pass: z.boolean(),
+  count: nonNegative,
+  balance: z.number().int().max(0),
+});
+
+export const hygieneCheckSchema = z.discriminatedUnion("code", [
+  emergencyFundCheckSchema,
+  cardsPaidCheckSchema,
+  importsCheckSchema,
+  monthClosedCheckSchema,
+  inboxAgeCheckSchema,
+  sinkingCheckSchema,
+  savingsRateCheckSchema,
+  recurringCheckSchema,
+  overspentCheckSchema,
+]);
+
+export const hygieneSchema = z.object({
+  asOf: isoDateSchema,
+  checks: z.tuple([
+    emergencyFundCheckSchema,
+    cardsPaidCheckSchema,
+    importsCheckSchema,
+    monthClosedCheckSchema,
+    inboxAgeCheckSchema,
+    sinkingCheckSchema,
+    savingsRateCheckSchema,
+    recurringCheckSchema,
+    overspentCheckSchema,
+  ]),
+});
+
+export type Hygiene = z.infer<typeof hygieneSchema>;
+export type HygieneCheck = z.infer<typeof hygieneCheckSchema>;

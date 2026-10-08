@@ -4,6 +4,7 @@ import {
   categoryListSchema,
   currencyUpdateSchema,
   merchantListSchema,
+  hygieneSchema,
   monthDetailSchema,
   monthListSchema,
   planListSchema,
@@ -22,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useEditors } from "@/editors/editor-api";
 import { blockerText, monthError, monthTitle, rateText, statusLabel, statusVariant } from "@/insights/format";
+import { HygienePanel } from "@/insights/hygiene-panel";
 import { MonthStoryView } from "@/insights/month-story";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
@@ -50,6 +52,16 @@ export function MonthsScreen() {
         throw new Error(result.code);
       }
       return result.data.currency;
+    },
+  });
+  const hygiene = useQuery({
+    queryKey: ["hygiene", asOf],
+    queryFn: async () => {
+      const result = await apiRequest(`/api/hygiene?asOf=${asOf}`, hygieneSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
     },
   });
   const months = useQuery({
@@ -134,6 +146,15 @@ export function MonthsScreen() {
   return (
     <>
       <PageHeader kicker="Insights" title="Months" />
+      <HygienePanel
+        currency={bookCurrency}
+        hygiene={hygiene.data}
+        pending={hygiene.isPending}
+        failed={hygiene.isError}
+        onMonth={(month) => {
+          void navigate({ search: (prev) => ({ ...prev, month }) });
+        }}
+      />
       {story ? (
         <SummaryStrip
           tint="plan"
