@@ -257,7 +257,8 @@ Settings for each kind:
 Bucket events (append only):
 - `fund`: money from Unassigned into the bucket.
 - `move`: money from one bucket to a different bucket.
-- `release`: money from the bucket back to Unassigned.
+- `release`: money from the bucket back to Unassigned. A release cannot be more than the bucket balance.
+- A manual `fund` cannot be more than Unassigned.
 - Each event has `amount` (positive), `date`, `note?`, `fundingRunId?`, `undoneAt?`.
 - Undo of an event sets `undoneAt`. The app does not delete events.
   The user can undo an event that has no `fundingRunId`. Events of a funding run are undone only with the run (§5.9).
@@ -340,6 +341,8 @@ Fields: `itemKey`, `reason`, `dismissedAt`.
 The app calculates most Inbox items from other records. It does not store them.
 `itemKey` is a stable key for one item: the item kind and the IDs of its records.
 A dismissed item does not show again. If the user removes the dismissal, the item shows again.
+The Inbox has a "Dismissed" view with Restore.
+The overspent item key includes the month of `asOf`: a dismissal hides it for that month only.
 
 ### 5.16 Forecast snapshot
 
@@ -365,8 +368,10 @@ It stores the forecast of the on-budget total for the last day of the month (§8
 ## 6. Calculated values
 
 - **On-budget total** = the sum of the balances of all on-budget accounts. Card balances are negative.
-- **Bills reserved** = the sum of the unlinked `bill` occurrences from today until the next `fundsBuckets` income occurrence.
+- **Bills reserved** = the sum of the unlinked `bill` occurrences from today until the next `fundsBuckets` income occurrence
+  after today. An income occurrence on today is the current paycheck, not the end of the window.
   The next income occurrence is not included. If there is no income plan, use the next 30 days.
+  A `variable` bill reserves its safe amount (the largest outflow of the last 6 actuals, §5.7).
 - **Unassigned** = on-budget total − the sum of the positive bucket balances − bills reserved.
 - **Credit cards do not need a special bucket.** The on-budget total includes the card balances.
   A card purchase decreases its bucket and the total by the same amount. Thus, Unassigned does not change.
@@ -418,6 +423,7 @@ The user can create, edit and archive accounts.
    - The app removes the transactions that the batch created, if they are not reconciled and not edited after import.
    - The app removes the links of matched rows.
    - The app shows the rows that it cannot undo.
+   - The app removes the recurring occurrence links of the transactions that it removes (audited).
 
 If the user imports the same file again, or a file with overlapping dates, the app must not create duplicate transactions.
 
@@ -500,6 +506,7 @@ The user can open the month again. The user must give a reason.
    - Spending: `refillTo − balance` at the first paycheck of the month. At other paychecks: 0.
    - Sinking: `(amount − balance) / the number of remaining fundsBuckets income occurrences before dueDate`.
    - Goal: `(target − balance) / the number of remaining occurrences before targetDate`. If there is no date, use the fixed amount.
+   - If no paycheck remains before the due date or target date, propose the whole shortfall.
 3. The user confirms with one click, or edits the amounts. The app creates a funding run.
    Round each amount up to the next cent.
 4. The user can also fund a bucket from Unassigned at any time. This is a manual fund event.
