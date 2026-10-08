@@ -102,6 +102,7 @@ function blankQuery(value: unknown): unknown {
 const optionalQueryText = z.preprocess(blankQuery, z.string().trim().min(1).optional());
 const optionalQueryId = z.preprocess(blankQuery, z.uuid().optional());
 const optionalQueryDate = z.preprocess(blankQuery, isoDateSchema.optional());
+const optionalIdOrNone = z.preprocess(blankQuery, z.union([z.uuid(), z.literal("none")]).optional());
 
 export const transactionSortColumns = ["date", "amount", "payeeRaw"] as const;
 
@@ -109,8 +110,9 @@ export const transactionListQuerySchema = listQuerySchema(transactionSortColumns
   q: optionalQueryText,
   accountId: optionalQueryId,
   categoryId: optionalQueryId,
-  merchantId: optionalQueryId,
-  tagId: optionalQueryId,
+  groupId: optionalIdOrNone,
+  merchantId: optionalIdOrNone,
+  tagId: optionalIdOrNone,
   from: optionalQueryDate,
   to: optionalQueryDate,
   uncategorized: z

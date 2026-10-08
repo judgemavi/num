@@ -9,15 +9,26 @@ const right = 16;
 const top = 16;
 const bottom = 36;
 
+export type ChartSeries = {
+  name: string;
+  amounts: number[];
+  dashed?: boolean;
+};
+
 type ForecastChartProps = {
   currency: string;
   dates: string[];
-  known: number[];
-  estimated: number[];
-  lowest: { date: string; amount: number };
+  label?: string;
+  known?: number[];
+  estimated?: number[];
+  lowest?: { date: string; amount: number };
+  series?: ChartSeries[];
 };
 
 function shortDate(iso: string): string {
+  if (iso.length === 7) {
+    return Temporal.PlainDate.from(`${iso}-01`).toLocaleString(undefined, { month: "short", year: "2-digit" });
+  }
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric" });
 }
 
@@ -33,9 +44,13 @@ function stepPath(points: { x: number; y: number }[]): string {
   return path;
 }
 
-export function ForecastChart({ currency, dates, known, estimated, lowest }: ForecastChartProps) {
+export function ForecastChart({ currency, dates, known = [], estimated = [], lowest, series, label }: ForecastChartProps) {
   const [hover, setHover] = useState<number | null>(null);
-  const values = [...known, ...estimated];
+  const lines: ChartSeries[] = series ?? [
+    { name: "Known", amounts: known },
+    { name: "Estimated", amounts: estimated, dashed: true },
+  ];
+  const values = lines.flatMap((line) => line.amounts);
   const peak = Math.max(...values, 0);
   const floor = Math.min(...values, 0);
   const span = Math.max(peak - floor, 1);
@@ -45,14 +60,12 @@ export function ForecastChart({ currency, dates, known, estimated, lowest }: For
   const plotHeight = height - top - bottom;
   const xAt = (index: number) => left + (plotWidth * index) / Math.max(dates.length - 1, 1);
   const yAt = (value: number) => top + plotHeight * (1 - (value - yMin) / Math.max(yMax - yMin, 1));
-  const knownPoints = known.map((value, index) => ({ x: xAt(index), y: yAt(value) }));
-  const estimatedPoints = estimated.map((value, index) => ({ x: xAt(index), y: yAt(value) }));
-  const knownPath = stepPath(knownPoints);
-  const estimatedPath = stepPath(estimatedPoints);
+  const linePoints = lines.map((line) => line.amounts.map((value, index) => ({ x: xAt(index), y: yAt(value) })));
+  const linePaths = linePoints.map((points) => stepPath(points));
   const zero = yAt(0);
-  const lowIndex = Math.max(0, dates.indexOf(lowest.date));
+  const lowIndex = lowest ? Math.max(0, dates.indexOf(lowest.date)) : 0;
   const lowX = xAt(lowIndex);
-  const lowY = yAt(estimated[lowIndex] ?? lowest.amount);
+  const lowY = lowest ? yAt(lines[1]?.amounts[lowIndex] ?? lines[0]?.amounts[lowIndex] ?? lowest.amount) : 0;
   const labelLeft = lowX > width * 0.72;
   const ticks = [yMin, Math.round((yMin + yMax) / 2), yMax];
   const dateIndexes = [0, Math.round((dates.length - 1) / 3), Math.round(((dates.length - 1) * 2) / 3), dates.length - 1];
@@ -64,7 +77,12 @@ export function ForecastChart({ currency, dates, known, estimated, lowest }: For
         viewBox={`0 0 ${width} ${height}`}
         className="h-auto w-full"
         role="img"
-        aria-label={`Forecast. Lowest estimated point ${formatMoney(currency, lowest.amount)} on ${shortDate(lowest.date)}.`}
+        aria-label={
+          label ??
+          (lowest
+            ? `Forecast. Lowest estimated point ${formatMoney(currency, lowest.amount)} on ${shortDate(lowest.date)}.`
+            : "Chart")
+        }
       >
         {ticks.map((tick) => (
           <g key={tick}>
@@ -79,18 +97,31 @@ export function ForecastChart({ currency, dates, known, estimated, lowest }: For
             {dates[index] ? shortDate(dates[index]) : ""}
           </text>
         ))}
-        <path d={`${knownPath}V${zero}H${xAt(0)}Z`} className="fill-primary" fillOpacity="0.07" />
-        <path d={knownPath} fill="none" className="stroke-primary" strokeWidth="2.5" strokeLinejoin="round" />
-        <path d={estimatedPath} fill="none" className="stroke-est" strokeWidth="2.5" strokeDasharray="7 5" strokeLinejoin="round" />
-        <circle cx={lowX} cy={lowY} r="7" className="fill-card stroke-attn" strokeWidth="3" />
-        <text
-          x={labelLeft ? lowX - 10 : lowX + 12}
-          y={Math.min(lowY + 22, height - bottom)}
-          textAnchor={labelLeft ? "end" : "start"}
-          className="fill-attn text-[13px] font-semibold"
-        >
-          {`Lowest point: ${formatMoney(currency, lowest.amount)} on ${shortDate(lowest.date)}`}
-        </text>
+        {linePaths[0] ? <path d={`${linePaths[0]}V${zero}H${xAt(0)}Z`} className="fill-primary" fillOpacity="0.07" /> : null}
+        {lines.map((line, index) => (
+          <path
+            key={line.name}
+            d={linePaths[index]}
+            fill="none"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+            strokeDasharray={line.dashed ? "7 5" : undefined}
+            className={line.dashed ? "stroke-est" : "stroke-primary"}
+          />
+        ))}
+        {lowest ? (
+          <>
+            <circle cx={lowX} cy={lowY} r="7" className="fill-card stroke-attn" strokeWidth="3" />
+            <text
+              x={labelLeft ? lowX - 10 : lowX + 12}
+              y={Math.min(lowY + 22, height - bottom)}
+              textAnchor={labelLeft ? "end" : "start"}
+              className="fill-attn text-[13px] font-semibold"
+            >
+              {`Lowest point: ${formatMoney(currency, lowest.amount)} on ${shortDate(lowest.date)}`}
+            </text>
+          </>
+        ) : null}
         {hover !== null ? (
           <line x1={xAt(hover)} x2={xAt(hover)} y1={top} y2={height - bottom} className="stroke-muted-foreground" strokeWidth="1" />
         ) : null}
@@ -115,8 +146,11 @@ export function ForecastChart({ currency, dates, known, estimated, lowest }: For
           style={{ left: `${(xAt(hover) / width) * 100}%` }}
         >
           <p className="font-semibold">{shortDate(hoverDate)}</p>
-          <p>Known {formatMoney(currency, known[hover] ?? 0)}</p>
-          <p>Estimated {formatMoney(currency, estimated[hover] ?? 0)}</p>
+          {lines.map((line) => (
+            <p key={line.name}>
+              {line.name} {formatMoney(currency, line.amounts[hover] ?? 0)}
+            </p>
+          ))}
         </div>
       ) : null}
     </div>

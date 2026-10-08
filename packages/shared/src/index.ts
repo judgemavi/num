@@ -406,7 +406,13 @@ export { isUtcTimestamp, utcNow } from "./time";
 export {
   buildMonthStory,
   closeBlockerCodes,
+  expenseSpending,
+  isExpenseLine,
+  isIncomeLine,
   isMonthKey,
+  isUncategorizedLine,
+  storyLineKind,
+  uncategorizedFlows,
   monthDetailSchema,
   monthKeySchema,
   monthLastDay,

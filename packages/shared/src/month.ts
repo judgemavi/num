@@ -160,10 +160,46 @@ function savingsRateMilliPct(income: number, spending: number): number | null {
   return divRoundHalfAway(BigInt(income - spending) * 100_000n, BigInt(income));
 }
 
+export function storyLineKind(value: string | null): StoryLine["kind"] {
+  if (value === "income" || value === "expense") {
+    return value;
+  }
+  return null;
+}
+
+export function isExpenseLine(line: Pick<StoryLine, "transfer" | "kind" | "categoryId">): boolean {
+  return !line.transfer && line.kind === "expense" && line.categoryId !== null;
+}
+
+export function isIncomeLine(line: Pick<StoryLine, "transfer" | "kind" | "categoryId">): boolean {
+  return !line.transfer && line.kind === "income" && line.categoryId !== null;
+}
+
+export function isUncategorizedLine(line: Pick<StoryLine, "transfer" | "categoryId">): boolean {
+  return !line.transfer && line.categoryId === null;
+}
+
+export function expenseSpending(amount: number): number {
+  return -amount;
+}
+
+export function uncategorizedFlows(amounts: readonly number[]): { spent: number; inflow: number } {
+  let spent = 0;
+  let inflow = 0;
+  for (const amount of amounts) {
+    if (amount < 0) {
+      spent -= amount;
+    } else if (amount > 0) {
+      inflow += amount;
+    }
+  }
+  return { spent, inflow };
+}
+
 function expenseByMonth(lines: readonly StoryLine[]): Map<string, Map<string, number>> {
   const months = new Map<string, Map<string, number>>();
   for (const line of lines) {
-    if (line.transfer || line.kind !== "expense" || line.categoryId === null) {
+    if (!isExpenseLine(line) || line.categoryId === null) {
       continue;
     }
     let categories = months.get(line.month);
@@ -171,7 +207,7 @@ function expenseByMonth(lines: readonly StoryLine[]): Map<string, Map<string, nu
       categories = new Map();
       months.set(line.month, categories);
     }
-    categories.set(line.categoryId, (categories.get(line.categoryId) ?? 0) - line.amount);
+    categories.set(line.categoryId, (categories.get(line.categoryId) ?? 0) + expenseSpending(line.amount));
   }
   return months;
 }
@@ -180,7 +216,7 @@ function uncategorizedOf(lines: readonly StoryLine[], month: string): { count: n
   let count = 0;
   let amount = 0;
   for (const line of lines) {
-    if (line.month !== month || line.transfer || line.categoryId !== null) {
+    if (line.month !== month || !isUncategorizedLine(line)) {
       continue;
     }
     count += 1;
@@ -192,7 +228,7 @@ function uncategorizedOf(lines: readonly StoryLine[], month: string): { count: n
 function incomeOf(lines: readonly StoryLine[], month: string): number {
   let total = 0;
   for (const line of lines) {
-    if (line.month === month && !line.transfer && line.kind === "income" && line.categoryId !== null) {
+    if (line.month === month && isIncomeLine(line)) {
       total += line.amount;
     }
   }

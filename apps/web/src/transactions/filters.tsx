@@ -1,4 +1,4 @@
-import type { Account, Category, Merchant, Tag, TransactionListQuery } from "@num/shared";
+import type { Account, Category, CategoryGroup, Merchant, Tag, TransactionListQuery } from "@num/shared";
 import { useEffect, useState } from "react";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
 import { sortChoice } from "@/components/sort-choice";
@@ -12,6 +12,7 @@ type TransactionFilterBarProps = {
   search: TransactionListQuery;
   accounts: Account[];
   categories: Category[];
+  groups: CategoryGroup[];
   merchants: Merchant[];
   tags: Tag[];
   onChange: (patch: Partial<TransactionListQuery>) => void;
@@ -20,6 +21,7 @@ type TransactionFilterBarProps = {
 type Draft = {
   accountId?: string;
   categoryId?: string;
+  groupId?: string;
   merchantId?: string;
   tagId?: string;
   from?: string;
@@ -45,6 +47,7 @@ function draftFrom(search: TransactionListQuery): Draft {
   return {
     accountId: search.accountId,
     categoryId: search.categoryId,
+    groupId: search.groupId,
     merchantId: search.merchantId,
     tagId: search.tagId,
     from: search.from,
@@ -68,7 +71,7 @@ function applySort(value: string): Partial<TransactionListQuery> {
   return { sort: column, dir };
 }
 
-export function TransactionFilterBar({ search, accounts, categories, merchants, tags, onChange }: TransactionFilterBarProps) {
+export function TransactionFilterBar({ search, accounts, categories, groups, merchants, tags, onChange }: TransactionFilterBarProps) {
   const [text, setText] = useState(search.q ?? "");
   const [seenQuery, setSeenQuery] = useState(search.q);
   const [draft, setDraft] = useState<Draft>(() => draftFrom(search));
@@ -103,13 +106,26 @@ export function TransactionFilterBar({ search, accounts, categories, merchants, 
   if (search.categoryId && categoryName) {
     badges.push({ key: "category", label: `Category: ${categoryName}`, onRemove: () => onChange({ categoryId: undefined }) });
   }
-  const merchantName = nameOf(merchants, search.merchantId);
-  if (search.merchantId && merchantName) {
-    badges.push({ key: "merchant", label: `Merchant: ${merchantName}`, onRemove: () => onChange({ merchantId: undefined }) });
+  if (search.groupId === "none") {
+    badges.push({ key: "group", label: "Group: No group", onRemove: () => onChange({ groupId: undefined }) });
+  } else if (search.groupId) {
+    badges.push({ key: "group", label: `Group: ${nameOf(groups, search.groupId) ?? "Group"}`, onRemove: () => onChange({ groupId: undefined }) });
   }
-  const tagName = nameOf(tags, search.tagId);
-  if (search.tagId && tagName) {
-    badges.push({ key: "tag", label: `Tag: ${tagName}`, onRemove: () => onChange({ tagId: undefined }) });
+  if (search.merchantId === "none") {
+    badges.push({ key: "merchant", label: "Merchant: No merchant", onRemove: () => onChange({ merchantId: undefined }) });
+  } else {
+    const merchantName = nameOf(merchants, search.merchantId);
+    if (search.merchantId && merchantName) {
+      badges.push({ key: "merchant", label: `Merchant: ${merchantName}`, onRemove: () => onChange({ merchantId: undefined }) });
+    }
+  }
+  if (search.tagId === "none") {
+    badges.push({ key: "tag", label: "Tag: No tag", onRemove: () => onChange({ tagId: undefined }) });
+  } else {
+    const tagName = nameOf(tags, search.tagId);
+    if (search.tagId && tagName) {
+      badges.push({ key: "tag", label: `Tag: ${tagName}`, onRemove: () => onChange({ tagId: undefined }) });
+    }
   }
   if (search.from) {
     badges.push({ key: "from", label: `From: ${formatDate(search.from)}`, onRemove: () => onChange({ from: undefined }) });
@@ -128,6 +144,7 @@ export function TransactionFilterBar({ search, accounts, categories, merchants, 
     onChange({
       accountId: draft.accountId,
       categoryId: draft.categoryId,
+      groupId: draft.groupId,
       merchantId: draft.merchantId,
       tagId: draft.tagId,
       from: draft.from,
@@ -141,6 +158,7 @@ export function TransactionFilterBar({ search, accounts, categories, merchants, 
     onChange({
       accountId: undefined,
       categoryId: undefined,
+      groupId: undefined,
       merchantId: undefined,
       tagId: undefined,
       from: undefined,
@@ -201,11 +219,22 @@ export function TransactionFilterBar({ search, accounts, categories, merchants, 
             />
           </Field>
           <Field>
+            <FieldLabel htmlFor="filter-group">Group</FieldLabel>
+            <OptionCombobox
+              id="filter-group"
+              value={draft.groupId ?? null}
+              options={[{ id: "none", label: "No group" }, ...groups.map((group) => ({ id: group.id, label: group.name }))]}
+              placeholder="Any group"
+              emptyLabel="Any group"
+              onChange={(groupId) => setDraft({ ...draft, groupId: groupId ?? undefined })}
+            />
+          </Field>
+          <Field>
             <FieldLabel htmlFor="filter-merchant">Merchant</FieldLabel>
             <OptionCombobox
               id="filter-merchant"
               value={draft.merchantId ?? null}
-              options={merchants.map((merchant) => ({ id: merchant.id, label: merchant.name }))}
+              options={[{ id: "none", label: "No merchant" }, ...merchants.map((merchant) => ({ id: merchant.id, label: merchant.name }))]}
               placeholder="Any merchant"
               emptyLabel="Any merchant"
               onChange={(merchantId) => setDraft({ ...draft, merchantId: merchantId ?? undefined })}
@@ -216,7 +245,7 @@ export function TransactionFilterBar({ search, accounts, categories, merchants, 
             <OptionCombobox
               id="filter-tag"
               value={draft.tagId ?? null}
-              options={namedOptions(tags)}
+              options={[{ id: "none", label: "No tag" }, ...namedOptions(tags)]}
               placeholder="Any tag"
               emptyLabel="Any tag"
               onChange={(tagId) => setDraft({ ...draft, tagId: tagId ?? undefined })}

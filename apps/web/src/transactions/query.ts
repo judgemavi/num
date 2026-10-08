@@ -23,6 +23,9 @@ export function transactionPath(search: TransactionListQuery): string {
   if (search.categoryId) {
     params.set("categoryId", search.categoryId);
   }
+  if (search.groupId) {
+    params.set("groupId", search.groupId);
+  }
   if (search.merchantId) {
     params.set("merchantId", search.merchantId);
   }
@@ -50,6 +53,7 @@ export function hasFilters(search: TransactionListQuery): boolean {
     search.q ||
       search.accountId ||
       search.categoryId ||
+      search.groupId ||
       search.merchantId ||
       search.tagId ||
       search.from ||

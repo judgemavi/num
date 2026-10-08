@@ -1,4 +1,4 @@
-import { accounts, buckets, categories, occurrenceLinks, recurringPlans, transactionLines, transactions } from "@num/db";
+import { accounts, buckets, occurrenceLinks, recurringPlans, transactions } from "@num/db";
 import {
   accountKinds,
   buildMonthStory,
@@ -18,11 +18,12 @@ import {
   type StoryLine,
   type StoryOccurrence,
 } from "@num/shared";
-import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import { isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
 import { balanceAsOf } from "./forecast";
+import { loadLedgerLines } from "./ledger-lines";
 
 type PlanRow = typeof recurringPlans.$inferSelect;
 
@@ -31,13 +32,6 @@ function asAccountKind(value: string): AccountKind {
     throw new Error("Unknown account kind");
   }
   return value as AccountKind;
-}
-
-function asCategoryKind(value: string | null): StoryLine["kind"] {
-  if (value === "income" || value === "expense") {
-    return value;
-  }
-  return null;
 }
 
 function scheduleOf(row: PlanRow): PlanSchedule {
@@ -76,26 +70,13 @@ export function onBudgetTotal(db: Db, asOf: string): number {
 }
 
 function storyLines(db: Db, from: string, through: string): StoryLine[] {
-  return db
-    .select({
-      date: transactions.date,
-      amount: transactionLines.amount,
-      categoryId: transactionLines.categoryId,
-      kind: categories.kind,
-      transferAccountId: transactionLines.transferAccountId,
-    })
-    .from(transactionLines)
-    .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
-    .leftJoin(categories, eq(transactionLines.categoryId, categories.id))
-    .where(and(isNull(transactions.deletedAt), gte(transactions.date, from), lte(transactions.date, through)))
-    .all()
-    .map((row) => ({
-      month: row.date.slice(0, 7),
-      amount: row.amount,
-      categoryId: row.categoryId,
-      kind: asCategoryKind(row.kind),
-      transfer: row.transferAccountId !== null,
-    }));
+  return loadLedgerLines(db, { from, through }).map((row) => ({
+    month: row.month,
+    amount: row.amount,
+    categoryId: row.categoryId,
+    kind: row.kind,
+    transfer: row.transfer,
+  }));
 }
 
 function storyOccurrences(db: Db, month: string, through: string): StoryOccurrence[] {

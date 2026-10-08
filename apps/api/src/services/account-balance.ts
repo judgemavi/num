@@ -1,6 +1,6 @@
 import { transactions, valuations } from "@num/db";
 import type { AccountKind } from "@num/shared";
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { integerSum } from "../integer-sum";
 import { accountBalance } from "./account-rules";
@@ -15,14 +15,14 @@ function readSum(row: { total: unknown } | undefined): number {
   return integerSum(row.total);
 }
 
-export function transactionTotals(db: Reader): Map<string, number> {
+export function transactionTotals(db: Reader, asOf?: string): Map<string, number> {
   const rows = db
     .select({
       accountId: transactions.accountId,
       total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)`,
     })
     .from(transactions)
-    .where(isNull(transactions.deletedAt))
+    .where(and(isNull(transactions.deletedAt), asOf ? lte(transactions.date, asOf) : undefined))
     .groupBy(transactions.accountId)
     .all();
   const totals = new Map<string, number>();
@@ -32,18 +32,25 @@ export function transactionTotals(db: Reader): Map<string, number> {
   return totals;
 }
 
-function sumAfter(db: Reader, accountId: string, date: string): number {
+function sumAfter(db: Reader, accountId: string, date: string, asOf?: string): number {
   const row = db
     .select({
       total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)`,
     })
     .from(transactions)
-    .where(and(eq(transactions.accountId, accountId), isNull(transactions.deletedAt), gt(transactions.date, date)))
+    .where(
+      and(
+        eq(transactions.accountId, accountId),
+        isNull(transactions.deletedAt),
+        gt(transactions.date, date),
+        asOf ? lte(transactions.date, asOf) : undefined,
+      ),
+    )
     .get();
   return readSum(row);
 }
 
-export function latestValuations(db: Reader): Map<string, { date: string; balance: number }> {
+export function latestValuations(db: Reader, asOf?: string): Map<string, { date: string; balance: number }> {
   const rows = db
     .select({
       accountId: valuations.accountId,
@@ -51,7 +58,7 @@ export function latestValuations(db: Reader): Map<string, { date: string; balanc
       balance: valuations.balance,
     })
     .from(valuations)
-    .where(isNull(valuations.deletedAt))
+    .where(and(isNull(valuations.deletedAt), asOf ? lte(valuations.date, asOf) : undefined))
     .all();
   const latest = new Map<string, { date: string; balance: number }>();
   for (const row of rows) {
@@ -68,14 +75,15 @@ export function balanceOf(
   row: { id: string; kind: AccountKind; openingBalance: number },
   totals?: Map<string, number>,
   latest?: Map<string, { date: string; balance: number }>,
+  asOf?: string,
 ): number {
-  const valuation = (latest ?? latestValuations(db)).get(row.id) ?? null;
+  const valuation = (latest ?? latestValuations(db, asOf)).get(row.id) ?? null;
   return accountBalance({
     kind: row.kind,
     openingBalance: row.openingBalance,
-    transactionTotal: (totals ?? transactionTotals(db)).get(row.id) ?? 0,
+    transactionTotal: (totals ?? transactionTotals(db, asOf)).get(row.id) ?? 0,
     valuation: valuation
-      ? { balance: valuation.balance, transactionsAfter: sumAfter(db, row.id, valuation.date) }
+      ? { balance: valuation.balance, transactionsAfter: sumAfter(db, row.id, valuation.date, asOf) }
       : null,
   });
 }

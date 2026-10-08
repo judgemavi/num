@@ -10,10 +10,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
-import { PaydayIllustration } from "@/components/illustrations";
 import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
-import { SidePanel } from "@/components/side-panel";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,8 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBookCurrency, useCategories, useGroups, useMerchants, useTags } from "@/editors/lookups";
 import { monthTitle } from "@/insights/format";
-import { InsightsChart } from "@/insights/insights-chart";
 import { formatMoney } from "@/money";
+import { ForecastChart } from "@/plan/forecast-chart";
 import { apiRequest } from "@/request";
 import { OptionCombobox } from "@/transactions/option-combobox";
 
@@ -149,8 +147,9 @@ export function InsightsScreen() {
         from: data.from,
         to: data.to,
         categoryId: by === "category" && row.kind === "item" ? (row.id ?? undefined) : undefined,
-        merchantId: by === "merchant" && row.kind === "item" ? (row.id ?? undefined) : undefined,
-        tagId: by === "tag" && row.kind === "item" ? (row.id ?? undefined) : undefined,
+        groupId: by === "group" ? (row.kind === "none" ? "none" : (row.id ?? undefined)) : undefined,
+        merchantId: by === "merchant" ? (row.kind === "none" ? "none" : (row.id ?? undefined)) : undefined,
+        tagId: by === "tag" ? (row.kind === "none" ? "none" : (row.id ?? undefined)) : undefined,
       },
     });
   }
@@ -232,7 +231,6 @@ export function InsightsScreen() {
       ) : null}
       {data ? (
         <SummaryStrip
-          tint="plan"
           label="Spending"
           amount={<Amount currency={bookCurrency} minor={data.spending} hero />}
           hint={rangeText(data.from, data.to)}
@@ -246,31 +244,20 @@ export function InsightsScreen() {
               </Fact>
             </>
           }
-          illustration={<PaydayIllustration />}
         />
       ) : null}
       {data ? (
         <Card>
           <CardContent className="grid gap-2 p-5 md:p-6">
             <h2 className="text-base font-bold">{data.categoryTrend ? `${trendName ?? "Category"}, 12 months` : "Spending and income, 12 months"}</h2>
-            <InsightsChart currency={bookCurrency} label={trendLabel} months={data.trend.map((point) => point.month)} series={trendSeries} />
+            <ForecastChart currency={bookCurrency} label={trendLabel} dates={data.trend.map((point) => point.month)} series={trendSeries} />
           </CardContent>
         </Card>
       ) : null}
       {data ? (
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
-          <ListCard label="Spending" title={breakdowns.find((item) => item.id === by)?.label ?? "Category"}>
-            {data.rows.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">No spending in this period.</p> : null}
-            {data.rows.map((row) => (
-              <ListRow key={`${row.kind}-${row.id ?? "none"}`} onOpen={() => openTransactions(row)}>
-                <span className={listName}>{rowLabel(row, by, names)}</span>
-                <span className={listAmt}>
-                  <Amount currency={bookCurrency} minor={row.amount} />
-                </span>
-              </ListRow>
-            ))}
-          </ListCard>
-          <SidePanel title="Net worth" text="Assets minus liabilities at each month end.">
+        <Card>
+          <CardContent className="grid gap-2 p-5 md:p-6">
+            <h2 className="text-base font-bold">Net worth, 24 months</h2>
             {latest ? <Amount currency={bookCurrency} minor={latest.net} /> : null}
             {firstWorth ? (
               <p className={`text-sm font-semibold ${worthDelta > 0 ? "text-pos" : worthDelta < 0 ? "text-attn" : ""}`}>
@@ -278,14 +265,28 @@ export function InsightsScreen() {
                 {formatMoney(bookCurrency, worthDelta < 0 ? -worthDelta : worthDelta)} since {monthTitle(firstWorth.month)}.
               </p>
             ) : null}
-            <InsightsChart
+            <ForecastChart
               currency={bookCurrency}
-              label={`Net worth for 24 months. Latest ${formatMoney(bookCurrency, latest?.net ?? 0)} on ${latest?.date ?? asOf}.`}
-              months={data.netWorth.map((point) => point.month)}
+              label={`Net worth for 24 months. Latest ${formatMoney(bookCurrency, latest?.net ?? 0)}.`}
+              dates={data.netWorth.map((point) => point.month)}
               series={[{ name: "Net worth", amounts: data.netWorth.map((point) => point.net) }]}
             />
-          </SidePanel>
-        </div>
+          </CardContent>
+        </Card>
+      ) : null}
+      {data ? (
+        <ListCard label="Spending" title={breakdowns.find((item) => item.id === by)?.label ?? "Category"}>
+          {data.rows.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">No spending in this period.</p> : null}
+          {data.rows.map((row) => (
+            <ListRow key={`${row.kind}-${row.id ?? "none"}`} onOpen={() => openTransactions(row)}>
+              <span className={listName}>{rowLabel(row, by, names)}</span>
+              <span className={listAmt}>
+                <Amount currency={bookCurrency} minor={row.amount} />
+                {row.kind === "uncategorized" ? <small>In {formatMoney(bookCurrency, row.inflow ?? 0)}</small> : null}
+              </span>
+            </ListRow>
+          ))}
+        </ListCard>
       ) : null}
     </>
   );

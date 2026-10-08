@@ -40,6 +40,7 @@ const rowSchema = z.object({
   id: z.uuid().nullable(),
   kind: z.enum(insightRowKinds),
   amount: cents,
+  inflow: cents.nullable(),
 });
 
 const monthPoint = z.object({

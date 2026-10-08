@@ -125,7 +125,7 @@ test("an investment or property balance uses the latest valuation and later tran
     const mortgage = createAccount(book.db, base("mortgage", -20_000));
     addValuation(book.db, mortgage.id, "2026-06-01", -15_000);
     addTransaction(book.db, mortgage.id, "2026-07-01", 500);
-    expect(balanceOf(book.db, mortgage.id)).toBe(-19_500);
+    expect(balanceOf(book.db, mortgage.id)).toBe(-14_500);
   } finally {
     book.close();
   }

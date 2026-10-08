@@ -10,7 +10,6 @@ import {
   settings,
   transactionLines,
   transactions,
-  valuations,
 } from "@num/db";
 import {
   accountKinds,
@@ -37,7 +36,7 @@ import {
 } from "@num/shared";
 import { and, eq, gt, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
+import { balanceOf } from "./account-balance";
 import { storeForecastSnapshot } from "./forecast-snapshot";
 import { ServiceError } from "../service-error";
 import { type AuditSource } from "./write";
@@ -129,44 +128,7 @@ export function balanceAsOf(
   account: { id: string; kind: AccountKind; openingBalance: number },
   asOf?: string,
 ): number {
-  const total = db
-    .select({ total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)` })
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.accountId, account.id),
-        isNull(transactions.deletedAt),
-        asOf ? lte(transactions.date, asOf) : undefined,
-      ),
-    )
-    .get();
-  if (account.kind !== "investment" && account.kind !== "property") {
-    return account.openingBalance + integerSum(total?.total);
-  }
-  const marks = db
-    .select({ date: valuations.date, balance: valuations.balance })
-    .from(valuations)
-    .where(
-      and(eq(valuations.accountId, account.id), isNull(valuations.deletedAt), asOf ? lte(valuations.date, asOf) : undefined),
-    )
-    .all();
-  const latest = marks.sort((left, right) => (left.date < right.date ? 1 : -1))[0];
-  if (!latest) {
-    return account.openingBalance + integerSum(total?.total);
-  }
-  const after = db
-    .select({ total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)` })
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.accountId, account.id),
-        isNull(transactions.deletedAt),
-        gt(transactions.date, latest.date),
-        asOf ? lte(transactions.date, asOf) : undefined,
-      ),
-    )
-    .get();
-  return latest.balance + integerSum(after?.total);
+  return balanceOf(db, account, undefined, undefined, asOf);
 }
 
 function planAmount(plan: PlanRow, links: { planId: string; dueDate: string; transactionId: string | null }[], amounts: Map<string, number>, asOf: string): number {

@@ -118,10 +118,9 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
       </CardHeader>
       <CardContent className="grid gap-4 px-5 pt-4 pb-5">
         <p className="text-sm">
-          Balance <Amount currency={currency} minor={-row.balance} owed />
+          Balance <Amount currency={currency} minor={row.balance} owed />
           <span className="text-muted-foreground"> · {rate} · {frequencyLabels[row.paymentFrequency]}</span>
         </p>
-        <p className="text-sm text-muted-foreground">This balance comes from the payment schedule.</p>
         {row.payoffDate ? (
           <p className="text-sm">
             Payoff date {formatDay(row.payoffDate)}

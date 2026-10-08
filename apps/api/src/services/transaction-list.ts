@@ -60,8 +60,23 @@ function filters(query: TransactionListQuery): SQL {
   if (query.accountId) {
     parts.push(sql`t.account_id = ${query.accountId}`);
   }
-  if (query.merchantId) {
+  if (query.merchantId === "none") {
+    parts.push(sql`t.merchant_id is null`);
+  } else if (query.merchantId) {
     parts.push(sql`t.merchant_id = ${query.merchantId}`);
+  }
+  if (query.groupId === "none") {
+    parts.push(sql`exists (
+      select 1 from transaction_lines l
+      join categories c on c.id = l.category_id
+      where l.transaction_id = t.id and c.group_id is null
+    )`);
+  } else if (query.groupId) {
+    parts.push(sql`exists (
+      select 1 from transaction_lines l
+      join categories c on c.id = l.category_id
+      where l.transaction_id = t.id and c.group_id = ${query.groupId}
+    )`);
   }
   if (query.from) {
     parts.push(sql`t.date >= ${query.from}`);
@@ -75,7 +90,15 @@ function filters(query: TransactionListQuery): SQL {
       where l.transaction_id = t.id and l.category_id = ${query.categoryId}
     )`);
   }
-  if (query.tagId) {
+  if (query.tagId === "none") {
+    parts.push(sql`exists (
+      select 1 from transaction_lines l
+      join categories c on c.id = l.category_id
+      where l.transaction_id = t.id
+        and c.kind = 'expense'
+        and not exists (select 1 from line_tags lt where lt.line_id = l.id)
+    )`);
+  } else if (query.tagId) {
     parts.push(sql`exists (
       select 1 from transaction_lines l
       join line_tags lt on lt.line_id = l.id

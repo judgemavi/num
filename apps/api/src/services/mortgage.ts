@@ -1,6 +1,5 @@
 import { accounts, categories, mortgageTerms, valuations } from "@num/db";
 import {
-  mortgageBalanceAsOf,
   mortgageExtraEffect,
   mortgageNextPayments,
   mortgageSchedule,
@@ -13,6 +12,7 @@ import {
 } from "@num/shared";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
+import { balanceOf } from "./account-balance";
 import { ServiceError } from "../service-error";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -140,6 +140,7 @@ export function mortgageAccountView(
   asOf: string,
   options: { extra?: number; lumpSum?: number; lumpDate?: string },
 ): MortgageView {
+  const account = requireMortgage(db, accountId);
   const terms = getMortgageTerms(db, accountId);
   const checkpoints = activeValuations(db, accountId);
   const schedule = mortgageSchedule(terms, checkpoints);
@@ -147,7 +148,7 @@ export function mortgageAccountView(
   const lump = options.lumpSum && options.lumpSum > 0 && options.lumpDate ? { date: options.lumpDate, amount: options.lumpSum } : null;
   const effect = perPayment > 0 || lump ? mortgageExtraEffect(terms, checkpoints, { perPayment, lumpSum: lump }) : null;
   return {
-    balance: mortgageBalanceAsOf(terms, checkpoints, asOf),
+    balance: balanceOf(db, { id: account.id, kind: "mortgage", openingBalance: account.openingBalance }, undefined, undefined, asOf),
     rateMilliPct: terms.rateMilliPct,
     payoffDate: schedule.payoffDate,
     totalInterest: schedule.totalInterest,

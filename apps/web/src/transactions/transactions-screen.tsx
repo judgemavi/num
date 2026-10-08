@@ -29,6 +29,7 @@ import { TransactionFilterBar } from "@/transactions/filters";
 import { automaticReasonText, formatDate, statusLabel } from "@/transactions/format";
 import { hasFilters, transactionPath } from "@/transactions/query";
 import { useEditors } from "@/editors/editor-api";
+import { useGroups } from "@/editors/lookups";
 
 const transactionsRoute = getRouteApi("/transactions");
 
@@ -45,6 +46,7 @@ async function loadNamed<T extends { id: string }>(
 
 export function TransactionsScreen() {
   const search = transactionsRoute.useSearch();
+  const groups = useGroups();
   const navigate = transactionsRoute.useNavigate();
   const queryClient = useQueryClient();
   const { openEditor } = useEditors();
@@ -204,6 +206,7 @@ export function TransactionsScreen() {
         search={search}
         accounts={accounts.data}
         categories={categories.data}
+        groups={groups.data ?? []}
         merchants={merchants.data}
         tags={tags.data}
         onChange={changeFilters}

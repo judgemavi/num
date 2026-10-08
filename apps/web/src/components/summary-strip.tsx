@@ -9,19 +9,19 @@ const tints = {
 } as const;
 
 type SummaryStripProps = {
-  tint: keyof typeof tints;
+  tint?: keyof typeof tints;
   label: string;
   amount: ReactNode;
   hint?: ReactNode;
   facts?: ReactNode;
   extra?: ReactNode;
-  illustration: ReactNode;
+  illustration?: ReactNode;
 };
 
 export function SummaryStrip({ tint, label, amount, hint, facts, extra, illustration }: SummaryStripProps) {
   return (
-    <Card aria-label={label} className={`border-transparent ${tints[tint]}`}>
-      <CardContent className="grid items-center gap-6 p-5 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-8 md:px-6">
+    <Card aria-label={label} className={tint ? `border-transparent ${tints[tint]}` : undefined}>
+      <CardContent className={`grid items-center gap-6 p-5 md:gap-8 md:px-6 ${illustration ? "md:grid-cols-[auto_minmax(0,1fr)_auto]" : "md:grid-cols-[auto_minmax(0,1fr)]"}`}>
         <div>
           <CardHeader className="p-0">
             <CardTitle className="text-sm font-semibold text-muted-foreground">{label}</CardTitle>

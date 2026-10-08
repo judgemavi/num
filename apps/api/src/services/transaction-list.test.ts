@@ -6,7 +6,7 @@ import type { TransactionListQuery } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
-import { createCategory } from "./categories";
+import { createCategory, createCategoryGroup } from "./categories";
 import { createTag } from "./tags";
 import { listTransactions } from "./transaction-list";
 import { createTransaction, deleteTransaction } from "./transactions";
@@ -306,6 +306,48 @@ test("running balance is null for an investment account and present for a chequi
     const cash = listTransactions(fixture.db, { ...page, accountId: fixture.chequing.id });
     expect(cash.items).toHaveLength(1);
     expect(cash.items[0]?.runningBalance).toBe(990);
+  } finally {
+    fixture.close();
+  }
+});
+
+test("group, no merchant and no tag filters match the insights drill-down", () => {
+  const fixture = book();
+  try {
+    const home = createCategoryGroup(fixture.db, { name: "Home", ...saved });
+    const groceries = createCategory(fixture.db, { name: "Groceries", kind: "expense", groupId: home.id, ...saved });
+    const grouped = add(fixture.db, {
+      accountId: fixture.chequing.id,
+      date: "2026-02-02",
+      amount: -40,
+      payeeRaw: "Market",
+      merchantId: fixture.merchantId,
+      categoryId: groceries.id,
+      tagIds: [fixture.trip.id],
+    });
+    const loose = add(fixture.db, {
+      accountId: fixture.chequing.id,
+      date: "2026-02-03",
+      amount: -15,
+      payeeRaw: "Stand",
+      categoryId: fixture.food.id,
+    });
+    add(fixture.db, {
+      accountId: fixture.chequing.id,
+      date: "2026-02-04",
+      amount: -9,
+      payeeRaw: "Cafe",
+      merchantId: fixture.merchantId,
+      categoryId: fixture.food.id,
+      tagIds: [fixture.trip.id],
+    });
+
+    expect(listTransactions(fixture.db, { ...page, groupId: home.id }).items.map((item) => item.id)).toEqual([grouped.id]);
+    expect(listTransactions(fixture.db, { ...page, groupId: "none" }).items.map((item) => item.id)).toContain(loose.id);
+    expect(listTransactions(fixture.db, { ...page, groupId: "none" }).items.map((item) => item.id)).not.toContain(grouped.id);
+    expect(listTransactions(fixture.db, { ...page, merchantId: "none" }).items.map((item) => item.id)).toContain(loose.id);
+    expect(listTransactions(fixture.db, { ...page, merchantId: "none" }).items.map((item) => item.id)).not.toContain(grouped.id);
+    expect(listTransactions(fixture.db, { ...page, tagId: "none" }).items.map((item) => item.id)).toEqual([loose.id]);
   } finally {
     fixture.close();
   }

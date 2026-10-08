@@ -17,7 +17,8 @@ export function accountBalance(input: {
   transactionTotal: number;
   valuation: { balance: number; transactionsAfter: number } | null;
 }): number {
-  if ((input.kind === "investment" || input.kind === "property") && input.valuation) {
+  const marked = input.kind === "investment" || input.kind === "property" || input.kind === "mortgage";
+  if (marked && input.valuation) {
     return input.valuation.balance + input.valuation.transactionsAfter;
   }
   return input.openingBalance + input.transactionTotal;
