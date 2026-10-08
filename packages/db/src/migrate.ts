@@ -6,5 +6,10 @@ import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 const migrationsFolder = join(import.meta.dir, "..", "migrations");
 
 export function migrateDatabase(sqlite: Database) {
-  migrate(drizzle(sqlite), { migrationsFolder });
+  sqlite.exec("pragma foreign_keys = off");
+  try {
+    migrate(drizzle(sqlite), { migrationsFolder });
+  } finally {
+    sqlite.exec("pragma foreign_keys = on");
+  }
 }

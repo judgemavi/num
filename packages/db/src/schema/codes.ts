@@ -42,6 +42,31 @@ export const sinkingRepeats = ["none", "yearly"] as const;
 
 export const bucketEventKinds = ["fund", "move", "release"] as const;
 
+export const bucketColors = ["sky", "mint", "lilac", "butter", "pink", "teal"] as const;
+
+export const bucketIcons = [
+  "shopping-cart",
+  "utensils",
+  "fuel",
+  "smile",
+  "package",
+  "shirt",
+  "paw-print",
+  "heart",
+  "shield",
+  "gift",
+  "wrench",
+  "house",
+  "plane",
+  "car",
+  "baby",
+  "briefcase",
+  "piggy-bank",
+  "wallet",
+  "coffee",
+  "bus",
+] as const;
+
 export const importOutcomes = ["created", "matched", "duplicate", "ignored"] as const;
 
 export const proposalStatuses = ["pending", "approved", "rejected"] as const;

@@ -79,6 +79,34 @@ export {
   type Clearance,
   type ClosingHint,
 } from "./checkpoint";
+export {
+  bucketColors,
+  bucketCoverSchema,
+  bucketEventCreateSchema,
+  bucketEventKinds,
+  bucketEventSchema,
+  bucketIcons,
+  bucketKinds,
+  bucketListQuerySchema,
+  bucketListSchema,
+  bucketSchema,
+  bucketWriteSchema,
+  nextBucketColor,
+  overspentListSchema,
+  sinkingRepeats,
+  type Bucket,
+  type BucketColor,
+  type BucketCover,
+  type BucketEvent,
+  type BucketEventCreate,
+  type BucketEventKind,
+  type BucketIcon,
+  type BucketKind,
+  type BucketListQuery,
+  type BucketWrite,
+  type OverspentBucket,
+  type SinkingRepeat,
+} from "./bucket";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
 export { documentSchema, type Document } from "./document";
 export { errorCodes, errorSchema, type ErrorBody, type ErrorCode } from "./error";

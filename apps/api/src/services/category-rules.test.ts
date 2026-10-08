@@ -156,6 +156,8 @@ function addBucket(db: ReturnType<typeof tempDatabase>["db"], categoryId: string
       kind: "spending",
       priority: 1,
       essential: false,
+      color: "sky",
+      icon: "shopping-cart",
       refillTo: 100,
     })
     .run();

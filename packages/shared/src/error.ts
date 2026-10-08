@@ -56,6 +56,17 @@ export const errorCodes = [
   "transaction_already_linked",
   "link_not_found",
   "skip_not_found",
+  "bucket_not_found",
+  "bucket_archived",
+  "bucket_not_archived",
+  "bucket_fields_invalid",
+  "bucket_same",
+  "bucket_not_overspent",
+  "bucket_short",
+  "category_not_expense",
+  "category_in_bucket",
+  "event_not_found",
+  "event_undone",
   "internal_error",
 ] as const;
 

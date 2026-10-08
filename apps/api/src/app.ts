@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { dataDirectory, type Db } from "./db";
 import { registerAccounts } from "./routes/accounts";
 import { registerCheckpoints } from "./routes/checkpoints";
+import { registerBuckets } from "./routes/buckets";
 import { registerCategories } from "./routes/categories";
 import { registerDocuments } from "./routes/documents";
 import { healthRoute } from "./routes/health";
@@ -36,6 +37,7 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
   registerDocuments(app, db, options.dataDir ?? dataDirectory(undefined));
   registerAccounts(app, db);
   registerCheckpoints(app, db);
+  registerBuckets(app, db);
   registerCategories(app, db);
   registerTags(app, db);
   registerMerchants(app, db);

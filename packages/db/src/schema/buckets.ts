@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { categories } from "./categories";
-import { bucketEventKinds, bucketKinds, sinkingRepeats } from "./codes";
+import { bucketColors, bucketEventKinds, bucketIcons, bucketKinds, sinkingRepeats } from "./codes";
 import { transactions } from "./ledger";
 import { isoDate, nullOrIsoDate, nullOrOneOf, oneOf } from "./sql";
 
@@ -13,6 +13,8 @@ export const buckets = sqliteTable(
     kind: text("kind").notNull(),
     priority: integer("priority").notNull(),
     essential: integer("essential", { mode: "boolean" }).notNull(),
+    color: text("color").notNull(),
+    icon: text("icon").notNull(),
     archivedAt: text("archived_at"),
     refillTo: integer("refill_to"),
     amount: integer("amount"),
@@ -25,6 +27,8 @@ export const buckets = sqliteTable(
   },
   (table) => [
     check("buckets_kind", oneOf(table.kind, bucketKinds)),
+    check("buckets_color", oneOf(table.color, bucketColors)),
+    check("buckets_icon", oneOf(table.icon, bucketIcons)),
     check("buckets_repeat", nullOrOneOf(table.repeat, sinkingRepeats)),
     check("buckets_due_date", nullOrIsoDate(table.dueDate)),
     check("buckets_target_date", nullOrIsoDate(table.targetDate)),
