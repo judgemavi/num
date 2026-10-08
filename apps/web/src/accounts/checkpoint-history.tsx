@@ -22,9 +22,10 @@ import { formatDate } from "@/transactions/format";
 type CheckpointHistoryProps = {
   accountId: string;
   currency: string;
+  owed: boolean;
 };
 
-export function CheckpointHistory({ accountId, currency }: CheckpointHistoryProps) {
+export function CheckpointHistory({ accountId, currency, owed }: CheckpointHistoryProps) {
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<Checkpoint | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export function CheckpointHistory({ accountId, currency }: CheckpointHistoryProp
     setPending(null);
     await queryClient.invalidateQueries({ queryKey: ["checkpoints", accountId] });
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    await queryClient.invalidateQueries({ queryKey: ["reconcile", accountId] });
     await queryClient.invalidateQueries({ queryKey: ["account", accountId] });
   }
 
@@ -76,7 +78,7 @@ export function CheckpointHistory({ accountId, currency }: CheckpointHistoryProp
             </div>
             {item.unlockedAt ? <Badge variant="neutral">Unlocked</Badge> : null}
             <div className="ml-auto text-right">
-              <Amount currency={currency} minor={item.statementBalance} />
+              <Amount currency={currency} minor={item.statementBalance} owed={owed} />
             </div>
             {item.unlockedAt ? null : (
               <RowMenu label={`Actions for the checkpoint on ${formatDate(item.date)}`}>

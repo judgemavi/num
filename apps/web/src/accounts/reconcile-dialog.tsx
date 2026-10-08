@@ -5,12 +5,11 @@ import {
   checkpointSchema,
   closingHintSchema,
   fromMinorUnits,
+  printedStatementBalance,
+  storedStatementBalance,
   toMinorUnits,
-  transactionListSchema,
   type AccountKind,
   type CheckpointCompare,
-  type CheckpointHelp,
-  type TransactionListItem,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -26,7 +25,6 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/request";
 import { formatDate } from "@/transactions/format";
-import { transactionPath } from "@/transactions/query";
 
 type ReconcileDialogProps = {
   accountId: string;
@@ -34,36 +32,6 @@ type ReconcileDialogProps = {
   kind: AccountKind;
   onClose: () => void;
 };
-
-function helpTransactions(items: TransactionListItem[], help: CheckpointHelp[]) {
-  const byId = new Map(items.map((item) => [item.id, item]));
-  return {
-    uncleared: help.flatMap((item) => (item.code === "uncleared" ? [byId.get(item.transactionId)] : [])),
-    duplicates: help.flatMap((item) =>
-      item.code === "duplicate" ? [[byId.get(item.transactionIds[0]), byId.get(item.transactionIds[1])] as const] : [],
-    ),
-    gaps: help.flatMap((item) => (item.code === "gap" ? [item] : [])),
-  };
-}
-
-async function loadTransactions(accountId: string): Promise<TransactionListItem[]> {
-  const items: TransactionListItem[] = [];
-  let page = 1;
-  for (;;) {
-    const result = await apiRequest(
-      transactionPath({ page, pageSize: 200, accountId, uncategorized: false }),
-      transactionListSchema,
-    );
-    if (!result.ok) {
-      throw new Error(result.code);
-    }
-    items.push(...result.data.items);
-    if (items.length >= result.data.total || result.data.items.length === 0) {
-      return items;
-    }
-    page += 1;
-  }
-}
 
 export function ReconcileDialog({ accountId, currency, kind, onClose }: ReconcileDialogProps) {
   const queryClient = useQueryClient();
@@ -88,20 +56,14 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
   if (!seeded && hint.data) {
     if (hint.data.closingDate !== null && hint.data.closingBalance !== null) {
       setDate(hint.data.closingDate);
-      setAmount(fromMinorUnits(currency, hint.data.closingBalance));
+      setAmount(fromMinorUnits(currency, printedStatementBalance(kind, hint.data.closingBalance)));
     }
     setSeeded(true);
   }
 
-  const known = useQuery({
-    queryKey: ["reconcile-transactions", accountId],
-    enabled: compare !== null && !compare.balanced,
-    queryFn: () => loadTransactions(accountId),
-  });
-
   function parsedAmount(): number | null {
     try {
-      return toMinorUnits(currency, amount.trim());
+      return storedStatementBalance(kind, toMinorUnits(currency, amount.trim()));
     } catch {
       return null;
     }
@@ -174,6 +136,7 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
       await queryClient.invalidateQueries({ queryKey: ["account", accountId] });
       await queryClient.invalidateQueries({ queryKey: ["accounts"] });
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      await queryClient.invalidateQueries({ queryKey: ["reconcile", accountId] });
       onClose();
     } catch {
       setError("The checkpoint did not save. Try again.");
@@ -182,9 +145,11 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
     }
   }
 
-  const lists =
-    compare && !compare.balanced && known.data ? helpTransactions(known.data, compare.help) : null;
   const owed = accountClass(kind) === "liability";
+  const help = compare && !compare.balanced ? compare.help : [];
+  const uncleared = help.flatMap((item) => (item.code === "uncleared" ? [item.transaction] : []));
+  const duplicates = help.flatMap((item) => (item.code === "duplicate" ? [item.transactions] : []));
+  const gaps = help.flatMap((item) => (item.code === "gap" ? [item] : []));
 
   return (
     <>
@@ -217,7 +182,7 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
           />
         </Field>
         <Field>
-          <FieldLabel htmlFor="statement-balance">Statement balance</FieldLabel>
+          <FieldLabel htmlFor="statement-balance">{owed ? "Amount you owed" : "Statement balance"}</FieldLabel>
           <Input
             id="statement-balance"
             inputMode="decimal"
@@ -229,7 +194,7 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
             }}
           />
           <FieldDescription>
-            {owed ? "Use a minus sign for money you owe. Example: -12.50" : "Example: 12.50"}
+            {owed ? "Enter the amount on the statement. Example: 12.50" : "Example: 12.50"}
           </FieldDescription>
         </Field>
         {compare?.balanced ? (
@@ -243,39 +208,36 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
               The book is off by <Amount currency={currency} minor={compare.difference} />. The book balance is{" "}
               <Amount currency={currency} minor={compare.calculatedBalance} owed={owed} />.
             </p>
-            {lists && lists.uncleared.length > 0 ? (
+            {uncleared.length > 0 ? (
               <div>
                 <h3 className="text-sm font-semibold">Uncleared</h3>
                 <ul className="mt-1 grid gap-1 text-sm text-muted-foreground">
-                  {lists.uncleared.map((item) =>
-                    item ? (
-                      <li key={item.id}>
-                        {item.payeeRaw} · {formatDate(item.date)} · <Amount currency={currency} minor={item.amount} />
-                      </li>
-                    ) : null,
-                  )}
-                </ul>
-              </div>
-            ) : null}
-            {lists && lists.duplicates.length > 0 ? (
-              <div>
-                <h3 className="text-sm font-semibold">Possible duplicates</h3>
-                <ul className="mt-1 grid gap-1 text-sm text-muted-foreground">
-                  {lists.duplicates.map((pair) => (
-                    <li key={`${pair[0]?.id ?? "missing"}-${pair[1]?.id ?? "missing"}`}>
-                      {pair[0] ? `${pair[0].payeeRaw} · ${formatDate(pair[0].date)}` : "A transaction"} and{" "}
-                      {pair[1] ? `${pair[1].payeeRaw} · ${formatDate(pair[1].date)}` : "a transaction"} have the same
-                      amount.
+                  {uncleared.map((item) => (
+                    <li key={item.id}>
+                      {item.payee} · {formatDate(item.date)} · <Amount currency={currency} minor={item.amount} />
                     </li>
                   ))}
                 </ul>
               </div>
             ) : null}
-            {lists && lists.gaps.length > 0 ? (
+            {duplicates.length > 0 ? (
+              <div>
+                <h3 className="text-sm font-semibold">Possible duplicates</h3>
+                <ul className="mt-1 grid gap-1 text-sm text-muted-foreground">
+                  {duplicates.map((pair) => (
+                    <li key={`${pair[0].id}-${pair[1].id}`}>
+                      {pair[0].payee} · {formatDate(pair[0].date)} and {pair[1].payee} · {formatDate(pair[1].date)} have
+                      the same amount.
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {gaps.length > 0 ? (
               <div>
                 <h3 className="text-sm font-semibold">No transactions</h3>
                 <ul className="mt-1 grid gap-1 text-sm text-muted-foreground">
-                  {lists.gaps.map((gap) => (
+                  {gaps.map((gap) => (
                     <li key={`${gap.from}-${gap.to}`}>
                       {formatDate(gap.from)} – {formatDate(gap.to)}
                     </li>
@@ -283,7 +245,7 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
                 </ul>
               </div>
             ) : null}
-            {lists && lists.uncleared.length === 0 && lists.duplicates.length === 0 && lists.gaps.length === 0 ? (
+            {uncleared.length === 0 && duplicates.length === 0 && gaps.length === 0 ? (
               <p className="text-sm text-muted-foreground">No uncleared transactions, duplicates, or gaps were found.</p>
             ) : null}
           </div>

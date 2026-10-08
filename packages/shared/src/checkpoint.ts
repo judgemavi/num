@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { accountClass, type AccountKind } from "./account";
 import { isoDateSchema } from "./date";
 import { transactionInputStatuses } from "./transaction";
 import { isUtcTimestamp } from "./time";
@@ -19,14 +20,21 @@ export const checkpointSchema = z.object({
   unlockedAt: z.string().refine(isUtcTimestamp).nullable(),
 });
 
+export const checkpointHelpRowSchema = z.object({
+  id: z.uuid(),
+  date: isoDateSchema,
+  payee: z.string(),
+  amount: centsSchema,
+});
+
 export const checkpointHelpSchema = z.discriminatedUnion("code", [
   z.object({
     code: z.literal("uncleared"),
-    transactionId: z.uuid(),
+    transaction: checkpointHelpRowSchema,
   }),
   z.object({
     code: z.literal("duplicate"),
-    transactionIds: z.tuple([z.uuid(), z.uuid()]),
+    transactions: z.tuple([checkpointHelpRowSchema, checkpointHelpRowSchema]),
   }),
   z.object({
     code: z.literal("gap"),
@@ -34,6 +42,14 @@ export const checkpointHelpSchema = z.discriminatedUnion("code", [
     to: isoDateSchema,
   }),
 ]);
+
+export function storedStatementBalance(kind: AccountKind, printedMinor: number): number {
+  return accountClass(kind) === "liability" ? -printedMinor : printedMinor;
+}
+
+export function printedStatementBalance(kind: AccountKind, storedMinor: number): number {
+  return accountClass(kind) === "liability" ? -storedMinor : storedMinor;
+}
 
 export const checkpointCompareSchema = z.object({
   balanced: z.boolean(),

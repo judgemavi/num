@@ -69,6 +69,8 @@ export {
   clearanceResultSchema,
   clearanceSchema,
   closingHintSchema,
+  printedStatementBalance,
+  storedStatementBalance,
   type AccountActivityQuery,
   type Checkpoint,
   type CheckpointCompare,

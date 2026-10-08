@@ -9,7 +9,12 @@ export type HelpTransaction = {
   date: string;
   amount: number;
   status: string;
+  payee: string;
 };
+
+function inWindow(row: HelpTransaction, openingDate: string, statementDate: string): boolean {
+  return row.date >= openingDate && row.date <= statementDate;
+}
 
 function addDays(iso: string, days: number): string {
   return Temporal.PlainDate.from(iso).add({ days }).toString();
@@ -57,12 +62,15 @@ export function checkpointHelp(input: {
   statementDate: string;
   transactions: HelpTransaction[];
 }): CheckpointHelp[] {
-  const rows = [...input.transactions].sort(byDateThenId);
+  const rows = input.transactions.filter((row) => inWindow(row, input.openingDate, input.statementDate)).sort(byDateThenId);
   const help: CheckpointHelp[] = [];
 
   for (const row of rows) {
     if (row.status === "open" && dayDistance(row.date, input.statementDate) <= unclearedWindowDays) {
-      help.push({ code: "uncleared", transactionId: row.id });
+      help.push({
+        code: "uncleared",
+        transaction: { id: row.id, date: row.date, payee: row.payee, amount: row.amount },
+      });
     }
   }
 
@@ -92,7 +100,13 @@ export function checkpointHelp(input: {
         if (dayDistance(left.date, right.date) > duplicateWindowDays) {
           break;
         }
-        help.push({ code: "duplicate", transactionIds: [left.id, right.id] });
+        help.push({
+          code: "duplicate",
+          transactions: [
+            { id: left.id, date: left.date, payee: left.payee, amount: left.amount },
+            { id: right.id, date: right.date, payee: right.payee, amount: right.amount },
+          ],
+        });
       }
     }
   }

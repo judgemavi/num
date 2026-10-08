@@ -10,6 +10,8 @@ import { apiRequest } from "@/request";
 import { formatDate, statusLabel } from "@/transactions/format";
 import { transactionPath } from "@/transactions/query";
 
+const selectionLimit = 200;
+
 type AccountTransactionsProps = {
   accountId: string;
   currency: string;
@@ -17,9 +19,30 @@ type AccountTransactionsProps = {
   onPage: (page: number) => void;
 };
 
+function withLimit(current: string[], ids: string[], on: boolean): { next: string[]; capped: boolean } {
+  if (!on) {
+    const drop = new Set(ids);
+    return { next: current.filter((id) => !drop.has(id)), capped: false };
+  }
+  const next = [...current];
+  let capped = false;
+  for (const id of ids) {
+    if (next.includes(id)) {
+      continue;
+    }
+    if (next.length >= selectionLimit) {
+      capped = true;
+      break;
+    }
+    next.push(id);
+  }
+  return { next, capped };
+}
+
 export function AccountTransactions({ accountId, currency, page, onPage }: AccountTransactionsProps) {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string[]>([]);
+  const [capped, setCapped] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -42,23 +65,21 @@ export function AccountTransactions({ accountId, currency, page, onPage }: Accou
   const selectedOnPage = selectable.filter((row) => selected.includes(row.id));
   const lastPage = transactions.data ? Math.max(1, Math.ceil(transactions.data.total / transactions.data.pageSize)) : 1;
 
+  function applySelection(ids: string[], on: boolean) {
+    const result = withLimit(selected, ids, on);
+    setCapped(result.capped);
+    setSelected(result.next);
+  }
+
   function toggle(id: string, on: boolean) {
-    setSelected((current) => {
-      if (on) {
-        return current.includes(id) ? current : [...current, id];
-      }
-      return current.filter((item) => item !== id);
-    });
+    applySelection([id], on);
   }
 
   function togglePage(on: boolean) {
-    const ids = selectable.map((row) => row.id);
-    setSelected((current) => {
-      if (on) {
-        return [...new Set([...current, ...ids])];
-      }
-      return current.filter((id) => !ids.includes(id));
-    });
+    applySelection(
+      selectable.map((row) => row.id),
+      on,
+    );
   }
 
   async function mark(status: "open" | "cleared") {
@@ -82,7 +103,9 @@ export function AccountTransactions({ accountId, currency, page, onPage }: Accou
         return;
       }
       setSelected([]);
+      setCapped(false);
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      await queryClient.invalidateQueries({ queryKey: ["reconcile", accountId] });
     } catch {
       setError("The transactions did not update. Try again.");
     } finally {
@@ -133,6 +156,11 @@ export function AccountTransactions({ accountId, currency, page, onPage }: Accou
           onChecked={(on) => toggle(row.id, on)}
         />
       ))}
+      {capped || selected.length >= selectionLimit ? (
+        <p role="status" className="px-5 py-3 text-sm text-muted-foreground">
+          You can mark 200 transactions at a time.
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" className="px-5 py-3 text-sm text-attn">
           {error}

@@ -7,7 +7,7 @@ import {
   type CheckpointCompare,
   type ClosingHint,
 } from "@num/shared";
-import { and, eq, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { calculatedBalance } from "./checkpoint-balance";
@@ -74,16 +74,24 @@ function snapshot(row: Checkpoint) {
   };
 }
 
-function helpTransactions(db: Reader, accountId: string) {
+function helpTransactions(db: Reader, accountId: string, openingDate: string, statementDate: string) {
   return db
     .select({
       id: transactions.id,
       date: transactions.date,
       amount: transactions.amount,
       status: transactions.status,
+      payee: transactions.payeeRaw,
     })
     .from(transactions)
-    .where(and(eq(transactions.accountId, accountId), isNull(transactions.deletedAt)))
+    .where(
+      and(
+        eq(transactions.accountId, accountId),
+        isNull(transactions.deletedAt),
+        gte(transactions.date, openingDate),
+        lte(transactions.date, statementDate),
+      ),
+    )
     .all();
 }
 
@@ -106,7 +114,7 @@ export function compareCheckpoint(
         : checkpointHelp({
             openingDate: account.openingDate,
             statementDate: input.date,
-            transactions: helpTransactions(db, accountId),
+            transactions: helpTransactions(db, accountId, account.openingDate, input.date),
           }),
   };
 }

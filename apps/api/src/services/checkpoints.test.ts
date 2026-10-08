@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditLog, migrateDatabase, openDatabase } from "@num/db";
-import type { ErrorCode, TransactionCreate, TransactionLineInput } from "@num/shared";
+import { auditLog, migrateDatabase, openDatabase, valuations } from "@num/db";
+import { storedStatementBalance, type ErrorCode, type TransactionCreate, type TransactionLineInput } from "@num/shared";
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -143,6 +143,8 @@ test("a checkpoint is created only when the balances are equal, and only rows on
     expect(unlocks[0]?.entityId).toBe(createdId);
     expect(unlocks[0]?.source).toBe("ui");
 
+    expectCode(() => unlockCheckpoint(book.db, chequing.id, createdId, saved), "checkpoint_unlocked");
+
     const edited = updateTransaction(book.db, onDate.id, entry(chequing.id, -301, "2026-02-15"));
     expect(edited.amount).toBe(-301);
     const cleared = setClearance(book.db, chequing.id, { transactionIds: [before.id], status: "open", ...saved });
@@ -164,10 +166,121 @@ test("difference help finds a duplicate and a gap", () => {
     expect(result.balanced).toBe(false);
     expect(result.calculatedBalance).toBe(-250);
     expect(result.difference).toBe(-250);
-    expect(result.help).toContainEqual({ code: "duplicate", transactionIds: [first.id, copy.id] });
+    expect(result.help).toContainEqual({
+      code: "duplicate",
+      transactions: [
+        { id: first.id, date: "2026-01-02", payee: "Example shop", amount: -100 },
+        { id: copy.id, date: "2026-01-04", payee: "Example shop", amount: -100 },
+      ],
+    });
     expect(result.help).toContainEqual({ code: "gap", from: "2026-01-05", to: "2026-01-24" });
-    expect(result.help).toContainEqual({ code: "uncleared", transactionId: later.id });
-    expect(result.help.some((item) => item.code === "uncleared" && item.transactionId === first.id)).toBe(false);
+    expect(result.help).toContainEqual({
+      code: "uncleared",
+      transaction: { id: later.id, date: "2026-01-25", payee: "Example shop", amount: -50 },
+    });
+    expect(result.help.some((item) => item.code === "uncleared" && item.transaction.id === first.id)).toBe(false);
+  } finally {
+    book.close();
+  }
+});
+
+test("help ignores rows after the statement date", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db);
+    const onDate = createTransaction(book.db, entry(chequing.id, -40, "2026-01-25"));
+    const after = createTransaction(book.db, entry(chequing.id, -40, "2026-01-27"));
+    const laterCopy = createTransaction(book.db, entry(chequing.id, -40, "2026-01-28"));
+    const result = compareCheckpoint(book.db, chequing.id, { date: "2026-01-25", statementBalance: 0 });
+    expect(result.calculatedBalance).toBe(-40);
+    const flagged = result.help.flatMap((item) => {
+      if (item.code === "uncleared") {
+        return [item.transaction.id];
+      }
+      if (item.code === "duplicate") {
+        return [item.transactions[0].id, item.transactions[1].id];
+      }
+      return [];
+    });
+    expect(flagged).toContain(onDate.id);
+    expect(flagged).not.toContain(after.id);
+    expect(flagged).not.toContain(laterCopy.id);
+  } finally {
+    book.close();
+  }
+});
+
+test("a liability checkpoint stores the negated printed amount", () => {
+  const book = tempDatabase();
+  try {
+    const card = createAccount(book.db, {
+      name: "Card",
+      kind: "credit_card",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      paymentPolicy: "full",
+      ...saved,
+    });
+    const charge = createTransaction(book.db, entry(card.id, -180_636, "2026-02-15"));
+    const printed = 180_636;
+    const stored = storedStatementBalance(card.kind, printed);
+    expect(stored).toBe(-180_636);
+    const created = createCheckpoint(book.db, card.id, { date: "2026-02-15", statementBalance: stored, ...saved });
+    expect(created.statementBalance).toBe(-180_636);
+    expect(getTransaction(book.db, charge.id)?.status).toBe("reconciled");
+  } finally {
+    book.close();
+  }
+});
+
+test("an investment checkpoint uses the valuation and later transactions", () => {
+  const book = tempDatabase();
+  try {
+    const fund = createAccount(book.db, {
+      name: "Fund",
+      kind: "investment",
+      openingDate: "2026-01-01",
+      openingBalance: 100,
+      ...saved,
+    });
+    book.db.insert(valuations).values({ id: crypto.randomUUID(), accountId: fund.id, date: "2026-02-01", balance: 50_000 }).run();
+    const before = createTransaction(book.db, entry(fund.id, 9_999, "2026-01-15"));
+    const afterValuation = createTransaction(book.db, entry(fund.id, -1_000, "2026-02-10"));
+    const afterStatement = createTransaction(book.db, entry(fund.id, -5_000, "2026-03-01"));
+    const compared = compareCheckpoint(book.db, fund.id, { date: "2026-02-15", statementBalance: 49_000 });
+    expect(compared.balanced).toBe(true);
+    expect(compared.calculatedBalance).toBe(49_000);
+    createCheckpoint(book.db, fund.id, { date: "2026-02-15", statementBalance: 49_000, ...saved });
+    expect(getTransaction(book.db, before.id)?.status).toBe("reconciled");
+    expect(getTransaction(book.db, afterValuation.id)?.status).toBe("reconciled");
+    expect(getTransaction(book.db, afterStatement.id)?.status).toBe("open");
+  } finally {
+    book.close();
+  }
+});
+
+test("a checkpoint does not reconcile the mirror in the other account", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db);
+    const savings = createAccount(book.db, {
+      name: "Savings",
+      kind: "savings",
+      openingDate: "2026-01-01",
+      openingBalance: 0,
+      ...saved,
+    });
+    const transfer = createTransaction(book.db, {
+      ...entry(chequing.id, -200, "2026-02-15"),
+      lines: [{ amount: -200, transferAccountId: savings.id }],
+    });
+    const mirrorId = transfer.transferPeerId;
+    if (!mirrorId) {
+      throw new Error("Transfer has no mirror");
+    }
+    createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: -200, ...saved });
+    expect(getTransaction(book.db, transfer.id)?.status).toBe("reconciled");
+    expect(getTransaction(book.db, mirrorId)?.status).toBe("open");
   } finally {
     book.close();
   }

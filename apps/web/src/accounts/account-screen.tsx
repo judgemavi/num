@@ -105,7 +105,7 @@ export function AccountScreen() {
             void navigate({ search: { ...search, page } });
           }}
         />
-        <CheckpointHistory accountId={row.id} currency={bookCurrency} />
+        <CheckpointHistory accountId={row.id} currency={bookCurrency} owed={accountClass(row.kind) === "liability"} />
       </div>
       <Dialog open={search.reconcile} onOpenChange={(open) => !open && void navigate({ search: { ...search, reconcile: false } })}>
         <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
