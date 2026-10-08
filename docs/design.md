@@ -104,8 +104,9 @@ Inside 32px page padding. 20px gaps between cards.
 
 ## 6. Components
 
-Make these as React components in `apps/web/src/components/` on top of shadcn. Do not edit `components/ui/` files by hand
-(AGENTS.md). Set the look with the tokens and with `className`.
+Make these as React components in `apps/web/src/components/` on top of shadcn. Change shadcn variants in `components/ui/`
+where the look differs (for example, button shape and sizes). Style with Tailwind classes and the tokens. Do not write
+global component CSS (AGENTS.md).
 
 | Component | Rules |
 |---|---|

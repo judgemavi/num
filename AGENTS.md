@@ -43,7 +43,10 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 - Put business logic in service functions in `apps/api/src/services/`. Routes and MCP tools only validate input and call services.
 - Each service function that writes data uses one database transaction and writes the audit log (§11).
 - Keep files under 400 lines. Keep functions small.
-  Exception: files that a tool generates (shadcn components in `components/ui/`, `routeTree.gen.ts`). Do not edit them by hand.
+  Exception: generated files (`routeTree.gen.ts`, shadcn components in `components/ui/`).
+- Do not edit `routeTree.gen.ts` by hand.
+- You can edit shadcn files in `components/ui/` to change styles and variants (shadcn expects this).
+  Do not change their behavior. Keep the change small.
 - Add a shadcn component only in the slice that uses it. Remove components that no code uses.
 - Do not keep dead code.
 - Use the shadcn components in `apps/web/src/components/ui/`. Do not add TanStack Table or virtual scrolling.
@@ -56,6 +59,8 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
   - Confirmations: `AlertDialog`.
 - Do not use native `<select>`, `<label>` or custom-styled inputs.
 - Follow `docs/design.md` for every UI change: tokens, type, page pattern and components. Do not add other colours or fonts.
+- Style with Tailwind classes in the components. `index.css` contains only tokens (`@theme`), base styles and the font.
+  Do not write global component CSS. Do not target shadcn internals (`data-slot`) from CSS.
 - The web app imports only `packages/shared`. Do not import `packages/db` or API code in the web app.
 - Use `Temporal.PlainDate` for calendar dates. Do not use `Date` for calendar dates.
 - Lists: one shared Zod query schema for the URL and the API. Follow decision 0004.
