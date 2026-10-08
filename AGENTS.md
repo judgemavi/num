@@ -24,6 +24,8 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 ## Data safety
 
 - Do not run SQL by hand on any real database. Do not "fix" data with scripts.
+- Never edit a migration's `when` timestamp or its journal entry by hand. Drizzle applies migrations by timestamp;
+  a wrong timestamp makes it skip later migrations silently. After a rebase, regenerate the migration instead.
 - The `v1` branch is private and read-only. Read it only with `git show v1:<path>`.
   Do not check it out, merge it, rebase it or push it.
 - Tests must use temporary databases.
