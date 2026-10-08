@@ -16,6 +16,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
 import { assertCanArchive, assertSameClass, cardFields, interestRate, type CardFields } from "./account-rules";
+import { accountAuditSnapshot, readColumnMap } from "./account-snapshot";
 import { write, type AuditSource } from "./write";
 
 type WriteInput = {
@@ -50,38 +51,6 @@ function blankToNull(value: string | null | undefined): string | null {
   return trimmed.length === 0 ? null : trimmed;
 }
 
-function snapshot(row: {
-  name: string;
-  institution: string | null;
-  kind: string;
-  onBudget: boolean;
-  openingDate: string;
-  openingBalance: number;
-  archivedAt: string | null;
-  creditLimit: number | null;
-  statementDay: number | null;
-  dueDay: number | null;
-  paymentPolicy: string | null;
-  fixedPayment: number | null;
-  interestRateMilliPct: number | null;
-}) {
-  return {
-    name: row.name,
-    institution: row.institution,
-    kind: row.kind,
-    onBudget: row.onBudget,
-    openingDate: row.openingDate,
-    openingBalance: row.openingBalance,
-    archivedAt: row.archivedAt,
-    creditLimit: row.creditLimit,
-    statementDay: row.statementDay,
-    dueDay: row.dueDay,
-    paymentPolicy: row.paymentPolicy,
-    fixedPayment: row.fixedPayment,
-    interestRateMilliPct: row.interestRateMilliPct,
-  };
-}
-
 function toAccount(row: AccountRow, balance: number): Account {
   return {
     id: row.id,
@@ -98,6 +67,8 @@ function toAccount(row: AccountRow, balance: number): Account {
     paymentPolicy: asPolicy(row.paymentPolicy),
     fixedPayment: row.fixedPayment,
     interestRateMilliPct: row.interestRateMilliPct,
+    importPreset: row.importPreset,
+    columnMap: readColumnMap(row.columnMap),
     balance,
   };
 }
@@ -192,6 +163,8 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
       card,
       interestRateMilliPct: rate,
     }),
+    importPreset: null,
+    columnMap: null,
   };
   write(db, { source: input.source, at: input.at }, (tx) => {
     tx.insert(accounts).values(row).run();
@@ -200,7 +173,7 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
       entityId: id,
       action: "create",
       before: null,
-      after: snapshot(row),
+      after: accountAuditSnapshot(row),
     });
   });
   return toAccount(row, row.openingBalance);
@@ -233,11 +206,11 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
       entity: "accounts",
       entityId: id,
       action: "update",
-      before: snapshot(existing),
-      after: snapshot(next),
+      before: accountAuditSnapshot(existing),
+      after: accountAuditSnapshot({ ...existing, ...next }),
     });
     updated = toAccount(
-      { id, ...next },
+      { ...existing, ...next },
       balanceOf(tx, { id, kind: input.kind, openingBalance: next.openingBalance }),
     );
   });
@@ -271,8 +244,8 @@ export function archiveAccount(
       entity: "accounts",
       entityId: id,
       action: "archive",
-      before: snapshot(existing),
-      after: snapshot(next),
+      before: accountAuditSnapshot(existing),
+      after: accountAuditSnapshot(next),
     });
     archived = toAccount(next, balance);
   });
@@ -299,8 +272,8 @@ export function restoreAccount(db: Db, id: string, input: WriteInput): Account {
       entity: "accounts",
       entityId: id,
       action: "restore",
-      before: snapshot(existing),
-      after: snapshot(next),
+      before: accountAuditSnapshot(existing),
+      after: accountAuditSnapshot(next),
     });
     restored = toAccount(next, balanceOf(tx, { id, kind, openingBalance: existing.openingBalance }));
   });

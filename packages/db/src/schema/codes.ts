@@ -67,7 +67,7 @@ export const bucketIcons = [
   "bus",
 ] as const;
 
-export const importOutcomes = ["created", "matched", "duplicate", "ignored"] as const;
+export const importOutcomes = ["created", "matched", "needs_review", "duplicate", "ignored"] as const;
 
 export const proposalStatuses = ["pending", "approved", "rejected"] as const;
 

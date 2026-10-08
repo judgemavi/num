@@ -110,6 +110,23 @@ export {
   type SinkingRepeat,
 } from "./bucket";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
+export {
+  importBatchSchema,
+  importCountsSchema,
+  importListSchema,
+  importPresetListSchema,
+  importPreviewSchema,
+  importResultSchema,
+  importUndoSchema,
+  importUnreadableSchema,
+  importedBatchSchema,
+  undoBlockReasons,
+  type ImportBatch,
+  type ImportCounts,
+  type ImportResult,
+  type ImportUndo,
+  type UndoBlockReason,
+} from "./import-batch";
 export { documentSchema, type Document } from "./document";
 export { errorCodes, errorSchema, type ErrorBody, type ErrorCode } from "./error";
 export { listQuerySchema, pagedResponseSchema, sortDirections } from "./list";
@@ -189,11 +206,15 @@ export {
   decimalSeparators,
   presetSchema,
   signConventions,
+  unreadableReasons,
+  unreadableRowSchema,
   type ColumnMap,
   type DateOrder,
   type DecimalSeparator,
   type Preset,
   type SignConvention,
+  type UnreadableReason,
+  type UnreadableRow,
 } from "./statement";
 export {
   ambiguousLinkSchema,

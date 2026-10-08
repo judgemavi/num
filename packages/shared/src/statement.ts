@@ -1,5 +1,23 @@
 import { z } from "zod";
 
+export const unreadableReasons = [
+  "date_unreadable",
+  "amount_unreadable",
+  "too_many_decimals",
+  "amount_too_large",
+  "sign_marker",
+] as const;
+
+export type UnreadableReason = (typeof unreadableReasons)[number];
+
+export const unreadableRowSchema = z.object({
+  line: z.number().int().nonnegative(),
+  raw: z.string(),
+  reason: z.enum(unreadableReasons),
+});
+
+export type UnreadableRow = z.infer<typeof unreadableRowSchema>;
+
 export const signConventions = ["account", "inverted"] as const;
 
 export type SignConvention = (typeof signConventions)[number];

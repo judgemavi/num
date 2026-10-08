@@ -1,12 +1,6 @@
-export const unreadableReasons = [
-  "date_unreadable",
-  "amount_unreadable",
-  "too_many_decimals",
-  "amount_too_large",
-  "sign_marker",
-] as const;
+import type { UnreadableReason } from "@num/shared";
 
-export type UnreadableReason = (typeof unreadableReasons)[number];
+export type { UnreadableReason };
 
 export type StatementRow = {
   date: string;

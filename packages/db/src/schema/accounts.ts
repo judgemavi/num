@@ -21,6 +21,8 @@ export const accounts = sqliteTable(
     paymentPolicy: text("payment_policy"),
     fixedPayment: integer("fixed_payment"),
     interestRateMilliPct: integer("interest_rate_milli_pct"),
+    importPreset: text("import_preset"),
+    columnMap: text("column_map"),
   },
   (table) => [
     check("accounts_kind", oneOf(table.kind, accountKinds)),

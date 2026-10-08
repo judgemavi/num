@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
+import { columnMapSchema } from "./statement";
 import { listQuerySchema, pagedResponseSchema } from "./list";
 import { interestRateMilliPctSchema } from "./rate";
 import { isUtcTimestamp } from "./time";
@@ -95,6 +96,8 @@ export const accountSchema = z.object({
   paymentPolicy: z.enum(paymentPolicies).nullable(),
   fixedPayment: nonNegativeCentsSchema.nullable(),
   interestRateMilliPct: interestRateMilliPctSchema.nullable(),
+  importPreset: z.string().nullable(),
+  columnMap: columnMapSchema.nullable(),
   balance: centsSchema,
 });
 

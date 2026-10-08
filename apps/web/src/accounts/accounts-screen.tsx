@@ -1,9 +1,11 @@
 import { accountClass, accountListSchema, accountSchema, currencyUpdateSchema, type Account } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { useState } from "react";
 import { AccountForm } from "@/accounts/account-form";
+import { AccountImports } from "@/accounts/account-imports";
+import { ImportDialog } from "@/accounts/import-dialog";
 import { AccountIcon } from "@/accounts/account-icon";
 import { accountCountLabel, accountDetail, accountError, formatBalance, formatMoney, kindLabel } from "@/accounts/format";
 import { groupAccounts, groupHue, groupLabel, worthOf } from "@/accounts/groups";
@@ -44,6 +46,8 @@ export function AccountsScreen() {
   const openAccount = useNavigate();
   const [draft, setDraft] = useState<Account | "new" | null>(null);
   const [pending, setPending] = useState<Account | null>(null);
+  const [importAccount, setImportAccount] = useState<Account | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const currency = useQuery({
@@ -124,10 +128,23 @@ export function AccountsScreen() {
         kicker={search.archived ? "Archived" : accountCountLabel(rows.length)}
         title="Accounts"
         actions={
-          <Button type="button" onClick={() => setDraft("new")}>
-            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
-            Add account
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setImportAccount(null);
+                setImportOpen(true);
+              }}
+            >
+              <Upload size={20} strokeWidth={1.8} aria-hidden="true" />
+              Import a statement
+            </Button>
+            <Button type="button" onClick={() => setDraft("new")}>
+              <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
+              Add account
+            </Button>
+          </>
         }
       />
       <AccountFilterBar
@@ -212,6 +229,15 @@ export function AccountsScreen() {
                         <DropdownMenuItem
                           className="min-h-11"
                           onSelect={() => {
+                            setImportAccount(account);
+                            setImportOpen(true);
+                          }}
+                        >
+                          Import a statement
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onSelect={() => {
                             void openAccount({
                               to: "/accounts/$accountId",
                               params: { accountId: account.id },
@@ -258,20 +284,34 @@ export function AccountsScreen() {
       <Dialog open={draft !== null} onOpenChange={(open) => !open && setDraft(null)}>
         <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
           {draft !== null ? (
-            <AccountForm
-              key={draft === "new" ? "new" : draft.id}
-              currency={bookCurrency}
-              account={draft === "new" ? null : draft}
-              onClose={() => setDraft(null)}
-              onSaved={() => {
-                setDraft(null);
-                setActionError(null);
-                void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-              }}
-            />
+            <>
+              <AccountForm
+                key={draft === "new" ? "new" : draft.id}
+                currency={bookCurrency}
+                account={draft === "new" ? null : draft}
+                onClose={() => setDraft(null)}
+                onSaved={() => {
+                  setDraft(null);
+                  setActionError(null);
+                  void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+                }}
+              />
+              {draft !== "new" ? (
+                <AccountImports accountId={draft.id} accountName={draft.name} currency={bookCurrency} />
+              ) : null}
+            </>
           ) : null}
         </DialogContent>
       </Dialog>
+      <ImportDialog
+        open={importOpen}
+        account={importAccount}
+        onOpenChange={setImportOpen}
+        onImported={() => {
+          void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+          void queryClient.invalidateQueries({ queryKey: ["imports"] });
+        }}
+      />
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
