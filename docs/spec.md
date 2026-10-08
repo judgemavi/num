@@ -427,6 +427,14 @@ The user can create, edit and archive accounts.
 
 If the user imports the same file again, or a file with overlapping dates, the app must not create duplicate transactions.
 
+**Imports view** (Accounts → Imports):
+- All import batches, newest first: date, file name, account, period, status (`imported | undone | needs_you`),
+  and the counts (created, matched, duplicate, needs review, unreadable). `needs_you` means rows need review
+  or unreadable rows are not handled.
+- Filters: account, status, date (compact filter bar).
+- Import detail: each row of the file with its outcome and a link to its transaction (created or matched),
+  the duplicate's earlier row, or the unreadable reason. Actions: download the original file, undo (More menu).
+
 ### 7.3 Categorization
 
 **Normalized payee.** One pure function makes it. Table tests cover it. The function:
@@ -666,7 +674,7 @@ There are 8 screens.
 | Plan | Monthly: income → bills → bucket funding → Unassigned. Goal feasibility. Forecast chart. Safe to spend. |
 | Buckets | Balances, funding history, moves, settings |
 | Insights | Month story, categories, merchants, tags, net worth, mortgage, hygiene panel |
-| Accounts | List with balances, import, checkpoints, valuations, mortgage terms |
+| Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports (§7.2). |
 | Recurring | Plans, occurrences, links, skips |
 | Settings | Subpages: Groups, Categories, Tags, Backup. Later: Merchants and rules, Preferences. |
 
