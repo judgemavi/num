@@ -132,6 +132,7 @@ export async function readImportFile(
     alreadyImported: false,
     unreadable: [],
     createdAt: null,
+    openingSuggestion: null,
   };
   if (file.size > maxBytes) {
     return {

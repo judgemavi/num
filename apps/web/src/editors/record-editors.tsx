@@ -53,6 +53,8 @@ export function TransactionRecord({ props, onClose, onSaved }: { props: EditorIn
       id={props.id}
       rawLine={props.rawLine}
       initialAccountId={props.initialAccountId}
+      groupIds={props.groupIds}
+      queueIds={props.queueIds}
       onClose={onClose}
       onSaved={onSaved}
     />
@@ -74,6 +76,7 @@ export function AccountRecord({ props, onClose, onSaved }: { props: EditorInput[
       <AccountForm
         currency={currency.data}
         account={props.id ? (account.data ?? null) : null}
+        initialName={props.name}
         onClose={onClose}
         onSaved={save}
       />
@@ -98,6 +101,8 @@ export function CategoryRecord({ props, onClose, onSaved }: { props: EditorInput
     <CategoryForm
       category={props.id ? (category.data ?? null) : null}
       groups={groups.data}
+      initialName={props.name}
+      initialKind={props.kind}
       onClose={onClose}
       onSaved={save}
     />
@@ -120,7 +125,7 @@ export function GroupRecord({ props, onClose, onSaved }: { props: EditorInput["g
       label="Name"
       submitLabel={props.id ? "Save group" : "Add group"}
       savingLabel="Saving group"
-      initialName={group.data?.name ?? ""}
+      initialName={group.data?.name ?? props.name ?? ""}
       onClose={onClose}
       onSubmit={async (name) => {
         const result = await apiRequest(props.id ? `/api/category-groups/${props.id}` : "/api/category-groups", categoryGroupSchema, {
@@ -156,7 +161,7 @@ export function TagRecord({ props, onClose, onSaved }: { props: EditorInput["tag
       label="Name"
       submitLabel={props.id ? "Save tag" : "Add tag"}
       savingLabel="Saving tag"
-      initialName={tag.data?.name ?? ""}
+      initialName={tag.data?.name ?? props.name ?? ""}
       onClose={onClose}
       onSubmit={async (name) => {
         const result = await apiRequest(props.id ? `/api/tags/${props.id}` : "/api/tags", tagSchema, {
@@ -188,6 +193,7 @@ export function MerchantRecord({ props, onClose, onSaved }: { props: EditorInput
   return (
     <MerchantForm
       merchant={props.id ? (merchant.data ?? null) : null}
+      initialName={props.name}
       categories={categories.data}
       onClose={onClose}
       onSaved={save}

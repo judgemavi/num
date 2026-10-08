@@ -1,6 +1,8 @@
-import { signedAmount, toMinorUnits, type MoneyDirection } from "@num/shared";
+import type { MoneyDirection } from "@num/shared";
+import { signedAmount, toMinorUnits } from "@num/shared";
+import type { WhatChoice } from "@num/shared";
 
-export type WhatChoice = "spending" | "transfer" | "split";
+export type { WhatChoice };
 
 export type SplitLine = {
   key: string;

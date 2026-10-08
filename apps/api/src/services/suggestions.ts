@@ -1,6 +1,7 @@
 import { accounts, merchants, rules, settings, transactions } from "@num/db";
 import {
   normalizePayee,
+  oppositeTransferAccount,
   ruleCoversPayee,
   suggestCategorization,
   Temporal,
@@ -55,6 +56,47 @@ function lastCategorized(db: Db, payee: string): HistoryRow[] {
 
 function ruleRows(db: Db): RulePattern[] {
   return db.select().from(rules).all().map((row) => toRule(row));
+}
+
+export function transferHint(db: Db, input: { accountId: string; date: string; amount: number }): { accountId: string | null } {
+  const account = db.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, input.accountId)).get();
+  if (!account) {
+    throw new ServiceError("account_not_found", 404);
+  }
+  if (input.amount === 0) {
+    return { accountId: null };
+  }
+  const start = Temporal.PlainDate.from(input.date).subtract({ days: 3 }).toString();
+  const end = Temporal.PlainDate.from(input.date).add({ days: 3 }).toString();
+  const rows = db.all<{ id: string; accountId: string; date: string; amount: number; status: string; lineCount: number }>(sql`
+    select
+      t.id as id,
+      t.account_id as accountId,
+      t.date as date,
+      t.amount as amount,
+      t.status as status,
+      (select count(*) from transaction_lines l where l.transaction_id = t.id) as lineCount
+    from transactions t
+    where t.deleted_at is null
+      and t.transfer_peer_id is null
+      and t.account_id <> ${input.accountId}
+      and t.amount = ${-input.amount}
+      and t.date >= ${start}
+      and t.date <= ${end}
+  `);
+  return {
+    accountId: oppositeTransferAccount(
+      rows.map((row) => ({
+        id: row.id,
+        accountId: row.accountId,
+        date: row.date,
+        amount: row.amount,
+        lineCount: Number(row.lineCount),
+        reconciled: row.status === "reconciled",
+      })),
+      input,
+    ),
+  };
 }
 
 export function suggestForPayee(db: Db, accountId: string, rawPayee: string): Suggestion {

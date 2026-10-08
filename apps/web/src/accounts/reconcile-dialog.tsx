@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { loadAccount, setOpeningBalance } from "@/accounts/opening-action";
 import { apiRequest } from "@/request";
 import { formatDate } from "@/transactions/format";
 
@@ -247,6 +248,40 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
             ) : null}
             {uncleared.length === 0 && duplicates.length === 0 && gaps.length === 0 ? (
               <p className="text-sm text-muted-foreground">No uncleared transactions, duplicates, or gaps were found.</p>
+            ) : null}
+            {compare.openingSuggestion ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving}
+                onClick={() => {
+                  const suggestion = compare.openingSuggestion;
+                  if (!suggestion) {
+                    return;
+                  }
+                  void (async () => {
+                    setSaving(true);
+                    setError(null);
+                    const account = await loadAccount(accountId);
+                    if (!account || !suggestion) {
+                      setSaving(false);
+                      setError("The account did not load.");
+                      return;
+                    }
+                    const code = await setOpeningBalance(account, suggestion);
+                    setSaving(false);
+                    if (code) {
+                      setError("The opening balance did not save.");
+                      return;
+                    }
+                    await queryClient.invalidateQueries({ queryKey: ["account", accountId] });
+                    await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+                    await checkBalance();
+                  })();
+                }}
+              >
+                Set the opening balance so this statement balances
+              </Button>
             ) : null}
           </div>
         ) : null}

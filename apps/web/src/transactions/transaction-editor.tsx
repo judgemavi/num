@@ -1,15 +1,20 @@
 import { transactionSchema, type Transaction } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { LoadError, LoadingLine } from "@/editors/load-state";
 import { useAccounts, useBookCurrency, useCategories, useMerchants, useTags } from "@/editors/lookups";
+import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/request";
 import { transactionError } from "@/transactions/format";
+import { GroupEditor } from "@/transactions/transaction-group";
 import { TransactionForm } from "@/transactions/transaction-form";
 
 type TransactionEditorProps = {
   id: string | null;
   rawLine?: string;
   initialAccountId?: string;
+  groupIds?: string[];
+  queueIds?: string[];
   onClose: () => void;
   onSaved: (id: string) => void;
 };
@@ -22,7 +27,72 @@ function amountLocked(transaction: Transaction, peer: Transaction | undefined): 
   return peer.lines.length > 1 && line.transferAccountId === peer.accountId;
 }
 
-export function TransactionEditor({ id, rawLine, initialAccountId, onClose, onSaved }: TransactionEditorProps) {
+export function TransactionEditor({ id, rawLine, initialAccountId, groupIds, queueIds, onClose, onSaved }: TransactionEditorProps) {
+  if (groupIds && groupIds.length > 0) {
+    return <GroupHost ids={groupIds} onClose={onClose} onSaved={onSaved} />;
+  }
+  if (queueIds && queueIds.length > 0) {
+    return <QueueEditor ids={queueIds} onClose={onClose} onSaved={onSaved} />;
+  }
+  return <SingleEditor id={id} rawLine={rawLine} initialAccountId={initialAccountId} onClose={onClose} onSaved={onSaved} />;
+}
+
+function GroupHost({ ids, onClose, onSaved }: { ids: string[]; onClose: () => void; onSaved: (id: string) => void }) {
+  const currency = useBookCurrency();
+  const accounts = useAccounts();
+  const categories = useCategories();
+  const merchants = useMerchants();
+  if (!currency.data || !accounts.data || !categories.data || !merchants.data) {
+    return <LoadingLine label="Loading the transactions." />;
+  }
+  return (
+    <GroupEditor
+      ids={ids}
+      currency={currency.data}
+      accounts={accounts.data}
+      categories={categories.data}
+      merchants={merchants.data}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  );
+}
+
+function QueueEditor({ ids, onClose, onSaved }: { ids: string[]; onClose: () => void; onSaved: (id: string) => void }) {
+  const [index, setIndex] = useState(0);
+  const current = ids[index] ?? ids[0] ?? null;
+  return (
+    <div className="grid gap-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          {index + 1} of {ids.length}
+        </p>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" disabled={index === 0} onClick={() => setIndex((value) => Math.max(0, value - 1))}>
+            Previous
+          </Button>
+          <Button type="button" variant="outline" disabled={index >= ids.length - 1} onClick={() => setIndex((value) => Math.min(ids.length - 1, value + 1))}>
+            Next
+          </Button>
+        </div>
+      </div>
+      <SingleEditor
+        key={current ?? "queue"}
+        id={current}
+        onClose={onClose}
+        onSaved={(savedId) => {
+          if (index >= ids.length - 1) {
+            onSaved(savedId);
+            return;
+          }
+          setIndex((value) => value + 1);
+        }}
+      />
+    </div>
+  );
+}
+
+function SingleEditor({ id, rawLine, initialAccountId, onClose, onSaved }: TransactionEditorProps) {
   const queryClient = useQueryClient();
   const currency = useBookCurrency();
   const accounts = useAccounts();

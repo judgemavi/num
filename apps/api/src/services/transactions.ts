@@ -177,28 +177,32 @@ export function createTransaction(db: Db, input: TransactionBody & WriteInput): 
   return created;
 }
 
-export function updateTransaction(db: Db, id: string, input: TransactionBody & WriteInput): Transaction {
-  const at = input.at ?? utcNow();
+export function applyTransactionUpdate(tx: WriteTx, id: string, input: TransactionBody, at: string): Transaction {
   const header = headerFrom(input);
   const lines = input.lines.map(normalizeLine);
+  const existing = requireActive(tx, id);
+  const existingLines = loadLines(tx, id);
+  const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
+  const peerLines = peer ? loadLines(tx, peer.id) : [];
+  assertReconciledMoney(existing, existingLines, peer, header, lines);
+  assertPayee(existing, header.payeeRaw);
+  assertLineShape(header.accountId, header.amount, lines);
+  const previousTarget = existingLines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null;
+  assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
+  const savedHeader = existing.status === "reconciled" ? { ...header, status: "reconciled" as const } : header;
+  if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {
+    applyMirrorEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at);
+  } else {
+    applySourceEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at);
+  }
+  return readTransaction(tx, id);
+}
+
+export function updateTransaction(db: Db, id: string, input: TransactionBody & WriteInput): Transaction {
+  const at = input.at ?? utcNow();
   let updated: Transaction | undefined;
   write(db, { source: input.source, at }, (tx) => {
-    const existing = requireActive(tx, id);
-    const existingLines = loadLines(tx, id);
-    const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
-    const peerLines = peer ? loadLines(tx, peer.id) : [];
-    assertReconciledMoney(existing, existingLines, peer, header, lines);
-    assertPayee(existing, header.payeeRaw);
-    assertLineShape(header.accountId, header.amount, lines);
-    const previousTarget = existingLines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null;
-    assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
-    const savedHeader = existing.status === "reconciled" ? { ...header, status: "reconciled" as const } : header;
-    if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {
-      applyMirrorEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at);
-    } else {
-      applySourceEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at);
-    }
-    updated = readTransaction(tx, id);
+    updated = applyTransactionUpdate(tx, id, input, at);
   });
   if (!updated) {
     throw new Error("Update did not return a transaction");

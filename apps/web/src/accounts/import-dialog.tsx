@@ -228,6 +228,7 @@ export function ImportForm({
         unreadable: response.data.unreadable,
         batchId: response.data.id,
         createdAt: response.data.createdAt,
+        openingSuggestion: response.data.openingSuggestion,
         message: null,
       });
       return "ok";
@@ -329,6 +330,7 @@ export function ImportForm({
               onAccount={onAccount}
               onApplyAccount={onApplyAccount}
               onOpenImport={onClose}
+              onOpeningApplied={(key) => updateRow(key, { openingSuggestion: null })}
             />
           ) : null}
           {presets.isError ? (

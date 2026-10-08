@@ -34,6 +34,12 @@ function editValueOf(kind: EditorKind, props: EditorInput[EditorKind]): string |
   if (!isRecordKind(kind) || !("id" in props)) {
     return null;
   }
+  if (kind === "transaction") {
+    const transaction = props as EditorInput["transaction"];
+    if ((transaction.groupIds?.length ?? 0) > 0 || (transaction.queueIds?.length ?? 0) > 0) {
+      return null;
+    }
+  }
   return formatEditParam(kind, props.id);
 }
 

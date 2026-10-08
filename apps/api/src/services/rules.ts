@@ -201,18 +201,27 @@ function fields(input: RuleInput, origin: RuleOrigin, archivedAt: string | null)
   };
 }
 
-export function createRule(db: Db, input: RuleCreate & WriteInput & { origin?: RuleOrigin }): Rule {
+export function insertRule(tx: WriteTx, input: RuleCreate & { origin?: RuleOrigin }): Rule {
   const id = crypto.randomUUID();
   const row = { id, ...fields(input, input.origin ?? "manual", null) };
-  write(db, { source: input.source, at: input.at }, (tx) => {
-    assertAccount(tx, row.accountId);
-    assertAccount(tx, row.transferAccountId);
-    assertMerchant(tx, row.merchantId);
-    assertActiveCategory(tx, row.categoryId);
-    tx.insert(rules).values(row).run();
-    tx.audit({ entity: "rules", entityId: id, action: "create", before: null, after: snapshot(row) });
-  });
+  assertAccount(tx, row.accountId);
+  assertAccount(tx, row.transferAccountId);
+  assertMerchant(tx, row.merchantId);
+  assertActiveCategory(tx, row.categoryId);
+  tx.insert(rules).values(row).run();
+  tx.audit({ entity: "rules", entityId: id, action: "create", before: null, after: snapshot(row) });
   return toRule(row);
+}
+
+export function createRule(db: Db, input: RuleCreate & WriteInput & { origin?: RuleOrigin }): Rule {
+  let created: Rule | undefined;
+  write(db, { source: input.source, at: input.at }, (tx) => {
+    created = insertRule(tx, input);
+  });
+  if (!created) {
+    throw new Error("Create did not return a rule");
+  }
+  return created;
 }
 
 export function updateRule(db: Db, id: string, input: RuleUpdate & WriteInput): Rule {

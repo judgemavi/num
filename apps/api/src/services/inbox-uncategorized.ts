@@ -1,5 +1,14 @@
 import { merchants, rules } from "@num/db";
-import { suggestCategorization, type HistoryRow, type InboxItem, type Suggestion } from "@num/shared";
+import {
+  alternateSuggestion,
+  groupByPayee,
+  suggestCategorization,
+  uncategorizedItemKey,
+  type HistoryRow,
+  type InboxItem,
+  type PayeeGroupRow,
+  type Suggestion,
+} from "@num/shared";
 import { sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { toRule } from "./rules";
@@ -115,7 +124,6 @@ function historyFor(db: Db, payees: readonly string[]): Map<string, HistoryRow[]
 export function uncategorizedItems(db: Db): InboxItem[] {
   const rows = db.all<{
     transactionId: string;
-    lineId: string;
     accountId: string;
     date: string;
     amount: number;
@@ -124,17 +132,19 @@ export function uncategorizedItems(db: Db): InboxItem[] {
   }>(sql`
     select
       t.id as transactionId,
-      l.id as lineId,
       t.account_id as accountId,
       t.date as date,
-      l.amount as amount,
+      t.amount as amount,
       t.payee_raw as payeeRaw,
       t.payee_normalized as payee
-    from transaction_lines l
-    inner join transactions t on t.id = l.transaction_id
-    where l.category_id is null
-      and l.transfer_account_id is null
-      and t.deleted_at is null
+    from transactions t
+    where t.deleted_at is null
+      and exists (
+        select 1 from transaction_lines l
+        where l.transaction_id = t.id
+          and l.category_id is null
+          and l.transfer_account_id is null
+      )
   `);
   if (rows.length === 0) {
     return [];
@@ -152,7 +162,7 @@ export function uncategorizedItems(db: Db): InboxItem[] {
     .from(merchants)
     .all();
   const cache = new Map<string, Suggestion>();
-  return rows.map((row) => {
+  const grouped: PayeeGroupRow[] = rows.map((row) => {
     const cacheKey = `${row.accountId}\u0000${row.payee}`;
     let suggestion = cache.get(cacheKey);
     if (!suggestion) {
@@ -166,15 +176,36 @@ export function uncategorizedItems(db: Db): InboxItem[] {
       cache.set(cacheKey, suggestion);
     }
     return {
-      kind: "uncategorized" as const,
-      itemKey: `uncategorized:${row.lineId}`,
-      date: row.date,
       transactionId: row.transactionId,
-      lineId: row.lineId,
-      accountId: row.accountId,
+      date: row.date,
       amount: row.amount,
       payeeRaw: row.payeeRaw,
+      payee: row.payee,
       suggestion,
+    };
+  });
+  return groupByPayee(grouped).map((group) => {
+    const sample = rows.find((row) => row.transactionId === group.transactionIds[0] && row.payee === group.payee);
+    const next = sample
+      ? alternateSuggestion({
+          accountId: sample.accountId,
+          rawPayee: sample.payeeRaw,
+          rules: ruleRows,
+          history: history.get(group.payee) ?? [],
+          merchants: merchantRows,
+        })
+      : null;
+    return {
+      kind: "uncategorized" as const,
+      itemKey: uncategorizedItemKey(group.payee),
+      date: group.date,
+      payee: group.payee,
+      payeeRaw: group.payeeRaw,
+      count: group.count,
+      total: group.total,
+      transactionIds: group.transactionIds,
+      suggestion: group.suggestion,
+      next,
     };
   });
 }

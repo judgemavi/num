@@ -88,7 +88,7 @@ export function itemTitle(item: InboxItem, names: Names, currency: string): stri
     case "import_review":
       return `Choose a match for ${item.payeeRaw}`;
     case "uncategorized":
-      return `${item.payeeRaw} needs a category`;
+      return item.payeeRaw.length > 0 ? item.payeeRaw : "Needs a category";
     case "recurring_changed":
       return `${names.plan(item.planId)} went from ${formatMoney(currency, item.expectedAmount)} to ${formatMoney(currency, item.actualAmount)}`;
     case "recurring_missed":
@@ -115,7 +115,7 @@ export function itemWhy(item: InboxItem, names: Names, currency: string): string
     case "import_review":
       return `${shortDate(item.date)} · ${names.account(item.accountId)} · ${formatMoney(currency, item.amount)}`;
     case "uncategorized":
-      return `${shortDate(item.date)} · ${names.account(item.accountId)} · ${formatMoney(currency, item.amount)}`;
+      return `${item.count} ${item.count === 1 ? "transaction" : "transactions"} · ${formatMoney(currency, Math.abs(item.total))}`;
     case "recurring_changed":
       return `Charged ${shortDate(item.date)}. Update the plan?`;
     case "recurring_missed":

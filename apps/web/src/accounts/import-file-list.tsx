@@ -1,7 +1,10 @@
-import type { Account, ColumnMap, ImportCounts, Preset, StatementFormat, UnreadableRow } from "@num/shared";
+import type { Account, ColumnMap, ImportCounts, OpeningSuggestion, Preset, StatementFormat, UnreadableRow } from "@num/shared";
 import { Link } from "@tanstack/react-router";
-import type { DragEvent, RefObject } from "react";
+import { useState, type DragEvent, type RefObject } from "react";
 import { formatImportDate, importCountText, unreadableLabel } from "@/accounts/import-format";
+import { loadAccount, setOpeningBalance } from "@/accounts/opening-action";
+import { useBookCurrency } from "@/editors/lookups";
+import { formatMoney } from "@/money";
 import { rowNeedsColumnMap, totalCounts } from "@/accounts/import-prepare";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { Button } from "@/components/ui/button";
@@ -25,6 +28,7 @@ export type ImportFileRow = {
   alreadyImported: boolean;
   unreadable: UnreadableRow[];
   createdAt: string | null;
+  openingSuggestion: OpeningSuggestion | null;
 };
 
 const columnsValue = "columns";
@@ -100,6 +104,7 @@ type ImportFileListProps = {
   onAccount: (key: string, accountId: string | null) => void;
   onApplyAccount: (accountId: string | null) => void;
   onOpenImport: () => void;
+  onOpeningApplied: (key: string) => void;
 };
 
 export function ImportFileList({
@@ -113,6 +118,7 @@ export function ImportFileList({
   onAccount,
   onApplyAccount,
   onOpenImport,
+  onOpeningApplied,
 }: ImportFileListProps) {
   const options = accounts.map((account) => ({ id: account.id, label: account.name }));
 
@@ -169,7 +175,7 @@ export function ImportFileList({
               </Field>
               <Field>
                 <FieldLabel>Status</FieldLabel>
-                <FileStatus row={row} onOpenImport={onOpenImport} />
+                <FileStatus row={row} onOpenImport={onOpenImport} onOpeningApplied={() => onOpeningApplied(row.key)} />
               </Field>
             </div>
           </li>
@@ -180,7 +186,49 @@ export function ImportFileList({
   );
 }
 
-function FileStatus({ row, onOpenImport }: { row: ImportFileRow; onOpenImport: () => void }) {
+function OpeningBalanceButton({ row, onApplied }: { row: ImportFileRow; onApplied: () => void }) {
+  const currency = useBookCurrency();
+  const suggestion = row.openingSuggestion;
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  if (!suggestion || row.accountId.length === 0) {
+    return null;
+  }
+  return (
+    <div className="grid gap-1">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={pending || !currency.data}
+        onClick={() => {
+          void (async () => {
+            setPending(true);
+            setMessage(null);
+            const account = await loadAccount(row.accountId);
+            if (!account) {
+              setPending(false);
+              setMessage("The account did not load.");
+              return;
+            }
+            const code = await setOpeningBalance(account, suggestion);
+            setPending(false);
+            if (code) {
+              setMessage("The opening balance did not save.");
+              return;
+            }
+            onApplied();
+          })();
+        }}
+      >
+        Set the opening balance from this statement
+        {currency.data ? ` · ${formatMoney(currency.data, suggestion.amount)}` : ""}
+      </Button>
+      {message ? <p className="text-sm text-attn">{message}</p> : null}
+    </div>
+  );
+}
+
+function FileStatus({ row, onOpenImport, onOpeningApplied }: { row: ImportFileRow; onOpenImport: () => void; onOpeningApplied: () => void }) {
   const message = statusMessage(row);
   return (
     <div className="grid gap-1">
@@ -190,6 +238,7 @@ function FileStatus({ row, onOpenImport }: { row: ImportFileRow; onOpenImport: (
       {row.createdAt && row.phase === "done" && !row.alreadyImported ? (
         <p className="text-sm text-muted-foreground">{formatImportDate(row.createdAt)}</p>
       ) : null}
+      {row.phase === "done" && row.openingSuggestion ? <OpeningBalanceButton row={row} onApplied={onOpeningApplied} /> : null}
       {row.batchId ? (
         <Link
           to="/accounts/imports/$importId"

@@ -1,14 +1,20 @@
-import type { ImportBatch } from "@num/shared";
+import type { CategoryKind, ImportBatch } from "@num/shared";
 import type { PlanSeed } from "@/recurring/plan-form";
 import type { RecordEditorKind } from "@/editors/edit-url";
 
 export type EditorInput = {
-  transaction: { id: string | null; rawLine?: string; initialAccountId?: string };
-  account: { id: string | null };
-  category: { id: string | null };
-  group: { id: string | null };
-  tag: { id: string | null };
-  merchant: { id: string | null };
+  transaction: {
+    id: string | null;
+    rawLine?: string;
+    initialAccountId?: string;
+    groupIds?: string[];
+    queueIds?: string[];
+  };
+  account: { id: string | null; name?: string };
+  category: { id: string | null; name?: string; kind?: CategoryKind };
+  group: { id: string | null; name?: string };
+  tag: { id: string | null; name?: string };
+  merchant: { id: string | null; name?: string };
   rule: { id: string | null };
   bucket: { id: string | null };
   plan: { id: string | null; seed?: PlanSeed };

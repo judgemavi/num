@@ -1,8 +1,9 @@
-import type { Account, Bucket, Category, InboxItem, Merchant, Plan } from "@num/shared";
+import type { Bucket, Category, InboxItem, Plan } from "@num/shared";
 import { AlertTriangle, ArrowLeftRight, Banknote, FileWarning, Repeat, Tag, TrendingUp, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import {
   acceptPair,
+  applyInboxGroup,
   coverOverspent,
   createProposedPlan,
   fundFromUnassigned,
@@ -11,7 +12,6 @@ import {
   resolveReview,
   updatePlanAmount,
 } from "@/inbox/actions";
-import { UncategorizedEditor } from "@/inbox/uncategorized-editor";
 import { inboxHue, itemTitle, itemWhy } from "@/inbox/format";
 import { IconTile } from "@/components/icon-tile";
 import { Button } from "@/components/ui/button";
@@ -22,16 +22,15 @@ type InboxItemRowProps = {
   currency: string;
   asOf: string;
   accounts: Map<string, string>;
-  accountList: Account[];
   plans: Map<string, Plan>;
   merchants: Map<string, string>;
-  merchantList: Merchant[];
   categories: Category[];
   buckets: Bucket[];
   onSkip: (planId: string, dueDate: string) => void;
   onDismiss: (itemKey: string) => void;
   onAddByHand: (item: Extract<InboxItem, { kind: "import_unreadable" }>) => void;
-  onOpenTransaction: (transactionId: string) => void;
+  onOpenGroup: (transactionIds: string[]) => void;
+  onReviewQueue: (transactionIds: string[]) => void;
   onFundPaycheck: (incomeTransactionId: string) => void;
   unassigned: number;
   onRestore?: (itemKey: string) => void;
@@ -75,16 +74,15 @@ export function InboxItemRow({
   currency,
   asOf,
   accounts,
-  accountList,
   plans,
   merchants,
-  merchantList,
   categories,
   buckets,
   onSkip,
   onDismiss,
   onAddByHand,
-  onOpenTransaction,
+  onOpenGroup,
+  onReviewQueue,
   onFundPaycheck,
   unassigned,
   onRestore,
@@ -249,16 +247,33 @@ export function InboxItemRow({
         </div>
       </div>
       {!dismissedReason && item.kind === "uncategorized" ? (
-        <UncategorizedEditor
-          item={item}
-          currency={currency}
-          accounts={accountList}
-          categories={categories}
-          merchants={merchantList}
-          onMore={() => onOpenTransaction(item.transactionId)}
-          onDone={onDone}
-          onError={onError}
-        />
+        <div className="mt-3 flex flex-wrap gap-2 pl-13">
+          {[item.suggestion, item.next].filter((suggestion) => suggestion && (suggestion.categoryId || suggestion.transferAccountId)).map((suggestion, index) => {
+            if (!suggestion) {
+              return null;
+            }
+            const label = suggestion.transferAccountId
+              ? `Transfer · ${names.account(suggestion.transferAccountId)}`
+              : names.category(suggestion.categoryId ?? "");
+            return (
+              <Button
+                key={`${suggestion.categoryId ?? ""}-${suggestion.transferAccountId ?? ""}-${index}`}
+                type="button"
+                variant={index === 0 ? "default" : "outline"}
+                disabled={pending}
+                onClick={() => void run(() => applyInboxGroup(item.transactionIds, suggestion))}
+              >
+                {label}
+              </Button>
+            );
+          })}
+          <Button type="button" variant="outline" disabled={pending} onClick={() => onOpenGroup(item.transactionIds)}>
+            Other…
+          </Button>
+          <Button type="button" variant="ghost" disabled={pending} onClick={() => onReviewQueue(item.transactionIds)}>
+            Review one by one
+          </Button>
+        </div>
       ) : null}
       {!dismissedReason && choices.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2 pl-13">

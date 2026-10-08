@@ -1,4 +1,6 @@
 import {
+  bucketSchema,
+  bucketWriteSchema,
   categoryCreateSchema,
   categoryKinds,
   categorySchema,
@@ -8,7 +10,10 @@ import {
   type CategoryKind,
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
+import { useEditors } from "@/editors/editor-api";
+import { useActiveBuckets } from "@/editors/lookups";
 import { categoryError } from "@/settings/format";
+import { OptionCombobox } from "@/transactions/option-combobox";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +27,8 @@ const noGroup = "none";
 type CategoryFormProps = {
   category: Category | null;
   groups: CategoryGroup[];
+  initialName?: string;
+  initialKind?: CategoryKind;
   onClose: () => void;
   onSaved: (id: string) => void;
 };
@@ -30,14 +37,22 @@ function isKind(value: string): value is CategoryKind {
   return (categoryKinds as readonly string[]).includes(value);
 }
 
-export function CategoryForm({ category, groups, onClose, onSaved }: CategoryFormProps) {
-  const [name, setName] = useState(category?.name ?? "");
-  const [kind, setKind] = useState<CategoryKind>(category?.kind ?? "expense");
+export function CategoryForm({ category, groups, initialName, initialKind, onClose, onSaved }: CategoryFormProps) {
+  const { openEditor } = useEditors();
+  const buckets = useActiveBuckets();
+  const [name, setName] = useState(category?.name ?? initialName ?? "");
+  const [kind, setKind] = useState<CategoryKind>(category?.kind ?? initialKind ?? "expense");
   const [groupId, setGroupId] = useState(category?.groupId ?? noGroup);
+  const [extraGroups, setExtraGroups] = useState<CategoryGroup[]>([]);
   const [essential, setEssential] = useState(category?.essential ?? false);
+  const [bucketId, setBucketId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const expense = kind === "expense";
+  const groupOptions = [...groups, ...extraGroups.filter((group) => !groups.some((item) => item.id === group.id))].map((group) => ({
+    id: group.id,
+    label: group.name,
+  }));
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -62,6 +77,24 @@ export function CategoryForm({ category, groups, onClose, onSaved }: CategoryFor
       if (!result.ok) {
         setError(categoryError(result.code));
         return;
+      }
+      if (!category && bucketId) {
+        const bucket = buckets.data?.items.find((item) => item.id === bucketId);
+        if (bucket) {
+          const body = bucketWriteSchema.safeParse({ ...bucket, categoryIds: [...bucket.categoryIds, result.data.id] });
+          if (body.success) {
+            const added = await apiRequest(`/api/buckets/${bucket.id}`, bucketSchema, {
+              method: "PATCH",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(body.data),
+            });
+            if (!added.ok) {
+              setError("The category was saved. The bucket did not update.");
+              onSaved(result.data.id);
+              return;
+            }
+          }
+        }
       }
       onSaved(result.data.id);
     } catch {
@@ -111,20 +144,40 @@ export function CategoryForm({ category, groups, onClose, onSaved }: CategoryFor
         </Field>
         <Field>
           <FieldLabel htmlFor="category-group">Group</FieldLabel>
-          <Select value={groupId} onValueChange={setGroupId}>
-            <SelectTrigger id="category-group" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={noGroup}>No group</SelectItem>
-              {groups.map((group) => (
-                <SelectItem key={group.id} value={group.id}>
-                  {group.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <OptionCombobox
+            id="category-group"
+            value={groupId === noGroup ? null : groupId}
+            options={groupOptions}
+            placeholder="No group"
+            emptyLabel="No group"
+            create={{
+              noun: "group",
+              onCreate: (typed) => {
+                void openEditor("group", { id: null, name: typed }).then((id) => {
+                  if (!id) {
+                    return;
+                  }
+                  setExtraGroups((current) => [...current, { id, name: typed }]);
+                  setGroupId(id);
+                });
+              },
+            }}
+            onChange={(id) => setGroupId(id ?? noGroup)}
+          />
         </Field>
+        {!category && expense ? (
+          <Field>
+            <FieldLabel htmlFor="category-bucket">Add to a bucket</FieldLabel>
+            <OptionCombobox
+              id="category-bucket"
+              value={bucketId}
+              options={(buckets.data?.items ?? []).map((bucket) => ({ id: bucket.id, label: bucket.name }))}
+              placeholder="No bucket"
+              emptyLabel="No bucket"
+              onChange={setBucketId}
+            />
+          </Field>
+        ) : null}
         {expense ? (
           <Field orientation="horizontal">
             <Checkbox

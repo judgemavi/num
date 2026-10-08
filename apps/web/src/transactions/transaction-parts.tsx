@@ -1,5 +1,6 @@
 import type { MoneyDirection, Tag } from "@num/shared";
 import { ChevronRight, Ellipsis } from "lucide-react";
+import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -119,8 +120,11 @@ export function MoreDetails({
   onCleared: (cleared: boolean) => void;
   clearedLocked: boolean;
 }) {
-  const selected = tags.filter((tag) => tagIds.includes(tag.id));
-  const options = tags
+  const { openEditor } = useEditors();
+  const [created, setCreated] = useState<Tag[]>([]);
+  const allTags = [...tags, ...created.filter((tag) => !tags.some((item) => item.id === tag.id))];
+  const selected = allTags.filter((tag) => tagIds.includes(tag.id));
+  const options = allTags
     .filter((tag) => tag.archivedAt === null && !tagIds.includes(tag.id))
     .map((tag) => ({ id: tag.id, label: tag.name }));
   return (
@@ -140,8 +144,19 @@ export function MoreDetails({
             id="txn-tag"
             value={null}
             options={options}
-            placeholder={options.length === 0 ? "No tags to add" : "Add a tag"}
-            disabled={options.length === 0}
+            placeholder="Add a tag"
+            create={{
+              noun: "tag",
+              onCreate: (name) => {
+                void openEditor("tag", { id: null, name }).then((id) => {
+                  if (!id) {
+                    return;
+                  }
+                  setCreated((current) => [...current, { id, name, archivedAt: null }]);
+                  onTags([...tagIds, id]);
+                });
+              },
+            }}
             onChange={(tagId) => {
               if (tagId) {
                 onTags([...tagIds, tagId]);

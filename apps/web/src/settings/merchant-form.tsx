@@ -1,5 +1,6 @@
-import { merchantSchema, type Category, type Merchant } from "@num/shared";
+import { categoryKindForChoice, merchantSchema, type Category, type Merchant } from "@num/shared";
 import { useState, type FormEvent } from "react";
+import { useEditors } from "@/editors/editor-api";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -10,16 +11,23 @@ import { merchantError } from "@/settings/format";
 
 type MerchantFormProps = {
   merchant: Merchant | null;
+  initialName?: string;
   categories: Category[];
   onClose: () => void;
   onSaved: (id: string) => void;
 };
 
-export function MerchantForm({ merchant, categories, onClose, onSaved }: MerchantFormProps) {
-  const [name, setName] = useState(merchant?.name ?? "");
+export function MerchantForm({ merchant, initialName, categories, onClose, onSaved }: MerchantFormProps) {
+  const [name, setName] = useState(merchant?.name ?? initialName ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(merchant?.defaultCategoryId ?? null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [extra, setExtra] = useState<Category[]>([]);
+  const { openEditor } = useEditors();
+  const categoryOptions = [...categories, ...extra.filter((item) => !categories.some((category) => category.id === item.id))].map((category) => ({
+    id: category.id,
+    label: category.name,
+  }));
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -56,9 +64,21 @@ export function MerchantForm({ merchant, categories, onClose, onSaved }: Merchan
         <OptionCombobox
           id="merchant-category"
           value={categoryId}
-          options={categories.map((category) => ({ id: category.id, label: category.name }))}
+          options={categoryOptions}
           placeholder="No default category"
           emptyLabel="No default category"
+          create={{
+            noun: "category",
+            onCreate: (typed) => {
+              void openEditor("category", { id: null, name: typed, kind: categoryKindForChoice("spending") ?? "expense" }).then((id) => {
+                if (!id) {
+                  return;
+                }
+                setExtra((current) => [...current, { id, name: typed, kind: "expense", groupId: null, essential: false, archivedAt: null }]);
+                setCategoryId(id);
+              });
+            },
+          }}
           onChange={setCategoryId}
         />
       </Field>

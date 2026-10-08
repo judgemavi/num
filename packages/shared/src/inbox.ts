@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { asOfQuerySchema, isoDateSchema } from "./date";
 import { amountModes, planFrequencies } from "./recurring-calc";
+import { ruleMatches } from "./rule";
 import { suggestionSchema } from "./suggest";
 import { unreadableReasons } from "./statement";
 import { isUtcTimestamp } from "./time";
@@ -48,12 +49,13 @@ export const inboxItemSchema = z.discriminatedUnion("kind", [
     kind: z.literal("uncategorized"),
     itemKey,
     date: isoDateSchema,
-    transactionId: z.uuid(),
-    lineId: z.uuid(),
-    accountId: z.uuid(),
-    amount: cents,
+    payee: z.string(),
     payeeRaw: z.string(),
+    count: z.number().int().positive(),
+    total: cents,
+    transactionIds: z.array(z.uuid()).min(1),
     suggestion: suggestionSchema,
+    next: suggestionSchema.nullable(),
   }),
   z.object({
     kind: z.literal("recurring_changed"),
@@ -196,7 +198,48 @@ export const transferPairAcceptSchema = z.object({
   rightId: z.uuid(),
 });
 
+export const inboxGroupApplySchema = z
+  .object({
+    transactionIds: z.array(z.uuid()).min(1).max(500),
+    categoryId: z.uuid().nullable(),
+    transferAccountId: z.uuid().nullable(),
+    merchantId: z.uuid().nullable(),
+  })
+  .refine((value) => (value.categoryId === null) !== (value.transferAccountId === null));
+
+export const inboxGroupApplyResultSchema = z.object({
+  applied: z.number().int().nonnegative(),
+});
+
+export const payeeRuleSchema = z
+  .object({
+    payee: z.string().trim().min(1).max(200),
+    match: z.enum(ruleMatches),
+    pattern: z.string().trim().min(1).max(200),
+    merchantId: z.uuid().nullable(),
+    categoryId: z.uuid().nullable(),
+    transferAccountId: z.uuid().nullable(),
+    exceptIds: z.array(z.uuid()).max(500),
+  })
+  .refine((value) => (value.categoryId === null) !== (value.transferAccountId === null));
+
+export const payeeRuleResultSchema = z.object({
+  ruleId: z.uuid(),
+  applied: z.number().int().nonnegative(),
+});
+
+export const payeeCountQuerySchema = z.object({
+  payee: z.string().trim().min(1).max(200),
+  except: z.string().optional(),
+});
+
+export const payeeCountSchema = z.object({
+  count: z.number().int().nonnegative(),
+});
+
 export type InboxItem = z.infer<typeof inboxItemSchema>;
 export type Inbox = z.infer<typeof inboxSchema>;
 export type InboxDismiss = z.infer<typeof inboxDismissSchema>;
 export type ImportReviewResolve = z.infer<typeof importReviewResolveSchema>;
+export type InboxGroupApply = z.infer<typeof inboxGroupApplySchema>;
+export type PayeeRuleCreate = z.infer<typeof payeeRuleSchema>;

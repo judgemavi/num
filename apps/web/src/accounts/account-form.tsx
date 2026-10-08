@@ -29,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 
 type AccountFormProps = {
+  initialName?: string;
   currency: string;
   account: Account | null;
   onClose: () => void;
@@ -68,8 +69,8 @@ function isPolicy(value: string): value is PaymentPolicy {
   return value === "full" || value === "fixed" || value === "manual";
 }
 
-export function AccountForm({ currency, account, onClose, onSaved }: AccountFormProps) {
-  const [name, setName] = useState(account?.name ?? "");
+export function AccountForm({ currency, account, initialName, onClose, onSaved }: AccountFormProps) {
+  const [name, setName] = useState(account?.name ?? initialName ?? "");
   const [institution, setInstitution] = useState(account?.institution ?? "");
   const [kind, setKind] = useState<AccountKind>(account?.kind ?? "chequing");
   const [onBudget, setOnBudget] = useState(account?.onBudget ?? true);

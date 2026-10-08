@@ -200,7 +200,20 @@ export {
   type MerchantListQuery,
   type MerchantUpdate,
 } from "./merchant";
-export { normalizePayee, storedPayee } from "./payee";
+export { merchantNameFromPayee, normalizePayee, storedPayee } from "./payee";
+export { oppositeTransferAccount, transferHintQuerySchema, transferHintSchema } from "./transfer-hint";
+export { groupByPayee, uncategorizedItemKey, type PayeeGroup, type PayeeGroupRow } from "./payee-group";
+export {
+  categoryKindForChoice,
+  choiceForCategory,
+  choicesForDirection,
+  defaultChoice,
+  merchantForChoice,
+  preselectTransfer,
+  resolveEditorChoice,
+  whatChoices,
+  type WhatChoice,
+} from "./categorize";
 export {
   chooseRule,
   patternHits,
@@ -225,6 +238,7 @@ export {
   type RuleUpdate,
 } from "./rule";
 export {
+  alternateSuggestion,
   chooseTransferMatch,
   promotionAcceptSchema,
   promotionCandidates,
@@ -350,13 +364,21 @@ export {
   inboxItemSchema,
   inboxKinds,
   inboxRestoreSchema,
+  inboxGroupApplyResultSchema,
+  inboxGroupApplySchema,
   inboxSchema,
+  payeeCountQuerySchema,
+  payeeCountSchema,
+  payeeRuleResultSchema,
+  payeeRuleSchema,
   transferPairAcceptSchema,
   type ImportReviewResolve,
   type Inbox,
   type InboxDismiss,
+  type InboxGroupApply,
   type InboxItem,
   type InboxKind,
+  type PayeeRuleCreate,
 } from "./inbox";
 export {
   transactionCreateSchema,

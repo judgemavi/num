@@ -1,7 +1,21 @@
-import { asOfQuerySchema, errorSchema, inboxDismissSchema, inboxQuerySchema, inboxRestoreSchema, inboxSchema } from "@num/shared";
+import {
+  asOfQuerySchema,
+  errorSchema,
+  inboxDismissSchema,
+  inboxGroupApplyResultSchema,
+  inboxGroupApplySchema,
+  inboxQuerySchema,
+  inboxRestoreSchema,
+  inboxSchema,
+  payeeCountQuerySchema,
+  payeeCountSchema,
+  payeeRuleResultSchema,
+  payeeRuleSchema,
+} from "@num/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { dismissInboxItem, listInbox, restoreInboxItem } from "../services/inbox";
+import { applyInboxGroup, countOtherUncategorized, createPayeeRule } from "../services/inbox-group";
 import { autoLink } from "../services/recurring-view";
 
 const errorResponse = {
@@ -52,7 +66,54 @@ const restoreRoute = createRoute({
   },
 });
 
+const groupRoute = createRoute({
+  method: "post",
+  path: "/api/inbox/groups",
+  request: { body: { required: true, content: { "application/json": { schema: inboxGroupApplySchema } } } },
+  responses: {
+    200: { description: "The group was categorized", content: { "application/json": { schema: inboxGroupApplyResultSchema } } },
+    400: errorResponse,
+    404: errorResponse,
+    409: errorResponse,
+  },
+});
+
+const payeeRuleRoute = createRoute({
+  method: "post",
+  path: "/api/inbox/payee-rules",
+  request: { body: { required: true, content: { "application/json": { schema: payeeRuleSchema } } } },
+  responses: {
+    200: { description: "The rule and the other payee rows", content: { "application/json": { schema: payeeRuleResultSchema } } },
+    400: errorResponse,
+    404: errorResponse,
+    409: errorResponse,
+  },
+});
+
+const payeeCountRoute = createRoute({
+  method: "get",
+  path: "/api/inbox/payee-count",
+  request: { query: payeeCountQuerySchema },
+  responses: {
+    200: { description: "Other uncategorized rows for this payee", content: { "application/json": { schema: payeeCountSchema } } },
+    400: errorResponse,
+  },
+});
+
+function exceptIds(except: string | undefined): string[] {
+  if (!except) {
+    return [];
+  }
+  return except.split(",").map((id) => id.trim()).filter((id) => id.length > 0);
+}
+
 export function registerInbox(app: OpenAPIHono, db: Db) {
+  app.openapi(groupRoute, (c) => c.json(applyInboxGroup(db, { ...c.req.valid("json"), source: "ui" }), 200));
+  app.openapi(payeeRuleRoute, (c) => c.json(createPayeeRule(db, { ...c.req.valid("json"), source: "ui" }), 200));
+  app.openapi(payeeCountRoute, (c) => {
+    const query = c.req.valid("query");
+    return c.json({ count: countOtherUncategorized(db, query.payee, exceptIds(query.except)) }, 200);
+  });
   app.openapi(listRoute, (c) => {
     const query = c.req.valid("query");
     try {

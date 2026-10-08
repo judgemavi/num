@@ -91,3 +91,17 @@ export function normalizePayee(description: string): string {
   const upper = description.toUpperCase().replace(/[,'"`()]+/g, " ").replace(/\s+/g, " ").trim();
   return tidy(stripPlace(stripNoise(stripPrefixes(upper))));
 }
+
+function titleWord(word: string): string {
+  const first = word.charAt(0).toLocaleUpperCase();
+  return `${first}${word.slice(1).toLocaleLowerCase()}`;
+}
+
+/** A merchant name from bank text. "SQ *BLUE BOTTLE 0423" becomes "Blue Bottle". */
+export function merchantNameFromPayee(description: string): string {
+  const words = normalizePayee(description).split(" ").filter((word) => word.length > 0);
+  while (words.length > 1 && /\d/.test(words[words.length - 1] ?? "")) {
+    words.pop();
+  }
+  return words.map(titleWord).join(" ");
+}

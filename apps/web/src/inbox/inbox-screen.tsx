@@ -158,10 +158,8 @@ export function InboxScreen() {
               currency={bookCurrency}
               asOf={asOf}
               accounts={accountNames}
-              accountList={accounts.data?.items ?? []}
               plans={planRows}
               merchants={merchantNames}
-              merchantList={merchants.data?.items ?? []}
               categories={categoryRows}
               buckets={bucketRows}
               onSkip={(planId, dueDate) => {
@@ -191,8 +189,11 @@ export function InboxScreen() {
                   });
                 });
               }}
-              onOpenTransaction={(transactionId) => {
-                void openEditor("transaction", { id: transactionId }).then(() => refresh());
+              onOpenGroup={(transactionIds) => {
+                void openEditor("transaction", { id: null, groupIds: transactionIds }).then(() => refresh());
+              }}
+              onReviewQueue={(transactionIds) => {
+                void openEditor("transaction", { id: transactionIds[0] ?? null, queueIds: transactionIds }).then(() => refresh());
               }}
               onFundPaycheck={(incomeTransactionId) => {
                 void openEditor("fundPaycheck", { incomeTransactionId }).then(() => refresh());

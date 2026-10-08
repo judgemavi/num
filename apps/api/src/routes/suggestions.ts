@@ -6,13 +6,15 @@ import {
   ruleSchema,
   suggestionQuerySchema,
   suggestionSchema,
+  transferHintQuerySchema,
+  transferHintSchema,
   transferPairAcceptSchema,
   transferPairListSchema,
   transferPairSchema,
 } from "@num/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { acceptTransferPair, listPromotionCandidates, listTransferPairs, promotePayee, suggestForPayee } from "../services/suggestions";
+import { acceptTransferPair, listPromotionCandidates, listTransferPairs, promotePayee, suggestForPayee, transferHint } from "../services/suggestions";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -75,7 +77,22 @@ const pairRoute = createRoute({
   },
 });
 
+const hintRoute = createRoute({
+  method: "get",
+  path: "/api/transfer-hint",
+  request: { query: transferHintQuerySchema },
+  responses: {
+    200: { description: "An opposite transfer match", content: { "application/json": { schema: transferHintSchema } } },
+    400: errorResponse,
+    404: errorResponse,
+  },
+});
+
 export function registerSuggestions(app: OpenAPIHono, db: Db) {
+  app.openapi(hintRoute, (c) => {
+    const query = c.req.valid("query");
+    return c.json(transferHint(db, { accountId: query.accountId, date: query.date, amount: query.amount }), 200);
+  });
   app.openapi(suggestRoute, (c) => {
     const query = c.req.valid("query");
     return c.json(suggestForPayee(db, query.accountId, query.payee), 200);

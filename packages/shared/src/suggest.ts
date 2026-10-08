@@ -126,6 +126,33 @@ function merchantDefault(merchants: MerchantChoice[], normalizedPayee: string): 
   return matches.length === 1 ? (matches[0] ?? null) : null;
 }
 
+function rankedCategories(rows: HistoryRow[]): { categoryId: string; merchantId: string | null }[] {
+  const categorized = rows
+    .filter((row) => row.categoryId !== null)
+    .sort((left, right) => {
+      if (left.date !== right.date) {
+        return left.date < right.date ? 1 : -1;
+      }
+      return left.id < right.id ? 1 : left.id > right.id ? 1 : 0;
+    })
+    .slice(0, 10);
+  const counts = new Map<string, { categoryId: string; merchantId: string | null; count: number }>();
+  for (const row of categorized) {
+    if (!row.categoryId) {
+      continue;
+    }
+    const current = counts.get(row.categoryId);
+    if (current) {
+      current.count += 1;
+    } else {
+      counts.set(row.categoryId, { categoryId: row.categoryId, merchantId: row.merchantId, count: 1 });
+    }
+  }
+  return [...counts.values()]
+    .sort((left, right) => right.count - left.count || (left.categoryId < right.categoryId ? -1 : 1))
+    .map((row) => ({ categoryId: row.categoryId, merchantId: row.merchantId }));
+}
+
 export function suggestCategorization(input: {
   accountId: string;
   rawPayee: string;
@@ -160,6 +187,44 @@ export function suggestCategorization(input: {
     };
   }
   return none;
+}
+
+/** The next category or transfer after the suggestion, when one exists. */
+export function alternateSuggestion(input: {
+  accountId: string;
+  rawPayee: string;
+  rules: RulePattern[];
+  history: HistoryRow[];
+  merchants: MerchantChoice[];
+}): Suggestion | null {
+  const primary = suggestCategorization(input);
+  const primaryTarget = primary.transferAccountId ?? primary.categoryId;
+  if (!primaryTarget) {
+    return null;
+  }
+  const payee = normalizePayee(input.rawPayee);
+  const ranked = rankedCategories(input.history.filter((row) => normalizePayee(row.payeeRaw) === payee));
+  const merchant = merchantDefault(input.merchants, payee);
+  const candidates: Suggestion[] = [];
+  for (const row of ranked) {
+    if (row.categoryId !== primary.categoryId) {
+      candidates.push({
+        merchantId: row.merchantId,
+        categoryId: row.categoryId,
+        transferAccountId: null,
+        reason: "payee_history",
+      });
+    }
+  }
+  if (merchant?.defaultCategoryId && merchant.defaultCategoryId !== primary.categoryId) {
+    candidates.push({
+      merchantId: merchant.id,
+      categoryId: merchant.defaultCategoryId,
+      transferAccountId: null,
+      reason: "merchant_default",
+    });
+  }
+  return candidates[0] ?? null;
 }
 
 export function promotionCandidates(

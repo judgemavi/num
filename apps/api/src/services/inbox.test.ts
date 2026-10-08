@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { auditLog, importRows, merchants, migrateDatabase, occurrenceLinks, openDatabase, settings, transactions } from "@num/db";
-import { columnMapSchema, type ColumnMap, type InboxKind } from "@num/shared";
+import { columnMapSchema, normalizePayee, type ColumnMap, type InboxKind } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq, isNull } from "drizzle-orm";
 import { createDb, type Db } from "../db";
@@ -124,7 +124,7 @@ test("each inbox kind appears and leaves after its action", () => {
     const stream = merchant(sample.db, "Stream Co");
 
     const open = pay(sample.db, cash.id, "2026-03-02", -6400, "Corner market", null);
-    expect(keys(sample.db, "uncategorized")).toEqual([`uncategorized:${open.lines[0]?.id}`]);
+    expect(keys(sample.db, "uncategorized")).toEqual([`uncategorized:${normalizePayee(open.payeeRaw)}`]);
     updateTransaction(sample.db, open.id, {
       accountId: open.accountId,
       date: open.date,
@@ -329,7 +329,7 @@ test("dismiss hides an item and un-dismiss shows it", () => {
   try {
     const cash = account(sample.db, "Cash");
     const open = pay(sample.db, cash.id, "2026-03-04", -100, "Needs a category", null);
-    const itemKey = `uncategorized:${open.lines[0]?.id}`;
+    const itemKey = `uncategorized:${normalizePayee(open.payeeRaw)}`;
     expect(keys(sample.db, "uncategorized")).toEqual([itemKey]);
     dismissInboxItem(sample.db, asOf, itemKey, "Later", saved);
     expect(keys(sample.db, "uncategorized")).toEqual([]);

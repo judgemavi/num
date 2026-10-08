@@ -1,17 +1,17 @@
 import {
   bucketEventSchema,
   importReviewResultSchema,
+  inboxGroupApplyResultSchema,
   inboxRestoreSchema,
   occurrenceLinkSchema,
   planSchema,
   ruleSchema,
-  transactionSchema,
   transferPairSchema,
   type InboxItem,
   type Plan,
-  type Transaction,
+  type Suggestion,
 } from "@num/shared";
-import { apiRequest, type ApiResult } from "@/request";
+import { apiRequest } from "@/request";
 
 function json(body: unknown): RequestInit {
   return {
@@ -21,36 +21,13 @@ function json(body: unknown): RequestInit {
   };
 }
 
-export async function saveUncategorized(
-  transactionId: string,
-  merchantId: string | null,
-  lines: {
-    amount: number;
-    memo: string | null;
-    categoryId: string | null;
-    transferAccountId: string | null;
-    tagIds: string[];
-  }[],
-): Promise<ApiResult<Transaction>> {
-  const current = await apiRequest(`/api/transactions/${transactionId}`, transactionSchema);
-  if (!current.ok) {
-    return current;
-  }
-  const txn = current.data;
-  return apiRequest(`/api/transactions/${transactionId}`, transactionSchema, {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      accountId: txn.accountId,
-      date: txn.date,
-      amount: txn.amount,
-      payeeRaw: txn.payeeRaw,
-      merchantId,
-      notes: txn.notes,
-      status: txn.status === "cleared" ? "cleared" : "open",
-      lines,
-    }),
-  });
+export function applyInboxGroup(transactionIds: string[], suggestion: Suggestion) {
+  return apiRequest("/api/inbox/groups", inboxGroupApplyResultSchema, json({
+    transactionIds,
+    categoryId: suggestion.transferAccountId ? null : suggestion.categoryId,
+    transferAccountId: suggestion.transferAccountId,
+    merchantId: suggestion.transferAccountId ? null : suggestion.merchantId,
+  }));
 }
 
 export function resolveReview(item: Extract<InboxItem, { kind: "import_review" }>, transactionId: string | null) {
