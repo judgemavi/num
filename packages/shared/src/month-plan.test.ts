@@ -229,3 +229,42 @@ test("the current month compares planned amounts with linked actuals", () => {
   });
   expect(future.compareActual).toBe(false);
 });
+
+test("a future month uses planned funding from earlier months, not today's balance", () => {
+  const trip = goal("trip", 300, "2026-04-01", null, 0);
+  const january = buildMonthPlan({
+    month: "2026-01",
+    asOf: "2026-01-15",
+    links: [],
+    buckets: [trip],
+    plans: [income("pay", 100_000, schedule("2026-01-01", "monthly", 1, 1))],
+  });
+  const march = buildMonthPlan({
+    month: "2026-03",
+    asOf: "2026-01-15",
+    links: [],
+    buckets: [trip],
+    plans: [income("pay", 100_000, schedule("2026-01-01", "monthly", 1, 1))],
+  });
+  expect(january.funding.items.find((item) => item.bucketId === "trip")?.perPaycheck).toBe(100);
+  expect(march.funding.items.find((item) => item.bucketId === "trip")?.perPaycheck).toBe(100);
+  expect(march.feasibility?.need).toBe(100);
+});
+
+test("goals that are short together each get a later date from a share of the surplus", () => {
+  const month = buildMonthPlan({
+    month: "2026-02",
+    asOf: "2026-02-01",
+    links: [],
+    plans: [income("pay", 10_000, biweekly)],
+    buckets: [
+      { ...goal("north", 80_000, "2026-02-28", null), priority: 1, name: "North" },
+      { ...goal("south", 80_000, "2026-02-28", null), priority: 2, name: "South" },
+    ],
+  });
+  expect(month.feasibility?.surplus).toBe(10_000);
+  expect(month.feasibility?.shortfall).toBe(70_000);
+  const dates = month.feasibility?.buckets.map((bucket) => bucket.laterDate) ?? [];
+  expect(dates.every((date) => date !== null)).toBe(true);
+  expect(new Set(dates).size).toBe(1);
+});

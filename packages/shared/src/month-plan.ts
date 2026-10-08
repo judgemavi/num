@@ -152,7 +152,62 @@ function skippedKey(planId: string, dueDate: string): string {
   return `${planId}|${dueDate}`;
 }
 
+function nextMonth(month: string): string {
+  return Temporal.PlainDate.from(`${month}-01`).add({ months: 1 }).toString().slice(0, 7);
+}
+
+function openingsFor(input: {
+  month: string;
+  asOf: string;
+  plans: readonly MonthPlanSource[];
+  links: readonly MonthPlanLink[];
+  buckets: readonly MonthPlanBucketSource[];
+}): MonthPlanBucketSource[] {
+  const origin = input.asOf.slice(0, 7);
+  if (input.month <= origin) {
+    return [...input.buckets];
+  }
+  let buckets = input.buckets.map((bucket) => ({ ...bucket, actualFunded: 0 }));
+  let cursor = origin;
+  while (cursor < input.month) {
+    const funded = new Map(monthFigures({ ...input, month: cursor, buckets }).funding.items.map((item) => [item.bucketId, item.planned]));
+    buckets = buckets.map((bucket) => ({ ...bucket, balance: bucket.balance + (funded.get(bucket.id) ?? 0) }));
+    cursor = nextMonth(cursor);
+  }
+  const actuals = new Map(input.buckets.map((bucket) => [bucket.id, bucket.actualFunded]));
+  return buckets.map((bucket) => ({ ...bucket, actualFunded: actuals.get(bucket.id) ?? 0 }));
+}
+
+function surplusShares(
+  surplus: number,
+  buckets: readonly { bucketId: string; perPaycheck: number; dueDate: string | null }[],
+): Map<string, number> {
+  const blocked = buckets.filter((bucket) => bucket.dueDate !== null && surplus - (buckets.reduce((sum, item) => sum + item.perPaycheck, 0) - bucket.perPaycheck) <= 0);
+  const shares = new Map<string, number>();
+  if (surplus <= 0 || blocked.length === 0) {
+    return shares;
+  }
+  const total = blocked.reduce((sum, bucket) => sum + bucket.perPaycheck, 0);
+  let left = surplus;
+  blocked.forEach((bucket, index) => {
+    const share = index === blocked.length - 1 ? left : Math.floor((surplus * bucket.perPaycheck) / total);
+    shares.set(bucket.bucketId, share);
+    left -= share;
+  });
+  return shares;
+}
+
 export function buildMonthPlan(input: {
+  month: string;
+  asOf: string;
+  plans: readonly MonthPlanSource[];
+  links: readonly MonthPlanLink[];
+  buckets: readonly MonthPlanBucketSource[];
+}): MonthPlan {
+  return monthFigures({ ...input, buckets: openingsFor(input) });
+}
+
+function monthFigures(input: {
   month: string;
   asOf: string;
   plans: readonly MonthPlanSource[];
@@ -225,7 +280,9 @@ export function buildMonthPlan(input: {
   });
 
   for (const bucket of input.buckets) {
-    fundingActual += Math.max(0, bucket.actualFunded);
+    if (!bucket.archived) {
+      fundingActual += Math.max(0, bucket.actualFunded);
+    }
   }
 
   for (const bucket of activeBuckets) {
@@ -292,8 +349,10 @@ export function buildMonthPlan(input: {
     const refillsEach = shareUp(refillTotal, paycheckCount);
     const surplus = expectedPaycheck - billsEach - refillsEach;
     const shortfall = Math.max(0, need - surplus);
+    const shares = surplusShares(surplus, feasibilityBuckets);
     const buckets = feasibilityBuckets.map((bucket) => {
-      const room = surplus - (need - bucket.perPaycheck);
+      const alone = surplus - (need - bucket.perPaycheck);
+      const room = alone > 0 ? alone : (shares.get(bucket.bucketId) ?? 0);
       const source = activeBuckets.find((item) => item.id === bucket.bucketId);
       const gap = source
         ? Math.max(0, (source.kind === "sinking" ? (source.amount ?? 0) : (source.target ?? 0)) - source.balance)

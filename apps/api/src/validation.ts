@@ -22,6 +22,9 @@ function queryError(error: ZodError, query: Query): ErrorBody {
     }
     return { code: "as_of_invalid", params: { asOf } };
   }
+  if (field === "month") {
+    return { code: "month_invalid", params: { month: query.month ?? "" } };
+  }
   if (field === "sort") {
     return { code: "sort_unknown", params: { sort: query.sort ?? "" } };
   }

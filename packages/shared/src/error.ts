@@ -3,6 +3,7 @@ import { z } from "zod";
 export const errorCodes = [
   "as_of_required",
   "as_of_invalid",
+  "month_invalid",
   "sort_unknown",
   "invalid_query",
   "invalid_body",
