@@ -1,5 +1,6 @@
 import type { Category, Tag } from "@num/shared";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/button";
+import { Chip } from "@/components/chip";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { emptyLine, type LineDraft } from "@/transactions/line-draft";
@@ -47,8 +48,8 @@ export function LineEditor({
           .filter((tag) => tag.archivedAt === null && !line.tagIds.includes(tag.id))
           .map((tag) => ({ id: tag.id, label: tag.name }));
         return (
-          <fieldset key={line.key} className="flex flex-col gap-3 rounded-lg border p-3">
-            <legend className="px-1 text-sm font-medium">Line {index + 1}</legend>
+          <fieldset key={line.key} className="reveal">
+            <legend>Line {index + 1}</legend>
             <Field>
               <FieldLabel htmlFor={`${line.key}-amount`}>Amount</FieldLabel>
               <Input
@@ -119,16 +120,15 @@ export function LineEditor({
               {selectedTags.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {selectedTags.map((tag) => (
-                    <Button
+                    <Chip
                       key={tag.id}
-                      type="button"
-                      variant="outline"
-                      size="sm"
+                      pressed
                       disabled={disabled}
+                      aria-label={`Remove ${tag.name}`}
                       onClick={() => update(line.key, { tagIds: line.tagIds.filter((id) => id !== tag.id) })}
                     >
-                      {tag.name} Remove
-                    </Button>
+                      {tag.name}
+                    </Chip>
                   ))}
                 </div>
               ) : null}

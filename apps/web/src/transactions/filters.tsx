@@ -1,8 +1,8 @@
 import type { Account, Category, Merchant, Tag, TransactionListQuery } from "@num/shared";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/button";
+import { Chip } from "@/components/chip";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { hasFilters } from "@/transactions/query";
 
@@ -32,7 +32,7 @@ export function TransactionFilters({
   onClear,
 }: FiltersProps) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="filter-grid">
       <Field>
         <FieldLabel htmlFor="filter-account">Account</FieldLabel>
         <OptionCombobox
@@ -95,19 +95,16 @@ export function TransactionFilters({
           onChange={(event) => onChange({ to: event.target.value || undefined })}
         />
       </Field>
-      <Field orientation="horizontal" className="w-auto sm:col-span-2 lg:col-span-3">
-        <Switch
-          id="filter-uncategorized"
-          checked={search.uncategorized}
-          onCheckedChange={(checked) => onChange({ uncategorized: checked === true })}
-        />
-        <FieldLabel htmlFor="filter-uncategorized">Uncategorized only</FieldLabel>
+      <div className="filter-actions">
+        <Chip pressed={search.uncategorized} onClick={() => onChange({ uncategorized: !search.uncategorized })}>
+          Uncategorized only
+        </Chip>
         {hasFilters(search) ? (
-          <Button type="button" variant="outline" onClick={onClear}>
+          <Button type="button" variant="ghost" onClick={onClear}>
             Clear filters
           </Button>
         ) : null}
-      </Field>
+      </div>
     </div>
   );
 }

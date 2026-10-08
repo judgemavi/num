@@ -11,13 +11,18 @@ import {
   type Tag,
   type Transaction,
   type TransactionListQuery,
+  accountClass,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
+import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { formatBalance, formatMoney } from "@/accounts/format";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
+import { Amount } from "@/components/amount";
+import { Button } from "@/components/button";
+import { PageHeader } from "@/components/page-header";
+import { Pill } from "@/components/pill";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +33,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -168,7 +172,7 @@ export function TransactionsScreen() {
   const pending =
     currency.isPending || transactions.isPending || accounts.isPending || categories.isPending || tags.isPending || merchants.isPending;
   if (pending) {
-    return <p className="text-muted-foreground">Loading transactions.</p>;
+    return <p className="muted">Loading transactions.</p>;
   }
   if (
     currency.isError ||
@@ -185,7 +189,7 @@ export function TransactionsScreen() {
     !merchants.data
   ) {
     return (
-      <div className="flex flex-col items-start gap-4">
+      <div className="stack">
         <p>The transactions did not load.</p>
         <Button
           type="button"
@@ -222,21 +226,21 @@ export function TransactionsScreen() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-end justify-between gap-4">
-        <Field className="max-w-sm">
-          <FieldLabel htmlFor="transaction-search">Search</FieldLabel>
-          <Input
-            id="transaction-search"
-            value={text}
-            placeholder="Payee, notes or merchant"
-            onChange={(event) => setText(event.target.value)}
-          />
-        </Field>
-        <Button type="button" onClick={() => setDraft("new")} disabled={accounts.data.every((account) => account.archivedAt)}>
-          New transaction
-        </Button>
-      </div>
+    <>
+      <PageHeader
+        kicker={page.total === 1 ? "1 transaction" : `${page.total} transactions`}
+        title="Transactions"
+        actions={
+          <Button type="button" disabled={accounts.data.every((account) => account.archivedAt)} onClick={() => setDraft("new")}>
+            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
+            New transaction
+          </Button>
+        }
+      />
+      <Field className="max-w-sm">
+        <FieldLabel htmlFor="transaction-search">Search</FieldLabel>
+        <Input id="transaction-search" value={text} placeholder="Payee, notes or merchant" onChange={(event) => setText(event.target.value)} />
+      </Field>
       <TransactionFilters
         search={search}
         accounts={accounts.data}
@@ -258,10 +262,11 @@ export function TransactionsScreen() {
         }
       />
       {actionError ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="alert">
           {actionError}
         </p>
       ) : null}
+      <div className="card txn-table">
       <Table>
         <TableHeader>
           <TableRow>
@@ -289,7 +294,7 @@ export function TransactionsScreen() {
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={showBalance ? 7 : 6} className="text-muted-foreground">
+              <TableCell colSpan={showBalance ? 7 : 6} className="muted">
                 {hasFilters(search) ? "No transactions match." : "No transactions yet."}
               </TableCell>
             </TableRow>
@@ -300,15 +305,19 @@ export function TransactionsScreen() {
                 <TableCell>{row.accountName}</TableCell>
                 <TableCell>
                   <div>{row.payeeRaw}</div>
-                  {row.merchantName ? <div className="text-muted-foreground">{row.merchantName}</div> : null}
+                  {row.merchantName ? <div className="muted">{row.merchantName}</div> : null}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">{formatMoney(bookCurrency, row.amount)}</TableCell>
-                <TableCell>{statusLabel(row.status)}</TableCell>
+                <TableCell className="text-right">
+                  <Amount currency={bookCurrency} minor={row.amount} />
+                </TableCell>
+                <TableCell>
+                  <Pill tone={row.status === "open" ? "neutral" : "positive"}>{statusLabel(row.status)}</Pill>
+                </TableCell>
                 {showBalance ? (
-                  <TableCell className="text-right tabular-nums">
-                    {row.runningBalance === null
-                      ? ""
-                      : formatBalance(bookCurrency, row.accountKind, row.runningBalance)}
+                  <TableCell className="text-right">
+                    {row.runningBalance === null ? null : (
+                      <Amount currency={bookCurrency} minor={row.runningBalance} owed={accountClass(row.accountKind) === "liability"} />
+                    )}
                   </TableCell>
                 ) : null}
                 <TableCell className="text-right">
@@ -321,9 +330,7 @@ export function TransactionsScreen() {
           )}
         </TableBody>
       </Table>
-      <p className="text-sm text-muted-foreground">
-        {page.total} {page.total === 1 ? "transaction" : "transactions"}
-      </p>
+      </div>
       {page.total > page.pageSize ? (
         <div className="flex items-center justify-end gap-2">
           <Button
@@ -383,6 +390,6 @@ export function TransactionsScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }

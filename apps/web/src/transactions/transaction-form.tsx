@@ -14,7 +14,7 @@ import {
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
 import { apiRequest } from "@/request";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/button";
 import {
   DialogDescription,
   DialogFooter,
@@ -199,7 +199,7 @@ export function TransactionForm({
   }
 
   return (
-    <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-4">
+    <form onSubmit={(event) => void onSubmit(event)} className="form-grid">
       <DialogHeader>
         <DialogTitle>{transaction ? "Edit transaction" : "New transaction"}</DialogTitle>
         <DialogDescription>
@@ -302,7 +302,7 @@ export function TransactionForm({
             Delete
           </Button>
         ) : null}
-        <Button type="button" variant="outline" onClick={onClose}>
+        <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
         {locked ? null : (
