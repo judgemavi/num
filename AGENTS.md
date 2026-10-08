@@ -58,6 +58,9 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
   - Lists of records: ListCard rows (`docs/design.md` §6). `Table` only for the Transactions list.
   - Confirmations: `AlertDialog`.
 - Do not use native `<select>`, `<label>` or custom-styled inputs.
+- Before you write a UI component, check the shadcn component list (https://ui.shadcn.com/docs/components).
+  If shadcn has it, add it with the CLI and style its variants. Do not write your own.
+  Examples: Badge, Toggle, ToggleGroup, Progress, Collapsible, Card, Sidebar, Sheet, Tabs, Tooltip, Skeleton.
 - Follow `docs/design.md` for every UI change: tokens, type, page pattern and components. Do not add other colours or fonts.
 - Style with Tailwind classes in the components. `index.css` contains only tokens (`@theme`), base styles and the font.
   Do not write global component CSS. Do not target shadcn internals (`data-slot`) from CSS.
