@@ -221,3 +221,37 @@ test("a decimal comma reads 1.234,56 and letters around an amount are ignored", 
   expect(dotted.rows[0]?.amount).toBe(1250);
   expect(dotted.closingBalance).toBe(2000);
 });
+
+test("a leading unicode minus is negative, and CR or DR is a sign marker", () => {
+  const map = {
+    hasHeader: false,
+    date: 0,
+    description: 1,
+    amount: 2,
+    balance: 3,
+    dateOrder: "mdy",
+    signConvention: "account",
+  } as const;
+
+  const minus = parseCsvStatement("2026-07-01,NORTH MARKET,\u221212.50,0.00\n", map, digits);
+  expect(minus.rows[0]?.amount).toBe(-1250);
+  expect(minus.unreadable).toEqual([]);
+
+  const enDash = parseCsvStatement("2026-07-01,NORTH MARKET,\u201312.50,0.00\n", map, digits);
+  expect(enDash.rows[0]?.amount).toBe(-1250);
+
+  const marked = parseCsvStatement(
+    ["2026-07-02,NORTH MARKET,123.45 CR,10.00", "2026-07-03,CITY TRANSIT,123.45 DR,10.00"].join("\n"),
+    map,
+    digits,
+  );
+  expect(marked.rows).toEqual([]);
+  expect(marked.unreadable.map((row) => ({ line: row.line, reason: row.reason }))).toEqual([
+    { line: 1, reason: "sign_marker" },
+    { line: 2, reason: "sign_marker" },
+  ]);
+
+  const cad = parseCsvStatement("2026-07-04,NORTH MARKET,CAD 12.50,12.50\n", map, digits);
+  expect(cad.rows[0]?.amount).toBe(1250);
+  expect(cad.unreadable).toEqual([]);
+});

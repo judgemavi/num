@@ -3,6 +3,7 @@ export const unreadableReasons = [
   "amount_unreadable",
   "too_many_decimals",
   "amount_too_large",
+  "sign_marker",
 ] as const;
 
 export type UnreadableReason = (typeof unreadableReasons)[number];
