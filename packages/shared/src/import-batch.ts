@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { listQuerySchema, pagedResponseSchema } from "./list";
 import { isUtcTimestamp } from "./time";
-import { unreadableRowSchema } from "./statement";
+import { presetSchema, unreadableRowSchema } from "./statement";
 
 const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 
@@ -68,12 +68,7 @@ export const importListSchema = z.object({
 });
 
 export const importPresetListSchema = z.object({
-  presets: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-    }),
-  ),
+  presets: z.array(presetSchema),
 });
 
 export const importedBatchSchema = importBatchSchema.extend({

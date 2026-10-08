@@ -1,4 +1,4 @@
-import { statementDate, type ColumnMap, type DecimalSeparator, type SignConvention } from "@num/shared";
+import { splitCsvLine, statementDate, type ColumnMap, type DecimalSeparator, type SignConvention } from "@num/shared";
 import { readMinorAmount, type AmountProblem } from "./parse-amount";
 import type { ParsedStatement, StatementRow, UnreadableReason, UnreadableRow } from "./statement";
 
@@ -14,45 +14,6 @@ type ReadRow =
 
 function stripBom(text: string): string {
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-}
-
-export function splitCsvLine(line: string): string[] {
-  const cells: string[] = [];
-  let current = "";
-  let quoted = false;
-
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-    if (char === undefined) {
-      break;
-    }
-    if (quoted) {
-      if (char === '"') {
-        if (line[index + 1] === '"') {
-          current += '"';
-          index += 1;
-        } else {
-          quoted = false;
-        }
-      } else {
-        current += char;
-      }
-      continue;
-    }
-    if (char === '"') {
-      quoted = true;
-      continue;
-    }
-    if (char === ",") {
-      cells.push(current.trim());
-      current = "";
-      continue;
-    }
-    current += char;
-  }
-
-  cells.push(current.trim());
-  return cells;
 }
 
 function firstContentIndex(lines: string[]): number {

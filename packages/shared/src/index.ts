@@ -140,6 +140,17 @@ export {
 } from "./funding";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
 export {
+  detectStatementFormat,
+  firstStatementDate,
+  guessImportAccount,
+  isOfxFile,
+  orderByFirstDate,
+  sampleCsvRows,
+  splitCsvLine,
+  type ImportAccountChoice,
+  type StatementFormat,
+} from "./detect-format";
+export {
   importBatchSchema,
   importBatchStatus,
   importCountsSchema,

@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { accounts, documents, importBatches, importRows, settings, transactions } from "@num/db";
 import {
+  isOfxFile,
   minorUnitDigits,
+  sampleCsvRows,
   Temporal,
   utcNow,
   type ColumnMap,
@@ -15,7 +17,7 @@ import { restoreDocument } from "./documents";
 import { planImportRows } from "./import-plan";
 import { batchForDocument, presentBatch } from "./import-read";
 import { saveImportBatch } from "./import-save";
-import { parseCsvStatement, splitCsvLine } from "./parse-csv";
+import { parseCsvStatement } from "./parse-csv";
 import { parseOfxStatement } from "./parse-ofx";
 import { loadPreset, loadPresets } from "./presets";
 import { autoLink } from "./recurring-view";
@@ -55,20 +57,8 @@ function textOf(bytes: Uint8Array): string {
   return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 }
 
-function isOfx(filename: string, text: string): boolean {
-  if (/\.(ofx|qfx)$/i.test(filename)) {
-    return true;
-  }
-  return /OFXHEADER|<OFX>/i.test(text.slice(0, 500));
-}
-
 function previewRows(text: string): string[][] {
-  return text
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/)
-    .filter((line) => line.trim().length > 0)
-    .slice(0, 6)
-    .map((line) => splitCsvLine(line));
+  return sampleCsvRows(text, 6);
 }
 
 function presetMap(id: string): ColumnMap {
@@ -86,9 +76,6 @@ function resolveParse(
   account: { importPreset: string | null; columnMap: string | null },
   request: { presetId: string | null; columnMap: ColumnMap | null },
 ): ReadyParse | { kind: "preview"; rows: string[][] } {
-  if (isOfx(filename, text)) {
-    return { parser: "ofx", statement: parseOfxStatement(text, digits), presetId: null, columnMap: null };
-  }
   if (request.columnMap) {
     return {
       parser: "csv",
@@ -97,7 +84,18 @@ function resolveParse(
       columnMap: request.columnMap,
     };
   }
-  const presetId = request.presetId ?? account.importPreset;
+  if (request.presetId) {
+    return {
+      parser: "csv",
+      statement: parseCsvStatement(text, presetMap(request.presetId), digits),
+      presetId: request.presetId,
+      columnMap: null,
+    };
+  }
+  if (isOfxFile(filename, text)) {
+    return { parser: "ofx", statement: parseOfxStatement(text, digits), presetId: null, columnMap: null };
+  }
+  const presetId = account.importPreset;
   if (presetId) {
     return {
       parser: "csv",
@@ -132,7 +130,7 @@ function dateWindow(dates: readonly string[]): { start: string; end: string } {
 
 export function listImportPresets() {
   return {
-    presets: loadPresets().map((preset) => ({ id: preset.id, name: preset.name })),
+    presets: loadPresets(),
   };
 }
 

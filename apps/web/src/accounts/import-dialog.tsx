@@ -1,22 +1,25 @@
 import {
   accountListSchema,
+  firstStatementDate,
+  guessImportAccount,
+  orderByFirstDate,
   importPresetListSchema,
   importResultSchema,
+  sampleCsvRows,
   type Account,
   type ColumnMap,
-  type ImportResult,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ImportDropZone, ImportFileList, type ImportFileRow } from "@/accounts/import-file-list";
+import { importError } from "@/accounts/import-format";
 import { ImportMapForm } from "@/accounts/import-map-form";
-import { formatImportDate, importCountText, importError, unreadableLabel } from "@/accounts/import-format";
+import { dateFor, formatFromChoice, knownAccount, readImportFile, rowNeedsColumnMap, syncImportRows } from "@/accounts/import-prepare";
 import { localAsOf } from "@/as-of";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type ImportDialogProps = {
   open: boolean;
@@ -25,12 +28,10 @@ type ImportDialogProps = {
   onImported: () => void;
 };
 
-const savedFormat = "saved";
-
 export function ImportDialog({ open, account, onOpenChange, onImported }: ImportDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
+      <DialogContent className="max-h-[min(44rem,calc(100%-2rem))] w-[min(52rem,calc(100%-2rem))] max-w-[52rem]">
         {open ? (
           <ImportForm
             key={account?.id ?? "none"}
@@ -55,13 +56,17 @@ function ImportForm({
 }) {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [accountId, setAccountId] = useState(account?.id ?? "");
-  const [presetId, setPresetId] = useState(savedFormat);
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string[][] | null>(null);
-  const [result, setResult] = useState<Exclude<ImportResult, { kind: "preview" }> | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const rowsRef = useRef<ImportFileRow[]>([]);
+  const pendingRef = useRef(false);
+  const mapWait = useRef<{ resolve: (map: ColumnMap | null) => void } | null>(null);
+  const [rows, setRows] = useState<ImportFileRow[]>([]);
+  const [applyAccountId, setApplyAccountId] = useState<string | null>(null);
+  const [columnFile, setColumnFile] = useState<{ key: string; name: string; rows: string[][] } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [reading, setReading] = useState(false);
   const [pending, setPending] = useState(false);
+  const [finished, setFinished] = useState(false);
+  const fallbackId = account?.id ?? "";
 
   const accounts = useQuery({
     queryKey: ["accounts", "import-choices"],
@@ -78,171 +83,299 @@ function ImportForm({
     },
   });
 
-  const choices = accounts.data?.items ?? [];
-  const known = account && !choices.some((item) => item.id === account.id) ? [account, ...choices] : choices;
+  const presetList = presets.data ?? [];
+  const loaded = accounts.data?.items ?? [];
+  const known = account && !loaded.some((item) => item.id === account.id) ? [account, ...loaded] : loaded;
 
-  async function send(columnMap?: ColumnMap) {
-    if (!file || accountId.length === 0) {
-      setError("Choose an account and a file.");
+  useEffect(() => {
+    if (!presets.data || !accounts.data || pendingRef.current) {
       return;
     }
-    setPending(true);
-    setError(null);
-    const body = new FormData();
-    body.set("file", file);
-    body.set("accountId", accountId);
-    body.set("asOf", localAsOf());
-    if (presetId !== savedFormat) {
-      body.set("presetId", presetId);
+    const presetRows = presets.data;
+    const accountRows = accounts.data.items;
+    setRows((current) => {
+      const next = syncImportRows(current, presetRows, accountRows, applyAccountId, fallbackId, account);
+      if (!next) {
+        return current;
+      }
+      rowsRef.current = next;
+      return next;
+    });
+  }, [presets.data, accounts.data, applyAccountId, fallbackId, account]);
+
+  useEffect(() => {
+    return () => {
+      mapWait.current?.resolve(null);
+      mapWait.current = null;
+    };
+  }, []);
+
+  function storeRows(next: ImportFileRow[]) {
+    rowsRef.current = next;
+    setRows(next);
+  }
+
+  function updateRow(key: string, patch: Partial<ImportFileRow>) {
+    storeRows(rowsRef.current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  }
+
+  async function addFiles(list: File[]) {
+    if (list.length === 0) {
+      return;
     }
-    if (columnMap) {
-      body.set("columnMap", JSON.stringify(columnMap));
+    setReading(true);
+    const added: ImportFileRow[] = [];
+    for (const file of list) {
+      added.push(await readImportFile(file, presetList, loaded, applyAccountId, fallbackId, account));
+    }
+    storeRows([...rowsRef.current, ...added]);
+    setReading(false);
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
+  }
+
+  function onFormat(key: string, value: string) {
+    const format = formatFromChoice(value);
+    const row = rowsRef.current.find((item) => item.key === key);
+    if (!row) {
+      return;
+    }
+    const accountId = row.accountTouched ? row.accountId : (applyAccountId ?? guessImportAccount(loaded, format, presetList) ?? fallbackId);
+    const chosen = knownAccount(loaded, account, accountId);
+    const columnMap = format.kind === "unknown" ? row.columnMap : null;
+    updateRow(key, {
+      format,
+      formatTouched: true,
+      columnMap,
+      accountId,
+      firstDate: dateFor(row.text, format, columnMap, chosen, presetList),
+    });
+  }
+
+  function onAccount(key: string, accountId: string | null) {
+    const id = accountId ?? "";
+    const row = rowsRef.current.find((item) => item.key === key);
+    if (!row) {
+      return;
+    }
+    const chosen = knownAccount(loaded, account, id);
+    updateRow(key, {
+      accountId: id,
+      accountTouched: true,
+      firstDate: dateFor(row.text, row.format, row.columnMap, chosen, presetList),
+    });
+  }
+
+  function onApplyAccount(accountId: string | null) {
+    setApplyAccountId(accountId);
+    if (!accountId) {
+      return;
+    }
+    const chosen = knownAccount(loaded, account, accountId);
+    storeRows(
+      rowsRef.current.map((row) =>
+        row.phase === "ready"
+          ? { ...row, accountId, accountTouched: true, firstDate: dateFor(row.text, row.format, row.columnMap, chosen, presetList) }
+          : row,
+      ),
+    );
+  }
+
+  function askForMap(row: ImportFileRow, preview: string[][]): Promise<ColumnMap | null> {
+    setColumnFile({ key: row.key, name: row.file.name, rows: preview });
+    return new Promise((resolve) => {
+      mapWait.current = { resolve };
+    });
+  }
+
+  function finishMap(map: ColumnMap | null) {
+    mapWait.current?.resolve(map);
+    mapWait.current = null;
+    setColumnFile(null);
+  }
+
+  async function postFile(row: ImportFileRow, allowPreview: boolean): Promise<"ok" | "cancelled"> {
+    if (row.accountId.length === 0) {
+      updateRow(row.key, { phase: "error", message: importError("account_not_found") });
+      return "ok";
+    }
+    updateRow(row.key, { phase: "importing", message: null });
+    const body = new FormData();
+    body.set("file", row.file);
+    body.set("accountId", row.accountId);
+    body.set("asOf", localAsOf());
+    if (row.format.kind === "preset") {
+      body.set("presetId", row.format.presetId);
+    }
+    if (row.columnMap) {
+      body.set("columnMap", JSON.stringify(row.columnMap));
     }
     try {
       const response = await apiRequest("/api/imports", importResultSchema, { method: "POST", body });
       if (!response.ok) {
-        setError(importError(response.code));
-        return;
+        updateRow(row.key, { phase: "error", message: importError(response.code) });
+        return "ok";
       }
       if (response.data.kind === "preview") {
-        setPreview(response.data.rows);
-        return;
+        if (!allowPreview) {
+          updateRow(row.key, { phase: "error", message: importError("invalid_body") });
+          return "ok";
+        }
+        const map = await askForMap(row, response.data.rows);
+        if (!map) {
+          updateRow(row.key, { phase: "ready" });
+          return "cancelled";
+        }
+        const firstDate = firstStatementDate(row.text, { kind: "unknown" }, presetList, map);
+        updateRow(row.key, { columnMap: map, firstDate, phase: "ready" });
+        const latest = rowsRef.current.find((item) => item.key === row.key);
+        return latest ? postFile(latest, false) : "cancelled";
       }
-      setPreview(null);
-      setResult(response.data);
-      onImported();
-      await queryClient.invalidateQueries({ queryKey: ["imports"] });
+      if (response.data.kind === "unreadable") {
+        updateRow(row.key, {
+          phase: "done",
+          alreadyImported: false,
+          batchId: null,
+          createdAt: null,
+          unreadable: response.data.unreadable,
+          counts: { created: 0, matched: 0, duplicate: 0, needsReview: 0, unreadable: response.data.unreadable.length },
+        });
+        return "ok";
+      }
+      updateRow(row.key, {
+        phase: "done",
+        alreadyImported: response.data.alreadyImported,
+        counts: response.data.alreadyImported ? null : response.data.counts,
+        unreadable: response.data.unreadable,
+        batchId: response.data.id,
+        createdAt: response.data.createdAt,
+        message: null,
+      });
+      return "ok";
     } catch {
-      setError(importError("internal_error"));
-    } finally {
-      setPending(false);
+      updateRow(row.key, { phase: "error", message: importError("internal_error") });
+      return "ok";
     }
   }
+
+  async function importAll() {
+    setPending(true);
+    pendingRef.current = true;
+    const waiting = rowsRef.current.filter((row) => row.phase === "ready" && rowNeedsColumnMap(row));
+    for (const row of waiting) {
+      const map = await askForMap(row, sampleCsvRows(row.text));
+      if (!map) {
+        pendingRef.current = false;
+        setPending(false);
+        return;
+      }
+      updateRow(row.key, {
+        columnMap: map,
+        firstDate: firstStatementDate(row.text, { kind: "unknown" }, presetList, map),
+      });
+    }
+    const ordered = orderByFirstDate(rowsRef.current.filter((row) => row.phase === "ready"));
+    for (const row of ordered) {
+      const latest = rowsRef.current.find((item) => item.key === row.key) ?? row;
+      const outcome = await postFile(latest, true);
+      if (outcome === "cancelled") {
+        pendingRef.current = false;
+        setPending(false);
+        return;
+      }
+    }
+    if (rowsRef.current.some((row) => row.phase === "done")) {
+      onImported();
+      await queryClient.invalidateQueries({ queryKey: ["imports"] });
+    }
+    setFinished(true);
+    pendingRef.current = false;
+    setPending(false);
+  }
+
+  const busy = pending || reading;
+  const importLabel = rows.length > 1 ? "Import all" : "Import";
 
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Import a statement</DialogTitle>
-        <DialogDescription>Upload a CSV, OFX or QFX file for one account.</DialogDescription>
+        <DialogTitle>{columnFile ? "Set the columns" : finished ? "Import summary" : "Import statements"}</DialogTitle>
+        <DialogDescription>
+          {columnFile
+            ? columnFile.name
+            : "Choose or drop one or more CSV, OFX or QFX files. Maximum 20 MB each."}
+        </DialogDescription>
       </DialogHeader>
-      {result ? (
-        <ImportSummary result={result} onClose={onClose} />
-      ) : preview ? (
-        <ImportMapForm rows={preview} pending={pending} onBack={() => setPreview(null)} onImport={(map) => void send(map)} />
+      {columnFile ? (
+        <ImportMapForm
+          key={columnFile.key}
+          rows={columnFile.rows}
+          pending={false}
+          onBack={() => finishMap(null)}
+          onImport={(map) => finishMap(map)}
+        />
       ) : (
         <div className="grid gap-4">
-          <Field>
-            <FieldLabel>Account</FieldLabel>
-            <Select value={accountId || undefined} onValueChange={setAccountId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose an account" />
-              </SelectTrigger>
-              <SelectContent>
-                {known.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel>Bank format</FieldLabel>
-            <Select value={presetId} onValueChange={setPresetId}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={savedFormat}>Saved format, or set columns</SelectItem>
-                {(presets.data ?? []).map((preset) => (
-                  <SelectItem key={preset.id} value={preset.id}>
-                    {preset.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FieldDescription>An unknown CSV asks for the columns next.</FieldDescription>
-          </Field>
-          <Field>
-            <FieldLabel>File</FieldLabel>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()}>
-                Choose a file
-              </Button>
-              <span className="text-sm text-muted-foreground">{file ? file.name : "CSV, OFX or QFX. Maximum 20 MB."}</span>
-            </div>
-            <input
-              ref={fileRef}
-              className="sr-only"
-              type="file"
-              accept=".csv,.ofx,.qfx,text/csv"
-              onChange={(event) => {
-                setFile(event.target.files?.[0] ?? null);
-                setPreview(null);
-                setResult(null);
+          {finished ? null : (
+            <ImportDropZone
+              inputRef={fileRef}
+              dragOver={dragOver}
+              disabled={busy}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragOver(false);
+                void addFiles(Array.from(event.dataTransfer.files));
+              }}
+              onChoose={() => fileRef.current?.click()}
+              onFiles={(files) => {
+                void addFiles(files);
               }}
             />
-          </Field>
-          {error ? (
+          )}
+          {rows.length > 0 ? (
+            <ImportFileList
+              rows={rows}
+              presets={presetList}
+              accounts={known}
+              disabled={busy}
+              applyAccountId={applyAccountId}
+              showTotal={finished}
+              onFormat={onFormat}
+              onAccount={onAccount}
+              onApplyAccount={onApplyAccount}
+              onOpenImport={onClose}
+            />
+          ) : null}
+          {presets.isError ? (
             <p role="alert" className="text-sm text-attn">
-              {error}
+              The bank formats did not load.
             </p>
           ) : null}
           <DialogFooter>
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="button" disabled={pending || !file || accountId.length === 0} onClick={() => void send()}>
-              {pending ? "Importing" : "Import"}
-            </Button>
+            {finished ? (
+              <Button type="button" onClick={onClose}>
+                Done
+              </Button>
+            ) : (
+              <>
+                <Button type="button" variant="secondary" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button type="button" disabled={busy || rows.length === 0} onClick={() => void importAll()}>
+                  {pending ? "Importing" : importLabel}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </div>
       )}
-      {preview && error ? (
-        <p role="alert" className="text-sm text-attn">
-          {error}
-        </p>
-      ) : null}
     </>
   );
 }
 
-function ImportSummary({ result, onClose }: { result: Exclude<ImportResult, { kind: "preview" }>; onClose: () => void }) {
-  const counts =
-    result.kind === "batch"
-      ? result.counts
-      : { created: 0, matched: 0, duplicate: 0, needsReview: 0, unreadable: result.unreadable.length };
-  const unreadable = result.unreadable;
-  return (
-    <div className="grid gap-4">
-      {result.kind === "batch" && result.alreadyImported ? (
-        <p>This file was already imported{result.filename ? ` (${result.filename})` : ""}.</p>
-      ) : (
-        <p className="text-lg font-semibold">{importCountText(counts)}</p>
-      )}
-      {result.kind === "batch" && result.alreadyImported ? (
-        <p className="text-lg font-semibold">{importCountText(counts)}</p>
-      ) : null}
-      {result.kind === "batch" ? (
-        <p className="text-sm text-muted-foreground">{formatImportDate(result.createdAt)}</p>
-      ) : null}
-      {unreadable.length > 0 ? (
-        <ul className="grid gap-3">
-          {unreadable.map((row) => (
-            <li key={`${row.line}-${row.raw}`} className="grid gap-1 border-t pt-3">
-              <p className="font-semibold">
-                Line {row.line}. {unreadableLabel(row.reason)}
-              </p>
-              <p className="break-all text-sm text-muted-foreground">{row.raw}</p>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <DialogFooter>
-        <Button type="button" onClick={onClose}>
-          Done
-        </Button>
-      </DialogFooter>
-    </div>
-  );
-}
