@@ -101,6 +101,12 @@ export const errorCodes = [
   "import_review_not_found",
   "import_match_invalid",
   "transfer_pair_not_found",
+  "month_invalid",
+  "month_not_found",
+  "month_not_ready",
+  "month_closed",
+  "month_not_closed",
+  "reopen_reason_required",
   "internal_error",
 ] as const;
 

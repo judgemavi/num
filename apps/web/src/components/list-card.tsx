@@ -33,16 +33,19 @@ export function ListGroup({ label, aside }: { label: string; aside?: ReactNode }
 
 export function ListRow({
   simple = false,
+  current = false,
   onOpen,
   children,
 }: {
   simple?: boolean;
+  current?: boolean;
   onOpen?: () => void;
   children: ReactNode;
 }) {
   return (
     <div
-      className={`flex items-center gap-3.5 border-t px-5 py-2 first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary max-md:flex-wrap ${simple ? "min-h-12" : "min-h-[60px]"} ${onOpen ? "cursor-pointer" : ""}`}
+      aria-current={current ? "true" : undefined}
+      className={`flex items-center gap-3.5 border-t px-5 py-2 first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary max-md:flex-wrap ${simple ? "min-h-12" : "min-h-[60px]"} ${onOpen ? "cursor-pointer" : ""} ${current ? "bg-primary-soft" : ""}`}
       tabIndex={onOpen ? 0 : undefined}
       onClick={onOpen}
       onKeyDown={
