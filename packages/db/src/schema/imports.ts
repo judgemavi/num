@@ -38,6 +38,7 @@ export const importBatches = sqliteTable(
     periodEnd: text("period_end").notNull(),
     closingBalance: integer("closing_balance"),
     closingDate: text("closing_date"),
+    unreadableJson: text("unreadable_json").notNull().default("[]"),
     createdAt: text("created_at").notNull(),
     undoneAt: text("undone_at"),
   },

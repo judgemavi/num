@@ -30,6 +30,7 @@ export const importBatchSchema = z.object({
   createdAt: timestampSchema,
   undoneAt: timestampSchema.nullable(),
   counts: importCountsSchema,
+  unreadable: z.array(unreadableRowSchema),
 });
 
 export type ImportBatch = z.infer<typeof importBatchSchema>;
@@ -50,7 +51,6 @@ export const importPresetListSchema = z.object({
 export const importedBatchSchema = importBatchSchema.extend({
   kind: z.literal("batch"),
   alreadyImported: z.boolean(),
-  unreadable: z.array(unreadableRowSchema),
 });
 
 export const importPreviewSchema = z.object({

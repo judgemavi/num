@@ -1,4 +1,5 @@
-import { accounts, importBatches, importRows, settings, transactions } from "@num/db";
+import { createHash } from "node:crypto";
+import { accounts, documents, importBatches, importRows, settings, transactions } from "@num/db";
 import {
   minorUnitDigits,
   Temporal,
@@ -10,13 +11,14 @@ import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { readColumnMap } from "./account-snapshot";
-import { uploadDocument } from "./documents";
+import { restoreDocument } from "./documents";
 import { planImportRows } from "./import-plan";
 import { batchForDocument, presentBatch } from "./import-read";
 import { saveImportBatch } from "./import-save";
 import { parseCsvStatement, splitCsvLine } from "./parse-csv";
 import { parseOfxStatement } from "./parse-ofx";
 import { loadPreset, loadPresets } from "./presets";
+import { suggestForPayee } from "./suggestions";
 import type { ParsedStatement } from "./statement";
 import type { AuditSource } from "./write";
 
@@ -153,16 +155,16 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     throw new ServiceError("account_not_found", 404);
   }
   const at = input.at ?? utcNow();
-  const document = uploadDocument(db, dataDir, {
-    bytes: input.bytes,
-    filename: input.filename,
-    mimeType: input.mimeType,
-    source: input.source,
-    at,
-  });
-  const existing = batchForDocument(db, document.id);
-  if (existing) {
-    return { kind: "batch", alreadyImported: true, unreadable: [], ...presentBatch(db, existing) };
+  const hash = createHash("sha256").update(input.bytes).digest("hex");
+  const stored = db.select().from(documents).where(eq(documents.hash, hash)).get();
+  if (stored) {
+    const existing = batchForDocument(db, stored.id);
+    if (existing) {
+      if (stored.deletedAt) {
+        restoreDocument(db, stored.id, { source: input.source, at });
+      }
+      return { kind: "batch", alreadyImported: true, ...presentBatch(db, existing) };
+    }
   }
 
   const text = textOf(input.bytes);
@@ -218,12 +220,31 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     })),
     taken,
     candidates,
+  ).map((row) =>
+    row.outcome === "created" ? { ...row, suggestion: suggestForPayee(db, account.id, row.payeeRaw) } : row,
   );
+  const filename = input.filename.split(/[/\\]/).pop()?.replace(/[\r\n"]/g, "").trim() || "upload";
+  const mimeType = input.mimeType.trim() || "application/octet-stream";
+  const document = stored ?? {
+    id: crypto.randomUUID(),
+    filename,
+    hash,
+    mimeType,
+    storagePath: `uploads/${hash}`,
+    uploadedAt: at,
+    deletedAt: null,
+  };
   const batch = saveImportBatch(db, {
     source: input.source,
     at,
     accountId: account.id,
-    documentId: document.id,
+    dataDir,
+    bytes: stored ? null : input.bytes,
+    document: stored
+      ? { ...stored, filename: stored.filename }
+      : { ...document, filename },
+    newFile: !stored,
+    restoreDocument: stored?.deletedAt != null,
     parser: resolved.parser,
     rows: planned,
     closingBalance: resolved.statement.closingBalance,
@@ -232,5 +253,5 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     presetId: resolved.presetId,
     columnMap: resolved.columnMap,
   });
-  return { kind: "batch", alreadyImported: false, unreadable: resolved.statement.unreadable, ...batch };
+  return { kind: "batch", alreadyImported: false, ...batch };
 }

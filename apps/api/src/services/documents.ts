@@ -72,7 +72,15 @@ function findByHash(db: Db, hash: string): DocumentRow | undefined {
   return db.select().from(documents).where(eq(documents.hash, hash)).get();
 }
 
-function restoreDocument(db: Db, row: DocumentRow, input: WriteInput): Document {
+export function restoreDocument(db: Db, id: string, input: WriteInput): Document {
+  const row = db.select().from(documents).where(eq(documents.id, id)).get();
+  if (!row) {
+    throw new ServiceError("document_not_found", 404);
+  }
+  return restoreStoredDocument(db, row, input);
+}
+
+function restoreStoredDocument(db: Db, row: DocumentRow, input: WriteInput): Document {
   const at = input.at ?? utcNow();
   let restored: DocumentRow | undefined;
   write(db, { source: input.source, at }, (tx) => {
@@ -100,7 +108,7 @@ function restoreDocument(db: Db, row: DocumentRow, input: WriteInput): Document 
 
 function sameDocument(db: Db, row: DocumentRow, input: WriteInput): Document {
   if (row.deletedAt) {
-    return restoreDocument(db, row, input);
+    return restoreStoredDocument(db, row, input);
   }
   return toDocument(row);
 }

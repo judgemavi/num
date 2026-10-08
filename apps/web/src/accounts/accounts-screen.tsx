@@ -309,7 +309,9 @@ export function AccountsScreen() {
         onOpenChange={setImportOpen}
         onImported={() => {
           void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+          void queryClient.invalidateQueries({ queryKey: ["account"] });
           void queryClient.invalidateQueries({ queryKey: ["imports"] });
+          void queryClient.invalidateQueries({ queryKey: ["transactions"] });
         }}
       />
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>

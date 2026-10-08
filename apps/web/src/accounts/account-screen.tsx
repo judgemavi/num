@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AccountForm } from "@/accounts/account-form";
+import { AccountImports } from "@/accounts/account-imports";
 import { AccountTransactions } from "@/accounts/account-transactions";
 import { CheckpointHistory } from "@/accounts/checkpoint-history";
 import { accountDetail, kindLabel } from "@/accounts/format";
@@ -106,6 +107,7 @@ export function AccountScreen() {
           }}
         />
         <CheckpointHistory accountId={row.id} currency={bookCurrency} owed={accountClass(row.kind) === "liability"} />
+        <AccountImports accountId={row.id} accountName={row.name} currency={bookCurrency} />
       </div>
       <Dialog open={search.reconcile} onOpenChange={(open) => !open && void navigate({ search: { ...search, reconcile: false } })}>
         <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">

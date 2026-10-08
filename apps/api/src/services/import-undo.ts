@@ -1,41 +1,37 @@
-import { importBatches, importRows, transactions } from "@num/db";
+import { auditLog, importBatches, importRows, transactions } from "@num/db";
 import { utcNow, type ImportUndo, type UndoBlockReason } from "@num/shared";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { presentBatch } from "./import-read";
-import { loadLines } from "./transaction-lines";
 import { auditTransaction, readTransaction, type TxRow } from "./transaction-record";
 import { write, type AuditSource } from "./write";
 
-type Row = typeof importRows.$inferSelect;
+function editedAfterImport(db: Db, transactionId: string): boolean {
+  const rows = db
+    .select({ action: auditLog.action })
+    .from(auditLog)
+    .where(and(eq(auditLog.entity, "transactions"), eq(auditLog.entityId, transactionId)))
+    .orderBy(sql`rowid`)
+    .all();
+  const created = rows.findIndex((row) => row.action === "create");
+  if (created < 0) {
+    return true;
+  }
+  return rows.slice(created + 1).some((row) => row.action === "update");
+}
 
-function blockReason(txn: TxRow | undefined, row: Row, db: Db): UndoBlockReason | null {
+function blockReason(txn: TxRow | undefined, db: Db): UndoBlockReason | "removed" | null {
   if (!txn || txn.deletedAt !== null) {
-    return "edited";
+    return "removed";
   }
   if (txn.status === "reconciled") {
     return "reconciled";
   }
-  const lines = loadLines(db, txn.id);
-  const line = lines.length === 1 ? lines[0] : undefined;
-  const untouched =
-    txn.status === "open" &&
-    txn.date === row.date &&
-    txn.amount === row.amount &&
-    txn.payeeRaw === row.payeeRaw &&
-    txn.merchantId === null &&
-    txn.notes === null &&
-    txn.source === "import" &&
-    txn.transferPeerId === null &&
-    txn.importRowId === row.id &&
-    line !== undefined &&
-    line.amount === row.amount &&
-    line.memo === null &&
-    line.categoryId === null &&
-    line.transferAccountId === null &&
-    line.tagIds.length === 0;
-  return untouched ? null : "edited";
+  if (editedAfterImport(db, txn.id)) {
+    return "edited";
+  }
+  return null;
 }
 
 export function undoImportBatch(db: Db, id: string, input: { source: AuditSource; at?: string }): ImportUndo {
@@ -61,8 +57,10 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
       const txn = row.transactionId
         ? db.select().from(transactions).where(eq(transactions.id, row.transactionId)).get()
         : undefined;
-      const reason = blockReason(txn, row, db);
-      if (reason) {
+      const reason = blockReason(txn, db);
+      if (reason === "removed") {
+        dropIds.push(row.id);
+      } else if (reason) {
         blocked.push({
           rowIndex: row.rowIndex,
           date: row.date,

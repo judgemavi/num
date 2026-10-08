@@ -334,3 +334,4 @@ test("a column map is saved after the first import", () => {
     book.close();
   }
 });
+

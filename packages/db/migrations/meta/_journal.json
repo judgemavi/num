@@ -43,6 +43,13 @@
       "when": 1791464368300,
       "tag": "0005_payee_normalized",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791464659682,
+      "tag": "0006_account_import_fields",
+      "breakpoints": true
     }
   ]
 }

@@ -131,12 +131,13 @@ export function auditTransaction(
   action: string,
   before: Transaction | null,
   after: Transaction | null,
+  extra?: Record<string, string | null>,
 ): void {
   tx.audit({
     entity: "transactions",
     entityId: id,
     action,
     before: before ? snapshot(before) : null,
-    after: after ? snapshot(after) : null,
+    after: after ? { ...snapshot(after), ...extra } : null,
   });
 }

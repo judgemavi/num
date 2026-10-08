@@ -1,9 +1,5 @@
 import { createHash } from "node:crypto";
-import { Temporal } from "@num/shared";
-
-export function normalizePayee(payee: string): string {
-  return payee.toUpperCase().replace(/\s+/g, " ").trim();
-}
+import { normalizePayee, Temporal, type Suggestion } from "@num/shared";
 
 export type PlanCandidate = {
   id: string;
@@ -25,6 +21,7 @@ export type PlannedImportRow = PlanInput & {
   identity: string;
   outcome: PlannedOutcome;
   transactionId: string | null;
+  suggestion: Suggestion | null;
 };
 
 function fingerprint(accountId: string, date: string, amount: number, payee: string, n: number): string {
@@ -60,7 +57,7 @@ export function planImportRows(
       identity = fingerprint(accountId, row.date, row.amount, row.payeeRaw, n);
     }
 
-    const base = { ...row, bankId, rowIndex, identity };
+    const base = { ...row, bankId, rowIndex, identity, suggestion: null };
     if (seen.has(identity)) {
       planned.push({ ...base, outcome: "duplicate", transactionId: null });
       return;
