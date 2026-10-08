@@ -82,6 +82,4 @@ export function planError(code: string): string {
   }
 }
 
-export function localAsOf(): string {
-  return Temporal.Now.plainDateISO().toString();
-}
+export { localAsOf } from "@/as-of";

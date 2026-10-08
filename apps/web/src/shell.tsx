@@ -1,8 +1,9 @@
-import { setupStatusSchema } from "@num/shared";
+import { inboxSchema, setupStatusSchema } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Ellipsis, type LucideIcon } from "lucide-react";
 import { useState } from "react";
+import { localAsOf } from "@/as-of";
 import { moreNav, phoneMoreNav, primaryNav, settingsNav, type NavPath } from "@/nav";
 import { apiRequest } from "@/request";
 import { SetupScreen } from "@/setup-screen";
@@ -171,15 +172,26 @@ function PhoneTabs({ pathname, inboxCount }: { pathname: string; inboxCount?: nu
 
 function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const asOf = localAsOf();
+  const inbox = useQuery({
+    queryKey: ["inbox", asOf],
+    queryFn: async () => {
+      const result = await apiRequest(`/api/inbox?asOf=${asOf}`, inboxSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
+    },
+  });
   return (
     <SidebarProvider className="h-svh overflow-hidden bg-background">
-      <AppSidebar pathname={pathname} />
+      <AppSidebar pathname={pathname} inboxCount={inbox.data?.count} />
       <SidebarInset className="min-h-0 overflow-y-auto bg-background">
         <main className="grid content-start gap-5 px-4 pt-2 pb-[calc(96px+env(safe-area-inset-bottom))] md:px-8 md:py-7 md:pb-9">
           <Outlet />
         </main>
       </SidebarInset>
-      <PhoneTabs pathname={pathname} />
+      <PhoneTabs pathname={pathname} inboxCount={inbox.data?.count} />
     </SidebarProvider>
   );
 }

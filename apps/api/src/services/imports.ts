@@ -18,6 +18,7 @@ import { saveImportBatch } from "./import-save";
 import { parseCsvStatement, splitCsvLine } from "./parse-csv";
 import { parseOfxStatement } from "./parse-ofx";
 import { loadPreset, loadPresets } from "./presets";
+import { autoLink } from "./recurring-view";
 import { suggestForPayee } from "./suggestions";
 import type { ParsedStatement } from "./statement";
 import type { AuditSource } from "./write";
@@ -31,6 +32,7 @@ type ImportInput = {
   bytes: Uint8Array;
   presetId?: string | null;
   columnMap?: ColumnMap | null;
+  asOf?: string;
 };
 
 type ReadyParse = {
@@ -253,5 +255,8 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     presetId: resolved.presetId,
     columnMap: resolved.columnMap,
   });
+  if (input.asOf) {
+    autoLink(db, input.asOf, { source: input.source, at, accountId: account.id });
+  }
   return { kind: "batch", alreadyImported: false, ...batch };
 }

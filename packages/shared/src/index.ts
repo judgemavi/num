@@ -304,6 +304,22 @@ export {
 export { detectPlans, type DetectionTransaction } from "./recurring-detect";
 export { isUtcTimestamp, utcNow } from "./time";
 export {
+  importReviewResolveSchema,
+  importReviewResultSchema,
+  inboxDismissSchema,
+  inboxImportSchema,
+  inboxItemSchema,
+  inboxKinds,
+  inboxRestoreSchema,
+  inboxSchema,
+  transferPairAcceptSchema,
+  type ImportReviewResolve,
+  type Inbox,
+  type InboxDismiss,
+  type InboxItem,
+  type InboxKind,
+} from "./inbox";
+export {
   transactionCreateSchema,
   transactionInputStatuses,
   transactionLineInputSchema,

@@ -4,13 +4,17 @@ import {
   importListSchema,
   importPresetListSchema,
   importResultSchema,
+  importReviewResolveSchema,
+  importReviewResultSchema,
   importUndoSchema,
+  isoDateSchema,
   type ColumnMap,
 } from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { resolveImportReview } from "../services/import-review";
 import { importStatement, listImportBatches, listImportPresets } from "../services/imports";
 import { undoImportBatch } from "../services/import-undo";
 
@@ -64,6 +68,7 @@ const importRoute = createRoute({
           schema: z.object({
             file: z.instanceof(File).openapi({ type: "string", format: "binary" }),
             accountId: z.uuid(),
+            asOf: isoDateSchema,
             presetId: z.string().optional(),
             columnMap: z.string().optional(),
           }),
@@ -79,6 +84,24 @@ const importRoute = createRoute({
     400: errorResponse,
     404: errorResponse,
     413: errorResponse,
+  },
+});
+
+const reviewRoute = createRoute({
+  method: "post",
+  path: "/api/imports/rows/{id}/resolve",
+  request: {
+    params: idParams,
+    body: { required: true, content: { "application/json": { schema: importReviewResolveSchema } } },
+  },
+  responses: {
+    200: {
+      description: "The review decision",
+      content: { "application/json": { schema: importReviewResultSchema } },
+    },
+    400: errorResponse,
+    404: errorResponse,
+    409: errorResponse,
   },
 });
 
@@ -143,9 +166,15 @@ export function registerImports(app: OpenAPIHono, db: Db, dataDir: string) {
       bytes: new Uint8Array(await body.file.arrayBuffer()),
       presetId: blankToNull(body.presetId),
       columnMap: readColumnMap(body.columnMap),
+      asOf: body.asOf,
       source: "import",
     });
     return c.json(result, 200);
+  });
+
+  app.openapi(reviewRoute, (c) => {
+    const { id } = c.req.valid("param");
+    return c.json(resolveImportReview(db, id, c.req.valid("json"), { source: "import" }), 200);
   });
 
   app.openapi(undoRoute, (c) => {

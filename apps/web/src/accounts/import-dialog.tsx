@@ -10,6 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { ImportMapForm } from "@/accounts/import-map-form";
 import { formatImportDate, importCountText, importError, unreadableLabel } from "@/accounts/import-format";
+import { localAsOf } from "@/as-of";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,7 @@ function ImportForm({
     const body = new FormData();
     body.set("file", file);
     body.set("accountId", accountId);
+    body.set("asOf", localAsOf());
     if (presetId !== savedFormat) {
       body.set("presetId", presetId);
     }

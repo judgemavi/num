@@ -294,8 +294,8 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
   return { changed, missed, ambiguous, proposals };
 }
 
-export function autoLink(db: Db, asOf: string, input: WriteInput): { linked: number } {
-  const plans = activePlans(db);
+export function autoLink(db: Db, asOf: string, input: WriteInput & { accountId?: string }): { linked: number } {
+  const plans = activePlans(db).filter((row) => !input.accountId || row.accountId === input.accountId);
   const links = db.select().from(occurrenceLinks).all();
   const grace = graceDays(db);
   const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));

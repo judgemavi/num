@@ -6,11 +6,13 @@ import {
   ruleSchema,
   suggestionQuerySchema,
   suggestionSchema,
+  transferPairAcceptSchema,
   transferPairListSchema,
+  transferPairSchema,
 } from "@num/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { listPromotionCandidates, listTransferPairs, promotePayee, suggestForPayee } from "../services/suggestions";
+import { acceptTransferPair, listPromotionCandidates, listTransferPairs, promotePayee, suggestForPayee } from "../services/suggestions";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -58,6 +60,21 @@ const transfersRoute = createRoute({
   },
 });
 
+const pairRoute = createRoute({
+  method: "post",
+  path: "/api/transfer-pairs",
+  request: {
+    query: asOfQuerySchema,
+    body: { required: true, content: { "application/json": { schema: transferPairAcceptSchema } } },
+  },
+  responses: {
+    200: { description: "The linked transfer", content: { "application/json": { schema: transferPairSchema } } },
+    400: errorResponse,
+    404: errorResponse,
+    409: errorResponse,
+  },
+});
+
 export function registerSuggestions(app: OpenAPIHono, db: Db) {
   app.openapi(suggestRoute, (c) => {
     const query = c.req.valid("query");
@@ -66,4 +83,8 @@ export function registerSuggestions(app: OpenAPIHono, db: Db) {
   app.openapi(promotionsRoute, (c) => c.json(listPromotionCandidates(db), 200));
   app.openapi(acceptRoute, (c) => c.json(promotePayee(db, { ...c.req.valid("json"), source: "ui" }), 200));
   app.openapi(transfersRoute, (c) => c.json(listTransferPairs(db, c.req.valid("query").asOf), 200));
+  app.openapi(pairRoute, (c) => {
+    const body = c.req.valid("json");
+    return c.json(acceptTransferPair(db, c.req.valid("query").asOf, body.leftId, body.rightId, { source: "ui" }), 200);
+  });
 }
