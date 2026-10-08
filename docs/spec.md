@@ -116,6 +116,13 @@ Rules:
   If the account has no valuation, use the transaction account formula.
 
 The opening balance is a field. It is not a transaction. There is no equity account.
+The opening balance is optional when the user creates an account. The default is 0. The default opening date is the day
+before the first transaction of the account (or the creation date when there is none).
+The app helps the user set it, always with one click and never without the user:
+- After the first import of a file with a running balance: "Set the opening balance from this statement".
+  Value = the first row's balance − the first row's amount, dated the day before the first row.
+- In reconcile (§7.5), when the account has no checkpoint and the balances are different:
+  "Set the opening balance so this statement balances" (opening balance + the difference).
 
 ### 5.2 Mortgage terms
 
