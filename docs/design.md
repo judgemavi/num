@@ -139,7 +139,18 @@ Use shadcn `Table` only for the Transactions list. All other record lists use Li
 - Show a status only when it is not the default. Example: show an "Essential" badge; do not show "Not essential".
 - Do not repeat information that the group already gives. Example: no "Income" label on rows in the Income group.
 
-**Long settings pages:** split them with shadcn `Tabs` (example: Categories, Tags, Preferences).
+**Settings:** each area is its own subpage with its own URL: `/settings/groups`, `/settings/categories`,
+`/settings/tags`, `/settings/backup`. Desktop: a settings sub-navigation (a short vertical list) on the left of the content.
+Phone: `/settings` shows the list of areas; each opens its own page with a back link. Do not put all areas on one page.
+
+**Filters (all list screens):** one compact filter bar, one row high.
+- Left: search field (max 320px) with a search icon.
+- Then a "Filters" button (secondary). Its count badge shows the number of active filters.
+  It opens a `Popover` on desktop and a `Sheet` on the phone with all filter fields and "Apply" / "Clear".
+- Right: the sort control (`Select` or `DropdownMenu`).
+- Below the bar, only when filters are active: one `Badge` for each active filter ("Account: Visa Card ×")
+  and a "Clear all" ghost button. A click on × removes that filter.
+- Do not show all filter fields on the page.
 
 **Focus:** one focus style for each control: a 3px iris ring. Do not add an outline as well.
 A search field inside a Command or Popover has no ring and no fill; the open popover shows the focus.

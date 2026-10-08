@@ -54,6 +54,8 @@ Goal: accounts and transactions are correct.
 |---|---|---|
 | D.1 Design system | `docs/design.md` (decision 0009). Tokens in `index.css` mapped to shadcn variables. Self-hosted Archivo. Shell: desktop sidebar with nav groups and phone bottom tabs with the More sheet. Components in `apps/web/src/components/`: PageHeader, SummaryStrip, ListCard (group header, row), SidePanel, Amount, IconTile, Progress, SplitBar, Chip, Pill, Count, Choice cards, Reveal, Disclosure, the 4 illustrations. Restyle setup, Accounts (grouped list, net worth strip, new account dialog with the kind picker of §9) and Settings. | Owner check against `docs/design/signal-reference.html`: same tokens, type, spacing and patterns. No request to Google Fonts. Layout works at 390px. Touch targets ≥ 44px. No hand edits in `components/ui/`. No tests (UI only). |
 
+| D.2 Compact filters and Settings subpages | Decision 0010. Filter bar component (design.md §6, Filters) used on Transactions and Accounts (archived switch moves into it). Settings subpages with sub-navigation: Groups, Categories (sorted by name; group shown on each row; filter by group), Tags, Backup (link the 0.6 page). Migration: remove `category_groups.sort_order`, add a unique lower(name) index on groups. Remove the reorder route and UI. | Owner check: one-row filter bar; badges for active filters; Settings subpages work at 390px. Tests: group and category lists sort by name without case; duplicate group name rejected. |
+
 ## Phase 2 — Capture
 
 Goal: imports are safe and the Inbox works.

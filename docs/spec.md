@@ -137,7 +137,8 @@ The terms do not create transactions.
 
 - Category fields: `name`, `kind` (`income | expense`), `groupId?`, `essential` (boolean, only for expense), `archivedAt?`.
   The name is unique. The comparison ignores case.
-- Group fields: `name`, `sortOrder`. Groups are only for display.
+- Group fields: `name`. The name is unique. The comparison ignores case. Groups are only for display.
+- Lists of groups and categories sort by name, without case. There is no manual order.
 - The user can delete a group. After a confirmation, its categories move to no group.
 - The user can change the kind of a category only when no transaction line uses it and it is not in a bucket.
 - **Spending** = the sum of the lines in expense categories.
@@ -638,6 +639,6 @@ There are 8 screens.
 | Insights | Month story, categories, merchants, tags, net worth, mortgage, hygiene panel |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms |
 | Recurring | Plans, occurrences, links, skips |
-| Settings | Categories, merchants and rules, tags, preferences, backup download |
+| Settings | Subpages: Groups, Categories, Tags, Backup. Later: Merchants and rules, Preferences. |
 
 The first-run setup screen (§7.0) is not one of the 8 screens. It shows only one time.
