@@ -489,19 +489,21 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
    merchant that the user chose or accepted (not one that the app set automatically).
    - All agree (1 or more): the app is **sure**.
    - 80% or more agree: a **suggestion** only.
-   - Less: nothing (the payee has a conflict).
+   - Less: the payee has a conflict. The most recent confirmation is a suggestion only.
 3. The default category of the merchant (a suggestion only).
 4. No result: the line is uncategorized. It goes to the Inbox.
 
 **Automatic labels (decision 0015).**
 - When the app is sure (a rule, or a learned payee where all confirmations agree), it sets the category and merchant
-  automatically, on import and on the payee's other uncategorized transactions.
+  automatically: on import (only the rows of that import, so undo removes them all), and after a user confirmation on
+  the payee's other uncategorized transactions. It keeps a merchant that the user set.
 - **Learn from the first answer.** When the user confirms a category or merchant for a payee, the app applies it at once
   to that payee's other uncategorized single-line transactions (one write, audited), and to future imports.
 - An automatic label stores its reason on the transaction: `autoReason` (`rule | learned`) and `autoSourceId`
   (the rule, or the confirmed transaction). The UI shows it ("Rule: NETFLIX", "Learned from Mar 12").
-  Transactions has an "Automatic" filter. When the user changes or confirms the label, `autoReason` is cleared and the
-  change counts as a confirmation.
+  Transactions has an "Automatic" filter. A confirmation is: the user changes the category or merchant, or clicks
+  "Looks right" on an automatic label. Then `autoReason` is cleared. Other edits (notes, tags) are not confirmations.
+- When a transaction becomes a transfer or a split, `autoReason` and `autoSourceId` are cleared.
 - If a new confirmation disagrees with the earlier ones, the payee is no longer sure: the app stops automatic labels for
   it and its next transactions go to the Inbox with a suggestion.
 - Transfers are never automatic. A transfer rule or evidence only preselects Transfer in the editor.
