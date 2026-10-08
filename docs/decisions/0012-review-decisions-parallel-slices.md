@@ -23,4 +23,4 @@ Parallel reviews of four slices found risks that need a rule in the spec.
 
 ## Consequences
 
-- Merge order: 2.5 (no migration), 3.2 (migration 0004), 2.2 (renumber to 0005), 2.3 (renumber to 0006).
+- Merge order: 2.5 (no migration), 3.2 (migration 0004), 2.3 (migration 0005), 2.2 (renumber to 0006).
