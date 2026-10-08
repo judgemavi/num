@@ -129,6 +129,23 @@ global component CSS (AGENTS.md).
 
 Use shadcn `Table` only for the Transactions list. All other record lists use ListCard rows.
 
+**Actions in lists:**
+- Click a row to open it (edit dialog or detail). The whole row is the target.
+- Show a maximum of one visible button in a row. Put other actions in a "More" menu
+  (shadcn `DropdownMenu`, an icon-only ghost button with `aria-label`).
+- Group headers have no visible buttons. Their actions (rename, reorder, delete) go in the group's "More" menu.
+- Archive, delete and other destructive actions are neutral menu items. Confirm them with `AlertDialog`.
+  Do not use tomato for destructive actions. Tomato means "this needs you" only.
+- Show a status only when it is not the default. Example: show an "Essential" badge; do not show "Not essential".
+- Do not repeat information that the group already gives. Example: no "Income" label on rows in the Income group.
+
+**Long settings pages:** split them with shadcn `Tabs` (example: Categories, Tags, Preferences).
+
+**Focus:** one focus style for each control: a 3px iris ring. Do not add an outline as well.
+A search field inside a Command or Popover has no ring and no fill; the open popover shows the focus.
+
+**Full height:** the app shell fills the viewport height. The desktop sidebar is full height and stays in place when the page scrolls.
+
 ## 7. Illustrations
 
 Four small duotone illustrations, one for each tinted summary strip: payday (Inbox), balance scale (Accounts),
