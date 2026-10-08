@@ -271,7 +271,7 @@ export function BucketRecord({ props, onClose, onSaved }: { props: EditorInput["
   const currency = useBookCurrency();
   const board = useActiveBuckets();
   const bucket = useRecord("bucket", props.id, `/api/buckets/${props.id ?? ""}`, bucketSchema);
-  const save = useSaved([["buckets"], ["bucket"]], onSaved);
+  const save = useSaved([["buckets"], ["bucket"], ["month-plan"]], onSaved);
   if (!currency.data || board.isPending || (props.id && bucket.isPending)) {
     return <LoadingLine label="Loading the bucket." />;
   }
@@ -297,7 +297,7 @@ export function PlanRecord({ props, onClose, onSaved }: { props: EditorInput["pl
   const categories = useCategories();
   const merchants = useMerchants();
   const plan = useRecord("plan", props.id, `/api/recurring/${props.id ?? ""}`, planSchema);
-  const save = useSaved([["plans"], ["plan"], ["recurring-signals"], ["occurrences"]], onSaved);
+  const save = useSaved([["plans"], ["plan"], ["recurring-signals"], ["occurrences"], ["month-plan"], ["forecast"]], onSaved);
   if (!currency.data || accounts.isPending || categories.isPending || merchants.isPending || (props.id && plan.isPending)) {
     return <LoadingLine label="Loading the plan." />;
   }

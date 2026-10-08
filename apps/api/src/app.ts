@@ -6,6 +6,7 @@ import { registerAccounts } from "./routes/accounts";
 import { registerCheckpoints } from "./routes/checkpoints";
 import { registerBuckets } from "./routes/buckets";
 import { registerForecast } from "./routes/forecast";
+import { registerPlan } from "./routes/plan";
 import { registerFunding } from "./routes/funding";
 import { registerCategories } from "./routes/categories";
 import { registerDocuments } from "./routes/documents";
@@ -53,6 +54,7 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
   registerBuckets(app, db);
   registerFunding(app, db);
   registerForecast(app, db);
+  registerPlan(app, db);
   registerCategories(app, db);
   registerTags(app, db);
   registerMerchants(app, db);

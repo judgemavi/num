@@ -140,6 +140,18 @@ export {
   type FundingRunCreate,
   type ReservedBill,
 } from "./funding";
+export {
+  buildMonthPlan,
+  isYearMonth,
+  monthPlanQuerySchema,
+  monthPlanSchema,
+  planSearchSchema,
+  yearMonthSchema,
+  type MonthPlan,
+  type MonthPlanBucketSource,
+  type MonthPlanLink,
+  type MonthPlanSource,
+} from "./month-plan";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
 export {
   chosenPresetId,

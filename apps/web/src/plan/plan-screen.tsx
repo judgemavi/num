@@ -1,17 +1,28 @@
-import { accountListSchema, currencyUpdateSchema, forecastSchema, Temporal } from "@num/shared";
+import { accountListSchema, currencyUpdateSchema, forecastSchema, monthPlanSchema, Temporal } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
-import { PaycheckSplitIllustration } from "@/components/illustrations";
 import { PageHeader } from "@/components/page-header";
-import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ForecastChart } from "@/plan/forecast-chart";
+import { MonthDetails, MonthFlow } from "@/plan/month-board";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
+
+const planRoute = getRouteApi("/plan");
+
+function shiftMonth(month: string, by: number): string {
+  return Temporal.PlainDate.from(`${month}-01`).add({ months: by }).toString().slice(0, 7);
+}
+
+function monthTitle(month: string): string {
+  return Temporal.PlainDate.from(`${month}-01`).toLocaleString(undefined, { month: "long", year: "numeric" });
+}
 
 function shortDate(iso: string): string {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric" });
@@ -25,6 +36,9 @@ function longRange(from: string, to: string): string {
 
 export function PlanScreen() {
   const asOf = localAsOf();
+  const search = planRoute.useSearch();
+  const navigate = planRoute.useNavigate();
+  const month = search.month ?? asOf.slice(0, 7);
   const [accountId, setAccountId] = useState("total");
   const currency = useQuery({
     queryKey: ["book-currency"],
@@ -39,6 +53,16 @@ export function PlanScreen() {
   const accounts = useQuery({
     queryKey: ["accounts", "plan"],
     queryFn: () => loadAllPages("/api/accounts", accountListSchema, { archived: false, sort: "name", dir: "asc" }),
+  });
+  const monthPlan = useQuery({
+    queryKey: ["month-plan", asOf, month],
+    queryFn: async () => {
+      const result = await apiRequest(`/api/plan?asOf=${asOf}&month=${month}`, monthPlanSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
+    },
   });
   const forecast = useQuery({
     queryKey: ["forecast", asOf],
@@ -60,41 +84,48 @@ export function PlanScreen() {
   const first = forecast.data?.dates[0];
   const last = forecast.data?.dates[forecast.data.dates.length - 1];
 
+  function go(next: string) {
+    const current = asOf.slice(0, 7);
+    void navigate({ search: { ...search, month: next === current ? undefined : next } });
+  }
+
   return (
     <>
-      <PageHeader kicker="Next 90 days" title="Plan" />
-      {forecast.data && lowest ? (
-        <SummaryStrip
-          tint="plan"
-          label="Lowest point"
-          amount={
-            <span className="text-attn">
-              <Amount currency={bookCurrency} minor={forecast.data.lowest.amount} hero />
-            </span>
-          }
-          hint={shortDate(forecast.data.lowest.date)}
-          facts={
-            <>
-              <Fact label="Safe to spend">
-                <Amount currency={bookCurrency} minor={forecast.data.safeToSpend} />
-              </Fact>
-              <Fact label="Known in 90 days">
-                <Amount currency={bookCurrency} minor={forecast.data.total.known[forecast.data.dates.length - 1] ?? 0} />
-              </Fact>
-              <Fact label="Estimated in 90 days">
-                <Amount currency={bookCurrency} minor={forecast.data.total.estimated[forecast.data.dates.length - 1] ?? 0} />
-              </Fact>
-            </>
-          }
-          illustration={<PaycheckSplitIllustration />}
-        />
+      <PageHeader
+        kicker="Your monthly plan"
+        title={`Plan · ${monthTitle(month)}`}
+        actions={
+          <>
+            <Button type="button" variant="secondary" size="icon" aria-label="Previous month" onClick={() => go(shiftMonth(month, -1))}>
+              <ChevronLeft strokeWidth={1.8} />
+            </Button>
+            <Button type="button" variant="secondary" size="icon" aria-label="Next month" onClick={() => go(shiftMonth(month, 1))}>
+              <ChevronRight strokeWidth={1.8} />
+            </Button>
+          </>
+        }
+      />
+      {monthPlan.isPending ? <p className="text-muted-foreground">Loading the month.</p> : null}
+      {monthPlan.isError ? (
+        <div className="grid gap-3">
+          <p>The month did not load.</p>
+          <Button type="button" onClick={() => void monthPlan.refetch()}>
+            Try again
+          </Button>
+        </div>
       ) : null}
+      {monthPlan.data ? <MonthFlow plan={monthPlan.data} currency={bookCurrency} /> : null}
       <Card>
         <CardContent className="grid gap-4 p-5 md:p-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 className="text-base font-bold">{title}, next 90 days</h2>
               {first && last ? <p className="text-sm text-muted-foreground">{longRange(first, last)}</p> : null}
+              {forecast.data ? (
+                <p className="text-sm">
+                  Safe to spend <Amount currency={bookCurrency} minor={forecast.data.safeToSpend} />
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-4 text-sm">
@@ -170,6 +201,7 @@ export function PlanScreen() {
             ))}
         </CardContent>
       </Card>
+      {monthPlan.data ? <MonthDetails plan={monthPlan.data} currency={bookCurrency} /> : null}
     </>
   );
 }
