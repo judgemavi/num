@@ -77,6 +77,12 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 - Do not write browser end-to-end tests. The owner does usability tests.
 - Use plain language in the UI (spec §2.6).
 
+## Running the app
+
+- Do not use the owner's ports (API 3000, web 5173) or the owner's data folder (`.data`).
+  Use your own `PORT`, `WEB_PORT`, `API_PORT` and a `DATA_DIR` under `/tmp`.
+- Stop every server that you started before you report the slice as finished.
+
 ## Verification
 
 Before you open a PR, run all of these. All must pass:
