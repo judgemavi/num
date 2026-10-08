@@ -226,6 +226,15 @@ test("imports fail when an on-budget account has no recent import", () => {
       bytes: new TextEncoder().encode("date,description,amount\n09/01/2026,SHOP,-1.00\n"),
       columnMap: map,
     });
+    importStatement(db, dir, {
+      ...saved,
+      at: "2026-10-20T12:00:00Z",
+      accountId: cash.id,
+      filename: "later.csv",
+      mimeType: "text/csv",
+      bytes: new TextEncoder().encode("date,description,amount\n10/20/2026,SHOP,-2.00\n"),
+      columnMap: map,
+    });
     const row = check(db, "2026-10-08", "imports_current");
     expect(row.pass).toBe(false);
     expect(row.staleImportDays).toBe(10);
@@ -233,7 +242,6 @@ test("imports fail when an on-budget account has no recent import", () => {
     expect(row.items[0]?.ageDays).toBe(37);
   });
 });
-
 test("the previous month passes when it is closed", () => {
   withBook((db) => {
     const cash = account(db, "chequing", "Cash", 500);
@@ -364,7 +372,6 @@ test("recurring passes when nothing is changed or missed", () => {
     expect(check(db, "2026-01-10", "recurring")).toMatchObject({ pass: true, changed: 0, missed: 0 });
   });
 });
-
 test("recurring fails when a payment was missed", () => {
   withBook((db) => {
     const cash = account(db, "chequing", "Cash", 0);

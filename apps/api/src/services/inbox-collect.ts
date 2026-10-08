@@ -267,7 +267,7 @@ function unreadableItems(db: Db): InboxItem[] {
   return items;
 }
 
-function importFreshness(db: Db): { accountId: string; lastImportAt: string | null }[] {
+function importFreshness(db: Db, asOf: string): { accountId: string; lastImportAt: string | null }[] {
   const open = db
     .select({ id: accounts.id })
     .from(accounts)
@@ -280,6 +280,9 @@ function importFreshness(db: Db): { accountId: string; lastImportAt: string | nu
     .all();
   const latest = new Map<string, string>();
   for (const batch of batches) {
+    if (batch.createdAt.slice(0, 10) > asOf) {
+      continue;
+    }
     const current = latest.get(batch.accountId);
     if (!current || current < batch.createdAt) {
       latest.set(batch.accountId, batch.createdAt);
@@ -306,7 +309,7 @@ export function collectInbox(db: Db, asOf: string): {
   ];
   return {
     items,
-    imports: importFreshness(db),
+    imports: importFreshness(db, asOf),
     staleImportDays: settingNumber(db, "staleImportDays", 10),
   };
 }

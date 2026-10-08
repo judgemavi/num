@@ -23,14 +23,21 @@ function detail(check: HygieneCheck, currency: string): string {
     return `${late.length} still unpaid after the due date.`;
   }
   if (check.code === "imports_current") {
-    const stale = check.items.filter((item) => !item.pass).length;
+    const stale = check.items.filter((item) => !item.pass);
+    const missing = check.items.filter((item) => item.lastImportDate === null);
     if (check.items.length === 0) {
       return "No on-budget accounts.";
     }
-    if (stale === 0) {
-      return `Each account has an import in the last ${check.staleImportDays} days.`;
+    const imported = check.items.length - missing.length;
+    const fresh =
+      stale.length === 0
+        ? `Each imported account has an import in the last ${check.staleImportDays} days.`
+        : `${stale.length} of ${imported} imported accounts are older than ${check.staleImportDays} days.`;
+    if (missing.length === 0) {
+      return fresh;
     }
-    return `${stale} of ${check.items.length} accounts are older than ${check.staleImportDays} days.`;
+    const absent = missing.length === 1 ? "1 not imported." : `${missing.length} not imported.`;
+    return imported === 0 ? absent : `${fresh} ${absent}`;
   }
   if (check.code === "month_closed") {
     if (check.status === "none") {

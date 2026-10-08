@@ -110,6 +110,7 @@ export function InboxScreen() {
 
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    void queryClient.invalidateQueries({ queryKey: ["hygiene"] });
     void queryClient.invalidateQueries({ queryKey: ["buckets"] });
     void queryClient.invalidateQueries({ queryKey: ["plans"] });
   }

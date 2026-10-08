@@ -113,6 +113,7 @@ export function MonthsScreen() {
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["months"] });
+    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
   }
 
   async function closeMonth(month: MonthDetail) {
@@ -146,15 +147,6 @@ export function MonthsScreen() {
   return (
     <>
       <PageHeader kicker="Insights" title="Months" />
-      <HygienePanel
-        currency={bookCurrency}
-        hygiene={hygiene.data}
-        pending={hygiene.isPending}
-        failed={hygiene.isError}
-        onMonth={(month) => {
-          void navigate({ search: (prev) => ({ ...prev, month }) });
-        }}
-      />
       {story ? (
         <SummaryStrip
           tint="plan"
@@ -175,6 +167,15 @@ export function MonthsScreen() {
           illustration={<PaycheckSplitIllustration />}
         />
       ) : null}
+      <HygienePanel
+        currency={bookCurrency}
+        hygiene={hygiene.data}
+        pending={hygiene.isPending}
+        failed={hygiene.isError}
+        onMonth={(month) => {
+          void navigate({ search: (prev) => ({ ...prev, month }) });
+        }}
+      />
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <ListCard label="Months" title="Months">
           {months.isPending ? <p className="px-5 py-4 text-sm text-muted-foreground">Loading months.</p> : null}

@@ -1,6 +1,7 @@
 import { accounts, checkpoints, forecastSnapshots, monthCloses, transactions } from "@num/db";
 import {
   isIsoDate,
+  type Inbox,
   isMonthKey,
   monthLastDay,
   monthStorySchema,
@@ -144,12 +145,12 @@ function liveDetail(db: Db, month: string, asOf: string, blockers: Blocker[]): M
   };
 }
 
-export function listMonths(db: Db, asOf: string): MonthList {
+export function listMonths(db: Db, asOf: string, knownInbox?: Inbox): MonthList {
   requireAsOf(asOf);
   const closes = new Map(db.select().from(monthCloses).all().map((row) => [row.month, row]));
   const accountRows = db.select().from(accounts).all();
   const checkpointRows = db.select().from(checkpoints).all();
-  const inboxMonths = new Set(listInbox(db, asOf).items.map((item) => item.date.slice(0, 7)));
+  const inboxMonths = new Set((knownInbox ?? listInbox(db, asOf)).items.map((item) => item.date.slice(0, 7)));
   return {
     asOf,
     items: monthsInBook(db, asOf).map((month) => {
@@ -161,6 +162,21 @@ export function listMonths(db: Db, asOf: string): MonthList {
       return { month, status: statusOf(isClosed(closes.get(month)), blockers), blockers };
     }),
   };
+}
+
+export function closedStories(db: Db, months: readonly string[]) {
+  const wanted = new Set(months);
+  const stories = new Map<string, MonthDetail["story"]>();
+  if (wanted.size === 0) {
+    return stories;
+  }
+  for (const row of db.select().from(monthCloses).all()) {
+    if (!wanted.has(row.month) || row.reopenedAt !== null) {
+      continue;
+    }
+    stories.set(row.month, monthStorySchema.parse(JSON.parse(row.summaryJson)));
+  }
+  return stories;
 }
 
 export function readMonth(db: Db, month: string, asOf: string): MonthDetail {

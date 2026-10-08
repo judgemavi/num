@@ -7,6 +7,8 @@ import {
   type AccountListQuery,
   type BucketListQuery,
   type Hygiene,
+  type Inbox,
+  type MonthList,
   type PlanListQuery,
 } from "@num/shared";
 import type { Db } from "../db";
@@ -15,11 +17,10 @@ import { listAccounts } from "./accounts";
 import { listBuckets, listOverspent } from "./buckets";
 import { cardLedger } from "./card-statements";
 import { monthlyBills } from "./funding-book";
-import { collectInbox, settingNumber } from "./inbox-collect";
+import { settingNumber } from "./inbox-collect";
 import { listInbox } from "./inbox";
-import { listMonths, readMonth } from "./months";
+import { closedStories, listMonths } from "./months";
 import { listPlans } from "./recurring-plans";
-import { recurringSignals } from "./recurring-view";
 
 const pageSize = 200;
 
@@ -100,11 +101,11 @@ function cardsPaid(db: Db, asOf: string) {
     .filter((account) => account.kind === "credit_card" && account.paymentPolicy === "full")
     .map((account) => {
       const ledger = cardLedger(db, account.id);
-      const listed = cardStatements({
-        statements: ledger.statements,
-        paymentDates: ledger.payments.map((payment) => payment.date),
-      }).filter((item) => item.code === "statement");
-      const latest = listed[listed.length - 1];
+      const due = cardStatements({
+        statements: ledger.statements.filter((row) => row.date <= asOf),
+        paymentDates: ledger.payments.filter((payment) => payment.date <= asOf).map((payment) => payment.date),
+      }).filter((item) => item.code === "statement" && item.date <= asOf && item.dueDate <= asOf);
+      const latest = due[due.length - 1];
       if (!latest) {
         return { accountId: account.id, statementDate: null, dueDate: null, owed: 0, paid: 0, pass: true };
       }
@@ -113,7 +114,7 @@ function cardsPaid(db: Db, asOf: string) {
         .sort((left, right) => (left.createdAt < right.createdAt ? 1 : -1))[0];
       const owed = Math.max(0, -(statement?.balance ?? 0));
       const paid = ledger.payments.reduce((sum, payment) => {
-        if (payment.date > latest.date && payment.date <= latest.dueDate && payment.date <= asOf) {
+        if (payment.date > latest.date && payment.date <= latest.dueDate) {
           return sum + payment.amount;
         }
         return sum;
@@ -124,41 +125,41 @@ function cardsPaid(db: Db, asOf: string) {
         dueDate: latest.dueDate,
         owed,
         paid,
-        pass: latest.dueDate > asOf || paid >= owed,
+        pass: paid >= owed,
       };
     });
   return { code: "cards_paid" as const, pass: items.every((item) => item.pass), items };
 }
 
-function importsCurrent(db: Db, asOf: string) {
+function importsCurrent(db: Db, asOf: string, inbox: Inbox) {
   const staleImportDays = settingNumber(db, "staleImportDays", 10);
-  const imported = new Map(collectInbox(db, asOf).imports.map((row) => [row.accountId, row.lastImportAt]));
+  const imported = new Map(inbox.imports.map((row) => [row.accountId, row.lastImportAt]));
   const items = accounts(db)
     .filter((account) => account.onBudget)
     .map((account) => {
       const at = imported.get(account.id) ?? null;
-      const lastImportDate = at ? at.slice(0, 10) : null;
+      const lastImportDate = at && at.slice(0, 10) <= asOf ? at.slice(0, 10) : null;
       const age = lastImportDate ? ageDays(asOf, lastImportDate) : null;
       return {
         accountId: account.id,
         lastImportDate,
         ageDays: age,
-        pass: age !== null && age <= staleImportDays,
+        pass: age === null || age <= staleImportDays,
       };
     });
   return { code: "imports_current" as const, pass: items.every((item) => item.pass), staleImportDays, items };
 }
 
-function monthClosed(db: Db, asOf: string) {
+function monthClosed(asOf: string, months: MonthList) {
   const month = previousMonth(asOf);
-  const listed = listMonths(db, asOf).items.find((item) => item.month === month);
+  const listed = months.items.find((item) => item.month === month);
   const status = listed?.status ?? "none";
   return { code: "month_closed" as const, pass: status === "closed" || status === "none", month, status };
 }
 
-function inboxAge(db: Db, asOf: string) {
+function inboxAge(asOf: string, inbox: Inbox) {
   const limit = Temporal.PlainDate.from(asOf).subtract({ days: inboxAgeDays }).toString();
-  const old = listInbox(db, asOf).items.filter((item) => item.date < limit);
+  const old = inbox.items.filter((item) => item.date < limit);
   let oldestDate: string | null = null;
   for (const item of old) {
     if (oldestDate === null || item.date < oldestDate) {
@@ -181,23 +182,27 @@ function sinkingFunds(db: Db) {
   return { code: "sinking_funds" as const, pass: missing.length === 0, yearly: yearly.length, missing };
 }
 
-function savingsRate(db: Db, asOf: string) {
-  const closed = listMonths(db, asOf).items.filter((item) => item.status === "closed").slice(0, 3);
-  const months = closed.map((item) => {
-    const story = readMonth(db, item.month, asOf).story;
-    return { month: item.month, savingsRateMilliPct: story.savingsRateMilliPct, savings: story.savings };
+function savingsRate(db: Db, months: MonthList) {
+  const closed = months.items.filter((item) => item.status === "closed").slice(0, 3);
+  const stories = closedStories(db, closed.map((item) => item.month));
+  const rows = closed.map((item) => {
+    const story = stories.get(item.month);
+    return { month: item.month, savingsRateMilliPct: story?.savingsRateMilliPct ?? null, savings: story?.savings ?? 0 };
   });
-  return { code: "savings_rate" as const, pass: months.every((item) => item.savings >= 0), months };
+  return { code: "savings_rate" as const, pass: rows.every((item) => item.savings >= 0), months: rows };
 }
 
-function recurring(db: Db, asOf: string) {
-  const signals = recurringSignals(db, asOf);
-  return {
-    code: "recurring" as const,
-    pass: signals.changed.length === 0 && signals.missed.length === 0,
-    changed: signals.changed.length,
-    missed: signals.missed.length,
-  };
+function recurring(inbox: Inbox) {
+  let changed = 0;
+  let missed = 0;
+  for (const item of inbox.items) {
+    if (item.kind === "recurring_changed") {
+      changed += 1;
+    } else if (item.kind === "recurring_missed") {
+      missed += 1;
+    }
+  }
+  return { code: "recurring" as const, pass: changed === 0 && missed === 0, changed, missed };
 }
 
 function overspent(db: Db) {
@@ -208,17 +213,19 @@ function overspent(db: Db) {
 
 export function readHygiene(db: Db, asOf: string): Hygiene {
   requireAsOf(asOf);
+  const inbox = listInbox(db, asOf);
+  const months = listMonths(db, asOf, inbox);
   return hygieneSchema.parse({
     asOf,
     checks: [
       emergencyFund(db, asOf),
       cardsPaid(db, asOf),
-      importsCurrent(db, asOf),
-      monthClosed(db, asOf),
-      inboxAge(db, asOf),
+      importsCurrent(db, asOf, inbox),
+      monthClosed(asOf, months),
+      inboxAge(asOf, inbox),
       sinkingFunds(db),
-      savingsRate(db, asOf),
-      recurring(db, asOf),
+      savingsRate(db, months),
+      recurring(inbox),
       overspent(db),
     ],
   });
