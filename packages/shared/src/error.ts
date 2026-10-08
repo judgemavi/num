@@ -105,6 +105,7 @@ export const errorCodes = [
   "month_invalid",
   "month_not_ended",
   "month_not_found",
+  "period_invalid",
   "month_not_ready",
   "month_closed",
   "month_not_closed",

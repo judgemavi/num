@@ -154,6 +154,19 @@ export {
 } from "./month-plan";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
 export {
+  insightBreakdowns,
+  insightRowKinds,
+  insightsQuerySchema,
+  insightsSchema,
+  insightsSearchSchema,
+  type InsightBreakdown,
+  type InsightRow,
+  type InsightRowKind,
+  type Insights,
+  type InsightsQuery,
+  type InsightsSearch,
+} from "./insights";
+export {
   chosenPresetId,
   detectStatementFormat,
   firstStatementDate,

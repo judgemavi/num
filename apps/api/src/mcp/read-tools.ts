@@ -6,6 +6,7 @@ import {
   categoryListQuerySchema,
   importViewQuerySchema,
   inboxQuerySchema,
+  insightsQuerySchema,
   isoDateSchema,
   merchantListQuerySchema,
   planListQuerySchema,
@@ -20,6 +21,7 @@ import { readForecastOnly } from "../services/forecast";
 import { fundingPosition } from "../services/funding-book";
 import { listImportView } from "../services/import-list";
 import { listInbox } from "../services/inbox";
+import { readInsights } from "../services/insights";
 import { listMerchants } from "../services/merchants";
 import { listPlans } from "../services/recurring-plans";
 import { listOccurrences } from "../services/recurring-view";
@@ -147,6 +149,16 @@ export function registerReadTools(server: McpServer, db: Db) {
       const { id, asOf } = occurrenceReadSchema.parse(args);
       return listOccurrences(db, id, asOf);
     },
+  );
+
+  addTool(
+    server,
+    "get_insights",
+    {
+      description: "Read spending for a period, the 12-month trend and 24 months of net worth. Requires asOf. Amounts are integer minor units.",
+      inputSchema: insightsQuerySchema,
+    },
+    (args) => readInsights(db, insightsQuerySchema.parse(args)),
   );
 
   addTool(

@@ -1,13 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { editOnly } from "@/editors/page-search";
-import { MonthsScreen } from "@/insights/months-screen";
-import { isMonthKey } from "@num/shared";
+import { insightsSearchSchema, type InsightsSearch } from "@num/shared";
+import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
+import { withEdit } from "@/editors/page-search";
+import { InsightsScreen } from "@/insights/insights-screen";
+
+type Search = InsightsSearch & { edit?: string };
 
 export const Route = createFileRoute("/insights")({
-  validateSearch: (search: Record<string, unknown>): { edit?: string; month?: string } => {
-    const base = editOnly(search);
-    const month = typeof search.month === "string" && isMonthKey(search.month) ? search.month : undefined;
-    return month ? { ...base, month } : base;
+  validateSearch: (search: Record<string, unknown>): Search => withEdit(insightsSearchSchema, search),
+  search: {
+    middlewares: [stripSearchParams<Search>({ edit: undefined })],
   },
-  component: MonthsScreen,
+  component: InsightsScreen,
 });

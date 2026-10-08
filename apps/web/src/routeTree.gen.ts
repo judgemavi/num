@@ -19,6 +19,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TransactionsRouteImport } from './routes/transactions'
 import { Route as AccountsAccountIdRouteImport } from './routes/accounts_.$accountId'
 import { Route as AccountsImportsRouteImport } from './routes/accounts_.imports'
+import { Route as InsightsMonthsRouteImport } from './routes/insights_.months'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsBackupRouteImport } from './routes/settings/backup'
 import { Route as SettingsCategoriesRouteImport } from './routes/settings/categories'
@@ -77,6 +78,11 @@ const AccountsImportsRoute = AccountsImportsRouteImport.update({
   path: '/accounts/imports',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InsightsMonthsRoute = InsightsMonthsRouteImport.update({
+  id: '/insights_/months',
+  path: '/insights/months',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/transactions': typeof TransactionsRoute
   '/accounts/$accountId': typeof AccountsAccountIdRoute
   '/accounts/imports': typeof AccountsImportsRoute
+  '/insights/months': typeof InsightsMonthsRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
@@ -142,6 +149,7 @@ export interface FileRoutesByTo {
   '/transactions': typeof TransactionsRoute
   '/accounts/$accountId': typeof AccountsAccountIdRoute
   '/accounts/imports': typeof AccountsImportsRoute
+  '/insights/months': typeof InsightsMonthsRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
@@ -162,6 +170,7 @@ export interface FileRoutesById {
   '/transactions': typeof TransactionsRoute
   '/accounts_/$accountId': typeof AccountsAccountIdRoute
   '/accounts_/imports': typeof AccountsImportsRoute
+  '/insights_/months': typeof InsightsMonthsRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
@@ -183,6 +192,7 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/accounts/$accountId'
     | '/accounts/imports'
+    | '/insights/months'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/accounts/$accountId'
     | '/accounts/imports'
+    | '/insights/months'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/accounts_/$accountId'
     | '/accounts_/imports'
+    | '/insights_/months'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
@@ -240,6 +252,7 @@ export interface RootRouteChildren {
   TransactionsRoute: typeof TransactionsRoute
   AccountsAccountIdRoute: typeof AccountsAccountIdRoute
   AccountsImportsRoute: typeof AccountsImportsRoute
+  InsightsMonthsRoute: typeof InsightsMonthsRoute
   AccountsImportsImportIdRoute: typeof AccountsImportsImportIdRoute
 }
 
@@ -313,6 +326,13 @@ declare module '@tanstack/react-router' {
       path: '/accounts/imports'
       fullPath: '/accounts/imports'
       preLoaderRoute: typeof AccountsImportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/insights_/months': {
+      id: '/insights_/months'
+      path: '/insights/months'
+      fullPath: '/insights/months'
+      preLoaderRoute: typeof InsightsMonthsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/': {
@@ -400,6 +420,7 @@ const rootRouteChildren: RootRouteChildren = {
   TransactionsRoute: TransactionsRoute,
   AccountsAccountIdRoute: AccountsAccountIdRoute,
   AccountsImportsRoute: AccountsImportsRoute,
+  InsightsMonthsRoute: InsightsMonthsRoute,
   AccountsImportsImportIdRoute: AccountsImportsImportIdRoute,
 }
 export const routeTree = rootRouteImport

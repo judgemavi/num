@@ -11,7 +11,7 @@ import {
   type MonthDetail,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
+import { getRouteApi, Link } from "@tanstack/react-router";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
 import { PaycheckSplitIllustration } from "@/components/illustrations";
@@ -29,7 +29,7 @@ import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { useState } from "react";
 
-const insightsRoute = getRouteApi("/insights");
+const insightsRoute = getRouteApi("/insights_/months");
 
 function namesFrom<T extends { id: string; name: string }>(items: T[] | undefined): Map<string, string> {
   return new Map((items ?? []).map((item) => [item.id, item.name]));
@@ -146,7 +146,15 @@ export function MonthsScreen() {
 
   return (
     <>
-      <PageHeader kicker="Insights" title="Months" />
+      <PageHeader
+        kicker="Insights"
+        title="Months"
+        actions={
+          <Button type="button" variant="secondary" asChild>
+            <Link to="/insights">Spending</Link>
+          </Button>
+        }
+      />
       {story ? (
         <SummaryStrip
           tint="plan"

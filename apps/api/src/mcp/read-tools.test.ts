@@ -8,6 +8,7 @@ import {
   columnMapSchema,
   importViewQuerySchema,
   inboxQuerySchema,
+  insightsQuerySchema,
   merchantListQuerySchema,
   planListQuerySchema,
   transactionListQuerySchema,
@@ -24,6 +25,7 @@ import { fundingPosition } from "../services/funding-book";
 import { listImportView } from "../services/import-list";
 import { importStatement } from "../services/imports";
 import { listInbox } from "../services/inbox";
+import { readInsights } from "../services/insights";
 import { createMerchant, listMerchants } from "../services/merchants";
 import { listPlans, createPlan } from "../services/recurring-plans";
 import { listOccurrences } from "../services/recurring-view";
@@ -226,6 +228,9 @@ test("each read tool returns the same data as its service", async () => {
       listOccurrences(book.db, planId, asOf),
     );
     expect(dataOf(await callTool(book.db, book.dir, "get_forecast", { asOf }))).toEqual(readForecastOnly(book.db, asOf));
+    expect(dataOf(await callTool(book.db, book.dir, "get_insights", { asOf, by: "category" }))).toEqual(
+      readInsights(book.db, insightsQuerySchema.parse({ asOf, by: "category" })),
+    );
     expect(dataOf(await callTool(book.db, book.dir, "list_inbox", { asOf }))).toEqual(
       listInbox(book.db, inboxQuery.asOf),
     );
@@ -247,7 +252,7 @@ test("tools that need today require asOf", async () => {
           result?: { tools?: { name: string; inputSchema?: { required?: string[]; properties?: Record<string, { format?: string; pattern?: string }> } }[] };
         }
       ).result?.tools ?? [];
-    for (const name of ["list_buckets", "list_occurrences", "get_forecast", "list_inbox"]) {
+    for (const name of ["list_buckets", "list_occurrences", "get_forecast", "get_insights", "list_inbox"]) {
       const schema = tools.find((tool) => tool.name === name)?.inputSchema;
       expect(schema?.required).toContain("asOf");
       expect(schema?.properties?.asOf).toMatchObject({ format: "date", pattern: String.raw`^\d{4}-\d{2}-\d{2}$` });
@@ -276,6 +281,7 @@ test("read tools do not write", async () => {
       ["list_plans", {}],
       ["list_occurrences", { id: planId, asOf }],
       ["get_forecast", { asOf }],
+      ["get_insights", { asOf }],
       ["list_inbox", { asOf }],
       ["list_imports", {}],
     ];
@@ -294,7 +300,7 @@ test("date tools reject a call without asOf", async () => {
   const book = tempBook();
   try {
     const { planId } = seed(book.db, book.dir);
-    const names = ["list_buckets", "list_occurrences", "get_forecast", "list_inbox"] as const;
+    const names = ["list_buckets", "list_occurrences", "get_forecast", "get_insights", "list_inbox"] as const;
     for (const name of names) {
       const missing = await callTool(book.db, book.dir, name, name === "list_occurrences" ? { id: planId } : {});
       expect(missing.result?.isError).toBe(true);
