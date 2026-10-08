@@ -1,20 +1,4 @@
-import {
-  accountListSchema,
-  categoryListSchema,
-  currencyUpdateSchema,
-  importDetailSchema,
-  importUndoSchema,
-  merchantListSchema,
-  tagListSchema,
-  transactionSchema,
-  type Account,
-  type Category,
-  type ImportDetailRow,
-  type ImportUndo,
-  type Merchant,
-  type Tag,
-  type Transaction,
-} from "@num/shared";
+import { currencyUpdateSchema, importDetailSchema, importUndoSchema, type ImportDetailRow } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -30,7 +14,6 @@ import {
   unreadableLabel,
 } from "@/accounts/import-format";
 import { apiRequest } from "@/request";
-import { loadAllPages } from "@/settings/load-all-pages";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
@@ -38,36 +21,17 @@ import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { TransactionDialog } from "@/transactions/transaction-dialog";
+import { useEditors } from "@/editors/editor-api";
+import { useBookCurrency } from "@/editors/lookups";
 
 const detailRoute = getRouteApi("/accounts_/imports_/$importId");
-
-type Page<T> = { items: T[]; page: number; pageSize: number; total: number };
-
-async function loadNamed<T extends { id: string }>(base: string, schema: { parse: (data: unknown) => Page<T> }) {
-  const active = await loadAllPages(base, schema, { archived: false });
-  const archived = await loadAllPages(base, schema, { archived: true });
-  return [...active.items, ...archived.items];
-}
 
 export function ImportDetailScreen() {
   const { importId } = detailRoute.useParams();
   const queryClient = useQueryClient();
-  const [confirmUndo, setConfirmUndo] = useState(false);
-  const [blocked, setBlocked] = useState<ImportUndo["blocked"]>([]);
+  const { openEditor, confirm } = useEditors();
+  const currency = useBookCurrency();
   const [error, setError] = useState<string | null>(null);
-  const [transactionId, setTransactionId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
 
   const detail = useQuery({
     queryKey: ["import-detail", importId],
@@ -88,19 +52,49 @@ export function ImportDetailScreen() {
     document.getElementById(id)?.scrollIntoView({ block: "center" });
   }, [detail.data]);
 
-  async function confirm() {
-    setConfirmUndo(false);
+  async function undoImport(filename: string) {
+    const ok = await confirm({
+      title: "Undo this import?",
+      description: `Remove the transactions from ${filename} that are still unchanged. Matched rows lose their link.`,
+      confirmLabel: "Undo import",
+    });
+    if (!ok) {
+      return;
+    }
     const result = await apiRequest(`/api/imports/${importId}/undo`, importUndoSchema, { method: "POST" });
     if (!result.ok) {
       setError(importError(result.code));
       return;
     }
     setError(null);
-    setBlocked(result.data.blocked);
     await queryClient.invalidateQueries({ queryKey: ["import-detail", importId] });
     await queryClient.invalidateQueries({ queryKey: ["import-view"] });
     await queryClient.invalidateQueries({ queryKey: ["imports"] });
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    if (result.data.blocked.length > 0) {
+      await confirm({
+        title: "Some rows stayed",
+        description: (
+          <div className="grid gap-3">
+            <p>These rows were edited or reconciled, so this undo left them in place.</p>
+            <ul className="grid max-h-64 gap-3 overflow-y-auto">
+              {result.data.blocked.map((row) => (
+                <li key={row.rowIndex} className="grid gap-1 border-t pt-3 text-sm">
+                  <p className="font-semibold text-foreground">
+                    {formatStatementDate(row.date)} · {row.payeeRaw || "No description"}
+                  </p>
+                  <p>
+                    {currency.data ? <Amount currency={currency.data} minor={row.amount} /> : null} · {undoBlockLabel(row.reason)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ),
+        confirmLabel: "Close",
+        hideCancel: true,
+      });
+    }
   }
 
   if (detail.isPending) {
@@ -136,7 +130,7 @@ export function ImportDetailScreen() {
             ) : null}
             {item.status === "undone" ? null : (
               <RowMenu label={`Actions for ${filename}`}>
-                <DropdownMenuItem className="min-h-11" onSelect={() => setConfirmUndo(true)}>
+                <DropdownMenuItem className="min-h-11" onSelect={() => void undoImport(filename)}>
                   Undo
                 </DropdownMenuItem>
               </RowMenu>
@@ -165,7 +159,7 @@ export function ImportDetailScreen() {
           <p className="px-5 py-4 text-muted-foreground">This file has no rows.</p>
         ) : null}
         {detail.data.rows.map((row) => (
-          <DetailRow key={row.id} row={row} onOpenTransaction={setTransactionId} />
+          <DetailRow key={row.id} row={row} onOpenTransaction={(id) => void openEditor("transaction", { id })} />
         ))}
         {detail.data.unreadable.map((row) => (
           <ListRow key={`line-${row.line}`}>
@@ -178,75 +172,6 @@ export function ImportDetailScreen() {
           </ListRow>
         ))}
       </ListCard>
-      <AlertDialog open={confirmUndo} onOpenChange={setConfirmUndo}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Undo this import?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Remove the transactions from {filename} that are still unchanged. Matched rows lose their link.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void confirm()}>Undo import</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={blocked.length > 0} onOpenChange={(open) => !open && setBlocked([])}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Some rows stayed</AlertDialogTitle>
-            <AlertDialogDescription>These rows were edited or reconciled, so this undo left them in place.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <ul className="grid max-h-64 gap-3 overflow-y-auto">
-            {blocked.map((row) => (
-              <li key={row.rowIndex} className="grid gap-1 border-t pt-3 text-sm">
-                <p className="font-semibold">
-                  {formatStatementDate(row.date)} · {row.payeeRaw || "No description"}
-                </p>
-                <p className="text-muted-foreground">
-                  <BlockedAmount row={row} /> · {undoBlockLabel(row.reason)}
-                </p>
-              </li>
-            ))}
-          </ul>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setBlocked([])}>Close</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      {transactionId ? (
-        <ImportTransaction
-          id={transactionId}
-          onClose={() => setTransactionId(null)}
-          onDelete={setDeleteTarget}
-        />
-      ) : null}
-      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
-            <AlertDialogDescription>The transaction leaves the list.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (!deleteTarget) {
-                  return;
-                }
-                void apiRequest(`/api/transactions/${deleteTarget.id}`, transactionSchema, { method: "DELETE" }).then(() => {
-                  setDeleteTarget(null);
-                  setTransactionId(null);
-                  void queryClient.invalidateQueries({ queryKey: ["transactions"] });
-                });
-              }}
-            >
-              Delete transaction
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
@@ -304,74 +229,4 @@ function RowAmount({ row }: { row: ImportDetailRow }) {
     return null;
   }
   return <Amount currency={currency.data} minor={row.amount} />;
-}
-
-function BlockedAmount({ row }: { row: { amount: number } }) {
-  const currency = useQuery({
-    queryKey: ["book-currency"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/settings/currency", currencyUpdateSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.currency;
-    },
-  });
-  if (!currency.data) {
-    return null;
-  }
-  return <Amount currency={currency.data} minor={row.amount} />;
-}
-
-function ImportTransaction({
-  id,
-  onClose,
-  onDelete,
-}: {
-  id: string;
-  onClose: () => void;
-  onDelete: (transaction: Transaction) => void;
-}) {
-  const currency = useQuery({
-    queryKey: ["book-currency"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/settings/currency", currencyUpdateSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.currency;
-    },
-  });
-  const accounts = useQuery({
-    queryKey: ["accounts", "options"],
-    queryFn: () => loadNamed<Account>("/api/accounts", accountListSchema),
-  });
-  const categories = useQuery({
-    queryKey: ["categories", "options"],
-    queryFn: () => loadNamed<Category>("/api/categories", categoryListSchema),
-  });
-  const tags = useQuery({
-    queryKey: ["tags", "options"],
-    queryFn: () => loadNamed<Tag>("/api/tags", tagListSchema),
-  });
-  const merchants = useQuery({
-    queryKey: ["merchants", "options"],
-    queryFn: async () => (await loadAllPages("/api/merchants", merchantListSchema, { archived: false })).items as Merchant[],
-  });
-  if (!currency.data || !accounts.data || !categories.data || !tags.data || !merchants.data) {
-    return <p className="text-muted-foreground">Loading the transaction.</p>;
-  }
-  return (
-    <TransactionDialog
-      draft={id}
-      currency={currency.data}
-      accounts={accounts.data}
-      categories={categories.data}
-      tags={tags.data}
-      merchants={merchants.data}
-      onClose={onClose}
-      onSaved={onClose}
-      onDelete={onDelete}
-    />
-  );
 }

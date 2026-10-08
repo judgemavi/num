@@ -1,27 +1,24 @@
 import { accountClass, accountSchema, currencyUpdateSchema } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { AccountForm } from "@/accounts/account-form";
+import { useEffect } from "react";
 import { AccountImports } from "@/accounts/account-imports";
 import { AccountTransactions } from "@/accounts/account-transactions";
 import { CheckpointHistory } from "@/accounts/checkpoint-history";
 import { accountDetail, kindLabel } from "@/accounts/format";
-import { ReconcileDialog } from "@/accounts/reconcile-dialog";
+import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { apiRequest } from "@/request";
 
 const accountRoute = getRouteApi("/accounts_/$accountId");
 
 export function AccountScreen() {
-  const queryClient = useQueryClient();
   const { accountId } = accountRoute.useParams();
   const search = accountRoute.useSearch();
   const navigate = accountRoute.useNavigate();
-  const [editing, setEditing] = useState(false);
+  const { openEditor, dismissKind } = useEditors();
 
   const currency = useQuery({
     queryKey: ["book-currency"],
@@ -44,6 +41,18 @@ export function AccountScreen() {
       return result.data;
     },
   });
+
+  useEffect(() => {
+    if (!search.reconcile) {
+      dismissKind("reconcile");
+      return;
+    }
+    void openEditor("reconcile", { accountId }).then(() => {
+      if (new URLSearchParams(window.location.search).get("reconcile") === "true") {
+        void navigate({ search: { ...search, reconcile: false } });
+      }
+    });
+  }, [search.reconcile, accountId, dismissKind, openEditor, navigate, search]);
 
   if (currency.isPending || account.isPending) {
     return <p className="text-muted-foreground">Loading account.</p>;
@@ -73,7 +82,7 @@ export function AccountScreen() {
         title={row.name}
         actions={
           <>
-            <Button type="button" variant="outline" onClick={() => setEditing(true)}>
+            <Button type="button" variant="outline" onClick={() => void openEditor("account", { id: accountId })}>
               Edit
             </Button>
             <Button
@@ -109,36 +118,6 @@ export function AccountScreen() {
         <CheckpointHistory accountId={row.id} currency={bookCurrency} owed={accountClass(row.kind) === "liability"} />
         <AccountImports accountId={row.id} accountName={row.name} currency={bookCurrency} />
       </div>
-      <Dialog open={search.reconcile} onOpenChange={(open) => !open && void navigate({ search: { ...search, reconcile: false } })}>
-        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
-          {search.reconcile ? (
-            <ReconcileDialog
-              accountId={row.id}
-              currency={bookCurrency}
-              kind={row.kind}
-              onClose={() => {
-                void navigate({ search: { ...search, reconcile: false } });
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={editing} onOpenChange={(open) => !open && setEditing(false)}>
-        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
-          {editing ? (
-            <AccountForm
-              currency={bookCurrency}
-              account={row}
-              onClose={() => setEditing(false)}
-              onSaved={() => {
-                setEditing(false);
-                void queryClient.invalidateQueries({ queryKey: ["account", accountId] });
-                void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

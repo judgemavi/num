@@ -1,6 +1,5 @@
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,20 +15,9 @@ import { EditorBody } from "@/editors/editor-body";
 import { formatEditParam, parseEditParam, type EditTarget } from "@/editors/edit-url";
 import { createEditorStack, type EditorFrame } from "@/editors/editor-stack";
 import { isRecordKind, type EditorInput, type EditorKind } from "@/editors/editor-types";
+import { EditorContext, type ConfirmOptions, type HostApi } from "@/editors/editor-api";
 
-export type ConfirmOptions = {
-  title: string;
-  description?: ReactNode;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  hideCancel?: boolean;
-};
-
-type HostApi = {
-  openEditor: <K extends EditorKind>(kind: K, props: EditorInput[K]) => Promise<string | null>;
-  confirm: (options: ConfirmOptions) => Promise<boolean>;
-  dismissKind: (kind: EditorKind) => void;
-};
+export type { ConfirmOptions };
 
 type FrameMeta = {
   trackUrl: boolean;
@@ -42,8 +30,6 @@ type ConfirmState = ConfirmOptions & { resolve: (value: boolean) => void };
 const stack = createEditorStack();
 const meta = new Map<number, FrameMeta>();
 const pending = new Map<number, Promise<string | null>>();
-const EditorContext = createContext<HostApi | null>(null);
-
 function editValueOf(kind: EditorKind, props: EditorInput[EditorKind]): string | null {
   if (!isRecordKind(kind) || !("id" in props)) {
     return null;
@@ -58,14 +44,6 @@ function panelClass(kind: string): string | undefined {
   return undefined;
 }
 
-export function useEditors(): HostApi {
-  const value = useContext(EditorContext);
-  if (!value) {
-    throw new Error("The editor host is missing.");
-  }
-  return value;
-}
-
 function FrameSlot({
   active,
   className,
@@ -77,21 +55,12 @@ function FrameSlot({
   onDismiss: () => void;
   children: ReactNode;
 }) {
-  const [fallbackNode, setFallbackNode] = useState<HTMLDivElement | null>(null);
-  const [dialogNode, setDialogNode] = useState<HTMLDivElement | null>(null);
-  const target = active && dialogNode ? dialogNode : fallbackNode;
   return (
-    <>
-      <div hidden ref={setFallbackNode} />
-      {active ? (
-        <Dialog open onOpenChange={(open) => { if (!open) onDismiss(); }}>
-          <DialogContent className={className}>
-            <div ref={setDialogNode} />
-          </DialogContent>
-        </Dialog>
-      ) : null}
-      {target ? createPortal(children, target) : null}
-    </>
+    <Dialog open={active} onOpenChange={(open) => { if (!open) onDismiss(); }}>
+      <DialogContent forceMount className={active ? className : "invisible pointer-events-none"}>
+        {children}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -103,8 +72,14 @@ export function EditorHost({ children }: { children: ReactNode }) {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const suppress = useRef(0);
   const pathRef = useRef<string | null>(null);
-  const confirmRef = useRef(confirmState);
-  confirmRef.current = confirmState;
+  const confirmRef = useRef<ConfirmState | null>(null);
+  const apiRef = useRef<HostApi | null>(null);
+  const reconcileRef = useRef<(edit: EditTarget | null, pathnameChanged: boolean) => void>(() => {});
+  const stableApi = useState<HostApi>(() => ({
+    openEditor: (kind, props) => apiRef.current?.openEditor(kind, props) ?? Promise.resolve(null),
+    confirm: (options) => apiRef.current?.confirm(options) ?? Promise.resolve(false),
+    dismissKind: (kind) => apiRef.current?.dismissKind(kind),
+  }))[0];
 
   function writeEdit(edit: string | undefined, replace: boolean) {
     suppress.current += 1;
@@ -213,8 +188,11 @@ export function EditorHost({ children }: { children: ReactNode }) {
     },
   };
 
-  const reconcileRef = useRef(reconcile);
-  reconcileRef.current = reconcile;
+  useEffect(() => {
+    apiRef.current = api;
+    confirmRef.current = confirmState;
+    reconcileRef.current = reconcile;
+  });
 
   useEffect(() => {
     const pathnameChanged = pathRef.current !== null && pathRef.current !== pathname;
@@ -229,7 +207,7 @@ export function EditorHost({ children }: { children: ReactNode }) {
   const description = confirmState?.description;
 
   return (
-    <EditorContext.Provider value={api}>
+    <EditorContext.Provider value={stableApi}>
       {children}
       {frames.map((frame, index) => (
         <HostedFrame

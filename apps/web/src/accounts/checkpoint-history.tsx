@@ -1,19 +1,10 @@
 import { checkpointListSchema, checkpointSchema, type Checkpoint } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { apiRequest } from "@/request";
@@ -27,7 +18,7 @@ type CheckpointHistoryProps = {
 
 export function CheckpointHistory({ accountId, currency, owed }: CheckpointHistoryProps) {
   const queryClient = useQueryClient();
-  const [pending, setPending] = useState<Checkpoint | null>(null);
+  const { confirm } = useEditors();
   const [error, setError] = useState<string | null>(null);
 
   const checkpoints = useQuery({
@@ -41,12 +32,17 @@ export function CheckpointHistory({ accountId, currency, owed }: CheckpointHisto
     },
   });
 
-  async function unlock() {
-    if (!pending) {
+  async function unlock(item: Checkpoint) {
+    const ok = await confirm({
+      title: "Unlock this checkpoint?",
+      description: `Transactions that only the ${formatDate(item.date)} checkpoint covers return to cleared. You can edit them again.`,
+      confirmLabel: "Unlock checkpoint",
+    });
+    if (!ok) {
       return;
     }
     const result = await apiRequest(
-      `/api/accounts/${accountId}/checkpoints/${pending.id}/unlock`,
+      `/api/accounts/${accountId}/checkpoints/${item.id}/unlock`,
       checkpointSchema,
       { method: "POST" },
     );
@@ -55,7 +51,6 @@ export function CheckpointHistory({ accountId, currency, owed }: CheckpointHisto
       return;
     }
     setError(null);
-    setPending(null);
     await queryClient.invalidateQueries({ queryKey: ["checkpoints", accountId] });
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     await queryClient.invalidateQueries({ queryKey: ["reconcile", accountId] });
@@ -82,7 +77,7 @@ export function CheckpointHistory({ accountId, currency, owed }: CheckpointHisto
             </div>
             {item.unlockedAt ? null : (
               <RowMenu label={`Actions for the checkpoint on ${formatDate(item.date)}`}>
-                <DropdownMenuItem className="min-h-11" onSelect={() => setPending(item)}>
+                <DropdownMenuItem className="min-h-11" onSelect={() => void unlock(item)}>
                   Unlock
                 </DropdownMenuItem>
               </RowMenu>
@@ -95,22 +90,6 @@ export function CheckpointHistory({ accountId, currency, owed }: CheckpointHisto
           {error}
         </p>
       ) : null}
-      <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unlock this checkpoint?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pending
-                ? `Transactions that only the ${formatDate(pending.date)} checkpoint covers return to cleared. You can edit them again.`
-                : "Transactions from this checkpoint return to cleared."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void unlock()}>Unlock checkpoint</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

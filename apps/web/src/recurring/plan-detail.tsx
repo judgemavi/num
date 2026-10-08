@@ -1,21 +1,17 @@
 import {
   occurrenceLinkSchema,
   occurrenceListSchema,
-  transactionListSchema,
   type Occurrence,
   type Plan,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useEditors } from "@/editors/editor-api";
 import { formatDate, planError } from "@/recurring/format";
-import { OptionCombobox } from "@/transactions/option-combobox";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { ListCard, ListGroup, ListRow, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { SidePanel } from "@/components/side-panel";
@@ -45,10 +41,7 @@ function statusText(item: Occurrence): string | null {
 
 export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
   const queryClient = useQueryClient();
-  const [skipDue, setSkipDue] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
-  const [linkDue, setLinkDue] = useState<string | null>(null);
-  const [transactionId, setTransactionId] = useState<string | null>(null);
+  const { openEditor } = useEditors();
   const [error, setError] = useState<string | null>(null);
 
   const occurrences = useQuery({
@@ -59,19 +52,6 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
         throw new Error(result.code);
       }
       return result.data;
-    },
-  });
-
-  const candidates = useQuery({
-    queryKey: ["plan-transactions", plan.accountId, linkDue],
-    enabled: linkDue !== null,
-    queryFn: async () => {
-      const params = new URLSearchParams({ accountId: plan.accountId, pageSize: "200" });
-      const result = await apiRequest(`/api/transactions?${params.toString()}`, transactionListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
     },
   });
 
@@ -92,10 +72,6 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
       return;
     }
     setError(null);
-    setSkipDue(null);
-    setLinkDue(null);
-    setReason("");
-    setTransactionId(null);
     await refresh();
   }
 
@@ -125,7 +101,12 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
                 Remove link
               </DropdownMenuItem>
             ) : (
-              <DropdownMenuItem className="min-h-11" onSelect={() => setLinkDue(item.dueDate)}>
+              <DropdownMenuItem
+                className="min-h-11"
+                onSelect={() => {
+                  void openEditor("linkOccurrence", { planId: plan.id, accountId: plan.accountId, dueDate: item.dueDate }).then(() => refresh());
+                }}
+              >
                 Link a transaction
               </DropdownMenuItem>
             )}
@@ -137,8 +118,7 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
               <DropdownMenuItem
                 className="min-h-11"
                 onSelect={() => {
-                  setReason("");
-                  setSkipDue(item.dueDate);
+                  void openEditor("skipOccurrence", { planId: plan.id, dueDate: item.dueDate }).then(() => refresh());
                 }}
               >
                 Skip
@@ -186,60 +166,6 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
         <ListGroup label="Past" />
         {rows(past)}
       </ListCard>
-      <Dialog open={skipDue !== null} onOpenChange={(open) => !open && setSkipDue(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Skip this occurrence</DialogTitle>
-            <DialogDescription>Tell why this one will not happen. You can restore it later.</DialogDescription>
-          </DialogHeader>
-          <Field>
-            <FieldLabel htmlFor="skip-reason">Reason</FieldLabel>
-            <Input id="skip-reason" value={reason} onChange={(event) => setReason(event.target.value)} />
-          </Field>
-          {reason.trim().length === 0 ? <FieldError>Enter a reason.</FieldError> : null}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setSkipDue(null)}>
-              Cancel
-            </Button>
-            <Button type="button" disabled={reason.trim().length === 0} onClick={() => skipDue && void post(`${skipDue}/skip`, { reason: reason.trim() })}>
-              Skip
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={linkDue !== null} onOpenChange={(open) => !open && setLinkDue(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Link a transaction</DialogTitle>
-            <DialogDescription>Choose a transaction on this account.</DialogDescription>
-          </DialogHeader>
-          <Field>
-            <FieldLabel htmlFor="link-transaction">Transaction</FieldLabel>
-            <OptionCombobox
-              id="link-transaction"
-              value={transactionId}
-              options={(candidates.data ?? []).map((item) => ({
-                id: item.id,
-                label: `${formatDate(item.date)} · ${item.payeeRaw}`,
-              }))}
-              placeholder="Choose a transaction"
-              onChange={setTransactionId}
-            />
-          </Field>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setLinkDue(null)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={!transactionId}
-              onClick={() => linkDue && transactionId && void post(`${linkDue}/link`, { transactionId })}
-            >
-              Link
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

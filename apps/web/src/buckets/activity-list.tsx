@@ -2,22 +2,13 @@ import { bucketEventListSchema, bucketEventSchema, type Bucket, type BucketEvent
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { bucketError, formatDate } from "@/buckets/format";
+import { useEditors } from "@/editors/editor-api";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 type ActivityListProps = {
   currency: string;
@@ -32,7 +23,7 @@ const kindLabel = {
 } as const;
 
 export function ActivityList({ currency, buckets, onDone }: ActivityListProps) {
-  const [pending, setPending] = useState<BucketEvent | null>(null);
+  const { confirm } = useEditors();
   const [error, setError] = useState<string | null>(null);
   const events = useQuery({
     queryKey: ["bucket-events"],
@@ -45,20 +36,23 @@ export function ActivityList({ currency, buckets, onDone }: ActivityListProps) {
     },
   });
 
-  async function undo() {
-    if (!pending) {
+  async function undo(event: BucketEvent) {
+    const ok = await confirm({
+      title: `Undo this ${kindLabel[event.kind].toLowerCase()}?`,
+      description: "The money goes back. The event stays in the record.",
+      confirmLabel: "Undo",
+    });
+    if (!ok) {
       return;
     }
-    const result = await apiRequest(`/api/buckets/${pending.bucketId}/events/${pending.id}/undo`, bucketEventSchema, {
+    const result = await apiRequest(`/api/buckets/${event.bucketId}/events/${event.id}/undo`, bucketEventSchema, {
       method: "POST",
     });
     if (!result.ok) {
       setError(bucketError(result.code));
-      setPending(null);
       return;
     }
     setError(null);
-    setPending(null);
     await events.refetch();
     onDone();
   }
@@ -109,7 +103,7 @@ export function ActivityList({ currency, buckets, onDone }: ActivityListProps) {
                 </div>
                 {event.fundingRunId ? null : (
                   <RowMenu label={`Actions for ${kindLabel[event.kind]}`}>
-                    <DropdownMenuItem className="min-h-11" onSelect={() => setPending(event)}>
+                    <DropdownMenuItem className="min-h-11" onSelect={() => void undo(event)}>
                       Undo
                     </DropdownMenuItem>
                   </RowMenu>
@@ -119,18 +113,6 @@ export function ActivityList({ currency, buckets, onDone }: ActivityListProps) {
           })
         )}
       </ListCard>
-      <AlertDialog open={pending !== null} onOpenChange={(open) => { if (!open) setPending(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Undo this {pending ? kindLabel[pending.kind].toLowerCase() : "event"}?</AlertDialogTitle>
-            <AlertDialogDescription>The money goes back. The event stays in the record.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void undo()}>Undo</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

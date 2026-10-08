@@ -1,13 +1,7 @@
-import {
-  ApplyRuleEditor,
-  AssignEditor,
-  FundEditor,
-  ImportEditor,
-  MoveEditor,
-  ReconcileEditor,
-} from "@/editors/action-editors";
+import { AssignEditor, FundEditor, ImportEditor, MoveEditor, ReconcileEditor } from "@/editors/action-editors";
 import type { EditorInput, EditorKind } from "@/editors/editor-types";
 import {
+  ApplyRuleEditor,
   ImportInfoEditor,
   InboxReasonEditor,
   LinkOccurrenceEditor,

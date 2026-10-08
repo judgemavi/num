@@ -2,22 +2,13 @@ import { fundingRunListSchema, fundingRunSchema, type FundingRun } from "@num/sh
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { bucketError, formatDate } from "@/buckets/format";
+import { useEditors } from "@/editors/editor-api";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 type FundingHistoryProps = {
   currency: string;
@@ -25,7 +16,7 @@ type FundingHistoryProps = {
 };
 
 export function FundingHistory({ currency, onDone }: FundingHistoryProps) {
-  const [pending, setPending] = useState<FundingRun | null>(null);
+  const { confirm } = useEditors();
   const [error, setError] = useState<string | null>(null);
   const runs = useQuery({
     queryKey: ["funding-runs"],
@@ -38,18 +29,21 @@ export function FundingHistory({ currency, onDone }: FundingHistoryProps) {
     },
   });
 
-  async function undo() {
-    if (!pending) {
+  async function undo(run: FundingRun) {
+    const ok = await confirm({
+      title: "Undo this paycheck funding?",
+      description: "The money returns to Unassigned. The funding record stays.",
+      confirmLabel: "Undo",
+    });
+    if (!ok) {
       return;
     }
-    const result = await apiRequest(`/api/funding/runs/${pending.id}/undo`, fundingRunSchema, { method: "POST" });
+    const result = await apiRequest(`/api/funding/runs/${run.id}/undo`, fundingRunSchema, { method: "POST" });
     if (!result.ok) {
       setError(bucketError(result.code));
-      setPending(null);
       return;
     }
     setError(null);
-    setPending(null);
     await runs.refetch();
     onDone();
   }
@@ -93,7 +87,7 @@ export function FundingHistory({ currency, onDone }: FundingHistoryProps) {
               </div>
               {run.undoneAt ? null : (
                 <RowMenu label={`Actions for ${run.payee || "paycheck"} funding`}>
-                  <DropdownMenuItem className="min-h-11" onSelect={() => setPending(run)}>
+                  <DropdownMenuItem className="min-h-11" onSelect={() => void undo(run)}>
                     Undo
                   </DropdownMenuItem>
                 </RowMenu>
@@ -102,18 +96,6 @@ export function FundingHistory({ currency, onDone }: FundingHistoryProps) {
           ))
         )}
       </ListCard>
-      <AlertDialog open={pending !== null} onOpenChange={(open) => { if (!open) setPending(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Undo this paycheck funding?</AlertDialogTitle>
-            <AlertDialogDescription>The money returns to Unassigned. The funding record stays.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void undo()}>Undo</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

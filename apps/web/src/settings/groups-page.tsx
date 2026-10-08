@@ -1,7 +1,7 @@
 import { categoryGroupDeleteSchema, categoryGroupListSchema, categoryListSchema, type CategoryGroup } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useEditors } from "@/editors/editor-host";
+import { useEditors } from "@/editors/editor-api";
 import { categoryError } from "@/settings/format";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { SettingsBack } from "@/settings/settings-nav";

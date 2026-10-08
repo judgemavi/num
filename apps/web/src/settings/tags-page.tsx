@@ -2,7 +2,7 @@ import { tagListSchema, tagSchema, type Tag, type TagListQuery } from "@num/shar
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
-import { useEditors } from "@/editors/editor-host";
+import { useEditors } from "@/editors/editor-api";
 import { FilterBar } from "@/components/filter-bar";
 import { sortChoice } from "@/components/sort-choice";
 import { ListCard, ListRow, listName } from "@/components/list-card";

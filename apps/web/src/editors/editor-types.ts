@@ -30,13 +30,6 @@ export type EditorInput = {
 
 export type EditorKind = keyof EditorInput;
 
-export function recordId(kind: EditorKind, props: EditorInput[EditorKind]): string | null {
-  if (!("id" in props)) {
-    return null;
-  }
-  return props.id ?? null;
-}
-
 export function isRecordKind(kind: EditorKind): kind is RecordEditorKind {
   return (
     kind === "transaction" ||

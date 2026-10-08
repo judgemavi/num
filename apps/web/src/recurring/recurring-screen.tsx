@@ -1,7 +1,6 @@
 import {
   accountListSchema,
   autoLinkResultSchema,
-  categoryListSchema,
   currencyUpdateSchema,
   merchantListSchema,
   planListSchema,
@@ -18,10 +17,10 @@ import { useCallback, useState } from "react";
 import { PlanFilters } from "@/recurring/filters";
 import { kindLabel, localAsOf, planError, scheduleLabel } from "@/recurring/format";
 import { PlanDetail } from "@/recurring/plan-detail";
-import { PlanForm, type PlanDraft, type PlanSeed } from "@/recurring/plan-form";
+import { type PlanSeed } from "@/recurring/plan-form";
+import { useEditors } from "@/editors/editor-api";
 import { planPath } from "@/recurring/query";
 import { ReviewList } from "@/recurring/review-list";
-import { SkipNext } from "@/recurring/skip-next";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
@@ -33,18 +32,7 @@ import { RowMenu } from "@/components/row-menu";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 const recurringRoute = getRouteApi("/recurring");
 const asOf = localAsOf();
@@ -55,11 +43,8 @@ export function RecurringScreen() {
   const queryClient = useQueryClient();
   const search = recurringRoute.useSearch();
   const navigate = recurringRoute.useNavigate();
-  const [draft, setDraft] = useState<PlanDraft | null>(null);
+  const { openEditor, confirm } = useEditors();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [pending, setPending] = useState<Plan | null>(null);
-  const [skipPlan, setSkipPlan] = useState<Plan | null>(null);
-  const [reason, setReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
   const changeFilters = useCallback(
@@ -119,10 +104,6 @@ export function RecurringScreen() {
     queryKey: ["accounts", "recurring"],
     queryFn: () => loadAllPages("/api/accounts", accountListSchema, { archived: false }),
   });
-  const categories = useQuery({
-    queryKey: ["categories", "recurring"],
-    queryFn: () => loadAllPages("/api/categories", categoryListSchema, { archived: false }),
-  });
   const merchants = useQuery({
     queryKey: ["merchants", "recurring"],
     queryFn: () => loadAllPages("/api/merchants", merchantListSchema, { archived: false }),
@@ -135,18 +116,14 @@ export function RecurringScreen() {
     await queryClient.invalidateQueries({ queryKey: ["occurrences"] });
   }
 
-  async function confirmPending() {
-    if (!pending) {
-      return;
-    }
-    const path = pending.archivedAt ? "restore" : "archive";
-    const result = await apiRequest(`/api/recurring/${pending.id}/${path}`, planSchema, { method: "POST" });
+  async function archivePlan(plan: Plan) {
+    const path = plan.archivedAt ? "restore" : "archive";
+    const result = await apiRequest(`/api/recurring/${plan.id}/${path}`, planSchema, { method: "POST" });
     if (!result.ok) {
       setActionError(planError(result.code));
       return;
     }
     setActionError(null);
-    setPending(null);
     await refresh();
   }
 
@@ -177,7 +154,7 @@ export function RecurringScreen() {
       name,
       kind: proposal.expectedAmount >= 0 ? "income" : "bill",
     };
-    setDraft(seed);
+    void openEditor("plan", { id: null, seed });
   }
 
   return (
@@ -186,7 +163,7 @@ export function RecurringScreen() {
         kicker={rows.length === 1 ? "1 plan" : `${plans.data?.total ?? 0} plans`}
         title="Recurring"
         actions={
-          <Button type="button" onClick={() => setDraft("new")}>
+          <Button type="button" onClick={() => void openEditor("plan", { id: null })}>
             <Plus aria-hidden="true" />
             New plan
           </Button>
@@ -237,7 +214,7 @@ export function RecurringScreen() {
                       key={plan.id}
                       onOpen={() => {
                         setSelectedId(plan.id);
-                        setDraft(plan);
+                        void openEditor("plan", { id: plan.id });
                       }}
                     >
                       <IconTile hue={hues[plan.kind]}>
@@ -251,15 +228,30 @@ export function RecurringScreen() {
                       {plan.archivedAt ? <Badge variant="neutral">Archived</Badge> : null}
                       <Amount currency={bookCurrency} minor={plan.expectedAmount} />
                       <RowMenu label={`Actions for ${plan.name}`}>
-                        <DropdownMenuItem className="min-h-11" onSelect={() => setPending(plan)}>
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onSelect={() => {
+                            const restore = plan.archivedAt !== null;
+                            void confirm({
+                              title: restore ? "Restore this plan?" : "Archive this plan?",
+                              description: restore
+                                ? `Restore ${plan.name}. It returns to the active list.`
+                                : `Archive ${plan.name}. It leaves the active list.`,
+                              confirmLabel: restore ? "Restore plan" : "Archive plan",
+                            }).then((ok) => {
+                              if (ok) {
+                                void archivePlan(plan);
+                              }
+                            });
+                          }}
+                        >
                           {plan.archivedAt ? "Restore" : "Archive"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="min-h-11"
                           onSelect={() => {
                             setSelectedId(plan.id);
-                            setSkipPlan(plan);
-                            setReason("");
+                            void openEditor("skipNext", { planId: plan.id, asOf });
                           }}
                         >
                           Skip next
@@ -273,64 +265,11 @@ export function RecurringScreen() {
           </ListCard>
         </div>
         {selected ? (
-          <PlanDetail plan={selected} currency={bookCurrency} asOf={asOf} onEdit={() => setDraft(selected)} />
+          <PlanDetail plan={selected} currency={bookCurrency} asOf={asOf} onEdit={() => void openEditor("plan", { id: selected.id })} />
         ) : (
           <p className="text-sm text-muted-foreground">Add a plan to see its occurrences.</p>
         )}
       </div>
-      <Dialog open={draft !== null} onOpenChange={(open) => !open && setDraft(null)}>
-        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
-          {draft && categories.data && merchants.data ? (
-            <PlanForm
-              key={draft === "new" ? "new" : "id" in draft ? draft.id : draft.merchantId}
-              currency={bookCurrency}
-              draft={draft}
-              accounts={accounts.data?.items ?? []}
-              categories={categories.data.items}
-              merchants={merchants.data.items}
-              onClose={() => setDraft(null)}
-              onSaved={() => {
-                setDraft(null);
-                void refresh();
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{pending?.archivedAt ? "Restore this plan?" : "Archive this plan?"}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pending?.archivedAt
-                ? `Restore ${pending.name}. It returns to the active list.`
-                : `Archive ${pending?.name ?? "this plan"}. It leaves the active list.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void confirmPending()}>
-              {pending?.archivedAt ? "Restore plan" : "Archive plan"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <Dialog open={skipPlan !== null} onOpenChange={(open) => !open && setSkipPlan(null)}>
-        <DialogContent>
-          <SkipNext
-            plan={skipPlan}
-            reason={reason}
-            asOf={asOf}
-            onReason={setReason}
-            onClose={() => setSkipPlan(null)}
-            onDone={() => {
-              setSkipPlan(null);
-              void refresh();
-            }}
-            onError={setActionError}
-          />
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

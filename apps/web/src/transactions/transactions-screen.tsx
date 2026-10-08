@@ -25,7 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TransactionFilterBar } from "@/transactions/filters";
 import { formatDate, statusLabel } from "@/transactions/format";
 import { hasFilters, transactionPath } from "@/transactions/query";
-import { useEditors } from "@/editors/editor-host";
+import { useEditors } from "@/editors/editor-api";
 
 const transactionsRoute = getRouteApi("/transactions");
 

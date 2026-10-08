@@ -12,16 +12,13 @@ import { getRouteApi } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { ActivityList } from "@/buckets/activity-list";
-import { AssignMoney } from "@/buckets/assign-money";
-import { BucketForm } from "@/buckets/bucket-form";
 import { BucketRow } from "@/buckets/bucket-row";
-import { FundPaycheck } from "@/buckets/fund-paycheck";
+import { useEditors } from "@/editors/editor-api";
 import { FundingHistory } from "@/buckets/funding-history";
 import { OverspentPanel } from "@/buckets/overspent-panel";
 import { BucketFilterBar } from "@/buckets/filters";
 import { bucketError, today } from "@/buckets/format";
 import { formatMoney } from "@/money";
-import { MoveMoney } from "@/buckets/move-money";
 import { loadBuckets } from "@/buckets/query";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
@@ -30,17 +27,6 @@ import { ListCard, ListGroup } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 const bucketsRoute = getRouteApi("/buckets");
 
@@ -54,13 +40,9 @@ export function BucketsScreen() {
   const queryClient = useQueryClient();
   const search = bucketsRoute.useSearch();
   const navigate = bucketsRoute.useNavigate();
-  const [draft, setDraft] = useState<Bucket | "new" | null>(null);
-  const [moveFrom, setMoveFrom] = useState<string | null | false>(false);
-  const [pending, setPending] = useState<Bucket | null>(null);
+  const { openEditor, confirm } = useEditors();
   const [actionError, setActionError] = useState<string | null>(null);
   const [coverFrom, setCoverFrom] = useState<Record<string, string>>({});
-  const [fundOpen, setFundOpen] = useState(false);
-  const [assign, setAssign] = useState<{ bucket: Bucket; kind: "fund" | "release" } | null>(null);
   const asOf = today();
 
   const currency = useQuery({
@@ -112,12 +94,9 @@ export function BucketsScreen() {
     await queryClient.invalidateQueries({ queryKey: ["funding-runs"] });
   }
 
-  async function confirmPending() {
-    if (!pending) {
-      return;
-    }
-    const restoring = pending.archivedAt !== null;
-    const result = await apiRequest(`/api/buckets/${pending.id}/${restoring ? "restore" : "archive"}`, bucketSchema, {
+  async function archiveBucket(bucket: Bucket) {
+    const restoring = bucket.archivedAt !== null;
+    const result = await apiRequest(`/api/buckets/${bucket.id}/${restoring ? "restore" : "archive"}`, bucketSchema, {
       method: "POST",
     });
     if (!result.ok) {
@@ -125,7 +104,6 @@ export function BucketsScreen() {
       return;
     }
     setActionError(null);
-    setPending(null);
     await refresh();
   }
 
@@ -176,8 +154,6 @@ export function BucketsScreen() {
   const spendingLeft = spending.reduce((sum, bucket) => sum + bucket.balance, 0);
   const spendingTarget = spending.reduce((sum, bucket) => sum + (bucket.refillTo ?? 0), 0);
   const allBalances = rows.reduce((sum, bucket) => sum + bucket.balance, 0);
-  const suggestedPriority = rows.reduce((max, bucket) => Math.max(max, bucket.priority), 0) + 1;
-
   return (
     <>
       <PageHeader
@@ -185,13 +161,13 @@ export function BucketsScreen() {
         title="Buckets"
         actions={
           <>
-            <Button type="button" variant="secondary" onClick={() => setFundOpen(true)}>
+            <Button type="button" variant="secondary" onClick={() => void openEditor("fundPaycheck", {})}>
               Fund this paycheck
             </Button>
-            <Button type="button" variant="secondary" onClick={() => setMoveFrom(null)}>
+            <Button type="button" variant="secondary" onClick={() => void openEditor("moveMoney", { fromId: null })}>
               Move money
             </Button>
-            <Button type="button" onClick={() => setDraft("new")}>
+            <Button type="button" onClick={() => void openEditor("bucket", { id: null })}>
               <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
               New bucket
             </Button>
@@ -268,11 +244,24 @@ export function BucketsScreen() {
                       key={bucket.id}
                       bucket={bucket}
                       currency={bookCurrency}
-                      onOpen={() => setDraft(bucket)}
-                      onMove={() => setMoveFrom(bucket.id)}
-                      onFund={() => setAssign({ bucket, kind: "fund" })}
-                      onRelease={() => setAssign({ bucket, kind: "release" })}
-                      onArchive={() => setPending(bucket)}
+                      onOpen={() => void openEditor("bucket", { id: bucket.id })}
+                      onMove={() => void openEditor("moveMoney", { fromId: bucket.id })}
+                      onFund={() => void openEditor("assignMoney", { bucketId: bucket.id, kind: "fund" })}
+                      onRelease={() => void openEditor("assignMoney", { bucketId: bucket.id, kind: "release" })}
+                      onArchive={() => {
+                        const restore = bucket.archivedAt !== null;
+                        void confirm({
+                          title: restore ? "Restore this bucket?" : "Archive this bucket?",
+                          description: restore
+                            ? "The bucket returns to the active list. Its categories are not put back."
+                            : "The balance must be zero. Categories leave this bucket. You can restore the bucket later.",
+                          confirmLabel: restore ? "Restore" : "Archive",
+                        }).then((ok) => {
+                          if (ok) {
+                            void archiveBucket(bucket);
+                          }
+                        });
+                      }}
                     />
                   ))}
                 </div>
@@ -292,84 +281,6 @@ export function BucketsScreen() {
           onCover={(id) => void cover(id)}
         />
       </div>
-      <Dialog open={draft !== null} onOpenChange={(open) => { if (!open) setDraft(null); }}>
-        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
-          {draft ? (
-            <BucketForm
-              currency={bookCurrency}
-              draft={draft}
-              nextColor={board.data.nextColor}
-              suggestedPriority={suggestedPriority}
-              onClose={() => setDraft(null)}
-              onSaved={() => {
-                setDraft(null);
-                void refresh();
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={fundOpen} onOpenChange={(open) => { if (!open) setFundOpen(false); }}>
-        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
-          {fundOpen ? (
-            <FundPaycheck
-              currency={bookCurrency}
-              asOf={asOf}
-              onClose={() => setFundOpen(false)}
-              onSaved={() => {
-                setFundOpen(false);
-                void refresh();
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={assign !== null} onOpenChange={(open) => { if (!open) setAssign(null); }}>
-        <DialogContent>
-          {assign ? (
-            <AssignMoney
-              currency={bookCurrency}
-              bucket={assign.bucket}
-              kind={assign.kind}
-              onClose={() => setAssign(null)}
-              onSaved={() => {
-                setAssign(null);
-                void refresh();
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={moveFrom !== false} onOpenChange={(open) => { if (!open) setMoveFrom(false); }}>
-        <DialogContent>
-          <MoveMoney
-            currency={bookCurrency}
-            buckets={pool}
-            fromId={moveFrom === false ? null : moveFrom}
-            onClose={() => setMoveFrom(false)}
-            onSaved={() => {
-              setMoveFrom(false);
-              void refresh();
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={pending !== null} onOpenChange={(open) => { if (!open) setPending(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{pending?.archivedAt ? "Restore this bucket?" : "Archive this bucket?"}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pending?.archivedAt
-                ? "The bucket returns to the active list. Its categories are not put back."
-                : "The balance must be zero. Categories leave this bucket. You can restore the bucket later."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void confirmPending()}>{pending?.archivedAt ? "Restore" : "Archive"}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

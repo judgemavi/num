@@ -1,7 +1,6 @@
 import type { MoneyDirection, Tag } from "@num/shared";
 import { ChevronRight, Ellipsis } from "lucide-react";
-import { useState } from "react";
-import { useEditors } from "@/editors/editor-host";
+import { useEditors } from "@/editors/editor-api";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";

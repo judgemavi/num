@@ -3,9 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Upload } from "lucide-react";
 import { useState } from "react";
-import { AccountForm } from "@/accounts/account-form";
-import { AccountImports } from "@/accounts/account-imports";
-import { ImportDialog } from "@/accounts/import-dialog";
+import { useEditors } from "@/editors/editor-api";
 import { AccountIcon } from "@/accounts/account-icon";
 import { accountCountLabel, accountDetail, accountError, formatBalance, formatMoney, kindLabel } from "@/accounts/format";
 import { groupAccounts, groupHue, groupLabel, worthOf } from "@/accounts/groups";
@@ -24,17 +22,6 @@ import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { SidePanel } from "@/components/side-panel";
 import { SplitBar } from "@/components/split-bar";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { hueColor } from "@/components/hue";
 
 const accountsRoute = getRouteApi("/accounts");
@@ -44,10 +31,7 @@ export function AccountsScreen() {
   const search = accountsRoute.useSearch();
   const navigate = accountsRoute.useNavigate();
   const openAccount = useNavigate();
-  const [draft, setDraft] = useState<Account | "new" | null>(null);
-  const [pending, setPending] = useState<Account | null>(null);
-  const [importAccount, setImportAccount] = useState<Account | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
+  const { openEditor, confirm } = useEditors();
   const [actionError, setActionError] = useState<string | null>(null);
 
   const currency = useQuery({
@@ -71,13 +55,10 @@ export function AccountsScreen() {
       }),
   });
 
-  async function confirmPending() {
-    if (!pending) {
-      return;
-    }
-    const restoring = pending.archivedAt !== null;
+  async function archiveAccount(account: Account) {
+    const restoring = account.archivedAt !== null;
     const result = await apiRequest(
-      `/api/accounts/${pending.id}/${restoring ? "restore" : "archive"}`,
+      `/api/accounts/${account.id}/${restoring ? "restore" : "archive"}`,
       accountSchema,
       restoring
         ? { method: "POST" }
@@ -92,7 +73,6 @@ export function AccountsScreen() {
       return;
     }
     setActionError(null);
-    setPending(null);
     await queryClient.invalidateQueries({ queryKey: ["accounts"] });
   }
 
@@ -137,15 +117,12 @@ export function AccountsScreen() {
             <Button
               type="button"
               variant="secondary"
-              onClick={() => {
-                setImportAccount(null);
-                setImportOpen(true);
-              }}
+              onClick={() => void openEditor("import", { accountId: null })}
             >
               <Upload size={20} strokeWidth={1.8} aria-hidden="true" />
               Import a statement
             </Button>
-            <Button type="button" onClick={() => setDraft("new")}>
+            <Button type="button" onClick={() => void openEditor("account", { id: null })}>
               <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
               Add account
             </Button>
@@ -228,16 +205,10 @@ export function AccountsScreen() {
                         {detail ? <small>{detail}</small> : null}
                       </div>
                       <RowMenu label={`Actions for ${account.name}`}>
-                        <DropdownMenuItem className="min-h-11" onSelect={() => setDraft(account)}>
+                        <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("account", { id: account.id })}>
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="min-h-11"
-                          onSelect={() => {
-                            setImportAccount(account);
-                            setImportOpen(true);
-                          }}
-                        >
+                        <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("import", { accountId: account.id })}>
                           Import a statement
                         </DropdownMenuItem>
                         <DropdownMenuItem
@@ -252,7 +223,25 @@ export function AccountsScreen() {
                         >
                           Reconcile
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="min-h-11" onSelect={() => setPending(account)}>
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onSelect={() => {
+                            const restore = account.archivedAt !== null;
+                            void confirm({
+                              title: restore ? "Restore this account?" : "Archive this account?",
+                              description: restore
+                                ? `Restore ${account.name}. It returns to the active list.`
+                                : account.balance !== 0
+                                  ? `${account.name} has a balance of ${formatBalance(bookCurrency, account.kind, account.balance)}. Archive it only if you mean to.`
+                                  : `Archive ${account.name}. It leaves the active list.`,
+                              confirmLabel: restore ? "Restore account" : "Archive account",
+                            }).then((ok) => {
+                              if (ok) {
+                                void archiveAccount(account);
+                              }
+                            });
+                          }}
+                        >
                           {account.archivedAt ? "Restore" : "Archive"}
                         </DropdownMenuItem>
                       </RowMenu>
@@ -283,59 +272,6 @@ export function AccountsScreen() {
           )}
         </div>
       </div>
-      <Dialog open={draft !== null} onOpenChange={(open) => !open && setDraft(null)}>
-        <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
-          {draft !== null ? (
-            <>
-              <AccountForm
-                key={draft === "new" ? "new" : draft.id}
-                currency={bookCurrency}
-                account={draft === "new" ? null : draft}
-                onClose={() => setDraft(null)}
-                onSaved={() => {
-                  setDraft(null);
-                  setActionError(null);
-                  void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-                }}
-              />
-              {draft !== "new" ? (
-                <AccountImports accountId={draft.id} accountName={draft.name} currency={bookCurrency} />
-              ) : null}
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-      <ImportDialog
-        open={importOpen}
-        account={importAccount}
-        onOpenChange={setImportOpen}
-        onImported={() => {
-          void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-          void queryClient.invalidateQueries({ queryKey: ["account"] });
-          void queryClient.invalidateQueries({ queryKey: ["imports"] });
-          void queryClient.invalidateQueries({ queryKey: ["transactions"] });
-        }}
-      />
-      <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{pending?.archivedAt ? "Restore this account?" : "Archive this account?"}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pending?.archivedAt
-                ? `Restore ${pending.name}. It returns to the active list.`
-                : pending && pending.balance !== 0
-                  ? `${pending.name} has a balance of ${formatBalance(bookCurrency, pending.kind, pending.balance)}. Archive it only if you mean to.`
-                  : `Archive ${pending?.name ?? "this account"}. It leaves the active list.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void confirmPending()}>
-              {pending?.archivedAt ? "Restore account" : "Archive account"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

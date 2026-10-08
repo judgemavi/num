@@ -12,7 +12,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
-import { useEditors } from "@/editors/editor-host";
+import { useEditors } from "@/editors/editor-api";
 import { FilterBar } from "@/components/filter-bar";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";

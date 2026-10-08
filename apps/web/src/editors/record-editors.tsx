@@ -10,6 +10,7 @@ import {
 } from "@num/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { AccountForm } from "@/accounts/account-form";
+import { AccountImports } from "@/accounts/account-imports";
 import { BucketForm } from "@/buckets/bucket-form";
 import { LoadError, LoadingLine } from "@/editors/load-state";
 import {
@@ -69,12 +70,17 @@ export function AccountRecord({ props, onClose, onSaved }: { props: EditorInput[
     return <LoadError label="The account did not load." onRetry={() => void account.refetch()} />;
   }
   return (
-    <AccountForm
-      currency={currency.data}
-      account={props.id ? (account.data ?? null) : null}
-      onClose={onClose}
-      onSaved={save}
-    />
+    <>
+      <AccountForm
+        currency={currency.data}
+        account={props.id ? (account.data ?? null) : null}
+        onClose={onClose}
+        onSaved={save}
+      />
+      {props.id && account.data ? (
+        <AccountImports accountId={props.id} accountName={account.data.name} currency={currency.data} />
+      ) : null}
+    </>
   );
 }
 
