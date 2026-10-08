@@ -172,16 +172,15 @@ Order, top to bottom:
    - Transfer: "To account" / "From account" Combobox (link an existing match or create the mirror). No merchant.
    - Split: line rows (direction, amount, then category or account) and a live "$X left to assign". Save is disabled until it is 0.
 4. **Merchant** Combobox, with the suggestion and its reason. Hidden for Transfer.
-5. **"Always do this for <payee>"** checkbox: creates a rule (match type editable) and shows "also applies to N more".
+5. **Make a rule** (Collapsible): "When the bank text [contains ▾] [text] in [all accounts ▾] then set <current choices>",
+   live preview "Matches N · M uncategorized will change" with the matches' bank text, and "More options" (full rule editor).
 6. **More details** (Collapsible, closed): notes, tags, bank text, "Cleared" checkbox. No "status" word in the UI.
 7. Footer: Save (primary). Delete goes in a More menu (shared confirm).
 
 **Group mode:** opened with several transactions that the user selected. Header: "12 transactions · $84.20".
 Category, transfer and merchant apply to all; the user can exclude items. Split is not available.
 
-**Queue mode:** "Review one by one" opens the editor with the uncategorized transactions. Next, Previous, auto-advance after Save.
-
-An Inbox row is one transaction: payee, date, amount, suggestion chips (one click), and "Other…" (opens the editor).
+An Inbox row is one transaction: payee, date, amount, suggestion chips (one click). The whole row opens the editor; a chevron at the right shows this. No "Other…" button, no dismiss, no queue mode.
 An automatic label shows its reason ("Rule: NETFLIX", "Learned from Mar 12").
 
 ## 6b. Shared editors and the dialog host

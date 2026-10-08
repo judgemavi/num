@@ -360,15 +360,27 @@ Fields: `kind`, `payloadJson`, `source`, `status` (`pending | approved | rejecte
 
 When the user approves a proposal, the app makes the change with the same code that the UI uses.
 
-### 5.15 Inbox dismissal
+### 5.15 Inbox decision
 
-Fields: `itemKey`, `reason`, `dismissedAt`.
+Fields: `itemKey`, `decision` (code), `reason?` (text), `decidedAt`.
 
 The app calculates most Inbox items from other records. It does not store them.
 `itemKey` is a stable key for one item: the item kind and the IDs of its records.
-A dismissed item does not show again. If the user removes the dismissal, the item shows again.
-The Inbox has a "Dismissed" view with Restore.
-The overspent item key includes the month of `asOf`: a dismissal hides it for that month only.
+There is no generic dismiss. Each item kind has its own answers (decision 0016). A "no" answer is a decision that the
+app records, so the same question does not come back:
+
+| Item | Answer that resolves it | Recorded "no" decision |
+|---|---|---|
+| Uncategorized | category, transfer or split | none (must be answered) |
+| Possible transfer | link | `not_transfer` |
+| Recurring amount changed | update the plan | `keep_plan_amount` |
+| Missed payment | link a transaction | `skipped` (+ reason, as a plan skip) |
+| Plan proposal | create the plan | `not_recurring` |
+| Overspent bucket | cover from a bucket or Unassigned | none (must be fixed) |
+| Fund this paycheck | fund buckets | `keep_unassigned` |
+| Unreadable import row | add it by hand | `not_a_transaction` |
+
+The user can see and undo decisions on the record they belong to (for example the import detail page).
 
 ### 5.16 Forecast snapshot
 
@@ -523,16 +535,18 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
    both groups with labels (this also covers returned income).
 The suggestion (§7.3) preselects the choice: a category, or a transfer from a transfer rule.
 
-**Inbox, one row for each transaction.** The Inbox shows each transaction that the app cannot categorize. "Review one by
-one" opens the editor as a queue (Next, Previous, auto-advance after Save). The editor's group mode stays available for
-bulk edits that the user starts (for example from a selection on Transactions).
+**Inbox, one row for each transaction.** The Inbox shows each transaction that the app cannot categorize. The whole row
+opens the transaction editor (a chevron at the right shows this). Suggestion chips on the row apply with one click.
+The editor's group mode stays available for bulk edits that the user starts (for example from a selection on Transactions).
 
 **Create on the spot.** The editor can create a merchant (name from the payee, for example "SQ *BLUE BOTTLE 0423" →
-"Blue Bottle"), a category, a group and a tag without leaving the flow. "Always do this for <payee>" creates a rule
-(match type editable) and applies it to that payee's other uncategorized transactions after it shows the count.
+"Blue Bottle"), a category, a group and a tag without leaving the flow. "Make a rule" in the editor opens an inline rule
+builder: match type and text (prefilled from the payee), scope (all accounts or this account), the values from the current
+choices, and a live preview (matches, and how many uncategorized transactions will change, with their bank text).
+"More options" opens the full rule editor. Save and rule are one write.
 
 **Rules and learning.** Learning replaces the "promote to rule" Inbox item. The user can still make a rule
-("Always do this for <payee>", or Settings). A rule wins over learning and over a conflict.
+("Make a rule" in the editor, or Settings). A rule wins over learning and over a conflict.
 
 **Transfer detection.** An imported row can have an opposite amount to an unlinked row in a different on-budget account,
 within ±3 days. Then the Inbox suggests a transfer pair. The user accepts with one click.
