@@ -15,10 +15,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/button";
-import { Chip } from "@/components/chip";
+import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { ListCard, ListRow } from "@/components/list-card";
-import { Pill } from "@/components/pill";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export function TagsPanel() {
@@ -98,9 +98,9 @@ export function TagsPanel() {
       title="Tags"
       actions={
         <>
-          <Chip pressed={archived} onClick={() => setArchived((value) => !value)}>
+          <Toggle variant="outline" pressed={archived} onPressedChange={setArchived}>
             Show archived
-          </Chip>
+          </Toggle>
           <Button type="button" onClick={() => setDraft("new")}>
             New tag
           </Button>
@@ -108,18 +108,18 @@ export function TagsPanel() {
       }
     >
       {actionError ? (
-        <p role="alert" className="alert">
+        <p role="alert" className="text-sm text-attn">
           {actionError}
         </p>
       ) : null}
       {rows.length === 0 ? (
-        <p className="empty">{archived ? "No archived tags." : "No tags yet."}</p>
+        <p className="px-5 py-5 text-muted-foreground">{archived ? "No archived tags." : "No tags yet."}</p>
       ) : (
         rows.map((tag) => (
           <ListRow key={tag.id} simple>
-            <div className="list-name">{tag.name}</div>
-            <div className="list-meta">{tag.archivedAt ? <Pill tone="attention">Archived</Pill> : "Active"}</div>
-            <div className="list-acts">
+            <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">{tag.name}</div>
+            <div className="hidden w-40 shrink-0 text-[13px] text-muted-foreground md:block">{tag.archivedAt ? <Badge variant="attention">Archived</Badge> : "Active"}</div>
+            <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
               <Button type="button" variant="outline" onClick={() => setDraft(tag)}>
                 Rename
               </Button>

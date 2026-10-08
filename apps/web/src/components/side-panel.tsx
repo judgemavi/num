@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type SidePanelProps = {
   title: string;
@@ -9,11 +10,15 @@ type SidePanelProps = {
 
 export function SidePanel({ title, text, children, action }: SidePanelProps) {
   return (
-    <section className="card panel">
-      <h2>{title}</h2>
-      {text ? <p>{text}</p> : null}
-      {children}
-      {action}
-    </section>
+    <Card>
+      <CardHeader className="px-5 pt-5 pb-0">
+        <CardTitle className="text-base font-bold">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-2.5 px-5 pt-2.5 pb-5">
+        {text ? <p className="text-sm text-muted-foreground">{text}</p> : null}
+        {children}
+        {action}
+      </CardContent>
+    </Card>
   );
 }

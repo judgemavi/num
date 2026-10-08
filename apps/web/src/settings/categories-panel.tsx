@@ -24,11 +24,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/button";
+import { Button } from "@/components/ui/button";
 import { ListCard, ListGroup, ListRow } from "@/components/list-card";
-import { Pill } from "@/components/pill";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Chip } from "@/components/chip";
+import { Toggle } from "@/components/ui/toggle";
 
 type GroupDialog = { kind: "create" } | { kind: "rename"; group: CategoryGroup };
 type Confirm = { kind: "archive"; category: Category } | { kind: "delete"; group: CategoryGroup };
@@ -182,9 +182,9 @@ export function CategoriesPanel() {
       title="Categories"
       actions={
         <>
-          <Chip pressed={archived} onClick={() => setArchived((value) => !value)}>
+          <Toggle variant="outline" pressed={archived} onPressedChange={setArchived}>
             Show archived
-          </Chip>
+          </Toggle>
           <Button type="button" variant="outline" onClick={() => setGroupDialog({ kind: "create" })}>
             New group
           </Button>
@@ -195,12 +195,12 @@ export function CategoriesPanel() {
       }
     >
       {actionError ? (
-        <p role="alert" className="alert">
+        <p role="alert" className="text-sm text-attn">
           {actionError}
         </p>
       ) : null}
       {sections.every((section) => section.rows.length === 0 && section.group === null) && groupRows.length === 0 ? (
-        <p className="empty">No categories.</p>
+        <p className="px-5 py-5 text-muted-foreground">No categories.</p>
       ) : null}
       {sections.map((section, index) => {
         const group = section.group;
@@ -213,7 +213,7 @@ export function CategoriesPanel() {
               label={section.title}
               aside={
                 group ? (
-                  <span className="list-acts">
+                  <span className="flex flex-wrap justify-end gap-2 max-md:w-full">
                     <Button type="button" variant="outline" disabled={index === 0} onClick={() => void moveGroup(group, -1)}>
                       Move up
                     </Button>
@@ -236,19 +236,19 @@ export function CategoriesPanel() {
               }
             />
             {archived && section.rows.length === 0 ? null : section.rows.length === 0 ? (
-              <p className="empty">No categories.</p>
+              <p className="px-5 py-5 text-muted-foreground">No categories.</p>
             ) : (
               section.rows.map((category) => (
                 <ListRow key={category.id} simple>
-                  <div className="list-name">
+                  <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
                     {category.name}
                     {category.archivedAt ? <small>Archived</small> : null}
                   </div>
-                  <div className="list-meta">{kindLabel(category.kind)}</div>
-                  <div className="list-meta">
-                    {category.kind === "expense" && category.essential ? <Pill>Essential</Pill> : "Not essential"}
+                  <div className="hidden w-40 shrink-0 text-[13px] text-muted-foreground md:block">{kindLabel(category.kind)}</div>
+                  <div className="hidden w-40 shrink-0 text-[13px] text-muted-foreground md:block">
+                    {category.kind === "expense" && category.essential ? <Badge variant="neutral">Essential</Badge> : "Not essential"}
                   </div>
-                  <div className="list-acts">
+                  <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
                     <Button type="button" variant="outline" onClick={() => setCategoryDraft(category)}>
                       Edit
                     </Button>

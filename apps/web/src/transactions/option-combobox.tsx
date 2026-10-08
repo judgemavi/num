@@ -1,6 +1,6 @@
 import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/button";
+import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -48,7 +48,7 @@ export function OptionCombobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className="control-input w-full justify-between font-normal"
+          className="w-full justify-between rounded-xl font-normal"
         >
           <span className="truncate">{selected?.label ?? placeholder}</span>
           <ChevronsUpDown />

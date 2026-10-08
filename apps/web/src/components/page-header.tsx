@@ -8,12 +8,12 @@ type PageHeaderProps = {
 
 export function PageHeader({ kicker, title, actions }: PageHeaderProps) {
   return (
-    <div className="page-head">
+    <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="sub">{kicker}</p>
-        <h1 className="title display">{title}</h1>
+        <p className="mb-1 text-sm font-medium text-muted-foreground">{kicker}</p>
+        <h1 className="font-display text-4xl leading-none font-extrabold uppercase [font-stretch:72%] max-md:text-[36px]">{title}</h1>
       </div>
-      {actions ? <div className="head-acts">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }

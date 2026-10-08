@@ -10,7 +10,7 @@ import {
 import { useState, type FormEvent } from "react";
 import { categoryError } from "@/settings/format";
 import { apiRequest } from "@/request";
-import { Button } from "@/components/button";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";

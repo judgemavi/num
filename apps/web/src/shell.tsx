@@ -6,9 +6,23 @@ import { useState } from "react";
 import { moreNav, phoneMoreNav, primaryNav, settingsNav, type NavPath } from "@/nav";
 import { apiRequest } from "@/request";
 import { SetupScreen } from "@/setup-screen";
-import { Button } from "@/components/button";
-import { Count } from "@/components/count";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from "@/components/ui/sidebar";
 
 function isCurrent(pathname: string, to: NavPath) {
   if (to === "/") {
@@ -17,7 +31,7 @@ function isCurrent(pathname: string, to: NavPath) {
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
-function SideLink({
+function NavItem({
   to,
   label,
   icon: Icon,
@@ -34,36 +48,56 @@ function SideLink({
 }) {
   const current = isCurrent(pathname, to);
   return (
-    <Link to={to} className="nav-a" aria-current={current ? "page" : undefined} onClick={onClick}>
-      <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
-      <span>{label}</span>
-      {count !== undefined && count > 0 ? <Count value={count} /> : null}
-    </Link>
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={current}>
+        <Link to={to} aria-current={current ? "page" : undefined} onClick={onClick}>
+          <Icon strokeWidth={1.8} aria-hidden="true" />
+          <span>{label}</span>
+          {count !== undefined && count > 0 ? <Badge variant="count" className="ml-auto">{count}</Badge> : null}
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }
 
 function AppSidebar({ pathname, inboxCount }: { pathname: string; inboxCount?: number }) {
   return (
-    <aside className="app-side">
-      <Link to="/" className="brand" aria-label="Num home">
-        <span className="brand-mark" aria-hidden="true">
-          N
-        </span>
-        Num
-      </Link>
-      <nav aria-label="Main">
-        {primaryNav.map((item) => (
-          <SideLink key={item.to} {...item} pathname={pathname} count={item.to === "/" ? inboxCount : undefined} />
-        ))}
-        <div className="nav-group">More</div>
-        {moreNav.map((item) => (
-          <SideLink key={item.to} {...item} pathname={pathname} />
-        ))}
-      </nav>
-      <div className="side-foot">
-        <SideLink {...settingsNav} pathname={pathname} />
-      </div>
-    </aside>
+    <Sidebar collapsible="none" className="hidden border-r bg-card md:flex">
+      <SidebarHeader className="px-3 pt-5">
+        <Link to="/" aria-label="Num home" className="font-display flex items-center gap-2.5 px-3 text-2xl leading-none font-extrabold [font-stretch:72%]">
+          <span className="grid size-7 place-items-center rounded-lg bg-foreground text-base text-background" aria-hidden="true">
+            N
+          </span>
+          Num
+        </Link>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {primaryNav.map((item) => (
+                <NavItem key={item.to} {...item} pathname={pathname} count={item.to === "/" ? inboxCount : undefined} />
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-3 text-xs font-semibold text-muted-foreground">More</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {moreNav.map((item) => (
+                <NavItem key={item.to} {...item} pathname={pathname} />
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <NavItem {...settingsNav} pathname={pathname} />
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
   );
 }
 
@@ -73,38 +107,61 @@ function PhoneTabs({ pathname, inboxCount }: { pathname: string; inboxCount?: nu
   const tabs = primaryNav.filter((item) => item.to !== "/accounts");
   return (
     <>
-      <nav className="app-tabs" aria-label="Main">
+      <nav
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-card px-1 pt-1.5 pb-[calc(10px+env(safe-area-inset-bottom))] md:hidden"
+        aria-label="Main"
+      >
         {tabs.map((item) => {
           const current = isCurrent(pathname, item.to);
           const Icon = item.icon;
           return (
-            <Link key={item.to} to={item.to} className="tab" aria-current={current ? "page" : undefined}>
+            <Link
+              key={item.to}
+              to={item.to}
+              aria-current={current ? "page" : undefined}
+              className={`relative grid min-h-[52px] justify-items-center gap-0.5 pt-1.5 text-[11px] font-semibold ${current ? "text-primary" : "text-muted-foreground"}`}
+            >
               <Icon size={24} strokeWidth={1.8} aria-hidden="true" />
               {item.label}
-              {item.to === "/" && inboxCount !== undefined && inboxCount > 0 ? <Count value={inboxCount} /> : null}
+              {item.to === "/" && inboxCount !== undefined && inboxCount > 0 ? (
+                <Badge variant="count" className="absolute top-0 left-[calc(50%+6px)]">{inboxCount}</Badge>
+              ) : null}
             </Link>
           );
         })}
         <button
           type="button"
-          className="tab"
           aria-current={moreCurrent ? "page" : undefined}
           aria-expanded={moreOpen}
           onClick={() => setMoreOpen(true)}
+          className={`grid min-h-[52px] justify-items-center gap-0.5 pt-1.5 text-[11px] font-semibold ${moreCurrent ? "text-primary" : "text-muted-foreground"}`}
         >
           <Ellipsis size={24} strokeWidth={1.8} aria-hidden="true" />
           More
         </button>
       </nav>
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom">
+        <SheetContent side="bottom" className="rounded-t-[20px] pb-[calc(16px+env(safe-area-inset-bottom))]">
           <SheetHeader>
-            <SheetTitle className="display">More</SheetTitle>
+            <SheetTitle className="font-display text-2xl font-extrabold uppercase [font-stretch:72%]">More</SheetTitle>
           </SheetHeader>
-          <nav aria-label="More">
-            {phoneMoreNav.map((item) => (
-              <SideLink key={item.to} {...item} pathname={pathname} onClick={() => setMoreOpen(false)} />
-            ))}
+          <nav aria-label="More" className="grid px-2">
+            {phoneMoreNav.map((item) => {
+              const Icon = item.icon;
+              const current = isCurrent(pathname, item.to);
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  aria-current={current ? "page" : undefined}
+                  onClick={() => setMoreOpen(false)}
+                  className={`flex min-h-11 items-center gap-3 rounded-[10px] px-3 font-semibold ${current ? "bg-primary-soft text-primary" : ""}`}
+                >
+                  <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
         </SheetContent>
       </Sheet>
@@ -115,13 +172,15 @@ function PhoneTabs({ pathname, inboxCount }: { pathname: string; inboxCount?: nu
 function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   return (
-    <div className="app-shell">
+    <SidebarProvider className="min-h-svh bg-background">
       <AppSidebar pathname={pathname} />
-      <main className="page">
-        <Outlet />
-      </main>
+      <SidebarInset className="bg-background">
+        <main className="grid content-start gap-5 px-4 pt-2 pb-[calc(96px+env(safe-area-inset-bottom))] md:px-8 md:py-7 md:pb-9">
+          <Outlet />
+        </main>
+      </SidebarInset>
       <PhoneTabs pathname={pathname} />
-    </div>
+    </SidebarProvider>
   );
 }
 
@@ -138,11 +197,11 @@ export function RootLayout() {
   });
 
   if (setup.isPending) {
-    return <p className="muted setup">Loading setup.</p>;
+    return <p className="mx-auto grid min-h-svh content-center px-4 text-muted-foreground">Loading setup.</p>;
   }
   if (setup.isError) {
     return (
-      <div className="setup">
+      <div className="mx-auto grid min-h-svh w-full max-w-xl content-center gap-3 px-4">
         <p>The setup status did not load.</p>
         <Button type="button" onClick={() => void setup.refetch()}>
           Try again

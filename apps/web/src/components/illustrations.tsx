@@ -20,7 +20,7 @@ function stroke(fill: string, width = 2.5) {
 
 function Art({ label, viewBox, children }: { label: string; viewBox: string; children: ReactNode }) {
   return (
-    <svg className="il" viewBox={viewBox} role="img" aria-label={label}>
+    <svg className="block h-auto w-[132px] max-md:w-[92px]" viewBox={viewBox} role="img" aria-label={label}>
       {children}
     </svg>
   );

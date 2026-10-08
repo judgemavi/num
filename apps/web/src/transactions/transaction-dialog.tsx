@@ -1,7 +1,7 @@
 import { transactionSchema, type Account, type Category, type Merchant, type Tag, type Transaction } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/request";
-import { Button } from "@/components/button";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { TransactionForm } from "@/transactions/transaction-form";
 
@@ -66,7 +66,7 @@ export function TransactionDialog({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[min(40rem,calc(100%-2rem))] overflow-y-auto">
-        {loading ? <p className="muted">Loading the transaction.</p> : null}
+        {loading ? <p className="text-muted-foreground">Loading the transaction.</p> : null}
         {failed ? (
           <div className="flex flex-col items-start gap-4">
             <p>The transaction did not load.</p>

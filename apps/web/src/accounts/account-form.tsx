@@ -20,9 +20,10 @@ import { accountError, dayOptionLabel, policyLabel } from "@/accounts/format";
 import { KindPicker } from "@/accounts/kind-picker";
 import { sameClassKinds } from "@/accounts/groups";
 import { apiRequest } from "@/request";
-import { Button } from "@/components/button";
-import { Disclosure } from "@/components/disclosure";
+import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/reveal";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronRight } from "lucide-react";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -217,7 +218,7 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
           {account ? "Change the details of this account." : "Add an account to the book."}
         </DialogDescription>
       </DialogHeader>
-      <form className="form-grid" onSubmit={(event) => void onSubmit(event)}>
+      <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
         <Field>
           <FieldLabel htmlFor="account-name">Name</FieldLabel>
           <Input id="account-name" value={name} required onChange={(event) => setName(event.target.value)} />
@@ -227,7 +228,7 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
           <Input id="account-institution" value={institution} onChange={(event) => setInstitution(event.target.value)} />
         </Field>
         <KindPicker kind={kind} allowed={allowed} onChange={changeKind} />
-        <div className="two">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="opening-balance">{liability ? "Amount you owed" : "Balance"}</FieldLabel>
             <Input
@@ -244,12 +245,12 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
             <Input id="opening-date" type="date" value={openingDate} required onChange={(event) => setOpeningDate(event.target.value)} />
           </Field>
         </div>
-        <p className="hint" style={{ marginTop: 0 }}>
+        <p className="text-sm text-muted-foreground" style={{ marginTop: 0 }}>
           Use a balance from a statement. Num counts forward from this date.
         </p>
         {kind === "credit_card" ? (
           <Reveal title="Card details">
-            <div className="two">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <DayField id="statement-day" label="Statement ends on" value={statementDay} onChange={setStatementDay} />
               <DayField id="due-day" label="Payment is due on" value={dueDay} onChange={setDueDay} />
             </div>
@@ -294,8 +295,13 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
             ) : null}
           </Reveal>
         ) : null}
-        <Disclosure label={moreLabel}>
-          <div className="form-grid">
+        <Collapsible>
+          <CollapsibleTrigger className="group flex min-h-11 items-center gap-1.5 font-semibold text-primary">
+            <ChevronRight className="size-5 transition-transform group-data-[state=open]:rotate-90" aria-hidden="true" strokeWidth={1.8} />
+            {moreLabel}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+          <div className="grid gap-4">
             {kind === "credit_card" ? (
               <Field>
                 <FieldLabel htmlFor="credit-limit">Credit limit</FieldLabel>
@@ -321,7 +327,7 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
                 />
               </Field>
             ) : null}
-            <div className="switch-row">
+            <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
               <div>
                 <FieldLabel htmlFor="on-budget">On budget</FieldLabel>
                 <FieldDescription>You can assign money in this account to buckets.</FieldDescription>
@@ -329,7 +335,8 @@ export function AccountForm({ currency, account, onClose, onSaved }: AccountForm
               <Switch id="on-budget" checked={onBudget} onCheckedChange={(checked) => setOnBudget(checked === true)} />
             </div>
           </div>
-        </Disclosure>
+          </CollapsibleContent>
+        </Collapsible>
         {error ? <FieldError>{error}</FieldError> : null}
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose}>

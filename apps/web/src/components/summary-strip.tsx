@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+const tints = {
+  inbox: "bg-tint-inbox",
+  accounts: "bg-tint-accounts",
+  buckets: "bg-tint-buckets",
+  plan: "bg-tint-plan",
+} as const;
 
 type SummaryStripProps = {
-  tint: "inbox" | "accounts" | "buckets" | "plan";
+  tint: keyof typeof tints;
   label: string;
   amount: ReactNode;
   hint?: ReactNode;
@@ -12,25 +20,29 @@ type SummaryStripProps = {
 
 export function SummaryStrip({ tint, label, amount, hint, facts, extra, illustration }: SummaryStripProps) {
   return (
-    <section className={`card stat tint-${tint}`} aria-label={label}>
-      <div>
-        <p className="lbl">{label}</p>
-        {amount}
-        {hint ? <p className="hint">{hint}</p> : null}
-      </div>
-      <div>
-        {facts ? <div className="facts">{facts}</div> : null}
-        {extra}
-      </div>
-      {illustration}
-    </section>
+    <Card aria-label={label} className={`border-transparent ${tints[tint]}`}>
+      <CardContent className="grid items-center gap-6 p-5 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-8 md:px-6">
+        <div>
+          <CardHeader className="p-0">
+            <CardTitle className="text-sm font-semibold text-muted-foreground">{label}</CardTitle>
+          </CardHeader>
+          {amount}
+          {hint ? <p className="mt-2.5 text-sm text-muted-foreground">{hint}</p> : null}
+        </div>
+        <div className="max-md:col-span-1">
+          {facts ? <div className="flex flex-wrap gap-y-3">{facts}</div> : null}
+          {extra}
+        </div>
+        {illustration}
+      </CardContent>
+    </Card>
   );
 }
 
 export function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="fact">
-      <span>{label}</span>
+    <div className="grid gap-0.5 border-l border-foreground/12 px-6">
+      <span className="text-[13px] text-muted-foreground">{label}</span>
       {children}
     </div>
   );

@@ -1,6 +1,6 @@
 import type { Category, Tag } from "@num/shared";
-import { Button } from "@/components/button";
-import { Chip } from "@/components/chip";
+import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { emptyLine, type LineDraft } from "@/transactions/line-draft";
@@ -120,15 +120,16 @@ export function LineEditor({
               {selectedTags.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {selectedTags.map((tag) => (
-                    <Chip
+                    <Toggle
                       key={tag.id}
+                      variant="outline"
                       pressed
                       disabled={disabled}
                       aria-label={`Remove ${tag.name}`}
-                      onClick={() => update(line.key, { tagIds: line.tagIds.filter((id) => id !== tag.id) })}
+                      onPressedChange={() => update(line.key, { tagIds: line.tagIds.filter((id) => id !== tag.id) })}
                     >
                       {tag.name}
-                    </Chip>
+                    </Toggle>
                   ))}
                 </div>
               ) : null}

@@ -20,9 +20,9 @@ import { useEffect, useState } from "react";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { Amount } from "@/components/amount";
-import { Button } from "@/components/button";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import { Pill } from "@/components/pill";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -172,7 +172,7 @@ export function TransactionsScreen() {
   const pending =
     currency.isPending || transactions.isPending || accounts.isPending || categories.isPending || tags.isPending || merchants.isPending;
   if (pending) {
-    return <p className="muted">Loading transactions.</p>;
+    return <p className="text-muted-foreground">Loading transactions.</p>;
   }
   if (
     currency.isError ||
@@ -189,7 +189,7 @@ export function TransactionsScreen() {
     !merchants.data
   ) {
     return (
-      <div className="stack">
+      <div className="grid content-start gap-5">
         <p>The transactions did not load.</p>
         <Button
           type="button"
@@ -262,11 +262,11 @@ export function TransactionsScreen() {
         }
       />
       {actionError ? (
-        <p role="alert" className="alert">
+        <p role="alert" className="text-sm text-attn">
           {actionError}
         </p>
       ) : null}
-      <div className="card txn-table">
+      <div className="overflow-hidden rounded-[16px] border border-border bg-card">
       <Table>
         <TableHeader>
           <TableRow>
@@ -294,7 +294,7 @@ export function TransactionsScreen() {
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={showBalance ? 7 : 6} className="muted">
+              <TableCell colSpan={showBalance ? 7 : 6} className="text-muted-foreground">
                 {hasFilters(search) ? "No transactions match." : "No transactions yet."}
               </TableCell>
             </TableRow>
@@ -305,13 +305,13 @@ export function TransactionsScreen() {
                 <TableCell>{row.accountName}</TableCell>
                 <TableCell>
                   <div>{row.payeeRaw}</div>
-                  {row.merchantName ? <div className="muted">{row.merchantName}</div> : null}
+                  {row.merchantName ? <div className="text-muted-foreground">{row.merchantName}</div> : null}
                 </TableCell>
                 <TableCell className="text-right">
                   <Amount currency={bookCurrency} minor={row.amount} />
                 </TableCell>
                 <TableCell>
-                  <Pill tone={row.status === "open" ? "neutral" : "positive"}>{statusLabel(row.status)}</Pill>
+                  <Badge variant={row.status === "open" ? "neutral" : "positive"}>{statusLabel(row.status)}</Badge>
                 </TableCell>
                 {showBalance ? (
                   <TableCell className="text-right">

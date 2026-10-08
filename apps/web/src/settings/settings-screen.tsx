@@ -6,7 +6,7 @@ export function SettingsScreen() {
   return (
     <>
       <PageHeader kicker="Book" title="Settings" />
-      <div className="stack">
+      <div className="grid content-start gap-5">
         <CategoriesPanel />
         <TagsPanel />
       </div>

@@ -2,7 +2,7 @@ import { currencyCodes, setupRequestSchema, setupResultSchema, type CategorySet,
 import { useState, type FormEvent } from "react";
 import { CurrencyCombobox } from "@/currency-combobox";
 import { apiRequest } from "@/request";
-import { Button } from "@/components/button";
+import { Button } from "@/components/ui/button";
 import { ChoiceCard } from "@/components/choice-card";
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { RadioGroup } from "@/components/ui/radio-group";
@@ -68,16 +68,16 @@ export function SetupScreen({ onDone }: SetupScreenProps) {
   }
 
   return (
-    <main className="setup">
-      <p className="brand" style={{ padding: 0 }}>
-        <span className="brand-mark" aria-hidden="true">
+    <main className="mx-auto grid min-h-svh w-full max-w-xl content-center gap-3 px-4 py-8">
+      <p className="font-display flex items-center gap-2.5 text-2xl leading-none font-extrabold [font-stretch:72%]">
+        <span className="grid size-7 place-items-center rounded-lg bg-foreground text-base text-background" aria-hidden="true">
           N
         </span>
         Num
       </p>
-      <h1 className="title display">Set up your book</h1>
-      <p className="muted">Choose the currency for this book. You cannot change it after you add a transaction.</p>
-      <form className="form-grid" onSubmit={(event) => void onSubmit(event)}>
+      <h1 className="font-display text-4xl leading-none font-extrabold uppercase [font-stretch:72%]">Set up your book</h1>
+      <p className="text-muted-foreground">Choose the currency for this book. You cannot change it after you add a transaction.</p>
+      <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
         <Field data-invalid={error !== null && currency.length === 0}>
           <FieldLabel htmlFor="currency">Currency</FieldLabel>
           <CurrencyCombobox id="currency" value={currency} invalid={error !== null && currency.length === 0} onChange={setCurrency} />
@@ -93,7 +93,7 @@ export function SetupScreen({ onDone }: SetupScreenProps) {
               }
             }}
           >
-            <div className="kinds">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <ChoiceCard value="default" title="Common categories" description="A short list you can change later." />
               <ChoiceCard value="none" title="No categories" description="Start with an empty list." />
             </div>

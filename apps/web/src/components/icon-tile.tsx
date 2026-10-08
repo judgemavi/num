@@ -10,7 +10,7 @@ type IconTileProps = {
 export function IconTile({ hue, children, label }: IconTileProps) {
   return (
     <span
-      className="icon-tile"
+      className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-(--hb) text-(--hf) [&_svg]:size-5"
       style={hueVars(hue) as CSSProperties}
       aria-hidden={label ? undefined : true}
       role={label ? "img" : undefined}

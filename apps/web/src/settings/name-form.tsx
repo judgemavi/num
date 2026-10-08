@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Button } from "@/components/button";
+import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";

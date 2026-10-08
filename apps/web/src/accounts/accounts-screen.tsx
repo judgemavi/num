@@ -10,14 +10,14 @@ import { groupAccounts, groupHue, groupLabel, worthOf } from "@/accounts/groups"
 import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
-import { Button } from "@/components/button";
-import { Chip } from "@/components/chip";
+import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { IconTile } from "@/components/icon-tile";
 import { BalanceScaleIllustration } from "@/components/illustrations";
 import { ListCard, ListGroup, ListRow } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
-import { Pill } from "@/components/pill";
+import { Badge } from "@/components/ui/badge";
 import { SidePanel } from "@/components/side-panel";
 import { SplitBar } from "@/components/split-bar";
 import {
@@ -88,11 +88,11 @@ export function AccountsScreen() {
   }
 
   if (currency.isPending || accounts.isPending) {
-    return <p className="muted">Loading accounts.</p>;
+    return <p className="text-muted-foreground">Loading accounts.</p>;
   }
   if (currency.isError || accounts.isError || !currency.data) {
     return (
-      <div className="stack">
+      <div className="grid content-start gap-5">
         <p>The accounts did not load.</p>
         <Button
           type="button"
@@ -120,14 +120,15 @@ export function AccountsScreen() {
         title="Accounts"
         actions={
           <>
-            <Chip
+            <Toggle
+              variant="outline"
               pressed={search.archived}
-              onClick={() => {
-                void navigate({ search: { ...search, archived: !search.archived, page: 1 } });
+              onPressedChange={(pressed) => {
+                void navigate({ search: { ...search, archived: pressed, page: 1 } });
               }}
             >
               Show archived
-            </Chip>
+            </Toggle>
             <Button type="button" onClick={() => setDraft("new")}>
               <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
               Add account
@@ -143,10 +144,10 @@ export function AccountsScreen() {
         facts={
           <>
             <Fact label="What you have">
-              <Amount currency={bookCurrency} minor={worth.have} />
+              <Amount currency={bookCurrency} minor={worth.have} className="text-lg" />
             </Fact>
             <Fact label="What you owe">
-              <Amount currency={bookCurrency} minor={worth.owe} />
+              <Amount currency={bookCurrency} minor={worth.owe} className="text-lg" />
             </Fact>
           </>
         }
@@ -162,14 +163,14 @@ export function AccountsScreen() {
         illustration={<BalanceScaleIllustration />}
       />
       {actionError ? (
-        <p role="alert" className="alert">
+        <p role="alert" className="text-sm text-attn">
           {actionError}
         </p>
       ) : null}
-      <div className="cols">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <ListCard label="All accounts">
           {groups.length === 0 ? (
-            <p className="empty">{search.archived ? "No archived accounts." : "No accounts yet."}</p>
+            <p className="px-5 py-5 text-muted-foreground">{search.archived ? "No archived accounts." : "No accounts yet."}</p>
           ) : (
             groups.map((group) => (
               <div key={group.id}>
@@ -184,18 +185,18 @@ export function AccountsScreen() {
                       <IconTile hue={groupHue[group.id]}>
                         <AccountIcon kind={account.kind} />
                       </IconTile>
-                      <div className="list-name">
+                      <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
                         {account.name}
                         {account.institution ? <small>{account.institution}</small> : null}
                       </div>
-                      <div className="list-meta">
-                        {account.archivedAt ? <Pill tone="attention">Archived</Pill> : kindLabel(account.kind)}
+                      <div className="hidden w-40 shrink-0 text-[13px] text-muted-foreground md:block">
+                        {account.archivedAt ? <Badge variant="attention">Archived</Badge> : kindLabel(account.kind)}
                       </div>
-                      <div className="list-amt">
+                      <div className="ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
                         <Amount currency={bookCurrency} minor={account.balance} owed={accountClass(account.kind) === "liability"} />
                         {detail ? <small>{detail}</small> : null}
                       </div>
-                      <div className="list-acts">
+                      <div className="flex flex-wrap justify-end gap-2 max-md:w-full">
                         <Button type="button" variant="outline" onClick={() => setDraft(account)}>
                           Edit
                         </Button>
@@ -216,21 +217,21 @@ export function AccountsScreen() {
             ))
           )}
         </ListCard>
-        <div className="stack">
+        <div className="grid content-start gap-5">
           {cards.length === 0 ? (
             <SidePanel title="Card statements" text="Add a credit card to see what you owe and the due day." />
           ) : (
             <ListCard label="Card statements" title="Card statements">
               {cards.map((account) => (
                 <ListRow key={account.id} simple>
-                  <div className="list-name">
+                  <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
                     {account.name}
                     <small>
                       {account.dueDay === null ? "No due day" : `Due day ${account.dueDay}`}
                       {account.paymentPolicy === "full" ? " · pays the full statement" : ""}
                     </small>
                   </div>
-                  <div className="list-amt">
+                  <div className="ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
                     <Amount currency={bookCurrency} minor={account.balance} owed />
                   </div>
                 </ListRow>

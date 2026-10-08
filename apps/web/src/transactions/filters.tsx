@@ -1,6 +1,6 @@
 import type { Account, Category, Merchant, Tag, TransactionListQuery } from "@num/shared";
-import { Button } from "@/components/button";
-import { Chip } from "@/components/chip";
+import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { OptionCombobox } from "@/transactions/option-combobox";
@@ -32,7 +32,7 @@ export function TransactionFilters({
   onClear,
 }: FiltersProps) {
   return (
-    <div className="filter-grid">
+    <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-3">
       <Field>
         <FieldLabel htmlFor="filter-account">Account</FieldLabel>
         <OptionCombobox
@@ -95,10 +95,10 @@ export function TransactionFilters({
           onChange={(event) => onChange({ to: event.target.value || undefined })}
         />
       </Field>
-      <div className="filter-actions">
-        <Chip pressed={search.uncategorized} onClick={() => onChange({ uncategorized: !search.uncategorized })}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Toggle variant="outline" pressed={search.uncategorized} onPressedChange={(pressed) => onChange({ uncategorized: pressed })}>
           Uncategorized only
-        </Chip>
+        </Toggle>
         {hasFilters(search) ? (
           <Button type="button" variant="ghost" onClick={onClear}>
             Clear filters

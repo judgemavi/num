@@ -16,22 +16,22 @@ type SplitBarProps = {
 export function SplitBar({ label, segments }: SplitBarProps) {
   const total = segments.reduce((sum, segment) => sum + Math.max(0, segment.value), 0);
   return (
-    <div className="split-wrap">
-      <div className="split" role="img" aria-label={label}>
+    <div>
+      <div className="flex h-2 gap-0.5 overflow-hidden rounded-full" role="img" aria-label={label}>
         {total === 0 ? (
-          <i style={{ flex: 1, background: "var(--sunken)" }} />
+          <i className="block h-full flex-1 bg-sunken" />
         ) : (
           segments.map((segment) => (
-            <i key={segment.key} style={{ flex: Math.max(0, segment.value), background: segment.color }} />
+            <i key={segment.key} className="block h-full" style={{ flex: Math.max(0, segment.value), background: segment.color }} />
           ))
         )}
       </div>
-      <div className="key">
+      <div className="mt-2 flex flex-wrap gap-5 text-sm text-muted-foreground">
         {segments.map((segment) => (
-          <span key={segment.key}>
-            <i style={{ background: segment.color }} />
+          <span key={segment.key} className="inline-flex items-center gap-1.5">
+            <i className="size-2 rounded-full" style={{ background: segment.color }} />
             {segment.label}
-            <b>{segment.amount}</b>
+            <b className="font-semibold text-foreground">{segment.amount}</b>
           </span>
         ))}
       </div>

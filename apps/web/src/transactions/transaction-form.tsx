@@ -14,7 +14,7 @@ import {
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
 import { apiRequest } from "@/request";
-import { Button } from "@/components/button";
+import { Button } from "@/components/ui/button";
 import {
   DialogDescription,
   DialogFooter,
@@ -199,7 +199,7 @@ export function TransactionForm({
   }
 
   return (
-    <form onSubmit={(event) => void onSubmit(event)} className="form-grid">
+    <form onSubmit={(event) => void onSubmit(event)} className="grid gap-4">
       <DialogHeader>
         <DialogTitle>{transaction ? "Edit transaction" : "New transaction"}</DialogTitle>
         <DialogDescription>
