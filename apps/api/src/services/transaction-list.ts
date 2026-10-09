@@ -219,12 +219,12 @@ export function listTransactions(db: Db, query: TransactionListQuery) {
         when t.auto_reason = 'merchant_default' then (select m2.name from merchants m2 where m2.id = t.auto_source_id)
         else (select s.payee_normalized from transactions s where s.id = t.auto_source_id)
       end as autoSourceName,
-      (
+      case when t.auto_reason is null then null else (
         select count(*) from transactions c
         inner join transaction_lines cl on cl.transaction_id = c.id
         where c.deleted_at is null and c.auto_reason is null and c.payee_normalized = t.payee_normalized
           and cl.category_id is not null and cl.transfer_account_id is null
-      ) as autoLearnedCount
+      ) end as autoLearnedCount
     from transactions t
     join accounts a on a.id = t.account_id
     ${merchantJoin}

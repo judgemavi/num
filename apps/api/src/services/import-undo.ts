@@ -21,6 +21,21 @@ function editedAfterImport(db: Db, transactionId: string): boolean {
   return rows.slice(created + 1).some((row) => row.action === "update");
 }
 
+function removeMirror(tx: WriteTx, sourceId: string, at: string): void {
+  const source = tx.select().from(transactions).where(eq(transactions.id, sourceId)).get();
+  if (!source?.transferPeerId) {
+    return;
+  }
+  const peer = tx.select().from(transactions).where(eq(transactions.id, source.transferPeerId)).get();
+  if (!peer || peer.deletedAt || !peer.mirror) {
+    return;
+  }
+  const before = readTransaction(tx, peer.id);
+  tx.update(transactions).set({ transferPeerId: null, deletedAt: at }).where(eq(transactions.id, peer.id)).run();
+  tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, sourceId)).run();
+  auditTransaction(tx, peer.id, "delete", before, readTransaction(tx, peer.id));
+}
+
 function blockReason(txn: TxRow | undefined, db: Db): UndoBlockReason | "removed" | null {
   if (!txn || txn.deletedAt !== null) {
     return "removed";
@@ -113,6 +128,7 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
       }
       const before = readTransaction(tx, row.transactionId);
       clearOccurrenceLinks(tx, row.transactionId);
+      removeMirror(tx, row.transactionId, at);
       tx.update(transactions).set({ deletedAt: at }).where(eq(transactions.id, row.transactionId)).run();
       tx.update(importRows).set({ active: false }).where(eq(importRows.id, row.id)).run();
       auditTransaction(tx, row.transactionId, "delete", before, readTransaction(tx, row.transactionId));

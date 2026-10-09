@@ -7,10 +7,10 @@ import {
   confidenceModes,
   learnedConfidence,
   linkWindowStart,
+  similarPayees,
   matchLinks,
   occurrenceDates,
   scoreMatch,
-  similarPayees,
   type ConfidenceMode,
   type LearnedRow,
   type LinkTransaction,
@@ -50,10 +50,15 @@ type PlanRow = {
   businessDayShift: string;
 };
 
+type TransferRow = { id: string; date: string; payee: string; transferAccountId: string };
+
 export type MatchBook = {
   mode: ConfidenceMode;
   byPayee: Map<string, ConfirmRow[]>;
-  payees: string[];
+  transfersByPayee: Map<string, TransferRow[]>;
+  payeeLearned: Map<string, ReturnType<typeof learnedConfidence>>;
+  amountLearned: Map<string, ReturnType<typeof learnedConfidence>>;
+  similarByPayee: Map<string, { payee: string; similarity: number; scores: ReturnType<typeof learnedConfidence> }[]>;
   index: ReturnType<typeof buildTrigramIndex>;
   merchants: { id: string; name: string; categoryId: string; payee: string }[];
 };
@@ -81,8 +86,9 @@ export function loadMatchBook(db: Reader): MatchBook {
       and t.auto_reason is null
       and l.category_id is not null
       and l.transfer_account_id is null
-      and t.id in (
-        select transaction_id from transaction_lines group by transaction_id having count(*) = 1
+      and not exists (
+        select 1 from transaction_lines extra
+        where extra.transaction_id = t.id and extra.id <> l.id
       )
   `);
   const byPayee = new Map<string, ConfirmRow[]>();
@@ -94,7 +100,35 @@ export function loadMatchBook(db: Reader): MatchBook {
       byPayee.set(row.payee, [row]);
     }
   }
-  const payees = [...byPayee.keys()];
+  const transfers = db.all<TransferRow>(sql`
+    select t.id as id, t.date as date, t.payee_normalized as payee, l.transfer_account_id as transferAccountId
+    from transactions t
+    inner join transaction_lines l on l.transaction_id = t.id
+    where t.deleted_at is null
+      and t.mirror = 0
+      and t.auto_reason is null
+      and l.category_id is null
+      and l.transfer_account_id is not null
+      and not exists (
+        select 1 from transaction_lines extra
+        where extra.transaction_id = t.id and extra.id <> l.id
+      )
+  `);
+  const transfersByPayee = new Map<string, TransferRow[]>();
+  for (const row of transfers) {
+    const list = transfersByPayee.get(row.payee);
+    if (list) {
+      list.push(row);
+    } else {
+      transfersByPayee.set(row.payee, [row]);
+    }
+  }
+  const payees = [...new Set([...byPayee.keys(), ...transfersByPayee.keys()])];
+  const payeeLearned = new Map<string, ReturnType<typeof learnedConfidence>>();
+  for (const [payee, rows] of byPayee) {
+    payeeLearned.set(payee, learnedConfidence(learnedOf(rows)));
+  }
+  const index = buildTrigramIndex(payees);
   const merchants = db.all<{ id: string; name: string; categoryId: string }>(sql`
     select id as id, name as name, default_category_id as categoryId
     from merchants
@@ -103,8 +137,11 @@ export function loadMatchBook(db: Reader): MatchBook {
   return {
     mode: confidenceMode(db),
     byPayee,
-    payees,
-    index: buildTrigramIndex(payees),
+    transfersByPayee,
+    payeeLearned,
+    amountLearned: new Map(),
+    similarByPayee: new Map(),
+    index,
     merchants: merchants.map((merchant) => ({ ...merchant, payee: normalizePayee(merchant.name) })),
   };
 }
@@ -118,21 +155,42 @@ export function scorePayee(
   input: { payee: string; amount: number; recurring: RecurringSignal | null },
 ): MatchResult {
   const same = book.byPayee.get(input.payee) ?? [];
-  const amountRows = learnedOf(same.filter((row) => amountsWithinOnePercent(row.amount, input.amount)));
-  const similar = similarPayees(book.index, input.payee).map((hit) => ({
-    payee: hit.payee,
-    similarity: hit.similarity,
-    rows: learnedOf(book.byPayee.get(hit.payee) ?? []),
-  }));
+  const amountKey = `${input.payee}\0${input.amount}`;
+  let amountScores = book.amountLearned.get(amountKey);
+  if (!amountScores) {
+    amountScores = learnedConfidence(learnedOf(same.filter((row) => amountsWithinOnePercent(row.amount, input.amount))));
+    book.amountLearned.set(amountKey, amountScores);
+  }
+  let similar = book.similarByPayee.get(input.payee);
+  if (!similar) {
+    similar = similarPayees(book.index, input.payee).map((hit) => ({
+      payee: hit.payee,
+      similarity: hit.similarity,
+      scores: book.payeeLearned.get(hit.payee) ?? [],
+    }));
+    book.similarByPayee.set(input.payee, similar);
+  }
   const merchantHits = book.merchants.filter((merchant) => merchant.payee === input.payee);
   const merchant = merchantHits.length === 1 ? merchantHits[0] : null;
   const scored: ScoreInput = {
     mode: book.mode,
     recurring: input.recurring,
-    amountRows,
-    payeeRows: learnedOf(same),
-    similar,
+    amountRows: [],
+    payeeRows: [],
+    amountScores,
+    payeeScores: book.payeeLearned.get(input.payee) ?? [],
+    similar: (book.similarByPayee.get(input.payee) ?? []).map((hit) => ({
+      payee: hit.payee,
+      similarity: hit.similarity,
+      rows: [],
+      scores: hit.scores,
+    })),
     merchant: merchant ? { id: merchant.id, name: merchant.name, categoryId: merchant.categoryId } : null,
+    transferRows: (book.transfersByPayee.get(input.payee) ?? []).map((row) => ({
+      id: row.id,
+      date: row.date,
+      transferAccountId: row.transferAccountId,
+    })),
   };
   return scoreMatch(scored);
 }

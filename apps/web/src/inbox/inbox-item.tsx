@@ -260,9 +260,13 @@ export function InboxItemRow({
               if (!suggestion) {
                 return null;
               }
-              const label = suggestion.transferAccountId
+              const sure = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 0 }).format(
+                suggestion.confidence / 1000,
+              );
+              const name = suggestion.transferAccountId
                 ? `Transfer · ${names.account(suggestion.transferAccountId)}`
                 : names.category(suggestion.categoryId ?? "");
+              const label = `${name} · ${sure}`;
               return (
                 <Button
                   key={`${suggestion.categoryId ?? ""}-${suggestion.transferAccountId ?? ""}-${index}`}

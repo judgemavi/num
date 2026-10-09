@@ -9,7 +9,7 @@ import {
 import { sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { readTransaction, type TransactionBody } from "./transaction-record";
-import { applyTransactionUpdate, insertTransaction, spreadAfterConfirmation } from "./transactions";
+import { applyTransactionUpdate, spreadAfterConfirmations } from "./transactions";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
@@ -127,6 +127,7 @@ export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { 
   const targets = groupIds.filter((id) => !excluded.has(id));
   let applied = 0;
   const skipped: GroupSkip[] = [];
+  const confirmed: string[] = [];
   write(db, { source: input.source, at }, (tx) => {
     for (const id of targets) {
       const skip = applyOne(tx, id, input, at);
@@ -134,11 +135,10 @@ export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { 
         skipped.push(skip);
       } else {
         applied += 1;
+        confirmed.push(id);
       }
     }
-    for (const id of targets) {
-      spreadAfterConfirmation(tx, id, excluded);
-    }
+    spreadAfterConfirmations(tx, confirmed, excluded);
   });
   return { applied, skipped };
 }
@@ -154,29 +154,3 @@ export function countOtherUncategorized(db: Db, payeeRaw: string, accountId: str
   }).length;
 }
 
-type Saved = { id: string; applied: number; skipped: GroupSkip[] };
-
-function saveInWrite(db: Db, at: string, source: AuditSource, run: (tx: WriteTx) => string): Saved {
-  let id = "";
-  write(db, { source, at }, (tx) => {
-    id = run(tx);
-    spreadAfterConfirmation(tx, id);
-  });
-  return { id, applied: 0, skipped: [] };
-}
-
-export function saveTransactionWithRule(
-  db: Db,
-  id: string | null,
-  input: TransactionBody & WriteInput,
-): Transaction & { applied: number; skipped: GroupSkip[] } {
-  const at = input.at ?? utcNow();
-  const saved = saveInWrite(db, at, input.source, (tx) => {
-    if (id) {
-      return applyTransactionUpdate(tx, id, input, at, false).id;
-    }
-    return insertTransaction(tx, input, input.source, false).id;
-  });
-  const transaction = readTransaction(db, saved.id);
-  return { ...transaction, applied: saved.applied, skipped: saved.skipped };
-}

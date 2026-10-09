@@ -217,7 +217,7 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
   const created = readTransaction(tx, id);
   auditTransaction(tx, id, "create", null, created);
   if (spread && isUserConfirmation(created)) {
-    spreadSureLabels(tx, created.payeeNormalized, new Set([created.id]));
+    spreadSureLabels(tx, [created.payeeNormalized], new Set([created.id]));
   }
   return created;
 }
@@ -262,7 +262,7 @@ export function applyTransactionUpdate(
   }
   const saved = readTransaction(tx, id);
   if (spread && changed && isUserConfirmation(saved)) {
-    spreadSureLabels(tx, saved.payeeNormalized, new Set([saved.id]));
+    spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));
   }
   return saved;
 }
@@ -280,7 +280,7 @@ export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transac
     const saved = readTransaction(tx, id);
     auditTransaction(tx, id, "update", before, saved);
     if (isUserConfirmation(saved)) {
-      spreadSureLabels(tx, saved.payeeNormalized, new Set([saved.id]));
+      spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));
     }
     accepted = saved;
   });
@@ -290,11 +290,21 @@ export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transac
   return accepted;
 }
 
-export function spreadAfterConfirmation(tx: WriteTx, id: string, alsoExcept: ReadonlySet<string> = new Set()): void {
-  const saved = readTransaction(tx, id);
-  if (saved.autoReason === null && isUserConfirmation(saved)) {
-    spreadSureLabels(tx, saved.payeeNormalized, new Set([saved.id, ...alsoExcept]));
+export function spreadAfterConfirmations(tx: WriteTx, ids: readonly string[], alsoExcept: ReadonlySet<string> = new Set()): void {
+  const except = new Set<string>(alsoExcept);
+  const payees: string[] = [];
+  for (const id of ids) {
+    except.add(id);
+    const saved = readTransaction(tx, id);
+    if (saved.autoReason === null && isUserConfirmation(saved)) {
+      payees.push(saved.payeeNormalized);
+    }
   }
+  spreadSureLabels(tx, payees, except);
+}
+
+export function spreadAfterConfirmation(tx: WriteTx, id: string, alsoExcept: ReadonlySet<string> = new Set()): void {
+  spreadAfterConfirmations(tx, [id], alsoExcept);
 }
 
 export function updateTransaction(db: Db, id: string, input: TransactionBody & WriteInput): Transaction {

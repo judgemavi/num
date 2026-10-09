@@ -193,12 +193,13 @@ test("migration 0011 drops rules and adds confidence on a populated database", (
       insert into accounts (id, name, kind, on_budget, opening_date, opening_balance)
       values ('acct', 'Everyday', 'chequing', 1, '2026-01-01', 2500);
       insert into categories (id, name, kind, essential) values ('food', 'Groceries', 'expense', 0);
-      insert into rules (id, match, pattern, category_id, priority, origin)
-      values ('rule', 'exact', 'NORTH CAFE', 'food', 1, 'manual');
+      insert into merchants (id, name) values ('shop', 'North Cafe');
+      insert into rules (id, match, pattern, category_id, merchant_id, priority, origin)
+      values ('rule', 'exact', 'NORTH CAFE', 'food', 'shop', 1, 'manual');
       insert into transactions (
-        id, account_id, date, amount, payee_raw, payee_normalized, status, source, mirror, auto_reason, auto_source_id
+        id, account_id, date, amount, merchant_id, payee_raw, payee_normalized, status, source, mirror, auto_reason, auto_source_id
       ) values (
-        'txn', 'acct', '2026-03-12', -1800, 'NORTH CAFE', 'NORTH CAFE', 'open', 'import', 0, 'learned', 'rule'
+        'txn', 'acct', '2026-03-12', -1800, 'shop', 'NORTH CAFE', 'NORTH CAFE', 'open', 'import', 0, 'rule', 'rule'
       );
       insert into transaction_lines (id, transaction_id, amount, category_id) values ('line', 'txn', -1800, 'food');
       insert into settings (key, value) values ('currency', 'USD');
@@ -213,11 +214,12 @@ test("migration 0011 drops rules and adds confidence on a populated database", (
     expect(tables.map((table) => table.name)).not.toContain("rules");
     const columns = sqlite.query("select name from pragma_table_info('transactions')").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toContain("auto_confidence");
-    expect(sqlite.query("select amount, payee_raw, auto_reason, auto_confidence from transactions where id = 'txn'").get()).toEqual({
+    expect(sqlite.query("select amount, payee_raw, auto_reason, auto_confidence, merchant_id from transactions where id = 'txn'").get()).toEqual({
       amount: -1800,
       payee_raw: "NORTH CAFE",
       auto_reason: null,
       auto_confidence: null,
+      merchant_id: null,
     });
     expect(sqlite.query("select category_id from transaction_lines where id = 'line'").get()).toEqual({ category_id: null });
     expect(sqlite.query("select value from settings where key = 'currency'").get()).toEqual({ value: "USD" });

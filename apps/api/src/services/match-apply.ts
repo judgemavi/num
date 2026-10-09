@@ -1,9 +1,10 @@
-import { mortgageTerms, occurrenceLinks, transactionLines, transactions, valuations } from "@num/db";
-import { mortgagePrefillLines, mortgageSplitForDate, type Compounding, type MatchResult, type PaymentFrequency } from "@num/shared";
+import { accounts, mortgageTerms, occurrenceLinks, transactionLines, transactions, valuations } from "@num/db";
+import { mortgagePrefillLines, mortgageSplitForDate, similarPayees, type Compounding, type MatchResult, type PaymentFrequency } from "@num/shared";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { replaceLines } from "./transaction-lines";
+import { attachTransfer } from "./transaction-transfer";
 import type { WriteTx } from "./write";
 
 type OpenRow = {
@@ -63,6 +64,78 @@ export function mortgageSplitLines(tx: WriteTx, result: MatchResult, fromAccount
   ];
 }
 
+export function applyLinkedPlan(
+  tx: WriteTx,
+  plan: { id: string; name: string; categoryId: string | null; merchantId: string | null; transferAccountId: string | null },
+  transactionId: string,
+): void {
+  const txn = tx.select().from(transactions).where(eq(transactions.id, transactionId)).get();
+  if (!txn || txn.deletedAt) {
+    return;
+  }
+  const mortgage =
+    plan.transferAccountId !== null &&
+    tx.select({ kind: accounts.kind }).from(accounts).where(eq(accounts.id, plan.transferAccountId)).get()?.kind === "mortgage";
+  if (!mortgage && plan.categoryId === null) {
+    return;
+  }
+  const result = {
+    level: "automatic" as const,
+    confidence: 0.99,
+    confidenceMilli: 990,
+    lead: 1,
+    reason: "recurring" as const,
+    sourceId: plan.id,
+    sourceName: plan.name,
+    categoryId: mortgage ? null : plan.categoryId,
+    merchantId: plan.merchantId,
+    transferAccountId: mortgage ? plan.transferAccountId : null,
+    learnedCount: null,
+    mortgage,
+    signals: [],
+    alternate: null,
+  };
+  const before = readTransaction(tx, transactionId);
+  const lines = mortgage ? mortgageSplitLines(tx, result, txn.accountId, txn.date, txn.amount) : null;
+  if (mortgage && !lines) {
+    return;
+  }
+  tx.update(transactions)
+    .set({
+      merchantId: plan.merchantId ?? txn.merchantId,
+      autoReason: "recurring",
+      autoSourceId: plan.id,
+      autoConfidence: 990,
+    })
+    .where(eq(transactions.id, transactionId))
+    .run();
+  if (lines) {
+    replaceLines(tx, transactionId, lines);
+    const principal = lines.find((line) => line.transferAccountId);
+    if (principal?.transferAccountId) {
+      const current = tx.select().from(transactions).where(eq(transactions.id, transactionId)).get();
+      if (current) {
+        attachTransfer(tx, transactionId, {
+          accountId: current.accountId,
+          date: current.date,
+          amount: current.amount,
+          merchantId: current.merchantId,
+          notes: current.notes,
+          payeeRaw: current.payeeRaw,
+          payeeNormalized: current.payeeNormalized,
+          status: current.status === "cleared" || current.status === "reconciled" ? current.status : "open",
+        }, current.source, principal);
+      }
+    }
+  } else if (plan.categoryId) {
+    const line = tx.select().from(transactionLines).where(eq(transactionLines.transactionId, transactionId)).all();
+    if (line.length === 1 && line[0] && line[0].transferAccountId === null) {
+      tx.update(transactionLines).set({ categoryId: plan.categoryId }).where(eq(transactionLines.id, line[0].id)).run();
+    }
+  }
+  auditTransaction(tx, transactionId, "label", before, readTransaction(tx, transactionId));
+}
+
 export function linkRecurring(tx: WriteTx, planId: string, dueDate: string, transactionId: string): void {
   const taken = tx.select({ id: occurrenceLinks.id }).from(occurrenceLinks).where(eq(occurrenceLinks.transactionId, transactionId)).get();
   if (taken) {
@@ -104,13 +177,9 @@ export function labelFields(result: MatchResult, merchantId: string | null) {
   };
 }
 
-function applyRow(tx: WriteTx, row: OpenRow, result: MatchResult, dueDate: string | null): void {
-  const mortgage = result.mortgage ? mortgageSplitLines(tx, result, row.accountId, row.date, row.amount) : null;
+function applyRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
   const label = labelFields(result, row.merchantId);
-  if (!label) {
-    return;
-  }
-  if (result.mortgage && !mortgage) {
+  if (!label || !("categoryId" in label) || !label.categoryId) {
     return;
   }
   const before = readTransaction(tx, row.id);
@@ -123,43 +192,54 @@ function applyRow(tx: WriteTx, row: OpenRow, result: MatchResult, dueDate: strin
     })
     .where(eq(transactions.id, row.id))
     .run();
-  if (mortgage) {
-    replaceLines(tx, row.id, mortgage);
-  } else if ("categoryId" in label && label.categoryId) {
-    tx.update(transactionLines).set({ categoryId: label.categoryId }).where(eq(transactionLines.id, row.lineId)).run();
-  }
-  if (result.reason === "recurring" && result.sourceId && dueDate) {
-    linkRecurring(tx, result.sourceId, dueDate, row.id);
-  }
-  auditTransaction(tx, row.id, "update", before, readTransaction(tx, row.id));
+  tx.update(transactionLines).set({ categoryId: label.categoryId }).where(eq(transactionLines.id, row.lineId)).run();
+  auditTransaction(tx, row.id, "label", before, readTransaction(tx, row.id));
 }
 
-const openRows = sql`
-  select t.id as id, t.account_id as accountId, t.date as date, t.amount as amount,
-    t.payee_normalized as payee, t.merchant_id as merchantId, l.id as lineId
-  from transactions t
-  inner join transaction_lines l on l.transaction_id = t.id
-  where t.deleted_at is null
-    and t.mirror = 0
-    and l.category_id is null
-    and l.transfer_account_id is null
-    and t.id in (
-      select transaction_id from transaction_lines group by transaction_id having count(*) = 1
-    )
-`;
-
-/** Labels other uncategorized transactions that are now above the threshold. */
-export function spreadSureLabels(tx: WriteTx, _payee: string, except: ReadonlySet<string>): void {
-  const rows = tx.all<OpenRow>(openRows).filter((row) => !except.has(row.id));
-  if (rows.length === 0) {
+/** Labels uncategorized rows for these payees, and for payees similar to them. */
+export function spreadSureLabels(tx: WriteTx, payees: readonly string[], except: ReadonlySet<string>): void {
+  const seeds = [...new Set(payees.filter((payee) => payee.length > 0))];
+  if (seeds.length === 0) {
     return;
   }
   const book = loadMatchBook(tx);
+  const wanted = new Set<string>();
+  for (const payee of seeds) {
+    wanted.add(payee);
+    let similar = book.similarByPayee.get(payee);
+    if (!similar) {
+      similar = similarPayees(book.index, payee).map((hit) => ({
+        payee: hit.payee,
+        similarity: hit.similarity,
+        scores: book.payeeLearned.get(hit.payee) ?? [],
+      }));
+      book.similarByPayee.set(payee, similar);
+    }
+    for (const hit of similar) {
+      wanted.add(hit.payee);
+    }
+  }
+  const list = sql.join([...wanted].map((payee) => sql`${payee}`), sql`, `);
+  const rows = tx.all<OpenRow>(sql`
+    select t.id as id, t.account_id as accountId, t.date as date, t.amount as amount,
+      t.payee_normalized as payee, t.merchant_id as merchantId, l.id as lineId
+    from transactions t
+    inner join transaction_lines l on l.transaction_id = t.id
+    where t.deleted_at is null
+      and t.mirror = 0
+      and t.payee_normalized in (${list})
+      and l.category_id is null
+      and l.transfer_account_id is null
+      and not exists (
+        select 1 from transaction_lines extra
+        where extra.transaction_id = t.id and extra.id <> l.id
+      )
+  `).filter((row) => !except.has(row.id));
   for (const row of rows) {
     const result = scorePayee(book, { payee: row.payee, amount: row.amount, recurring: null });
     if (result.level !== "automatic") {
       continue;
     }
-    applyRow(tx, row, result, null);
+    applyRow(tx, row, result);
   }
 }

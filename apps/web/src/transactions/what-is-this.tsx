@@ -109,7 +109,8 @@ function suggestionText(suggestion: Suggestion, merchants: Option[], categories:
   if (parts.length === 0) {
     return null;
   }
-  return `Suggested. ${parts.join(". ")}. ${reasonText(suggestion.reason)}`;
+  const sure = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 0 }).format(suggestion.confidence / 1000);
+  return `Suggested. ${sure} sure. ${parts.join(". ")}. ${reasonText(suggestion.reason)}`;
 }
 
 export function WhatIsThis({

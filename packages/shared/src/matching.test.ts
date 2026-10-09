@@ -24,6 +24,7 @@ function score(patch: Partial<ScoreInput> & Pick<ScoreInput, "amountRows" | "pay
     recurring: null,
     similar: [],
     merchant: null,
+    transferRows: [],
     ...patch,
   });
 }
@@ -35,8 +36,8 @@ test("one confirmation and three that agree follow the learned formula", () => {
     row("b", "2026-02-01", "rent"),
     row("a", "2026-01-01", "rent"),
   ]);
-  expect(one[0]?.confidence).toBeCloseTo((1.15 / 1.3) * (1 - 0.5 ** 2), 10);
-  expect(three[0]?.confidence).toBeCloseTo((1.9 / 2.05) * (1 - 0.5 ** 4), 10);
+  expect(one[0]?.confidence).toBeCloseTo(0.85, 10);
+  expect(three[0]?.confidence).toBeCloseTo(1 - 0.15 * 0.6 ** 2, 10);
   expect(one[0]?.count).toBe(1);
   expect(three[0]?.count).toBe(3);
 });
@@ -46,7 +47,7 @@ test("a conflict splits the weight and does not make an automatic label", () => 
   const scores = learnedConfidence(rows);
   expect(scores).toHaveLength(2);
   expect(scores[0]?.categoryId).toBe("gifts");
-  expect(scores[0]?.confidence).toBeLessThan(0.6);
+  expect(scores[0]?.confidence).toBeCloseTo((1 / 1.5) * (1 - 0.15 * 0.6), 10);
   const result = score({ amountRows: rows, payeeRows: rows, mode: "balanced" });
   expect(result.level).not.toBe("automatic");
 });

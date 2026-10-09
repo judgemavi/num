@@ -49,8 +49,13 @@ export function buildTrigramIndex(payees: readonly string[]): TrigramIndex {
 export function similarPayees(index: TrigramIndex, payee: string, minimum: number): { payee: string; similarity: number }[] {
   const grams = characterTrigrams(payee);
   const seen = new Set<number>();
+  const common = Math.max(8, Math.floor(index.payees.length / 2));
   for (const gram of grams) {
-    for (const indexOfPayee of index.byGram.get(gram) ?? []) {
+    const bucket = index.byGram.get(gram);
+    if (!bucket || bucket.length > common) {
+      continue;
+    }
+    for (const indexOfPayee of bucket) {
       seen.add(indexOfPayee);
     }
   }

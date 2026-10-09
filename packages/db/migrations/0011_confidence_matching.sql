@@ -1,5 +1,5 @@
 DROP TABLE `rules`;--> statement-breakpoint
-CREATE TEMP TABLE `cleared_auto` AS SELECT `id` FROM `transactions` WHERE `auto_reason` IS NOT NULL;--> statement-breakpoint
+CREATE TEMP TABLE `cleared_auto` AS SELECT `id`, `auto_reason` FROM `transactions` WHERE `auto_reason` IS NOT NULL;--> statement-breakpoint
 PRAGMA foreign_keys=OFF;--> statement-breakpoint
 CREATE TABLE `__new_settings` (
 	`key` text PRIMARY KEY NOT NULL,
@@ -51,5 +51,6 @@ CREATE INDEX `transactions_active_account_date` ON `transactions` (`account_id`,
 CREATE INDEX `transactions_active_merchant_date` ON `transactions` (`merchant_id`,`date`,`id`) WHERE "transactions"."deleted_at" is null;--> statement-breakpoint
 CREATE INDEX `transactions_payee_normalized` ON `transactions` (`payee_normalized`,`date`,`id`) WHERE "transactions"."deleted_at" is null;--> statement-breakpoint
 UPDATE `transaction_lines` SET `category_id` = NULL WHERE `transaction_id` IN (SELECT `id` FROM `cleared_auto`) AND `transfer_account_id` IS NULL;--> statement-breakpoint
+UPDATE `transactions` SET `merchant_id` = NULL WHERE `id` IN (SELECT `id` FROM `cleared_auto` WHERE `auto_reason` = 'rule');--> statement-breakpoint
 DROP TABLE `cleared_auto`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;

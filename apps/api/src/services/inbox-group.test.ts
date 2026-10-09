@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
-import { applyInboxGroup, saveTransactionWithRule } from "./inbox-group";
+import { applyInboxGroup } from "./inbox-group";
 import { createMerchant } from "./merchants";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
@@ -49,7 +49,7 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
   });
 }
 
-test("unticked rows stay out of the rule, and a failure writes nothing", () => {
+test("excluded rows stay unchanged, and a failure writes nothing", () => {
   const sample = book();
   try {
     const cash = createAccount(sample.db, {
@@ -206,7 +206,7 @@ test("a group keeps an existing merchant and a transfer clears it on PATCH", () 
   }
 });
 
-test("a rule does not fill a split, and the save with the rule is one write", () => {
+test("saving one transaction does not fill a split", () => {
   const sample = book();
   try {
     const cash = createAccount(sample.db, {
@@ -226,7 +226,7 @@ test("a rule does not fill a split, and the save with the rule is one write", ()
     ]);
     const ruleAt = "2026-10-08T21:00:00Z";
     expect(() =>
-      saveTransactionWithRule(sample.db, current.id, {
+      updateTransaction(sample.db, current.id, {
         accountId: cash.id,
         date: current.date,
         amount: current.amount,
@@ -243,7 +243,7 @@ test("a rule does not fill a split, and the save with the rule is one write", ()
     expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBeNull();
     expect(sample.db.select().from(auditLog).where(eq(auditLog.at, ruleAt)).all()).toHaveLength(0);
 
-    const savedRow = saveTransactionWithRule(sample.db, current.id, {
+    const savedRow = updateTransaction(sample.db, current.id, {
       accountId: cash.id,
       date: current.date,
       amount: current.amount,
@@ -256,7 +256,6 @@ test("a rule does not fill a split, and the save with the rule is one write", ()
       at: "2026-10-08T22:00:00Z",
     });
     expect(savedRow.lines[0]?.categoryId).toBe(food.id);
-    expect(savedRow.skipped).toEqual([]);
     expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBeNull();
     expect(getTransaction(sample.db, split.id)?.lines.every((line) => line.categoryId === null)).toBe(true);
   } finally {

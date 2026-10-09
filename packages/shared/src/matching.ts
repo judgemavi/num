@@ -52,6 +52,7 @@ export type SimilarPayee = {
   payee: string;
   similarity: number;
   rows: readonly LearnedRow[];
+  scores?: readonly LearnedScore[];
 };
 
 export type ScoreInput = {
@@ -59,8 +60,11 @@ export type ScoreInput = {
   recurring: RecurringSignal | null;
   amountRows: readonly LearnedRow[];
   payeeRows: readonly LearnedRow[];
+  amountScores?: readonly LearnedScore[];
+  payeeScores?: readonly LearnedScore[];
   similar: readonly SimilarPayee[];
   merchant: { id: string; name: string; categoryId: string } | null;
+  transferRows: readonly { id: string; date: string; transferAccountId: string }[];
 };
 
 export type MatchSignal = {
@@ -151,7 +155,7 @@ export function learnedConfidence(rows: readonly LearnedRow[]): LearnedScore[] {
     weights.push(weight);
     total += weight;
   }
-  const sample = 1 - 0.5 ** (count + 1);
+  const certainty = 1 - 0.15 * 0.6 ** (count - 1);
   const groups = new Map<string, { row: LearnedRow; weight: number }>();
   ordered.forEach((row, index) => {
     const key = candidateKey(row.categoryId, row.merchantId);
@@ -165,7 +169,7 @@ export function learnedConfidence(rows: readonly LearnedRow[]): LearnedScore[] {
   });
   const scores: LearnedScore[] = [];
   for (const group of groups.values()) {
-    const confidence = ((group.weight + 0.15) / (total + 0.3)) * sample;
+    const confidence = total === 0 ? 0 : (group.weight / total) * certainty;
     scores.push({
       categoryId: group.row.categoryId,
       merchantId: group.row.merchantId,
@@ -179,19 +183,11 @@ export function learnedConfidence(rows: readonly LearnedRow[]): LearnedScore[] {
 }
 
 export function combineConfidence(values: readonly number[]): number {
-  if (values.length === 0) {
-    return 0;
-  }
-  const miss = values.reduce((product, value) => product * (1 - value), 1);
-  return 1 - miss;
+  return 1 - values.reduce((product, value) => product * (1 - value), 1);
 }
 
 export function confidenceMilli(confidence: number): number {
-  const milli = Math.round(confidence * 1000);
-  if (milli < 0) {
-    return 0;
-  }
-  return milli > 1000 ? 1000 : milli;
+  return Math.min(1000, Math.max(0, Math.round(confidence * 1000)));
 }
 
 export function matchLevel(confidence: number, lead: number, mode: ConfidenceMode, transfer: boolean): MatchLevel {
@@ -265,7 +261,9 @@ function collectSignals(input: ScoreInput): MatchSignal[] {
       sourceName: input.recurring.planName,
       count: 0,
     });
-  } else if (input.recurring?.transferAccountId) {
+    return signals;
+  }
+  if (input.recurring?.transferAccountId) {
     signals.push({
       reason: "recurring",
       confidence: recurringConfidence,
@@ -277,13 +275,28 @@ function collectSignals(input: ScoreInput): MatchSignal[] {
       count: 0,
     });
   }
-  pushLearned(signals, learnedConfidence(input.amountRows), "learned_amount", 1, null);
-  pushLearned(signals, learnedConfidence(input.payeeRows), "learned_payee", 0.95, null);
+  pushLearned(signals, input.amountScores ?? learnedConfidence(input.amountRows), "learned_amount", 1, null);
+  pushLearned(signals, input.payeeScores ?? learnedConfidence(input.payeeRows), "learned_payee", 0.95, null);
   for (const similar of input.similar) {
     if (similar.similarity < similarMinimum) {
       continue;
     }
-    pushLearned(signals, learnedConfidence(similar.rows), "similar", similar.similarity, similar.payee);
+    pushLearned(signals, similar.scores ?? learnedConfidence(similar.rows), "similar", similar.similarity, similar.payee);
+  }
+  const transferLearned = learnedConfidence(
+    input.transferRows.map((row) => ({ id: row.id, date: row.date, categoryId: row.transferAccountId, merchantId: null })),
+  );
+  for (const score of transferLearned) {
+    signals.push({
+      reason: "learned_payee",
+      confidence: score.confidence,
+      categoryId: null,
+      merchantId: null,
+      transferAccountId: score.categoryId,
+      sourceId: score.sourceId,
+      sourceName: null,
+      count: score.count,
+    });
   }
   if (input.merchant) {
     signals.push({

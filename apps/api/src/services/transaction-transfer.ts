@@ -15,6 +15,16 @@ export function insertMirror(
   targetAccountId: string,
   line: NormalizedLine,
 ): void {
+  const matchId = findTransferMatch(tx, {
+    sourceId,
+    targetAccountId,
+    date: header.date,
+    lineAmount: line.amount,
+  });
+  if (matchId) {
+    linkMatch(tx, sourceId, header.accountId, matchId);
+    return;
+  }
   const id = crypto.randomUUID();
   const amount = -line.amount;
   tx.insert(transactions)

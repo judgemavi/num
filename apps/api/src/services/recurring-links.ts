@@ -3,6 +3,7 @@ import { occurrenceDates, type OccurrenceLink, type PlanSchedule } from "@num/sh
 import { and, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { applyLinkedPlan } from "./match-apply";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
@@ -113,6 +114,7 @@ export function linkOccurrence(
       before: null,
       after: linkSnapshot(row),
     });
+    applyLinkedPlan(tx, plan, transactionId);
     linked = toLink(row);
   });
   if (!linked) {

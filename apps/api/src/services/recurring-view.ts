@@ -18,6 +18,7 @@ import {
 import { and, eq, gte, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { applyLinkedPlan } from "./match-apply";
 import { write, type AuditSource } from "./write";
 
 type WriteInput = {
@@ -307,8 +308,13 @@ export function autoLink(db: Db, asOf: string, input: WriteInput & { accountId?:
   if (unique.length === 0) {
     return { linked: 0 };
   }
+  const byPlan = new Map(plans.map((plan) => [plan.id, plan]));
   write(db, { source: input.source, at: input.at }, (tx) => {
     for (const pair of unique) {
+      const plan = byPlan.get(pair.planId);
+      if (plan) {
+        applyLinkedPlan(tx, plan, pair.transactionId);
+      }
       const id = crypto.randomUUID();
       const row: LinkRow = {
         id,

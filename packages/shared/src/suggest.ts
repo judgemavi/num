@@ -129,6 +129,7 @@ export function suggestCategorization(input: {
       payeeRows: learnedRows(same),
       similar: input.similar,
       merchant: merchant?.defaultCategoryId ? { id: merchant.id, name: merchant.name, categoryId: merchant.defaultCategoryId } : null,
+      transferRows: [],
     }),
   );
 }
@@ -152,6 +153,7 @@ export function alternateSuggestion(input: Parameters<typeof suggestCategorizati
       payeeRows: learnedRows(same),
       similar: input.similar,
       merchant: merchant?.defaultCategoryId ? { id: merchant.id, name: merchant.name, categoryId: merchant.defaultCategoryId } : null,
+      transferRows: [],
     }),
   );
 }
