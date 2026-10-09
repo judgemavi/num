@@ -58,14 +58,14 @@ Goal: accounts and transactions are correct.
 
 ## Phase 2 — Capture
 
-Goal: imports are safe and the Inbox works.
+Goal: imports are safe and the user can review what needs attention.
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
 | 2.1 Documents and parsers | Documents (§5.12). OFX/QFX parser. CSV column-map parser. Preset format and loader. Presets for TD chequing, TD savings, TD credit card and CIBC credit card (§7.2). | Each preset has a synthetic test file. Tests: correct dates, amounts, signs and closing balance for each preset and for OFX. Date order (DMY/MDY) and both sign conventions are tested. |
 | 2.2 Import pipeline | Identity, dedupe, matching, batch summary, undo (§5.11, §7.2). | Tests: same file two times → 0 new. Overlapping files → 0 duplicates. Two identical rows on one day in one file → 2 transactions. Undo removes only unedited, unreconciled rows. |
 | 2.3 Normalization and suggestions | Normalized payee, rules, payee history, merchant default, promote to rule, transfer detection (§5.6, §7.3). | Table test with 50 or more synthetic payee strings in real bank formats from several countries. Each suggestion has a reason code. Promote suggestion after `promoteAfter` confirmations. |
-| 2.4 Inbox | Inbox screen with all item types from phases 1–2. Dismiss with reason. Text made in the browser from codes. | Owner check list passes. |
+| 2.4 Inbox | Replaced by R.1 (decision 0021). Inbox screen with all item types from phases 1–2. Dismiss with reason. Text made in the browser from codes. | Owner check list passes. |
 | 2.5 Checkpoints | Checkpoints, unlock, difference help (§5.13, §7.5). | Tests: checkpoint only when balances are equal. Reconciled status is set. Unlock is audited. |
 | 2.6 Owner import test | No code. The owner creates the accounts and imports the real statements into a local v2 instance. | Each account balance agrees with its latest statement. Importing all files a second time creates zero transactions. The owner writes the defects as issues. |
 
@@ -78,13 +78,13 @@ Goal: recurring plans, buckets and paycheck funding.
 | 3.1 Recurring plans | Plans, `amountMode`, occurrences, business-day shift, links, skips, changed, missed, detection (§5.7, §7.4). | Tests: monthly day 31 in February. Biweekly gives 3 paychecks in some months. Weekend shift. One occurrence per transaction. Variable plan: median and lowest of the last 6, fallback when fewer than 3, no "changed amount" items. |
 | 3.2 Buckets | Buckets, kinds, category map, events, balances, moves, overspending (§5.8, §7.7). | Tests: balance formula. Each category in one bucket only. Refund increases the balance. Card purchase does not change Unassigned. |
 | 3.3 Funding | Unassigned, bills reserved, funding proposal, funding run, undo (§6, §5.9, §7.6). | Tests: proposal order by priority. Sinking and goal amounts for each paycheck. The proposal stops at the smaller of paycheck or Unassigned. A variable paycheck uses its actual amount. Undo removes all events. |
-| 3.4 Plan screen | Monthly plan, goal feasibility (§7.8, §14). | Tests: shortfall calculation and both fixes. Owner check list passes. |
+| 3.4 Plan screen | Replaced by R.1 (decision 0021). Monthly plan, goal feasibility (§7.8, §14). | Tests: shortfall calculation and both fixes. Owner check list passes. |
 
 ## Phase 4 — Understand
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
-| 4.1 Month close | Close rules, summary, open again (§7.5). | Tests: a missing checkpoint blocks the close. Open Inbox items block the close. Reopen needs a reason. |
+| 4.1 Month close | Close rules and open again (§7.5). Decision 0020: the close is a reviewed mark only. | Tests: a missing checkpoint blocks the close. Open Needs review items block the close. |
 | 4.2 Insights | Month story, category, merchant and tag reports, trends, net worth (§9). | Tests: refund decreases spending. Transfers are not spending or income. Month story calculations (changes against the 3-month median, savings rate). Net worth at month end. |
 | 4.3 Hygiene panel | All checks in §10. | One test for each check: pass case and fail case. |
 
@@ -107,6 +107,7 @@ Goal: recurring plans, buckets and paycheck funding.
 |---|---|---|
 | 6.1 MCP | Part 1: read tools. Part 2: full parity, tools generated from the API (§12, decision 0019). | Tests: every route has a tool. A tool call equals the REST call. `aiCanWrite` false hides and refuses writes. Audit source is `mcp`. Date tools require `asOf`. |
 | C.1 Cleanup | Decision 0020. Remove: DB CHECK constraints, soft delete (except documents), stored `reconciled`, month close summary and reopen reason, forecast snapshot, perf and backfill scripts, `integerSum`, dead code. Import undo does not read the audit log. Squash all migrations into one baseline. | All checks pass. A fresh DB has one migration. No `deleted_at` except documents. Tests for logic that changed: reconciled calculation (checkpoint, unlock), hard delete of a transfer pair, import undo and re-import. |
+| R.1 Home and Needs review | Decision 0021. Home screen with the financial health cards (§14). Needs review is a filter on Transactions, with levels Sure, Likely and Maybe and approve by level. Remove the Inbox and Plan screens. Move Plan content to Home, goal feasibility to Buckets, the forecast chart to Insights, detected recurring to Recurring, import problems to Imports. | All checks pass. Tests: needs-review set and levels, bulk approve with filters and a changed count, recorded "no" decisions stay. Owner check list passes. |
 | 6.2 Cutover | Owner imports all statements into the production v2 instance. Stop v1. Delete the `v1` branch. | Owner uses v2 for one full weekly review and one paycheck funding without v1. |
 
 ## Reuse from v1
