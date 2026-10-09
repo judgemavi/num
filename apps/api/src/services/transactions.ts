@@ -6,6 +6,7 @@ import { ServiceError } from "../service-error";
 import { loadLines, replaceLines, type StoredLine } from "./transaction-lines";
 import {
   auditTransaction,
+  headerForWrite,
   headerFrom,
   readTransaction,
   recordSource,
@@ -201,6 +202,7 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
     .values({
       id,
       ...header,
+      refundOfId: header.refundOfId ?? null,
       source: recordSourceName,
       importRowId: null,
       transferPeerId: null,
@@ -252,10 +254,10 @@ export function applyTransactionUpdate(
   assertReconciledMoney(existing, existingLines, peer, header, lines);
   assertPayee(existing, header.payeeRaw);
   assertLineShape(header.accountId, header.amount, lines);
-  assertRefundLink(tx, header, id);
   const previousTarget = existingLines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null;
   assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
-  const savedHeader = existing.status === "reconciled" ? { ...header, status: "reconciled" as const } : header;
+  const savedHeader = headerForWrite(existing.refundOfId, existing.status === "reconciled" ? { ...header, status: "reconciled" as const } : header);
+  assertRefundLink(tx, savedHeader, id);
   const changed = labelChanged(existing, existingLines, savedHeader, lines);
   const auto: AutoStamp = changed || isTransferOrSplit(lines) ? clearedAuto : keptAuto(existing);
   if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {

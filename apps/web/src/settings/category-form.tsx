@@ -11,9 +11,9 @@ import {
   type CategoryKind,
 } from "@num/shared";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useActiveBuckets } from "@/editors/lookups";
-import { FormActions, FormHeading } from "@/editors/form-chrome";
+import { FormActions, FormHeading, FormShell } from "@/editors/form-chrome";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { categoryError } from "@/settings/format";
 import { NameForm } from "@/settings/name-form";
@@ -60,8 +60,7 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
     label: group.name,
   }));
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function submit() {
     const body = {
       name,
       kind,
@@ -119,7 +118,7 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
           category ? "Change the name, the kind, the group, or whether it is essential." : "Add a category for income or expenses."
         }
       />
-      <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
+      <FormShell inline={inline} className="flex flex-col gap-4" onSubmit={() => void submit()}>
         <Field>
           <FieldLabel htmlFor={`${fieldId}-name`}>Name</FieldLabel>
           <Input id={`${fieldId}-name`} value={name} autoComplete="off" onChange={(event) => setName(event.target.value)} />
@@ -221,11 +220,11 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void submit() : undefined}>
             {saving ? "Saving category" : "Save category"}
           </Button>
         </FormActions>
-      </form>
+      </FormShell>
     </>
   );
 }

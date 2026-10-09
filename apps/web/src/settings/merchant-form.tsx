@@ -1,7 +1,7 @@
 import { inboxDecisionListSchema, merchantSchema, type Category, type Merchant } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
-import { FormActions, FormHeading } from "@/editors/form-chrome";
+import { useState } from "react";
+import { FormActions, FormHeading, FormShell } from "@/editors/form-chrome";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { useRestoreNamed } from "@/editors/restore-named";
 import { undoDecision } from "@/inbox/actions";
@@ -51,8 +51,7 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
     .map((category) => ({ id: category.id, label: category.name }));
   const archivedCategories = allCategories.filter((category) => category.archivedAt).map((category) => ({ id: category.id, label: category.name }));
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function submit() {
     if (name.trim().length === 0) {
       setError("Enter a name.");
       return;
@@ -72,7 +71,7 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="grid gap-4">
+    <FormShell inline={inline} className="grid gap-4" onSubmit={() => void submit()}>
       <FormHeading
         inline={inline}
         title={merchant ? "Edit merchant" : "New merchant"}
@@ -151,10 +150,10 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={saving}>
+        <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void submit() : undefined}>
           {saving ? "Saving" : merchant ? "Save merchant" : "Add merchant"}
         </Button>
       </FormActions>
-    </form>
+    </FormShell>
   );
 }

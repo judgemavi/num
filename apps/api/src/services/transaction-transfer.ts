@@ -3,7 +3,7 @@ import { chooseTransferMatch } from "@num/shared";
 import { eq, sql } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import { loadLines, replaceLines, type StoredLine } from "./transaction-lines";
-import { auditTransaction, readTransaction, toTransaction, type Header, type TxRow } from "./transaction-record";
+import { auditTransaction, headerForWrite, readTransaction, toTransaction, type Header, type TxRow } from "./transaction-record";
 import { transferLine, type NormalizedLine } from "./transaction-rules";
 import type { WriteTx } from "./write";
 
@@ -210,7 +210,7 @@ export function applyMirrorEdit(
   const before = toTransaction(tx, existing, existingLines);
   const peerBefore = toTransaction(tx, peer, peerLines);
   const moneyChanged = header.date !== existing.date || header.accountId !== existing.accountId;
-  tx.update(transactions).set({ ...header, ...auto }).where(eq(transactions.id, existing.id)).run();
+  tx.update(transactions).set({ ...headerForWrite(existing.refundOfId, header), ...auto }).where(eq(transactions.id, existing.id)).run();
   replaceLines(tx, existing.id, lines);
   if (peer.mirror) {
     tx.update(transactions).set({ date: header.date }).where(eq(transactions.id, peer.id)).run();
@@ -237,7 +237,7 @@ export function applySourceEdit(
   auto: { autoReason: string | null; autoSourceId: string | null; autoConfidence: number | null },
 ): void {
   const before = toTransaction(tx, existing, existingLines);
-  tx.update(transactions).set({ ...header, ...auto }).where(eq(transactions.id, existing.id)).run();
+  tx.update(transactions).set({ ...headerForWrite(existing.refundOfId, header), ...auto }).where(eq(transactions.id, existing.id)).run();
   replaceLines(tx, existing.id, lines);
   const line = transferLine(lines);
   if (!line?.transferAccountId) {

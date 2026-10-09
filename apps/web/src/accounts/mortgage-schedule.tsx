@@ -34,10 +34,10 @@ export function MortgageSchedule({
       {[...years.entries()].map(([year, items]) => (
         <ListCard key={year} label={year} title={year}>
           {items.map((item) => (
-            <ListRow key={item.date} simple>
+            <ListRow key={item.actual && item.scheduled === null ? item.actual.id : item.date} simple>
               <div className={listName}>
                 {formatDay(item.date)}
-                <small>Scheduled {formatMoney(currency, item.payment)}</small>
+                <small>{item.scheduled ? `Scheduled ${formatMoney(currency, item.scheduled.payment)}` : "Extra payment"}</small>
               </div>
               <span className="text-sm tabular-nums">
                 {item.actual ? formatMoney(currency, item.actual.amount) : item.date <= asOf ? "No payment" : ""}

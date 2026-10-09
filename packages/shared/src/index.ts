@@ -232,6 +232,8 @@ export {
   categoryForRefund,
   rankRefundPurchases,
   refundLinkAllowed,
+  refundLinkRejected,
+  refundOfIdAfterEdit,
   refundPurchaseListSchema,
   refundPurchaseQuerySchema,
   refundWindowDays,

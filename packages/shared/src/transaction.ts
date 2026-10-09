@@ -82,6 +82,7 @@ export const transactionSchema = z.object({
       id: z.uuid(),
       date: isoDateSchema,
       amount: centsSchema,
+      payeeRaw: z.string(),
     })
     .nullable(),
   refundedAmount: centsSchema.nullable(),
@@ -148,6 +149,7 @@ export const transactionListItemSchema = z.object({
       id: z.uuid(),
       date: isoDateSchema,
       amount: centsSchema,
+      payeeRaw: z.string(),
     })
     .nullable(),
   refundedAmount: centsSchema.nullable(),

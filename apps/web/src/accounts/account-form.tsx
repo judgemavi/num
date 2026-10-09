@@ -14,7 +14,7 @@ import {
   type AccountKind,
   type PaymentPolicy,
 } from "@num/shared";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { accountError, policyLabel } from "@/accounts/format";
 import { KindPicker } from "@/accounts/kind-picker";
 import { sameClassKinds } from "@/accounts/groups";
@@ -22,7 +22,7 @@ import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
-import { FormActions, FormHeading } from "@/editors/form-chrome";
+import { FormActions, FormHeading, FormShell } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -106,8 +106,7 @@ export function AccountForm({ currency, account, initialName, inline = false, on
     }
   }
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function onSubmit() {
     setError(null);
     let body: unknown;
     try {
@@ -174,7 +173,7 @@ export function AccountForm({ currency, account, initialName, inline = false, on
         title={account ? "Edit account" : "Add an account"}
         description={account ? "Change the details of this account." : "Add an account to the book."}
       />
-      <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
+      <FormShell inline={inline} className="grid gap-4" onSubmit={() => void onSubmit()}>
         <Field>
           <FieldLabel htmlFor="account-name">Name</FieldLabel>
           <Input id="account-name" value={name} required onChange={(event) => setName(event.target.value)} />
@@ -278,11 +277,11 @@ export function AccountForm({ currency, account, initialName, inline = false, on
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void onSubmit() : undefined}>
             {saving ? "Saving account" : account ? "Save account" : "Add account"}
           </Button>
         </FormActions>
-      </form>
+      </FormShell>
     </>
   );
 }

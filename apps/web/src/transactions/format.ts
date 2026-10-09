@@ -46,6 +46,11 @@ export function refundOfText(currency: string, date: string, amount: number): st
   return `Refund of ${day} · ${formatMoney(currency, Math.abs(amount))}`;
 }
 
+export function refundPurchaseLabel(currency: string, payee: string, date: string, amount: number): string {
+  const day = Temporal.PlainDate.from(date).toLocaleString(undefined, { month: "short", day: "numeric" });
+  return `${payee} · ${day} · ${formatMoney(currency, Math.abs(amount))}`;
+}
+
 export function refundedText(currency: string, amount: number): string {
   return `Refunded ${formatMoney(currency, amount)}`;
 }

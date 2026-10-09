@@ -19,8 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { InlineAccount } from "@/editors/inline-records";
 import { automaticReasonText } from "@/transactions/format";
-import { OptionCombobox, type Option } from "@/transactions/option-combobox";
+import { type Option } from "@/transactions/option-combobox";
 
 export function MoneySection({
   direction,
@@ -30,6 +31,7 @@ export function MoneySection({
   moneyLocked,
   accountId,
   accountOptions,
+  archivedAccounts = [],
   onAccount,
   accountLocked,
   date,
@@ -42,11 +44,13 @@ export function MoneySection({
   moneyLocked: boolean;
   accountId: string;
   accountOptions: Option[];
+  archivedAccounts?: Option[];
   onAccount: (id: string) => void;
   accountLocked: boolean;
   date: string;
   onDate: (date: string) => void;
 }) {
+  const restoreNamed = useRestoreNamed();
   return (
     <>
       <Field>
@@ -73,17 +77,27 @@ export function MoneySection({
       <div className="grid gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel htmlFor="txn-account">Account</FieldLabel>
-          <OptionCombobox
+          <ManagedPicker
             id="txn-account"
             value={accountId || null}
             options={accountOptions}
             placeholder="Choose an account"
-            disabled={accountLocked || accountOptions.length === 0}
+            disabled={accountLocked || (accountOptions.length === 0 && archivedAccounts.length === 0)}
+            noun="account"
+            archived={archivedAccounts}
+            onRestore={(id) => {
+              void restoreNamed(`/api/accounts/${id}/restore`).then((restored) => {
+                if (restored) {
+                  onAccount(restored);
+                }
+              });
+            }}
             onChange={(id) => {
               if (id) {
                 onAccount(id);
               }
             }}
+            renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
           />
         </Field>
         <Field>

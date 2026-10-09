@@ -29,6 +29,7 @@ type ListRow = {
   autoLearnedCount: number | null;
   refundOfDate: string | null;
   refundOfAmount: number | null;
+  refundOfPayee: string | null;
   refundOfKey: string | null;
   refundedAmount: number | null;
 };
@@ -153,9 +154,9 @@ function toItem(row: ListRow): TransactionListItem {
     autoSourceName: row.autoSourceName,
     autoLearnedCount: row.autoLearnedCount === null ? null : Number(row.autoLearnedCount),
     refundOf:
-      row.refundOfKey === null || row.refundOfDate === null || row.refundOfAmount === null
+      row.refundOfKey === null || row.refundOfDate === null || row.refundOfAmount === null || row.refundOfPayee === null
         ? null
-        : { id: row.refundOfKey, date: row.refundOfDate, amount: integerSum(row.refundOfAmount) },
+        : { id: row.refundOfKey, date: row.refundOfDate, amount: integerSum(row.refundOfAmount), payeeRaw: row.refundOfPayee },
     refundedAmount: row.refundedAmount === null ? null : integerSum(row.refundedAmount),
   };
 }
@@ -237,6 +238,7 @@ export function listTransactions(db: Db, query: TransactionListQuery) {
       (select p.id from transactions p where p.id = t.refund_of_id and p.deleted_at is null) as refundOfKey,
       (select p.date from transactions p where p.id = t.refund_of_id and p.deleted_at is null) as refundOfDate,
       (select p.amount from transactions p where p.id = t.refund_of_id and p.deleted_at is null) as refundOfAmount,
+      (select p.payee_raw from transactions p where p.id = t.refund_of_id and p.deleted_at is null) as refundOfPayee,
       (select sum(r.amount) from transactions r where r.refund_of_id = t.id and r.deleted_at is null) as refundedAmount
     from transactions t
     join accounts a on a.id = t.account_id

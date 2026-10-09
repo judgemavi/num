@@ -59,6 +59,7 @@ type WhatIsThisProps = {
   suggestion: Suggestion | null;
   refundOfId?: string | null;
   onRefundOf?: (id: string | null) => void;
+  linkedRefund?: { id: string; date: string; amount: number; payeeRaw: string } | null;
   asOf?: string;
   depth?: number;
 };
@@ -148,6 +149,7 @@ export function WhatIsThis({
   suggestion,
   refundOfId = null,
   onRefundOf,
+  linkedRefund = null,
   asOf = "",
   depth = 0,
 }: WhatIsThisProps) {
@@ -235,6 +237,7 @@ export function WhatIsThis({
           merchantId={merchantId}
           value={refundOfId}
           currency={currency}
+          linked={linkedRefund}
           onChange={onRefundOf}
           onCategory={onCategoryId}
         />

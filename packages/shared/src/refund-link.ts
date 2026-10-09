@@ -48,6 +48,33 @@ function daySpan(earlier: string, later: string): number {
   return Temporal.PlainDate.from(earlier).until(Temporal.PlainDate.from(later), { largestUnit: "day" }).days;
 }
 
+/** A missing field keeps the stored link. Only an explicit null clears it. */
+export function refundOfIdAfterEdit(current: string | null, incoming: string | null | undefined): string | null {
+  if (incoming === undefined) {
+    return current;
+  }
+  return incoming;
+}
+
+export function refundLinkRejected(input: {
+  refundId: string | null;
+  purchaseId: string;
+  purchaseAmount: number;
+  purchaseDate: string;
+  refundAmount: number;
+  refundDate: string;
+}): boolean {
+  if (input.refundId !== null && input.refundId === input.purchaseId) {
+    return true;
+  }
+  return !refundLinkAllowed({
+    purchaseAmount: input.purchaseAmount,
+    purchaseDate: input.purchaseDate,
+    refundAmount: input.refundAmount,
+    refundDate: input.refundDate,
+  });
+}
+
 /** A partial refund stays linked when it is money in, on or after the purchase, within 90 days. */
 export function refundLinkAllowed(input: {
   purchaseAmount: number;

@@ -1,6 +1,7 @@
 import { merchants, recurringPlans, transactions } from "@num/db";
 import {
   autoReasons,
+  refundOfIdAfterEdit,
   storedPayee,
   transactionInputStatuses,
   transactionSources,
@@ -105,20 +106,36 @@ export function headerFrom(input: TransactionBody): Header {
     notes: blankToNull(input.notes),
     ...storedPayee(requireText(input.payeeRaw, "payeeRaw")),
     status: inputStatus(input.status),
-    refundOfId: input.refundOfId ?? null,
+    ...(input.refundOfId === undefined ? {} : { refundOfId: input.refundOfId }),
   };
 }
 
-function refundFacts(db: Reader, row: TxRow): { refundOf: { id: string; date: string; amount: number } | null; refundedAmount: number | null } {
-  let refundOf: { id: string; date: string; amount: number } | null = null;
+export function headerForWrite(existingRefundOfId: string | null, header: Header): Header {
+  return {
+    ...header,
+    refundOfId: refundOfIdAfterEdit(existingRefundOfId, header.refundOfId),
+  };
+}
+
+function refundFacts(db: Reader, row: TxRow): {
+  refundOf: { id: string; date: string; amount: number; payeeRaw: string } | null;
+  refundedAmount: number | null;
+} {
+  let refundOf: { id: string; date: string; amount: number; payeeRaw: string } | null = null;
   if (row.refundOfId) {
     const purchase = db
-      .select({ id: transactions.id, date: transactions.date, amount: transactions.amount, deletedAt: transactions.deletedAt })
+      .select({
+        id: transactions.id,
+        date: transactions.date,
+        amount: transactions.amount,
+        payeeRaw: transactions.payeeRaw,
+        deletedAt: transactions.deletedAt,
+      })
       .from(transactions)
       .where(eq(transactions.id, row.refundOfId))
       .get();
     if (purchase && purchase.deletedAt === null) {
-      refundOf = { id: purchase.id, date: purchase.date, amount: purchase.amount };
+      refundOf = { id: purchase.id, date: purchase.date, amount: purchase.amount, payeeRaw: purchase.payeeRaw };
     }
   }
   const linked = db

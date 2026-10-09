@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { categoryForRefund, rankRefundPurchases, refundLinkAllowed } from "./refund-link";
+import { categoryForRefund, rankRefundPurchases, refundLinkAllowed, refundLinkRejected, refundOfIdAfterEdit } from "./refund-link";
 
 describe("refund link", () => {
   test("sets the category from the purchase and stays valid with a partial amount", () => {
@@ -32,6 +32,35 @@ describe("refund link", () => {
         refundDate: "2026-05-01",
       }),
     ).toBe(false);
+  });
+
+  test("keeps the link when the edit omits the field and clears it on explicit null", () => {
+    expect(refundOfIdAfterEdit("purchase", undefined)).toBe("purchase");
+    expect(refundOfIdAfterEdit("purchase", null)).toBeNull();
+  });
+
+  test("rejects a link to itself, to money in, and to a purchase after the refund", () => {
+    const base = {
+      refundId: "refund",
+      purchaseId: "purchase",
+      purchaseAmount: -8_000,
+      purchaseDate: "2026-03-03",
+      refundAmount: 3_000,
+      refundDate: "2026-03-20",
+    };
+    expect(refundLinkRejected({ ...base, refundId: "purchase", purchaseId: "purchase" })).toBe(true);
+    expect(refundLinkRejected({ ...base, purchaseAmount: 8_000 })).toBe(true);
+    expect(refundLinkRejected({ ...base, purchaseDate: "2026-04-01" })).toBe(true);
+    expect(refundLinkRejected(base)).toBe(false);
+  });
+
+  test("the purchase list uses the refund date, not a later day", () => {
+    const rows = [
+      { id: "in-window", date: "2026-01-01", amount: -100, payeeRaw: "Shop", payeeNormalized: "SHOP", merchantId: null, categoryId: "food" },
+      { id: "too-old", date: "2025-10-01", amount: -100, payeeRaw: "Shop", payeeNormalized: "SHOP", merchantId: null, categoryId: "food" },
+    ];
+    expect(rankRefundPurchases("2026-03-20", "SHOP", null, rows).map((row) => row.id)).toEqual(["in-window"]);
+    expect(rankRefundPurchases("2026-06-01", "SHOP", null, rows).map((row) => row.id)).toEqual([]);
   });
 
   test("lists the same payee or merchant before other spending in the last 90 days", () => {

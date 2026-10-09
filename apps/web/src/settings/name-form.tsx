@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FormActions, FormHeading } from "@/editors/form-chrome";
+import { FormActions, FormHeading, FormShell } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
@@ -33,8 +33,7 @@ export function NameForm({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function submit() {
     const trimmed = name.trim();
     if (trimmed.length === 0) {
       setError("Enter a name.");
@@ -58,7 +57,7 @@ export function NameForm({
   return (
     <>
       <FormHeading inline={inline} title={title} description={description} />
-      <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
+      <FormShell inline={inline} className="flex flex-col gap-4" onSubmit={() => void submit()}>
         <Field>
           <FieldLabel htmlFor={idPrefix}>{label}</FieldLabel>
           <Input
@@ -73,11 +72,11 @@ export function NameForm({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void submit() : undefined}>
             {saving ? savingLabel : submitLabel}
           </Button>
         </FormActions>
-      </form>
+      </FormShell>
     </>
   );
 }

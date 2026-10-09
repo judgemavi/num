@@ -15,7 +15,6 @@ import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FieldError } from "@/components/ui/field";
-import { localAsOf } from "@/as-of";
 import { formatMoney } from "@/money";
 import { inboxError } from "@/inbox/format";
 import { formatDate, refundedText, transactionError } from "@/transactions/format";
@@ -274,6 +273,7 @@ export function TransactionForm({
           moneyLocked={moneyLocked}
           accountId={accountId}
           accountOptions={accountOptions}
+          archivedAccounts={archivedAccounts}
           onAccount={(id) => {
             setAccountId(id);
             if (transferAccountId === id) {
@@ -348,7 +348,8 @@ export function TransactionForm({
           setTouched(true);
           setRefundOfId(id);
         }}
-        asOf={localAsOf()}
+        linkedRefund={refundOfId !== null && transaction?.refundOf?.id === refundOfId ? transaction.refundOf : null}
+        asOf={date}
       />
       {transaction?.refundedAmount ? <p className="text-sm text-muted-foreground">{refundedText(currency, transaction.refundedAmount)}</p> : null}
       <MoreDetails
