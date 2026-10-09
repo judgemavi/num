@@ -1,12 +1,13 @@
 import { accounts, documents, importBatches, importRows, inboxDecisions, transactions } from "@num/db";
 import {
   importBatchStatus,
+  Temporal,
   type ImportDetail,
   type ImportDetailRow,
   type ImportViewItem,
   type ImportViewQuery,
 } from "@num/shared";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { readUnreadable } from "./import-read";
@@ -221,8 +222,49 @@ export function getImportDetail(db: Db, id: string): ImportDetail {
       transactionId: row.transactionId && liveTransactions.has(row.transactionId) ? row.transactionId : null,
       duplicateBatchId: earlier?.batchId ?? null,
       duplicateRowId: earlier?.id ?? null,
+      matches: [],
     };
   });
+  const reviewRows = rows.filter((row) => row.outcome === "needs_review");
+  if (reviewRows.length > 0) {
+    let minDate = reviewRows[0]?.date ?? "";
+    let maxDate = minDate;
+    for (const row of reviewRows) {
+      if (row.date < minDate) {
+        minDate = row.date;
+      }
+      if (row.date > maxDate) {
+        maxDate = row.date;
+      }
+    }
+    const pool = db
+      .select({
+        id: transactions.id,
+        date: transactions.date,
+        amount: transactions.amount,
+        payeeRaw: transactions.payeeRaw,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.accountId, batch.accountId),
+          isNull(transactions.importRowId),
+          gte(transactions.date, Temporal.PlainDate.from(minDate).subtract({ days: 3 }).toString()),
+          lte(transactions.date, Temporal.PlainDate.from(maxDate).add({ days: 3 }).toString()),
+        ),
+      )
+      .all();
+    for (const detail of detailRows) {
+      if (detail.outcome !== "needs_review") {
+        continue;
+      }
+      const start = Temporal.PlainDate.from(detail.date).subtract({ days: 3 }).toString();
+      const end = Temporal.PlainDate.from(detail.date).add({ days: 3 }).toString();
+      detail.matches = pool
+        .filter((item) => item.amount === detail.amount && item.date >= start && item.date <= end)
+        .sort((left, right) => (left.date < right.date ? -1 : left.date > right.date ? 1 : left.id < right.id ? -1 : 1));
+    }
+  }
 
   const decided = new Set(db.select({ itemKey: inboxDecisions.itemKey }).from(inboxDecisions).all().map((row) => row.itemKey));
   return {

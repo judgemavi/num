@@ -162,6 +162,14 @@ export const importDetailRowSchema = z.object({
   transactionId: z.uuid().nullable(),
   duplicateBatchId: z.uuid().nullable(),
   duplicateRowId: z.uuid().nullable(),
+  matches: z.array(
+    z.object({
+      id: z.uuid(),
+      date: isoDateSchema,
+      amount: centsSchema,
+      payeeRaw: z.string(),
+    }),
+  ),
 });
 
 export type ImportDetailRow = z.infer<typeof importDetailRowSchema>;

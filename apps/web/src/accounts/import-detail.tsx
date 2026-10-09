@@ -180,6 +180,20 @@ export function ImportDetailScreen() {
             key={row.id}
             row={row}
             onOpenTransaction={(id) => void openEditor("transaction", { id })}
+            onMatch={(transactionId) => {
+              void apiRequest(`/api/imports/rows/${row.id}/resolve`, importReviewResultSchema, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ decision: "match", transactionId }),
+              }).then(async (result) => {
+                if (!result.ok) {
+                  setError(importError(result.code));
+                  return;
+                }
+                setError(null);
+                await queryClient.invalidateQueries({ queryKey: ["import-detail", importId] });
+              });
+            }}
             onAddNew={() => {
               void apiRequest(`/api/imports/rows/${row.id}/resolve`, importReviewResultSchema, {
                 method: "POST",
@@ -257,10 +271,12 @@ export function ImportDetailScreen() {
 function DetailRow({
   row,
   onOpenTransaction,
+  onMatch,
   onAddNew,
 }: {
   row: ImportDetailRow;
   onOpenTransaction: (id: string) => void;
+  onMatch: (transactionId: string) => void;
   onAddNew: () => void;
 }) {
   return (
@@ -273,9 +289,16 @@ function DetailRow({
         <RowLinks row={row} onOpenTransaction={onOpenTransaction} />
       </div>
       {row.outcome === "needs_review" ? (
-        <Button type="button" onClick={onAddNew}>
-          Add as new
-        </Button>
+        <span className="flex flex-wrap gap-2">
+          {row.matches.map((match) => (
+            <Button key={match.id} type="button" variant="outline" onClick={() => onMatch(match.id)}>
+              Use {match.payeeRaw}
+            </Button>
+          ))}
+          <Button type="button" onClick={onAddNew}>
+            Add as new
+          </Button>
+        </span>
       ) : null}
       <RowAmount row={row} />
     </ListRow>
