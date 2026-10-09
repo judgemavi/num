@@ -63,9 +63,9 @@ sqlite.prepare(
 ).run(documentId, crypto.randomUUID().replaceAll("-", ""), `uploads/${documentId}`);
 sqlite.prepare(
   `insert into import_batches (
-    id, account_id, document_id, proposal_id, parser, period_start, period_end,
+    id, account_id, document_id, parser, period_start, period_end,
     closing_balance, closing_date, unreadable_json, created_at, undone_at
-  ) values (?, ?, ?, null, 'csv', '2024-06-15', '2024-06-15', null, null, '[]', '2024-06-16T12:00:00Z', null)`,
+  ) values (?, ?, ?, 'csv', '2024-06-15', '2024-06-15', null, null, '[]', '2024-06-16T12:00:00Z', null)`,
 ).run(batchId, accountA, documentId);
 const insertReview = sqlite.prepare(
   `insert into import_rows (

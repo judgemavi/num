@@ -65,8 +65,6 @@ export const bucketIcons = [
 
 export const importOutcomes = ["created", "matched", "needs_review", "duplicate", "ignored"] as const;
 
-export const proposalStatuses = ["pending", "applied", "expired"] as const;
-
 export const inboxDecisionCodes = [
   "not_transfer",
   "keep_plan_amount",

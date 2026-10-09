@@ -96,8 +96,8 @@
     {
       "idx": 13,
       "version": "6",
-      "when": 1791511092842,
-      "tag": "0013_mcp_proposals",
+      "when": 1791512309531,
+      "tag": "0013_remove_proposals",
       "breakpoints": true
     }
   ]

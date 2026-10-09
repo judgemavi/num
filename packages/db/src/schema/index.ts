@@ -4,4 +4,4 @@ export { categories, categoryGroups, merchants, tags } from "./categories";
 export { checkpoints, documents, importBatches, importRows, valuations } from "./imports";
 export { lineTags, transactionLines, transactions } from "./ledger";
 export { occurrenceLinks, recurringPlans } from "./plans";
-export { auditLog, forecastSnapshots, inboxDecisions, monthCloses, proposals, settings } from "./records";
+export { auditLog, forecastSnapshots, inboxDecisions, monthCloses, settings } from "./records";

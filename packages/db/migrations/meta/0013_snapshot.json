@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0acc0bf0-f088-499e-abfc-1e155afd6e0c",
+  "id": "106b8503-3436-4ad0-89b4-eb24b33f7bcc",
   "prevId": "85ae9241-84d6-4fe4-8109-6ae2fa2ec165",
   "tables": {
     "accounts": {
@@ -950,14 +950,7 @@
           "name": "document_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "proposal_id": {
-          "name": "proposal_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "parser": {
@@ -1045,19 +1038,6 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "import_batches_proposal_id_proposals_id_fk": {
-          "name": "import_batches_proposal_id_proposals_id_fk",
-          "tableFrom": "import_batches",
-          "tableTo": "proposals",
-          "columnsFrom": [
-            "proposal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1074,10 +1054,6 @@
         "import_batches_closing_date": {
           "name": "import_batches_closing_date",
           "value": "(\"import_batches\".\"closing_date\" is null or \"import_batches\".\"closing_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')"
-        },
-        "import_batches_source": {
-          "name": "import_batches_source",
-          "value": "(\n        \"import_batches\".\"document_id\" is not null and \"import_batches\".\"proposal_id\" is null\n      ) or (\n        \"import_batches\".\"document_id\" is null and \"import_batches\".\"proposal_id\" is not null\n      )"
         }
       }
     },
@@ -1766,107 +1742,6 @@
         "occurrence_links_result": {
           "name": "occurrence_links_result",
           "value": "(\n        \"occurrence_links\".\"transaction_id\" is not null\n        and \"occurrence_links\".\"skipped\" = 0\n        and \"occurrence_links\".\"reason\" is null\n      ) or (\n        \"occurrence_links\".\"transaction_id\" is null\n        and \"occurrence_links\".\"skipped\" = 1\n        and \"occurrence_links\".\"reason\" is not null\n      )"
-        }
-      }
-    },
-    "proposals": {
-      "name": "proposals",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "payload_json": {
-          "name": "payload_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "token_hash": {
-          "name": "token_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "result_ref": {
-          "name": "result_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "decided_at": {
-          "name": "decided_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "proposals_token_hash_unique": {
-          "name": "proposals_token_hash_unique",
-          "columns": [
-            "token_hash"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "proposals_status": {
-          "name": "proposals_status",
-          "value": "\"proposals\".\"status\" in ('pending', 'applied', 'expired')"
-        },
-        "proposals_payload_json": {
-          "name": "proposals_payload_json",
-          "value": "json_valid(\"proposals\".\"payload_json\")"
-        },
-        "proposals_decided_at": {
-          "name": "proposals_decided_at",
-          "value": "(\n        \"proposals\".\"status\" = 'pending' and \"proposals\".\"decided_at\" is null\n      ) or (\n        \"proposals\".\"status\" <> 'pending' and \"proposals\".\"decided_at\" is not null\n      )"
         }
       }
     },

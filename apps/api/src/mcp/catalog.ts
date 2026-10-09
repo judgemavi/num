@@ -10,12 +10,19 @@ import { publishedSchema } from "./result";
 const moneyText = "Amounts are integer minor units. Money that enters the account is positive.";
 
 const fileInputSchema = z
-  .object({
-    filename: z.string(),
-    mimeType: z.string(),
-    contentBase64: z.string(),
-  })
-  .describe("The file bytes as base64.");
+  .union([
+    z.object({
+      filename: z.string(),
+      mimeType: z.string().optional(),
+      text: z.string(),
+    }),
+    z.object({
+      filename: z.string(),
+      mimeType: z.string().optional(),
+      contentBase64: z.string(),
+    }),
+  ])
+  .describe("The file as text or as base64. Use text for a CSV.");
 
 export type McpRoute = {
   method: "get" | "post" | "put" | "patch" | "delete";
@@ -114,11 +121,6 @@ export function mcpRoutes(app: OpenAPIHono): McpRoute[] {
   return routes;
 }
 
-const tokenField = z
-  .string()
-  .optional()
-  .describe("Confirmation token from the preview of these same inputs. Omit it to preview.");
-
 function addFields(fields: Record<string, z.ZodType>, schema: z.ZodType | undefined, route: McpRoute) {
   for (const [key, value] of Object.entries(shapeOf(schema))) {
     if (key in fields) {
@@ -149,12 +151,6 @@ function inputSchema(route: McpRoute): z.ZodType {
   const fields: Record<string, z.ZodType> = {};
   addFields(fields, route.params, route);
   addFields(fields, route.query, route);
-  if (!route.read) {
-    if ("token" in fields) {
-      throw new Error(`MCP input field token is repeated on ${route.operationId}`);
-    }
-    fields.token = tokenField;
-  }
   const union = unionSchema(route, fields);
   if (union) {
     return publishedSchema(union);
@@ -164,11 +160,10 @@ function inputSchema(route: McpRoute): z.ZodType {
 }
 
 function toolDescription(route: McpRoute): string {
-  const money = route.description.includes("minor units") ? "" : ` ${moneyText}`;
-  const step = route.read
-    ? "This call does not write."
-    : "Without a token, this is a preview and it writes nothing. Send the token only after the user approves that preview.";
-  return `${route.description}${money} ${step}`;
+  if (route.description.includes("minor units")) {
+    return route.description;
+  }
+  return `${route.description} ${moneyText}`;
 }
 
 export function registerGeneratedTools(server: McpServer, app: OpenAPIHono, db: Db): void {

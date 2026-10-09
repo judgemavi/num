@@ -1,7 +1,7 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { auditLog, auditSources } from "@num/db";
 import { isUtcTimestamp, utcNow } from "@num/shared";
 import type { Db } from "../db";
-import { currentAuditSource, inUnit } from "./work";
 
 function jsonText(value: unknown): string | null {
   if (value === undefined) {
@@ -33,42 +33,30 @@ export type WriteTx = SqliteTx & {
   audit(entry: AuditEntry): void;
 };
 
-function auditedDb(tx: Db, entries: AuditEntry[]): WriteTx {
-  return new Proxy(tx, {
-    get(target, prop, receiver) {
-      if (prop === "audit") {
-        return (entry: AuditEntry) => {
-          entries.push(entry);
-        };
-      }
-      const value = Reflect.get(target, prop, receiver);
-      return typeof value === "function" ? value.bind(target) : value;
-    },
-  }) as WriteTx;
+const auditSourceOverride = new AsyncLocalStorage<AuditSource>();
+
+export function currentAuditSource(): AuditSource | undefined {
+  return auditSourceOverride.getStore();
 }
 
-export function write<T>(
-  db: Db,
-  options: { source: AuditSource; at?: string },
-  run: (tx: WriteTx) => T,
-): T {
+export function withMcpAudit<T>(run: () => T | Promise<T>): Promise<T> {
+  return Promise.resolve(auditSourceOverride.run("mcp", run));
+}
+
+export function write<T>(db: Db, options: { source: AuditSource; at?: string }, run: (tx: WriteTx) => T): T {
   const at = options.at ?? utcNow();
   if (!isUtcTimestamp(at)) {
     throw new Error("Audit time must be a UTC timestamp");
   }
   const source = currentAuditSource() ?? options.source;
 
-  return inUnit(db, (tx) => {
+  return db.transaction((tx) => {
     const entries: AuditEntry[] = [];
-    const audited = (
-      tx === db
-        ? auditedDb(tx, entries)
-        : Object.assign(tx, {
-            audit(entry: AuditEntry) {
-              entries.push(entry);
-            },
-          })
-    ) as WriteTx;
+    const audited: WriteTx = Object.assign(tx, {
+      audit(entry: AuditEntry) {
+        entries.push(entry);
+      },
+    });
     const result = run(audited);
     if (entries.length === 0) {
       throw new Error("A write must record an audit entry");

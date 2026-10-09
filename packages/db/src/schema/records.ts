@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { auditSources, inboxDecisionCodes, proposalStatuses, settingKeys } from "./codes";
+import { auditSources, inboxDecisionCodes, settingKeys } from "./codes";
 import { isoDate, oneOf } from "./sql";
 
 export const monthCloses = sqliteTable(
@@ -21,34 +21,6 @@ export const monthCloses = sqliteTable(
         ${table.reopenedAt} is null and ${table.reopenReason} is null
       ) or (
         ${table.reopenedAt} is not null and ${table.reopenReason} is not null
-      )`,
-    ),
-  ],
-);
-
-export const proposals = sqliteTable(
-  "proposals",
-  {
-    id: text("id").primaryKey(),
-    kind: text("kind").notNull(),
-    payloadJson: text("payload_json").notNull(),
-    source: text("source").notNull(),
-    status: text("status").notNull(),
-    tokenHash: text("token_hash").notNull().unique(),
-    expiresAt: text("expires_at").notNull(),
-    resultRef: text("result_ref"),
-    createdAt: text("created_at").notNull(),
-    decidedAt: text("decided_at"),
-  },
-  (table) => [
-    check("proposals_status", oneOf(table.status, proposalStatuses)),
-    check("proposals_payload_json", sql`json_valid(${table.payloadJson})`),
-    check(
-      "proposals_decided_at",
-      sql`(
-        ${table.status} = 'pending' and ${table.decidedAt} is null
-      ) or (
-        ${table.status} <> 'pending' and ${table.decidedAt} is not null
       )`,
     ),
   ],

@@ -1,14 +1,18 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { McpRoute } from "./catalog";
 
-const fileInputSchema = z.object({
-  filename: z.string().min(1),
-  mimeType: z.string(),
-  contentBase64: z.string(),
-});
-
-type FileInput = z.infer<typeof fileInputSchema>;
+const fileInputSchema = z.union([
+  z.object({
+    filename: z.string().min(1),
+    mimeType: z.string().optional(),
+    text: z.string(),
+  }),
+  z.object({
+    filename: z.string().min(1),
+    mimeType: z.string().optional(),
+    contentBase64: z.string(),
+  }),
+]);
 
 export function shapeOf(schema: z.ZodType | undefined): Record<string, z.ZodType> {
   if (!schema || !("shape" in schema)) {
@@ -58,54 +62,13 @@ export function isFileSchema(schema: z.ZodType): boolean {
   return type === "instanceof" || type === "file" || type === "custom";
 }
 
-function stable(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stable(item)).join(",")}]`;
-  }
-  if (typeof value === "object" && value !== null) {
-    const entries = Object.entries(value)
-      .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
-    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stable(item)}`).join(",")}}`;
-  }
-  return JSON.stringify(value) ?? "null";
-}
-
-function fileBytes(input: FileInput): Uint8Array {
-  return Buffer.from(input.contentBase64, "base64");
-}
-
-function canonicalField(schema: z.ZodType, value: unknown): unknown {
-  if (!isFileSchema(schema)) {
-    return value;
-  }
+function fileFrom(value: unknown): File {
   const file = fileInputSchema.parse(value);
-  return {
-    filename: file.filename,
-    mimeType: file.mimeType,
-    contentSha256: createHash("sha256").update(fileBytes(file)).digest("hex"),
-  };
-}
-
-function section(schema: z.ZodType | undefined, args: Record<string, unknown>, multipart: boolean): Record<string, unknown> | undefined {
-  if (!schema) {
-    return undefined;
+  if ("text" in file) {
+    return new File([file.text], file.filename, { type: file.mimeType || "text/csv" });
   }
-  const out: Record<string, unknown> = {};
-  for (const key of fieldKeys(schema)) {
-    if (args[key] !== undefined) {
-      const field = fieldSchema(schema, key);
-      out[key] = multipart && field ? canonicalField(field, args[key]) : args[key];
-    }
-  }
-  return out;
-}
-
-export function canonicalPayload(route: McpRoute, args: Record<string, unknown>): string {
-  return stable({
-    params: section(route.params, args, false),
-    query: section(route.query, args, false),
-    body: section(route.body, args, route.multipart),
+  return new File([Buffer.from(file.contentBase64, "base64")], file.filename, {
+    type: file.mimeType || "application/octet-stream",
   });
 }
 
@@ -128,8 +91,7 @@ function queryString(value: unknown): string {
 
 function formValue(schema: z.ZodType, value: unknown): string | File {
   if (isFileSchema(schema)) {
-    const file = fileInputSchema.parse(value);
-    return new File([fileBytes(file)], file.filename, { type: file.mimeType || "application/octet-stream" });
+    return fileFrom(value);
   }
   return queryString(value);
 }

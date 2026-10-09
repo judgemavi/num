@@ -11,7 +11,6 @@ import {
 import { accounts } from "./accounts";
 import { importOutcomes } from "./codes";
 import { transactions } from "./ledger";
-import { proposals } from "./records";
 import { isoDate, nullOrIsoDate, oneOf } from "./sql";
 
 export const documents = sqliteTable("documents", {
@@ -31,8 +30,9 @@ export const importBatches = sqliteTable(
     accountId: text("account_id")
       .notNull()
       .references(() => accounts.id),
-    documentId: text("document_id").references(() => documents.id),
-    proposalId: text("proposal_id").references(() => proposals.id),
+    documentId: text("document_id")
+      .notNull()
+      .references(() => documents.id),
     parser: text("parser").notNull(),
     periodStart: text("period_start").notNull(),
     periodEnd: text("period_end").notNull(),
@@ -46,14 +46,6 @@ export const importBatches = sqliteTable(
     check("import_batches_period_start", isoDate(table.periodStart)),
     check("import_batches_period_end", isoDate(table.periodEnd)),
     check("import_batches_closing_date", nullOrIsoDate(table.closingDate)),
-    check(
-      "import_batches_source",
-      sql`(
-        ${table.documentId} is not null and ${table.proposalId} is null
-      ) or (
-        ${table.documentId} is null and ${table.proposalId} is not null
-      )`,
-    ),
   ],
 );
 

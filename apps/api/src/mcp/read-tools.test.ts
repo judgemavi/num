@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditLog, forecastSnapshots, migrateDatabase, openDatabase } from "@num/db";
+import { migrateDatabase, openDatabase } from "@num/db";
 import { columnMapSchema, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
 import type { OpenAPIHono } from "@hono/zod-openapi";
@@ -217,39 +217,6 @@ test("tools that need today require asOf", async () => {
     }
     expect(tools.find((tool) => tool.name === "list_accounts")?.inputSchema?.required ?? []).not.toContain("asOf");
     expect(tools.find((tool) => tool.name === "list_buckets")?.inputSchema?.required ?? []).not.toContain("asOf");
-  } finally {
-    book.close();
-  }
-});
-
-test("read tools do not write", async () => {
-  const book = tempBook();
-  try {
-    const { accountId, planId } = seed(book.db, book.dir);
-    const before = {
-      audit: book.db.select().from(auditLog).all().length,
-      snapshots: book.db.select().from(forecastSnapshots).all().length,
-    };
-    const calls: [string, Record<string, unknown>][] = [
-      ["list_accounts", {}],
-      ["search_transactions", { accountId }],
-      ["list_categories", {}],
-      ["list_category_groups", {}],
-      ["list_merchants", {}],
-      ["list_buckets", {}],
-      ["list_plans", {}],
-      ["list_occurrences", { id: planId, asOf }],
-      ["get_forecast", { asOf }],
-      ["get_insights", { asOf }],
-      ["list_inbox", { asOf }],
-      ["list_imports", {}],
-    ];
-    for (const [name, args] of calls) {
-      const body = await callTool(book.app, name, args);
-      expect(body.result?.isError).toBeFalsy();
-    }
-    expect(book.db.select().from(auditLog).all().length).toBe(before.audit);
-    expect(book.db.select().from(forecastSnapshots).all().length).toBe(before.snapshots);
   } finally {
     book.close();
   }

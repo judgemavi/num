@@ -46,28 +46,22 @@ Put an authenticating proxy in front of remote access.
 The Cloudflare MCP portal with Cloudflare Access is one example.
 
 Each API route is one MCP tool.
-A read tool runs at once.
-A write tool has two steps:
-
-1. Call the tool with no token.
-   The server changes nothing.
-   It returns a preview and a confirmation token.
-   The token expires after 10 minutes.
-2. Show that preview to the person.
-   After the person approves it, call the same tool with the same inputs and the token.
-   The server applies that change.
-
-Do not retry a write after an uncertain response.
-Read the current state first.
-A 409 is a conflict to resolve.
-It is not permission to force the write.
+A tool does the same thing as that route in the app.
 
 AI writes are off by default.
 Open Settings, then AI access, and turn on "Let an AI change the books".
 Until you do, the server lists read tools only and refuses write calls.
 
+The MCP client must ask the person before it runs a write.
+Describe the change.
+Run the tool only after the person approves it.
+After an uncertain response, read the current state before a retry.
+A 409 is a conflict to resolve.
+It is not permission to force the write.
+
 Amounts are integer minor units.
 Money that enters an account is positive.
+A file tool takes the file name and the file text, or the file name and base64 bytes.
 
 ## Checks
 
