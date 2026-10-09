@@ -164,8 +164,8 @@ Transaction fields:
 - `accountId`, `date`, `amount`, `merchantId?`, `notes?`
 - `payeeRaw`: the bank text. Do not change it after import.
 - `payeeNormalized`: `normalizePayee(payeeRaw)`, stored and indexed. The app sets it on each write.
-- `status`: `open | cleared` (stored). A transaction is **reconciled** when it is cleared and its date is on or before the
-  latest active checkpoint of its account. The app calculates this; it is not stored.
+- `status`: `open | cleared` (stored). A transaction is **reconciled** when its date is on or before the latest active
+  checkpoint of its account. The app calculates this; it is not stored.
 - `source`: `import | manual | mcp`
 - `importRowId?`, `transferPeerId?`
 
