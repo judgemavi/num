@@ -53,7 +53,10 @@ const transactionFields = {
   refundOfId: z.uuid().nullable().optional(),
 };
 
-export const transactionCreateSchema = z.object(transactionFields);
+export const transactionCreateSchema = z.object({
+  ...transactionFields,
+  unreadableItemKey: z.string().trim().min(1).max(500).optional(),
+});
 
 export const transactionUpdateSchema = z.object(transactionFields);
 
@@ -176,7 +179,6 @@ export const transactionListSchema = pagedResponseSchema(transactionListItemSche
 });
 
 export type TransactionFilter = z.output<typeof transactionFilterSchema>;
-export type ApproveLevel = z.infer<typeof approveLevelSchema>;
 export type TransactionLineInput = z.infer<typeof transactionLineInputSchema>;
 export type TransactionLine = z.infer<typeof transactionLineSchema>;
 export type TransactionCreate = z.infer<typeof transactionCreateSchema>;

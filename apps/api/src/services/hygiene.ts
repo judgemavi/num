@@ -17,7 +17,7 @@ import { listBuckets, listOverspent } from "./buckets";
 import { cardLedger } from "./card-statements";
 import { monthlyBills } from "./funding-book";
 import { importFreshness, settingNumber } from "./book-settings";
-import { decidedKeys } from "./inbox-decisions";
+import { decidedKeys } from "./decision-keys";
 import { loadReviewState, type ReviewState } from "./needs-review";
 import { closedStories, listMonths } from "./months";
 import { listPlans } from "./recurring-plans";
@@ -193,7 +193,7 @@ function savingsRate(db: Db, months: MonthList, asOf: string) {
 }
 
 function recurring(db: Db, state: ReviewState) {
-  const hidden = decidedKeys(db);
+  const hidden = decidedKeys(db, "recurring_changed");
   const signals = state.signals;
   const changed = signals.changed.filter((item) => !hidden.has(`recurring_changed:${item.planId}:${item.dueDate}`)).length;
   const missed = signals.missed.length;

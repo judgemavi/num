@@ -28,6 +28,7 @@ type SubmitInput = {
   lines: SplitLine[];
   tagIds: string[];
   refundOfId: string | null;
+  unreadableItemKey?: string;
 };
 
 export type SubmitResult =
@@ -77,7 +78,7 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
   const result = await apiRequest(input.transaction ? `/api/transactions/${input.transaction.id}` : "/api/transactions", transactionSaveResultSchema, {
     method: input.transaction ? "PATCH" : "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(parsed.data),
+    body: JSON.stringify(input.transaction ? parsed.data : { ...parsed.data, unreadableItemKey: input.unreadableItemKey }),
   });
   if (!result.ok) {
     return { ok: false, error: transactionError(result.code) };

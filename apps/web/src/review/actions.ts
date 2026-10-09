@@ -2,7 +2,6 @@ import {
   inboxDecisionSchema,
   inboxDecisionUndoSchema,
   inboxGroupApplyResultSchema,
-  inboxUnreadableAcceptSchema,
   occurrenceLinkSchema,
   planSchema,
   transferPairSchema,
@@ -111,8 +110,4 @@ export function decideItem(asOf: string, itemKey: string, decision: InboxDecisio
 
 export function undoDecision(itemKey: string) {
   return apiRequest("/api/review/decisions/undo", inboxDecisionUndoSchema, json({ itemKey }));
-}
-
-export function acceptUnreadable(asOf: string, itemKey: string) {
-  return apiRequest(`/api/imports/unreadable?asOf=${asOf}`, inboxUnreadableAcceptSchema, json({ itemKey }));
 }

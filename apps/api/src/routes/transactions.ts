@@ -5,6 +5,7 @@ import {
   errorSchema,
   refundPurchaseListSchema,
   refundPurchaseQuerySchema,
+  transactionCreateSchema,
   transactionListApiQuerySchema,
   transactionListSchema,
   skippedRowSchema,
@@ -14,8 +15,8 @@ import {
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { approveReviewLevel } from "../services/needs-review";
-import { filteredReviewHits, listTransactions } from "../services/transaction-list";
+import { approveFiltered } from "../services/review-approve";
+import { listTransactions } from "../services/transaction-list";
 import { listRefundPurchases } from "../services/refund-link";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
 
@@ -146,7 +147,7 @@ const createRouteDef = createRoute({
       required: true,
       content: {
         "application/json": {
-          schema: transactionWriteSchema,
+          schema: transactionCreateSchema,
         },
       },
     },
@@ -206,8 +207,7 @@ const deleteRoute = createRoute({
 export function registerTransactions(app: OpenAPIHono, db: Db) {
   app.openapi(approveRoute, (c) => {
     const { level, count, ...filter } = c.req.valid("json");
-    const targets = filteredReviewHits(db, filter, c.req.valid("query").asOf).filter((hit) => hit.review.level === level);
-    return c.json(approveReviewLevel(db, targets, level, count, { source: "ui" }), 200);
+    return c.json(approveFiltered(db, c.req.valid("query").asOf, filter, level, count, { source: "ui" }), 200);
   });
   app.openapi(refundPurchasesRoute, (c) => c.json({ items: listRefundPurchases(db, c.req.valid("query")) }, 200));
   app.openapi(listRoute, (c) => c.json(listTransactions(db, c.req.valid("query")), 200));

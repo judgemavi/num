@@ -75,7 +75,7 @@ export function TransactionsScreen() {
   });
 
   const transactions = useQuery({
-    queryKey: ["transactions", search],
+    queryKey: ["transactions", search, search.needsReview ? localAsOf() : null],
     queryFn: async () => {
       const result = await apiRequest(transactionPath(search, localAsOf()), transactionListSchema);
       if (!result.ok) {
@@ -233,7 +233,7 @@ export function TransactionsScreen() {
           currency={bookCurrency}
           search={search}
           items={rows}
-          counts={page.reviewCounts ?? { sure: 0, likely: 0, maybe: 0, none: 0 }}
+          counts={page.reviewCounts ?? { sure: 0, likely: 0, maybe: 0, none: 0, questions: 0 }}
         />
       ) : (
       <div className="overflow-hidden rounded-[16px] border border-border bg-card">

@@ -274,7 +274,6 @@ export {
   type WhatChoice,
 } from "./categorize";
 export {
-  alternateFromMatch,
   chooseTransferMatch,
   suggestionQuerySchema,
   suggestionReasons,
@@ -455,7 +454,6 @@ export {
   inboxDecisionUndoSchema,
   inboxGroupApplyResultSchema,
   inboxGroupApplySchema,
-  inboxUnreadableAcceptSchema,
   payeeCountQuerySchema,
   payeeCountSchema,
   reviewCountSchema,
@@ -531,7 +529,6 @@ export {
   type Transaction,
   type TransactionCreate,
   type TransactionInputStatus,
-  type ApproveLevel,
   type TransactionFilter,
   type TransactionLine,
   type TransactionLineInput,

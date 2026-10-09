@@ -107,6 +107,8 @@ export function AccountTransactions({ accountId, currency, page, onPage }: Accou
       setSelected([]);
       setCapped(false);
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
+      await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
       await queryClient.invalidateQueries({ queryKey: ["reconcile", accountId] });
     } catch {
       setError("The transactions did not update. Try again.");

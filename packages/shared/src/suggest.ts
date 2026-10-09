@@ -62,22 +62,6 @@ export function suggestionFromMatch(result: MatchResult): Suggestion {
   };
 }
 
-export function alternateFromMatch(result: MatchResult): Suggestion | null {
-  const next = result.alternate;
-  if (!next || (next.categoryId === null && next.transferAccountId === null)) {
-    return null;
-  }
-  return {
-    merchantId: next.transferAccountId ? null : next.merchantId,
-    categoryId: next.categoryId,
-    transferAccountId: next.transferAccountId,
-    reason: next.reason,
-    level: reviewLevel(false, next.confidenceMilli / 1000),
-    sourceId: next.sourceId,
-    confidence: next.confidenceMilli,
-  };
-}
-
 export type TransferCandidate = {
   id: string;
   accountId: string;

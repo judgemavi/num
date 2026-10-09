@@ -139,6 +139,8 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
       await queryClient.invalidateQueries({ queryKey: ["account", accountId] });
       await queryClient.invalidateQueries({ queryKey: ["accounts"] });
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
+      await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
       await queryClient.invalidateQueries({ queryKey: ["reconcile", accountId] });
       onClose();
     } catch {

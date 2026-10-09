@@ -70,7 +70,7 @@ export function ImportInfoEditor({ props }: { props: EditorInput["importInfo"] }
 export function MergeEditor({ props, onSaved }: { props: EditorInput["mergeMerchant"]; onSaved: (id: string) => void }) {
   const merchants = useMerchants();
   const merchant = useRecord("merchant", props.merchantId, `/api/merchants/${props.merchantId}`, merchantSchema);
-  const refresh = useRefresh([["merchants"], ["transactions"]]);
+  const refresh = useRefresh([["merchants"], ["transactions"], ["needs-review"]]);
   if (merchants.isPending || merchant.isPending) {
     return <LoadingLine label="Loading the merchant." />;
   }
@@ -92,7 +92,7 @@ export function SkipNextEditor({ props, onSaved }: { props: EditorInput["skipNex
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const plan = useRecord("plan", props.planId, `/api/recurring/${props.planId}`, planSchema);
-  const refresh = useRefresh([["plans"], ["occurrences"], ["recurring-signals"], ["recurring-sync"]]);
+  const refresh = useRefresh([["plans"], ["occurrences"], ["recurring-signals"], ["recurring-sync"], ["needs-review"], ["hygiene"]]);
   if (plan.isPending) {
     return <LoadingLine label="Loading recurring." />;
   }
@@ -117,7 +117,7 @@ export function SkipNextEditor({ props, onSaved }: { props: EditorInput["skipNex
 export function SkipOccurrenceEditor({ props, onSaved }: { props: EditorInput["skipOccurrence"]; onSaved: (id: string) => void }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const refresh = useRefresh([["occurrences"], ["recurring-signals"], ["recurring-sync"]]);
+  const refresh = useRefresh([["occurrences"], ["recurring-signals"], ["recurring-sync"], ["needs-review"], ["hygiene"]]);
 
   async function skip() {
     if (reason.trim().length === 0) {
@@ -172,7 +172,7 @@ export function SkipOccurrenceEditor({ props, onSaved }: { props: EditorInput["s
 export function LinkOccurrenceEditor({ props, onSaved }: { props: EditorInput["linkOccurrence"] } & Finish) {
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const refresh = useRefresh([["occurrences"], ["recurring-signals"], ["recurring-sync"]]);
+  const refresh = useRefresh([["occurrences"], ["recurring-signals"], ["recurring-sync"], ["needs-review"], ["hygiene"]]);
   const candidates = useQuery({
     queryKey: ["plan-transactions", props.accountId, props.dueDate],
     queryFn: async () => {

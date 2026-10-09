@@ -102,6 +102,8 @@ export function BucketsScreen() {
     await queryClient.invalidateQueries({ queryKey: ["bucket-events"] });
     await queryClient.invalidateQueries({ queryKey: ["funding-position"] });
     await queryClient.invalidateQueries({ queryKey: ["funding-paychecks"] });
+    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
+    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
     await queryClient.invalidateQueries({ queryKey: ["funding-proposal"] });
     await queryClient.invalidateQueries({ queryKey: ["funding-runs"] });
   }

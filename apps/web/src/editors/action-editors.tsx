@@ -56,7 +56,7 @@ export function ReconcileEditor({ props, onClose }: { props: EditorInput["reconc
 
 export function FundEditor({ props, onSaved }: { props: EditorInput["fundPaycheck"] } & Finish) {
   const currency = useBookCurrency();
-  const refresh = useRefresh([["buckets"], ["funding-position"], ["funding-paychecks"], ["funding-proposal"], ["funding-runs"], ["needs-review"]]);
+  const refresh = useRefresh([["buckets"], ["funding-position"], ["funding-paychecks"], ["funding-proposal"], ["funding-runs"], ["needs-review"], ["hygiene"]]);
   if (!currency.data) {
     return <LoadingLine label="Loading the paycheck." />;
   }
@@ -75,7 +75,7 @@ export function FundEditor({ props, onSaved }: { props: EditorInput["fundPaychec
 export function AssignEditor({ props, onClose, onSaved }: { props: EditorInput["assignMoney"] } & Finish) {
   const currency = useBookCurrency();
   const bucket = useRecord("bucket", props.bucketId, `/api/buckets/${props.bucketId}`, bucketSchema);
-  const refresh = useRefresh([["buckets"], ["bucket-events"], ["funding-position"]]);
+  const refresh = useRefresh([["buckets"], ["bucket-events"], ["funding-position"], ["hygiene"]]);
   if (!currency.data || bucket.isPending) {
     return <LoadingLine label="Loading the bucket." />;
   }
@@ -98,7 +98,7 @@ export function AssignEditor({ props, onClose, onSaved }: { props: EditorInput["
 export function MoveEditor({ props, onClose, onSaved }: { props: EditorInput["moveMoney"] } & Finish) {
   const currency = useBookCurrency();
   const board = useActiveBuckets();
-  const refresh = useRefresh([["buckets"], ["bucket-events"], ["funding-position"]]);
+  const refresh = useRefresh([["buckets"], ["bucket-events"], ["funding-position"], ["hygiene"]]);
   if (!currency.data || board.isPending) {
     return <LoadingLine label="Loading buckets." />;
   }

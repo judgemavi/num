@@ -23,13 +23,15 @@ import { apiRequest } from "@/request";
 import { formatDate, levelLabel, plainReason } from "@/transactions/format";
 import { filterBody, transactionPath } from "@/transactions/query";
 
-const groups: ReviewLevel[] = ["sure", "likely", "maybe", "none"];
+type GroupKey = ReviewLevel | "questions";
+
+const groups: GroupKey[] = ["questions", "sure", "likely", "maybe", "none"];
 
 type NeedsReviewListProps = {
   currency: string;
   search: TransactionListQuery;
   items: TransactionListItem[];
-  counts: { sure: number; likely: number; maybe: number; none: number };
+  counts: { sure: number; likely: number; maybe: number; none: number; questions: number };
 };
 
 export function NeedsReviewList({ currency, search, items, counts }: NeedsReviewListProps) {
@@ -84,8 +86,12 @@ export function NeedsReviewList({ currency, search, items, counts }: NeedsReview
       if (result.code === "review_changed") {
         await refresh();
         const fresh = await apiRequest(transactionPath({ ...search, page: 1, pageSize: 1, needsReview: true }, asOf), transactionListSchema);
-        if (fresh.ok && fresh.data.reviewCounts) {
-          await approve(level, fresh.data.reviewCounts[level]);
+        const left = fresh.ok ? (fresh.data.reviewCounts?.[level] ?? 0) : 0;
+        if (left === 0) {
+          setError(`Nothing is left to approve in ${level === "sure" ? "Sure" : "Likely"}.`);
+        } else {
+          setError(null);
+          await approve(level, left);
         }
       }
       return;
@@ -102,11 +108,11 @@ export function NeedsReviewList({ currency, search, items, counts }: NeedsReview
     <div className="grid gap-5">
       {error ? <p role="alert">{error}</p> : null}
       {groups.map((level) => {
-        const rows = items.filter((item) => (item.review?.level ?? "none") === level);
+        const rows = items.filter((item) => groupOf(item) === level);
         if (rows.length === 0) {
           return null;
         }
-        const title = levelLabel(level);
+        const title = level === "questions" ? "Questions" : levelLabel(level);
         return (
           <ListCard
             key={level}
@@ -137,6 +143,13 @@ export function NeedsReviewList({ currency, search, items, counts }: NeedsReview
       })}
     </div>
   );
+}
+
+function groupOf(item: TransactionListItem): GroupKey {
+  if (item.review && item.review.question !== "categorize") {
+    return "questions";
+  }
+  return item.review?.level ?? "none";
 }
 
 function ReviewRow({

@@ -267,6 +267,7 @@ export type TransactionFormProps = {
   merchants: Merchant[];
   rawLine?: string;
   initialAccountId?: string;
+  unreadableItemKey?: string;
   onClose: () => void;
   onSaved: (id: string) => void;
   onDelete: () => Promise<string | null>;

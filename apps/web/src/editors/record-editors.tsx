@@ -54,6 +54,7 @@ export function TransactionRecord({ props, onClose, onSaved }: { props: EditorIn
       id={props.id}
       rawLine={props.rawLine}
       initialAccountId={props.initialAccountId}
+      unreadableItemKey={props.unreadableItemKey}
       groupIds={props.groupIds}
       onClose={onClose}
       onSaved={onSaved}
@@ -271,7 +272,7 @@ export function PlanRecord({ props, onClose, onSaved }: { props: EditorInput["pl
   const categories = useCategories();
   const merchants = useMerchants();
   const plan = useRecord("plan", props.id, `/api/recurring/${props.id ?? ""}`, planSchema);
-  const save = useSaved([["plans"], ["plan"], ["recurring-signals"], ["occurrences"], ["month-plan"], ["forecast"]], onSaved);
+  const save = useSaved([["plans"], ["plan"], ["recurring-signals"], ["occurrences"], ["month-plan"], ["forecast"], ["needs-review"], ["hygiene"]], onSaved);
   if (!currency.data || accounts.isPending || categories.isPending || merchants.isPending || (props.id && plan.isPending)) {
     return <LoadingLine label="Loading recurring." />;
   }

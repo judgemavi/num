@@ -53,6 +53,8 @@ export function CheckpointHistory({ accountId, currency, owed }: CheckpointHisto
     setError(null);
     await queryClient.invalidateQueries({ queryKey: ["checkpoints", accountId] });
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
+    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
     await queryClient.invalidateQueries({ queryKey: ["reconcile", accountId] });
     await queryClient.invalidateQueries({ queryKey: ["account", accountId] });
   }

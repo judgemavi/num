@@ -27,6 +27,7 @@ import { useEditors } from "@/editors/editor-api";
 import { useActiveBuckets, useActivePlans, useBookCurrency, useCategories, useReviewSummary } from "@/editors/lookups";
 import { inboxError, paydayHint } from "@/review/format";
 import { HygienePanel } from "@/insights/hygiene-panel";
+import { formatMoney } from "@/money";
 import { signedMoney } from "@/insights/format";
 import { formatDate, levelLabel } from "@/transactions/format";
 import { apiRequest } from "@/request";
@@ -131,11 +132,11 @@ export function HomeScreen() {
     },
   });
 
+  const openPaychecks = (paychecks.data ?? []).filter((item) => !item.kept);
   const counts = review.data?.counts;
   const reviewTotal = review.data?.total ?? 0;
-  const clear = reviewTotal === 0 && (hygiene.data?.checks.every((item) => item.pass) ?? false) && (paychecks.data?.length ?? 0) === 0 && (signals.data?.missed.length ?? 0) === 0 && (overspent.data?.length ?? 0) === 0;
+  const clear = reviewTotal === 0 && (hygiene.data?.checks.every((item) => item.pass) ?? false) && openPaychecks.length === 0 && (signals.data?.missed.length ?? 0) === 0 && (overspent.data?.length ?? 0) === 0;
   const feasibility = plan.data?.feasibility;
-  const behind = feasibility && feasibility.shortfall > 0 ? feasibility.buckets.filter((bucket) => bucket.kind === "goal") : [];
   const worth = insights.data?.netWorth.slice(-12) ?? [];
   const latestWorth = worth.at(-1);
 
@@ -173,9 +174,9 @@ export function HomeScreen() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2 px-5 pb-5">
           {counts
-            ? (["sure", "likely", "maybe", "none"] as const).map((level) => (
+            ? (["questions", "sure", "likely", "maybe", "none"] as const).map((level) => (
                 <Badge key={level} variant={counts[level] > 0 && level !== "none" ? "attention" : "neutral"}>
-                  {levelLabel(level)} {counts[level]}
+                  {level === "questions" ? "Questions" : levelLabel(level)} {counts[level]}
                 </Badge>
               ))
             : null}
@@ -194,11 +195,27 @@ export function HomeScreen() {
         <>
           <MonthFlow plan={plan.data} currency={bookCurrency} />
           <MonthDetails plan={plan.data} currency={bookCurrency} />
+          {feasibility && (feasibility.shortfall > 0 || feasibility.buckets.length > 0) ? (
+            <Card>
+              <CardContent className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                <p className={feasibility.shortfall > 0 ? "font-semibold text-attn" : "font-semibold"}>
+                  {feasibility.shortfall > 0
+                    ? `Goals need ${formatMoney(bookCurrency, feasibility.shortfall)} more each paycheck than you have`
+                    : "Your goals fit your paychecks"}
+                </p>
+                <Button type="button" variant="secondary" asChild>
+                  <Link to="/buckets" search={{ page: 1, pageSize: 50, archived: false }}>
+                    Buckets
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
         </>
       ) : null}
-      {paychecks.data && paychecks.data.length > 0 ? (
+      {openPaychecks.length > 0 ? (
         <ListCard label="Fund this paycheck" title="Fund this paycheck">
-          {paychecks.data.map((item) => (
+          {openPaychecks.map((item) => (
             <ListRow key={item.incomeTransactionId} onOpen={() => void openEditor("fundPaycheck", { incomeTransactionId: item.incomeTransactionId })}>
               <span className={listName}>
                 {item.payee}
@@ -243,22 +260,6 @@ export function HomeScreen() {
               <Button type="button" variant="ghost" onClick={() => void openEditor("skipOccurrence", { planId: item.planId, dueDate: item.dueDate })}>
                 Skip
               </Button>
-            </ListRow>
-          ))}
-        </ListCard>
-      ) : null}
-      {behind.length > 0 ? (
-        <ListCard label="Goals behind" title="Goals behind">
-          {behind.map((goal) => (
-            <ListRow key={goal.bucketId} simple onOpen={() => void navigate({ to: "/buckets", search: { page: 1, pageSize: 50, archived: false } })}>
-              <span className={listName}>
-                {goal.name}
-                <small>{goal.laterDate ? `Needs more each paycheck. A date of ${formatDate(goal.laterDate)} fits.` : "Needs more each paycheck."}</small>
-              </span>
-              <span className={listAmt}>
-                <Amount currency={bookCurrency} minor={goal.perPaycheck} />
-                <small>each paycheck</small>
-              </span>
             </ListRow>
           ))}
         </ListCard>

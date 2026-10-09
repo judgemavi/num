@@ -37,6 +37,7 @@ export function TransactionForm({
   merchants,
   rawLine,
   initialAccountId,
+  unreadableItemKey,
   onSaved,
   onDelete,
   deleteKind = "plain",
@@ -181,7 +182,7 @@ export function TransactionForm({
       transferAccountId,
       lines,
       tagIds,
-      refundOfId,
+      refundOfId, unreadableItemKey,
     });
     setSaving(false);
     if (!result.ok) {

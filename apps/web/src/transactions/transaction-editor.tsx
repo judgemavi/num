@@ -13,6 +13,7 @@ type TransactionEditorProps = {
   id: string | null;
   rawLine?: string;
   initialAccountId?: string;
+  unreadableItemKey?: string;
   groupIds?: string[];
   onClose: () => void;
   onSaved: (id: string) => void;
@@ -26,11 +27,11 @@ function amountLocked(transaction: Transaction, peer: Transaction | undefined): 
   return peer.lines.length > 1 && line.transferAccountId === peer.accountId;
 }
 
-export function TransactionEditor({ id, rawLine, initialAccountId, groupIds, onClose, onSaved }: TransactionEditorProps) {
+export function TransactionEditor({ id, rawLine, initialAccountId, unreadableItemKey, groupIds, onClose, onSaved }: TransactionEditorProps) {
   if (groupIds && groupIds.length > 0) {
     return <GroupHost ids={groupIds} onSaved={onSaved} />;
   }
-  return <SingleEditor id={id} rawLine={rawLine} initialAccountId={initialAccountId} onClose={onClose} onSaved={onSaved} />;
+  return <SingleEditor id={id} rawLine={rawLine} initialAccountId={initialAccountId} unreadableItemKey={unreadableItemKey} onClose={onClose} onSaved={onSaved} />;
 }
 
 function GroupHost({ ids, onSaved }: { ids: string[]; onSaved: (id: string) => void }) {
@@ -53,7 +54,7 @@ function GroupHost({ ids, onSaved }: { ids: string[]; onSaved: (id: string) => v
   );
 }
 
-function SingleEditor({ id, rawLine, initialAccountId, onClose, onSaved }: TransactionEditorProps) {
+function SingleEditor({ id, rawLine, initialAccountId, unreadableItemKey, onClose, onSaved }: TransactionEditorProps) {
   const queryClient = useQueryClient();
   const currency = useBookCurrency();
   const accounts = useAccounts();
@@ -107,6 +108,8 @@ function SingleEditor({ id, rawLine, initialAccountId, onClose, onSaved }: Trans
     await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
     await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
     await queryClient.invalidateQueries({ queryKey: ["import-detail"] });
+    await queryClient.invalidateQueries({ queryKey: ["import-view"] });
+    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
   }
 
   if (loading) {
@@ -147,6 +150,7 @@ function SingleEditor({ id, rawLine, initialAccountId, onClose, onSaved }: Trans
         }
         await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
         await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
+        await queryClient.invalidateQueries({ queryKey: ["funding-paychecks"] });
         return result;
       }}
       currency={currency.data}
@@ -158,6 +162,7 @@ function SingleEditor({ id, rawLine, initialAccountId, onClose, onSaved }: Trans
       merchants={merchants.data}
       rawLine={rawLine}
       initialAccountId={initialAccountId}
+      unreadableItemKey={unreadableItemKey}
       onClose={onClose}
       onSaved={(savedId) => {
         void refresh();

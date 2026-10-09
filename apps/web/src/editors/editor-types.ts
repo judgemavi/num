@@ -7,6 +7,7 @@ export type EditorInput = {
     id: string | null;
     rawLine?: string;
     initialAccountId?: string;
+    unreadableItemKey?: string;
     groupIds?: string[];
   };
   account: { id: string | null; name?: string };

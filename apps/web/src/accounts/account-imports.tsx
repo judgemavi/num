@@ -50,6 +50,8 @@ export function AccountImports({ accountId, accountName, currency }: AccountImpo
     await queryClient.invalidateQueries({ queryKey: ["accounts"] });
     await queryClient.invalidateQueries({ queryKey: ["account"] });
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
+    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
     if (result.data.blocked.length > 0) {
       await showBlocked(result.data.blocked);
     }

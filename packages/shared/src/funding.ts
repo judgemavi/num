@@ -204,7 +204,7 @@ export const fundingPaycheckSchema = z.object({
 });
 
 export const fundingPaycheckListSchema = z.object({
-  items: z.array(fundingPaycheckSchema),
+  items: z.array(fundingPaycheckSchema.extend({ kept: z.boolean() })),
 });
 
 export const fundingProposalQuerySchema = asOfQuerySchema.extend({

@@ -7,13 +7,12 @@ import {
   inboxDecisionUndoSchema,
   inboxGroupApplyResultSchema,
   inboxGroupApplySchema,
-  inboxUnreadableAcceptSchema,
   payeeCountQuerySchema,
   payeeCountSchema,
 } from "@num/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { acceptUnreadableLine, decideInboxItem, decisionRows, undoInboxDecision } from "../services/inbox-decisions";
+import { decideInboxItem, decisionRows, undoInboxDecision } from "../services/inbox-decisions";
 import { applyInboxGroup, countOtherUncategorized } from "../services/inbox-group";
 
 const errorResponse = {
@@ -57,22 +56,6 @@ const undoRoute = createRoute({
   },
   responses: {
     200: { description: "The undone decision", content: { "application/json": { schema: inboxDecisionUndoSchema } } },
-    400: errorResponse,
-    404: errorResponse,
-  },
-});
-
-const acceptRoute = createRoute({
-  operationId: "post_imports_unreadable",
-  description: "Add an unreadable import row by hand.",
-  method: "post",
-  path: "/api/imports/unreadable",
-  request: {
-    query: asOfQuerySchema,
-    body: { required: true, content: { "application/json": { schema: inboxUnreadableAcceptSchema } } },
-  },
-  responses: {
-    200: { description: "The unreadable row was added by hand", content: { "application/json": { schema: inboxUnreadableAcceptSchema } } },
     400: errorResponse,
     404: errorResponse,
   },
@@ -123,8 +106,4 @@ export function registerInbox(app: OpenAPIHono, db: Db) {
     return c.json(decideInboxItem(db, c.req.valid("query").asOf, body.itemKey, body.decision, { source: "ui" }), 200);
   });
   app.openapi(undoRoute, (c) => c.json(undoInboxDecision(db, c.req.valid("json").itemKey, { source: "ui" }), 200));
-  app.openapi(acceptRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(acceptUnreadableLine(db, c.req.valid("query").asOf, body.itemKey, { source: "ui" }), 200);
-  });
 }

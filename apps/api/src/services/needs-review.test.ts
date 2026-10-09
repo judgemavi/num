@@ -11,7 +11,8 @@ import { createCategory } from "./categories";
 import { createCheckpoint } from "./checkpoints";
 import { decideInboxItem } from "./inbox-decisions";
 import { closeMonth, listMonths } from "./months";
-import { approveReviewLevel, listNeedsReview } from "./needs-review";
+import { listNeedsReview } from "./needs-review";
+import { approveFiltered } from "./review-approve";
 import { linkOccurrence, skipOccurrence } from "./recurring-links";
 import { filteredReviewHits } from "./transaction-list";
 import { createPlan } from "./recurring-plans";
@@ -50,8 +51,7 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
 }
 
 function approve(db: Db, level: "sure" | "likely", count: number, filter: Parameters<typeof filteredReviewHits>[1], at: string) {
-  const targets = filteredReviewHits(db, filter, asOf).filter((hit) => hit.review.level === level);
-  return approveReviewLevel(db, targets, level, count, { source: "ui", at });
+  return approveFiltered(db, asOf, filter, level, count, { source: "ui", at });
 }
 
 const noFilter = { uncategorized: false, automatic: false };
@@ -207,6 +207,40 @@ test("approval uses the active filters and stops when the count changed", () => 
     const result = approve(db, "sure", 1, { ...noFilter, accountId: cash.id }, "2026-04-02T18:11:00Z");
     expect(result.ids).toEqual([here.id]);
     expect(getTransaction(db, there.id)?.autoReason).not.toBeNull();
+  });
+});
+
+test("a row has a bulk level only when the bulk action can apply it", () => {
+  withBook((db) => {
+    const cash = account(db, "Cash");
+    const savings = account(db, "Savings");
+    const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
+    const other = createCategory(db, { name: "Other", kind: "expense", ...saved });
+    pay(db, cash.id, "2026-03-01", -2_000, "Market", food.id);
+    const likely = pay(db, cash.id, "2026-03-02", -2_000, "Market");
+    const split = createTransaction(db, {
+      accountId: cash.id,
+      date: "2026-03-03",
+      amount: -2_000,
+      payeeRaw: "Market",
+      status: "cleared",
+      lines: [
+        { amount: -1_000, categoryId: other.id },
+        { amount: -1_000 },
+      ],
+      ...saved,
+    });
+    const out = pay(db, cash.id, "2026-03-05", -50_000, "Move");
+    pay(db, savings.id, "2026-03-06", 50_000, "Move");
+    db.update(transactions).set({ source: "import" }).where(eq(transactions.id, out.id)).run();
+    const hits = new Map(listNeedsReview(db, asOf).map((hit) => [hit.id, hit]));
+    expect(hits.get(likely.id)?.review.level).toBe("likely");
+    expect(hits.get(split.id)?.review.level).toBe("maybe");
+    expect(hits.get(out.id)?.review.question).toBe("transfer_pair");
+    expect(hits.get(out.id)?.review.level).toBe("none");
+    const result = approve(db, "likely", 1, noFilter, "2026-04-02T18:20:00Z");
+    expect(result.ids).toEqual([likely.id]);
+    expect(approve(db, "likely", 0, noFilter, "2026-04-02T18:21:00Z")).toEqual({ level: "likely", count: 0, ids: [] });
   });
 });
 

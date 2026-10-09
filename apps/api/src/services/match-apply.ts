@@ -94,7 +94,6 @@ export function applyLinkedPlan(
     learnedCount: null,
     mortgage,
     signals: [],
-    alternate: null,
   };
   const before = readTransaction(tx, transactionId);
   const lines = mortgage ? mortgageSplitLines(tx, result, txn.accountId, txn.date, txn.amount) : null;

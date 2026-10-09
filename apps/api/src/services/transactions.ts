@@ -21,6 +21,7 @@ import { spreadSureLabels } from "./match-apply";
 import { transactionReconciled } from "./reconciled";
 import { removeTransaction } from "./transaction-erase";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
+import { clearUnreadableLine } from "./unreadable-line";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
@@ -236,6 +237,9 @@ export function createTransaction(db: Db, input: TransactionBody & WriteInput): 
   let created: Transaction | undefined;
   write(db, { source: input.source, at }, (tx) => {
     created = insertTransaction(tx, input, input.source);
+    if (input.unreadableItemKey) {
+      clearUnreadableLine(tx, input.unreadableItemKey);
+    }
   });
   if (!created) {
     throw new Error("Create did not return a transaction");

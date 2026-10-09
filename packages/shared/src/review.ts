@@ -45,6 +45,7 @@ export const reviewCountSchema = z.object({
   likely: z.number().int().nonnegative(),
   maybe: z.number().int().nonnegative(),
   none: z.number().int().nonnegative(),
+  questions: z.number().int().nonnegative(),
 });
 
 export const approveLevels = ["sure", "likely"] as const;
@@ -85,10 +86,6 @@ export const inboxDecisionCreateSchema = z.object({
 });
 
 export const inboxDecisionUndoSchema = z.object({
-  itemKey,
-});
-
-export const inboxUnreadableAcceptSchema = z.object({
   itemKey,
 });
 

@@ -269,6 +269,8 @@ export function ImportForm({
       onImported();
       await queryClient.invalidateQueries({ queryKey: ["imports"] });
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
+      await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
     }
     setFinished(true);
     pendingRef.current = false;

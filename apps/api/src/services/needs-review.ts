@@ -1,10 +1,8 @@
-import { transactions } from "@num/db";
 import {
   autoReasons,
   isIsoDate,
   reviewLevel,
   suggestionFromMatch,
-  utcNow,
   type AutoReason,
   type RecurringSignals,
   type ReviewCounts,
@@ -12,22 +10,15 @@ import {
   type Suggestion,
   type TransactionReview,
 } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listOverspent } from "./buckets";
-import { listFundingPaychecks } from "./funding-paychecks";
-import { decidedKeys } from "./inbox-decisions";
-import { applySuggestion } from "./inbox-group";
+import { openFundingPaychecks } from "./funding-paychecks";
+import { decidedKeys } from "./decision-keys";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { recurringSignals } from "./recurring-view";
 import { listTransferPairs } from "./suggestions";
-import { auditTransaction, readTransaction } from "./transaction-record";
-import { spreadAfterConfirmations } from "./transactions";
-import { write, type AuditSource, type WriteTx } from "./write";
-
-type WriteInput = { source: AuditSource; at?: string };
-
 type Base = {
   id: string;
   accountId: string;
@@ -38,6 +29,8 @@ type Base = {
   merchantId: string | null;
   autoReason: string | null;
   openLine: number;
+  lineCount: number;
+  reconciled: number;
 };
 
 export type NeedsReviewHit = {
@@ -50,9 +43,7 @@ export type NeedsReviewHit = {
 
 const levelOrder: Record<ReviewLevel, number> = { sure: 0, likely: 1, maybe: 2, none: 3 };
 
-const clearedAuto = { autoReason: null, autoSourceId: null, autoConfidence: null };
-
-function requireAsOf(asOf: string) {
+export function requireAsOf(asOf: string) {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
@@ -92,13 +83,28 @@ function loadBases(db: Db, ids: readonly string[]): Base[] {
           exists (
             select 1 from transaction_lines l
             where l.transaction_id = t.id and l.category_id is null and l.transfer_account_id is null
-          ) as openLine
+          ) as openLine,
+          (select count(*) from transaction_lines l where l.transaction_id = t.id) as lineCount,
+          case when t.date <= (
+            select max(c.date) from checkpoints c
+            where c.account_id = t.account_id and c.unlocked_at is null
+          ) then 1 else 0 end as reconciled
         from transactions t
         where t.id in (${list})
       `),
     );
   }
   return found;
+}
+
+/** Sure and Likely are bulk levels. A row has one only when the bulk action can apply it. */
+function rowLevel(row: Base, automatic: boolean, suggestion: Suggestion | null): ReviewLevel {
+  const level = reviewLevel(automatic, suggestion ? suggestion.confidence / 1000 : null);
+  if (level !== "likely") {
+    return level;
+  }
+  const canApply = Number(row.lineCount) === 1 && !(suggestion?.transferAccountId && Number(row.reconciled) === 1);
+  return canApply ? "likely" : "maybe";
 }
 
 function emptyReview(level: ReviewLevel, reason: AutoReason | null): TransactionReview {
@@ -177,11 +183,11 @@ export function listNeedsReview(
         learnedCount = cached.learnedCount;
       }
     }
-    const confidence = suggestion ? suggestion.confidence / 1000 : null;
-    const level = reviewLevel(automatic, confidence);
     const pair = pairById.get(row.id);
     const ambiguous = ambiguousById.get(row.id);
     const amountChanged = changedById.get(row.id);
+    const asksQuestion = pair !== undefined || ambiguous !== undefined || amountChanged !== undefined;
+    const level = asksQuestion ? "none" : rowLevel(row, automatic, suggestion);
     const needs =
       automatic || openLine || pair !== undefined || ambiguous !== undefined || amountChanged !== undefined;
     if (!needs) {
@@ -241,9 +247,13 @@ export function listNeedsReview(
 }
 
 export function reviewCounts(hits: readonly NeedsReviewHit[]): ReviewCounts {
-  const counts: ReviewCounts = { sure: 0, likely: 0, maybe: 0, none: 0 };
+  const counts: ReviewCounts = { sure: 0, likely: 0, maybe: 0, none: 0, questions: 0 };
   for (const hit of hits) {
-    counts[hit.review.level] += 1;
+    if (hit.review.question === "categorize") {
+      counts[hit.review.level] += 1;
+    } else {
+      counts.questions += 1;
+    }
   }
   return counts;
 }
@@ -262,7 +272,7 @@ export function loadReviewState(db: Db, asOf: string): ReviewState {
   return {
     signals,
     hits: listNeedsReview(db, asOf, { signals, pairs }),
-    paychecks: listFundingPaychecks(db).items,
+    paychecks: openFundingPaychecks(db),
   };
 }
 
@@ -282,61 +292,4 @@ export function homeOpenMonths(db: Db, asOf: string, state: ReviewState): Set<st
     months.add(asOf.slice(0, 7));
   }
   return months;
-}
-
-function confirmSure(tx: WriteTx, id: string, at: string): boolean {
-  const existing = tx.select().from(transactions).where(eq(transactions.id, id)).get();
-  if (!existing?.autoReason) {
-    return false;
-  }
-  const before = readTransaction(tx, id);
-  tx.update(transactions).set({ ...clearedAuto, editedAt: at }).where(eq(transactions.id, id)).run();
-  auditTransaction(tx, id, "update", before, readTransaction(tx, id));
-  return true;
-}
-
-function applyLikely(tx: WriteTx, hit: NeedsReviewHit, at: string): boolean {
-  const suggestion = hit.review.suggestion;
-  if (!suggestion || hit.review.question !== "categorize") {
-    return false;
-  }
-  const skip = applySuggestion(
-    tx,
-    hit.id,
-    {
-      accountId: hit.accountId,
-      categoryId: suggestion.categoryId,
-      transferAccountId: suggestion.transferAccountId,
-      merchantId: suggestion.merchantId ?? hit.merchantId,
-    },
-    at,
-  );
-  return skip === null;
-}
-
-export function approveReviewLevel(
-  db: Db,
-  targets: readonly NeedsReviewHit[],
-  level: "sure" | "likely",
-  expectedCount: number,
-  input: WriteInput,
-): { level: "sure" | "likely"; count: number; ids: string[] } {
-  if (targets.length !== expectedCount) {
-    throw new ServiceError("review_changed", 409, { count: String(targets.length) });
-  }
-  const at = input.at ?? utcNow();
-  const ids: string[] = [];
-  if (targets.length === 0) {
-    return { level, count: 0, ids };
-  }
-  write(db, { source: input.source, at }, (tx) => {
-    for (const hit of targets) {
-      const applied = level === "sure" ? confirmSure(tx, hit.id, at) : applyLikely(tx, hit, at);
-      if (applied) {
-        ids.push(hit.id);
-      }
-    }
-    spreadAfterConfirmations(tx, ids);
-  });
-  return { level, count: ids.length, ids };
 }

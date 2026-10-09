@@ -1,11 +1,11 @@
-import { importBatches, inboxDecisions } from "@num/db";
+import { inboxDecisions } from "@num/db";
 import { planProposalKey, utcNow, type InboxDecision, type InboxDecisionCode } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { openUnreadableKeys } from "./book-settings";
-import { listFundingPaychecks } from "./funding-paychecks";
-import { readUnreadable } from "./import-read";
+import { decidedKeys } from "./decision-keys";
+import { openFundingPaychecks } from "./funding-paychecks";
 import { recurringSignals } from "./recurring-view";
 import { listTransferPairs } from "./suggestions";
 import { write, type AuditSource } from "./write";
@@ -36,10 +36,6 @@ export function decisionRows(db: Db): InboxDecision[] {
     }));
 }
 
-export function decidedKeys(db: Db): Set<string> {
-  return new Set(decisionRows(db).map((row) => row.itemKey));
-}
-
 function itemKind(itemKey: string): string {
   const split = itemKey.indexOf(":");
   return split === -1 ? itemKey : itemKey.slice(0, split);
@@ -61,7 +57,7 @@ function isOpen(db: Db, asOf: string, itemKey: string): boolean {
     case "plan_proposal":
       return recurringSignals(db, asOf).proposals.some((item) => planProposalKey(item) === itemKey);
     case "paycheck_funding":
-      return listFundingPaychecks(db).items.some((item) => `paycheck_funding:${item.incomeTransactionId}` === itemKey);
+      return openFundingPaychecks(db).some((item) => `paycheck_funding:${item.incomeTransactionId}` === itemKey);
     case "import_unreadable":
       return openUnreadableKeys(db).includes(itemKey);
     default:
@@ -111,51 +107,6 @@ export function undoInboxDecision(db: Db, itemKey: string, input: WriteInput): {
       action: "delete",
       before: row,
       after: null,
-    });
-  });
-  return { itemKey };
-}
-
-function unreadableParts(itemKey: string): { batchId: string; line: number } | null {
-  const prefix = "import_unreadable:";
-  if (!itemKey.startsWith(prefix)) {
-    return null;
-  }
-  const rest = itemKey.slice(prefix.length);
-  const split = rest.lastIndexOf(":");
-  if (split <= 0) {
-    return null;
-  }
-  const line = Number(rest.slice(split + 1));
-  if (!Number.isInteger(line) || line < 0) {
-    return null;
-  }
-  return { batchId: rest.slice(0, split), line };
-}
-
-export function acceptUnreadableLine(db: Db, asOf: string, itemKey: string, input: WriteInput): { itemKey: string } {
-  const parts = unreadableParts(itemKey);
-  if (!parts || !isOpen(db, asOf, itemKey)) {
-    throw new ServiceError("inbox_item_not_found", 404);
-  }
-  const batch = db.select().from(importBatches).where(eq(importBatches.id, parts.batchId)).get();
-  if (!batch) {
-    throw new ServiceError("inbox_item_not_found", 404);
-  }
-  const rows = readUnreadable(batch.unreadableJson);
-  const next = rows.filter((row) => row.line !== parts.line);
-  if (next.length === rows.length) {
-    throw new ServiceError("inbox_item_not_found", 404);
-  }
-  const at = input.at ?? utcNow();
-  write(db, { source: input.source, at }, (tx) => {
-    tx.update(importBatches).set({ unreadableJson: JSON.stringify(next) }).where(eq(importBatches.id, batch.id)).run();
-    tx.audit({
-      entity: "import_batches",
-      entityId: batch.id,
-      action: "update",
-      before: { unreadableJson: batch.unreadableJson },
-      after: { unreadableJson: JSON.stringify(next) },
     });
   });
   return { itemKey };

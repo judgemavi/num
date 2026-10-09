@@ -18,7 +18,7 @@ import {
 } from "@num/shared";
 import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
-import { decidedKeysOf } from "./decision-keys";
+import { decidedKeys } from "./decision-keys";
 import { ServiceError } from "../service-error";
 import { applyLinkedPlan } from "./match-apply";
 import { write, type AuditSource } from "./write";
@@ -290,7 +290,7 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
   const candidates = linkTransactions(db, plans, asOf, grace).filter((txn) => !taken.has(txn.id));
   const ambiguous = matchLinks(openOccurrences(plans, links, asOf, grace), candidates, grace).ambiguous;
   const covered = new Set(plans.filter((row) => row.merchantId).map((row) => `${row.accountId}|${row.merchantId}`));
-  const declined = decidedKeysOf(db, "plan_proposal");
+  const declined = decidedKeys(db, "plan_proposal");
   const proposals = detectPlans(detectionTransactions(db, asOf), asOf).filter((proposal) => {
     return !covered.has(`${proposal.accountId}|${proposal.merchantId}`) && !declined.has(planProposalKey(proposal));
   });

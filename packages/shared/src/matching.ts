@@ -93,14 +93,6 @@ export type MatchResult = {
   learnedCount: number | null;
   mortgage: boolean;
   signals: MatchSignal[];
-  alternate: {
-    categoryId: string | null;
-    merchantId: string | null;
-    transferAccountId: string | null;
-    reason: AutoReason;
-    sourceId: string | null;
-    confidenceMilli: number;
-  } | null;
 };
 
 type Candidate = {
@@ -129,7 +121,6 @@ const emptyMatch: MatchResult = {
   learnedCount: null,
   mortgage: false,
   signals: [],
-  alternate: null,
 };
 
 function newestFirst(left: { date: string; id: string }, right: { date: string; id: string }): number {
@@ -371,8 +362,7 @@ function resultFrom(candidate: Candidate, second: number | null, mode: Confidenc
     learnedCount: learned && learned.count > 0 ? learned.count : null,
     mortgage,
     signals: candidate.signals,
-    alternate: null,
-  };
+    };
 }
 
 export function scoreMatch(input: ScoreInput): MatchResult {
@@ -383,18 +373,5 @@ export function scoreMatch(input: ScoreInput): MatchResult {
     return emptyMatch;
   }
   const mortgage = input.recurring?.mortgage === true;
-  const result = resultFrom(best, candidates[1]?.confidence ?? null, input.mode, mortgage);
-  const next = candidates[1];
-  if (!next || next.confidence < suggestionFloor) {
-    return result;
-  }
-  result.alternate = {
-    categoryId: next.categoryId,
-    merchantId: next.merchantId,
-    transferAccountId: next.transferAccountId,
-    reason: next.reason,
-    sourceId: next.sourceId,
-    confidenceMilli: confidenceMilli(next.confidence),
-  };
-  return result;
+  return resultFrom(best, candidates[1]?.confidence ?? null, input.mode, mortgage);
 }

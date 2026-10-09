@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
-import { acceptUnreadable, decideItem, undoDecision } from "@/review/actions";
+import { decideItem, undoDecision } from "@/review/actions";
 import { localAsOf } from "@/as-of";
 import { inboxError } from "@/review/format";
 
@@ -47,22 +47,6 @@ export function ImportDetailScreen() {
       return result.data;
     },
   });
-
-  async function addByHand(line: number, raw: string) {
-    const saved = await openEditor("transaction", { id: null, rawLine: raw, initialAccountId: detail.data?.item.accountId });
-    if (!saved) {
-      return;
-    }
-    const result = await acceptUnreadable(localAsOf(), `import_unreadable:${importId}:${line}`);
-    if (!result.ok) {
-      setError(inboxError(result.code));
-    } else {
-      setError(null);
-    }
-    await queryClient.invalidateQueries({ queryKey: ["import-detail", importId] });
-    await queryClient.invalidateQueries({ queryKey: ["import-view"] });
-    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-  }
 
   useEffect(() => {
     const id = window.location.hash.replace("#", "");
@@ -104,6 +88,8 @@ export function ImportDetailScreen() {
     await queryClient.invalidateQueries({ queryKey: ["import-view"] });
     await queryClient.invalidateQueries({ queryKey: ["imports"] });
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
+    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
     if (result.data.blocked.length > 0) {
       await confirm({
         title: "Some rows stayed",
@@ -256,7 +242,14 @@ export function ImportDetailScreen() {
             ) : (
               <span className="flex flex-wrap gap-2">
                 <Badge variant="attention">Unreadable</Badge>
-                <Button type="button" onClick={() => void addByHand(row.line, row.raw)}>
+                <Button type="button" onClick={() =>
+                    void openEditor("transaction", {
+                      id: null,
+                      rawLine: row.raw,
+                      initialAccountId: detail.data?.item.accountId,
+                      unreadableItemKey: `import_unreadable:${importId}:${row.line}`,
+                    })
+                  }>
                   Add by hand
                 </Button>
                 <Button

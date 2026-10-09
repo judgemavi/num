@@ -330,6 +330,7 @@ test("each review source appears and leaves after its action", () => {
     expect(unreadable).toBeDefined();
     if (unreadable) {
       decideInboxItem(sample.db, asOf, unreadable, "not_a_transaction", saved);
+      expect(openUnreadableKeys(sample.db)).not.toContain(unreadable);
     }
   } finally {
     sample.close();

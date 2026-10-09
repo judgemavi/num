@@ -12,8 +12,8 @@ import { createCategory } from "./categories";
 import { readUnreadable } from "./import-read";
 import { importStatement } from "./imports";
 import { openUnreadableKeys } from "./book-settings";
-import { listFundingPaychecks } from "./funding-paychecks";
-import { acceptUnreadableLine, decidedKeys, decideInboxItem, undoInboxDecision } from "./inbox-decisions";
+import { openFundingPaychecks } from "./funding-paychecks";
+import { decideInboxItem, undoInboxDecision } from "./inbox-decisions";
 import { listNeedsReview } from "./needs-review";
 import { recurringSignals } from "./recurring-view";
 import { createMerchant } from "./merchants";
@@ -86,10 +86,10 @@ function hasKey(db: Db, asOfDate: string, itemKey: string): boolean {
   if (signals.proposals.some((item) => planProposalKey(item) === itemKey)) {
     return true;
   }
-  if (listFundingPaychecks(db).items.some((item) => `paycheck_funding:${item.incomeTransactionId}` === itemKey)) {
+  if (openFundingPaychecks(db).some((item) => `paycheck_funding:${item.incomeTransactionId}` === itemKey)) {
     return true;
   }
-  return openUnreadableKeys(db).includes(itemKey) && !decidedKeys(db).has(itemKey);
+  return openUnreadableKeys(db).includes(itemKey);
 }
 
 function roundTrip(db: Db, asOfDate: string, itemKey: string, decision: InboxDecisionCode) {
@@ -214,7 +214,21 @@ test("each no decision hides its review item until undo", () => {
     decideInboxItem(sample.db, asOf, unreadableKey, "not_a_transaction", saved);
     expect(hasKey(sample.db, asOf, unreadableKey)).toBe(false);
     undoInboxDecision(sample.db, unreadableKey, saved);
-    acceptUnreadableLine(sample.db, asOf, unreadableKey, saved);
+    const body = {
+      accountId: cash.id,
+      date: "2026-03-02",
+      amount: 100,
+      payeeRaw: "By hand",
+      status: "open" as const,
+      lines: [{ amount: 100, categoryId: null, memo: null, transferAccountId: null, tagIds: [] }],
+      ...saved,
+    };
+    const count = () => sample.db.select().from(transactions).all().length;
+    const total = count();
+    expect(() => createTransaction(sample.db, { ...body, unreadableItemKey: `import_unreadable:${batchId}:999` })).toThrow(ServiceError);
+    expect(count()).toBe(total);
+    createTransaction(sample.db, { ...body, unreadableItemKey: unreadableKey });
+    expect(count()).toBe(total + 1);
     expect(hasKey(sample.db, asOf, unreadableKey)).toBe(false);
     const batch = sample.db.select().from(importBatches).where(eq(importBatches.id, batchId)).get();
     expect(readUnreadable(batch?.unreadableJson ?? "[]").some((row) => String(row.line) === line)).toBe(false);

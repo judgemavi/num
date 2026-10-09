@@ -1,12 +1,11 @@
 import { fundingRuns, occurrenceLinks, recurringPlans, transactions } from "@num/db";
-import type { FundingPaycheck } from "@num/shared";
 import { and, eq, gt, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
-import { decidedKeysOf } from "./decision-keys";
+import { decidedKeys } from "./decision-keys";
 import { amountMode } from "./funding-book";
 
-export function listFundingPaychecks(db: Db): { items: FundingPaycheck[] } {
-  const hidden = decidedKeysOf(db, "paycheck_funding");
+export function listFundingPaychecks(db: Db) {
+  const hidden = decidedKeys(db, "paycheck_funding");
   const rows = db
     .select({
       incomeTransactionId: transactions.id,
@@ -31,16 +30,15 @@ export function listFundingPaychecks(db: Db): { items: FundingPaycheck[] } {
       ),
     )
     .all();
-  const items = rows
-    .filter((row) => !hidden.has(`paycheck_funding:${row.incomeTransactionId}`))
-    .map((row) => ({
-      incomeTransactionId: row.incomeTransactionId,
-      date: row.date,
-      dueDate: row.dueDate,
-      amount: row.amount,
-      payee: row.payee,
-      amountMode: amountMode(row.amountMode),
-    }));
+  const items = rows.map((row) => ({
+    incomeTransactionId: row.incomeTransactionId,
+    date: row.date,
+    dueDate: row.dueDate,
+    amount: row.amount,
+    payee: row.payee,
+    amountMode: amountMode(row.amountMode),
+    kept: hidden.has(`paycheck_funding:${row.incomeTransactionId}`),
+  }));
   items.sort((left, right) => {
     if (left.date !== right.date) {
       return left.date < right.date ? 1 : -1;
@@ -48,4 +46,9 @@ export function listFundingPaychecks(db: Db): { items: FundingPaycheck[] } {
     return left.incomeTransactionId < right.incomeTransactionId ? 1 : -1;
   });
   return { items };
+}
+
+/** Paychecks that still ask to be funded. A recorded "keep it unassigned" stops the question. */
+export function openFundingPaychecks(db: Db) {
+  return listFundingPaychecks(db).items.filter((item) => !item.kept);
 }

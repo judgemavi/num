@@ -1,6 +1,7 @@
 import { accounts, importBatches, settings } from "@num/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
+import { decidedKeys } from "./decision-keys";
 import { readUnreadable } from "./import-read";
 
 export function settingNumber(
@@ -39,11 +40,15 @@ export function importFreshness(db: Db, asOf: string): { accountId: string; last
   }));
 }
 
+/** Unreadable lines with no answer yet. */
 export function openUnreadableKeys(db: Db): string[] {
   const batches = db
     .select({ id: importBatches.id, unreadableJson: importBatches.unreadableJson })
     .from(importBatches)
     .where(and(isNull(importBatches.undoneAt), sql`${importBatches.unreadableJson} <> '[]'`))
     .all();
-  return batches.flatMap((batch) => readUnreadable(batch.unreadableJson).map((row) => `import_unreadable:${batch.id}:${row.line}`));
+  const decided = decidedKeys(db, "import_unreadable");
+  return batches
+    .flatMap((batch) => readUnreadable(batch.unreadableJson).map((row) => `import_unreadable:${batch.id}:${row.line}`))
+    .filter((key) => !decided.has(key));
 }

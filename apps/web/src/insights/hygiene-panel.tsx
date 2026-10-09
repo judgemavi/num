@@ -73,7 +73,11 @@ function detail(check: HygieneCheck, currency: string): string {
     if (check.changed === 0 && check.missed === 0) {
       return "No changed or missed payments.";
     }
-    return `${check.changed} changed · ${check.missed} missed.`;
+    const parts = [
+      check.changed > 0 ? `${check.changed} changed ${check.changed === 1 ? "amount" : "amounts"} in Needs review` : null,
+      check.missed > 0 ? `${check.missed} missed ${check.missed === 1 ? "payment" : "payments"} under This month on Home` : null,
+    ];
+    return `${parts.filter((part) => part !== null).join(" · ")}.`;
   }
   if (check.count === 0) {
     return "No bucket is below zero.";
@@ -101,7 +105,7 @@ const places: Record<HygieneCheck["code"], string> = {
   review: "Review",
   sinking_funds: "Buckets",
   savings_rate: "Months",
-  recurring: "Recurring",
+  recurring: "Needs review and Home",
   overspent: "Buckets",
 };
 
@@ -139,6 +143,9 @@ export function HygienePanel({
       return;
     }
     if (check.code === "recurring") {
+      if (check.changed === 0) {
+        return;
+      }
       void go({ to: "/transactions", search: { page: 1, pageSize: 50, needsReview: true, uncategorized: false, automatic: false } });
       return;
     }

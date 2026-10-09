@@ -56,6 +56,8 @@ export function MerchantsPage() {
     await queryClient.invalidateQueries({ queryKey: ["merchants"] });
     await queryClient.invalidateQueries({ queryKey: ["suggestion"] });
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
+    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
   }
 
   async function archiveRow(row: Merchant) {
