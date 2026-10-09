@@ -1,7 +1,6 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
-import { autoReasons, scoreMatch, type AutoReason, type LearnedRow, type MatchResult, type SimilarPayee } from "./matching";
-import { normalizePayee } from "./payee";
+import { autoReasons, type AutoReason, type MatchResult } from "./matching";
 import { dayDistance } from "./recurring-calc";
 
 export const suggestionReasons = [...autoReasons, "none"] as const;
@@ -36,23 +35,6 @@ export const transferPairListSchema = z.object({
 export type Suggestion = z.infer<typeof suggestionSchema>;
 export type TransferPair = z.infer<typeof transferPairSchema>;
 
-export type HistoryRow = {
-  id: string;
-  date: string;
-  amount: number;
-  payeeRaw: string;
-  merchantId: string | null;
-  categoryId: string | null;
-  transferAccountId?: string | null;
-};
-
-export type MerchantChoice = {
-  id: string;
-  name: string;
-  defaultCategoryId: string | null;
-  archivedAt: string | null;
-};
-
 const none: Suggestion = {
   merchantId: null,
   categoryId: null,
@@ -62,14 +44,6 @@ const none: Suggestion = {
   sourceId: null,
   confidence: 0,
 };
-
-function learnedRows(rows: readonly HistoryRow[]): LearnedRow[] {
-  return rows.flatMap((row) =>
-    row.categoryId && !row.transferAccountId
-      ? [{ id: row.id, date: row.date, categoryId: row.categoryId, merchantId: row.merchantId }]
-      : [],
-  );
-}
 
 export function suggestionFromMatch(result: MatchResult): Suggestion {
   if (result.level === "none" || result.mortgage || (result.categoryId === null && result.transferAccountId === null)) {
@@ -101,61 +75,6 @@ export function alternateFromMatch(result: MatchResult): Suggestion | null {
     sourceId: next.sourceId,
     confidence: next.confidenceMilli,
   };
-}
-
-export function suggestCategorization(input: {
-  rawPayee: string;
-  amount: number;
-  mode: "careful" | "balanced" | "eager";
-  history: HistoryRow[];
-  similar: readonly SimilarPayee[];
-  merchants: MerchantChoice[];
-}): Suggestion {
-  const payee = normalizePayee(input.rawPayee);
-  if (payee.length === 0) {
-    return none;
-  }
-  const same = input.history.filter((row) => normalizePayee(row.payeeRaw) === payee);
-  const amountRows = learnedRows(same.filter((row) => Math.abs(row.amount - input.amount) * 100 <= Math.max(Math.abs(row.amount), Math.abs(input.amount))));
-  const merchantMatches = input.merchants.filter(
-    (merchant) => merchant.archivedAt === null && merchant.defaultCategoryId !== null && normalizePayee(merchant.name) === payee,
-  );
-  const merchant = merchantMatches.length === 1 ? merchantMatches[0] : null;
-  return suggestionFromMatch(
-    scoreMatch({
-      mode: input.mode,
-      recurring: null,
-      amountRows,
-      payeeRows: learnedRows(same),
-      similar: input.similar,
-      merchant: merchant?.defaultCategoryId ? { id: merchant.id, name: merchant.name, categoryId: merchant.defaultCategoryId } : null,
-      transferRows: [],
-    }),
-  );
-}
-
-export function alternateSuggestion(input: Parameters<typeof suggestCategorization>[0]): Suggestion | null {
-  const payee = normalizePayee(input.rawPayee);
-  if (payee.length === 0) {
-    return null;
-  }
-  const same = input.history.filter((row) => normalizePayee(row.payeeRaw) === payee);
-  const amountRows = learnedRows(same.filter((row) => Math.abs(row.amount - input.amount) * 100 <= Math.max(Math.abs(row.amount), Math.abs(input.amount))));
-  const merchantMatches = input.merchants.filter(
-    (merchant) => merchant.archivedAt === null && merchant.defaultCategoryId !== null && normalizePayee(merchant.name) === payee,
-  );
-  const merchant = merchantMatches.length === 1 ? merchantMatches[0] : null;
-  return alternateFromMatch(
-    scoreMatch({
-      mode: input.mode,
-      recurring: null,
-      amountRows,
-      payeeRows: learnedRows(same),
-      similar: input.similar,
-      merchant: merchant?.defaultCategoryId ? { id: merchant.id, name: merchant.name, categoryId: merchant.defaultCategoryId } : null,
-      transferRows: [],
-    }),
-  );
 }
 
 export type TransferCandidate = {

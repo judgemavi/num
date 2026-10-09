@@ -99,7 +99,6 @@ function insertCreated(
       autoReason: applied?.autoReason ?? null,
       autoSourceId: applied?.autoSourceId ?? null,
       autoConfidence: applied?.autoConfidence ?? null,
-      deletedAt: null,
     })
     .run();
   const lines = planned.mortgage ?? [

@@ -182,9 +182,9 @@ function sinkingFunds(db: Db) {
   return { code: "sinking_funds" as const, pass: missing.length === 0, yearly: yearly.length, missing };
 }
 
-function savingsRate(db: Db, months: MonthList) {
+function savingsRate(db: Db, months: MonthList, asOf: string) {
   const closed = months.items.filter((item) => item.status === "closed").slice(0, 3);
-  const stories = closedStories(db, closed.map((item) => item.month));
+  const stories = closedStories(db, closed.map((item) => item.month), asOf);
   const rows = closed.map((item) => {
     const story = stories.get(item.month);
     return { month: item.month, savingsRateMilliPct: story?.savingsRateMilliPct ?? null, savings: story?.savings ?? 0 };
@@ -224,7 +224,7 @@ export function readHygiene(db: Db, asOf: string): Hygiene {
       monthClosed(asOf, months),
       inboxAge(asOf, inbox),
       sinkingFunds(db),
-      savingsRate(db, months),
+      savingsRate(db, months, asOf),
       recurring(inbox),
       overspent(db),
     ],

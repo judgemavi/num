@@ -4,9 +4,8 @@ import { isoDateSchema } from "./date";
 import { skippedRowSchema } from "./inbox";
 import { listQuerySchema, pagedResponseSchema } from "./list";
 import { autoReasons } from "./matching";
-import { isUtcTimestamp } from "./time";
 
-export const transactionStatuses = ["open", "cleared", "reconciled"] as const;
+export const transactionStatuses = ["open", "cleared"] as const;
 
 export type TransactionStatus = (typeof transactionStatuses)[number];
 
@@ -22,13 +21,15 @@ const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX
 
 const optionalText = z.string().trim().min(1).nullable().optional();
 
-export const transactionLineInputSchema = z.object({
-  amount: centsSchema,
-  memo: optionalText,
-  categoryId: z.uuid().nullable().optional(),
-  transferAccountId: z.uuid().nullable().optional(),
-  tagIds: z.array(z.uuid()).optional(),
-});
+export const transactionLineInputSchema = z
+  .object({
+    amount: centsSchema,
+    memo: optionalText,
+    categoryId: z.uuid().nullable().optional(),
+    transferAccountId: z.uuid().nullable().optional(),
+    tagIds: z.array(z.uuid()).optional(),
+  })
+  .refine((line) => line.categoryId == null || line.transferAccountId == null, { path: ["categoryId"] });
 
 export const transactionLineSchema = z.object({
   id: z.uuid(),
@@ -67,6 +68,7 @@ export const transactionSchema = z.object({
   payeeRaw: z.string(),
   payeeNormalized: z.string(),
   status: z.enum(transactionStatuses),
+  reconciled: z.boolean(),
   source: z.enum(transactionSources),
   importRowId: z.uuid().nullable(),
   transferPeerId: z.uuid().nullable(),
@@ -86,7 +88,6 @@ export const transactionSchema = z.object({
     })
     .nullable(),
   refundedAmount: centsSchema.nullable(),
-  deletedAt: z.string().refine(isUtcTimestamp).nullable(),
   lines: z.array(transactionLineSchema),
 });
 
@@ -139,6 +140,7 @@ export const transactionListItemSchema = z.object({
   merchantId: z.uuid().nullable(),
   merchantName: z.string().nullable(),
   status: z.enum(transactionStatuses),
+  reconciled: z.boolean(),
   runningBalance: centsSchema.nullable(),
   autoReason: z.enum(autoReasons).nullable(),
   autoConfidence: z.number().int().min(0).max(1000).nullable(),

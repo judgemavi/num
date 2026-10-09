@@ -13,10 +13,11 @@ import {
   type TransactionSource,
   type TransactionStatus,
 } from "@num/shared";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { loadLines, type StoredLine } from "./transaction-lines";
+import { transactionReconciled } from "./reconciled";
 import { blankToNull, requireText } from "./transaction-rules";
 import type { WriteTx } from "./write";
 
@@ -31,7 +32,7 @@ export type Header = {
   notes: string | null;
   payeeRaw: string;
   payeeNormalized: string;
-  status: TransactionInputStatus | "reconciled";
+  status: TransactionInputStatus;
   refundOfId?: string | null;
 };
 
@@ -74,8 +75,7 @@ function labelFacts(db: Reader, row: TxRow): { autoSourceName: string | null; au
     select count(*) as total
     from transactions t
     inner join transaction_lines l on l.transaction_id = t.id
-    where t.deleted_at is null
-      and t.auto_reason is null
+    where t.auto_reason is null
       and t.payee_normalized = ${row.payeeNormalized}
       and l.category_id is not null
       and l.transfer_account_id is null
@@ -129,19 +129,18 @@ function refundFacts(db: Reader, row: TxRow): {
         date: transactions.date,
         amount: transactions.amount,
         payeeRaw: transactions.payeeRaw,
-        deletedAt: transactions.deletedAt,
       })
       .from(transactions)
       .where(eq(transactions.id, row.refundOfId))
       .get();
-    if (purchase && purchase.deletedAt === null) {
+    if (purchase) {
       refundOf = { id: purchase.id, date: purchase.date, amount: purchase.amount, payeeRaw: purchase.payeeRaw };
     }
   }
   const linked = db
     .select({ amount: transactions.amount })
     .from(transactions)
-    .where(and(eq(transactions.refundOfId, row.id), isNull(transactions.deletedAt)))
+    .where(eq(transactions.refundOfId, row.id))
     .all();
   if (linked.length === 0) {
     return { refundOf, refundedAmount: null };
@@ -164,6 +163,7 @@ export function toTransaction(db: Reader, row: TxRow, lines: StoredLine[]): Tran
     payeeRaw: row.payeeRaw,
     payeeNormalized: row.payeeNormalized,
     status: asStatus(row.status),
+    reconciled: transactionReconciled(db, row.accountId, row.date),
     source: asSource(row.source),
     importRowId: row.importRowId,
     transferPeerId: row.transferPeerId,
@@ -174,7 +174,6 @@ export function toTransaction(db: Reader, row: TxRow, lines: StoredLine[]): Tran
     ...labelFacts(db, row),
     refundOfId: row.refundOfId,
     ...refundFacts(db, row),
-    deletedAt: row.deletedAt,
     lines,
   };
 }
@@ -189,6 +188,7 @@ function snapshot(record: Transaction) {
     payeeRaw: record.payeeRaw,
     payeeNormalized: record.payeeNormalized,
     status: record.status,
+    reconciled: record.reconciled,
     source: record.source,
     importRowId: record.importRowId,
     transferPeerId: record.transferPeerId,
@@ -197,7 +197,6 @@ function snapshot(record: Transaction) {
     autoSourceId: record.autoSourceId,
     autoConfidence: record.autoConfidence,
     refundOfId: record.refundOfId,
-    deletedAt: record.deletedAt,
     lines: record.lines.map((line) => ({
       id: line.id,
       amount: line.amount,

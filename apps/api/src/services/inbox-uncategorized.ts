@@ -27,7 +27,7 @@ export function uncategorizedInbox(db: Db, hidden: ReadonlySet<string>): InboxIt
     inner join transactions t on t.id = l.transaction_id
     where l.category_id is null
       and l.transfer_account_id is null
-      and t.deleted_at is null
+     
     group by t.id
   `);
   if (rows.length === 0) {

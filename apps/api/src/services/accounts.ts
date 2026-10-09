@@ -13,7 +13,7 @@ import {
   type PaymentPolicy,
   utcNow,
 } from "@num/shared";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
@@ -53,7 +53,7 @@ function earliestTransactionDate(db: Db | WriteTx, accountId: string): string | 
   const rows = db
     .select({ date: transactions.date })
     .from(transactions)
-    .where(and(eq(transactions.accountId, accountId), isNull(transactions.deletedAt)))
+    .where(and(eq(transactions.accountId, accountId)))
     .all();
   let earliest: string | null = null;
   for (const row of rows) {

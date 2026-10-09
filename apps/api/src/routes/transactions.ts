@@ -187,7 +187,7 @@ export function registerTransactions(app: OpenAPIHono, db: Db) {
   app.openapi(readRoute, (c) => {
     const { id } = c.req.valid("param");
     const record = getTransaction(db, id);
-    if (!record || record.deletedAt !== null) {
+    if (!record) {
       throw new ServiceError("transaction_not_found", 404);
     }
     return c.json(record, 200);

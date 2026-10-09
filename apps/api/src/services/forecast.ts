@@ -17,7 +17,6 @@ import {
   cardForecastSchedule,
   forecastDates,
   isIsoDate,
-  monthEnd,
   nextIncomeDate,
   occurrenceDates,
   planFrequencies,
@@ -37,16 +36,9 @@ import {
 import { and, eq, gt, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { balanceOf } from "./account-balance";
-import { storeForecastSnapshot } from "./forecast-snapshot";
 import { ServiceError } from "../service-error";
-import { type AuditSource } from "./write";
 
 type PlanRow = typeof recurringPlans.$inferSelect;
-
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
 
 const paymentPolicies = ["full", "fixed", "manual"] as const;
 
@@ -117,7 +109,6 @@ function closedMonths(db: Db): string[] {
     .select()
     .from(monthCloses)
     .all()
-    .filter((row) => row.reopenedAt === null)
     .map((row) => row.month)
     .sort()
     .slice(-3);
@@ -170,10 +161,10 @@ export function readForecastOnly(db: Db, asOf: string): Forecast {
   const amounts = new Map<string, number>();
   if (linkedTransactions.size > 0) {
     for (const row of db
-      .select({ id: transactions.id, amount: transactions.amount, deletedAt: transactions.deletedAt })
+      .select({ id: transactions.id, amount: transactions.amount })
       .from(transactions)
       .all()) {
-      if (row.deletedAt === null && linkedTransactions.has(row.id)) {
+      if (linkedTransactions.has(row.id)) {
         amounts.set(row.id, row.amount);
       }
     }
@@ -206,7 +197,7 @@ export function readForecastOnly(db: Db, asOf: string): Forecast {
   for (const row of db
     .select({ accountId: transactions.accountId, date: transactions.date, amount: transactions.amount })
     .from(transactions)
-    .where(and(isNull(transactions.deletedAt), gt(transactions.date, asOf), lte(transactions.date, horizonEnd)))
+    .where(and(gt(transactions.date, asOf), lte(transactions.date, horizonEnd)))
     .all()) {
     if (accountIds.has(row.accountId)) {
       deltas.push({ date: row.date, accountId: row.accountId, amount: row.amount, series: "known" });
@@ -238,7 +229,7 @@ export function readForecastOnly(db: Db, asOf: string): Forecast {
     })
     .from(transactionLines)
     .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
-    .where(and(isNull(transactions.deletedAt), isNotNull(transactionLines.categoryId)))
+    .where(and(isNotNull(transactionLines.categoryId)))
     .all();
   const monthly: { accountId: string; monthly: number }[] = [];
   for (const bucket of spending) {
@@ -291,9 +282,9 @@ export function readForecastOnly(db: Db, asOf: string): Forecast {
       from transactions t
       inner join transactions peer on peer.id = t.transfer_peer_id
       where t.account_id = ${account.id}
-        and t.deleted_at is null
+       
         and t.amount > 0
-        and peer.deleted_at is null
+       
     `);
     const fromHistory = usualAccount(payments);
     const chequing = openAccounts.filter((row) => row.kind === "chequing");
@@ -328,10 +319,6 @@ export function readForecastOnly(db: Db, asOf: string): Forecast {
   return forecast;
 }
 
-export function readForecast(db: Db, asOf: string, input: WriteInput): Forecast {
-  const forecast = readForecastOnly(db, asOf);
-  const end = monthEnd(asOf);
-  const endIndex = forecast.dates.indexOf(end);
-  storeForecastSnapshot(db, asOf, forecast.total.estimated[endIndex] ?? forecast.total.estimated[0] ?? 0, input);
-  return forecast;
+export function readForecast(db: Db, asOf: string): Forecast {
+  return readForecastOnly(db, asOf);
 }

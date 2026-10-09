@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { apiRequest } from "@/request";
-import { formatDate, refundOfText, refundedText, statusLabel } from "@/transactions/format";
+import { formatDate, reconciledLabel, refundOfText, refundedText, statusLabel } from "@/transactions/format";
 import { transactionPath } from "@/transactions/query";
 
 const selectionLimit = 200;
@@ -62,7 +62,7 @@ export function AccountTransactions({ accountId, currency, page, onPage }: Accou
   });
 
   const rows = transactions.data?.items ?? [];
-  const selectable = rows.filter((row) => row.status !== "reconciled");
+  const selectable = rows.filter((row) => !row.reconciled);
   const selectedOnPage = selectable.filter((row) => selected.includes(row.id));
   const lastPage = transactions.data ? Math.max(1, Math.ceil(transactions.data.total / transactions.data.pageSize)) : 1;
 
@@ -192,7 +192,7 @@ function TransactionLine({
   checked: boolean;
   onChecked: (on: boolean) => void;
 }) {
-  const locked = row.status === "reconciled";
+  const locked = row.reconciled;
   return (
     <ListRow simple>
       {locked ? (
@@ -211,7 +211,7 @@ function TransactionLine({
         {row.refundOf ? <small>{refundOfText(currency, row.refundOf.date, row.refundOf.amount)}</small> : null}
         {row.refundedAmount ? <small>{refundedText(currency, row.refundedAmount)}</small> : null}
       </div>
-      {row.status === "open" ? null : <Badge variant={row.status === "reconciled" ? "neutral" : "positive"}>{statusLabel(row.status)}</Badge>}
+      {row.reconciled ? <Badge variant="neutral">{reconciledLabel()}</Badge> : row.status === "open" ? null : <Badge variant="positive">{statusLabel(row.status)}</Badge>}
       <div className="ml-auto text-right">
         <Amount currency={currency} minor={row.amount} />
       </div>

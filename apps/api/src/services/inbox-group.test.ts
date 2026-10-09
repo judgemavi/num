@@ -1,11 +1,12 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditLog, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
+import { auditLog, migrateDatabase, openDatabase, settings } from "@num/db";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
+import { createCheckpoint } from "./checkpoints";
 import { createCategory } from "./categories";
 import { applyInboxGroup } from "./inbox-group";
 import { createMerchant } from "./merchants";
@@ -127,8 +128,8 @@ test("a categorized row, a split and a reconciled transfer are skipped", () => {
       { amount: -200, categoryId: null },
       { amount: -100, categoryId: null },
     ]);
-    const locked = pay(sample.db, cash.id, "2026-03-04", -50, "Cafe");
-    sample.db.update(transactions).set({ status: "reconciled" }).where(eq(transactions.id, locked.id)).run();
+    const locked = pay(sample.db, cash.id, "2026-02-01", -50, "Cafe");
+    createCheckpoint(sample.db, cash.id, { date: "2026-02-01", statementBalance: -50, ...saved });
     const result = applyInboxGroup(sample.db, {
       accountId: cash.id,
       transactionIds: [open.id, done.id, split.id, locked.id],

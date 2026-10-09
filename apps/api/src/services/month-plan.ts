@@ -22,7 +22,7 @@ import {
 } from "@num/shared";
 import { and, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
+import { whole } from "../whole";
 import { ServiceError } from "../service-error";
 
 type PlanRow = typeof recurringPlans.$inferSelect;
@@ -140,7 +140,7 @@ function loadLinks(db: Db, asOf: string, windowStart: string, windowEnd: string)
       select l.plan_id, l.due_date, t.amount,
              row_number() over (partition by l.plan_id order by l.due_date desc) as n
       from occurrence_links l
-      inner join transactions t on t.id = l.transaction_id and t.deleted_at is null
+      inner join transactions t on t.id = l.transaction_id
       where l.skipped = 0 and l.due_date <= ${asOf}
     )
     where n <= 6
@@ -149,13 +149,11 @@ function loadLinks(db: Db, asOf: string, windowStart: string, windowEnd: string)
   const amounts = new Map<string, number>();
   if (txnIds.length > 0) {
     for (const row of db
-      .select({ id: transactions.id, amount: transactions.amount, deletedAt: transactions.deletedAt })
+      .select({ id: transactions.id, amount: transactions.amount })
       .from(transactions)
       .where(inArray(transactions.id, txnIds))
       .all()) {
-      if (row.deletedAt === null) {
-        amounts.set(row.id, row.amount);
-      }
+      amounts.set(row.id, row.amount);
     }
   }
   const links = new Map<string, MonthPlanLink>();
@@ -201,11 +199,11 @@ function balancesBefore(db: Db, start: string): Map<string, number> {
     .from(transactionLines)
     .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
     .innerJoin(bucketCategories, eq(transactionLines.categoryId, bucketCategories.categoryId))
-    .where(and(isNull(transactions.deletedAt), lt(transactions.date, start)))
+    .where(and(lt(transactions.date, start)))
     .groupBy(bucketCategories.bucketId)
     .all();
   for (const line of lines) {
-    add(line.bucketId, integerSum(line.total));
+    add(line.bucketId, whole(line.total));
   }
   return balances;
 }

@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
-  check,
   index,
   integer,
   sqliteTable,
@@ -9,9 +8,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { accounts } from "./accounts";
-import { importOutcomes } from "./codes";
 import { transactions } from "./ledger";
-import { isoDate, nullOrIsoDate, oneOf } from "./sql";
 
 export const documents = sqliteTable("documents", {
   id: text("id").primaryKey(),
@@ -23,31 +20,23 @@ export const documents = sqliteTable("documents", {
   deletedAt: text("deleted_at"),
 });
 
-export const importBatches = sqliteTable(
-  "import_batches",
-  {
-    id: text("id").primaryKey(),
-    accountId: text("account_id")
-      .notNull()
-      .references(() => accounts.id),
-    documentId: text("document_id")
-      .notNull()
-      .references(() => documents.id),
-    parser: text("parser").notNull(),
-    periodStart: text("period_start").notNull(),
-    periodEnd: text("period_end").notNull(),
-    closingBalance: integer("closing_balance"),
-    closingDate: text("closing_date"),
-    unreadableJson: text("unreadable_json").notNull().default("[]"),
-    createdAt: text("created_at").notNull(),
-    undoneAt: text("undone_at"),
-  },
-  (table) => [
-    check("import_batches_period_start", isoDate(table.periodStart)),
-    check("import_batches_period_end", isoDate(table.periodEnd)),
-    check("import_batches_closing_date", nullOrIsoDate(table.closingDate)),
-  ],
-);
+export const importBatches = sqliteTable("import_batches", {
+  id: text("id").primaryKey(),
+  accountId: text("account_id")
+    .notNull()
+    .references(() => accounts.id),
+  documentId: text("document_id")
+    .notNull()
+    .references(() => documents.id),
+  parser: text("parser").notNull(),
+  periodStart: text("period_start").notNull(),
+  periodEnd: text("period_end").notNull(),
+  closingBalance: integer("closing_balance"),
+  closingDate: text("closing_date"),
+  unreadableJson: text("unreadable_json").notNull().default("[]"),
+  createdAt: text("created_at").notNull(),
+  undoneAt: text("undone_at"),
+});
 
 export const importRows = sqliteTable(
   "import_rows",
@@ -56,7 +45,6 @@ export const importRows = sqliteTable(
     batchId: text("batch_id")
       .notNull()
       .references(() => importBatches.id),
-    // Stored on the row so the active identity index can use account_id.
     accountId: text("account_id")
       .notNull()
       .references(() => accounts.id),
@@ -68,13 +56,9 @@ export const importRows = sqliteTable(
     identity: text("identity").notNull(),
     outcome: text("outcome").notNull(),
     transactionId: text("transaction_id").references((): AnySQLiteColumn => transactions.id),
-    // True while the parent batch is not undone.
     active: integer("active", { mode: "boolean" }).notNull().default(true),
   },
   (table) => [
-    check("import_rows_row_index", sql`${table.rowIndex} >= 0`),
-    check("import_rows_date", isoDate(table.date)),
-    check("import_rows_outcome", oneOf(table.outcome, importOutcomes)),
     uniqueIndex("import_rows_batch_row_unique").on(table.batchId, table.rowIndex),
     uniqueIndex("import_rows_account_identity_active")
       .on(table.accountId, table.identity)
@@ -94,14 +78,8 @@ export const valuations = sqliteTable(
     balance: integer("balance").notNull(),
     note: text("note"),
     documentId: text("document_id").references(() => documents.id),
-    deletedAt: text("deleted_at"),
   },
-  (table) => [
-    check("valuations_date", isoDate(table.date)),
-    uniqueIndex("valuations_account_date_active")
-      .on(table.accountId, table.date)
-      .where(sql`${table.deletedAt} is null`),
-  ],
+  (table) => [uniqueIndex("valuations_account_date").on(table.accountId, table.date)],
 );
 
 export const checkpoints = sqliteTable(
@@ -116,8 +94,5 @@ export const checkpoints = sqliteTable(
     createdAt: text("created_at").notNull(),
     unlockedAt: text("unlocked_at"),
   },
-  (table) => [
-    check("checkpoints_date", isoDate(table.date)),
-    index("checkpoints_account_date").on(table.accountId, table.date),
-  ],
+  (table) => [index("checkpoints_account_date").on(table.accountId, table.date)],
 );

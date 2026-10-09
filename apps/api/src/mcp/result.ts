@@ -1,8 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import type { z } from "zod";
-import { ZodError } from "zod";
-import { ServiceError } from "../service-error";
-import { validationError } from "../validation";
 
 export function toolResult(data: object): CallToolResult {
   const body = data as Record<string, unknown>;
@@ -65,39 +62,4 @@ export function publishedSchema(schema: z.ZodType): z.ZodType {
       validate: (value: unknown) => ({ value }),
     },
   } as unknown as z.ZodType;
-}
-
-function argQuery(args: unknown): Record<string, string | undefined> {
-  if (typeof args !== "object" || args === null) {
-    return {};
-  }
-  const query: Record<string, string | undefined> = {};
-  for (const [key, value] of Object.entries(args)) {
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      query[key] = String(value);
-    }
-  }
-  return query;
-}
-
-function errorResult(code: string, params: Record<string, string>): CallToolResult {
-  return {
-    ...toolResult({ code, params }),
-    isError: true,
-  };
-}
-
-export function readTool(args: unknown, load: () => object): CallToolResult {
-  try {
-    return toolResult(load());
-  } catch (error) {
-    if (error instanceof ServiceError) {
-      return errorResult(error.code, error.params);
-    }
-    if (error instanceof ZodError) {
-      const body = validationError(error, "query", argQuery(args));
-      return errorResult(body.code, body.params);
-    }
-    throw error;
-  }
 }

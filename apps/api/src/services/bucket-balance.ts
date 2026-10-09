@@ -1,7 +1,7 @@
 import { bucketCategories, bucketEvents, fundingRuns, transactionLines, transactions } from "@num/db";
 import { and, eq, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
+import { whole } from "../whole";
 import type { WriteTx } from "./write";
 
 export type Reader = Db | WriteTx;
@@ -49,12 +49,12 @@ export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
     .from(transactionLines)
     .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
     .innerJoin(bucketCategories, eq(transactionLines.categoryId, bucketCategories.categoryId))
-    .where(and(isNull(transactions.deletedAt), asOf ? lte(transactions.date, asOf) : undefined))
+    .where(and(asOf ? lte(transactions.date, asOf) : undefined))
     .groupBy(bucketCategories.bucketId)
     .all();
 
   for (const line of lines) {
-    add(balances, line.bucketId, integerSum(line.total));
+    add(balances, line.bucketId, whole(line.total));
   }
   return balances;
 }

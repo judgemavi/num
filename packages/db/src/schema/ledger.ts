@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
-  check,
   index,
   integer,
   primaryKey,
@@ -11,9 +10,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { accounts } from "./accounts";
 import { categories, merchants, tags } from "./categories";
-import { autoReasons, transactionSources, transactionStatuses } from "./codes";
 import { importRows } from "./imports";
-import { isoDate, nullOrOneOf, oneOf } from "./sql";
 
 export const transactions = sqliteTable(
   "transactions",
@@ -41,38 +38,14 @@ export const transactions = sqliteTable(
     autoConfidence: integer("auto_confidence"),
     autoSourceId: text("auto_source_id"),
     refundOfId: text("refund_of_id").references((): AnySQLiteColumn => transactions.id),
-    deletedAt: text("deleted_at"),
+    editedAt: text("edited_at"),
   },
   (table) => [
-    check("transactions_date", isoDate(table.date)),
-    check("transactions_status", oneOf(table.status, transactionStatuses)),
-    check("transactions_source", oneOf(table.source, transactionSources)),
-    check("transactions_auto_reason", nullOrOneOf(table.autoReason, autoReasons)),
-    check(
-      "transactions_auto_confidence",
-      sql`${table.autoConfidence} is null or (${table.autoConfidence} >= 0 and ${table.autoConfidence} <= 1000)`,
-    ),
-    check(
-      "transactions_transfer_peer",
-      sql`${table.transferPeerId} is null or ${table.transferPeerId} <> ${table.id}`,
-    ),
-    check(
-      "transactions_refund_of_self",
-      sql`${table.refundOfId} is null or ${table.refundOfId} <> ${table.id}`,
-    ),
     index("transactions_refund_of").on(table.refundOfId),
-    index("transactions_active_date")
-      .on(table.date, table.id)
-      .where(sql`${table.deletedAt} is null`),
-    index("transactions_active_account_date")
-      .on(table.accountId, table.date, table.id, table.amount)
-      .where(sql`${table.deletedAt} is null`),
-    index("transactions_active_merchant_date")
-      .on(table.merchantId, table.date, table.id)
-      .where(sql`${table.deletedAt} is null`),
-    index("transactions_payee_normalized")
-      .on(table.payeeNormalized, table.date, table.id)
-      .where(sql`${table.deletedAt} is null`),
+    index("transactions_date").on(table.date, table.id),
+    index("transactions_account_date").on(table.accountId, table.date, table.id, table.amount),
+    index("transactions_merchant_date").on(table.merchantId, table.date, table.id),
+    index("transactions_payee_normalized").on(table.payeeNormalized, table.date, table.id),
   ],
 );
 
@@ -89,10 +62,6 @@ export const transactionLines = sqliteTable(
     transferAccountId: text("transfer_account_id").references(() => accounts.id),
   },
   (table) => [
-    check(
-      "transaction_lines_category_or_transfer",
-      sql`${table.categoryId} is null or ${table.transferAccountId} is null`,
-    ),
     index("transaction_lines_transaction").on(table.transactionId),
     index("transaction_lines_category").on(table.categoryId),
     index("transaction_lines_uncategorized")
@@ -114,8 +83,5 @@ export const lineTags = sqliteTable(
       .notNull()
       .references(() => tags.id),
   },
-  (table) => [
-    primaryKey({ columns: [table.lineId, table.tagId] }),
-    index("line_tags_tag").on(table.tagId),
-  ],
+  (table) => [primaryKey({ columns: [table.lineId, table.tagId] }), index("line_tags_tag").on(table.tagId)],
 );

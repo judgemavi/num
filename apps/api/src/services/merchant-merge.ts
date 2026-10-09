@@ -16,11 +16,11 @@ function merchantSnapshot(row: { name: string; defaultCategoryId: string | null;
   return { name: row.name, defaultCategoryId: row.defaultCategoryId, archivedAt: row.archivedAt };
 }
 
-function moveTransactions(tx: WriteTx, sourceId: string, targetId: string) {
+function moveTransactions(tx: WriteTx, sourceId: string, targetId: string, at: string) {
   const rows = tx.select({ id: transactions.id }).from(transactions).where(eq(transactions.merchantId, sourceId)).all();
   for (const row of rows) {
     const before = readTransaction(tx, row.id);
-    tx.update(transactions).set({ merchantId: targetId }).where(eq(transactions.id, row.id)).run();
+    tx.update(transactions).set({ merchantId: targetId, editedAt: at }).where(eq(transactions.id, row.id)).run();
     auditTransaction(tx, row.id, "update", before, readTransaction(tx, row.id));
   }
 }
@@ -54,7 +54,7 @@ export function mergeMerchants(db: Db, sourceId: string, targetId: string, input
     if (target.archivedAt) {
       throw new ServiceError("merchant_archived", 409);
     }
-    moveTransactions(tx, sourceId, targetId);
+    moveTransactions(tx, sourceId, targetId, at);
     movePlans(tx, sourceId, targetId);
     const next = { ...source, archivedAt: source.archivedAt ?? at };
     if (!source.archivedAt) {

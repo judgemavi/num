@@ -40,7 +40,7 @@ export function MonthsScreen() {
   const search = insightsRoute.useSearch();
   const navigate = insightsRoute.useNavigate();
   const queryClient = useQueryClient();
-  const { confirm, openEditor } = useEditors();
+  const { confirm } = useEditors();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -119,7 +119,7 @@ export function MonthsScreen() {
   async function closeMonth(month: MonthDetail) {
     const ok = await confirm({
       title: `Close ${monthTitle(month.month)}?`,
-      description: "The month story is saved. You can open the month again later.",
+      description: "This marks the month as reviewed. The story stays calculated from current data. You can open the month again later.",
       confirmLabel: "Close",
     });
     if (!ok) {
@@ -137,11 +137,23 @@ export function MonthsScreen() {
   }
 
   async function reopen(month: string) {
-    const saved = await openEditor("reopenMonth", { month, asOf });
-    if (saved) {
-      setError(null);
-      await refresh();
+    const ok = await confirm({
+      title: `Open ${monthTitle(month)} again?`,
+      description: "This removes the reviewed mark. The month story stays calculated from current data.",
+      confirmLabel: "Open",
+    });
+    if (!ok) {
+      return;
     }
+    setSaving(true);
+    const result = await apiRequest(`/api/months/${month}/reopen?asOf=${asOf}`, monthDetailSchema, { method: "POST" });
+    setSaving(false);
+    if (!result.ok) {
+      setError(monthError(result.code));
+      return;
+    }
+    setError(null);
+    await refresh();
   }
 
   return (

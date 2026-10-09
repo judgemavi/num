@@ -26,7 +26,7 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TransactionFilterBar } from "@/transactions/filters";
-import { automaticReasonText, formatDate, refundOfText, refundedText, statusLabel } from "@/transactions/format";
+import { automaticReasonText, formatDate, reconciledLabel, refundOfText, refundedText, statusLabel } from "@/transactions/format";
 import { hasFilters, transactionPath } from "@/transactions/query";
 import { useEditors } from "@/editors/editor-api";
 import { useGroups } from "@/editors/lookups";
@@ -321,7 +321,11 @@ export function TransactionsScreen() {
                   <Amount currency={bookCurrency} minor={row.amount} />
                 </TableCell>
                 <TableCell>
-                  {row.status === "open" ? null : <Badge variant="positive">{statusLabel(row.status)}</Badge>}
+                  {row.reconciled ? (
+                    <Badge variant="neutral">{reconciledLabel()}</Badge>
+                  ) : row.status === "open" ? null : (
+                    <Badge variant="positive">{statusLabel(row.status)}</Badge>
+                  )}
                 </TableCell>
                 {showBalance ? (
                   <TableCell className="text-right">

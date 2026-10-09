@@ -56,8 +56,4 @@ export function presentBatch(db: Reader, batch: BatchRow): ImportBatch {
   };
 }
 
-export function batchForDocument(db: Reader, documentId: string): BatchRow | undefined {
-  return db.select().from(importBatches).where(eq(importBatches.documentId, documentId)).get();
-}
-
 export type { UnreadableRow };

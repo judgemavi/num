@@ -1,8 +1,8 @@
 import { transactions, valuations } from "@num/db";
 import type { AccountKind } from "@num/shared";
-import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gt, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
+import { whole } from "../whole";
 import { accountBalance } from "./account-rules";
 import type { WriteTx } from "./write";
 
@@ -12,7 +12,7 @@ function readSum(row: { total: unknown } | undefined): number {
   if (!row) {
     return 0;
   }
-  return integerSum(row.total);
+  return whole(row.total);
 }
 
 export function transactionTotals(db: Reader, asOf?: string): Map<string, number> {
@@ -22,12 +22,12 @@ export function transactionTotals(db: Reader, asOf?: string): Map<string, number
       total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)`,
     })
     .from(transactions)
-    .where(and(isNull(transactions.deletedAt), asOf ? lte(transactions.date, asOf) : undefined))
+    .where(and(asOf ? lte(transactions.date, asOf) : undefined))
     .groupBy(transactions.accountId)
     .all();
   const totals = new Map<string, number>();
   for (const row of rows) {
-    totals.set(row.accountId, integerSum(row.total));
+    totals.set(row.accountId, whole(row.total));
   }
   return totals;
 }
@@ -41,7 +41,6 @@ function sumAfter(db: Reader, accountId: string, date: string, asOf?: string): n
     .where(
       and(
         eq(transactions.accountId, accountId),
-        isNull(transactions.deletedAt),
         gt(transactions.date, date),
         asOf ? lte(transactions.date, asOf) : undefined,
       ),
@@ -58,7 +57,7 @@ export function latestValuations(db: Reader, asOf?: string): Map<string, { date:
       balance: valuations.balance,
     })
     .from(valuations)
-    .where(and(isNull(valuations.deletedAt), asOf ? lte(valuations.date, asOf) : undefined))
+    .where(and(asOf ? lte(valuations.date, asOf) : undefined))
     .all();
   const latest = new Map<string, { date: string; balance: number }>();
   for (const row of rows) {

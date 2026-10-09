@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditLog, forecastSnapshots, migrateDatabase, monthCloses, openDatabase } from "@num/db";
+import { auditLog, migrateDatabase, monthCloses, openDatabase } from "@num/db";
 import { type ErrorCode } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -10,7 +10,6 @@ import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { createCheckpoint } from "./checkpoints";
-import { readForecast } from "./forecast";
 import { closeMonth, listMonths, readMonth, reopenMonth } from "./months";
 import { createTransaction } from "./transactions";
 
@@ -153,7 +152,8 @@ test("a missing checkpoint blocks the close", () => {
     expect(closed.status).toBe("closed");
     expect(closed.story.spending).toBe(250);
     const row = book.db.select().from(monthCloses).where(eq(monthCloses.month, "2026-03")).get();
-    expect(JSON.parse(row?.summaryJson ?? "{}")).toMatchObject({ spending: 250, income: 0 });
+    expect(row?.month).toBe("2026-03");
+    expect(row?.closedAt).toBe(at);
     expect(listMonths(book.db, asOf).items.find((item) => item.month === "2026-03")?.status).toBe("closed");
   } finally {
     book.close();
@@ -176,38 +176,19 @@ test("an unresolved Inbox item blocks the close", () => {
   }
 });
 
-test("reopen needs a reason and the audit log stores it", () => {
+test("reopen removes the reviewed mark and the audit log stores the removal", () => {
   const book = tempDatabase();
   try {
     const account = cash(book.db, 500);
     createCheckpoint(book.db, account.id, { date: "2026-03-31", statementBalance: 500, ...saved });
     closeMonth(book.db, "2026-03", asOf, saved);
-    expectCode(() => reopenMonth(book.db, "2026-03", asOf, "   ", saved), "reopen_reason_required");
-    expect(book.db.select().from(monthCloses).where(eq(monthCloses.month, "2026-03")).get()?.reopenedAt).toBeNull();
-
-    const opened = reopenMonth(book.db, "2026-03", asOf, "Statement arrived late", saved);
+    const opened = reopenMonth(book.db, "2026-03", asOf, saved);
     expect(opened.status).toBe("ready");
-    const row = book.db.select().from(monthCloses).where(eq(monthCloses.month, "2026-03")).get();
-    expect(row?.reopenReason).toBe("Statement arrived late");
+    expect(book.db.select().from(monthCloses).where(eq(monthCloses.month, "2026-03")).get()).toBeUndefined();
     const audit = book.db.select().from(auditLog).where(eq(auditLog.entity, "month_close")).all();
     const reopen = audit.find((item) => item.action === "reopen");
-    expect(JSON.parse(reopen?.after ?? "{}")).toMatchObject({ reopenReason: "Statement arrived late" });
-  } finally {
-    book.close();
-  }
-});
-
-test("the accuracy record is the month-end forecast compared with the actual total", () => {
-  const book = tempDatabase();
-  try {
-    cash(book.db, 50_000);
-    readForecast(book.db, "2026-04-15", saved);
-    const snapshot = book.db.select().from(forecastSnapshots).where(eq(forecastSnapshots.month, "2026-04")).get();
-    if (!snapshot) {
-      throw new Error("Expected a forecast snapshot");
-    }
-    const detail = readMonth(book.db, "2026-04", "2026-04-15");
-    expect(detail.story.accuracy).toEqual({ predicted: snapshot.predictedTotal, actual: 50_000 });
+    expect(reopen?.after).toBeNull();
+    expect(JSON.parse(reopen?.before ?? "{}")).toMatchObject({ month: "2026-03" });
   } finally {
     book.close();
   }

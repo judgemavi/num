@@ -59,7 +59,6 @@ function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>): s
       importRowId: row.id,
       transferPeerId: null,
       mirror: false,
-      deletedAt: null,
     })
     .run();
   tx.insert(transactionLines)
@@ -96,8 +95,7 @@ export function resolveImportReview(
       const txn = tx.select().from(transactions).where(eq(transactions.id, decision.transactionId)).get();
       if (
         !txn ||
-        txn.deletedAt ||
-        txn.importRowId ||
+                txn.importRowId ||
         txn.accountId !== row.accountId ||
         txn.amount !== row.amount ||
         !withinThreeDays(txn.date, row.date)

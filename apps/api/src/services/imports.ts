@@ -17,7 +17,7 @@ import { ServiceError } from "../service-error";
 import { readColumnMap } from "./account-snapshot";
 import { restoreDocument } from "./documents";
 import { planImportRows } from "./import-plan";
-import { batchForDocument, presentBatch } from "./import-read";
+import { presentBatch } from "./import-read";
 import { saveImportBatch } from "./import-save";
 import { parseCsvStatement } from "./parse-csv";
 import { importOpeningSuggestion } from "./opening-suggestion";
@@ -183,7 +183,12 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
   const hash = createHash("sha256").update(input.bytes).digest("hex");
   const stored = db.select().from(documents).where(eq(documents.hash, hash)).get();
   if (stored) {
-    const existing = batchForDocument(db, stored.id);
+    const existing = db
+      .select()
+      .from(importBatches)
+      .where(eq(importBatches.documentId, stored.id))
+      .all()
+      .find((batch) => batch.undoneAt === null);
     if (existing) {
       if (stored.deletedAt) {
         restoreDocument(db, stored.id, { source: input.source, at });
@@ -228,7 +233,6 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     .where(
       and(
         eq(transactions.accountId, account.id),
-        isNull(transactions.deletedAt),
         isNull(transactions.importRowId),
         gte(transactions.date, window.start),
         lte(transactions.date, window.end),

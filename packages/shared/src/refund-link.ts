@@ -56,25 +56,6 @@ export function refundOfIdAfterEdit(current: string | null, incoming: string | n
   return incoming;
 }
 
-export function refundLinkRejected(input: {
-  refundId: string | null;
-  purchaseId: string;
-  purchaseAmount: number;
-  purchaseDate: string;
-  refundAmount: number;
-  refundDate: string;
-}): boolean {
-  if (input.refundId !== null && input.refundId === input.purchaseId) {
-    return true;
-  }
-  return !refundLinkAllowed({
-    purchaseAmount: input.purchaseAmount,
-    purchaseDate: input.purchaseDate,
-    refundAmount: input.refundAmount,
-    refundDate: input.refundDate,
-  });
-}
-
 /** A partial refund stays linked when it is money in, on or after the purchase, within 90 days. */
 export function refundLinkAllowed(input: {
   purchaseAmount: number;

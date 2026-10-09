@@ -53,7 +53,7 @@ function expectCode(run: () => void, code: ErrorCode) {
   throw new Error(`Expected ${code}`);
 }
 
-function addTransaction(db: Db, accountId: string, date: string, amount: number, deleted = false) {
+function addTransaction(db: Db, accountId: string, date: string, amount: number) {
   db.insert(transactions)
     .values({
       id: crypto.randomUUID(),
@@ -63,19 +63,17 @@ function addTransaction(db: Db, accountId: string, date: string, amount: number,
       ...storedPayee("Example shop"),
       status: "cleared",
       source: "manual",
-      deletedAt: deleted ? at : null,
     })
     .run();
 }
 
-function addValuation(db: Db, accountId: string, date: string, balance: number, deleted = false) {
+function addValuation(db: Db, accountId: string, date: string, balance: number) {
   db.insert(valuations)
     .values({
       id: crypto.randomUUID(),
       accountId,
       date,
       balance,
-      deletedAt: deleted ? at : null,
     })
     .run();
 }
@@ -95,7 +93,6 @@ test("a transaction account balance is the opening balance plus transactions", (
     const account = createAccount(book.db, base("chequing", 1_000));
     addTransaction(book.db, account.id, "2026-02-01", -250);
     addTransaction(book.db, account.id, "2026-02-02", 25);
-    addTransaction(book.db, account.id, "2026-02-03", 999, true);
     addValuation(book.db, account.id, "2026-02-01", 5_000);
     expect(balanceOf(book.db, account.id)).toBe(775);
   } finally {
@@ -110,11 +107,9 @@ test("an investment or property balance uses the latest valuation and later tran
       const account = createAccount(book.db, { ...base(kind, 999), name: kind });
       addValuation(book.db, account.id, "2026-03-01", 500);
       addValuation(book.db, account.id, "2026-06-01", 1_000);
-      addValuation(book.db, account.id, "2026-07-01", 9_000, true);
       addTransaction(book.db, account.id, "2026-05-01", -100);
       addTransaction(book.db, account.id, "2026-06-01", 200);
       addTransaction(book.db, account.id, "2026-06-02", 300);
-      addTransaction(book.db, account.id, "2026-06-03", 400, true);
       expect(balanceOf(book.db, account.id)).toBe(1_300);
     }
 

@@ -1,21 +1,20 @@
-import { accounts, checkpoints, forecastSnapshots, monthCloses, transactions } from "@num/db";
+import { accounts, checkpoints, monthCloses, transactions } from "@num/db";
 import {
   isIsoDate,
   type Inbox,
   isMonthKey,
   monthLastDay,
-  monthStorySchema,
   Temporal,
   utcNow,
   type MonthDetail,
   type MonthList,
   type MonthStatus,
 } from "@num/shared";
-import { eq, isNull, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listInbox } from "./inbox";
-import { loadMonthStory, onBudgetTotal } from "./month-story";
+import { loadMonthStory } from "./month-story";
 import { write, type AuditSource } from "./write";
 
 type WriteInput = {
@@ -38,7 +37,6 @@ function monthsInBook(db: Db, asOf: string): string[] {
   const earliest = db
     .select({ date: sql<string | null>`min(${transactions.date})` })
     .from(transactions)
-    .where(isNull(transactions.deletedAt))
     .get();
   const txnMonth = earliest?.date?.slice(0, 7);
   if (txnMonth && txnMonth < start) {
@@ -116,7 +114,7 @@ export function blockersFor(db: Db, month: string, asOf: string): Blocker[] {
 }
 
 function isClosed(row: CloseRow | undefined): boolean {
-  return row !== undefined && row.reopenedAt === null;
+  return row !== undefined;
 }
 
 function statusOf(closed: boolean, blockers: Blocker[]): MonthStatus {
@@ -126,22 +124,13 @@ function statusOf(closed: boolean, blockers: Blocker[]): MonthStatus {
   return blockers.length === 0 ? "ready" : "open";
 }
 
-function accuracyOf(db: Db, month: string, asOf: string): MonthDetail["story"]["accuracy"] {
-  const snapshot = db.select().from(forecastSnapshots).where(eq(forecastSnapshots.month, month)).get();
-  if (!snapshot) {
-    return null;
-  }
-  const through = asOf < monthLastDay(month) ? asOf : monthLastDay(month);
-  return { predicted: snapshot.predictedTotal, actual: onBudgetTotal(db, through) };
-}
-
-function liveDetail(db: Db, month: string, asOf: string, blockers: Blocker[]): MonthDetail {
+function liveDetail(db: Db, month: string, asOf: string, blockers: Blocker[], closed = false): MonthDetail {
   return {
     asOf,
     month,
-    status: statusOf(false, blockers),
+    status: statusOf(closed, blockers),
     blockers,
-    story: loadMonthStory(db, month, asOf, accuracyOf(db, month, asOf)),
+    story: loadMonthStory(db, month, asOf),
   };
 }
 
@@ -164,17 +153,17 @@ export function listMonths(db: Db, asOf: string, knownInbox?: Inbox): MonthList 
   };
 }
 
-export function closedStories(db: Db, months: readonly string[]) {
+export function closedStories(db: Db, months: readonly string[], asOf: string) {
   const wanted = new Set(months);
   const stories = new Map<string, MonthDetail["story"]>();
   if (wanted.size === 0) {
     return stories;
   }
   for (const row of db.select().from(monthCloses).all()) {
-    if (!wanted.has(row.month) || row.reopenedAt !== null) {
+    if (!wanted.has(row.month)) {
       continue;
     }
-    stories.set(row.month, monthStorySchema.parse(JSON.parse(row.summaryJson)));
+    stories.set(row.month, loadMonthStory(db, row.month, asOf));
   }
   return stories;
 }
@@ -183,16 +172,7 @@ export function readMonth(db: Db, month: string, asOf: string): MonthDetail {
   requireListedMonth(db, month, asOf);
   const row = db.select().from(monthCloses).where(eq(monthCloses.month, month)).get();
   const blockers = blockersFor(db, month, asOf);
-  if (!isClosed(row) || !row) {
-    return liveDetail(db, month, asOf, blockers);
-  }
-  return {
-    asOf,
-    month,
-    status: "closed",
-    blockers,
-    story: monthStorySchema.parse(JSON.parse(row.summaryJson)),
-  };
+  return liveDetail(db, month, asOf, blockers, isClosed(row));
 }
 
 export function closeMonth(db: Db, month: string, asOf: string, input: WriteInput): MonthDetail {
@@ -208,52 +188,37 @@ export function closeMonth(db: Db, month: string, asOf: string, input: WriteInpu
   if (blockers.length > 0) {
     throw new ServiceError("month_not_ready", 409, { month, blocker: blockers[0]?.code ?? "month_not_ready" });
   }
-  const story = loadMonthStory(db, month, asOf, accuracyOf(db, month, asOf));
   const at = input.at ?? utcNow();
-  const row = {
-    month,
-    closedAt: at,
-    reopenedAt: null,
-    reopenReason: null,
-    summaryJson: JSON.stringify(story),
-  };
+  const row = { month, closedAt: at };
   write(db, { source: input.source, at }, (tx) => {
-    if (existing) {
-      tx.update(monthCloses).set(row).where(eq(monthCloses.month, month)).run();
-    } else {
-      tx.insert(monthCloses).values(row).run();
-    }
+    tx.delete(monthCloses).where(eq(monthCloses.month, month)).run();
+    tx.insert(monthCloses).values(row).run();
     tx.audit({
       entity: "month_close",
       entityId: month,
       action: "close",
-      before: existing ?? null,
+      before: existing ? { month: existing.month, closedAt: existing.closedAt } : null,
       after: row,
     });
   });
-  return { asOf, month, status: "closed", blockers: [], story };
+  return liveDetail(db, month, asOf, [], true);
 }
 
-export function reopenMonth(db: Db, month: string, asOf: string, reason: string, input: WriteInput): MonthDetail {
+export function reopenMonth(db: Db, month: string, asOf: string, input: WriteInput): MonthDetail {
   requireListedMonth(db, month, asOf);
   const existing = db.select().from(monthCloses).where(eq(monthCloses.month, month)).get();
-  if (!isClosed(existing) || !existing) {
+  if (!existing) {
     throw new ServiceError("month_not_closed", 409, { month });
   }
-  const trimmed = reason.trim();
-  if (trimmed.length === 0) {
-    throw new ServiceError("reopen_reason_required", 400, { field: "reason" });
-  }
   const at = input.at ?? utcNow();
-  const row = { ...existing, reopenedAt: at, reopenReason: trimmed };
   write(db, { source: input.source, at }, (tx) => {
-    tx.update(monthCloses).set({ reopenedAt: at, reopenReason: trimmed }).where(eq(monthCloses.month, month)).run();
+    tx.delete(monthCloses).where(eq(monthCloses.month, month)).run();
     tx.audit({
       entity: "month_close",
       entityId: month,
       action: "reopen",
-      before: existing,
-      after: row,
+      before: { month: existing.month, closedAt: existing.closedAt },
+      after: null,
     });
   });
   return liveDetail(db, month, asOf, blockersFor(db, month, asOf));

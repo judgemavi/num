@@ -1,8 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditLog, forecastSnapshots, migrateDatabase, monthCloses, openDatabase, settings } from "@num/db";
-import { eq } from "drizzle-orm";
+import { auditLog, migrateDatabase, monthCloses, openDatabase, settings } from "@num/db";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
@@ -76,7 +75,7 @@ function payCard(db: Db, fromId: string, cardId: string, date: string, amount: n
 
 function closeMonth(db: Db, month: string) {
   db.insert(monthCloses)
-    .values({ month, closedAt: at, reopenedAt: null, reopenReason: null, summaryJson: "{}" })
+    .values({ month, closedAt: at })
     .run();
 }
 
@@ -95,7 +94,7 @@ test("a card purchase moves cash on the due date only", () => {
     spend(book.db, card.id, groceries.id, "2026-10-01", -2_000);
     createCheckpoint(book.db, card.id, { date: "2026-10-01", statementBalance: -2_000, ...saved });
 
-    const forecast = readForecast(book.db, "2026-10-08", saved);
+    const forecast = readForecast(book.db, "2026-10-08");
     const cashRow = forecast.accounts.find((row) => row.accountId === cash.id);
     const cardRow = forecast.accounts.find((row) => row.accountId === card.id);
     const before = forecast.dates.indexOf("2026-10-21");
@@ -136,7 +135,7 @@ test("bucket spending is not counted two times", () => {
       closeMonth(book.db, month);
       spend(book.db, cash.id, groceries.id, `${month}-15`, -9_000);
     }
-    const forecast = readForecast(book.db, "2026-10-01", saved);
+    const forecast = readForecast(book.db, "2026-10-01");
     const row = forecast.accounts.find((item) => item.accountId === cash.id);
     expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 100);
   } finally {
@@ -155,7 +154,7 @@ test("outlier lines are not included in category spending", () => {
     }
     spend(book.db, cash.id, snacks.id, "2026-02-16", -10_000);
     spend(book.db, cash.id, snacks.id, "2026-03-16", -10_000);
-    const forecast = readForecast(book.db, "2026-04-01", saved);
+    const forecast = readForecast(book.db, "2026-04-01");
     const row = forecast.accounts.find((item) => item.accountId === cash.id);
     expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 4);
   } finally {
@@ -163,7 +162,7 @@ test("outlier lines are not included in category spending", () => {
   }
 });
 
-test("the first forecast in a month stores the month-end total once", () => {
+test("a forecast read does not write a snapshot", () => {
   const book = tempDatabase();
   try {
     const cash = cashAccount(book.db, "Cash", 1_000);
@@ -183,19 +182,13 @@ test("the first forecast in a month stores the month-end total once", () => {
       fundsBuckets: false,
       ...saved,
     });
-    const first = readForecast(book.db, "2026-10-08", saved);
+    const before = book.db.select().from(auditLog).all().length;
+    const first = readForecast(book.db, "2026-10-08");
     const end = first.dates.indexOf("2026-10-31");
-    expect(book.db.select().from(forecastSnapshots).all()).toEqual([
-      { month: "2026-10", asOf: "2026-10-08", predictedTotal: first.total.estimated[end], createdAt: at },
-    ]);
     expect(first.total.estimated[end]).toBe(600);
-    spend(book.db, cash.id, expense(book.db, "Misc").id, "2026-10-09", -100);
-    readForecast(book.db, "2026-10-20", saved);
-    expect(book.db.select().from(forecastSnapshots).where(eq(forecastSnapshots.month, "2026-10")).all()).toHaveLength(1);
-    expect(book.db.select().from(forecastSnapshots).all()[0]?.predictedTotal).toBe(600);
-    expect(book.db.select().from(auditLog).where(eq(auditLog.entity, "forecast_snapshot")).all()).toHaveLength(1);
-    readForecast(book.db, "2026-11-02", saved);
-    expect(book.db.select().from(forecastSnapshots).all()).toHaveLength(2);
+    expect(book.db.select().from(auditLog).all()).toHaveLength(before);
+    readForecast(book.db, "2026-10-20");
+    expect(book.db.select().from(auditLog).all()).toHaveLength(before);
   } finally {
     book.close();
   }
@@ -238,7 +231,7 @@ test("variable income uses the median of the last 6 actuals", () => {
       });
       linkOccurrence(book.db, plan.id, date, txn.id, saved);
     }
-    const forecast = readForecast(book.db, "2026-07-01", saved);
+    const forecast = readForecast(book.db, "2026-07-01");
     const row = forecast.accounts.find((item) => item.accountId === cash.id);
     expect(row?.known[0]).toBe(2_100 + 350);
   } finally {
@@ -285,7 +278,7 @@ function safeToSpend(income: boolean): number {
         ...saved,
       });
     }
-    return readForecast(book.db, "2026-10-01", saved).safeToSpend;
+    return readForecast(book.db, "2026-10-01").safeToSpend;
   } finally {
     book.close();
   }

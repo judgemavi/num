@@ -4,8 +4,11 @@ import { formatMoney } from "@/money";
 const statusLabels: Record<TransactionStatus, string> = {
   open: "Open",
   cleared: "Cleared",
-  reconciled: "Reconciled",
 };
+
+export function reconciledLabel(): string {
+  return "Reconciled";
+}
 
 export function statusLabel(status: TransactionStatus): string {
   return statusLabels[status];

@@ -3,6 +3,7 @@ import { utcNow, type TransactionInputStatus } from "@num/shared";
 import { eq, inArray } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { transactionReconciled } from "./reconciled";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource } from "./write";
 
@@ -22,10 +23,10 @@ export function setClearance(
     throw new ServiceError("transaction_not_found", 404);
   }
   for (const row of rows) {
-    if (row.deletedAt !== null || row.accountId !== accountId) {
+    if (row.accountId !== accountId) {
       throw new ServiceError("transaction_not_found", 404);
     }
-    if (row.status === "reconciled") {
+    if (transactionReconciled(db, row.accountId, row.date)) {
       throw new ServiceError("transaction_reconciled", 409);
     }
   }
@@ -37,10 +38,10 @@ export function setClearance(
   write(db, { source: input.source, at }, (tx) => {
     for (const row of changes) {
       const before = readTransaction(tx, row.id);
-      if (before.status === "reconciled") {
+      if (before.reconciled) {
         throw new ServiceError("transaction_reconciled", 409);
       }
-      tx.update(transactions).set({ status: input.status }).where(eq(transactions.id, row.id)).run();
+      tx.update(transactions).set({ status: input.status, editedAt: at }).where(eq(transactions.id, row.id)).run();
       auditTransaction(tx, row.id, "update", before, readTransaction(tx, row.id));
     }
   });

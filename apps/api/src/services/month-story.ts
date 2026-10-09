@@ -18,7 +18,7 @@ import {
   type StoryLine,
   type StoryOccurrence,
 } from "@num/shared";
-import { isNull, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
@@ -86,7 +86,6 @@ function storyOccurrences(db: Db, month: string, through: string): StoryOccurren
     db
       .select({ id: transactions.id, amount: transactions.amount })
       .from(transactions)
-      .where(isNull(transactions.deletedAt))
       .all()
       .map((row) => [row.id, row.amount]),
   );
@@ -113,7 +112,7 @@ function storyOccurrences(db: Db, month: string, through: string): StoryOccurren
   return rows;
 }
 
-export function loadMonthStory(db: Db, month: string, asOf: string, accuracy: MonthStory["accuracy"]): MonthStory {
+export function loadMonthStory(db: Db, month: string, asOf: string): MonthStory {
   if (!isMonthKey(month)) {
     throw new ServiceError("month_invalid", 400, { month });
   }
@@ -125,7 +124,7 @@ export function loadMonthStory(db: Db, month: string, asOf: string, accuracy: Mo
   const merchants = db.all<{ merchantId: string; firstDate: string }>(sql`
     select merchant_id as merchantId, min(date) as firstDate
     from transactions
-    where deleted_at is null and merchant_id is not null
+    where merchant_id is not null
     group by merchant_id
   `);
   const balances = bucketBalances(db, through);
@@ -143,7 +142,6 @@ export function loadMonthStory(db: Db, month: string, asOf: string, accuracy: Mo
       .all()
       .filter((row) => row.archivedAt === null)
       .map((row) => ({ bucketId: row.id, balance: balances.get(row.id) ?? 0 })),
-    accuracy,
   });
   return monthStorySchema.parse(story);
 }

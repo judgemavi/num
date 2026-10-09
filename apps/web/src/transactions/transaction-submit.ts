@@ -66,7 +66,7 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
     merchantId: merchantForChoice(input.choice, input.merchantId),
     notes: input.notes.trim().length === 0 ? null : input.notes.trim(),
     payeeRaw: input.payee.trim(),
-    status: input.reconciled ? "open" : input.cleared ? "cleared" : "open",
+    status: input.cleared ? "cleared" : "open",
     lines: built,
     refundOfId: input.choice === "refund" ? input.refundOfId : null,
   };

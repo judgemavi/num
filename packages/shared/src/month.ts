@@ -66,7 +66,6 @@ export const monthStorySchema = z.object({
   recurringChanges: z.array(recurringChangeSchema),
   buckets: z.array(z.object({ bucketId: z.uuid(), balance: cents })),
   plan: z.array(z.object({ planId: z.uuid(), planned: cents, actual: cents })),
-  accuracy: z.object({ predicted: cents, actual: cents }).nullable(),
 });
 
 export type MonthStory = z.infer<typeof monthStorySchema>;
@@ -98,10 +97,6 @@ export const monthDetailSchema = z.object({
 });
 
 export type MonthDetail = z.infer<typeof monthDetailSchema>;
-
-export const monthReopenSchema = z.object({
-  reason: z.string().trim().min(1).max(500),
-});
 
 export type StoryLine = {
   month: string;
@@ -138,7 +133,6 @@ export type MonthStoryInput = {
   merchants: readonly StoryMerchant[];
   occurrences: readonly StoryOccurrence[];
   buckets: readonly StoryBucketBalance[];
-  accuracy: { predicted: number; actual: number } | null;
 };
 
 function divRoundHalfAway(numerator: bigint, denominator: bigint): number {
@@ -331,6 +325,5 @@ export function buildMonthStory(input: MonthStoryInput): MonthStory {
     recurringChanges,
     buckets: [...input.buckets].sort((left, right) => compareId(left.bucketId, right.bucketId)),
     plan,
-    accuracy: input.accuracy,
   };
 }

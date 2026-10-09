@@ -2,7 +2,7 @@ import { accounts } from "@num/db";
 import { accountKinds, autoReasons, transactionStatuses, type AccountKind, type AutoReason, type TransactionListItem, type TransactionListQuery, type TransactionStatus } from "@num/shared";
 import { eq, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
+import { whole } from "../whole";
 
 const sortColumns = {
   date: "t.date",
@@ -21,6 +21,7 @@ type ListRow = {
   merchantId: string | null;
   merchantName: string | null;
   status: string;
+  reconciled: number;
   accountOpening: number;
   runningBalance: number | null;
   autoReason: string | null;
@@ -65,7 +66,7 @@ function orderSql(query: TransactionListQuery): SQL {
 }
 
 function filters(query: TransactionListQuery): SQL {
-  const parts: SQL[] = [sql`t.deleted_at is null`];
+  const parts: SQL[] = [];
   if (query.accountId) {
     parts.push(sql`t.account_id = ${query.accountId}`);
   }
@@ -133,6 +134,9 @@ function filters(query: TransactionListQuery): SQL {
       or instr(lower(ifnull(m.name, '')), lower(${needle})) > 0
     )`);
   }
+  if (parts.length === 0) {
+    return sql`1 = 1`;
+  }
   return sql.join(parts, sql` and `);
 }
 
@@ -143,12 +147,13 @@ function toItem(row: ListRow): TransactionListItem {
     accountName: row.accountName,
     accountKind: asKind(row.accountKind),
     date: row.date,
-    amount: integerSum(row.amount),
+    amount: whole(row.amount),
     payeeRaw: row.payeeRaw,
     merchantId: row.merchantId,
     merchantName: row.merchantName,
     status: asStatus(row.status),
-    runningBalance: row.runningBalance === null ? null : integerSum(row.runningBalance),
+    reconciled: row.reconciled === 1,
+    runningBalance: row.runningBalance === null ? null : whole(row.runningBalance),
     autoReason: asAutoReason(row.autoReason),
     autoConfidence: row.autoConfidence,
     autoSourceName: row.autoSourceName,
@@ -156,8 +161,8 @@ function toItem(row: ListRow): TransactionListItem {
     refundOf:
       row.refundOfKey === null || row.refundOfDate === null || row.refundOfAmount === null || row.refundOfPayee === null
         ? null
-        : { id: row.refundOfKey, date: row.refundOfDate, amount: integerSum(row.refundOfAmount), payeeRaw: row.refundOfPayee },
-    refundedAmount: row.refundedAmount === null ? null : integerSum(row.refundedAmount),
+        : { id: row.refundOfKey, date: row.refundOfDate, amount: whole(row.refundOfAmount), payeeRaw: row.refundOfPayee },
+    refundedAmount: row.refundedAmount === null ? null : whole(row.refundedAmount),
   };
 }
 
@@ -179,17 +184,17 @@ function fillRunningBalances(db: Db, accountId: string, rows: ListRow[]): void {
       select tx.id as id,
         sum(tx.amount) over (order by tx.date asc, tx.id asc) as spent
       from transactions tx
-      where tx.deleted_at is null and tx.account_id = ${accountId}
+      where tx.account_id = ${accountId}
     )
     where id in (${ids})
   `);
-  const spentById = new Map(balances.map((row) => [row.id, integerSum(row.spent)]));
+  const spentById = new Map(balances.map((row) => [row.id, whole(row.spent)]));
   for (const row of rows) {
     const spent = spentById.get(row.id);
     if (spent === undefined) {
       throw new Error("Running balance is missing");
     }
-    const balance = integerSum(row.accountOpening) + spent;
+    const balance = whole(row.accountOpening) + spent;
     if (!Number.isSafeInteger(balance)) {
       throw new Error("Sum is not an integer");
     }
@@ -206,7 +211,7 @@ export function listTransactions(db: Db, query: TransactionListQuery) {
     ${query.q ? merchantJoin : sql``}
     where ${where}
   `);
-  const total = integerSum(totalRows[0]?.total ?? 0);
+  const total = whole(totalRows[0]?.total ?? 0);
   const offset = (query.page - 1) * query.pageSize;
   const rows = db.all<ListRow>(sql`
     select
@@ -220,6 +225,10 @@ export function listTransactions(db: Db, query: TransactionListQuery) {
       t.merchant_id as merchantId,
       m.name as merchantName,
       t.status as status,
+      case when t.date <= (
+        select max(c.date) from checkpoints c
+        where c.account_id = t.account_id and c.unlocked_at is null
+      ) then 1 else 0 end as reconciled,
       a.opening_balance as accountOpening,
       null as runningBalance,
       t.auto_reason as autoReason,
@@ -232,14 +241,14 @@ export function listTransactions(db: Db, query: TransactionListQuery) {
       case when t.auto_reason is null then null else (
         select count(*) from transactions c
         inner join transaction_lines cl on cl.transaction_id = c.id
-        where c.deleted_at is null and c.auto_reason is null and c.payee_normalized = t.payee_normalized
+        where c.auto_reason is null and c.payee_normalized = t.payee_normalized
           and cl.category_id is not null and cl.transfer_account_id is null
       ) end as autoLearnedCount,
-      (select p.id from transactions p where p.id = t.refund_of_id and p.deleted_at is null) as refundOfKey,
-      (select p.date from transactions p where p.id = t.refund_of_id and p.deleted_at is null) as refundOfDate,
-      (select p.amount from transactions p where p.id = t.refund_of_id and p.deleted_at is null) as refundOfAmount,
-      (select p.payee_raw from transactions p where p.id = t.refund_of_id and p.deleted_at is null) as refundOfPayee,
-      (select sum(r.amount) from transactions r where r.refund_of_id = t.id and r.deleted_at is null) as refundedAmount
+      (select p.id from transactions p where p.id = t.refund_of_id) as refundOfKey,
+      (select p.date from transactions p where p.id = t.refund_of_id) as refundOfDate,
+      (select p.amount from transactions p where p.id = t.refund_of_id) as refundOfAmount,
+      (select p.payee_raw from transactions p where p.id = t.refund_of_id) as refundOfPayee,
+      (select sum(r.amount) from transactions r where r.refund_of_id = t.id) as refundedAmount
     from transactions t
     join accounts a on a.id = t.account_id
     ${merchantJoin}

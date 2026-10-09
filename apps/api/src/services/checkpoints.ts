@@ -13,7 +13,6 @@ import { ServiceError } from "../service-error";
 import { calculatedBalance } from "./checkpoint-balance";
 import { checkpointHelp } from "./checkpoint-help";
 import { checkpointOpeningSuggestion } from "./opening-suggestion";
-import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
@@ -88,7 +87,6 @@ function helpTransactions(db: Reader, accountId: string, openingDate: string, st
     .where(
       and(
         eq(transactions.accountId, accountId),
-        isNull(transactions.deletedAt),
         gte(transactions.date, openingDate),
         lte(transactions.date, statementDate),
       ),
@@ -122,28 +120,6 @@ export function compareCheckpoint(
       statementBalance: input.statementBalance,
     }),
   };
-}
-
-function reconcileThrough(tx: WriteTx, accountId: string, date: string): void {
-  const rows = tx
-    .select({ id: transactions.id })
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.accountId, accountId),
-        isNull(transactions.deletedAt),
-        lte(transactions.date, date),
-      ),
-    )
-    .all();
-  for (const row of rows) {
-    const before = readTransaction(tx, row.id);
-    if (before.status === "reconciled") {
-      continue;
-    }
-    tx.update(transactions).set({ status: "reconciled" }).where(eq(transactions.id, row.id)).run();
-    auditTransaction(tx, row.id, "update", before, readTransaction(tx, row.id));
-  }
 }
 
 export function createCheckpoint(
@@ -181,7 +157,6 @@ export function createCheckpoint(
       before: null,
       after: snapshot(row),
     });
-    reconcileThrough(tx, accountId, input.date);
     created = row;
   });
   if (!created) {
@@ -207,10 +182,6 @@ export function listCheckpoints(db: Db, accountId: string): { items: Checkpoint[
   return { items };
 }
 
-function covered(dates: string[], transactionDate: string): boolean {
-  return dates.some((date) => transactionDate <= date);
-}
-
 export function unlockCheckpoint(db: Db, accountId: string, checkpointId: string, input: WriteInput): Checkpoint {
   const at = input.at ?? utcNow();
   let unlocked: Checkpoint | undefined;
@@ -232,31 +203,6 @@ export function unlockCheckpoint(db: Db, accountId: string, checkpointId: string
       before: snapshot(toCheckpoint(row)),
       after: snapshot(next),
     });
-    const later = tx
-      .select({ date: checkpoints.date })
-      .from(checkpoints)
-      .where(and(eq(checkpoints.accountId, accountId), isNull(checkpoints.unlockedAt)))
-      .all()
-      .map((item) => item.date);
-    const rows = tx
-      .select({ id: transactions.id, date: transactions.date, status: transactions.status })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.accountId, accountId),
-          isNull(transactions.deletedAt),
-          lte(transactions.date, row.date),
-        ),
-      )
-      .all();
-    for (const transaction of rows) {
-      if (transaction.status !== "reconciled" || covered(later, transaction.date)) {
-        continue;
-      }
-      const before = readTransaction(tx, transaction.id);
-      tx.update(transactions).set({ status: "cleared" }).where(eq(transactions.id, transaction.id)).run();
-      auditTransaction(tx, transaction.id, "update", before, readTransaction(tx, transaction.id));
-    }
     unlocked = next;
   });
   if (!unlocked) {

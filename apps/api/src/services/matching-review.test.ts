@@ -66,7 +66,7 @@ function importCsv(db: Db, dir: string, accountId: string, filename: string, lin
 }
 
 function active(db: Db) {
-  return db.select().from(transactions).all().filter((row) => row.deletedAt === null);
+  return db.select().from(transactions).all();
 }
 
 test("undo removes the mortgage mirror created for an imported payment", () => {

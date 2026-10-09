@@ -112,15 +112,11 @@ function loadBook(db: Reader): Book {
         amount: transactions.amount,
         date: transactions.date,
         payeeRaw: transactions.payeeRaw,
-        deletedAt: transactions.deletedAt,
       })
       .from(transactions)
       .where(inArray(transactions.id, txnIds))
       .all();
     for (const row of rows) {
-      if (row.deletedAt !== null) {
-        continue;
-      }
       amounts.set(row.id, row.amount);
       payees.set(row.id, { date: row.date, payee: row.payeeRaw, amount: row.amount });
     }
@@ -257,7 +253,7 @@ export function monthlyBills(db: Reader, asOf: string): number {
 
 export function requirePaycheck(db: Reader, incomeTransactionId: string): FundingPaycheck & { planId: string } {
   const txn = db.select().from(transactions).where(eq(transactions.id, incomeTransactionId)).get();
-  if (!txn || txn.deletedAt !== null || txn.amount <= 0) {
+  if (!txn || txn.amount <= 0) {
     throw new ServiceError("paycheck_not_found", 404);
   }
   const link = db.select().from(occurrenceLinks).where(eq(occurrenceLinks.transactionId, incomeTransactionId)).get();
@@ -307,7 +303,6 @@ export function listFundingPaychecks(db: Db): { items: FundingPaycheck[] } {
         eq(recurringPlans.fundsBuckets, true),
         eq(occurrenceLinks.skipped, false),
         isNotNull(occurrenceLinks.transactionId),
-        isNull(transactions.deletedAt),
         gt(transactions.amount, 0),
         isNull(fundingRuns.id),
       ),

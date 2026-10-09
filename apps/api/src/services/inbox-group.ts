@@ -34,7 +34,7 @@ function skipReason(transaction: Transaction, patch: Patch): GroupSkipReason | n
   if (!line || line.categoryId !== null || line.transferAccountId !== null) {
     return "categorized";
   }
-  if (patch.transferAccountId && transaction.status === "reconciled") {
+  if (patch.transferAccountId && transaction.reconciled) {
     return "reconciled";
   }
   return null;
@@ -89,9 +89,6 @@ function applyOne(tx: WriteTx, id: string, patch: Patch, at: string): GroupSkip 
   } catch {
     return { id, reason: "categorized" };
   }
-  if (transaction.deletedAt) {
-    return { id, reason: "categorized" };
-  }
   const reason = skipReason(transaction, patch);
   if (reason) {
     return { id, reason };
@@ -106,7 +103,7 @@ function otherIds(reader: { all<T>(query: ReturnType<typeof sql>): T[] }, payee:
   const rows = reader.all<OpenRow>(sql`
     select t.id as id
     from transactions t
-    where t.deleted_at is null
+    where 1 = 1
       and t.payee_normalized = ${payee}
       and t.account_id = ${accountId}
       and exists (

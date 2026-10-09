@@ -96,17 +96,6 @@ export function mortgagePeriodRate(rateMilliPct: number, compound: Compounding, 
   return Math.expm1(Math.log1p(nominal / compounds) * (compounds / periods));
 }
 
-export function mortgagePaymentCents(principal: number, periodicRate: number, paymentCount: number): number {
-  if (paymentCount <= 0) {
-    throw new Error("Payment count must be positive");
-  }
-  if (periodicRate === 0) {
-    return Math.round(principal / paymentCount);
-  }
-  const raw = (principal * periodicRate) / -Math.expm1(-paymentCount * Math.log1p(periodicRate));
-  return Math.round(raw);
-}
-
 function clampDay(month: Temporal.PlainDate, day: number): string {
   return month.with({ day: Math.min(day, month.daysInMonth) }).toString();
 }
@@ -243,36 +232,6 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
     remaining: balance,
     nonAmortizing,
   };
-}
-
-export function mortgageBalanceAsOf(loan: MortgageLoan, valuations: MortgageValuation[], asOf: string): number {
-  if (asOf < loan.principalAsOf) {
-    return loan.principal;
-  }
-  const checkpoints = sortedValuations(valuations);
-  const onDate = checkpoints.filter((valuation) => valuation.date === asOf);
-  if (onDate.length > 0) {
-    return owed(onDate[onDate.length - 1].balance);
-  }
-  const schedule = mortgageSchedule(loan, valuations);
-  let balance = loan.principal;
-  for (const valuation of checkpoints) {
-    if (valuation.date === loan.principalAsOf) {
-      balance = owed(valuation.balance);
-    }
-  }
-  const lastPaid = schedule.payments.filter((row) => row.date <= asOf).at(-1);
-  if (lastPaid) {
-    balance = lastPaid.balance;
-  }
-  let latest = lastPaid?.date ?? loan.principalAsOf;
-  for (const valuation of checkpoints) {
-    if (valuation.date > latest && valuation.date <= asOf) {
-      balance = owed(valuation.balance);
-      latest = valuation.date;
-    }
-  }
-  return balance;
 }
 
 export function mortgageNextPayments(schedule: MortgageSchedule, asOf: string, count: number): MortgagePaymentRow[] {

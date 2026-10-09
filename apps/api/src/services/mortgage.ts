@@ -10,9 +10,9 @@ import {
   type MortgageValuation,
   type MortgageView,
 } from "@num/shared";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
+import { whole } from "../whole";
 import { balanceOf } from "./account-balance";
 import { ServiceError } from "../service-error";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -78,7 +78,7 @@ function activeValuations(db: Db | WriteTx, accountId: string): MortgageValuatio
   return db
     .select({ date: valuations.date, balance: valuations.balance })
     .from(valuations)
-    .where(and(eq(valuations.accountId, accountId), isNull(valuations.deletedAt)))
+    .where(and(eq(valuations.accountId, accountId)))
     .all()
     .sort((left, right) => (left.date < right.date ? -1 : left.date > right.date ? 1 : 0));
 }
@@ -139,7 +139,7 @@ function actualPayments(db: Db, accountId: string): MortgageView["actualPayments
   const rows = db.all<{ id: string; date: string; amount: unknown }>(sql`
     select t.id as id, t.date as date, -t.amount as amount
     from transactions t
-    where t.deleted_at is null
+    where 1 = 1
       and t.mirror = 0
       and t.amount < 0
       and exists (
@@ -148,7 +148,7 @@ function actualPayments(db: Db, accountId: string): MortgageView["actualPayments
       )
     order by t.date asc, t.id asc
   `);
-  return rows.map((row) => ({ id: row.id, date: row.date, amount: integerSum(row.amount) }));
+  return rows.map((row) => ({ id: row.id, date: row.date, amount: whole(row.amount) }));
 }
 
 export function mortgageAccountView(

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { auditLog, importRows, merchants, migrateDatabase, occurrenceLinks, openDatabase, settings, transactions } from "@num/db";
 import { columnMapSchema, uncategorizedLineKey, type ColumnMap, type InboxKind } from "@num/shared";
 import { expect, test } from "bun:test";
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { coverBucket, createBucketEvent } from "./bucket-events";
@@ -85,7 +85,7 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
 }
 
 function openCount(db: Db): number {
-  return db.select({ id: transactions.id }).from(transactions).where(isNull(transactions.deletedAt)).all().length;
+  return db.select({ id: transactions.id }).from(transactions).all().length;
 }
 
 function keys(db: Db, kind: InboxKind) {

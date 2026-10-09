@@ -8,6 +8,7 @@ import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
+import { createCheckpoint } from "./checkpoints";
 import { createCategory } from "./categories";
 import { createTag } from "./tags";
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
@@ -197,9 +198,8 @@ test("edit and delete of a transfer update both sides in one database transactio
         deleteTransaction(book.db, payment.id, saved);
       }),
     ).toBe(1);
-    expect(getTransaction(book.db, payment.id)?.deletedAt).toBe(at);
-    expect(getTransaction(book.db, nextMirror.id)?.deletedAt).toBe(at);
-    expect(getTransaction(book.db, nextMirror.id)?.transferPeerId).toBe(payment.id);
+    expect(getTransaction(book.db, payment.id)).toBeNull();
+    expect(getTransaction(book.db, nextMirror.id)).toBeNull();
   } finally {
     book.close();
   }
@@ -267,25 +267,27 @@ test("a reconciled transaction accepts a category change and rejects an amount c
     const savings = account(book.db, "Savings", "savings");
     const food = createCategory(book.db, { name: "Food", kind: "expense", ...saved });
     const created = createTransaction(book.db, entry(chequing.id, -15, [{ amount: -15 }]));
-    book.sqlite.query("update transactions set status = 'reconciled' where id = ?").run(created.id);
-    expect(getTransaction(book.db, created.id)?.status).toBe("reconciled");
+    createCheckpoint(book.db, chequing.id, { date: created.date, statementBalance: -15, ...saved });
+    expect(getTransaction(book.db, created.id)?.reconciled).toBe(true);
+    expect(getTransaction(book.db, created.id)?.status).toBe("open");
     expectCode(
       () => updateTransaction(book.db, created.id, entry(chequing.id, -16, [{ amount: -16 }])),
       "transaction_reconciled",
     );
     const changed = updateTransaction(book.db, created.id, entry(chequing.id, -15, [{ amount: -15, categoryId: food.id }]));
-    expect(changed.status).toBe("reconciled");
+    expect(changed.reconciled).toBe(true);
+    expect(changed.status).toBe("open");
     expect(changed.amount).toBe(-15);
     expect(changed.lines[0]?.categoryId).toBe(food.id);
     expectCode(() => deleteTransaction(book.db, created.id, saved), "transaction_reconciled");
-    expect(getTransaction(book.db, created.id)?.deletedAt).toBeNull();
+    expect(getTransaction(book.db, created.id)?.reconciled).toBe(true);
 
     const transfer = createTransaction(
       book.db,
       entry(chequing.id, -30, [{ amount: -30, transferAccountId: savings.id }]),
     );
     const mirror = requirePeer(book.db, transfer);
-    book.sqlite.query("update transactions set status = 'reconciled' where id = ?").run(mirror.id);
+    createCheckpoint(book.db, savings.id, { date: mirror.date, statementBalance: 30, ...saved });
     expectCode(
       () =>
         updateTransaction(
@@ -298,7 +300,7 @@ test("a reconciled transaction accepts a category change and rejects an amount c
     expectCode(() => deleteTransaction(book.db, transfer.id, saved), "transaction_reconciled");
     expect(getTransaction(book.db, transfer.id)?.amount).toBe(-30);
     expect(getTransaction(book.db, mirror.id)?.amount).toBe(30);
-    expect(getTransaction(book.db, mirror.id)?.deletedAt).toBeNull();
+    expect(getTransaction(book.db, mirror.id)?.reconciled).toBe(true);
   } finally {
     book.close();
   }
@@ -367,7 +369,7 @@ test("a transfer links an opposite row within 3 days and mirrors when none match
     expect(mirror.amount).toBe(800);
 
     const held = createTransaction(book.db, entry(visa.id, 100, [{ amount: 100 }], "2026-06-01"));
-    book.sqlite.query("update transactions set status = 'reconciled' where id = ?").run(held.id);
+    createCheckpoint(book.db, visa.id, { date: "2026-06-01", statementBalance: 6_700, ...saved });
     const aroundHeld = createTransaction(
       book.db,
       entry(chequing.id, -100, [{ amount: -100, transferAccountId: visa.id }], "2026-06-01"),
@@ -400,7 +402,7 @@ test("changing a linked transfer to a category keeps the other row", () => {
     );
     expect(edited.transferPeerId).toBeNull();
     const peer = getTransaction(book.db, card.id);
-    expect(peer?.deletedAt).toBeNull();
+    expect(peer).not.toBeNull();
     expect(peer?.transferPeerId).toBeNull();
     expect(peer?.amount).toBe(5_000);
     expect(peer?.autoReason).toBeNull();
@@ -423,10 +425,10 @@ test("deleting one side of a linked pair keeps the other", () => {
     );
     deleteTransaction(book.db, payment.id, saved);
     const peer = getTransaction(book.db, card.id);
-    expect(peer?.deletedAt).toBeNull();
+    expect(peer).not.toBeNull();
     expect(peer?.amount).toBe(5_000);
     expect(peer?.transferPeerId).toBeNull();
-    expect(getTransaction(book.db, payment.id)?.deletedAt).not.toBeNull();
+    expect(getTransaction(book.db, payment.id)).toBeNull();
   } finally {
     book.close();
   }
@@ -448,7 +450,7 @@ test("removing a transfer deletes the mirror and keeps a linked row", () => {
     }
     expect(getTransaction(book.db, mirrorId)?.mirror).toBe(true);
     updateTransaction(book.db, created.id, entry(chequing.id, -3_000, [{ amount: -3_000, categoryId: food.id }]));
-    expect(getTransaction(book.db, mirrorId)?.deletedAt).not.toBeNull();
+    expect(getTransaction(book.db, mirrorId)).toBeNull();
   } finally {
     book.close();
   }
@@ -471,8 +473,8 @@ test("updateTransaction links an existing opposite row", () => {
     const peer = getTransaction(book.db, card.id);
     expect(peer?.mirror).toBe(false);
     expect(peer?.transferPeerId).toBe(payment.id);
-    expect(peer?.deletedAt).toBeNull();
-    expect(book.sqlite.query("select count(*) as n from transactions where deleted_at is null").get()).toEqual({ n: 2 });
+    expect(peer).not.toBeNull();
+    expect(book.sqlite.query("select count(*) as n from transactions").get()).toEqual({ n: 2 });
   } finally {
     book.close();
   }

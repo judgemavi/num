@@ -6,9 +6,9 @@ import {
   refundWindowStart,
   type RefundPurchaseItem,
 } from "@num/shared";
-import { and, eq, gte, isNull, lt, lte } from "drizzle-orm";
+import { and, eq, gte, lt, lte } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
+import { whole } from "../whole";
 import { ServiceError } from "../service-error";
 import { auditTransaction, readTransaction, type Header } from "./transaction-record";
 import type { WriteTx } from "./write";
@@ -21,7 +21,7 @@ export function assertRefundLink(tx: WriteTx, header: Header, selfId: string | n
     throw new ServiceError("refund_link_invalid", 400);
   }
   const purchase = tx.select().from(transactions).where(eq(transactions.id, header.refundOfId)).get();
-  if (!purchase || purchase.deletedAt !== null || purchase.mirror) {
+  if (!purchase || purchase.mirror) {
     throw new ServiceError("refund_link_invalid", 400);
   }
   const category = tx
@@ -49,7 +49,7 @@ export function clearRefundLinks(tx: WriteTx, purchaseId: string): void {
   const rows = tx
     .select({ id: transactions.id })
     .from(transactions)
-    .where(and(eq(transactions.refundOfId, purchaseId), isNull(transactions.deletedAt)))
+    .where(and(eq(transactions.refundOfId, purchaseId)))
     .all();
   for (const row of rows) {
     const before = readTransaction(tx, row.id);
@@ -75,7 +75,6 @@ export function listRefundPurchases(
     .from(transactions)
     .where(
       and(
-        isNull(transactions.deletedAt),
         eq(transactions.mirror, false),
         lt(transactions.amount, 0),
         gte(transactions.date, start),
@@ -104,7 +103,7 @@ export function listRefundPurchases(
       {
         id: row.id,
         date: row.date,
-        amount: integerSum(row.amount),
+        amount: whole(row.amount),
         payeeRaw: row.payeeRaw,
         categoryId: row.categoryId,
       },

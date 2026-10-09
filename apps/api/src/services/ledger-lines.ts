@@ -1,6 +1,6 @@
 import { categories, lineTags, transactionLines, transactions } from "@num/db";
 import { storyLineKind, type StoryLine } from "@num/shared";
-import { and, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import type { Db } from "../db";
 
 export type LedgerLine = {
@@ -33,7 +33,6 @@ export function loadLedgerLines(db: Db, range?: { from: string; through: string 
     .leftJoin(categories, eq(transactionLines.categoryId, categories.id))
     .where(
       and(
-        isNull(transactions.deletedAt),
         range ? gte(transactions.date, range.from) : undefined,
         range ? lte(transactions.date, range.through) : undefined,
       ),

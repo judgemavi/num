@@ -101,26 +101,6 @@ export function MonthStoryView({ currency, story, names }: { currency: string; s
           </ListRow>
         ))}
       </ListCard>
-      <ListCard label="Forecast accuracy" title="Forecast accuracy">
-        {story.accuracy === null ? (
-          <p className="px-5 py-4 text-sm text-muted-foreground">No forecast was saved for this month.</p>
-        ) : (
-          <>
-            <ListRow simple>
-              <span className={listName}>Forecast for the last day</span>
-              <span className={listAmt}>
-                <Amount currency={currency} minor={story.accuracy.predicted} />
-              </span>
-            </ListRow>
-            <ListRow simple>
-              <span className={listName}>Actual</span>
-              <span className={listAmt}>
-                <Amount currency={currency} minor={story.accuracy.actual} />
-              </span>
-            </ListRow>
-          </>
-        )}
-      </ListCard>
     </div>
   );
 }

@@ -104,7 +104,6 @@ export const errorCodes = [
   "month_not_ready",
   "month_closed",
   "month_not_closed",
-  "reopen_reason_required",
   "internal_error",
 ] as const;
 

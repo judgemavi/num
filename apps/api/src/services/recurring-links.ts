@@ -88,7 +88,7 @@ export function linkOccurrence(
       throw new ServiceError("occurrence_taken", 409);
     }
     const txn = tx.select().from(transactions).where(eq(transactions.id, transactionId)).get();
-    if (!txn || txn.deletedAt) {
+    if (!txn) {
       throw new ServiceError("transaction_not_found", 404);
     }
     if (txn.accountId !== plan.accountId) {

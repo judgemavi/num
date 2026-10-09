@@ -37,7 +37,7 @@ function earliestTransactionDate(db: Reader, accountId: string): string | null {
   const rows = db
     .select({ date: transactions.date })
     .from(transactions)
-    .where(and(eq(transactions.accountId, accountId), isNull(transactions.deletedAt)))
+    .where(and(eq(transactions.accountId, accountId)))
     .all();
   let earliest: string | null = null;
   for (const row of rows) {

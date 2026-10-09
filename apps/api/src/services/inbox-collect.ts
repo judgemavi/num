@@ -53,7 +53,7 @@ function loadTxns(db: Db, ids: readonly string[]): Map<string, TxnRef> {
     const rows = db
       .select(txnColumns)
       .from(transactions)
-      .where(and(inArray(transactions.id, group), isNull(transactions.deletedAt)))
+      .where(and(inArray(transactions.id, group)))
       .all();
     for (const row of rows) {
       found.set(row.id, row);
@@ -100,7 +100,6 @@ function reviewItems(db: Db): InboxItem[] {
     .where(
       and(
         inArray(transactions.accountId, [...accountIds]),
-        isNull(transactions.deletedAt),
         isNull(transactions.importRowId),
         gte(transactions.date, shiftDate(minDate, -3)),
         lte(transactions.date, shiftDate(maxDate, 3)),

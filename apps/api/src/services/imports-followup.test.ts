@@ -14,7 +14,7 @@ import {
 } from "@num/db";
 import { columnMapSchema, normalizePayee, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
@@ -79,7 +79,7 @@ function importCsv(db: Db, dir: string, accountId: string, filename: string, lin
 }
 
 function activeCount(db: Db): number {
-  return db.select({ id: transactions.id }).from(transactions).where(isNull(transactions.deletedAt)).all().length;
+  return db.select({ id: transactions.id }).from(transactions).all().length;
 }
 
 test("the same rows with different bytes create no new transactions", () => {
@@ -162,7 +162,7 @@ test("undo of every row sets undoneAt and a later file can import the rows again
       accountId: book.account.id,
       filename: "again.csv",
       mimeType: "text/csv",
-      bytes: new TextEncoder().encode(text.replaceAll("\n", "\r\n")),
+      bytes: new TextEncoder().encode(text),
       columnMap: map,
     });
     expect(again.kind).toBe("batch");
@@ -192,7 +192,7 @@ test("a deleted created transaction counts as removed", () => {
     expect(undone.blocked).toEqual([]);
     expect(undone.batch.undoneAt).toBe("2026-10-09T16:00:00Z");
     expect(book.db.select().from(importRows).all()[0]?.active).toBe(false);
-    expect(book.db.select().from(transactions).all()[0]?.deletedAt).toBe("2026-10-08T16:00:00Z");
+    expect(book.db.select().from(transactions).all()).toEqual([]);
   } finally {
     book.close();
   }

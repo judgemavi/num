@@ -21,7 +21,6 @@ function story(input: Partial<MonthStoryInput> & Pick<MonthStoryInput, "lines">)
     merchants: [],
     occurrences: [],
     buckets: [],
-    accuracy: null,
     ...input,
   });
 }

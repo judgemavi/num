@@ -69,7 +69,5 @@ export function ListRow({
 
 export const listName =
   "list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground";
-export const listMeta = "hidden w-40 shrink-0 text-[13px] text-muted-foreground md:block";
 export const listAmt =
   "ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground";
-export const listActs = "flex flex-wrap justify-end gap-2 max-md:w-full";

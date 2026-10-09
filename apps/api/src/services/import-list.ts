@@ -6,7 +6,7 @@ import {
   type ImportViewItem,
   type ImportViewQuery,
 } from "@num/shared";
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { readUnreadable } from "./import-read";
@@ -173,7 +173,7 @@ export function getImportDetail(db: Db, id: string): ImportDetail {
       : db
           .select({ id: transactions.id })
           .from(transactions)
-          .where(and(inArray(transactions.id, transactionIds), isNull(transactions.deletedAt)))
+          .where(and(inArray(transactions.id, transactionIds)))
           .all()
           .map((row) => row.id),
   );

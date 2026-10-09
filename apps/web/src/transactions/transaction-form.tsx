@@ -42,7 +42,7 @@ export function TransactionForm({
   decisions = [],
   onUndoDecision,
 }: TransactionFormProps) {
-  const reconciled = transaction?.status === "reconciled";
+  const reconciled = transaction?.reconciled === true;
   const imported = transaction?.source === "import";
   const moneyLocked = reconciled || amountLocked || imported;
   const [accountId, setAccountId] = useState(
@@ -53,7 +53,7 @@ export function TransactionForm({
   const [amount, setAmount] = useState(transaction ? fromMinorUnits(currency, Math.abs(transaction.amount)) : "");
   const [payee, setPayee] = useState(transaction?.payeeRaw ?? "");
   const [notes, setNotes] = useState(transaction?.notes ?? "");
-  const [cleared, setCleared] = useState(transaction?.status === "cleared" || transaction?.status === "reconciled");
+  const [cleared, setCleared] = useState(transaction?.status === "cleared");
   const [merchantId, setMerchantId] = useState<string | null>(transaction?.merchantId ?? null);
   const [refundOfId, setRefundOfId] = useState<string | null>(transaction?.refundOfId ?? null);
   const [choice, setChoice] = useState<WhatChoice>(choiceOf(transaction, categories));

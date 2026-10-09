@@ -1,6 +1,6 @@
 import { accounts, mortgageTerms, occurrenceLinks, transactionLines, transactions, valuations } from "@num/db";
 import { mortgagePrefillLines, mortgageSplitForDate, similarPayees, type Compounding, type MatchResult, type PaymentFrequency } from "@num/shared";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { replaceLines } from "./transaction-lines";
@@ -28,7 +28,7 @@ export function mortgageSplitLines(tx: WriteTx, result: MatchResult, fromAccount
   const history = tx
     .select({ date: valuations.date, balance: valuations.balance })
     .from(valuations)
-    .where(and(eq(valuations.accountId, result.transferAccountId), isNull(valuations.deletedAt)))
+    .where(and(eq(valuations.accountId, result.transferAccountId)))
     .all();
   const split = mortgageSplitForDate({
     terms: {
@@ -70,7 +70,7 @@ export function applyLinkedPlan(
   transactionId: string,
 ): void {
   const txn = tx.select().from(transactions).where(eq(transactions.id, transactionId)).get();
-  if (!txn || txn.deletedAt) {
+  if (!txn) {
     return;
   }
   const mortgage =
@@ -123,7 +123,7 @@ export function applyLinkedPlan(
           notes: current.notes,
           payeeRaw: current.payeeRaw,
           payeeNormalized: current.payeeNormalized,
-          status: current.status === "cleared" || current.status === "reconciled" ? current.status : "open",
+          status: current.status === "cleared" ? current.status : "open",
         }, current.source, principal);
       }
     }
@@ -225,7 +225,7 @@ export function spreadSureLabels(tx: WriteTx, payees: readonly string[], except:
       t.payee_normalized as payee, t.merchant_id as merchantId, l.id as lineId
     from transactions t
     inner join transaction_lines l on l.transaction_id = t.id
-    where t.deleted_at is null
+    where 1 = 1
       and t.mirror = 0
       and t.payee_normalized in (${list})
       and l.category_id is null

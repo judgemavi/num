@@ -1,8 +1,8 @@
 import { transactions, valuations } from "@num/db";
 import type { AccountKind } from "@num/shared";
-import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gt, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
+import { whole } from "../whole";
 import { accountBalance } from "./account-rules";
 import type { WriteTx } from "./write";
 
@@ -12,11 +12,11 @@ function readSum(row: { total: unknown } | undefined): number {
   if (!row) {
     return 0;
   }
-  return integerSum(row.total);
+  return whole(row.total);
 }
 
 function sumBetween(db: Reader, accountId: string, after: string | null, through: string): number {
-  const filters = [eq(transactions.accountId, accountId), isNull(transactions.deletedAt), lte(transactions.date, through)];
+  const filters = [eq(transactions.accountId, accountId), lte(transactions.date, through)];
   if (after !== null) {
     filters.push(gt(transactions.date, after));
   }
@@ -37,7 +37,7 @@ function valuationOn(db: Reader, accountId: string, date: string): { date: strin
       balance: valuations.balance,
     })
     .from(valuations)
-    .where(and(eq(valuations.accountId, accountId), isNull(valuations.deletedAt), lte(valuations.date, date)))
+    .where(and(eq(valuations.accountId, accountId), lte(valuations.date, date)))
     .all();
   let latest: { date: string; balance: number } | null = null;
   for (const row of rows) {

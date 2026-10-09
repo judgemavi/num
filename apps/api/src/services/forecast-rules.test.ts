@@ -74,7 +74,7 @@ function payCard(db: Db, fromId: string, cardId: string, date: string, amount: n
 
 function closeMonth(db: Db, month: string) {
   db.insert(monthCloses)
-    .values({ month, closedAt: at, reopenedAt: null, reopenReason: null, summaryJson: "{}" })
+    .values({ month, closedAt: at })
     .run();
 }
 
@@ -113,7 +113,7 @@ test("a card has no below-zero risk", () => {
     const card = cardAccount(book.db, "manual");
     spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -500);
     bill(book.db, cash.id, -200, "2026-10-15");
-    const forecast = readForecast(book.db, "2026-10-08", saved);
+    const forecast = readForecast(book.db, "2026-10-08");
     expect(forecast.accounts.find((row) => row.accountId === card.id)?.risk).toBeNull();
     expect(forecast.accounts.find((row) => row.accountId === cash.id)?.known[forecast.dates.indexOf("2026-10-14")]).toBe(100);
     expect(forecast.accounts.find((row) => row.accountId === cash.id)?.risk).toBe("below_zero");
@@ -131,7 +131,7 @@ test("one chequing account pays the card when there is no payment history", () =
     const card = cardAccount(book.db, "full");
     spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -2_000);
     createCheckpoint(book.db, card.id, { date: "2026-10-01", statementBalance: -2_000, ...saved });
-    const two = readForecast(book.db, "2026-10-08", saved);
+    const two = readForecast(book.db, "2026-10-08");
     const due = two.dates.indexOf("2026-10-22");
     expect(two.warnings).toContainEqual({ code: "no_payment_account", accountId: card.id });
     expect(two.accounts.find((row) => row.accountId === cash.id)?.known[due]).toBe(10_000);
@@ -145,7 +145,7 @@ test("one chequing account pays the card when there is no payment history", () =
     const card = cardAccount(alone.db, "full");
     spend(alone.db, card.id, expense(alone.db, "Shop").id, "2026-10-01", -2_000);
     createCheckpoint(alone.db, card.id, { date: "2026-10-01", statementBalance: -2_000, ...saved });
-    const one = readForecast(alone.db, "2026-10-08", saved);
+    const one = readForecast(alone.db, "2026-10-08");
     const due = one.dates.indexOf("2026-10-22");
     const before = one.dates.indexOf("2026-10-21");
     const cashRow = one.accounts.find((row) => row.accountId === cash.id);
@@ -165,7 +165,7 @@ test("a stale statement still schedules the next payment from the balance at asO
     const card = cardAccount(book.db, "full");
     spend(book.db, card.id, expense(book.db, "Shop").id, "2026-08-01", -3_000);
     createCheckpoint(book.db, card.id, { date: "2026-08-01", statementBalance: -3_000, ...saved });
-    const forecast = readForecast(book.db, "2026-10-08", saved);
+    const forecast = readForecast(book.db, "2026-10-08");
     const due = forecast.dates.indexOf("2026-10-22");
     const before = forecast.dates.indexOf("2026-10-21");
     const cashRow = forecast.accounts.find((row) => row.accountId === cash.id);
@@ -187,7 +187,7 @@ test("a partial payment reduces the next card payment", () => {
     spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -2_000);
     createCheckpoint(book.db, card.id, { date: "2026-10-01", statementBalance: -2_000, ...saved });
     payCard(book.db, cash.id, card.id, "2026-10-05", 500);
-    const forecast = readForecast(book.db, "2026-10-08", saved);
+    const forecast = readForecast(book.db, "2026-10-08");
     const due = forecast.dates.indexOf("2026-10-22");
     const before = forecast.dates.indexOf("2026-10-21");
     const cashRow = forecast.accounts.find((row) => row.accountId === cash.id);
@@ -205,7 +205,7 @@ test("fixed and manual cards follow their payment policy", () => {
     const card = cardAccount(book.db, "fixed", 1_000);
     spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -4_000);
     createCheckpoint(book.db, card.id, { date: "2026-10-01", statementBalance: -4_000, ...saved });
-    const forecast = readForecast(book.db, "2026-10-08", saved);
+    const forecast = readForecast(book.db, "2026-10-08");
     const due = forecast.dates.indexOf("2026-10-22");
     expect(forecast.accounts.find((row) => row.accountId === cash.id)?.known[due]).toBe(9_000);
     expect(forecast.accounts.find((row) => row.accountId === card.id)?.known[due]).toBe(-3_000);
@@ -233,7 +233,7 @@ test("off-budget lines are excluded from category medians", () => {
       spend(book.db, cash.id, snacks.id, `${month}-10`, -100);
       spend(book.db, outside.id, snacks.id, `${month}-11`, -10_000);
     }
-    const forecast = readForecast(book.db, "2026-04-01", saved);
+    const forecast = readForecast(book.db, "2026-04-01");
     const row = forecast.accounts.find((item) => item.accountId === cash.id);
     expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 4);
   } finally {
@@ -250,7 +250,7 @@ test("a business-day shift moves the bill, and skipped or linked occurrences are
     const linked = spend(book.db, cash.id, expense(book.db, "Rent").id, "2026-10-15", -1_000);
     linkOccurrence(book.db, plan.id, "2026-10-15", linked.id, saved);
     skipOccurrence(book.db, plan.id, "2026-11-15", "Away", saved);
-    const forecast = readForecast(book.db, "2026-10-01", saved);
+    const forecast = readForecast(book.db, "2026-10-01");
     const row = forecast.accounts.find((item) => item.accountId === cash.id);
     const atDate = (iso: string) => row?.known[forecast.dates.indexOf(iso)];
     expect(atDate("2026-10-10")).toBe(10_000);
@@ -275,7 +275,7 @@ test("a bill linked to a plan is not in the category median", () => {
       const linked = spend(book.db, cash.id, snacks.id, `${month}-12`, -400);
       linkOccurrence(book.db, plan.id, `${month}-12`, linked.id, saved);
     }
-    const forecast = readForecast(book.db, "2026-04-01", saved);
+    const forecast = readForecast(book.db, "2026-04-01");
     const row = forecast.accounts.find((item) => item.accountId === cash.id);
     expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 4);
   } finally {

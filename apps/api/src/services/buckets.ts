@@ -18,7 +18,7 @@ import {
 } from "@num/shared";
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
+import { whole } from "../whole";
 import { ServiceError } from "../service-error";
 import { bucketBalances, type Reader } from "./bucket-balance";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -208,7 +208,7 @@ export function readBucket(db: Reader, id: string): Bucket {
 
 function bucketCount(db: Reader): number {
   const row = db.select({ total: sql<unknown>`count(*)` }).from(buckets).get();
-  return integerSum(row?.total ?? 0);
+  return whole(row?.total ?? 0);
 }
 
 export function listBuckets(db: Db, query: BucketListQuery) {

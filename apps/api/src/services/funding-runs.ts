@@ -2,7 +2,7 @@ import { bucketEvents, buckets, fundingRuns, transactions } from "@num/db";
 import { fundingLimit, isIsoDate, utcNow, type FundingRun, type FundingRunCreate } from "@num/shared";
 import { eq, isNotNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { integerSum } from "../integer-sum";
+import { whole } from "../whole";
 import { ServiceError } from "../service-error";
 import { activeFundingRun, fundingPosition, requirePaycheck } from "./funding-book";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -170,7 +170,7 @@ function runTotals(db: Db): Map<string, number> {
     .all();
   for (const row of rows) {
     if (row.fundingRunId) {
-      totals.set(row.fundingRunId, integerSum(row.total));
+      totals.set(row.fundingRunId, whole(row.total));
     }
   }
   return totals;

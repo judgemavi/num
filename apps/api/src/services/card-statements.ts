@@ -41,7 +41,7 @@ export function cardLedger(db: Db, accountId: string): {
     select t.date as date, t.amount as amount
     from transactions t
     where t.account_id = ${accountId}
-      and t.deleted_at is null
+     
       and t.amount > 0
       and (
         t.transfer_peer_id is not null

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { categories, migrateDatabase, openDatabase, transactionLines, transactions, valuations } from "@num/db";
 import type { TransactionCreate } from "@num/shared";
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount, listAccounts } from "./accounts";
@@ -76,7 +76,7 @@ function rawClassified(db: Db) {
     .from(transactionLines)
     .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
     .leftJoin(categories, eq(transactionLines.categoryId, categories.id))
-    .where(isNull(transactions.deletedAt))
+    
     .all();
   let raw = 0;
   let spending = 0;

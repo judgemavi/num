@@ -7,7 +7,6 @@ const monthErrorText: Partial<Record<ErrorCode, string>> = {
   month_closed: "This month is already closed.",
   month_not_closed: "This month is open.",
   month_not_found: "This month is not in the book.",
-  reopen_reason_required: "Enter a reason.",
   as_of_invalid: "The date is not valid.",
 };
 

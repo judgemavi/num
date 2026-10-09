@@ -27,7 +27,6 @@ export type EditorInput = {
   skipNext: { planId: string; asOf: string };
   skipOccurrence: { planId: string; dueDate: string };
   linkOccurrence: { planId: string; accountId: string; dueDate: string };
-  reopenMonth: { month: string; asOf: string };
 };
 
 export type EditorKind = keyof EditorInput;

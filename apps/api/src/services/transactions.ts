@@ -18,6 +18,8 @@ import {
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
 import { assertRefundLink, clearRefundLinks } from "./refund-link";
 import { spreadSureLabels } from "./match-apply";
+import { transactionReconciled } from "./reconciled";
+import { eraseTransaction } from "./transaction-erase";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -55,7 +57,7 @@ function isTransferOrSplit(lines: NormalizedLine[]): boolean {
 }
 
 function isUserConfirmation(txn: Transaction): boolean {
-  if (txn.mirror || txn.deletedAt !== null || txn.lines.length !== 1) {
+  if (txn.mirror || txn.lines.length !== 1) {
     return false;
   }
   const line = txn.lines[0];
@@ -64,14 +66,14 @@ function isUserConfirmation(txn: Transaction): boolean {
 
 function requireActive(db: Db | WriteTx, id: string): TxRow {
   const row = db.select().from(transactions).where(eq(transactions.id, id)).get();
-  if (!row || row.deletedAt !== null) {
+  if (!row) {
     throw new ServiceError("transaction_not_found", 404);
   }
   return row;
 }
 
-function assertDeletable(row: { status: string }, peer: { status: string } | null): void {
-  if (row.status === "reconciled" || peer?.status === "reconciled") {
+function assertDeletable(db: Db | WriteTx, row: TxRow, peer: TxRow | null): void {
+  if (transactionReconciled(db, row.accountId, row.date) || (peer !== null && transactionReconciled(db, peer.accountId, peer.date))) {
     throw new ServiceError("transaction_reconciled", 409);
   }
 }
@@ -90,13 +92,17 @@ function moneySame(existing: TxRow, existingLines: StoredLine[], header: Header,
 }
 
 function assertReconciledMoney(
+  db: Db | WriteTx,
   existing: TxRow,
   existingLines: StoredLine[],
   peer: TxRow | null,
   header: Header,
   lines: NormalizedLine[],
 ): void {
-  if (existing.status !== "reconciled" && peer?.status !== "reconciled") {
+  const locked =
+    transactionReconciled(db, existing.accountId, existing.date) ||
+    (peer !== null && transactionReconciled(db, peer.accountId, peer.date));
+  if (!locked) {
     return;
   }
   if (!moneySame(existing, existingLines, header, lines)) {
@@ -210,7 +216,6 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
       autoReason: null,
       autoSourceId: null,
       autoConfidence: null,
-      deletedAt: null,
     })
     .run();
   replaceLines(tx, id, lines);
@@ -251,12 +256,12 @@ export function applyTransactionUpdate(
   const existingLines = loadLines(tx, id);
   const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
   const peerLines = peer ? loadLines(tx, peer.id) : [];
-  assertReconciledMoney(existing, existingLines, peer, header, lines);
+  assertReconciledMoney(tx, existing, existingLines, peer, header, lines);
   assertPayee(existing, header.payeeRaw);
   assertLineShape(header.accountId, header.amount, lines);
   const previousTarget = existingLines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null;
   assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
-  const savedHeader = headerForWrite(existing.refundOfId, existing.status === "reconciled" ? { ...header, status: "reconciled" as const } : header);
+  const savedHeader = headerForWrite(existing.refundOfId, header);
   assertRefundLink(tx, savedHeader, id);
   const changed = labelChanged(existing, existingLines, savedHeader, lines);
   const auto: AutoStamp = changed || isTransferOrSplit(lines) ? clearedAuto : keptAuto(existing);
@@ -281,7 +286,7 @@ export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transac
       throw new ServiceError("invalid_body", 400);
     }
     const before = readTransaction(tx, id);
-    tx.update(transactions).set(clearedAuto).where(eq(transactions.id, id)).run();
+    tx.update(transactions).set({ ...clearedAuto, editedAt: at }).where(eq(transactions.id, id)).run();
     const saved = readTransaction(tx, id);
     auditTransaction(tx, id, "update", before, saved);
     if (isUserConfirmation(saved)) {
@@ -308,10 +313,6 @@ export function spreadAfterConfirmations(tx: WriteTx, ids: readonly string[], al
   spreadSureLabels(tx, payees, except);
 }
 
-export function spreadAfterConfirmation(tx: WriteTx, id: string, alsoExcept: ReadonlySet<string> = new Set()): void {
-  spreadAfterConfirmations(tx, [id], alsoExcept);
-}
-
 export function updateTransaction(db: Db, id: string, input: TransactionBody & WriteInput): Transaction {
   const at = input.at ?? utcNow();
   let updated: Transaction | undefined;
@@ -332,15 +333,13 @@ export function deleteTransaction(db: Db, id: string, input: WriteInput): Transa
     const existingLines = loadLines(tx, id);
     const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
     const peerLines = peer ? loadLines(tx, peer.id) : [];
-    assertDeletable(existing, peer);
+    assertDeletable(tx, existing, peer);
     clearRefundLinks(tx, existing.id);
     const before = toTransaction(tx, existing, existingLines);
-    tx.update(transactions).set({ deletedAt: at }).where(eq(transactions.id, existing.id)).run();
-    auditTransaction(tx, existing.id, "delete", before, readTransaction(tx, existing.id));
     if (peer?.mirror) {
       const peerBefore = toTransaction(tx, peer, peerLines);
-      tx.update(transactions).set({ deletedAt: at }).where(eq(transactions.id, peer.id)).run();
-      auditTransaction(tx, peer.id, "delete", peerBefore, readTransaction(tx, peer.id));
+      eraseTransaction(tx, peer.id);
+      auditTransaction(tx, peer.id, "delete", peerBefore, null);
     } else if (peer) {
       const peerBefore = toTransaction(tx, peer, peerLines);
       tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, existing.id)).run();
@@ -358,7 +357,9 @@ export function deleteTransaction(db: Db, id: string, input: WriteInput): Transa
       );
       auditTransaction(tx, peer.id, "update", peerBefore, readTransaction(tx, peer.id));
     }
-    deleted = readTransaction(tx, existing.id);
+    eraseTransaction(tx, existing.id);
+    auditTransaction(tx, existing.id, "delete", before, null);
+    deleted = before;
   });
   if (!deleted) {
     throw new Error("Delete did not return a transaction");

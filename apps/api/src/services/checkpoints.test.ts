@@ -113,10 +113,12 @@ test("a checkpoint is created only when the balances are equal, and only rows on
       expect(created.unlockedAt).toBeNull();
     })).toBe(1);
 
-    expect(getTransaction(book.db, before.id)?.status).toBe("reconciled");
-    expect(getTransaction(book.db, onDate.id)?.status).toBe("reconciled");
-    expect(getTransaction(book.db, after.id)?.status).toBe("open");
-    expect(getTransaction(book.db, removed.id)?.status).toBe("open");
+    expect(getTransaction(book.db, before.id)?.reconciled).toBe(true);
+    expect(getTransaction(book.db, before.id)?.status).toBe("cleared");
+    expect(getTransaction(book.db, onDate.id)?.reconciled).toBe(true);
+    expect(getTransaction(book.db, onDate.id)?.status).toBe("open");
+    expect(getTransaction(book.db, after.id)?.reconciled).toBe(false);
+    expect(getTransaction(book.db, removed.id)).toBeNull();
 
     expectCode(
       () =>
@@ -133,9 +135,11 @@ test("a checkpoint is created only when the balances are equal, and only rows on
 
     const unlocked = unlockCheckpoint(book.db, chequing.id, createdId, { ...saved, at: "2026-10-08T16:00:00Z" });
     expect(unlocked.unlockedAt).toBe("2026-10-08T16:00:00Z");
+    expect(getTransaction(book.db, before.id)?.reconciled).toBe(false);
     expect(getTransaction(book.db, before.id)?.status).toBe("cleared");
-    expect(getTransaction(book.db, onDate.id)?.status).toBe("cleared");
-    expect(getTransaction(book.db, after.id)?.status).toBe("open");
+    expect(getTransaction(book.db, onDate.id)?.reconciled).toBe(false);
+    expect(getTransaction(book.db, onDate.id)?.status).toBe("open");
+    expect(getTransaction(book.db, after.id)?.reconciled).toBe(false);
 
     const unlocks = book.db.select().from(auditLog).where(eq(auditLog.action, "unlock")).all();
     expect(unlocks).toHaveLength(1);
@@ -227,7 +231,7 @@ test("a liability checkpoint stores the negated printed amount", () => {
     expect(stored).toBe(-180_636);
     const created = createCheckpoint(book.db, card.id, { date: "2026-02-15", statementBalance: stored, ...saved });
     expect(created.statementBalance).toBe(-180_636);
-    expect(getTransaction(book.db, charge.id)?.status).toBe("reconciled");
+    expect(getTransaction(book.db, charge.id)?.reconciled).toBe(true);
   } finally {
     book.close();
   }
@@ -251,8 +255,8 @@ test("an investment checkpoint uses the valuation and later transactions", () =>
     expect(compared.balanced).toBe(true);
     expect(compared.calculatedBalance).toBe(49_000);
     createCheckpoint(book.db, fund.id, { date: "2026-02-15", statementBalance: 49_000, ...saved });
-    expect(getTransaction(book.db, before.id)?.status).toBe("reconciled");
-    expect(getTransaction(book.db, afterValuation.id)?.status).toBe("reconciled");
+    expect(getTransaction(book.db, before.id)?.reconciled).toBe(true);
+    expect(getTransaction(book.db, afterValuation.id)?.reconciled).toBe(true);
     expect(getTransaction(book.db, afterStatement.id)?.status).toBe("open");
   } finally {
     book.close();
@@ -279,7 +283,7 @@ test("a checkpoint does not reconcile the mirror in the other account", () => {
       throw new Error("Transfer has no mirror");
     }
     createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: -200, ...saved });
-    expect(getTransaction(book.db, transfer.id)?.status).toBe("reconciled");
+    expect(getTransaction(book.db, transfer.id)?.reconciled).toBe(true);
     expect(getTransaction(book.db, mirrorId)?.status).toBe("open");
   } finally {
     book.close();
@@ -295,8 +299,8 @@ test("unlock leaves transactions reconciled when a later checkpoint still covers
     const first = createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 800, ...saved });
     createCheckpoint(book.db, chequing.id, { date: "2026-02-20", statementBalance: 400, ...saved });
     unlockCheckpoint(book.db, chequing.id, first.id, saved);
-    expect(getTransaction(book.db, early.id)?.status).toBe("reconciled");
-    expect(getTransaction(book.db, late.id)?.status).toBe("reconciled");
+    expect(getTransaction(book.db, early.id)?.reconciled).toBe(true);
+    expect(getTransaction(book.db, late.id)?.reconciled).toBe(true);
   } finally {
     book.close();
   }

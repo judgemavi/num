@@ -81,7 +81,7 @@ export function loadMatchBook(db: Reader): MatchBook {
       t.merchant_id as merchantId, l.category_id as categoryId
     from transactions t
     inner join transaction_lines l on l.transaction_id = t.id
-    where t.deleted_at is null
+    where 1 = 1
       and t.mirror = 0
       and t.auto_reason is null
       and l.category_id is not null
@@ -104,7 +104,7 @@ export function loadMatchBook(db: Reader): MatchBook {
     select t.id as id, t.date as date, t.payee_normalized as payee, l.transfer_account_id as transferAccountId
     from transactions t
     inner join transaction_lines l on l.transaction_id = t.id
-    where t.deleted_at is null
+    where 1 = 1
       and t.mirror = 0
       and t.auto_reason is null
       and l.category_id is null
@@ -260,7 +260,7 @@ export function recurringForRows(db: Reader, pending: readonly LinkTransaction[]
   const existing = db.all<LinkTransaction>(sql`
     select id, account_id as accountId, date, amount, merchant_id as merchantId
     from transactions
-    where deleted_at is null and date >= ${from} and date <= ${to}
+    where date >= ${from} and date <= ${to}
   `).filter((row) => accountIds.has(row.accountId) && !taken.has(row.id));
   const pendingIds = new Set(pending.map((row) => row.id));
   const unique = matchLinks(

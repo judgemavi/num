@@ -1,10 +1,10 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { accounts, auditLog, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
+import { accounts, auditLog, checkpoints, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
 import { columnMapSchema, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { importStatement, listImportBatches } from "./imports";
@@ -76,7 +76,7 @@ function importCsv(
 }
 
 function activeCount(db: Db): number {
-  return db.select({ id: transactions.id }).from(transactions).where(isNull(transactions.deletedAt)).all().length;
+  return db.select({ id: transactions.id }).from(transactions).all().length;
 }
 
 test("the same file two times creates no new transactions", () => {
@@ -242,8 +242,8 @@ test("undo removes only unedited, unreconciled rows", () => {
       at,
     });
     const result = importCsv(book.db, book.dir, book.account.id, "month.csv", [
-      "01/10/2026,KEEP,-1.00",
-      "01/11/2026,EDIT,-2.00",
+      "01/20/2026,KEEP,-1.00",
+      "01/21/2026,EDIT,-2.00",
       "01/12/2026,LOCK,-3.00",
       "01/13/2026,MANUAL MATCH,-4.00",
     ]);
@@ -276,15 +276,22 @@ test("undo removes only unedited, unreconciled rows", () => {
       source: "ui",
       at: "2026-10-08T16:00:00Z",
     });
-    book.sqlite.query("update transactions set status = 'reconciled' where id = ?").run(lock.id);
+    book.db.insert(checkpoints).values({
+      id: crypto.randomUUID(),
+      accountId: lock.accountId,
+      date: lock.date,
+      statementBalance: 0,
+      createdAt: at,
+      unlockedAt: null,
+    }).run();
 
     const undone = undoImportBatch(book.db, result.id, { source: "import", at: "2026-10-09T16:00:00Z" });
     expect(undone.blocked.map((row) => row.reason).sort()).toEqual(["edited", "reconciled"]);
     const after = book.db.select().from(transactions).all();
-    expect(after.find((row) => row.payeeRaw === "KEEP")?.deletedAt).toBe("2026-10-09T16:00:00Z");
-    expect(after.find((row) => row.payeeRaw === "EDIT")?.deletedAt).toBeNull();
-    expect(after.find((row) => row.payeeRaw === "LOCK")?.deletedAt).toBeNull();
-    expect(after.find((row) => row.payeeRaw === "MANUAL")?.deletedAt).toBeNull();
+    expect(after.find((row) => row.payeeRaw === "KEEP")).toBeUndefined();
+    expect(after.find((row) => row.payeeRaw === "EDIT")).toBeDefined();
+    expect(after.find((row) => row.payeeRaw === "LOCK")).toBeDefined();
+    expect(after.find((row) => row.payeeRaw === "MANUAL")).toBeDefined();
     expect(after.find((row) => row.payeeRaw === "MANUAL")?.importRowId).toBeNull();
     expect(undone.batch.undoneAt).toBeNull();
   } finally {
@@ -373,7 +380,7 @@ test("a later import matches a mirror and clears the mirror flag", () => {
     const matched = getTransaction(book.db, mirrorId);
     expect(matched?.mirror).toBe(false);
     expect(matched?.importRowId).not.toBeNull();
-    expect(matched?.deletedAt).toBeNull();
+    expect(matched).not.toBeNull();
     expect(activeCount(book.db)).toBe(2);
   } finally {
     book.close();
@@ -395,7 +402,7 @@ test("a transfer suggestion at import does not create a transfer", () => {
     const result = importCsv(book.db, book.dir, book.account.id, "chequing.csv", ["01/05/2026,VISA PAYMENT,-8.00"]);
     expect(result.kind).toBe("batch");
     expect(activeCount(book.db)).toBe(1);
-    const row = book.db.select().from(transactions).where(isNull(transactions.deletedAt)).all()[0];
+    const row = book.db.select().from(transactions).all()[0];
     if (!row) {
       throw new Error("Imported row is missing");
     }

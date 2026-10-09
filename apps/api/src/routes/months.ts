@@ -1,4 +1,4 @@
-import { asOfQuerySchema, errorSchema, monthDetailSchema, monthKeySchema, monthListSchema, monthReopenSchema } from "@num/shared";
+import { asOfQuerySchema, errorSchema, monthDetailSchema, monthKeySchema, monthListSchema } from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { closeMonth, listMonths, readMonth, reopenMonth } from "../services/months";
@@ -65,11 +65,7 @@ const reopenRoute = createRoute({
   description: "Create or run closed months (reopen). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/months/{month}/reopen",
-  request: {
-    params: monthParams,
-    query: asOfQuerySchema,
-    body: { required: true, content: { "application/json": { schema: monthReopenSchema } } },
-  },
+  request: { params: monthParams, query: asOfQuerySchema },
   responses: {
     200: {
       description: "The opened month",
@@ -93,6 +89,6 @@ export function registerMonths(app: OpenAPIHono, db: Db) {
   });
   app.openapi(reopenRoute, (c) => {
     const { month } = c.req.valid("param");
-    return c.json(reopenMonth(db, month, c.req.valid("query").asOf, c.req.valid("json").reason, { source: "ui" }), 200);
+    return c.json(reopenMonth(db, month, c.req.valid("query").asOf, { source: "ui" }), 200);
   });
 }

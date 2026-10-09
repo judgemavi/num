@@ -1,6 +1,5 @@
 import { AssignEditor, FundEditor, ImportEditor, MoveEditor, ReconcileEditor } from "@/editors/action-editors";
 import type { EditorInput, EditorKind } from "@/editors/editor-types";
-import { ReopenMonthEditor } from "@/insights/reopen-month";
 import {
   ImportInfoEditor,
   LinkOccurrenceEditor,
@@ -67,7 +66,5 @@ export function EditorBody({ kind, props, onClose, onSaved }: BodyProps) {
       return <SkipOccurrenceEditor props={props as EditorInput["skipOccurrence"]} onClose={onClose} onSaved={onSaved} />;
     case "linkOccurrence":
       return <LinkOccurrenceEditor props={props as EditorInput["linkOccurrence"]} onClose={onClose} onSaved={onSaved} />;
-    case "reopenMonth":
-      return <ReopenMonthEditor {...(props as EditorInput["reopenMonth"])} onClose={onClose} onSaved={onSaved} />;
   }
 }

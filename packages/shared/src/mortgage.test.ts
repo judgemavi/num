@@ -1,8 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-  mortgageBalanceAsOf,
   mortgageExtraEffect,
-  mortgagePaymentCents,
   mortgagePaymentDate,
   mortgagePeriodRate,
   mortgagePrefillLines,
@@ -41,13 +39,6 @@ function loan(patch: Partial<MortgageLoan> & Pick<MortgageLoan, "compounding" | 
 
 describe("mortgage schedule", () => {
   test("semi-annual compounding matches the published monthly, biweekly and weekly payments", () => {
-    const monthlyRate = mortgagePeriodRate(5_000, "semiannual", "monthly");
-    const biweeklyRate = mortgagePeriodRate(5_000, "semiannual", "biweekly");
-    const weeklyRate = mortgagePeriodRate(5_000, "semiannual", "weekly");
-    expect(mortgagePaymentCents(hundredThousand, monthlyRate, 25 * 12)).toBe(58_160);
-    expect(mortgagePaymentCents(hundredThousand, biweeklyRate, 25 * 26)).toBe(26_814);
-    expect(mortgagePaymentCents(hundredThousand, weeklyRate, 25 * 52)).toBe(13_400);
-
     const monthly = mortgageSchedule(loan({ compounding: "semiannual", paymentFrequency: "monthly", paymentAmount: 58_160, rateMilliPct: 5_000 }));
     expect(monthly.payments[0]).toMatchObject({ interest: 41_239, principal: 16_921, payment: 58_160 });
     const term = monthly.payments.slice(0, 60);
@@ -64,12 +55,7 @@ describe("mortgage schedule", () => {
 
   test("monthly compounding matches the published monthly payment and the equivalent weekly and biweekly payments", () => {
     const monthlyRate = mortgagePeriodRate(6_000, "monthly", "monthly");
-    const biweeklyRate = mortgagePeriodRate(6_000, "monthly", "biweekly");
-    const weeklyRate = mortgagePeriodRate(6_000, "monthly", "weekly");
     expect(monthlyRate).toBeCloseTo(0.06 / 12, 12);
-    expect(mortgagePaymentCents(hundredThousand, monthlyRate, 30 * 12)).toBe(59_955);
-    expect(mortgagePaymentCents(hundredThousand, biweeklyRate, 30 * 26)).toBe(27_634);
-    expect(mortgagePaymentCents(hundredThousand, weeklyRate, 30 * 52)).toBe(13_809);
 
     const monthly = mortgageSchedule(loan({ compounding: "monthly", paymentFrequency: "monthly", paymentAmount: 59_955, rateMilliPct: 6_000 }));
     expect(monthly.payments[0]).toMatchObject({ interest: 50_000, principal: 9_955, payment: 59_955 });
@@ -102,8 +88,6 @@ describe("mortgage schedule", () => {
       ["2024-08-01", 1_000],
       ["2024-09-01", 0],
     ]);
-    expect(mortgageBalanceAsOf(terms, [{ date: "2024-04-01", balance: -5_000 }], "2024-04-01")).toBe(5_000);
-    expect(mortgageBalanceAsOf(terms, [{ date: "2024-03-15", balance: -6_000 }], "2024-03-20")).toBe(6_000);
   });
 
   test("a mid-period valuation with interest replaces the balance and the next interest", () => {
@@ -121,7 +105,6 @@ describe("mortgage schedule", () => {
     expect(schedule.payments[1]).toMatchObject({ date: "2025-03-01", interest: 1_839, principal: 48_161, balance: 751_839 });
     const onPayment = mortgageSchedule(terms, [{ date: "2025-03-01", balance: -700_000 }]);
     expect(onPayment.payments[1]).toMatchObject({ date: "2025-03-01", interest: 4_775, principal: 45_225, balance: 700_000 });
-    expect(mortgageBalanceAsOf(terms, [{ date: "2025-03-01", balance: -700_000 }], "2025-03-01")).toBe(700_000);
     expect(onPayment.payments[2]).toMatchObject({ date: "2025-04-01", interest: 3_500 });
   });
 

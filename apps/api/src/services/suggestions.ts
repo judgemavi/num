@@ -11,6 +11,7 @@ import {
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { transactionReconciled } from "./reconciled";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { loadLines, replaceLines } from "./transaction-lines";
 import { auditTransaction, readTransaction, toTransaction } from "./transaction-record";
@@ -40,7 +41,7 @@ export function transferHint(db: Db, input: { accountId: string; date: string; a
       t.status as status,
       (select count(*) from transaction_lines l where l.transaction_id = t.id) as lineCount
     from transactions t
-    where t.deleted_at is null
+    where 1 = 1
       and t.transfer_peer_id is null
       and t.account_id <> ${input.accountId}
       and t.amount = ${-input.amount}
@@ -55,7 +56,7 @@ export function transferHint(db: Db, input: { accountId: string; date: string; a
         date: row.date,
         amount: row.amount,
         lineCount: Number(row.lineCount),
-        reconciled: row.status === "reconciled",
+        reconciled: transactionReconciled(db, row.accountId, row.date),
       })),
       input,
     ),
@@ -78,7 +79,7 @@ export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[]
       (t.source = 'import' or t.import_row_id is not null) as imported
     from transactions t
     inner join accounts a on a.id = t.account_id
-    where t.deleted_at is null
+    where 1 = 1
       and t.transfer_peer_id is null
       and a.on_budget = 1
       and t.amount != 0
@@ -105,13 +106,13 @@ export function acceptTransferPair(db: Db, asOf: string, leftId: string, rightId
   write(db, { source: input.source, at: input.at }, (tx) => {
     const left = tx.select().from(transactions).where(eq(transactions.id, leftId)).get();
     const right = tx.select().from(transactions).where(eq(transactions.id, rightId)).get();
-    if (!left || !right || left.deletedAt || right.deletedAt || left.accountId === right.accountId) {
+    if (!left || !right || left.accountId === right.accountId) {
       throw new ServiceError("transfer_pair_not_found", 404);
     }
     if (left.transferPeerId || right.transferPeerId) {
       throw new ServiceError("transfer_pair_not_found", 404);
     }
-    if (left.status === "reconciled" || right.status === "reconciled") {
+    if (transactionReconciled(tx, left.accountId, left.date) || transactionReconciled(tx, right.accountId, right.date)) {
       throw new ServiceError("transaction_reconciled", 409);
     }
     const leftLines = loadLines(tx, left.id);

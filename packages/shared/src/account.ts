@@ -62,15 +62,46 @@ const accountFields = {
   interestRateMilliPct: interestRateMilliPctSchema.nullable().optional(),
 };
 
-export const accountCreateSchema = z.object({
-  ...accountFields,
-  onBudget: z.boolean().optional(),
-});
+function cardAndRateOk(
+  value: {
+    kind: AccountKind;
+    paymentPolicy?: PaymentPolicy | null;
+    fixedPayment?: number | null;
+    interestRateMilliPct?: number | null;
+  },
+  context: z.RefinementCtx,
+): void {
+  const policy = value.paymentPolicy ?? null;
+  const fixed = value.fixedPayment ?? null;
+  if (value.kind === "credit_card") {
+    if (policy === null) {
+      context.addIssue({ code: "custom", path: ["paymentPolicy"] });
+    } else if (policy === "fixed" && fixed === null) {
+      context.addIssue({ code: "custom", path: ["fixedPayment"] });
+    } else if (policy !== "fixed" && fixed !== null) {
+      context.addIssue({ code: "custom", path: ["fixedPayment"] });
+    }
+  } else if (policy !== null || fixed !== null) {
+    context.addIssue({ code: "custom", path: ["paymentPolicy"] });
+  }
+  if ((value.interestRateMilliPct ?? null) !== null && !allowsInterestRate(value.kind)) {
+    context.addIssue({ code: "custom", path: ["interestRateMilliPct"] });
+  }
+}
 
-export const accountUpdateSchema = z.object({
-  ...accountFields,
-  onBudget: z.boolean(),
-});
+export const accountCreateSchema = z
+  .object({
+    ...accountFields,
+    onBudget: z.boolean().optional(),
+  })
+  .superRefine(cardAndRateOk);
+
+export const accountUpdateSchema = z
+  .object({
+    ...accountFields,
+    onBudget: z.boolean(),
+  })
+  .superRefine(cardAndRateOk);
 
 export const archiveAccountSchema = z.object({
   confirm: z.boolean().default(false),

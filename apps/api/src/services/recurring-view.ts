@@ -15,7 +15,7 @@ import {
   type PlanSchedule,
   type RecurringSignals,
 } from "@num/shared";
-import { and, eq, gte, inArray, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { applyLinkedPlan } from "./match-apply";
@@ -87,7 +87,7 @@ function transactionsByIds(db: Db, ids: readonly string[]): Map<string, TxnRow> 
         merchantId: transactions.merchantId,
       })
       .from(transactions)
-      .where(and(inArray(transactions.id, slice), isNull(transactions.deletedAt)))
+      .where(and(inArray(transactions.id, slice)))
       .all();
     for (const row of rows) {
       found.set(row.id, row);
@@ -114,7 +114,6 @@ function transactionsForAccounts(db: Db, accountIds: readonly string[], from: st
             eq(transactions.accountId, accountId),
             gte(transactions.date, from),
             lte(transactions.date, to),
-            isNull(transactions.deletedAt),
           ),
         )
         .all(),
@@ -134,7 +133,7 @@ function detectionTransactions(db: Db, asOf: string): DetectionTransaction[] {
       amount: transactions.amount,
     })
     .from(transactions)
-    .where(and(isNotNull(transactions.merchantId), gte(transactions.date, since), lte(transactions.date, asOf), isNull(transactions.deletedAt)))
+    .where(and(isNotNull(transactions.merchantId), gte(transactions.date, since), lte(transactions.date, asOf)))
     .all()
     .flatMap((row) => (row.merchantId ? [{ ...row, merchantId: row.merchantId }] : []));
 }
