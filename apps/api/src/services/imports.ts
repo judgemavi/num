@@ -24,7 +24,6 @@ import { importOpeningSuggestion } from "./opening-suggestion";
 import { parseOfxStatement } from "./parse-ofx";
 import { loadPreset, loadPresets } from "./presets";
 import { autoLink } from "./recurring-view";
-import { suggestForPayee } from "./suggestions";
 import type { ParsedStatement } from "./statement";
 import type { AuditSource } from "./write";
 
@@ -246,8 +245,6 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     })),
     taken,
     candidates,
-  ).map((row) =>
-    row.outcome === "created" ? { ...row, suggestion: suggestForPayee(db, account.id, row.payeeRaw) } : row,
   );
   const filename = input.filename.split(/[/\\]/).pop()?.replace(/[\r\n"]/g, "").trim() || "upload";
   const mimeType = input.mimeType.trim() || "application/octet-stream";
@@ -283,6 +280,7 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     unreadable: resolved.statement.unreadable,
     presetId: resolved.presetId,
     columnMap: resolved.columnMap,
+    asOf: input.asOf ?? null,
   });
   if (input.asOf) {
     try {

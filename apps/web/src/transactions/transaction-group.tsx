@@ -4,7 +4,6 @@ import {
   inboxGroupApplyResultSchema,
   merchantForChoice,
   moneyDirection,
-  normalizePayee,
   transactionSchema,
   type Account,
   type Category,
@@ -21,7 +20,6 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/co
 import { FieldError, FieldLabel } from "@/components/ui/field";
 import { apiRequest } from "@/request";
 import { formatMoney as formatDisplayMoney } from "@/money";
-import { PayeeRuleField } from "@/transactions/payee-rule-field";
 import { transactionError } from "@/transactions/format";
 import { WhatIsThis } from "@/transactions/what-is-this";
 
@@ -99,9 +97,6 @@ function GroupForm({
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [transferAccountId, setTransferAccountId] = useState<string | null>(null);
   const [merchantId, setMerchantId] = useState<string | null>(null);
-  const [always, setAlways] = useState(false);
-  const [ruleMatch, setRuleMatch] = useState<"exact" | "prefix" | "contains">("exact");
-  const [rulePattern, setRulePattern] = useState(normalizePayee(transactions[0]?.payeeRaw ?? ""));
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -143,10 +138,6 @@ function GroupForm({
         categoryId: choice === "transfer" ? null : categoryId,
         transferAccountId: choice === "transfer" ? transferAccountId : null,
         merchantId: choice === "transfer" ? null : merchantId,
-        rule:
-          always && rulePattern.trim().length > 0
-            ? { payee: normalizePayee(payee), match: ruleMatch, pattern: rulePattern.trim() }
-            : null,
       }),
     });
     setSaving(false);
@@ -222,17 +213,6 @@ function GroupForm({
         onMerchantId={setMerchantId}
         payee={payee}
         suggestion={null}
-      />
-      <PayeeRuleField
-        payee={payee}
-        accountId={accountId}
-        exceptIds={transactions.map((item) => item.id).join(",")}
-        enabled={always}
-        onEnabled={setAlways}
-        match={ruleMatch}
-        onMatch={setRuleMatch}
-        pattern={rulePattern}
-        onPattern={setRulePattern}
       />
       {notice ? <p role="status">{notice}</p> : null}
       {error ? <FieldError>{error}</FieldError> : null}

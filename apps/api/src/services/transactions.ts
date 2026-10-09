@@ -1,5 +1,5 @@
 import { accounts, categories, merchants, tags, transactions } from "@num/db";
-import { utcNow, type Transaction } from "@num/shared";
+import { autoReasons, utcNow, type AutoReason, type Transaction } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -15,7 +15,7 @@ import {
   type TxRow,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
-import { spreadSureLabels } from "./auto-label";
+import { spreadSureLabels } from "./match-apply";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -24,13 +24,17 @@ type WriteInput = {
   at?: string;
 };
 
-export type AutoStamp = { autoReason: "rule" | "learned" | null; autoSourceId: string | null };
+export type AutoStamp = { autoReason: AutoReason | null; autoSourceId: string | null; autoConfidence: number | null };
 
-const clearedAuto: AutoStamp = { autoReason: null, autoSourceId: null };
+const clearedAuto: AutoStamp = { autoReason: null, autoSourceId: null, autoConfidence: null };
 
 function keptAuto(row: TxRow): AutoStamp {
-  if (row.autoReason === "rule" || row.autoReason === "learned") {
-    return { autoReason: row.autoReason, autoSourceId: row.autoSourceId };
+  if (row.autoReason && (autoReasons as readonly string[]).includes(row.autoReason)) {
+    return {
+      autoReason: row.autoReason as AutoReason,
+      autoSourceId: row.autoSourceId,
+      autoConfidence: row.autoConfidence,
+    };
   }
   return clearedAuto;
 }
@@ -201,6 +205,7 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
       mirror: false,
       autoReason: null,
       autoSourceId: null,
+      autoConfidence: null,
       deletedAt: null,
     })
     .run();
@@ -234,7 +239,6 @@ export function applyTransactionUpdate(
   id: string,
   input: TransactionBody,
   at: string,
-  automatic?: { reason: "rule"; sourceId: string },
   spread = true,
 ): Transaction {
   const lines = input.lines.map(normalizeLine);
@@ -250,18 +254,14 @@ export function applyTransactionUpdate(
   assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
   const savedHeader = existing.status === "reconciled" ? { ...header, status: "reconciled" as const } : header;
   const changed = labelChanged(existing, existingLines, savedHeader, lines);
-  const auto: AutoStamp = automatic
-    ? { autoReason: automatic.reason, autoSourceId: automatic.sourceId }
-    : changed || isTransferOrSplit(lines)
-      ? clearedAuto
-      : keptAuto(existing);
+  const auto: AutoStamp = changed || isTransferOrSplit(lines) ? clearedAuto : keptAuto(existing);
   if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {
     applyMirrorEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at, auto);
   } else {
     applySourceEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at, auto);
   }
   const saved = readTransaction(tx, id);
-  if (spread && !automatic && changed && isUserConfirmation(saved)) {
+  if (spread && changed && isUserConfirmation(saved)) {
     spreadSureLabels(tx, saved.payeeNormalized, new Set([saved.id]));
   }
   return saved;
@@ -272,7 +272,7 @@ export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transac
   let accepted: Transaction | undefined;
   write(db, { source: input.source, at }, (tx) => {
     const existing = requireActive(tx, id);
-    if (existing.autoReason !== "rule" && existing.autoReason !== "learned") {
+    if (existing.autoReason === null) {
       throw new ServiceError("invalid_body", 400);
     }
     const before = readTransaction(tx, id);

@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { asOfQuerySchema, isoDateSchema } from "./date";
 import { amountModes, planFrequencies } from "./recurring-calc";
-import { ruleMatches } from "./rule";
 import { suggestionSchema } from "./suggest";
 import { unreadableReasons } from "./statement";
 import { isUtcTimestamp } from "./time";
@@ -214,12 +213,6 @@ export const skippedRowSchema = z.object({
   reason: z.enum(groupSkipReasons),
 });
 
-export const categorizationRuleSchema = z.object({
-  payee: z.string().trim().min(1).max(200),
-  match: z.enum(ruleMatches),
-  pattern: z.string().trim().min(1).max(200),
-});
-
 export const inboxGroupApplySchema = z
   .object({
     accountId: z.uuid(),
@@ -228,14 +221,12 @@ export const inboxGroupApplySchema = z
     categoryId: z.uuid().nullable(),
     transferAccountId: z.uuid().nullable(),
     merchantId: z.uuid().nullable(),
-    rule: categorizationRuleSchema.nullable(),
   })
   .refine((value) => (value.categoryId === null) !== (value.transferAccountId === null));
 
 export const inboxGroupApplyResultSchema = z.object({
   applied: z.number().int().nonnegative(),
   skipped: z.array(skippedRowSchema),
-  ruleId: z.uuid().nullable(),
 });
 
 export const payeeCountQuerySchema = z.object({
@@ -253,5 +244,4 @@ export type Inbox = z.infer<typeof inboxSchema>;
 export type InboxDecision = z.infer<typeof inboxDecisionSchema>;
 export type ImportReviewResolve = z.infer<typeof importReviewResolveSchema>;
 export type InboxGroupApply = z.infer<typeof inboxGroupApplySchema>;
-export type CategorizationRule = z.infer<typeof categorizationRuleSchema>;
 export type GroupSkip = z.infer<typeof skippedRowSchema>;

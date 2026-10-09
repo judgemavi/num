@@ -14,14 +14,30 @@ export function formatDate(iso: string): string {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { dateStyle: "medium" });
 }
 
-export function automaticReasonText(reason: AutoReason, pattern: string | null, date: string | null): string {
-  if (reason === "rule") {
-    return pattern ? `Rule: ${pattern}` : "Rule";
+export function automaticReasonText(input: {
+  confidence: number | null;
+  reason: AutoReason;
+  sourceName: string | null;
+  learnedCount: number | null;
+}): string {
+  const parts: string[] = [];
+  if (input.confidence !== null) {
+    parts.push(`${new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 0 }).format(input.confidence / 1000)} sure`);
   }
-  if (date) {
-    return `Learned from ${Temporal.PlainDate.from(date).toLocaleString(undefined, { month: "short", day: "numeric" })}`;
+  if (input.reason === "recurring") {
+    parts.push(input.sourceName ? `Recurring: ${input.sourceName}` : "Recurring");
   }
-  return "Learned";
+  if (input.reason === "similar" && input.sourceName) {
+    parts.push(`Similar: ${input.sourceName}`);
+  }
+  if (input.reason === "merchant_default") {
+    parts.push(input.sourceName ? `Merchant: ${input.sourceName}` : "Merchant default");
+  }
+  if (input.learnedCount && input.learnedCount > 0 && input.reason !== "merchant_default") {
+    const answers = input.learnedCount === 1 ? "answer" : "answers";
+    parts.push(`learned from ${input.learnedCount} ${answers}`);
+  }
+  return parts.join(" · ");
 }
 
 export function transactionError(code: string): string {

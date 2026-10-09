@@ -1,12 +1,15 @@
 import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { accounts, documents, importBatches, importRows, transactionLines, transactions } from "@num/db";
-import { storedAutomatic, storedPayee, type ColumnMap, type ImportBatch, type UnreadableRow } from "@num/shared";
+import { normalizePayee, storedPayee, type ColumnMap, type ImportBatch, type MatchResult, type UnreadableRow } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountAuditSnapshot } from "./account-snapshot";
 import { countOutcomes, presentBatch } from "./import-read";
 import type { PlannedImportRow } from "./import-plan";
+import { labelFields, linkRecurring, mortgageSplitLines } from "./match-apply";
+import { loadMatchBook, recurringForRows, scorePayee } from "./match-book";
+import { insertMirror } from "./transaction-transfer";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -36,14 +39,31 @@ type SaveInput = {
   unreadable: UnreadableRow[];
   presetId: string | null;
   columnMap: ColumnMap | null;
+  asOf: string | null;
 };
 
-function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: PlannedImportRow): void {
+function scoredLabel(tx: WriteTx, accountId: string, row: PlannedImportRow, result: MatchResult) {
+  const payee = storedPayee(row.payeeRaw);
+  const mortgage = result.mortgage ? mortgageSplitLines(tx, result, accountId, row.date, row.amount) : null;
+  if (result.mortgage && !mortgage) {
+    return { payee, applied: labelFields({ ...result, level: "none", mortgage: false }, null), mortgage: null, link: false };
+  }
+  return { payee, applied: labelFields(result, null), mortgage, link: result.level === "automatic" && result.reason === "recurring" };
+}
+
+function insertCreated(
+  tx: WriteTx,
+  batchId: string,
+  accountId: string,
+  row: PlannedImportRow,
+  result: MatchResult,
+  dueDate: string | null,
+): void {
   const rowId = crypto.randomUUID();
   const transactionId = crypto.randomUUID();
-  const payee = storedPayee(row.payeeRaw);
-  const suggestion = row.suggestion;
-  const applied = storedAutomatic(suggestion);
+  const planned = scoredLabel(tx, accountId, row, result);
+  const payee = planned.payee;
+  const applied = planned.applied;
   tx.insert(importRows)
     .values({
       id: rowId,
@@ -60,13 +80,14 @@ function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: Pla
       active: true,
     })
     .run();
+  const categoryId = applied && "categoryId" in applied ? applied.categoryId : null;
   tx.insert(transactions)
     .values({
       id: transactionId,
       accountId,
       date: row.date,
       amount: row.amount,
-      merchantId: applied.merchantId,
+      merchantId: applied?.merchantId ?? null,
       notes: null,
       payeeRaw: payee.payeeRaw,
       payeeNormalized: payee.payeeNormalized,
@@ -75,24 +96,53 @@ function insertCreated(tx: WriteTx, batchId: string, accountId: string, row: Pla
       importRowId: rowId,
       transferPeerId: null,
       mirror: false,
-      autoReason: applied.autoReason,
-      autoSourceId: applied.autoSourceId,
+      autoReason: applied?.autoReason ?? null,
+      autoSourceId: applied?.autoSourceId ?? null,
+      autoConfidence: applied?.autoConfidence ?? null,
       deletedAt: null,
     })
     .run();
-  tx.insert(transactionLines)
-    .values({
-      id: crypto.randomUUID(),
+  const lines = planned.mortgage ?? [
+    { amount: row.amount, memo: null, categoryId, transferAccountId: null, tagIds: [] },
+  ];
+  for (const line of lines) {
+    tx.insert(transactionLines)
+      .values({
+        id: crypto.randomUUID(),
+        transactionId,
+        amount: line.amount,
+        memo: line.memo,
+        categoryId: line.categoryId,
+        transferAccountId: line.transferAccountId,
+      })
+      .run();
+  }
+  const principal = planned.mortgage?.find((line) => line.transferAccountId);
+  if (principal?.transferAccountId) {
+    insertMirror(
+      tx,
       transactionId,
-      amount: row.amount,
-      memo: null,
-      categoryId: applied.categoryId,
-      transferAccountId: null,
-    })
-    .run();
+      {
+        accountId,
+        date: row.date,
+        amount: row.amount,
+        merchantId: null,
+        notes: null,
+        payeeRaw: payee.payeeRaw,
+        payeeNormalized: payee.payeeNormalized,
+        status: "open",
+      },
+      "import",
+      principal.transferAccountId,
+      principal,
+    );
+  }
+  if (planned.link && dueDate && result.sourceId) {
+    linkRecurring(tx, result.sourceId, dueDate, transactionId);
+  }
   tx.update(importRows).set({ transactionId }).where(eq(importRows.id, rowId)).run();
   auditTransaction(tx, transactionId, "create", null, readTransaction(tx, transactionId), {
-    suggestionReason: suggestion?.reason ?? "none",
+    suggestionReason: result.reason ?? "none",
   });
 }
 
@@ -236,9 +286,25 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
         undoneAt: null,
       })
       .run();
+    const created = input.rows.filter((row) => row.outcome === "created");
+    const book = loadMatchBook(tx);
+    const pending = created.map((row) => ({
+      id: `import:${row.rowIndex}`,
+      accountId: input.accountId,
+      date: row.date,
+      amount: row.amount,
+      merchantId: null,
+    }));
+    const recurring = input.asOf ? recurringForRows(tx, pending, input.asOf) : new Map();
+    const scores = new Map<number, MatchResult>();
+    for (const row of created) {
+      const hit = recurring.get(`import:${row.rowIndex}`) ?? null;
+      scores.set(row.rowIndex, scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: hit }));
+    }
     for (const row of input.rows) {
       if (row.outcome === "created") {
-        insertCreated(tx, batchId, input.accountId, row);
+        const hit = recurring.get(`import:${row.rowIndex}`);
+        insertCreated(tx, batchId, input.accountId, row, scores.get(row.rowIndex) ?? scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: null }), hit?.dueDate ?? null);
       } else if (row.outcome === "matched") {
         insertMatched(tx, batchId, input.accountId, row);
       } else {

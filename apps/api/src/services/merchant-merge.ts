@@ -1,4 +1,4 @@
-import { merchants, recurringPlans, rules, transactions } from "@num/db";
+import { merchants, recurringPlans, transactions } from "@num/db";
 import { utcNow, type Merchant } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
@@ -16,34 +16,12 @@ function merchantSnapshot(row: { name: string; defaultCategoryId: string | null;
   return { name: row.name, defaultCategoryId: row.defaultCategoryId, archivedAt: row.archivedAt };
 }
 
-function ruleSnapshot(row: typeof rules.$inferSelect) {
-  return {
-    match: row.match,
-    pattern: row.pattern,
-    accountId: row.accountId,
-    merchantId: row.merchantId,
-    categoryId: row.categoryId,
-    priority: row.priority,
-    origin: row.origin,
-    archivedAt: row.archivedAt,
-  };
-}
-
 function moveTransactions(tx: WriteTx, sourceId: string, targetId: string) {
   const rows = tx.select({ id: transactions.id }).from(transactions).where(eq(transactions.merchantId, sourceId)).all();
   for (const row of rows) {
     const before = readTransaction(tx, row.id);
     tx.update(transactions).set({ merchantId: targetId }).where(eq(transactions.id, row.id)).run();
     auditTransaction(tx, row.id, "update", before, readTransaction(tx, row.id));
-  }
-}
-
-function moveRules(tx: WriteTx, sourceId: string, targetId: string) {
-  const rows = tx.select().from(rules).where(eq(rules.merchantId, sourceId)).all();
-  for (const row of rows) {
-    const next = { ...row, merchantId: targetId };
-    tx.update(rules).set({ merchantId: targetId }).where(eq(rules.id, row.id)).run();
-    tx.audit({ entity: "rules", entityId: row.id, action: "update", before: ruleSnapshot(row), after: ruleSnapshot(next) });
   }
 }
 
@@ -77,7 +55,6 @@ export function mergeMerchants(db: Db, sourceId: string, targetId: string, input
       throw new ServiceError("merchant_archived", 409);
     }
     moveTransactions(tx, sourceId, targetId);
-    moveRules(tx, sourceId, targetId);
     movePlans(tx, sourceId, targetId);
     const next = { ...source, archivedAt: source.archivedAt ?? at };
     if (!source.archivedAt) {

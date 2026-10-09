@@ -1,5 +1,6 @@
-import { rules, transactions } from "@num/db";
+import { merchants, recurringPlans, transactions } from "@num/db";
 import {
+  autoReasons,
   storedPayee,
   transactionInputStatuses,
   transactionSources,
@@ -11,7 +12,7 @@ import {
   type TransactionSource,
   type TransactionStatus,
 } from "@num/shared";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { loadLines, type StoredLine } from "./transaction-lines";
@@ -49,22 +50,35 @@ function asSource(value: string): TransactionSource {
 }
 
 function asAutoReason(value: string | null): AutoReason | null {
-  if (value === "rule" || value === "learned") {
-    return value;
+  if (value && (autoReasons as readonly string[]).includes(value)) {
+    return value as AutoReason;
   }
   return null;
 }
 
-function labelFacts(db: Reader, row: TxRow): { autoPattern: string | null; autoDate: string | null } {
-  if (row.autoReason === "rule" && row.autoSourceId) {
-    const rule = db.select({ pattern: rules.pattern }).from(rules).where(eq(rules.id, row.autoSourceId)).get();
-    return { autoPattern: rule?.pattern ?? null, autoDate: null };
+function labelFacts(db: Reader, row: TxRow): { autoSourceName: string | null; autoLearnedCount: number | null } {
+  if (!row.autoReason) {
+    return { autoSourceName: null, autoLearnedCount: null };
   }
-  if (row.autoReason === "learned" && row.autoSourceId) {
-    const source = db.select({ date: transactions.date }).from(transactions).where(eq(transactions.id, row.autoSourceId)).get();
-    return { autoPattern: null, autoDate: source?.date ?? null };
+  let autoSourceName: string | null = null;
+  if (row.autoReason === "recurring" && row.autoSourceId) {
+    autoSourceName = db.select({ name: recurringPlans.name }).from(recurringPlans).where(eq(recurringPlans.id, row.autoSourceId)).get()?.name ?? null;
+  } else if (row.autoReason === "merchant_default" && row.autoSourceId) {
+    autoSourceName = db.select({ name: merchants.name }).from(merchants).where(eq(merchants.id, row.autoSourceId)).get()?.name ?? null;
+  } else if (row.autoSourceId) {
+    autoSourceName = db.select({ payee: transactions.payeeNormalized }).from(transactions).where(eq(transactions.id, row.autoSourceId)).get()?.payee ?? null;
   }
-  return { autoPattern: null, autoDate: null };
+  const counted = db.all<{ total: number }>(sql`
+    select count(*) as total
+    from transactions t
+    inner join transaction_lines l on l.transaction_id = t.id
+    where t.deleted_at is null
+      and t.auto_reason is null
+      and t.payee_normalized = ${row.payeeNormalized}
+      and l.category_id is not null
+      and l.transfer_account_id is null
+  `);
+  return { autoSourceName, autoLearnedCount: Number(counted[0]?.total ?? 0) };
 }
 
 export function recordSource(source: "ui" | TransactionSource): TransactionSource {
@@ -110,6 +124,7 @@ export function toTransaction(db: Reader, row: TxRow, lines: StoredLine[]): Tran
     mirror: row.mirror,
     autoReason: asAutoReason(row.autoReason),
     autoSourceId: row.autoSourceId,
+    autoConfidence: row.autoConfidence,
     ...labelFacts(db, row),
     deletedAt: row.deletedAt,
     lines,
@@ -132,6 +147,7 @@ function snapshot(record: Transaction) {
     mirror: record.mirror,
     autoReason: record.autoReason,
     autoSourceId: record.autoSourceId,
+    autoConfidence: record.autoConfidence,
     deletedAt: record.deletedAt,
     lines: record.lines.map((line) => ({
       id: line.id,

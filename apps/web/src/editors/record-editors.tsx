@@ -6,7 +6,6 @@ import {
   categorySchema,
   merchantSchema,
   planSchema,
-  ruleSchema,
   tagSchema,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -31,7 +30,6 @@ import { CategoryForm } from "@/settings/category-form";
 import { categoryError, tagError } from "@/settings/format";
 import { MerchantForm } from "@/settings/merchant-form";
 import { NameForm } from "@/settings/name-form";
-import { RuleForm } from "@/settings/rule-form";
 import { TransactionEditor } from "@/transactions/transaction-editor";
 
 type Finish = {
@@ -237,30 +235,6 @@ export function MerchantRecord({ props, onClose, onSaved }: { props: EditorInput
       merchant={props.id ? (merchant.data ?? null) : null}
       initialName={props.name}
       categories={categories.data}
-      onClose={onClose}
-      onSaved={save}
-    />
-  );
-}
-
-export function RuleRecord({ props, onClose, onSaved }: { props: EditorInput["rule"] } & Finish) {
-  const accounts = useAccounts();
-  const categories = useCategories();
-  const merchants = useMerchants();
-  const rule = useRecord("rule", props.id, `/api/rules/${props.id ?? ""}`, ruleSchema);
-  const save = useSaved([["rules"], ["rule"]], onSaved);
-  if (accounts.isPending || categories.isPending || merchants.isPending || (props.id && rule.isPending)) {
-    return <LoadingLine label="Loading the rule." />;
-  }
-  if (accounts.isError || categories.isError || merchants.isError || rule.isError || !accounts.data || !categories.data || !merchants.data) {
-    return <LoadError label="The rule did not load." onRetry={() => void rule.refetch()} />;
-  }
-  return (
-    <RuleForm
-      rule={props.id ? (rule.data ?? null) : null}
-      accounts={accounts.data}
-      categories={categories.data}
-      merchants={merchants.data}
       onClose={onClose}
       onSaved={save}
     />

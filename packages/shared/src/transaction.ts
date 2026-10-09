@@ -2,9 +2,8 @@ import { z } from "zod";
 import { accountKinds } from "./account";
 import { isoDateSchema } from "./date";
 import { skippedRowSchema } from "./inbox";
-import { ruleMatches } from "./rule";
 import { listQuerySchema, pagedResponseSchema } from "./list";
-import { autoReasons } from "./learned";
+import { autoReasons } from "./matching";
 import { isUtcTimestamp } from "./time";
 
 export const transactionStatuses = ["open", "cleared", "reconciled"] as const;
@@ -55,15 +54,7 @@ export const transactionCreateSchema = z.object(transactionFields);
 
 export const transactionUpdateSchema = z.object(transactionFields);
 
-export const transactionWriteSchema = transactionUpdateSchema.extend({
-  rule: z
-    .object({
-      payee: z.string().trim().min(1).max(200),
-      match: z.enum(ruleMatches),
-      pattern: z.string().trim().min(1).max(200),
-    })
-    .optional(),
-});
+export const transactionWriteSchema = transactionUpdateSchema;
 
 export const transactionSchema = z.object({
   id: z.uuid(),
@@ -81,8 +72,9 @@ export const transactionSchema = z.object({
   mirror: z.boolean(),
   autoReason: z.enum(autoReasons).nullable(),
   autoSourceId: z.uuid().nullable(),
-  autoPattern: z.string().nullable(),
-  autoDate: isoDateSchema.nullable(),
+  autoConfidence: z.number().int().min(0).max(1000).nullable(),
+  autoSourceName: z.string().nullable(),
+  autoLearnedCount: z.number().int().min(0).nullable(),
   deletedAt: z.string().refine(isUtcTimestamp).nullable(),
   lines: z.array(transactionLineSchema),
 });
@@ -138,8 +130,9 @@ export const transactionListItemSchema = z.object({
   status: z.enum(transactionStatuses),
   runningBalance: centsSchema.nullable(),
   autoReason: z.enum(autoReasons).nullable(),
-  autoPattern: z.string().nullable(),
-  autoDate: isoDateSchema.nullable(),
+  autoConfidence: z.number().int().min(0).max(1000).nullable(),
+  autoSourceName: z.string().nullable(),
+  autoLearnedCount: z.number().int().min(0).nullable(),
 });
 
 export const transactionListSchema = pagedResponseSchema(transactionListItemSchema);

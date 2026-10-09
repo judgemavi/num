@@ -72,7 +72,7 @@ export function MerchantForm({ merchant, initialName, categories, onClose, onSav
     <form onSubmit={(event) => void submit(event)} className="grid gap-4">
       <DialogHeader>
         <DialogTitle>{merchant ? "Edit merchant" : "New merchant"}</DialogTitle>
-        <DialogDescription>The default category is used when no rule and no payee history match.</DialogDescription>
+        <DialogDescription>The default category is used when nothing else matches.</DialogDescription>
       </DialogHeader>
       {(decisions.data ?? []).map((row) => (
         <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">

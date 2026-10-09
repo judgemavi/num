@@ -1,7 +1,6 @@
 import {
   normalizePayee,
   utcNow,
-  type CategorizationRule,
   type GroupSkip,
   type GroupSkipReason,
   type InboxGroupApply,
@@ -9,8 +8,6 @@ import {
 } from "@num/shared";
 import { sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { ServiceError } from "../service-error";
-import { insertRule } from "./rules";
 import { readTransaction, type TransactionBody } from "./transaction-record";
 import { applyTransactionUpdate, insertTransaction, spreadAfterConfirmation } from "./transactions";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -85,7 +82,7 @@ function bodyFor(transaction: Transaction, patch: Patch): TransactionBody {
   };
 }
 
-function applyOne(tx: WriteTx, id: string, patch: Patch, at: string, ruleId: string | null = null): GroupSkip | null {
+function applyOne(tx: WriteTx, id: string, patch: Patch, at: string): GroupSkip | null {
   let transaction: Transaction;
   try {
     transaction = readTransaction(tx, id);
@@ -99,7 +96,7 @@ function applyOne(tx: WriteTx, id: string, patch: Patch, at: string, ruleId: str
   if (reason) {
     return { id, reason };
   }
-  applyTransactionUpdate(tx, id, bodyFor(transaction, patch), at, ruleId ? { reason: "rule", sourceId: ruleId } : undefined, false);
+  applyTransactionUpdate(tx, id, bodyFor(transaction, patch), at, false);
   return null;
 }
 
@@ -123,46 +120,13 @@ function otherIds(reader: { all<T>(query: ReturnType<typeof sql>): T[] }, payee:
   return rows.map((row) => row.id).filter((id) => !except.has(id));
 }
 
-function applyRule(
-  tx: WriteTx,
-  rule: CategorizationRule,
-  patch: Patch,
-  except: ReadonlySet<string>,
-  at: string,
-): { ruleId: string; applied: number; skipped: GroupSkip[] } {
-  const payee = normalizePayee(rule.payee);
-  if (payee.length === 0) {
-    throw new ServiceError("invalid_body", 400);
-  }
-  const saved = insertRule(tx, {
-    match: rule.match,
-    pattern: rule.pattern,
-    merchantId: patch.transferAccountId ? null : patch.merchantId,
-    categoryId: patch.categoryId,
-    transferAccountId: patch.transferAccountId,
-    priority: 0,
-  });
-  const skipped: GroupSkip[] = [];
-  let applied = 0;
-  for (const id of otherIds(tx, payee, patch.accountId, except)) {
-    const skip = applyOne(tx, id, patch, at, patch.transferAccountId ? null : saved.id);
-    if (skip) {
-      skipped.push(skip);
-    } else {
-      applied += 1;
-    }
-  }
-  return { ruleId: saved.id, applied, skipped };
-}
-
-export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { applied: number; skipped: GroupSkip[]; ruleId: string | null } {
+export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { applied: number; skipped: GroupSkip[] } {
   const at = input.at ?? utcNow();
   const excluded = new Set(input.excludedIds);
   const groupIds = [...new Set(input.transactionIds)];
   const targets = groupIds.filter((id) => !excluded.has(id));
   let applied = 0;
-  let skipped: GroupSkip[] = [];
-  let ruleId: string | null = null;
+  const skipped: GroupSkip[] = [];
   write(db, { source: input.source, at }, (tx) => {
     for (const id of targets) {
       const skip = applyOne(tx, id, input, at);
@@ -172,17 +136,11 @@ export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { 
         applied += 1;
       }
     }
-    if (input.rule) {
-      const rule = applyRule(tx, input.rule, input, new Set(groupIds), at);
-      ruleId = rule.ruleId;
-      applied += rule.applied;
-      skipped = [...skipped, ...rule.skipped];
-    }
     for (const id of targets) {
       spreadAfterConfirmation(tx, id, excluded);
     }
   });
-  return { applied, skipped, ruleId };
+  return { applied, skipped };
 }
 
 export function countOtherUncategorized(db: Db, payeeRaw: string, accountId: string, exceptIds: readonly string[]): number {
@@ -198,43 +156,24 @@ export function countOtherUncategorized(db: Db, payeeRaw: string, accountId: str
 
 type Saved = { id: string; applied: number; skipped: GroupSkip[] };
 
-function withRule(db: Db, at: string, source: AuditSource, rule: CategorizationRule | undefined, accountId: string, except: string[], patch: Patch, run: (tx: WriteTx) => string): Saved {
+function saveInWrite(db: Db, at: string, source: AuditSource, run: (tx: WriteTx) => string): Saved {
   let id = "";
-  let applied = 0;
-  let skipped: GroupSkip[] = [];
   write(db, { source, at }, (tx) => {
     id = run(tx);
-    if (rule) {
-      const result = applyRule(tx, rule, { ...patch, accountId }, new Set([...except, id]), at);
-      applied = result.applied;
-      skipped = result.skipped;
-    }
     spreadAfterConfirmation(tx, id);
   });
-  return { id, applied, skipped };
+  return { id, applied: 0, skipped: [] };
 }
 
 export function saveTransactionWithRule(
   db: Db,
   id: string | null,
-  input: TransactionBody & WriteInput & { rule?: CategorizationRule },
+  input: TransactionBody & WriteInput,
 ): Transaction & { applied: number; skipped: GroupSkip[] } {
   const at = input.at ?? utcNow();
-  const patch: Patch = {
-    accountId: input.accountId,
-    categoryId: input.lines.find((line) => line.categoryId)?.categoryId ?? null,
-    transferAccountId: input.lines.find((line) => line.transferAccountId)?.transferAccountId ?? null,
-    merchantId: input.merchantId ?? null,
-  };
-  if (input.rule && patch.categoryId !== null && patch.transferAccountId !== null) {
-    throw new ServiceError("invalid_body", 400);
-  }
-  if (input.rule && patch.categoryId === null && patch.transferAccountId === null) {
-    throw new ServiceError("invalid_body", 400);
-  }
-  const saved = withRule(db, at, input.source, input.rule, input.accountId, [], patch, (tx) => {
+  const saved = saveInWrite(db, at, input.source, (tx) => {
     if (id) {
-      return applyTransactionUpdate(tx, id, input, at, undefined, false).id;
+      return applyTransactionUpdate(tx, id, input, at, false).id;
     }
     return insertTransaction(tx, input, input.source, false).id;
   });

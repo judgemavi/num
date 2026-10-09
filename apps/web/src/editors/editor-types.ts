@@ -14,7 +14,6 @@ export type EditorInput = {
   group: { id: string | null; name?: string };
   tag: { id: string | null; name?: string };
   merchant: { id: string | null; name?: string };
-  rule: { id: string | null };
   bucket: { id: string | null };
   plan: { id: string | null; seed?: PlanSeed };
   mortgage: { id: string | null };
@@ -25,7 +24,6 @@ export type EditorInput = {
   moveMoney: { fromId: string | null };
   importInfo: Pick<ImportBatch, "filename" | "counts" | "unreadable">;
   mergeMerchant: { merchantId: string };
-  applyRule: { ruleId: string };
   skipNext: { planId: string; asOf: string };
   skipOccurrence: { planId: string; dueDate: string };
   linkOccurrence: { planId: string; accountId: string; dueDate: string };
@@ -42,7 +40,6 @@ export function isRecordKind(kind: EditorKind): kind is RecordEditorKind {
     kind === "group" ||
     kind === "tag" ||
     kind === "merchant" ||
-    kind === "rule" ||
     kind === "bucket" ||
     kind === "plan" ||
     kind === "mortgage"

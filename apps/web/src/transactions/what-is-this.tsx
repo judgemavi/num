@@ -60,10 +60,14 @@ type WhatIsThisProps = {
 
 function reasonText(reason: SuggestionReason): string {
   switch (reason) {
-    case "rule":
-      return "This comes from a rule.";
-    case "payee_history":
-      return "This comes from past transactions.";
+    case "recurring":
+      return "This matches a recurring item.";
+    case "learned_amount":
+      return "This matches the payee and the amount.";
+    case "learned_payee":
+      return "This matches past answers for the payee.";
+    case "similar":
+      return "This looks like another payee.";
     case "merchant_default":
       return "This comes from the merchant.";
     case "none":

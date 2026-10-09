@@ -11,7 +11,6 @@ import { createCategory } from "./categories";
 import { importStatement } from "./imports";
 import { listInbox } from "./inbox";
 import { createMerchant } from "./merchants";
-import { createRule } from "./rules";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const at = "2026-10-08T16:00:00.000Z";
@@ -104,17 +103,14 @@ test("the first confirmation labels the payee's other rows and the next import",
     });
     for (const row of open.slice(1)) {
       const savedRow = getTransaction(sample.db, row.id);
-      expect(savedRow?.autoReason).toBe("learned");
-      expect(savedRow?.autoSourceId).toBe(first.id);
-      expect(savedRow?.merchantId).toBe(shop.id);
-      expect(savedRow?.lines[0]?.categoryId).toBe(food.id);
+      expect(savedRow?.autoReason).toBeNull();
+      expect(savedRow?.lines[0]?.categoryId).toBeNull();
       expect(savedRow?.amount).toBe(row.amount);
-      expect(savedRow?.date).toBe(row.date);
     }
-    const next = importCsv(sample.db, sample.dir, sample.account.id, "b.csv", ["03/12/2026,NORTH CAFE,-7.00"]);
+    const next = importCsv(sample.db, sample.dir, sample.account.id, "b.csv", ["03/12/2026,NORTH CAFE,-4.00"]);
     expect(next.kind).toBe("batch");
     const latest = rows(sample.db).find((row) => row.date === "2026-03-12");
-    expect(latest?.autoReason).toBe("learned");
+    expect(latest?.autoReason).toBe("learned_amount");
     expect(latest?.autoSourceId).toBe(first.id);
     expect(latest?.merchantId).toBe(shop.id);
     expect(lineCategory(sample.db, latest?.id ?? "")).toBe(food.id);
@@ -183,13 +179,6 @@ test("a transfer and a split are never labeled automatically", () => {
     expect(transferSaved?.autoReason).toBeNull();
     expect(transferSaved?.lines[0]?.transferAccountId).toBe(visa.id);
     expect(transferSaved?.amount).toBe(-400);
-    createRule(sample.db, {
-      match: "exact",
-      pattern: "VISA PAYMENT",
-      transferAccountId: visa.id,
-      priority: 1,
-      ...saved,
-    });
     const imported = importCsv(sample.db, sample.dir, sample.account.id, "visa.csv", ["03/04/2026,VISA PAYMENT,-8.00"]);
     expect(imported.kind).toBe("batch");
     const visaRow = rows(sample.db).find((row) => row.payeeRaw === "VISA PAYMENT");
@@ -241,47 +230,10 @@ test("a disagreeing confirmation stops automatic labels", () => {
     const item = listInbox(sample.db, asOf).items.find((row) => row.kind === "uncategorized" && row.transactionId === open.id);
     expect(item?.kind).toBe("uncategorized");
     if (item?.kind === "uncategorized") {
-      expect(item.suggestion.reason).toBe("payee_history");
-      expect(item.suggestion.sure).toBe(false);
-      expect(item.suggestion.categoryId).toBe(coffee.id);
+      expect(item.suggestion.reason).toBe("none");
+      expect(item.suggestion.categoryId).toBeNull();
     }
     expect(other.autoReason).toBeNull();
-  } finally {
-    sample.close();
-  }
-});
-
-test("a rule wins over learning", () => {
-  const sample = book();
-  try {
-    const coffee = createCategory(sample.db, { name: "Coffee", kind: "expense", ...saved });
-    const groceries = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
-    const shop = createMerchant(sample.db, { name: "North Cafe", ...saved });
-    createTransaction(sample.db, {
-      accountId: sample.account.id,
-      date: "2026-03-01",
-      amount: -400,
-      payeeRaw: "NORTH CAFE",
-      merchantId: shop.id,
-      status: "open",
-      lines: [{ amount: -400, categoryId: coffee.id, memo: null, tagIds: [] }],
-      ...saved,
-    });
-    const rule = createRule(sample.db, {
-      match: "exact",
-      pattern: "NORTH CAFE",
-      merchantId: shop.id,
-      categoryId: groceries.id,
-      priority: 1,
-      ...saved,
-    });
-    const imported = importCsv(sample.db, sample.dir, sample.account.id, "c.csv", ["03/12/2026,NORTH CAFE,-9.00"]);
-    expect(imported.kind).toBe("batch");
-    const latest = rows(sample.db).find((row) => row.date === "2026-03-12");
-    expect(latest?.autoReason).toBe("rule");
-    expect(latest?.autoSourceId).toBe(rule.id);
-    expect(latest?.merchantId).toBe(shop.id);
-    expect(lineCategory(sample.db, latest?.id ?? "")).toBe(groceries.id);
   } finally {
     sample.close();
   }
@@ -304,10 +256,10 @@ test("a correction clears the automatic reason and counts as a confirmation", ()
     const second = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-02",
-      amount: -500,
+      amount: -400,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -500 }],
+      lines: [{ amount: -400 }],
       ...saved,
     });
     updateTransaction(sample.db, first.id, {
@@ -321,7 +273,7 @@ test("a correction clears the automatic reason and counts as a confirmation", ()
       lines: [{ amount: first.amount, categoryId: coffee.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });
-    expect(getTransaction(sample.db, second.id)?.autoReason).toBe("learned");
+    expect(getTransaction(sample.db, second.id)?.autoReason).toBe("learned_amount");
     updateTransaction(sample.db, second.id, {
       accountId: second.accountId,
       date: second.date,

@@ -237,6 +237,7 @@ test("a failed import leaves no document, batch, row or file", () => {
         unreadable: [],
         presetId: null,
         columnMap: null,
+        asOf: null,
       }),
     ).toThrow();
     expect(book.db.select().from(documents).all()).toHaveLength(0);

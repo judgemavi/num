@@ -1,16 +1,7 @@
-import { merchants, rules } from "@num/db";
-import {
-  alternateSuggestion,
-  suggestCategorization,
-  uncategorizedLineKey,
-  type HistoryRow,
-  type InboxItem,
-  type Suggestion,
-} from "@num/shared";
+import { alternateFromMatch, suggestionFromMatch, uncategorizedLineKey, type InboxItem, type Suggestion } from "@num/shared";
 import { sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { loadConfirmations } from "./auto-label";
-import { toRule } from "./rules";
+import { loadMatchBook, scorePayee } from "./match-book";
 
 type Row = {
   transactionId: string;
@@ -21,40 +12,6 @@ type Row = {
   payeeRaw: string;
   payee: string;
 };
-
-function historyFor(db: Db, payees: readonly string[]): Map<string, HistoryRow[]> {
-  const grouped = new Map<string, HistoryRow[]>();
-  for (const payee of payees) {
-    grouped.set(payee, loadConfirmations(db, payee));
-  }
-  return grouped;
-}
-
-function toItem(
-  row: Row,
-  suggestion: Suggestion,
-  context: { rules: ReturnType<typeof toRule>[]; history: HistoryRow[]; merchants: Parameters<typeof alternateSuggestion>[0]["merchants"] },
-): InboxItem {
-  return {
-    kind: "uncategorized",
-    itemKey: uncategorizedLineKey(row.lineId),
-    date: row.date,
-    accountId: row.accountId,
-    transactionId: row.transactionId,
-    lineId: row.lineId,
-    amount: row.amount,
-    payee: row.payee,
-    payeeRaw: row.payeeRaw,
-    suggestion,
-    next: alternateSuggestion({
-      accountId: row.accountId,
-      rawPayee: row.payeeRaw,
-      rules: context.rules,
-      history: context.history,
-      merchants: context.merchants,
-    }),
-  };
-}
 
 export function uncategorizedInbox(db: Db, hidden: ReadonlySet<string>): InboxItem[] {
   const rows = db.all<Row>(sql`
@@ -76,33 +33,29 @@ export function uncategorizedInbox(db: Db, hidden: ReadonlySet<string>): InboxIt
   if (rows.length === 0) {
     return [];
   }
-  const payees = [...new Set(rows.map((row) => row.payee).filter((payee) => payee.length > 0))];
-  const history = historyFor(db, payees);
-  const ruleRows = db.select().from(rules).all().map((row) => toRule(row));
-  const merchantRows = db
-    .select({
-      id: merchants.id,
-      name: merchants.name,
-      defaultCategoryId: merchants.defaultCategoryId,
-      archivedAt: merchants.archivedAt,
-    })
-    .from(merchants)
-    .all();
-  const cache = new Map<string, Suggestion>();
+  const book = loadMatchBook(db);
+  const cache = new Map<string, { suggestion: Suggestion; next: Suggestion | null }>();
   const items = rows.map((row) => {
-    const cacheKey = `${row.accountId}\u0000${row.payee}`;
-    let suggestion = cache.get(cacheKey);
-    if (!suggestion) {
-      suggestion = suggestCategorization({
-        accountId: row.accountId,
-        rawPayee: row.payeeRaw,
-        rules: ruleRows,
-        history: history.get(row.payee) ?? [],
-        merchants: merchantRows,
-      });
-      cache.set(cacheKey, suggestion);
+    const cacheKey = `${row.payee}\u0000${row.amount}`;
+    let cached = cache.get(cacheKey);
+    if (!cached) {
+      const scored = scorePayee(book, { payee: row.payee, amount: row.amount, recurring: null });
+      cached = { suggestion: suggestionFromMatch(scored), next: alternateFromMatch(scored) };
+      cache.set(cacheKey, cached);
     }
-    return toItem(row, suggestion, { rules: ruleRows, history: history.get(row.payee) ?? [], merchants: merchantRows });
+    return {
+      kind: "uncategorized" as const,
+      itemKey: uncategorizedLineKey(row.lineId),
+      date: row.date,
+      accountId: row.accountId,
+      transactionId: row.transactionId,
+      lineId: row.lineId,
+      amount: row.amount,
+      payee: row.payee,
+      payeeRaw: row.payeeRaw,
+      suggestion: cached.suggestion,
+      next: cached.next,
+    };
   });
   return items.filter((item) => !hidden.has(item.itemKey));
 }

@@ -5,16 +5,9 @@ import {
   fromMinorUnits,
   merchantForChoice,
   moneyDirection,
-  normalizePayee,
   Temporal,
   transactionSchema,
-  type Account,
-  type Category,
-  type Merchant,
   type MoneyDirection,
-  type RuleMatch,
-  type Tag,
-  type Transaction,
   type WhatChoice,
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
@@ -24,32 +17,13 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/co
 import { FieldError } from "@/components/ui/field";
 import { formatMoney } from "@/money";
 import { inboxError } from "@/inbox/format";
-import { automaticReasonText, formatDate, transactionError } from "@/transactions/format";
+import { formatDate, transactionError } from "@/transactions/format";
 import { MortgageSplitWatch } from "@/transactions/mortgage-split-watch";
-import { DeleteMenu, MoneySection, MoreDetails } from "@/transactions/transaction-parts";
+import { AutomaticReason, DeleteMenu, MoneySection, MoreDetails, type TransactionFormProps } from "@/transactions/transaction-parts";
 import { alreadyChosen, choiceOf, linesOf, signedTotal, useApplySuggestion } from "@/transactions/transaction-draft";
 import { submitTransaction } from "@/transactions/transaction-submit";
-import { PayeeRuleField } from "@/transactions/payee-rule-field";
 import { splitRemainder, type SplitLine } from "@/transactions/what-choice";
 import { WhatIsThis } from "@/transactions/what-is-this";
-
-type TransactionFormProps = {
-  currency: string;
-  transaction: Transaction | null;
-  amountLocked: boolean;
-  accounts: Account[];
-  categories: Category[];
-  tags: Tag[];
-  merchants: Merchant[];
-  rawLine?: string;
-  initialAccountId?: string;
-  onClose: () => void;
-  onSaved: (id: string) => void;
-  onDelete: () => Promise<string | null>;
-  deleteKind?: "plain" | "mirror" | "linked";
-  decisions?: { itemKey: string; text: string }[];
-  onUndoDecision?: (itemKey: string) => Promise<{ ok: boolean; code?: string }>;
-};
 
 export function TransactionForm({
   currency,
@@ -94,10 +68,6 @@ export function TransactionForm({
   );
   const [tagIds, setTagIds] = useState<string[]>(() => [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])]);
   const [more, setMore] = useState(false);
-  const [always, setAlways] = useState(false);
-  const [ruleMatch, setRuleMatch] = useState<RuleMatch>("exact");
-  const [rulePattern, setRulePattern] = useState(transaction ? normalizePayee(transaction.payeeRaw) : "");
-  const [patternTouched, setPatternTouched] = useState(false);
   const [touched, setTouched] = useState(alreadyChosen(transaction));
   const [error, setError] = useState<string | null>(null);
   const [undoError, setUndoError] = useState<string | null>(null);
@@ -119,9 +89,6 @@ export function TransactionForm({
     setTransferAccountId,
     setMerchantId,
   });
-  if (!patternTouched && rulePattern !== normalizePayee(payee)) {
-    setRulePattern(normalizePayee(payee));
-  }
 
   const accountName = accounts.find((item) => item.id === accountId)?.name ?? "Account";
   const accountOptions = accounts
@@ -209,9 +176,6 @@ export function TransactionForm({
       transferAccountId,
       lines,
       tagIds,
-      always,
-      ruleMatch,
-      rulePattern,
     });
     setSaving(false);
     if (!result.ok) {
@@ -284,10 +248,7 @@ export function TransactionForm({
         <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, notes, category and tags can change.</p>
       ) : null}
       {transaction?.autoReason ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm text-muted-foreground">{automaticReasonText(transaction.autoReason, transaction.autoPattern, transaction.autoDate)}</p>
-          <Button type="button" variant="outline" disabled={saving} onClick={() => void markRight()}>Looks right</Button>
-        </div>
+        <AutomaticReason transaction={{ ...transaction, autoReason: transaction.autoReason }} saving={saving} onLooksRight={() => void markRight()} />
       ) : null}
       {imported ? (
         <p className="text-sm">{summary}</p>
@@ -377,22 +338,6 @@ export function TransactionForm({
         payee={payee}
         suggestion={suggestion}
       />
-      {choice === "split" ? null : (
-      <PayeeRuleField
-        payee={payee}
-        accountId={accountId}
-        exceptIds={transaction?.id ?? ""}
-        enabled={always}
-        onEnabled={setAlways}
-        match={ruleMatch}
-        onMatch={setRuleMatch}
-        pattern={rulePattern}
-        onPattern={(value) => {
-          setPatternTouched(true);
-          setRulePattern(value);
-        }}
-      />
-      )}
       <MoreDetails
         open={more}
         onOpenChange={setMore}

@@ -51,7 +51,8 @@ test("a write creates one audit row with before and after", () => {
         at,
       },
     ]);
-    expect(db.sqlite.query("select key, value from settings").all()).toEqual([
+    expect(db.sqlite.query("select key, value from settings order by key").all()).toEqual([
+      { key: "autoConfidence", value: "balanced" },
       { key: "currency", value: "JPY" },
     ]);
   } finally {
@@ -128,7 +129,7 @@ test("a write with no audit entry fails", () => {
       }),
     ).toThrow("A write must record an audit entry");
     expect(db.sqlite.query("select id from audit_log").all()).toEqual([]);
-    expect(db.sqlite.query("select key from settings").all()).toEqual([]);
+    expect(db.sqlite.query("select key from settings").all()).toEqual([{ key: "autoConfidence" }]);
   } finally {
     db.close();
   }
@@ -151,7 +152,7 @@ test("a failed write does not create an audit row", () => {
       }),
     ).toThrow("stop");
     expect(db.sqlite.query("select id from audit_log").all()).toEqual([]);
-    expect(db.sqlite.query("select key from settings").all()).toEqual([]);
+    expect(db.sqlite.query("select key from settings").all()).toEqual([{ key: "autoConfidence" }]);
   } finally {
     db.close();
   }

@@ -1,10 +1,8 @@
 import {
   merchantForChoice,
-  normalizePayee,
   signedAmount,
   transactionSaveResultSchema,
   transactionWriteSchema,
-  type RuleMatch,
   type Transaction,
   type WhatChoice,
 } from "@num/shared";
@@ -29,9 +27,6 @@ type SubmitInput = {
   transferAccountId: string | null;
   lines: SplitLine[];
   tagIds: string[];
-  always: boolean;
-  ruleMatch: RuleMatch;
-  rulePattern: string;
 };
 
 export type SubmitResult =
@@ -63,11 +58,6 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
   } catch (caught) {
     return { ok: false, error: caught instanceof Error ? caught.message : "Check the transaction fields." };
   }
-  if (input.always && input.choice !== "split") {
-    if ((input.choice === "transfer" && !input.transferAccountId) || (input.choice !== "transfer" && !input.categoryId) || input.rulePattern.trim().length === 0) {
-      return { ok: false, error: "Choose a category or account for the rule." };
-    }
-  }
   const body = {
     accountId: input.accountId,
     date: input.date,
@@ -77,9 +67,6 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
     payeeRaw: input.payee.trim(),
     status: input.reconciled ? "open" : input.cleared ? "cleared" : "open",
     lines: built,
-    ...(input.always && input.choice !== "split"
-      ? { rule: { payee: normalizePayee(input.payee), match: input.ruleMatch, pattern: input.rulePattern.trim() } }
-      : {}),
   };
   const parsed = transactionWriteSchema.safeParse(body);
   if (!parsed.success) {

@@ -1,14 +1,4 @@
-import {
-  accountListSchema,
-  categoryListSchema,
-  merchantListSchema,
-  merchantSchema,
-  ruleListSchema,
-  ruleSchema,
-  type Merchant,
-  type MerchantListQuery,
-  type Rule,
-} from "@num/shared";
+import { categoryListSchema, merchantListSchema, merchantSchema, type Merchant, type MerchantListQuery } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
@@ -18,13 +8,12 @@ import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
 import { sortChoice } from "@/components/sort-choice";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/request";
-import { merchantError, ruleError } from "@/settings/format";
+import { merchantError } from "@/settings/format";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { SettingsBack } from "@/settings/settings-nav";
 
@@ -34,8 +23,6 @@ const sortOptions = [
   { value: "name:asc", label: "Name, A to Z" },
   { value: "name:desc", label: "Name, Z to A" },
 ];
-
-const matchLabels = { exact: "Exact", prefix: "Starts with", contains: "Contains" };
 
 function applySort(value: string): Partial<MerchantListQuery> {
   if (value === "name:asc") {
@@ -56,17 +43,9 @@ export function MerchantsPage() {
     queryKey: ["merchants", search],
     queryFn: () => loadAllPages("/api/merchants", merchantListSchema, { archived: search.archived, sort: search.sort, dir: search.dir }),
   });
-  const rules = useQuery({
-    queryKey: ["rules", search.archived],
-    queryFn: () => loadAllPages("/api/rules", ruleListSchema, { archived: search.archived }),
-  });
   const categories = useQuery({
-    queryKey: ["categories", "merchant-rules"],
+    queryKey: ["categories", "merchants"],
     queryFn: () => loadAllPages("/api/categories", categoryListSchema, { archived: false }),
-  });
-  const accounts = useQuery({
-    queryKey: ["accounts", "merchant-rules"],
-    queryFn: () => loadAllPages("/api/accounts", accountListSchema, { archived: false }),
   });
 
   function changeFilters(patch: Partial<MerchantListQuery>) {
@@ -75,52 +54,46 @@ export function MerchantsPage() {
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["merchants"] });
-    await queryClient.invalidateQueries({ queryKey: ["rules"] });
     await queryClient.invalidateQueries({ queryKey: ["suggestion"] });
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
   }
 
-  async function archiveRow(kind: "merchant" | "rule", row: Merchant | Rule) {
+  async function archiveRow(row: Merchant) {
     const path = row.archivedAt ? "restore" : "archive";
-    const result =
-      kind === "merchant"
-        ? await apiRequest(`/api/merchants/${row.id}/${path}`, merchantSchema, { method: "POST" })
-        : await apiRequest(`/api/rules/${row.id}/${path}`, ruleSchema, { method: "POST" });
+    const result = await apiRequest(`/api/merchants/${row.id}/${path}`, merchantSchema, { method: "POST" });
     if (!result.ok) {
-      setActionError(kind === "merchant" ? merchantError(result.code) : ruleError(result.code));
+      setActionError(merchantError(result.code));
       return;
     }
     setActionError(null);
     await refresh();
   }
 
-  function askArchive(kind: "merchant" | "rule", row: Merchant | Rule) {
+  function askArchive(row: Merchant) {
     const restore = row.archivedAt !== null;
     void confirm({
-      title: restore ? "Restore this record?" : "Archive this record?",
+      title: restore ? "Restore this merchant?" : "Archive this merchant?",
       description: restore ? "It returns to the active list." : "It leaves the active list. You can restore it later.",
       confirmLabel: restore ? "Restore" : "Archive",
     }).then((ok) => {
       if (ok) {
-        void archiveRow(kind, row);
+        void archiveRow(row);
       }
     });
   }
 
-  if (merchants.isPending || rules.isPending || categories.isPending || accounts.isPending) {
-    return <p className="text-muted-foreground">Loading merchants and rules.</p>;
+  if (merchants.isPending || categories.isPending) {
+    return <p className="text-muted-foreground">Loading merchants.</p>;
   }
-  if (merchants.isError || rules.isError || categories.isError || accounts.isError) {
+  if (merchants.isError || categories.isError) {
     return (
       <div className="flex flex-col items-start gap-4">
-        <p>Merchants and rules did not load.</p>
+        <p>Merchants did not load.</p>
         <Button
           type="button"
           onClick={() => {
             void merchants.refetch();
-            void rules.refetch();
             void categories.refetch();
-            void accounts.refetch();
           }}
         >
           Try again
@@ -130,16 +103,13 @@ export function MerchantsPage() {
   }
 
   const categoryName = new Map(categories.data.items.map((category) => [category.id, category.name]));
-  const accountName = new Map(accounts.data.items.map((account) => [account.id, account.name]));
-  const merchantRows = merchants.data.items;
-  const ruleRows = rules.data.items;
 
   return (
     <>
       <SettingsBack />
       <PageHeader
         kicker="Settings"
-        title="Merchants and rules"
+        title="Merchants"
         actions={
           <Button type="button" onClick={() => void openEditor("merchant", { id: null })}>
             New merchant
@@ -176,122 +146,28 @@ export function MerchantsPage() {
           {actionError}
         </p>
       ) : null}
-      <MerchantList
-        rows={merchantRows}
-        archived={search.archived}
-        categoryName={categoryName}
-        onOpen={(row) => void openEditor("merchant", { id: row.id })}
-        onArchive={(row) => askArchive("merchant", row)}
-        onMerge={(row) => void openEditor("mergeMerchant", { merchantId: row.id })}
-      />
-      <RuleList
-        rows={ruleRows}
-        archived={search.archived}
-        accountName={accountName}
-        onOpen={(row) => void openEditor("rule", { id: row.id })}
-        onArchive={(row) => askArchive("rule", row)}
-        onApply={(row) => void openEditor("applyRule", { ruleId: row.id })}
-        onCreate={() => void openEditor("rule", { id: null })}
-      />
-    </>
-  );
-}
-
-function MerchantList({
-  rows,
-  archived,
-  categoryName,
-  onOpen,
-  onArchive,
-  onMerge,
-}: {
-  rows: Merchant[];
-  archived: boolean;
-  categoryName: Map<string, string>;
-  onOpen: (merchant: Merchant) => void;
-  onArchive: (merchant: Merchant) => void;
-  onMerge: (merchant: Merchant) => void;
-}) {
-  return (
-    <ListCard label="Merchants">
-      {rows.length === 0 ? (
-        <p className="px-5 py-5 text-muted-foreground">{archived ? "No archived merchants." : "No merchants yet."}</p>
-      ) : (
-        rows.map((merchant) => (
-          <ListRow key={merchant.id} simple onOpen={() => onOpen(merchant)}>
-            <div className={listName}>
-              {merchant.name}
-              {merchant.defaultCategoryId ? <small>{categoryName.get(merchant.defaultCategoryId) ?? "Category"}</small> : null}
-            </div>
-            <RowMenu label={`Actions for ${merchant.name}`}>
-              <DropdownMenuItem className="min-h-11" onSelect={() => onMerge(merchant)}>
-                Merge
-              </DropdownMenuItem>
-              <DropdownMenuItem className="min-h-11" onSelect={() => onArchive(merchant)}>
-                {merchant.archivedAt ? "Restore" : "Archive"}
-              </DropdownMenuItem>
-            </RowMenu>
-          </ListRow>
-        ))
-      )}
-    </ListCard>
-  );
-}
-
-function RuleList({
-  rows,
-  archived,
-  accountName,
-  onOpen,
-  onArchive,
-  onApply,
-  onCreate,
-}: {
-  rows: Rule[];
-  archived: boolean;
-  accountName: Map<string, string>;
-  onOpen: (rule: Rule) => void;
-  onArchive: (rule: Rule) => void;
-  onApply: (rule: Rule) => void;
-  onCreate: () => void;
-}) {
-  return (
-    <ListCard
-      label="Rules"
-      title="Rules"
-      actions={
-        <Button type="button" variant="secondary" onClick={onCreate}>
-          New rule
-        </Button>
-      }
-    >
-      {rows.length === 0 ? (
-        <p className="px-5 py-5 text-muted-foreground">{archived ? "No archived rules." : "No rules yet."}</p>
-      ) : (
-        rows.map((rule) => (
-          <ListRow key={rule.id} simple onOpen={() => onOpen(rule)}>
-            <div className={listName}>
-              {rule.pattern}
-              <small>
-                {matchLabels[rule.match]}
-                {rule.accountId ? ` · ${accountName.get(rule.accountId) ?? "One account"}` : ""}
-                {` · Priority ${rule.priority}`}
-              </small>
-            </div>
-            {rule.origin === "promoted" ? <Badge variant="neutral">Promoted</Badge> : null}
-            <RowMenu label={`Actions for ${rule.pattern}`}>
-              {rule.archivedAt ? null : (
-                <DropdownMenuItem className="min-h-11" onSelect={() => onApply(rule)}>
-                  Apply to existing
+      <ListCard label="Merchants">
+        {merchants.data.items.length === 0 ? (
+          <p className="px-5 py-5 text-muted-foreground">{search.archived ? "No archived merchants." : "No merchants yet."}</p>
+        ) : (
+          merchants.data.items.map((merchant) => (
+            <ListRow key={merchant.id} simple onOpen={() => void openEditor("merchant", { id: merchant.id })}>
+              <div className={listName}>
+                {merchant.name}
+                {merchant.defaultCategoryId ? <small>{categoryName.get(merchant.defaultCategoryId) ?? "Category"}</small> : null}
+              </div>
+              <RowMenu label={`Actions for ${merchant.name}`}>
+                <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("mergeMerchant", { merchantId: merchant.id })}>
+                  Merge
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuItem className="min-h-11" onSelect={() => onArchive(rule)}>
-                {rule.archivedAt ? "Restore" : "Archive"}
-              </DropdownMenuItem>
-            </RowMenu>
-          </ListRow>
-        ))
-      )}
-    </ListCard>
+                <DropdownMenuItem className="min-h-11" onSelect={() => askArchive(merchant)}>
+                  {merchant.archivedAt ? "Restore" : "Archive"}
+                </DropdownMenuItem>
+              </RowMenu>
+            </ListRow>
+          ))
+        )}
+      </ListCard>
+    </>
   );
 }

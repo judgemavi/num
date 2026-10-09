@@ -5,7 +5,6 @@ export const recordEditorKinds = [
   "group",
   "tag",
   "merchant",
-  "rule",
   "bucket",
   "plan",
   "mortgage",

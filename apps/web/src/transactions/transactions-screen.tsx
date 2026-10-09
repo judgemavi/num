@@ -263,7 +263,12 @@ export function TransactionsScreen() {
                   {row.autoReason ? (
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <span className="text-sm text-muted-foreground">
-                        {automaticReasonText(row.autoReason, row.autoPattern, row.autoDate)}
+                        {automaticReasonText({
+                          confidence: row.autoConfidence,
+                          reason: row.autoReason,
+                          sourceName: row.autoSourceName,
+                          learnedCount: row.autoLearnedCount,
+                        })}
                       </span>
                       {search.automatic ? (
                         <Button

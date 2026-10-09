@@ -10,7 +10,6 @@ import { createAccount } from "./accounts";
 import { importStatement, listImportBatches } from "./imports";
 import { presetsDirectory } from "./presets";
 import { undoImportBatch } from "./import-undo";
-import { createRule } from "./rules";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
@@ -393,14 +392,6 @@ test("a transfer suggestion at import does not create a transfer", () => {
       source: "ui",
       at,
     });
-    createRule(book.db, {
-      match: "exact",
-      pattern: "VISA PAYMENT",
-      transferAccountId: visa.id,
-      priority: 1,
-      source: "ui",
-      at,
-    });
     const result = importCsv(book.db, book.dir, book.account.id, "chequing.csv", ["01/05/2026,VISA PAYMENT,-8.00"]);
     expect(result.kind).toBe("batch");
     expect(activeCount(book.db)).toBe(1);
@@ -411,6 +402,7 @@ test("a transfer suggestion at import does not create a transfer", () => {
     const saved = getTransaction(book.db, row.id);
     expect(saved?.transferPeerId).toBeNull();
     expect(saved?.lines[0]?.transferAccountId).toBeNull();
+    expect(book.db.select().from(transactions).where(eq(transactions.accountId, visa.id)).all()).toHaveLength(0);
     expect(saved?.lines[0]?.categoryId).toBeNull();
   } finally {
     book.close();

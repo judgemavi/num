@@ -1,5 +1,5 @@
 import { accounts } from "@num/db";
-import { accountKinds, transactionStatuses, type AccountKind, type AutoReason, type TransactionListItem, type TransactionListQuery, type TransactionStatus } from "@num/shared";
+import { accountKinds, autoReasons, transactionStatuses, type AccountKind, type AutoReason, type TransactionListItem, type TransactionListQuery, type TransactionStatus } from "@num/shared";
 import { eq, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { integerSum } from "../integer-sum";
@@ -24,8 +24,9 @@ type ListRow = {
   accountOpening: number;
   runningBalance: number | null;
   autoReason: string | null;
-  autoPattern: string | null;
-  autoDate: string | null;
+  autoConfidence: number | null;
+  autoSourceName: string | null;
+  autoLearnedCount: number | null;
 };
 
 function asKind(value: string): AccountKind {
@@ -36,8 +37,8 @@ function asKind(value: string): AccountKind {
 }
 
 function asAutoReason(value: string | null): AutoReason | null {
-  if (value === "rule" || value === "learned") {
-    return value;
+  if (value && (autoReasons as readonly string[]).includes(value)) {
+    return value as AutoReason;
   }
   return null;
 }
@@ -50,6 +51,9 @@ function asStatus(value: string): TransactionStatus {
 }
 
 function orderSql(query: TransactionListQuery): SQL {
+  if (query.automatic && query.sort === undefined) {
+    return sql`t.auto_confidence asc, t.id asc`;
+  }
   const column = sortColumns[query.sort ?? "date"];
   const direction = query.dir ?? (query.sort === undefined ? "desc" : "asc");
   return sql.raw(`${column} ${direction}, t.id ${direction}`);
@@ -141,8 +145,9 @@ function toItem(row: ListRow): TransactionListItem {
     status: asStatus(row.status),
     runningBalance: row.runningBalance === null ? null : integerSum(row.runningBalance),
     autoReason: asAutoReason(row.autoReason),
-    autoPattern: row.autoPattern,
-    autoDate: row.autoDate,
+    autoConfidence: row.autoConfidence,
+    autoSourceName: row.autoSourceName,
+    autoLearnedCount: row.autoLearnedCount === null ? null : Number(row.autoLearnedCount),
   };
 }
 
@@ -208,8 +213,18 @@ export function listTransactions(db: Db, query: TransactionListQuery) {
       a.opening_balance as accountOpening,
       null as runningBalance,
       t.auto_reason as autoReason,
-      case when t.auto_reason = 'rule' then (select r.pattern from rules r where r.id = t.auto_source_id) else null end as autoPattern,
-      case when t.auto_reason = 'learned' then (select s.date from transactions s where s.id = t.auto_source_id) else null end as autoDate
+      t.auto_confidence as autoConfidence,
+      case
+        when t.auto_reason = 'recurring' then (select p.name from recurring_plans p where p.id = t.auto_source_id)
+        when t.auto_reason = 'merchant_default' then (select m2.name from merchants m2 where m2.id = t.auto_source_id)
+        else (select s.payee_normalized from transactions s where s.id = t.auto_source_id)
+      end as autoSourceName,
+      (
+        select count(*) from transactions c
+        inner join transaction_lines cl on cl.transaction_id = c.id
+        where c.deleted_at is null and c.auto_reason is null and c.payee_normalized = t.payee_normalized
+          and cl.category_id is not null and cl.transfer_account_id is null
+      ) as autoLearnedCount
     from transactions t
     join accounts a on a.id = t.account_id
     ${merchantJoin}

@@ -2,7 +2,6 @@ import { AssignEditor, FundEditor, ImportEditor, MoveEditor, ReconcileEditor } f
 import type { EditorInput, EditorKind } from "@/editors/editor-types";
 import { ReopenMonthEditor } from "@/insights/reopen-month";
 import {
-  ApplyRuleEditor,
   ImportInfoEditor,
   LinkOccurrenceEditor,
   MergeEditor,
@@ -17,7 +16,6 @@ import {
   MerchantRecord,
   MortgageRecord,
   PlanRecord,
-  RuleRecord,
   TagRecord,
   TransactionRecord,
 } from "@/editors/record-editors";
@@ -43,8 +41,6 @@ export function EditorBody({ kind, props, onClose, onSaved }: BodyProps) {
       return <TagRecord props={props as EditorInput["tag"]} onClose={onClose} onSaved={onSaved} />;
     case "merchant":
       return <MerchantRecord props={props as EditorInput["merchant"]} onClose={onClose} onSaved={onSaved} />;
-    case "rule":
-      return <RuleRecord props={props as EditorInput["rule"]} onClose={onClose} onSaved={onSaved} />;
     case "bucket":
       return <BucketRecord props={props as EditorInput["bucket"]} onClose={onClose} onSaved={onSaved} />;
     case "plan":
@@ -65,8 +61,6 @@ export function EditorBody({ kind, props, onClose, onSaved }: BodyProps) {
       return <ImportInfoEditor props={props as EditorInput["importInfo"]} onClose={onClose} />;
     case "mergeMerchant":
       return <MergeEditor props={props as EditorInput["mergeMerchant"]} onClose={onClose} onSaved={onSaved} />;
-    case "applyRule":
-      return <ApplyRuleEditor props={props as EditorInput["applyRule"]} onClose={onClose} onSaved={onSaved} />;
     case "skipNext":
       return <SkipNextEditor props={props as EditorInput["skipNext"]} onClose={onClose} onSaved={onSaved} />;
     case "skipOccurrence":

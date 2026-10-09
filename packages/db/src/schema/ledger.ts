@@ -38,6 +38,7 @@ export const transactions = sqliteTable(
       .references((): AnySQLiteColumn => transactions.id),
     mirror: integer("mirror", { mode: "boolean" }).notNull().default(false),
     autoReason: text("auto_reason"),
+    autoConfidence: integer("auto_confidence"),
     autoSourceId: text("auto_source_id"),
     deletedAt: text("deleted_at"),
   },
@@ -46,6 +47,10 @@ export const transactions = sqliteTable(
     check("transactions_status", oneOf(table.status, transactionStatuses)),
     check("transactions_source", oneOf(table.source, transactionSources)),
     check("transactions_auto_reason", nullOrOneOf(table.autoReason, autoReasons)),
+    check(
+      "transactions_auto_confidence",
+      sql`${table.autoConfidence} is null or (${table.autoConfidence} >= 0 and ${table.autoConfidence} <= 1000)`,
+    ),
     check(
       "transactions_transfer_peer",
       sql`${table.transferPeerId} is null or ${table.transferPeerId} <> ${table.id}`,

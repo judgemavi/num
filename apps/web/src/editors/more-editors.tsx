@@ -2,7 +2,6 @@ import {
   merchantSchema,
   occurrenceLinkSchema,
   planSchema,
-  ruleSchema,
   transactionListSchema,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,7 +15,6 @@ import { formatDate } from "@/transactions/format";
 import { SkipNext } from "@/recurring/skip-next";
 import { apiRequest } from "@/request";
 import { MergeDialog } from "@/settings/merge-dialog";
-import { RuleApplyDialog } from "@/settings/rule-apply-dialog";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -69,7 +67,7 @@ export function ImportInfoEditor({ props, onClose }: { props: EditorInput["impor
 export function MergeEditor({ props, onClose, onSaved }: { props: EditorInput["mergeMerchant"] } & Finish) {
   const merchants = useMerchants();
   const merchant = useRecord("merchant", props.merchantId, `/api/merchants/${props.merchantId}`, merchantSchema);
-  const refresh = useRefresh([["merchants"], ["rules"], ["transactions"]]);
+  const refresh = useRefresh([["merchants"], ["transactions"]]);
   if (merchants.isPending || merchant.isPending) {
     return <LoadingLine label="Loading the merchant." />;
   }
@@ -82,26 +80,6 @@ export function MergeEditor({ props, onClose, onSaved }: { props: EditorInput["m
       merchants={merchants.data}
       onClose={onClose}
       onMerged={() => {
-        void refresh().then(() => onSaved("ok"));
-      }}
-    />
-  );
-}
-
-export function ApplyRuleEditor({ props, onClose, onSaved }: { props: EditorInput["applyRule"] } & Finish) {
-  const rule = useRecord("rule", props.ruleId, `/api/rules/${props.ruleId}`, ruleSchema);
-  const refresh = useRefresh([["rules"], ["transactions"], ["suggestion"]]);
-  if (rule.isPending) {
-    return <LoadingLine label="Loading the rule." />;
-  }
-  if (rule.isError || !rule.data) {
-    return <LoadError label="The rule did not load." onRetry={() => void rule.refetch()} />;
-  }
-  return (
-    <RuleApplyDialog
-      rule={rule.data}
-      onClose={onClose}
-      onApplied={() => {
         void refresh().then(() => onSaved("ok"));
       }}
     />

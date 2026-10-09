@@ -110,10 +110,10 @@ type ApplyChoice = {
 
 export function useApplySuggestion(input: ApplyChoice): Suggestion | null {
   const suggestion = useQuery({
-    queryKey: ["suggestion", input.accountId, input.payee],
-    enabled: input.accountId.length > 0 && input.payee.trim().length > 0,
+    queryKey: ["suggestion", input.accountId, input.payee, input.amount],
+    enabled: input.accountId.length > 0 && input.payee.trim().length > 0 && input.amount !== null,
     queryFn: async () => {
-      const params = new URLSearchParams({ accountId: input.accountId, payee: input.payee });
+      const params = new URLSearchParams({ accountId: input.accountId, payee: input.payee, amount: String(input.amount) });
       const result = await apiRequest(`/api/suggestions?${params.toString()}`, suggestionSchema);
       if (!result.ok) {
         throw new Error(result.code);
@@ -150,7 +150,7 @@ export function useApplySuggestion(input: ApplyChoice): Suggestion | null {
       direction: input.direction,
       suggestion: suggestion.data,
       categoryKind,
-      transferAccountFromRule: suggestion.data.reason === "rule" ? suggestion.data.transferAccountId : null,
+      transferAccountFromRule: suggestion.data.transferAccountId,
       oppositeAccountId: transferHint.data?.accountId ?? null,
     });
     input.setChoice(resolved.choice);

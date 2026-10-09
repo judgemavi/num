@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { merchants, migrateDatabase, openDatabase, recurringPlans, rules, transactionLines, transactions } from "@num/db";
+import { merchants, migrateDatabase, openDatabase, recurringPlans, transactions } from "@num/db";
 import { storedPayee } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
@@ -10,17 +10,13 @@ import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { mergeMerchants } from "./merchant-merge";
-import { applyRule, previewRuleApply } from "./rule-apply";
-import { archiveMerchant, createMerchant } from "./merchants";
+import { createMerchant } from "./merchants";
 import { createPlan } from "./recurring-plans";
-import { archiveRule, createRule, restoreRule } from "./rules";
-import { listTransferPairs, suggestForPayee } from "./suggestions";
-import { createTransaction, getTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
 
 function tempDatabase() {
-  const dir = mkdtempSync(join(tmpdir(), "num-rules-"));
+  const dir = mkdtempSync(join(tmpdir(), "num-merge-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
   return {
@@ -32,7 +28,7 @@ function tempDatabase() {
   };
 }
 
-test("merge moves transactions, rules and plans, then archives the source", () => {
+test("merge moves transactions and plans, then archives the source", () => {
   const { db, close } = tempDatabase();
   try {
     const account = createAccount(db, {
@@ -47,15 +43,6 @@ test("merge moves transactions, rules and plans, then archives the source", () =
     const category = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
     const source = createMerchant(db, { name: "Cafe North", source: "ui", at });
     const target = createMerchant(db, { name: "Cafe South", defaultCategoryId: category.id, source: "ui", at });
-    const rule = createRule(db, {
-      match: "exact",
-      pattern: "CAFE NORTH",
-      merchantId: source.id,
-      categoryId: category.id,
-      priority: 1,
-      source: "ui",
-      at,
-    });
     const plan = createPlan(db, {
       name: "Coffee",
       kind: "bill",
@@ -92,306 +79,8 @@ test("merge moves transactions, rules and plans, then archives the source", () =
     const kept = mergeMerchants(db, source.id, target.id, { source: "ui", at });
     expect(kept.id).toBe(target.id);
     expect(db.select().from(transactions).where(eq(transactions.id, txnId)).get()?.merchantId).toBe(target.id);
-    expect(db.select().from(rules).where(eq(rules.id, rule.id)).get()?.merchantId).toBe(target.id);
     expect(db.select().from(recurringPlans).where(eq(recurringPlans.id, plan.id)).get()?.merchantId).toBe(target.id);
     expect(db.select().from(merchants).where(eq(merchants.id, source.id)).get()?.archivedAt).toBe(at);
-  } finally {
-    close();
-  }
-});
-
-test("restore rejects a rule whose merchant is archived", () => {
-  const { db, close } = tempDatabase();
-  try {
-    const category = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
-    const shop = createMerchant(db, { name: "Cafe", source: "ui", at });
-    const rule = createRule(db, {
-      match: "exact",
-      pattern: "CAFE",
-      merchantId: shop.id,
-      categoryId: category.id,
-      priority: 0,
-      source: "ui",
-      at,
-    });
-    archiveMerchant(db, shop.id, { source: "ui", at });
-    archiveRule(db, rule.id, { source: "ui", at });
-    expect(() => restoreRule(db, rule.id, { source: "ui", at })).toThrow(ServiceError);
-  } finally {
-    close();
-  }
-});
-
-test("apply to existing skips a split and updates a single line", () => {
-  const { db, close } = tempDatabase();
-  try {
-    const account = createAccount(db, {
-      name: "Chequing",
-      institution: null,
-      kind: "chequing",
-      openingDate: "2026-01-01",
-      openingBalance: 0,
-      source: "ui",
-      at,
-    });
-    const groceries = createCategory(db, { name: "Groceries", kind: "expense", source: "ui", at });
-    const coffee = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
-    const single = createTransaction(db, {
-      accountId: account.id,
-      date: "2026-04-01",
-      amount: -500,
-      payeeRaw: "SQ *CAFE",
-      status: "open",
-      lines: [{ amount: -500 }],
-      source: "ui",
-      at,
-    });
-    const split = createTransaction(db, {
-      accountId: account.id,
-      date: "2026-04-02",
-      amount: -500,
-      payeeRaw: "SQ *CAFE",
-      status: "open",
-      lines: [
-        { amount: -300, categoryId: groceries.id },
-        { amount: -200, categoryId: groceries.id },
-      ],
-      source: "ui",
-      at,
-    });
-    const rule = createRule(db, {
-      match: "exact",
-      pattern: "CAFE",
-      categoryId: coffee.id,
-      priority: 1,
-      source: "ui",
-      at,
-    });
-    expect(previewRuleApply(db, rule.id).count).toBe(1);
-    expect(applyRule(db, rule.id, { source: "ui", at }).count).toBe(1);
-    expect(db.select().from(transactionLines).where(eq(transactionLines.transactionId, single.id)).all()[0]?.categoryId).toBe(coffee.id);
-    const splitLines = db.select().from(transactionLines).where(eq(transactionLines.transactionId, split.id)).all();
-    expect(splitLines.every((line) => line.categoryId === groceries.id)).toBe(true);
-  } finally {
-    close();
-  }
-});
-
-test("a rule suggestion keeps its reason and a transfer pair stays available", () => {
-  const { db, close } = tempDatabase();
-  try {
-    const account = createAccount(db, {
-      name: "Chequing",
-      institution: null,
-      kind: "chequing",
-      openingDate: "2026-01-01",
-      openingBalance: 0,
-      source: "ui",
-      at,
-    });
-    const savings = createAccount(db, {
-      name: "Savings",
-      institution: null,
-      kind: "savings",
-      openingDate: "2026-01-01",
-      openingBalance: 0,
-      source: "ui",
-      at,
-    });
-    const category = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
-    const shop = createMerchant(db, { name: "Cafe", defaultCategoryId: category.id, source: "ui", at });
-    for (let day = 1; day <= 3; day += 1) {
-      const id = crypto.randomUUID();
-      db.insert(transactions)
-        .values({
-          id,
-          accountId: account.id,
-          date: `2026-03-0${day}`,
-          amount: -400,
-          merchantId: shop.id,
-          ...storedPayee("SQ *CAFE"),
-          status: "cleared",
-          source: "manual",
-        })
-        .run();
-      db.insert(transactionLines).values({ id: crypto.randomUUID(), transactionId: id, amount: -400, categoryId: category.id }).run();
-    }
-    createRule(db, {
-      match: "exact",
-      pattern: "cafe",
-      accountId: account.id,
-      merchantId: shop.id,
-      categoryId: category.id,
-      priority: 0,
-      source: "ui",
-      at,
-    });
-    expect(suggestForPayee(db, account.id, "TST*CAFE")).toMatchObject({
-      merchantId: shop.id,
-      categoryId: category.id,
-      transferAccountId: null,
-      reason: "rule",
-      sure: true,
-    });
-
-    const outId = crypto.randomUUID();
-    const inId = crypto.randomUUID();
-    db.insert(transactions)
-      .values([
-        {
-          id: outId,
-          accountId: account.id,
-          date: "2026-04-01",
-          amount: -2500,
-          ...storedPayee("Transfer out"),
-          status: "open",
-          source: "import",
-        },
-        {
-          id: inId,
-          accountId: savings.id,
-          date: "2026-04-03",
-          amount: 2500,
-          ...storedPayee("Transfer in"),
-          status: "open",
-          source: "manual",
-        },
-      ])
-      .run();
-    expect(listTransferPairs(db, "2026-04-03").items).toEqual([
-      { leftId: inId < outId ? inId : outId, rightId: inId < outId ? outId : inId },
-    ]);
-  } finally {
-    close();
-  }
-});
-
-
-test("a transfer rule cannot also set a category", () => {
-  const { db, close } = tempDatabase();
-  try {
-    const visa = createAccount(db, {
-      name: "Visa",
-      institution: null,
-      kind: "savings",
-      openingDate: "2026-01-01",
-      openingBalance: 0,
-      source: "ui",
-      at,
-    });
-    const coffee = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
-    expect(() =>
-      createRule(db, {
-        match: "exact",
-        pattern: "VISA PAYMENT",
-        categoryId: coffee.id,
-        transferAccountId: visa.id,
-        priority: 0,
-        source: "ui",
-        at,
-      }),
-    ).toThrow(ServiceError);
-  } finally {
-    close();
-  }
-});
-
-test("apply a transfer rule links the opposite row", () => {
-  const { db, close } = tempDatabase();
-  try {
-    const chequing = createAccount(db, {
-      name: "Chequing",
-      institution: null,
-      kind: "chequing",
-      openingDate: "2026-01-01",
-      openingBalance: 0,
-      source: "ui",
-      at,
-    });
-    const visa = createAccount(db, {
-      name: "Visa",
-      institution: null,
-      kind: "savings",
-      openingDate: "2026-01-01",
-      openingBalance: 0,
-      source: "ui",
-      at,
-    });
-    const payment = createTransaction(db, {
-      accountId: chequing.id,
-      date: "2026-05-01",
-      amount: -4_000,
-      payeeRaw: "VISA PAYMENT",
-      status: "open",
-      lines: [{ amount: -4_000 }],
-      source: "ui",
-      at,
-    });
-    const card = createTransaction(db, {
-      accountId: visa.id,
-      date: "2026-05-02",
-      amount: 4_000,
-      payeeRaw: "Payment thank you",
-      status: "open",
-      lines: [{ amount: 4_000 }],
-      source: "ui",
-      at,
-    });
-    const rule = createRule(db, {
-      match: "exact",
-      pattern: "VISA PAYMENT",
-      transferAccountId: visa.id,
-      priority: 1,
-      source: "ui",
-      at,
-    });
-    expect(suggestForPayee(db, chequing.id, "VISA PAYMENT").transferAccountId).toBe(visa.id);
-    applyRule(db, rule.id, { source: "ui", at });
-    expect(getTransaction(db, payment.id)?.transferPeerId).toBe(card.id);
-    expect(getTransaction(db, card.id)?.transferPeerId).toBe(payment.id);
-    expect(getTransaction(db, card.id)?.lines[0]?.transferAccountId).toBe(chequing.id);
-  } finally {
-    close();
-  }
-});
-
-test("a transfer does not keep a merchant", () => {
-  const { db, close } = tempDatabase();
-  try {
-    const chequing = createAccount(db, {
-      name: "Chequing",
-      institution: null,
-      kind: "chequing",
-      openingDate: "2026-01-01",
-      openingBalance: 0,
-      source: "ui",
-      at,
-    });
-    const visa = createAccount(db, {
-      name: "Visa",
-      institution: null,
-      kind: "savings",
-      openingDate: "2026-01-01",
-      openingBalance: 0,
-      source: "ui",
-      at,
-    });
-    const shop = createMerchant(db, { name: "Visa payment", source: "ui", at });
-    for (let day = 1; day <= 3; day += 1) {
-      createTransaction(db, {
-        accountId: chequing.id,
-        date: `2026-06-0${day}`,
-        amount: -4_000,
-        payeeRaw: "VISA PAYMENT",
-        merchantId: shop.id,
-        status: "open",
-        lines: [{ amount: -4_000, transferAccountId: visa.id }],
-        source: "ui",
-        at,
-      });
-    }
-    const payments = db.select().from(transactions).all().filter((row) => row.payeeRaw === "VISA PAYMENT");
-    expect(payments.every((row) => row.merchantId === null)).toBe(true);
   } finally {
     close();
   }

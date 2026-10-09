@@ -24,10 +24,6 @@ export const transactionStatuses = ["open", "cleared", "reconciled"] as const;
 
 export const transactionSources = ["import", "manual", "mcp"] as const;
 
-export const ruleMatches = ["exact", "prefix", "contains"] as const;
-
-export const ruleOrigins = ["manual", "promoted"] as const;
-
 export const planKinds = ["income", "bill", "transfer"] as const;
 
 export const amountModes = ["fixed", "variable"] as const;
@@ -81,7 +77,7 @@ export const inboxDecisionCodes = [
 
 export const auditSources = ["ui", "import", "mcp"] as const;
 
-export const autoReasons = ["rule", "learned"] as const;
+export const autoReasons = ["recurring", "learned_amount", "learned_payee", "similar", "merchant_default"] as const;
 
 export const settingKeys = [
   "currency",
@@ -89,4 +85,5 @@ export const settingKeys = [
   "emergencyFundMonths",
   "staleImportDays",
   "recurringGraceDays",
+  "autoConfidence",
 ] as const;

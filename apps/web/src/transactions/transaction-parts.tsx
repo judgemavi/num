@@ -1,4 +1,4 @@
-import type { MoneyDirection, Tag } from "@num/shared";
+import type { Account, AutoReason, Category, Merchant, MoneyDirection, Tag, Transaction } from "@num/shared";
 import { ChevronRight, Ellipsis } from "lucide-react";
 import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { automaticReasonText } from "@/transactions/format";
 import { OptionCombobox, type Option } from "@/transactions/option-combobox";
 
 export function MoneySection({
@@ -233,5 +234,49 @@ export function DeleteMenu({ kind, onDelete }: { kind: "plain" | "mirror" | "lin
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+export type TransactionFormProps = {
+  currency: string;
+  transaction: Transaction | null;
+  amountLocked: boolean;
+  accounts: Account[];
+  categories: Category[];
+  tags: Tag[];
+  merchants: Merchant[];
+  rawLine?: string;
+  initialAccountId?: string;
+  onClose: () => void;
+  onSaved: (id: string) => void;
+  onDelete: () => Promise<string | null>;
+  deleteKind?: "plain" | "mirror" | "linked";
+  decisions?: { itemKey: string; text: string }[];
+  onUndoDecision?: (itemKey: string) => Promise<{ ok: boolean; code?: string }>;
+};
+
+export function AutomaticReason({
+  transaction,
+  saving,
+  onLooksRight,
+}: {
+  transaction: Pick<Transaction, "autoReason" | "autoConfidence" | "autoSourceName" | "autoLearnedCount"> & { autoReason: AutoReason };
+  saving: boolean;
+  onLooksRight: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <p className="text-sm text-muted-foreground">
+        {automaticReasonText({
+          confidence: transaction.autoConfidence,
+          reason: transaction.autoReason,
+          sourceName: transaction.autoSourceName,
+          learnedCount: transaction.autoLearnedCount,
+        })}
+      </p>
+      <Button type="button" variant="outline" disabled={saving} onClick={onLooksRight}>
+        Looks right
+      </Button>
+    </div>
   );
 }

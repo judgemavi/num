@@ -1,9 +1,10 @@
 import { importBatches, importRows, transactionLines, transactions } from "@num/db";
-import { storedAutomatic, storedPayee, Temporal, type ImportReviewResolve, type Suggestion } from "@num/shared";
+import { normalizePayee, storedPayee, Temporal, type ImportReviewResolve } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { suggestForPayee } from "./suggestions";
+import { labelFields } from "./match-apply";
+import { loadMatchBook, scorePayee } from "./match-book";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -29,8 +30,15 @@ function requireReview(tx: WriteTx, id: string) {
   return row;
 }
 
-function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>, suggestion: Suggestion): string {
-  const applied = storedAutomatic(suggestion);
+function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>): string {
+  const scored = scorePayee(loadMatchBook(tx), { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: null });
+  const applied = labelFields(scored, null) ?? {
+    merchantId: null,
+    categoryId: null,
+    autoReason: null,
+    autoSourceId: null,
+    autoConfidence: null,
+  };
   const transactionId = crypto.randomUUID();
   const payee = storedPayee(row.payeeRaw);
   tx.insert(transactions)
@@ -42,6 +50,7 @@ function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>, su
       merchantId: applied.merchantId,
       autoReason: applied.autoReason,
       autoSourceId: applied.autoSourceId,
+      autoConfidence: applied.autoConfidence,
       notes: null,
       payeeRaw: payee.payeeRaw,
       payeeNormalized: payee.payeeNormalized,
@@ -59,13 +68,13 @@ function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>, su
       transactionId,
       amount: row.amount,
       memo: null,
-      categoryId: applied.categoryId,
+      categoryId: "categoryId" in applied ? applied.categoryId : null,
       transferAccountId: null,
     })
     .run();
   tx.update(importRows).set({ outcome: "created", transactionId }).where(eq(importRows.id, row.id)).run();
   auditTransaction(tx, transactionId, "create", null, readTransaction(tx, transactionId), {
-    suggestionReason: suggestion.reason,
+    suggestionReason: scored.reason ?? "none",
   });
   return transactionId;
 }
@@ -80,7 +89,6 @@ export function resolveImportReview(
   if (!preview || preview.outcome !== "needs_review" || !preview.active) {
     throw new ServiceError("import_review_not_found", 404);
   }
-  const suggestion = decision.decision === "create" ? suggestForPayee(db, preview.accountId, preview.payeeRaw) : null;
   let result: { importRowId: string; transactionId: string } | undefined;
   write(db, { source: input.source, at: input.at }, (tx) => {
     const row = requireReview(tx, id);
@@ -103,10 +111,7 @@ export function resolveImportReview(
       result = { importRowId: row.id, transactionId: txn.id };
       return;
     }
-    if (!suggestion) {
-      throw new ServiceError("import_review_not_found", 404);
-    }
-    result = { importRowId: row.id, transactionId: createFromReview(tx, row, suggestion) };
+    result = { importRowId: row.id, transactionId: createFromReview(tx, row) };
   });
   if (!result) {
     throw new Error("Review did not return a transaction");

@@ -175,3 +175,56 @@ test("migration 0009 adds automatic label columns on a populated database", () =
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("migration 0011 drops rules and adds confidence on a populated database", () => {
+  const dir = mkdtempSync(join(tmpdir(), "num-match-migrate-"));
+  const folder = join(dir, "migrations");
+  cpSync(source, folder, { recursive: true });
+  const journal = JSON.parse(readFileSync(join(folder, "meta", "_journal.json"), "utf8")) as {
+    entries: { tag: string }[];
+  };
+  journal.entries = journal.entries.filter((entry) => entry.tag < "0011");
+  writeFileSync(join(folder, "meta", "_journal.json"), JSON.stringify(journal, null, 2));
+
+  const sqlite = openDatabase(join(dir, "num.sqlite"));
+  try {
+    applyMigrations(sqlite, folder);
+    sqlite.exec(`
+      insert into accounts (id, name, kind, on_budget, opening_date, opening_balance)
+      values ('acct', 'Everyday', 'chequing', 1, '2026-01-01', 2500);
+      insert into categories (id, name, kind, essential) values ('food', 'Groceries', 'expense', 0);
+      insert into rules (id, match, pattern, category_id, priority, origin)
+      values ('rule', 'exact', 'NORTH CAFE', 'food', 1, 'manual');
+      insert into transactions (
+        id, account_id, date, amount, payee_raw, payee_normalized, status, source, mirror, auto_reason, auto_source_id
+      ) values (
+        'txn', 'acct', '2026-03-12', -1800, 'NORTH CAFE', 'NORTH CAFE', 'open', 'import', 0, 'learned', 'rule'
+      );
+      insert into transaction_lines (id, transaction_id, amount, category_id) values ('line', 'txn', -1800, 'food');
+      insert into settings (key, value) values ('currency', 'USD');
+    `);
+
+    cpSync(join(source, "0011_confidence_matching.sql"), join(folder, "0011_confidence_matching.sql"));
+    cpSync(join(source, "meta", "0011_snapshot.json"), join(folder, "meta", "0011_snapshot.json"));
+    cpSync(join(source, "meta", "_journal.json"), join(folder, "meta", "_journal.json"));
+    applyMigrations(sqlite, folder);
+
+    const tables = sqlite.query("select name from sqlite_master where type = 'table'").all() as { name: string }[];
+    expect(tables.map((table) => table.name)).not.toContain("rules");
+    const columns = sqlite.query("select name from pragma_table_info('transactions')").all() as { name: string }[];
+    expect(columns.map((column) => column.name)).toContain("auto_confidence");
+    expect(sqlite.query("select amount, payee_raw, auto_reason, auto_confidence from transactions where id = 'txn'").get()).toEqual({
+      amount: -1800,
+      payee_raw: "NORTH CAFE",
+      auto_reason: null,
+      auto_confidence: null,
+    });
+    expect(sqlite.query("select category_id from transaction_lines where id = 'line'").get()).toEqual({ category_id: null });
+    expect(sqlite.query("select value from settings where key = 'currency'").get()).toEqual({ value: "USD" });
+    expect(sqlite.query("select value from settings where key = 'autoConfidence'").get()).toEqual({ value: "balanced" });
+    expect(sqlite.query("pragma foreign_key_check").all()).toEqual([]);
+  } finally {
+    sqlite.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -10,7 +10,6 @@ import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listTransactions } from "../services/transaction-list";
-import { saveTransactionWithRule } from "../services/inbox-group";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
 
 const errorResponse = {
@@ -165,9 +164,6 @@ export function registerTransactions(app: OpenAPIHono, db: Db) {
 
   app.openapi(createRouteDef, (c) => {
     const body = c.req.valid("json");
-    if (body.rule) {
-      return c.json(saveTransactionWithRule(db, null, { ...body, source: "ui" }), 200);
-    }
     return c.json(createTransaction(db, { ...body, source: "ui" }), 200);
   });
 
@@ -179,9 +175,6 @@ export function registerTransactions(app: OpenAPIHono, db: Db) {
   app.openapi(updateRoute, (c) => {
     const body = c.req.valid("json");
     const { id } = c.req.valid("param");
-    if (body.rule) {
-      return c.json(saveTransactionWithRule(db, id, { ...body, source: "ui" }), 200);
-    }
     return c.json(updateTransaction(db, id, { ...body, source: "ui" }), 200);
   });
 

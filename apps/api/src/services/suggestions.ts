@@ -1,19 +1,17 @@
-import { accounts, merchants, rules, transactions } from "@num/db";
+import { accounts, transactions } from "@num/db";
 import {
   normalizePayee,
   oppositeTransferAccount,
-  suggestCategorization,
+  suggestionFromMatch,
   Temporal,
   transferPairs,
-  type RulePattern,
   type Suggestion,
   type TransferPair,
 } from "@num/shared";
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { loadConfirmations } from "./auto-label";
-import { toRule } from "./rules";
+import { loadMatchBook, scorePayee } from "./match-book";
 import { loadLines, replaceLines } from "./transaction-lines";
 import { auditTransaction, readTransaction, toTransaction } from "./transaction-record";
 import { write, type AuditSource } from "./write";
@@ -22,10 +20,6 @@ type WriteInput = {
   source: AuditSource;
   at?: string;
 };
-
-function ruleRows(db: Db): RulePattern[] {
-  return db.select().from(rules).all().map((row) => toRule(row));
-}
 
 export function transferHint(db: Db, input: { accountId: string; date: string; amount: number }): { accountId: string | null } {
   const account = db.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, input.accountId)).get();
@@ -68,19 +62,13 @@ export function transferHint(db: Db, input: { accountId: string; date: string; a
   };
 }
 
-export function suggestForPayee(db: Db, accountId: string, rawPayee: string): Suggestion {
+export function suggestForPayee(db: Db, accountId: string, rawPayee: string, amount: number): Suggestion {
   const account = db.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, accountId)).get();
   if (!account) {
     throw new ServiceError("account_not_found", 404);
   }
-  const payee = normalizePayee(rawPayee);
-  return suggestCategorization({
-    accountId,
-    rawPayee,
-    rules: ruleRows(db),
-    history: loadConfirmations(db, payee),
-    merchants: db.select().from(merchants).all(),
-  });
+  const book = loadMatchBook(db);
+  return suggestionFromMatch(scorePayee(book, { payee: normalizePayee(rawPayee), amount, recurring: null }));
 }
 
 export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[] } {
@@ -131,11 +119,11 @@ export function acceptTransferPair(db: Db, asOf: string, leftId: string, rightId
     const leftBefore = toTransaction(tx, left, leftLines);
     const rightBefore = toTransaction(tx, right, rightLines);
     tx.update(transactions)
-      .set({ transferPeerId: right.id, autoReason: null, autoSourceId: null })
+      .set({ transferPeerId: right.id, autoReason: null, autoSourceId: null, autoConfidence: null })
       .where(eq(transactions.id, left.id))
       .run();
     tx.update(transactions)
-      .set({ transferPeerId: left.id, autoReason: null, autoSourceId: null })
+      .set({ transferPeerId: left.id, autoReason: null, autoSourceId: null, autoConfidence: null })
       .where(eq(transactions.id, right.id))
       .run();
     replaceLines(tx, left.id, [

@@ -19,7 +19,6 @@ import { registerMerchants } from "./routes/merchants";
 import { registerMonths } from "./routes/months";
 import { registerMortgage } from "./routes/mortgage";
 import { registerRecurring } from "./routes/recurring";
-import { registerRules } from "./routes/rules";
 import { registerSuggestions } from "./routes/suggestions";
 import { registerSetup } from "./routes/setup";
 import { registerTags } from "./routes/tags";
@@ -62,7 +61,6 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
   registerCategories(app, db);
   registerTags(app, db);
   registerMerchants(app, db);
-  registerRules(app, db);
   registerSuggestions(app, db);
   registerRecurring(app, db);
   registerTransactions(app, db);

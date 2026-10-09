@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditLog, migrateDatabase, openDatabase, rules, settings, transactions } from "@num/db";
+import { auditLog, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
@@ -73,7 +73,6 @@ test("unticked rows stay out of the rule, and a failure writes nothing", () => {
         categoryId: missingCategory,
         transferAccountId: null,
         merchantId: null,
-        rule: { payee: "BLUE BOTTLE", match: "exact", pattern: "BLUE BOTTLE" },
         source: "ui",
         at: applyAt,
       }),
@@ -81,7 +80,6 @@ test("unticked rows stay out of the rule, and a failure writes nothing", () => {
     expect(getTransaction(sample.db, kept.id)?.lines[0]?.categoryId).toBeNull();
     expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBeNull();
     expect(getTransaction(sample.db, excluded.id)?.lines[0]?.categoryId).toBeNull();
-    expect(sample.db.select().from(rules).all()).toHaveLength(0);
     expect(sample.db.select().from(auditLog).where(eq(auditLog.at, applyAt)).all()).toHaveLength(0);
 
     const result = applyInboxGroup(sample.db, {
@@ -91,15 +89,13 @@ test("unticked rows stay out of the rule, and a failure writes nothing", () => {
       categoryId: food.id,
       transferAccountId: null,
       merchantId: null,
-      rule: { payee: "BLUE BOTTLE", match: "contains", pattern: "BOTTLE" },
       source: "ui",
       at: "2026-10-08T18:00:00Z",
     });
-    expect(result.applied).toBe(2);
+    expect(result.applied).toBe(1);
     expect(getTransaction(sample.db, kept.id)?.lines[0]?.categoryId).toBe(food.id);
-    expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBe(food.id);
+    expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBeNull();
     expect(getTransaction(sample.db, excluded.id)?.lines[0]?.categoryId).toBeNull();
-    expect(sample.db.select().from(rules).all()[0]?.pattern).toBe("BOTTLE");
   } finally {
     sample.close();
   }
@@ -140,7 +136,6 @@ test("a categorized row, a split and a reconciled transfer are skipped", () => {
       categoryId: null,
       transferAccountId: savings.id,
       merchantId: null,
-      rule: null,
       source: "ui",
       at: "2026-10-08T19:00:00Z",
     });
@@ -184,7 +179,6 @@ test("a group keeps an existing merchant and a transfer clears it on PATCH", () 
       categoryId: food.id,
       transferAccountId: null,
       merchantId: null,
-      rule: null,
       source: "ui",
       at: "2026-10-08T20:00:00Z",
     });
@@ -241,7 +235,6 @@ test("a rule does not fill a split, and the save with the rule is one write", ()
         notes: null,
         status: "open",
         lines: [{ amount: current.amount, categoryId: missingCategory, memo: null, transferAccountId: null, tagIds: [] }],
-        rule: { payee: "BLUE BOTTLE", match: "exact", pattern: "BLUE BOTTLE" },
         source: "ui",
         at: ruleAt,
       }),
@@ -259,13 +252,12 @@ test("a rule does not fill a split, and the save with the rule is one write", ()
       notes: null,
       status: "open",
       lines: [{ amount: current.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
-      rule: { payee: "BLUE BOTTLE", match: "exact", pattern: "BLUE BOTTLE" },
       source: "ui",
       at: "2026-10-08T22:00:00Z",
     });
     expect(savedRow.lines[0]?.categoryId).toBe(food.id);
-    expect(savedRow.skipped.map((row) => row.id)).toEqual([split.id]);
-    expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBe(food.id);
+    expect(savedRow.skipped).toEqual([]);
+    expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBeNull();
     expect(getTransaction(sample.db, split.id)?.lines.every((line) => line.categoryId === null)).toBe(true);
   } finally {
     sample.close();

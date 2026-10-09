@@ -12,7 +12,6 @@ import { undoImportBatch } from "./import-undo";
 import { importStatement } from "./imports";
 import { listInbox } from "./inbox";
 import { createMerchant } from "./merchants";
-import { createRule } from "./rules";
 import { acceptTransferPair } from "./suggestions";
 import { acceptLooksRight, createTransaction, getTransaction, updateTransaction } from "./transactions";
 
@@ -106,12 +105,12 @@ test("accepting a transfer pair clears the automatic reason", () => {
     });
     sample.db
       .update(transactions)
-      .set({ source: "import", autoReason: "learned", autoSourceId: left.id })
+      .set({ source: "import", autoReason: "learned_amount", autoSourceId: left.id, autoConfidence: 850 })
       .where(eq(transactions.id, left.id))
       .run();
     sample.db
       .update(transactions)
-      .set({ autoReason: "learned", autoSourceId: left.id })
+      .set({ autoReason: "learned_amount", autoSourceId: left.id, autoConfidence: 850 })
       .where(eq(transactions.id, right.id))
       .run();
     acceptTransferPair(sample.db, asOf, left.id, right.id, saved);
@@ -133,11 +132,11 @@ test("an automatic label keeps a merchant the user set", () => {
     const chosen = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-02",
-      amount: -500,
+      amount: -400,
       payeeRaw: "NORTH CAFE",
       merchantId: shop.id,
       status: "open",
-      lines: [{ amount: -500 }],
+      lines: [{ amount: -400 }],
       ...saved,
     });
     const first = createTransaction(sample.db, {
@@ -163,7 +162,7 @@ test("an automatic label keeps a merchant the user set", () => {
     const labeled = getTransaction(sample.db, chosen.id);
     expect(labeled?.merchantId).toBe(shop.id);
     expect(labeled?.lines[0]?.categoryId).toBe(food.id);
-    expect(labeled?.autoReason).toBe("learned");
+    expect(labeled?.autoReason).toBe("learned_amount");
   } finally {
     sample.close();
   }
@@ -185,10 +184,10 @@ test("a notes edit is not a confirmation and Looks right is", () => {
     const second = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-02",
-      amount: -500,
+      amount: -400,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -500 }],
+      lines: [{ amount: -400 }],
       ...saved,
     });
     updateTransaction(sample.db, first.id, {
@@ -205,10 +204,10 @@ test("a notes edit is not a confirmation and Looks right is", () => {
     const third = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-03",
-      amount: -600,
+      amount: -400,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -600 }],
+      lines: [{ amount: -400 }],
       ...saved,
     });
     updateTransaction(sample.db, second.id, {
@@ -222,13 +221,13 @@ test("a notes edit is not a confirmation and Looks right is", () => {
       lines: [{ amount: second.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });
-    expect(getTransaction(sample.db, second.id)?.autoReason).toBe("learned");
+    expect(getTransaction(sample.db, second.id)?.autoReason).toBe("learned_amount");
     expect(getTransaction(sample.db, second.id)?.notes).toBe("A note");
     expect(lineCategory(sample.db, third.id)).toBeNull();
     acceptLooksRight(sample.db, second.id, saved);
     expect(getTransaction(sample.db, second.id)?.autoReason).toBeNull();
     expect(lineCategory(sample.db, third.id)).toBe(food.id);
-    expect(getTransaction(sample.db, third.id)?.autoReason).toBe("learned");
+    expect(getTransaction(sample.db, third.id)?.autoReason).toBe("learned_amount");
     expect(getTransaction(sample.db, third.id)?.autoSourceId).toBe(second.id);
   } finally {
     sample.close();
@@ -248,14 +247,16 @@ test("an import labels only its own rows and undo removes those labels", () => {
       lines: [{ amount: -300 }],
       ...saved,
     });
-    createRule(sample.db, {
-      match: "exact",
-      pattern: "NORTH CAFE",
-      categoryId: food.id,
-      priority: 1,
+    createTransaction(sample.db, {
+      accountId: sample.account.id,
+      date: "2026-01-01",
+      amount: -400,
+      payeeRaw: "NORTH CAFE",
+      status: "open",
+      lines: [{ amount: -400, categoryId: food.id, memo: null, tagIds: [] }],
       ...saved,
     });
-    const imported = importCsv(sample.db, sample.dir, sample.account.id, "rule.csv", ["03/12/2026,NORTH CAFE,-4.00"]);
+    const imported = importCsv(sample.db, sample.dir, sample.account.id, "learn.csv", ["03/12/2026,NORTH CAFE,-4.00"]);
     expect(imported.kind).toBe("batch");
     if (imported.kind !== "batch") {
       return;
@@ -263,7 +264,7 @@ test("an import labels only its own rows and undo removes those labels", () => {
     expect(lineCategory(sample.db, older.id)).toBeNull();
     expect(getTransaction(sample.db, older.id)?.autoReason).toBeNull();
     const created = rows(sample.db).find((row) => row.date === "2026-03-12");
-    expect(created?.autoReason).toBe("rule");
+    expect(created?.autoReason).toBe("learned_amount");
     expect(lineCategory(sample.db, created?.id ?? "")).toBe(food.id);
     undoImportBatch(sample.db, imported.id, saved);
     expect(rows(sample.db).some((row) => row.id === created?.id)).toBe(false);
@@ -311,8 +312,8 @@ test("a conflict suggests the most recent confirmation and does not label", () =
     expect(item?.kind).toBe("uncategorized");
     if (item?.kind === "uncategorized") {
       expect(item.suggestion.sure).toBe(false);
-      expect(item.suggestion.reason).toBe("payee_history");
-      expect(item.suggestion.categoryId).toBe(groceries.id);
+      expect(item.suggestion.reason).toBe("none");
+      expect(item.suggestion.categoryId).toBeNull();
     }
   } finally {
     sample.close();

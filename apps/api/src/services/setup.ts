@@ -1,5 +1,5 @@
 import { categories, categoryGroups, settings, transactions } from "@num/db";
-import { minorUnitDigits, type CategorySet, type CurrencyCode } from "@num/shared";
+import { confidenceModes, minorUnitDigits, type CategorySet, type ConfidenceMode, type CurrencyCode } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -11,6 +11,7 @@ const settingDefaults = [
   ["emergencyFundMonths", "3"],
   ["staleImportDays", "10"],
   ["recurringGraceDays", "3"],
+  ["autoConfidence", "balanced"],
 ] as const;
 
 type SetupInput = {
@@ -37,6 +38,10 @@ function currencyRow(tx: WriteTx) {
 }
 
 function insertSetting(tx: WriteTx, key: (typeof settings.$inferInsert)["key"], value: string) {
+  const existing = tx.select().from(settings).where(eq(settings.key, key)).get();
+  if (existing) {
+    return;
+  }
   tx.insert(settings).values({ key, value }).run();
   tx.audit({
     entity: "settings",
@@ -148,4 +153,38 @@ export function changeCurrency(db: Db, input: CurrencyInput): { currency: Curren
     });
   });
   return { currency };
+}
+
+export function matchingSetting(db: Db): { autoConfidence: ConfidenceMode } {
+  const row = db.select().from(settings).where(eq(settings.key, "autoConfidence")).get();
+  if (row && (confidenceModes as readonly string[]).includes(row.value)) {
+    return { autoConfidence: row.value as ConfidenceMode };
+  }
+  return { autoConfidence: "balanced" };
+}
+
+export function changeMatching(db: Db, input: { autoConfidence: ConfidenceMode; source: AuditSource; at?: string }): { autoConfidence: ConfidenceMode } {
+  const current = db.select().from(settings).where(eq(settings.key, "currency")).get();
+  if (!current) {
+    throw new ServiceError("setup_required", 409);
+  }
+  write(db, { source: input.source, at: input.at }, (tx) => {
+    const row = tx.select().from(settings).where(eq(settings.key, "autoConfidence")).get();
+    if (!row) {
+      insertSetting(tx, "autoConfidence", input.autoConfidence);
+      return;
+    }
+    if (row.value === input.autoConfidence) {
+      return;
+    }
+    tx.update(settings).set({ value: input.autoConfidence }).where(eq(settings.key, "autoConfidence")).run();
+    tx.audit({
+      entity: "settings",
+      entityId: "autoConfidence",
+      action: "update",
+      before: { value: row.value },
+      after: { value: input.autoConfidence },
+    });
+  });
+  return { autoConfidence: input.autoConfidence };
 }
