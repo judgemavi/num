@@ -539,6 +539,9 @@ Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default,
 - Money in: **Income** (default) · Refund · Transfer · Split.
 
 1. **Spending** and **Refund:** an expense category. The list shows only expense categories.
+   **Refund** first asks "Refund of which purchase?" (optional; recent spending, same payee first, decision 0018).
+   A linked purchase gives the refund its category and merchant; the editor hides those fields. Without a linked
+   purchase, the user picks the category; merchant is optional, as for any transaction.
    **Income:** an income category. The list shows only income categories.
 2. **Transfer:** the other account. The app preselects Transfer only on evidence: an opposite transaction in another
    account within ±3 days, or a learned transfer for that payee. A transfer has no merchant. If that account has an unlinked transaction with the opposite amount within ±3 days,
