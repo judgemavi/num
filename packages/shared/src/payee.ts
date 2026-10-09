@@ -66,20 +66,36 @@ function isReferenceCode(token: string): boolean {
   return token.length >= 3 && /^[\p{L}\p{N}]+$/u.test(token) && /\p{L}/u.test(token) && /\p{N}/u.test(token);
 }
 
+/** * or XX at the start hides the rest of the token. Drop the whole token. */
+function isMaskedToken(token: string): boolean {
+  return /^\*/.test(token) || /^X{2,}/.test(token) || /^X+\*/.test(token);
+}
+
+function isStoreNumber(token: string): boolean {
+  return /^\d+$/.test(token);
+}
+
 function hasRealWord(value: string): boolean {
   return value.split(" ").some((word) => /\p{L}{2,}/u.test(word) && !isReferenceCode(word) && !REGIONS.has(word));
 }
 
 function stripTrailingCodes(value: string): string {
   const words = value.split(" ").filter((word) => word.length > 0);
-  while (words.length > 1 && isReferenceCode(words[words.length - 1] ?? "")) {
+  while (words.length > 1 && (isReferenceCode(words[words.length - 1] ?? "") || isStoreNumber(words[words.length - 1] ?? ""))) {
     words.pop();
   }
   return words.join(" ");
 }
 
-function stripNoise(value: string): string {
+function stripMaskedTokens(value: string): string {
   return value
+    .split(" ")
+    .filter((word) => word.length === 0 || !isMaskedToken(word))
+    .join(" ");
+}
+
+function stripNoise(value: string): string {
+  return stripMaskedTokens(value)
     .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
     .replace(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, " ")
     .replace(/\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/g, " ")
