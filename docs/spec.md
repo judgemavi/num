@@ -20,7 +20,7 @@ All features must support one of these three loops:
 |---|---|---|---|
 | Weekly review | One time each week | 10 min | Statements are imported. The Inbox is empty. |
 | Paycheck funding | At each paycheck | 2 min | The paycheck is assigned to buckets with one click. |
-| Monthly close | At the start of each month | 15 min | Balances agree with statements. The month is locked. The month story is available. |
+| Monthly close | At the start of each month | 15 min | Balances agree with statements. The month is marked as reviewed. The month story is available. |
 
 If a screen or feature does not support one of these loops, do not add it.
 
@@ -89,7 +89,10 @@ The owner finds information about unknown merchants with Claude through MCP.
 - **Rates:** Interest rates are integers in thousandths of a percent (`MilliPct`). Example: 6.875% = `6875`.
   The user types a percent with a maximum of 3 decimal places.
 - **IDs:** Use UUID text.
-- **Delete:** Use a soft delete (`deletedAt`) for financial records. You can archive configuration records (recurring items, buckets).
+- **Delete:** A delete removes the record (hard delete). The audit log keeps the record as it was (§11). Only documents
+  use a soft delete (§5.12). You can archive configuration records (recurring items, buckets).
+- **Validation:** The app validates codes and values with the shared Zod schemas. The database enforces only foreign keys
+  and unique indexes (no CHECK constraints).
 - **Audit:** Each change writes one `audit_log` row (§11).
 
 ## 5. Entities
@@ -161,7 +164,8 @@ Transaction fields:
 - `accountId`, `date`, `amount`, `merchantId?`, `notes?`
 - `payeeRaw`: the bank text. Do not change it after import.
 - `payeeNormalized`: `normalizePayee(payeeRaw)`, stored and indexed. The app sets it on each write.
-- `status`: `open | cleared | reconciled`
+- `status`: `open | cleared` (stored). A transaction is **reconciled** when it is cleared and its date is on or before the
+  latest active checkpoint of its account. The app calculates this; it is not stored.
 - `source`: `import | manual | mcp`
 - `importRowId?`, `transferPeerId?`
 
@@ -194,7 +198,7 @@ Rules:
   - The mirror has its own `status`. A new mirror starts as `open`.
   - If the source transaction has more than one line, the user cannot change the mirror amount.
     The user changes the amount on the source transaction.
-- The user and the API can set `status` to `open` or `cleared` only. Only a checkpoint sets `reconciled` (§5.13).
+- The user and the API set `status` to `open` or `cleared`. Reconciled is calculated (§5.13).
 - The user cannot add a transaction to an archived account, or move a transaction to an archived account.
 - A mortgage payment is one chequing transaction with two lines:
   - A transfer line for the principal. The target is the mortgage account.
@@ -329,9 +333,9 @@ Keep documents permanently. Use only a soft delete.
 
 Checkpoint fields: `accountId`, `date`, `statementBalance`, `createdAt`, `unlockedAt?`.
 - The app creates a checkpoint only if the calculated balance on `date` is equal to `statementBalance`.
-- When the app creates a checkpoint, all transactions of the account on or before `date` become `reconciled`.
+- After a checkpoint, the transactions of the account on or before `date` are reconciled (calculated, §5.4).
 
-Month close fields: `month` (`YYYY-MM`), `closedAt`, `reopenedAt?`, `reopenReason?`, `summaryJson`.
+Month close fields: `month` (`YYYY-MM`), `closedAt`. A month close is a "reviewed" mark. It does not lock the month.
 
 **Card statements are derived (no fixed days):**
 - A checkpoint of a `credit_card` account is a statement: its date and balance.
@@ -365,11 +369,9 @@ app records, so the same question does not come back:
 
 The user can see and undo decisions on the record they belong to (for example the import detail page).
 
-### 5.16 Forecast snapshot
+### 5.16 (Removed)
 
-Fields: `month` (`YYYY-MM`, unique), `asOf`, `predictedTotal`, `createdAt`.
-
-It stores the forecast of the on-budget total for the last day of the month (§8).
+The forecast snapshot is removed. A read never writes.
 
 ### 5.17 Audit log
 
@@ -586,8 +588,8 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
 - Each on-budget account has a checkpoint on or after the last day of the month.
 - The Inbox has no items with a date in that month.
 
-When the month closes, the app stores `summaryJson` (the month story, §9).
-The user can open the month again. The user must give a reason.
+A month close records that the user reviewed the month. It does not lock the month and it stores no summary: the month
+story is always calculated from current data (§9). The user can open the month again; this removes the mark (audited).
 
 ### 7.6 Paycheck funding
 
@@ -648,15 +650,11 @@ The forecast is daily, for 90 days. It shows each on-budget account and the tota
 - Safe to spend (§6).
 - Each account that goes below zero or below the buffer.
 
-**Accuracy:** The first forecast request with an `asOf` in a new month stores the forecast for the last day of that month.
-The backend has no scheduler for this (§4).
-At month close, Insights shows the forecast value and the actual value.
-
 After 90 days, show only the monthly net values from the Plan screen. Do not show daily values.
 
 ## 9. Insights
 
-- **Month story.** The app makes it at month close. It is also available for the current month. It shows:
+- **Month story.** The app calculates it for any month, closed or not. It shows:
   - Income, spending and savings rate.
   - The 3 largest increases and the 3 largest decreases by category, compared with the 3-month median.
   - New merchants.

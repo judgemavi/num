@@ -92,7 +92,7 @@ Goal: recurring plans, buckets and paycheck funding.
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
-| 5.1 Forecast | Known and estimated series, card payments, safe to spend, accuracy record (§8, §6). | Tests: card purchase moves cash on the due day only. Bucket spending is not counted two times. Outliers are not included. Accuracy record is stored one time for each month. Variable income uses the median. |
+| 5.1 Forecast | Known and estimated series, card payments, safe to spend (§8, §6). | Tests: card purchase moves cash on the due day only. Bucket spending is not counted two times. Outliers are not included. Variable income uses the median. |
 | 5.2 Mortgage | Terms, schedule, payment prefill, payoff, extra payment, valuations (§5.2, §5.10, §9). | Public tests with synthetic loans: monthly and semiannual compounding, weekly, biweekly and monthly payments, compared with values from a published lender calculator. Owner check in the UI: the owner enters the real mortgage terms and compares the schedule with a lender statement. |
 
 ## Deploy (when hosting is decided)
@@ -106,6 +106,7 @@ Goal: recurring plans, buckets and paycheck funding.
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
 | 6.1 MCP | Part 1: read tools. Part 2: full parity, tools generated from the API (§12, decision 0019). | Tests: every route has a tool. A tool call equals the REST call. `aiCanWrite` false hides and refuses writes. Audit source is `mcp`. Date tools require `asOf`. |
+| C.1 Cleanup | Decision 0020. Remove: DB CHECK constraints, soft delete (except documents), stored `reconciled`, month close summary and reopen reason, forecast snapshot, perf and backfill scripts, `integerSum`, dead code. Import undo does not read the audit log. Squash all migrations into one baseline. | All checks pass. A fresh DB has one migration. No `deleted_at` except documents. Tests for logic that changed: reconciled calculation (checkpoint, unlock), hard delete of a transfer pair, import undo and re-import. |
 | 6.2 Cutover | Owner imports all statements into the production v2 instance. Stop v1. Delete the `v1` branch. | Owner uses v2 for one full weekly review and one paycheck funding without v1. |
 
 ## Reuse from v1
