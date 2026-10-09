@@ -80,7 +80,8 @@ Other screens use the surface colour.
 
 ## 4. Navigation
 
-- **Desktop:** a 232px sidebar on the left.
+- **Desktop:** a 232px sidebar on the left. The user can collapse it to icons (shadcn Sidebar `collapsible="icon"`);
+  the app remembers the choice.
   - Brand at the top.
   - Primary: Inbox (with the tomato count), Transactions, Buckets, Plan, Accounts.
   - Group "More": Insights, Recurring.

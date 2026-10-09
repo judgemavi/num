@@ -103,6 +103,8 @@ An account is a real account at a bank or other institution.
 
 Fields:
 - `name`, `institution?`, `kind`, `onBudget` (boolean), `openingDate`, `openingBalance` (cents), `archivedAt?`
+- Display name: `institution` + `name` ("TD Chequing"). If `name` already starts with the institution, show `name` only.
+  The browser makes the display name; every place that shows an account uses it.
 - `kind`: `chequing | savings | cash | credit_card | mortgage | loan | investment | property | receivable | other_asset | other_liability`
 
 Rules:
