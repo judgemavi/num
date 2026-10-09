@@ -504,6 +504,8 @@ A confirmation is a category or merchant that the user chose or accepted ("Looks
 
 Combining: signals for the same candidate combine as 1 − Π(1 − cᵢ). The best candidate must lead the second by ≥ 0.2;
 otherwise it is a suggestion only.
+Exception: a recurring link is the user's own intent. It always labels (automatic), and other signals do not compete with it.
+It applies on every link: automatic link on import, and a manual link in the UI.
 
 Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default, Eager 0.75):
 - confidence ≥ `autoConfidence` and a clear lead: **automatic**.
