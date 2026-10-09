@@ -422,7 +422,8 @@ The user can create, edit and archive accounts.
 ### 7.2 Import (CSV)
 
 1. The user uploads a file (maximum 20 MB). The app stores it as a Document.
-   If a document with the same hash exists, show its batch. Do not import again.
+   If a document with the same hash has an active batch, show that batch. Do not import again. If its batch is undone,
+   import the file again.
    If that document is deleted, restore it (audited).
 2. The app selects the parser for the account:
    - **OFX/QFX parser.** It uses the bank transaction ID (`FITID`) as `bankId`. It reads the closing balance (`LEDGERBAL`).
