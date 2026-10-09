@@ -494,9 +494,12 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
 | Similar payee: character-trigram cosine similarity ≥ 0.80 to a payee with confirmations | similarity × that payee's learned confidence |
 | Merchant default category | 0.60 |
 
-Learned formula: a = recency-weighted confirmations for the candidate, t = recency-weighted confirmations for the key.
-Each confirmation weighs half as much as the next more recent one. confidence = (a + 0.15) / (t + 0.3) × (1 − 0.5^(n+1)),
-where n = number of confirmations for the key. (One confirmation ≈ 0.85; three that agree ≈ 0.95.)
+Learned formula: confidence = agreement × certainty.
+- agreement = a / t. a = recency-weighted confirmations for the candidate, t = recency-weighted confirmations for the key.
+  Each confirmation weighs half as much as the next more recent one.
+- certainty = 1 − 0.15 × 0.6^(n − 1), where n = number of confirmations for the key (n = 1: 0.85, 2: 0.91, 3: 0.946).
+Examples: payee + amount with 1 answer = 0.85; payee only with 1 answer = 0.85 × 0.95 = 0.81; payee only with 2 agreeing
+answers = 0.86; Coffee, Eating out, Coffee (newest first) = 0.71 × 0.946 = 0.68.
 A confirmation is a category or merchant that the user chose or accepted ("Looks right"), not one that the app set.
 
 Combining: signals for the same candidate combine as 1 − Π(1 − cᵢ). The best candidate must lead the second by ≥ 0.2;
