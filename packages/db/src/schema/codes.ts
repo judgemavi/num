@@ -65,7 +65,7 @@ export const bucketIcons = [
 
 export const importOutcomes = ["created", "matched", "needs_review", "duplicate", "ignored"] as const;
 
-export const proposalStatuses = ["pending", "approved", "rejected"] as const;
+export const proposalStatuses = ["pending", "applied", "expired"] as const;
 
 export const inboxDecisionCodes = [
   "not_transfer",
@@ -86,4 +86,5 @@ export const settingKeys = [
   "staleImportDays",
   "recurringGraceDays",
   "autoConfidence",
+  "aiCanWrite",
 ] as const;

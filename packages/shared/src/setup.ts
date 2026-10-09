@@ -26,3 +26,7 @@ export const currencyUpdateSchema = z.object({
 export const matchingSettingSchema = z.object({
   autoConfidence: z.enum(confidenceModes),
 });
+
+export const aiAccessSettingSchema = z.object({
+  aiCanWrite: z.boolean(),
+});

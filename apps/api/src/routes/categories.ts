@@ -41,6 +41,8 @@ const idParams = z.object({
 });
 
 const listGroupsRoute = createRoute({
+  operationId: "list_category_groups",
+  description: "Read category groups. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/category-groups",
   responses: {
@@ -52,6 +54,8 @@ const listGroupsRoute = createRoute({
 });
 
 const createGroupRoute = createRoute({
+  operationId: "post_category_groups",
+  description: "Create or run category groups. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/category-groups",
   request: {
@@ -71,6 +75,8 @@ const createGroupRoute = createRoute({
 });
 
 const updateGroupRoute = createRoute({
+  operationId: "patch_category_groups_id",
+  description: "Change category groups. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "patch",
   path: "/api/category-groups/{id}",
   request: {
@@ -92,6 +98,8 @@ const updateGroupRoute = createRoute({
 });
 
 const deleteGroupRoute = createRoute({
+  operationId: "delete_category_groups_id",
+  description: "Remove or archive category groups. This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
   method: "delete",
   path: "/api/category-groups/{id}",
   request: { params: idParams },
@@ -105,6 +113,8 @@ const deleteGroupRoute = createRoute({
 });
 
 const listCategoriesRoute = createRoute({
+  operationId: "list_categories",
+  description: "Read categories. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/categories",
   request: { query: categoryListQuerySchema },
@@ -118,6 +128,8 @@ const listCategoriesRoute = createRoute({
 });
 
 const createCategoryRoute = createRoute({
+  operationId: "post_categories",
+  description: "Create or run categories. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/categories",
   request: {
@@ -138,6 +150,8 @@ const createCategoryRoute = createRoute({
 });
 
 const updateCategoryRoute = createRoute({
+  operationId: "patch_categories_id",
+  description: "Change categories. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "patch",
   path: "/api/categories/{id}",
   request: {
@@ -159,6 +173,8 @@ const updateCategoryRoute = createRoute({
 });
 
 const restoreCategoryRoute = createRoute({
+  operationId: "post_categories_id_restore",
+  description: "Restore categories (restore). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/categories/{id}/restore",
   request: { params: idParams },
@@ -173,6 +189,8 @@ const restoreCategoryRoute = createRoute({
 });
 
 const archiveCategoryRoute = createRoute({
+  operationId: "post_categories_id_archive",
+  description: "Remove or archive categories (archive). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/categories/{id}/archive",
   request: { params: idParams },
@@ -187,6 +205,8 @@ const archiveCategoryRoute = createRoute({
 });
 
 const readGroupRoute = createRoute({
+  operationId: "get_category_groups_id",
+  description: "Read category groups. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/category-groups/{id}",
   request: { params: idParams },
@@ -197,6 +217,8 @@ const readGroupRoute = createRoute({
 });
 
 const readCategoryRoute = createRoute({
+  operationId: "get_categories_id",
+  description: "Read categories. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/categories/{id}",
   request: { params: idParams },

@@ -26,6 +26,8 @@ const errorResponse = {
 } as const;
 
 const listRoute = createRoute({
+  operationId: "list_inbox",
+  description: "Read the Inbox. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/inbox",
   request: { query: inboxQuerySchema },
@@ -36,6 +38,8 @@ const listRoute = createRoute({
 });
 
 const decisionsRoute = createRoute({
+  operationId: "get_inbox_decisions",
+  description: "Read the Inbox. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/inbox/decisions",
   responses: {
@@ -44,6 +48,8 @@ const decisionsRoute = createRoute({
 });
 
 const decideRoute = createRoute({
+  operationId: "post_inbox_decisions",
+  description: "Create or run the Inbox. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/inbox/decisions",
   request: {
@@ -58,6 +64,8 @@ const decideRoute = createRoute({
 });
 
 const undoRoute = createRoute({
+  operationId: "post_inbox_decisions_undo",
+  description: "Undo the Inbox (undo). This reverses that change. It does not remove the audit log. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/inbox/decisions/undo",
   request: {
@@ -71,6 +79,8 @@ const undoRoute = createRoute({
 });
 
 const acceptRoute = createRoute({
+  operationId: "post_inbox_unreadable",
+  description: "Create or run the Inbox. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/inbox/unreadable",
   request: {
@@ -85,6 +95,8 @@ const acceptRoute = createRoute({
 });
 
 const groupRoute = createRoute({
+  operationId: "post_inbox_groups",
+  description: "Create or run the Inbox. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/inbox/groups",
   request: { body: { required: true, content: { "application/json": { schema: inboxGroupApplySchema } } } },
@@ -97,6 +109,8 @@ const groupRoute = createRoute({
 });
 
 const payeeCountRoute = createRoute({
+  operationId: "get_inbox_payee_count",
+  description: "Read the Inbox. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/inbox/payee-count",
   request: { query: payeeCountQuerySchema },

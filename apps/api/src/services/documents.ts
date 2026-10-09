@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { documents } from "@num/db";
 import { utcNow, type Document } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { writeUpload } from "./uploads";
 import { write, type AuditSource } from "./write";
 
 type WriteInput = {
@@ -134,8 +135,7 @@ export function uploadDocument(
     deletedAt: null,
   };
 
-  mkdirSync(join(dataDir, "uploads"), { recursive: true });
-  writeFileSync(storedFile(dataDir, hash), input.bytes);
+  writeUpload(dataDir, hash, input.bytes);
 
   try {
     write(db, { source: input.source, at: row.uploadedAt }, (tx) => {

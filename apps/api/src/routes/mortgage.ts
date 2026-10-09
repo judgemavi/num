@@ -25,6 +25,8 @@ const idParams = z.object({
 });
 
 const readRoute = createRoute({
+  operationId: "get_accounts_id_mortgage_terms",
+  description: "Read accounts. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts/{id}/mortgage-terms",
   request: { params: idParams },
@@ -39,6 +41,8 @@ const readRoute = createRoute({
 });
 
 const saveRoute = createRoute({
+  operationId: "put_accounts_id_mortgage_terms",
+  description: "Change accounts. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "put",
   path: "/api/accounts/{id}/mortgage-terms",
   request: {
@@ -60,6 +64,8 @@ const saveRoute = createRoute({
 });
 
 const viewRoute = createRoute({
+  operationId: "get_accounts_id_mortgage",
+  description: "Read accounts. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts/{id}/mortgage",
   request: {
@@ -77,6 +83,8 @@ const viewRoute = createRoute({
 });
 
 const prefillRoute = createRoute({
+  operationId: "get_mortgage_prefill",
+  description: "Read mortgage prefill. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/mortgage-prefill",
   request: { query: mortgagePrefillQuerySchema },

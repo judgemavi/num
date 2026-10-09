@@ -52,6 +52,8 @@ const transactionSaveResponse = {
 } as const;
 
 const refundPurchasesRoute = createRoute({
+  operationId: "get_transactions_refund_purchases",
+  description: "Read transactions. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/transactions/refund-purchases",
   request: { query: refundPurchaseQuerySchema },
@@ -65,6 +67,8 @@ const refundPurchasesRoute = createRoute({
 });
 
 const listRoute = createRoute({
+  operationId: "search_transactions",
+  description: "Read transactions. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/transactions",
   request: {
@@ -84,6 +88,8 @@ const listRoute = createRoute({
 });
 
 const looksRightRoute = createRoute({
+  operationId: "post_transactions_id_looks_right",
+  description: "Create or run transactions. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/transactions/{id}/looks-right",
   request: { params: idParams },
@@ -96,6 +102,8 @@ const looksRightRoute = createRoute({
 });
 
 const readRoute = createRoute({
+  operationId: "get_transactions_id",
+  description: "Read transactions. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/transactions/{id}",
   request: { params: idParams },
@@ -106,6 +114,8 @@ const readRoute = createRoute({
 });
 
 const createRouteDef = createRoute({
+  operationId: "post_transactions",
+  description: "Create or run transactions. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/transactions",
   request: {
@@ -127,6 +137,8 @@ const createRouteDef = createRoute({
 });
 
 const updateRoute = createRoute({
+  operationId: "patch_transactions_id",
+  description: "Change transactions. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "patch",
   path: "/api/transactions/{id}",
   request: {
@@ -149,6 +161,8 @@ const updateRoute = createRoute({
 });
 
 const deleteRoute = createRoute({
+  operationId: "delete_transactions_id",
+  description: "Remove or archive transactions. This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
   method: "delete",
   path: "/api/transactions/{id}",
   request: { params: idParams },

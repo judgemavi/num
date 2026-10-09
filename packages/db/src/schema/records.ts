@@ -34,6 +34,8 @@ export const proposals = sqliteTable(
     payloadJson: text("payload_json").notNull(),
     source: text("source").notNull(),
     status: text("status").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: text("expires_at").notNull(),
     resultRef: text("result_ref"),
     createdAt: text("created_at").notNull(),
     decidedAt: text("decided_at"),

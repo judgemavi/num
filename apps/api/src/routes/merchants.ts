@@ -20,6 +20,8 @@ const errorResponse = {
 const idParams = z.object({ id: z.uuid() });
 
 const listRoute = createRoute({
+  operationId: "list_merchants",
+  description: "Read merchants. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/merchants",
   request: { query: merchantListQuerySchema },
@@ -30,6 +32,8 @@ const listRoute = createRoute({
 });
 
 const createRouteDef = createRoute({
+  operationId: "post_merchants",
+  description: "Create or run merchants. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/merchants",
   request: { body: { required: true, content: { "application/json": { schema: merchantCreateSchema } } } },
@@ -42,6 +46,8 @@ const createRouteDef = createRoute({
 });
 
 const updateRoute = createRoute({
+  operationId: "patch_merchants_id",
+  description: "Change merchants. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "patch",
   path: "/api/merchants/{id}",
   request: {
@@ -57,6 +63,8 @@ const updateRoute = createRoute({
 });
 
 const archiveRoute = createRoute({
+  operationId: "post_merchants_id_archive",
+  description: "Remove or archive merchants (archive). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/merchants/{id}/archive",
   request: { params: idParams },
@@ -68,6 +76,8 @@ const archiveRoute = createRoute({
 });
 
 const restoreRoute = createRoute({
+  operationId: "post_merchants_id_restore",
+  description: "Restore merchants (restore). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/merchants/{id}/restore",
   request: { params: idParams },
@@ -79,6 +89,8 @@ const restoreRoute = createRoute({
 });
 
 const mergeRoute = createRoute({
+  operationId: "post_merchants_id_merge",
+  description: "Create or run merchants (merge). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/merchants/{id}/merge",
   request: {
@@ -94,6 +106,8 @@ const mergeRoute = createRoute({
 });
 
 const readRoute = createRoute({
+  operationId: "get_merchants_id",
+  description: "Read merchants. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/merchants/{id}",
   request: { params: idParams },

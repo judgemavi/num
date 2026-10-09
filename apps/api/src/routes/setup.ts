@@ -1,4 +1,5 @@
 import {
+  aiAccessSettingSchema,
   currencyUpdateSchema,
   errorSchema,
   matchingSettingSchema,
@@ -8,6 +9,7 @@ import {
 } from "@num/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
+import { aiCanWrite, changeAiAccess } from "../services/ai-access";
 import { bookCurrency, changeCurrency, changeMatching, matchingSetting, runSetup, setupStatus } from "../services/setup";
 
 const errorResponse = {
@@ -20,6 +22,8 @@ const errorResponse = {
 } as const;
 
 const setupStatusRoute = createRoute({
+  operationId: "get_setup",
+  description: "Read setup. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/setup",
   responses: {
@@ -35,6 +39,8 @@ const setupStatusRoute = createRoute({
 });
 
 const setupRoute = createRoute({
+  operationId: "post_setup",
+  description: "Create or run setup. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/setup",
   request: {
@@ -62,6 +68,8 @@ const setupRoute = createRoute({
 });
 
 const currencyReadRoute = createRoute({
+  operationId: "get_settings_currency",
+  description: "Read the book currency. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/settings/currency",
   responses: {
@@ -78,6 +86,8 @@ const currencyReadRoute = createRoute({
 });
 
 const currencyRoute = createRoute({
+  operationId: "patch_settings_currency",
+  description: "Change the book currency. This does not change transactions. It is refused after the first transaction. Amounts are integer minor units. Money that enters the account is positive.",
   method: "patch",
   path: "/api/settings/currency",
   request: {
@@ -107,6 +117,9 @@ const currencyRoute = createRoute({
 const matchingReadRoute = createRoute({
   method: "get",
   path: "/api/settings/matching",
+  operationId: "get_settings_matching",
+  description:
+    "Read when labels become automatic. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   responses: {
     200: {
       description: "When labels become automatic",
@@ -116,7 +129,42 @@ const matchingReadRoute = createRoute({
   },
 });
 
+const aiReadRoute = createRoute({
+  method: "get",
+  path: "/api/settings/ai",
+  operationId: "get_ai_access",
+  description:
+    "Read whether an AI may change the books. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  responses: {
+    200: {
+      description: "Whether an AI may change the books",
+      content: { "application/json": { schema: aiAccessSettingSchema } },
+    },
+  },
+});
+
+const aiRoute = createRoute({
+  method: "patch",
+  path: "/api/settings/ai",
+  operationId: "patch_ai_access",
+  description:
+    "Allow or block AI changes to the books. This changes only that setting. Amounts are integer minor units. Money that enters the account is positive.",
+  request: {
+    body: { required: true, content: { "application/json": { schema: aiAccessSettingSchema } } },
+  },
+  responses: {
+    200: {
+      description: "Whether an AI may change the books",
+      content: { "application/json": { schema: aiAccessSettingSchema } },
+    },
+    400: errorResponse,
+    409: errorResponse,
+  },
+});
+
 const matchingRoute = createRoute({
+  operationId: "patch_settings_matching",
+  description: "Change when labels become automatic. This does not change transactions or categories. Amounts are integer minor units. Money that enters the account is positive.",
   method: "patch",
   path: "/api/settings/matching",
   request: {
@@ -152,5 +200,12 @@ export function registerSetup(app: OpenAPIHono, db: Db) {
   app.openapi(matchingRoute, (c) => {
     const body = c.req.valid("json");
     return c.json(changeMatching(db, { autoConfidence: body.autoConfidence, source: "ui" }), 200);
+  });
+
+  app.openapi(aiReadRoute, (c) => c.json({ aiCanWrite: aiCanWrite(db) }, 200));
+
+  app.openapi(aiRoute, (c) => {
+    const body = c.req.valid("json");
+    return c.json(changeAiAccess(db, { aiCanWrite: body.aiCanWrite, source: "ui" }), 200);
   });
 }

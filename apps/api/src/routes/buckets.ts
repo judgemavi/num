@@ -35,6 +35,8 @@ const eventParams = z.object({
 });
 
 const listRoute = createRoute({
+  operationId: "list_buckets",
+  description: "Read buckets. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/buckets",
   request: { query: bucketListQuerySchema },
@@ -48,6 +50,8 @@ const listRoute = createRoute({
 });
 
 const eventsRoute = createRoute({
+  operationId: "get_buckets_events",
+  description: "Read buckets. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/buckets/events",
   responses: {
@@ -59,6 +63,8 @@ const eventsRoute = createRoute({
 });
 
 const overspentRoute = createRoute({
+  operationId: "get_buckets_overspent",
+  description: "Read buckets. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/buckets/overspent",
   responses: {
@@ -70,6 +76,8 @@ const overspentRoute = createRoute({
 });
 
 const createRouteDef = createRoute({
+  operationId: "post_buckets",
+  description: "Create or run buckets. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/buckets",
   request: {
@@ -87,6 +95,8 @@ const createRouteDef = createRoute({
 });
 
 const updateRoute = createRoute({
+  operationId: "patch_buckets_id",
+  description: "Change buckets. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "patch",
   path: "/api/buckets/{id}",
   request: {
@@ -105,6 +115,8 @@ const updateRoute = createRoute({
 });
 
 const archiveRoute = createRoute({
+  operationId: "post_buckets_id_archive",
+  description: "Remove or archive buckets (archive). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/buckets/{id}/archive",
   request: { params: idParams },
@@ -119,6 +131,8 @@ const archiveRoute = createRoute({
 });
 
 const restoreRoute = createRoute({
+  operationId: "post_buckets_id_restore",
+  description: "Restore buckets (restore). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/buckets/{id}/restore",
   request: { params: idParams },
@@ -133,6 +147,8 @@ const restoreRoute = createRoute({
 });
 
 const eventRoute = createRoute({
+  operationId: "post_buckets_id_events",
+  description: "Create or run buckets. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/buckets/{id}/events",
   request: {
@@ -152,6 +168,8 @@ const eventRoute = createRoute({
 });
 
 const undoRoute = createRoute({
+  operationId: "post_buckets_id_events_eventid_undo",
+  description: "Undo buckets (undo). This reverses that change. It does not remove the audit log. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/buckets/{id}/events/{eventId}/undo",
   request: { params: eventParams },
@@ -166,6 +184,8 @@ const undoRoute = createRoute({
 });
 
 const coverRoute = createRoute({
+  operationId: "post_buckets_id_cover",
+  description: "Create or run buckets (cover). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/buckets/{id}/cover",
   request: {
@@ -184,6 +204,8 @@ const coverRoute = createRoute({
 });
 
 const readRoute = createRoute({
+  operationId: "get_buckets_id",
+  description: "Read buckets. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/buckets/{id}",
   request: { params: idParams },

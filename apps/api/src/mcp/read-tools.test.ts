@@ -2,39 +2,19 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { auditLog, forecastSnapshots, migrateDatabase, openDatabase } from "@num/db";
-import {
-  accountListQuerySchema,
-  categoryListQuerySchema,
-  columnMapSchema,
-  importViewQuerySchema,
-  inboxQuerySchema,
-  insightsQuerySchema,
-  merchantListQuerySchema,
-  planListQuerySchema,
-  transactionListQuerySchema,
-  type ColumnMap,
-} from "@num/shared";
+import { columnMapSchema, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
+import type { OpenAPIHono } from "@hono/zod-openapi";
 import { createApp } from "../app";
 import { createDb, type Db } from "../db";
 import { createAccount } from "../services/accounts";
-import { listBuckets } from "../services/buckets";
-import { listCategories, listCategoryGroups } from "../services/categories";
-import { readForecastOnly } from "../services/forecast";
-import { fundingPosition } from "../services/funding-book";
-import { listImportView } from "../services/import-list";
-import { importStatement } from "../services/imports";
-import { listInbox } from "../services/inbox";
-import { readInsights } from "../services/insights";
-import { createMerchant, listMerchants } from "../services/merchants";
-import { listPlans, createPlan } from "../services/recurring-plans";
-import { listOccurrences } from "../services/recurring-view";
-import { listAccounts } from "../services/accounts";
 import { createBucket } from "../services/buckets";
+import { listCategories } from "../services/categories";
+import { importStatement } from "../services/imports";
+import { createMerchant } from "../services/merchants";
+import { createPlan } from "../services/recurring-plans";
 import { runSetup } from "../services/setup";
-import { listTransactions } from "../services/transaction-list";
 import { createTransaction } from "../services/transactions";
-import { bucketReadSchema } from "./read-tools";
 
 const asOf = "2026-10-08";
 const at = "2026-10-08T16:00:00Z";
@@ -54,6 +34,7 @@ type Rpc = {
     isError?: boolean;
     structuredContent?: Record<string, unknown>;
     content?: { type: string; text: string }[];
+    tools?: { name: string; inputSchema?: { required?: string[]; properties?: Record<string, { format?: string; pattern?: string }> } }[];
   };
   error?: { code: number; message: string };
 };
@@ -64,9 +45,11 @@ function tempBook() {
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
   runSetup(db, { currency: "CAD", categorySet: "default", ...saved });
+  const app = createApp(db, { dataDir: dir });
   return {
     dir,
     db,
+    app,
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });
@@ -74,13 +57,13 @@ function tempBook() {
   };
 }
 
-async function post(db: Db, dataDir: string, method: string, params: object) {
-  const app = createApp(db, { dataDir });
+async function post(app: OpenAPIHono, method: string, params: object) {
   const response = await app.request("/mcp", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       accept: "application/json, text/event-stream",
+      host: "localhost",
     },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
   });
@@ -93,12 +76,11 @@ async function post(db: Db, dataDir: string, method: string, params: object) {
         .map((line) => line.slice("data: ".length))
         .at(-1)
     : text;
-  const body = JSON.parse(payload ?? "") as Rpc;
-  return { status: response.status, body };
+  return { status: response.status, body: JSON.parse(payload ?? "") as Rpc };
 }
 
-async function callTool(db: Db, dataDir: string, name: string, args: Record<string, unknown>) {
-  const { status, body } = await post(db, dataDir, "tools/call", { name, arguments: args });
+async function callTool(app: OpenAPIHono, name: string, args: Record<string, unknown>) {
+  const { status, body } = await post(app, "tools/call", { name, arguments: args });
   expect(status).toBe(200);
   return body;
 }
@@ -114,6 +96,12 @@ function dataOf(body: Rpc): Record<string, unknown> {
   return data;
 }
 
+async function restJson(app: OpenAPIHono, path: string): Promise<Record<string, unknown>> {
+  const response = await app.request(path);
+  expect(response.status).toBe(200);
+  return response.json() as Promise<Record<string, unknown>>;
+}
+
 function seed(db: Db, dir: string) {
   const account = createAccount(db, {
     name: "Everyday",
@@ -122,7 +110,7 @@ function seed(db: Db, dir: string) {
     openingBalance: 10_000,
     ...saved,
   });
-  const category = listCategories(db, categoryListQuerySchema.parse({})).items[0];
+  const category = listCategories(db, { page: 1, pageSize: 50, archived: false }).items[0];
   if (!category) {
     throw new Error("Setup did not create a category");
   }
@@ -187,56 +175,31 @@ function seed(db: Db, dir: string) {
   return { accountId: account.id, planId: plan.id };
 }
 
-test("each read tool returns the same data as its service", async () => {
+test("a read tool returns the same data as REST", async () => {
   const book = tempBook();
   try {
     const { accountId, planId } = seed(book.db, book.dir);
-    const accountsQuery = accountListQuerySchema.parse({ sort: "name", dir: "asc" });
-    const transactionQuery = transactionListQuerySchema.parse({
-      q: "north",
-      accountId,
-      from: "2026-03-01",
-      to: "2026-03-31",
-      page: 1,
-      pageSize: 10,
-    });
-    const categoryQuery = categoryListQuerySchema.parse({});
-    const merchantQuery = merchantListQuerySchema.parse({});
-    const bucketQuery = bucketReadSchema.parse({ asOf, sort: "name" });
-    const planQuery = planListQuerySchema.parse({ accountId, kind: "bill" });
-    const inboxQuery = inboxQuerySchema.parse({ asOf });
-    const importQuery = importViewQuerySchema.parse({ accountId, from: "2026-01-01" });
-
-    expect(dataOf(await callTool(book.db, book.dir, "list_accounts", { sort: "name", dir: "asc" }))).toEqual(
-      listAccounts(book.db, accountsQuery),
-    );
-    expect(dataOf(await callTool(book.db, book.dir, "search_transactions", transactionQuery))).toEqual(
-      listTransactions(book.db, transactionQuery),
-    );
-    expect(dataOf(await callTool(book.db, book.dir, "list_categories", {}))).toEqual(listCategories(book.db, categoryQuery));
-    expect(dataOf(await callTool(book.db, book.dir, "list_category_groups", {}))).toEqual(listCategoryGroups(book.db));
-    expect(dataOf(await callTool(book.db, book.dir, "list_merchants", {}))).toEqual(listMerchants(book.db, merchantQuery));
-    const { asOf: bucketAsOf, ...bucketsOnly } = bucketQuery;
-    expect(dataOf(await callTool(book.db, book.dir, "list_buckets", { asOf, sort: "name" }))).toEqual({
-      buckets: listBuckets(book.db, bucketsOnly),
-      position: fundingPosition(book.db, bucketAsOf),
-    });
-    expect(dataOf(await callTool(book.db, book.dir, "list_plans", { accountId, kind: "bill" }))).toEqual(
-      listPlans(book.db, planQuery),
-    );
-    expect(dataOf(await callTool(book.db, book.dir, "list_occurrences", { id: planId, asOf }))).toEqual(
-      listOccurrences(book.db, planId, asOf),
-    );
-    expect(dataOf(await callTool(book.db, book.dir, "get_forecast", { asOf }))).toEqual(readForecastOnly(book.db, asOf));
-    expect(dataOf(await callTool(book.db, book.dir, "get_insights", { asOf, by: "category" }))).toEqual(
-      readInsights(book.db, insightsQuerySchema.parse({ asOf, by: "category" })),
-    );
-    expect(dataOf(await callTool(book.db, book.dir, "list_inbox", { asOf }))).toEqual(
-      listInbox(book.db, inboxQuery.asOf),
-    );
-    expect(dataOf(await callTool(book.db, book.dir, "list_imports", { accountId, from: "2026-01-01" }))).toEqual(
-      listImportView(book.db, importQuery),
-    );
+    const cases: [string, Record<string, unknown>, string][] = [
+      ["list_accounts", { sort: "name", dir: "asc" }, "/api/accounts?sort=name&dir=asc"],
+      [
+        "search_transactions",
+        { q: "north", accountId, from: "2026-03-01", to: "2026-03-31", page: 1, pageSize: 10 },
+        `/api/transactions?q=north&accountId=${accountId}&from=2026-03-01&to=2026-03-31&page=1&pageSize=10`,
+      ],
+      ["list_categories", {}, "/api/categories"],
+      ["list_category_groups", {}, "/api/category-groups"],
+      ["list_merchants", {}, "/api/merchants"],
+      ["list_buckets", { sort: "name" }, "/api/buckets?sort=name"],
+      ["list_plans", { accountId, kind: "bill" }, `/api/recurring?accountId=${accountId}&kind=bill`],
+      ["list_occurrences", { id: planId, asOf }, `/api/recurring/${planId}/occurrences?asOf=${asOf}`],
+      ["get_forecast", { asOf }, `/api/forecast?asOf=${asOf}`],
+      ["get_insights", { asOf, by: "category" }, `/api/insights?asOf=${asOf}&by=category`],
+      ["list_inbox", { asOf }, `/api/inbox?asOf=${asOf}`],
+      ["list_imports", { accountId, from: "2026-01-01" }, `/api/imports?accountId=${accountId}&from=2026-01-01`],
+    ];
+    for (const [name, args, path] of cases) {
+      expect(dataOf(await callTool(book.app, name, args))).toEqual(await restJson(book.app, path));
+    }
   } finally {
     book.close();
   }
@@ -245,19 +208,15 @@ test("each read tool returns the same data as its service", async () => {
 test("tools that need today require asOf", async () => {
   const book = tempBook();
   try {
-    const listed = await post(book.db, book.dir, "tools/list", {});
-    const tools =
-      (
-        listed.body as Rpc & {
-          result?: { tools?: { name: string; inputSchema?: { required?: string[]; properties?: Record<string, { format?: string; pattern?: string }> } }[] };
-        }
-      ).result?.tools ?? [];
-    for (const name of ["list_buckets", "list_occurrences", "get_forecast", "get_insights", "list_inbox"]) {
+    const listed = await post(book.app, "tools/list", {});
+    const tools = listed.body.result?.tools ?? [];
+    for (const name of ["list_occurrences", "get_forecast", "get_insights", "list_inbox"]) {
       const schema = tools.find((tool) => tool.name === name)?.inputSchema;
       expect(schema?.required).toContain("asOf");
       expect(schema?.properties?.asOf).toMatchObject({ format: "date", pattern: String.raw`^\d{4}-\d{2}-\d{2}$` });
     }
     expect(tools.find((tool) => tool.name === "list_accounts")?.inputSchema?.required ?? []).not.toContain("asOf");
+    expect(tools.find((tool) => tool.name === "list_buckets")?.inputSchema?.required ?? []).not.toContain("asOf");
   } finally {
     book.close();
   }
@@ -277,7 +236,7 @@ test("read tools do not write", async () => {
       ["list_categories", {}],
       ["list_category_groups", {}],
       ["list_merchants", {}],
-      ["list_buckets", { asOf }],
+      ["list_buckets", {}],
       ["list_plans", {}],
       ["list_occurrences", { id: planId, asOf }],
       ["get_forecast", { asOf }],
@@ -286,7 +245,7 @@ test("read tools do not write", async () => {
       ["list_imports", {}],
     ];
     for (const [name, args] of calls) {
-      const body = await callTool(book.db, book.dir, name, args);
+      const body = await callTool(book.app, name, args);
       expect(body.result?.isError).toBeFalsy();
     }
     expect(book.db.select().from(auditLog).all().length).toBe(before.audit);
@@ -300,16 +259,14 @@ test("date tools reject a call without asOf", async () => {
   const book = tempBook();
   try {
     const { planId } = seed(book.db, book.dir);
-    const names = ["list_buckets", "list_occurrences", "get_forecast", "get_insights", "list_inbox"] as const;
-    for (const name of names) {
-      const missing = await callTool(book.db, book.dir, name, name === "list_occurrences" ? { id: planId } : {});
+    for (const name of ["list_occurrences", "get_forecast", "get_insights", "list_inbox"] as const) {
+      const missing = await callTool(book.app, name, name === "list_occurrences" ? { id: planId } : {});
       expect(missing.result?.isError).toBe(true);
       expect(missing.result?.structuredContent).toEqual({ code: "as_of_required", params: {} });
     }
-
-    const accounts = await callTool(book.db, book.dir, "list_accounts", {});
+    const accounts = await callTool(book.app, "list_accounts", {});
     expect(accounts.error).toBeUndefined();
-    expect(dataOf(accounts).items).toEqual(listAccounts(book.db, accountListQuerySchema.parse({})).items);
+    expect(dataOf(accounts).items).toEqual((await restJson(book.app, "/api/accounts")).items);
   } finally {
     book.close();
   }
@@ -318,19 +275,20 @@ test("date tools reject a call without asOf", async () => {
 test("an unknown tool or bad input returns an error code", async () => {
   const book = tempBook();
   try {
-    const unknown = await callTool(book.db, book.dir, "propose_transactions", {});
+    seed(book.db, book.dir);
+    const unknown = await callTool(book.app, "propose_transactions", {});
     expect(unknown.error?.code).toEqual(expect.any(Number));
     expect(unknown.result).toBeUndefined();
 
-    const badDate = await callTool(book.db, book.dir, "get_forecast", { asOf: "2026-02-31" });
+    const badDate = await callTool(book.app, "get_forecast", { asOf: "2026-02-31" });
     expect(badDate.result?.isError).toBe(true);
     expect(badDate.result?.structuredContent).toEqual({ code: "as_of_invalid", params: { asOf: "2026-02-31" } });
 
-    const badPage = await callTool(book.db, book.dir, "search_transactions", { page: 0 });
+    const badPage = await callTool(book.app, "search_transactions", { page: 0 });
     expect(badPage.result?.isError).toBe(true);
     expect(badPage.result?.structuredContent).toEqual({ code: "invalid_query", params: { field: "page" } });
 
-    const missingPlan = await callTool(book.db, book.dir, "list_occurrences", {
+    const missingPlan = await callTool(book.app, "list_occurrences", {
       id: "00000000-0000-4000-8000-000000000001",
       asOf,
     });

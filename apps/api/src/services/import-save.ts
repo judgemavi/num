@@ -1,5 +1,3 @@
-import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { accounts, documents, importBatches, importRows, transactionLines, transactions } from "@num/db";
 import { normalizePayee, storedPayee, type ColumnMap, type ImportBatch, type MatchResult, type UnreadableRow } from "@num/shared";
 import { eq } from "drizzle-orm";
@@ -11,6 +9,7 @@ import { labelFields, linkRecurring, mortgageSplitLines } from "./match-apply";
 import { loadMatchBook, recurringForRows, scorePayee } from "./match-book";
 import { insertMirror } from "./transaction-transfer";
 import { auditTransaction, readTransaction } from "./transaction-record";
+import { removeUpload, writeUpload } from "./uploads";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type DocumentInsert = {
@@ -219,8 +218,7 @@ function saveFormat(
 }
 
 function writeNewFile(dataDir: string, hash: string, bytes: Uint8Array): void {
-  mkdirSync(join(dataDir, "uploads"), { recursive: true });
-  writeFileSync(join(dataDir, "uploads", hash), bytes);
+  writeUpload(dataDir, hash, bytes);
 }
 
 export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
@@ -337,7 +335,7 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
   });
   } catch (error) {
     if (input.newFile) {
-      unlinkSync(join(input.dataDir, "uploads", input.document.hash));
+      removeUpload(input.dataDir, input.document.hash);
     }
     throw error;
   }

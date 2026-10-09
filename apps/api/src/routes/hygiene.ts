@@ -9,6 +9,8 @@ const errorResponse = {
 } as const;
 
 const hygieneRoute = createRoute({
+  operationId: "get_hygiene",
+  description: "Read hygiene checks. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/hygiene",
   request: { query: asOfQuerySchema },

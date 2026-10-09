@@ -13,6 +13,8 @@ const errorResponse = {
 } as const;
 
 const monthPlanRoute = createRoute({
+  operationId: "get_plan",
+  description: "Read the month plan. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/plan",
   request: { query: monthPlanQuerySchema },

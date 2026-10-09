@@ -13,6 +13,8 @@ const monthParams = z.object({
 });
 
 const listRoute = createRoute({
+  operationId: "get_months",
+  description: "Read closed months. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/months",
   request: { query: asOfQuerySchema },
@@ -26,6 +28,8 @@ const listRoute = createRoute({
 });
 
 const readRoute = createRoute({
+  operationId: "get_months_month",
+  description: "Read closed months. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
   path: "/api/months/{month}",
   request: { params: monthParams, query: asOfQuerySchema },
@@ -40,6 +44,8 @@ const readRoute = createRoute({
 });
 
 const closeRoute = createRoute({
+  operationId: "post_months_month_close",
+  description: "Create or run closed months (close). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/months/{month}/close",
   request: { params: monthParams, query: asOfQuerySchema },
@@ -55,6 +61,8 @@ const closeRoute = createRoute({
 });
 
 const reopenRoute = createRoute({
+  operationId: "post_months_month_reopen",
+  description: "Create or run closed months (reopen). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
   method: "post",
   path: "/api/months/{month}/reopen",
   request: {

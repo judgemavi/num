@@ -21,6 +21,7 @@ import { Route as AccountsAccountIdRouteImport } from './routes/accounts_.$accou
 import { Route as AccountsImportsRouteImport } from './routes/accounts_.imports'
 import { Route as InsightsMonthsRouteImport } from './routes/insights_.months'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as SettingsAiRouteImport } from './routes/settings/ai'
 import { Route as SettingsBackupRouteImport } from './routes/settings/backup'
 import { Route as SettingsCategoriesRouteImport } from './routes/settings/categories'
 import { Route as SettingsGroupsRouteImport } from './routes/settings/groups'
@@ -89,6 +90,11 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsAiRoute = SettingsAiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsBackupRoute = SettingsBackupRouteImport.update({
   id: '/backup',
   path: '/backup',
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/accounts/$accountId': typeof AccountsAccountIdRoute
   '/accounts/imports': typeof AccountsImportsRoute
   '/insights/months': typeof InsightsMonthsRoute
+  '/settings/ai': typeof SettingsAiRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/accounts/$accountId': typeof AccountsAccountIdRoute
   '/accounts/imports': typeof AccountsImportsRoute
   '/insights/months': typeof InsightsMonthsRoute
+  '/settings/ai': typeof SettingsAiRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/accounts_/$accountId': typeof AccountsAccountIdRoute
   '/accounts_/imports': typeof AccountsImportsRoute
   '/insights_/months': typeof InsightsMonthsRoute
+  '/settings/ai': typeof SettingsAiRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/groups': typeof SettingsGroupsRoute
@@ -202,6 +211,7 @@ export interface FileRouteTypes {
     | '/accounts/$accountId'
     | '/accounts/imports'
     | '/insights/months'
+    | '/settings/ai'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/accounts/$accountId'
     | '/accounts/imports'
     | '/insights/months'
+    | '/settings/ai'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
@@ -243,6 +254,7 @@ export interface FileRouteTypes {
     | '/accounts_/$accountId'
     | '/accounts_/imports'
     | '/insights_/months'
+    | '/settings/ai'
     | '/settings/backup'
     | '/settings/categories'
     | '/settings/groups'
@@ -354,6 +366,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/ai': {
+      id: '/settings/ai'
+      path: '/ai'
+      fullPath: '/settings/ai'
+      preLoaderRoute: typeof SettingsAiRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/backup': {
       id: '/settings/backup'
       path: '/backup'
@@ -407,6 +426,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface SettingsRouteChildren {
+  SettingsAiRoute: typeof SettingsAiRoute
   SettingsBackupRoute: typeof SettingsBackupRoute
   SettingsCategoriesRoute: typeof SettingsCategoriesRoute
   SettingsGroupsRoute: typeof SettingsGroupsRoute
@@ -417,6 +437,7 @@ interface SettingsRouteChildren {
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsAiRoute: SettingsAiRoute,
   SettingsBackupRoute: SettingsBackupRoute,
   SettingsCategoriesRoute: SettingsCategoriesRoute,
   SettingsGroupsRoute: SettingsGroupsRoute,

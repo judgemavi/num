@@ -302,6 +302,7 @@ export {
 export {
   categorySetSchema,
   categorySets,
+  aiAccessSettingSchema,
   currencyUpdateSchema,
   matchingSettingSchema,
   setupRequestSchema,
