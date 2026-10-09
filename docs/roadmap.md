@@ -105,7 +105,7 @@ Goal: recurring plans, buckets and paycheck funding.
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
-| 6.1 MCP | Read tools and proposal tools (§12, §5.14). | Tests: each proposal tool writes only a proposal. Approval uses the UI service function. Proposed rows go through dedupe. Date tools require `asOf`. |
+| 6.1 MCP | Part 1: read tools. Part 2: full parity, tools generated from the API (§12, decision 0019). | Tests: every route has a tool. A tool call equals the REST call. `aiCanWrite` false hides and refuses writes. Audit source is `mcp`. Date tools require `asOf`. |
 | 6.2 Cutover | Owner imports all statements into the production v2 instance. Stop v1. Delete the `v1` branch. | Owner uses v2 for one full weekly review and one paycheck funding without v1. |
 
 ## Reuse from v1
