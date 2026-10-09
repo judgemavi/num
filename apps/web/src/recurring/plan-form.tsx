@@ -24,7 +24,7 @@ import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogForm } from "@/editors/form-chrome";
+import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { accountLabel } from "@/accounts/label";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -160,6 +160,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
         </DialogDescription>
       </DialogHeader>
       <DialogForm onSubmit={(event) => void onSubmit(event)}>
+        <DialogBody>
         <Field>
           <FieldLabel htmlFor="plan-name">Name</FieldLabel>
           <Input id="plan-name" value={name} required onChange={(event) => setName(event.target.value)} />
@@ -340,6 +341,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
           </CollapsibleContent>
         </Collapsible>
         {error ? <FieldError>{error}</FieldError> : null}
+        </DialogBody>
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="outline">

@@ -31,7 +31,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogForm } from "@/editors/form-chrome";
+import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -164,6 +164,7 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
         <DialogTitle>{current ? "Edit bucket" : "New bucket"}</DialogTitle>
         <DialogDescription>A bucket keeps money for one purpose. The balance carries over.</DialogDescription>
       </DialogHeader>
+      <DialogBody>
       <Field>
         <FieldLabel htmlFor="bucket-name">Name</FieldLabel>
         <Input id="bucket-name" value={name} required onChange={(event) => setName(event.target.value)} />
@@ -261,6 +262,7 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
         </CollapsibleContent>
       </Collapsible>
       {error ? <FieldError>{error}</FieldError> : null}
+      </DialogBody>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">

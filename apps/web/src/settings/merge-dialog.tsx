@@ -2,7 +2,7 @@ import { merchantSchema, type Merchant } from "@num/shared";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogPanel } from "@/editors/form-chrome";
+import { DialogBody, DialogPanel } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { apiRequest } from "@/request";
@@ -11,7 +11,6 @@ import { merchantError } from "@/settings/format";
 type MergeDialogProps = {
   source: Merchant;
   merchants: Merchant[];
-  onClose: () => void;
   onMerged: () => void;
 };
 
@@ -48,6 +47,7 @@ export function MergeDialog({ source, merchants, onMerged }: MergeDialogProps) {
           Move transactions and recurring items from {source.name} to the merchant you choose. {source.name} is then archived.
         </DialogDescription>
       </DialogHeader>
+      <DialogBody>
       <Field data-invalid={error !== null || undefined}>
         <FieldLabel htmlFor="merge-target">Merchant that remains</FieldLabel>
         <OptionCombobox
@@ -59,6 +59,7 @@ export function MergeDialog({ source, merchants, onMerged }: MergeDialogProps) {
         />
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
+      </DialogBody>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">

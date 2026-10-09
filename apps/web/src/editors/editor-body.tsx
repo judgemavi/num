@@ -57,13 +57,13 @@ export function EditorBody({ kind, props, onClose, onSaved }: BodyProps) {
     case "moveMoney":
       return <MoveEditor props={props as EditorInput["moveMoney"]} onClose={onClose} onSaved={onSaved} />;
     case "importInfo":
-      return <ImportInfoEditor props={props as EditorInput["importInfo"]} onClose={onClose} />;
+      return <ImportInfoEditor props={props as EditorInput["importInfo"]} />;
     case "mergeMerchant":
-      return <MergeEditor props={props as EditorInput["mergeMerchant"]} onClose={onClose} onSaved={onSaved} />;
+      return <MergeEditor props={props as EditorInput["mergeMerchant"]} onSaved={onSaved} />;
     case "skipNext":
-      return <SkipNextEditor props={props as EditorInput["skipNext"]} onClose={onClose} onSaved={onSaved} />;
+      return <SkipNextEditor props={props as EditorInput["skipNext"]} onSaved={onSaved} />;
     case "skipOccurrence":
-      return <SkipOccurrenceEditor props={props as EditorInput["skipOccurrence"]} onClose={onClose} onSaved={onSaved} />;
+      return <SkipOccurrenceEditor props={props as EditorInput["skipOccurrence"]} onSaved={onSaved} />;
     case "linkOccurrence":
       return <LinkOccurrenceEditor props={props as EditorInput["linkOccurrence"]} onClose={onClose} onSaved={onSaved} />;
   }

@@ -14,7 +14,7 @@ import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogForm, DialogPanel } from "@/editors/form-chrome";
+import { DialogBody, DialogForm, DialogPanel } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,11 +23,10 @@ type FundPaycheckProps = {
   currency: string;
   asOf: string;
   incomeTransactionId?: string;
-  onClose: () => void;
   onSaved: () => void;
 };
 
-export function FundPaycheck({ currency, asOf, incomeTransactionId, onClose, onSaved }: FundPaycheckProps) {
+export function FundPaycheck({ currency, asOf, incomeTransactionId, onSaved }: FundPaycheckProps) {
   const [chosen, setChosen] = useState<string | null>(null);
   const paychecks = useQuery({
     queryKey: ["funding-paychecks"],
@@ -107,12 +106,11 @@ export function FundPaycheck({ currency, asOf, incomeTransactionId, onClose, onS
           currency={currency}
           asOf={asOf}
           proposal={proposal.data}
-          onClose={onClose}
           onSaved={onSaved}
         />
       ) : (
         <DialogPanel>
-          {status}
+          <DialogBody>{status}</DialogBody>
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline">
@@ -137,7 +135,6 @@ function ProposalForm({
   currency: string;
   asOf: string;
   proposal: FundingProposal;
-  onClose: () => void;
   onSaved: () => void;
 }) {
   const [amounts, setAmounts] = useState<Record<string, string>>(() => {
@@ -206,6 +203,7 @@ function ProposalForm({
 
   return (
     <DialogForm onSubmit={(event) => void onSubmit(event)}>
+      <DialogBody>
       {leading}
       <p className="text-sm text-muted-foreground">
         {proposal.payee} · {formatDate(proposal.date)}. Assign up to <Amount currency={currency} minor={proposal.limit} />. That is the smaller of the paycheck and Unassigned.
@@ -223,6 +221,7 @@ function ProposalForm({
         </Field>
       ))}
       {error ? <FieldError>{error}</FieldError> : null}
+      </DialogBody>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">

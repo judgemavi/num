@@ -4,8 +4,8 @@ import { isoDateSchema } from "./date";
 import { openingSuggestionSchema } from "./opening";
 import { transactionInputStatuses } from "./transaction";
 import { isUtcTimestamp } from "./time";
+import { centsSchema } from "./money";
 
-const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 
 export const checkpointCreateSchema = z.object({
   date: isoDateSchema,

@@ -72,18 +72,18 @@ export function AccountRecord({ props, onClose, onSaved }: { props: EditorInput[
     return <LoadError label="The account did not load." onRetry={() => void account.refetch()} />;
   }
   return (
-    <>
-      <AccountForm
-        currency={currency.data}
-        account={props.id ? (account.data ?? null) : null}
-        initialName={props.name}
-        onClose={onClose}
-        onSaved={save}
-      />
-      {props.id && account.data ? (
-        <AccountImports accountId={props.id} accountName={accountLabel(account.data)} currency={currency.data} />
-      ) : null}
-    </>
+    <AccountForm
+      currency={currency.data}
+      account={props.id ? (account.data ?? null) : null}
+      initialName={props.name}
+      onClose={onClose}
+      onSaved={save}
+      below={
+        props.id && account.data ? (
+          <AccountImports accountId={props.id} accountName={accountLabel(account.data)} currency={currency.data} />
+        ) : null
+      }
+    />
   );
 }
 
@@ -122,7 +122,6 @@ export function MortgageRecord({ props, onClose, onSaved }: { props: EditorInput
       terms={terms.data ?? null}
       accounts={accounts.data}
       categories={categories.data}
-      onClose={onClose}
       onSaved={save}
     />
   );

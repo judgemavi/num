@@ -2,7 +2,7 @@ import { columnMapSchema, statementDate, type ColumnMap, type DateOrder, type De
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
-import { DialogPanel } from "@/editors/form-chrome";
+import { DialogBody, DialogPanel } from "@/editors/form-chrome";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -80,6 +80,7 @@ export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapForm
 
   return (
     <DialogPanel>
+      <DialogBody>
       <div className="overflow-x-auto rounded-xl border">
         <table className="w-full min-w-[28rem] text-left text-sm">
           <thead>
@@ -222,6 +223,7 @@ export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapForm
           {error}
         </p>
       ) : null}
+      </DialogBody>
       <DialogFooter>
         <Button type="button" variant="secondary" onClick={onBack} disabled={pending}>
           Back

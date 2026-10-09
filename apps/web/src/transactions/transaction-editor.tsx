@@ -28,12 +28,12 @@ function amountLocked(transaction: Transaction, peer: Transaction | undefined): 
 
 export function TransactionEditor({ id, rawLine, initialAccountId, groupIds, onClose, onSaved }: TransactionEditorProps) {
   if (groupIds && groupIds.length > 0) {
-    return <GroupHost ids={groupIds} onClose={onClose} onSaved={onSaved} />;
+    return <GroupHost ids={groupIds} onSaved={onSaved} />;
   }
   return <SingleEditor id={id} rawLine={rawLine} initialAccountId={initialAccountId} onClose={onClose} onSaved={onSaved} />;
 }
 
-function GroupHost({ ids, onClose, onSaved }: { ids: string[]; onClose: () => void; onSaved: (id: string) => void }) {
+function GroupHost({ ids, onSaved }: { ids: string[]; onSaved: (id: string) => void }) {
   const currency = useBookCurrency();
   const accounts = useAccounts();
   const categories = useCategories();
@@ -48,7 +48,6 @@ function GroupHost({ ids, onClose, onSaved }: { ids: string[]; onClose: () => vo
       accounts={accounts.data}
       categories={categories.data}
       merchants={merchants.data}
-      onClose={onClose}
       onSaved={onSaved}
     />
   );

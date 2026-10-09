@@ -2,6 +2,7 @@ import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { listQuerySchema, pagedResponseSchema } from "./list";
 import { isUtcTimestamp } from "./time";
+import { nonNegativeCentsSchema as cents } from "./money";
 
 export const bucketKinds = ["spending", "sinking", "goal"] as const;
 
@@ -45,7 +46,6 @@ export const bucketIcons = [
 export type BucketIcon = (typeof bucketIcons)[number];
 
 const nameSchema = z.string().trim().min(1);
-const cents = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const positiveCents = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
 
 const archivedQuery = {

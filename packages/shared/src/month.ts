@@ -2,8 +2,8 @@ import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import { isoDateSchema, isIsoDate } from "./date";
 import { medianMinor, withinTolerance } from "./recurring-calc";
+import { centsSchema as cents } from "./money";
 
-const cents = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 
 export const monthStatuses = ["open", "ready", "closed"] as const;
 

@@ -4,8 +4,8 @@ import { bucketColors, bucketKinds, type BucketColor, type BucketKind } from "./
 import { isoDateSchema } from "./date";
 import { roundUpShare } from "./funding";
 import { occurrenceDates, variableAmounts, type AmountMode, type PlanKind, type PlanSchedule } from "./recurring-calc";
+import { centsSchema as cents } from "./money";
 
-const cents = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
 export function isYearMonth(value: string): boolean {

@@ -1,6 +1,7 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import { isoDateSchema } from "./date";
+import { centsSchema } from "./money";
 
 export const refundWindowDays = 90;
 
@@ -14,7 +15,6 @@ export type RefundPurchase = {
   categoryId: string | null;
 };
 
-const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 
 export const refundPurchaseQuerySchema = z.object({
   asOf: isoDateSchema,

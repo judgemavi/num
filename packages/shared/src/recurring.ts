@@ -4,8 +4,8 @@ import { listQuerySchema, pagedResponseSchema } from "./list";
 import { amountModes, businessDayShifts, planFrequencies, planKinds } from "./recurring-calc";
 import { type PlanProposal } from "./recurring-detect";
 import { isUtcTimestamp } from "./time";
+import { centsSchema } from "./money";
 
-const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 const toleranceSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const monthDaySchema = z
   .number()

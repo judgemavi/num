@@ -5,10 +5,10 @@ import { cardStatements } from "./card-statement";
 import { isoDateSchema } from "./date";
 import { billReserveDays } from "./funding";
 import { medianMinor } from "./recurring-calc";
+import { centsSchema } from "./money";
 
 export const forecastDayCount = 90;
 
-const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 
 export const forecastWarningCodes = ["manual_card", "no_payment_account"] as const;
 

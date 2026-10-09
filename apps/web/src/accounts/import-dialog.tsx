@@ -21,7 +21,7 @@ import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogPanel } from "@/editors/form-chrome";
+import { DialogBody, DialogPanel } from "@/editors/form-chrome";
 
 export function ImportForm({
   account,
@@ -298,6 +298,7 @@ export function ImportForm({
         />
       ) : (
         <DialogPanel>
+          <DialogBody>
           {finished ? null : (
             <ImportDropZone
               inputRef={fileRef}
@@ -339,6 +340,7 @@ export function ImportForm({
               The bank formats did not load.
             </p>
           ) : null}
+          </DialogBody>
           <DialogFooter>
             {finished ? (
               <DialogClose asChild>

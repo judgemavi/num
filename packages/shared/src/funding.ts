@@ -4,8 +4,8 @@ import type { BucketKind } from "./bucket";
 import { isoDateSchema, asOfQuerySchema } from "./date";
 import { amountModes } from "./recurring-calc";
 import { isUtcTimestamp } from "./time";
+import { centsSchema as cents } from "./money";
 
-const cents = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const positive = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
 

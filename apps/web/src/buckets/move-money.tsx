@@ -4,7 +4,7 @@ import { bucketError, today } from "@/buckets/format";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogForm } from "@/editors/form-chrome";
+import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -76,6 +76,7 @@ export function MoveMoney({ currency, buckets, fromId, onSaved }: MoveMoneyProps
         <DialogTitle>Move money</DialogTitle>
         <DialogDescription>Move money from one bucket to another. This does not move money between accounts.</DialogDescription>
       </DialogHeader>
+      <DialogBody>
       <Field>
         <FieldLabel htmlFor="move-from">From</FieldLabel>
         <Select value={from || undefined} onValueChange={setFrom}>
@@ -121,6 +122,7 @@ export function MoveMoney({ currency, buckets, fromId, onSaved }: MoveMoneyProps
         <Input id="move-note" value={note} onChange={(event) => setNote(event.target.value)} />
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
+      </DialogBody>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">

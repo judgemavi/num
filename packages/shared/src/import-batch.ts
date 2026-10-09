@@ -4,8 +4,8 @@ import { listQuerySchema, pagedResponseSchema } from "./list";
 import { isUtcTimestamp } from "./time";
 import { openingSuggestionSchema } from "./opening";
 import { presetSchema, unreadableRowSchema } from "./statement";
+import { centsSchema } from "./money";
 
-const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 
 export const importCountsSchema = z.object({
   created: z.number().int().nonnegative(),

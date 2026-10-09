@@ -1,7 +1,7 @@
 import { inboxDecisionListSchema, merchantSchema, type Category, type Merchant } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
+import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { useRestoreNamed } from "@/editors/restore-named";
 import { undoDecision } from "@/inbox/actions";
@@ -77,6 +77,7 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
         title={merchant ? "Edit merchant" : "New merchant"}
         description="The default category is used when nothing else matches."
       />
+      <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
       {(decisions.data ?? []).map((row) => (
         <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
           <span>{decisionText(row.decision)}</span>
@@ -146,6 +147,7 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
         />
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
+      </DialogBody>
       <FormActions inline={inline}>
         <FormCancel inline={inline} onClose={onClose}>
           Cancel

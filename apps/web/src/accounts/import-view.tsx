@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useCallback, useEffect } from "react";
 import { ImportFilterBar } from "@/accounts/import-filters";
-import { accountLabelOf } from "@/accounts/label";
+import { accountLabelOf, accountLabels } from "@/accounts/label";
 import { formatImportDate, formatImportPeriod, importCountText, importStatusLabel } from "@/accounts/import-format";
 import { importViewPath } from "@/accounts/import-query";
 import { apiRequest } from "@/request";
@@ -83,6 +83,7 @@ export function ImportViewScreen() {
   }
 
   const page = imports.data;
+  const accountNames = accountLabels(accounts.data.items);
   const lastPage = Math.max(1, Math.ceil(page.total / page.pageSize));
   const filtered = Boolean(search.accountId || search.status || search.from || search.to);
 
@@ -108,7 +109,7 @@ export function ImportViewScreen() {
             <ImportListRow
               key={item.id}
               item={item}
-              accountName={accountLabelOf(accounts.data?.items ?? [], item.accountId, item.accountName)}
+              accountName={accountLabelOf(accountNames, item.accountId, item.accountName)}
             />
           ))
         )}

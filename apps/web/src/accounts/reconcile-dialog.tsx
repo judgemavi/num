@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DialogForm } from "@/editors/form-chrome";
+import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { loadAccount, setOpeningBalance } from "@/accounts/opening-action";
@@ -170,6 +170,7 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
           void checkBalance();
         }}
       >
+        <DialogBody>
         <Field>
           <FieldLabel htmlFor="statement-date">Statement date</FieldLabel>
           <Input
@@ -287,6 +288,7 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
           </div>
         ) : null}
         {error ? <FieldError>{error}</FieldError> : null}
+        </DialogBody>
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="outline">

@@ -4,8 +4,8 @@ import { amountModes, planFrequencies } from "./recurring-calc";
 import { suggestionSchema } from "./suggest";
 import { unreadableReasons } from "./statement";
 import { isUtcTimestamp } from "./time";
+import { centsSchema as cents } from "./money";
 
-const cents = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 const itemKey = z.string().trim().min(1).max(500);
 const monthDay = z.number().int().refine((day) => day === -1 || (day >= 1 && day <= 31));
 

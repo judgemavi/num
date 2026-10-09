@@ -18,7 +18,7 @@ import { MergeDialog } from "@/settings/merge-dialog";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogForm, DialogPanel } from "@/editors/form-chrome";
+import { DialogBody, DialogForm, DialogPanel } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
@@ -33,7 +33,7 @@ function useRefresh(keys: string[][]) {
   };
 }
 
-export function ImportInfoEditor({ props }: { props: EditorInput["importInfo"]; onClose: () => void }) {
+export function ImportInfoEditor({ props }: { props: EditorInput["importInfo"] }) {
   return (
     <DialogPanel>
       <DialogHeader>
@@ -42,6 +42,7 @@ export function ImportInfoEditor({ props }: { props: EditorInput["importInfo"]; 
           {props.filename ?? "Statement"} · {importCountText(props.counts)}
         </DialogDescription>
       </DialogHeader>
+      <DialogBody>
       {props.unreadable.length > 0 ? (
         <ul className="grid gap-3">
           {props.unreadable.map((row) => (
@@ -56,6 +57,7 @@ export function ImportInfoEditor({ props }: { props: EditorInput["importInfo"]; 
       ) : (
         <p className="text-sm text-muted-foreground">Every row was read.</p>
       )}
+      </DialogBody>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button">Close</Button>
@@ -65,7 +67,7 @@ export function ImportInfoEditor({ props }: { props: EditorInput["importInfo"]; 
   );
 }
 
-export function MergeEditor({ props, onClose, onSaved }: { props: EditorInput["mergeMerchant"] } & Finish) {
+export function MergeEditor({ props, onSaved }: { props: EditorInput["mergeMerchant"]; onSaved: (id: string) => void }) {
   const merchants = useMerchants();
   const merchant = useRecord("merchant", props.merchantId, `/api/merchants/${props.merchantId}`, merchantSchema);
   const refresh = useRefresh([["merchants"], ["transactions"]]);
@@ -79,7 +81,6 @@ export function MergeEditor({ props, onClose, onSaved }: { props: EditorInput["m
     <MergeDialog
       source={merchant.data}
       merchants={merchants.data}
-      onClose={onClose}
       onMerged={() => {
         void refresh().then(() => onSaved("ok"));
       }}
@@ -87,7 +88,7 @@ export function MergeEditor({ props, onClose, onSaved }: { props: EditorInput["m
   );
 }
 
-export function SkipNextEditor({ props, onClose, onSaved }: { props: EditorInput["skipNext"] } & Finish) {
+export function SkipNextEditor({ props, onSaved }: { props: EditorInput["skipNext"]; onSaved: (id: string) => void }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const plan = useRecord("plan", props.planId, `/api/recurring/${props.planId}`, planSchema);
@@ -99,24 +100,21 @@ export function SkipNextEditor({ props, onClose, onSaved }: { props: EditorInput
     return <LoadError label="Recurring did not load." onRetry={() => void plan.refetch()} />;
   }
   return (
-    <div className="grid gap-4">
-      <SkipNext
-        plan={plan.data}
-        reason={reason}
-        asOf={props.asOf}
-        onReason={setReason}
-        onClose={onClose}
-        onDone={() => {
-          void refresh().then(() => onSaved("ok"));
-        }}
-        onError={setError}
-      />
-      {error ? <FieldError>{error}</FieldError> : null}
-    </div>
+    <SkipNext
+      plan={plan.data}
+      reason={reason}
+      asOf={props.asOf}
+      error={error}
+      onReason={setReason}
+      onDone={() => {
+        void refresh().then(() => onSaved("ok"));
+      }}
+      onError={setError}
+    />
   );
 }
 
-export function SkipOccurrenceEditor({ props, onSaved }: { props: EditorInput["skipOccurrence"] } & Finish) {
+export function SkipOccurrenceEditor({ props, onSaved }: { props: EditorInput["skipOccurrence"]; onSaved: (id: string) => void }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const refresh = useRefresh([["occurrences"], ["recurring-signals"], ["recurring-sync"]]);
@@ -149,12 +147,14 @@ export function SkipOccurrenceEditor({ props, onSaved }: { props: EditorInput["s
         <DialogTitle>Skip this occurrence</DialogTitle>
         <DialogDescription>Tell why this one will not happen. You can restore it later.</DialogDescription>
       </DialogHeader>
+      <DialogBody>
       <Field>
         <FieldLabel htmlFor="skip-reason">Reason</FieldLabel>
         <Input id="skip-reason" value={reason} onChange={(event) => setReason(event.target.value)} />
       </Field>
       {reason.trim().length === 0 ? <FieldError>Enter a reason.</FieldError> : null}
       {error ? <FieldError>{error}</FieldError> : null}
+      </DialogBody>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">
@@ -213,6 +213,7 @@ export function LinkOccurrenceEditor({ props, onSaved }: { props: EditorInput["l
         <DialogTitle>Link a transaction</DialogTitle>
         <DialogDescription>Choose a transaction on this account.</DialogDescription>
       </DialogHeader>
+      <DialogBody>
       <Field>
         <FieldLabel htmlFor="link-transaction">Transaction</FieldLabel>
         <OptionCombobox
@@ -227,6 +228,7 @@ export function LinkOccurrenceEditor({ props, onSaved }: { props: EditorInput["l
         />
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
+      </DialogBody>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">

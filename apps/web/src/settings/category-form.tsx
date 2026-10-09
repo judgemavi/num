@@ -13,7 +13,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useActiveBuckets } from "@/editors/lookups";
-import { FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
+import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { categoryError } from "@/settings/format";
 import { NameForm } from "@/settings/name-form";
@@ -119,6 +119,7 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
         }
       />
       <FormShell inline={inline} className="flex flex-col gap-4" onSubmit={() => void submit()}>
+        <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
         <Field>
           <FieldLabel htmlFor={`${fieldId}-name`}>Name</FieldLabel>
           <Input id={`${fieldId}-name`} value={name} autoComplete="off" onChange={(event) => setName(event.target.value)} />
@@ -216,6 +217,7 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
           </Field>
         ) : null}
         {error ? <FieldError>{error}</FieldError> : null}
+        </DialogBody>
         <FormActions inline={inline}>
           <FormCancel inline={inline} onClose={onClose}>
             Cancel

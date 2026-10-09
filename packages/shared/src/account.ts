@@ -4,6 +4,7 @@ import { columnMapSchema } from "./statement";
 import { listQuerySchema, pagedResponseSchema } from "./list";
 import { interestRateMilliPctSchema } from "./rate";
 import { isUtcTimestamp } from "./time";
+import { centsSchema } from "./money";
 
 export const accountKinds = [
   "chequing",
@@ -47,7 +48,6 @@ export function allowsInterestRate(kind: AccountKind): boolean {
   return interestKinds.has(kind);
 }
 
-const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 
 const nonNegativeCentsSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 

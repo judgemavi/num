@@ -52,53 +52,6 @@ type RouteConfig = {
 
 const methods = new Set(["get", "post", "put", "patch", "delete"]);
 
-const amountKeys = new Set([
-  "amount",
-  "openingBalance",
-  "balance",
-  "statementBalance",
-  "calculatedBalance",
-  "difference",
-  "closingBalance",
-  "principal",
-  "payment",
-  "interest",
-  "totalInterest",
-  "lumpSum",
-  "onBudgetTotal",
-  "unassigned",
-  "refillTo",
-  "target",
-  "fixedAmount",
-  "fixedPayment",
-  "held",
-  "need",
-  "savings",
-  "expectedAmount",
-  "actualAmount",
-  "forecastAmount",
-  "safeAmount",
-  "safeToSpend",
-  "runningBalance",
-  "refundedAmount",
-  "median",
-  "delta",
-  "income",
-  "spending",
-  "planned",
-  "actual",
-  "inflow",
-  "assets",
-  "liabilities",
-  "net",
-  "surplus",
-  "tolerance",
-  "perPaycheck",
-  "limit",
-  "known",
-  "estimated",
-]);
-
 type ZodDef = {
   shape?: Record<string, z.ZodType>;
   innerType?: z.ZodType;
@@ -113,13 +66,17 @@ function schemaHasAmount(schema: z.ZodType, seen: WeakSet<object>): boolean {
     return false;
   }
   seen.add(schema);
+  const meta = (schema as { meta?: () => { money?: boolean } }).meta?.();
+  if (meta?.money === true) {
+    return true;
+  }
   const def = (schema as { def?: ZodDef }).def;
   if (!def) {
     return false;
   }
   if (def.shape) {
-    for (const [key, value] of Object.entries(def.shape)) {
-      if (amountKeys.has(key) || schemaHasAmount(value, seen)) {
+    for (const value of Object.values(def.shape)) {
+      if (schemaHasAmount(value, seen)) {
         return true;
       }
     }

@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { isMonthKey } from "./month";
+import { centsSchema as cents } from "./money";
 
-const cents = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 
 export const insightBreakdowns = ["category", "group", "merchant", "tag"] as const;
 

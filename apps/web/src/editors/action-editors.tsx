@@ -54,7 +54,7 @@ export function ReconcileEditor({ props, onClose }: { props: EditorInput["reconc
   return <ReconcileDialog accountId={props.accountId} currency={currency.data} kind={account.data.kind} onClose={onClose} />;
 }
 
-export function FundEditor({ props, onClose, onSaved }: { props: EditorInput["fundPaycheck"] } & Finish) {
+export function FundEditor({ props, onSaved }: { props: EditorInput["fundPaycheck"] } & Finish) {
   const currency = useBookCurrency();
   const refresh = useRefresh([["buckets"], ["funding-position"], ["funding-paychecks"], ["funding-proposal"], ["funding-runs"], ["inbox"]]);
   if (!currency.data) {
@@ -65,7 +65,6 @@ export function FundEditor({ props, onClose, onSaved }: { props: EditorInput["fu
       currency={currency.data}
       asOf={localAsOf()}
       incomeTransactionId={props.incomeTransactionId}
-      onClose={onClose}
       onSaved={() => {
         void refresh().then(() => onSaved("ok"));
       }}

@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { monthKeySchema } from "./month";
+import { centsSchema as cents } from "./money";
 
-const cents = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
 export const inboxAgeDays = 7;

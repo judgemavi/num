@@ -4,9 +4,9 @@ import { usePhone } from "@/components/use-phone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 export type FilterBadge = {
   key: string;
@@ -132,9 +132,9 @@ export function FilterBar({
                 <SheetTitle className="font-display text-2xl font-extrabold uppercase [font-stretch:72%]">Filters</SheetTitle>
               </SheetHeader>
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{fields}</div>
-              <div className="shrink-0 px-4 py-3">
+              <SheetFooter className="shrink-0">
                 <PanelActions onApply={apply} onClear={onClear} />
-              </div>
+              </SheetFooter>
             </SheetContent>
           </Sheet>
         ) : (
@@ -143,7 +143,9 @@ export function FilterBar({
               <FiltersButton count={activeCount} />
             </PopoverTrigger>
             <PopoverContent align="start" className="flex max-h-[70vh] w-[min(24rem,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0">
-              <p className="shrink-0 px-4 pt-4 text-base font-semibold">Filters</p>
+              <PopoverHeader className="shrink-0 px-4 pt-4">
+                <PopoverTitle className="text-base font-semibold">Filters</PopoverTitle>
+              </PopoverHeader>
               <div className="min-h-0 overflow-y-auto px-4 py-4">{fields}</div>
               <div className="shrink-0 px-4 pb-4">
                 <PanelActions onApply={apply} onClear={onClear} />

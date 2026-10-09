@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
+import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
@@ -58,6 +58,7 @@ export function NameForm({
     <>
       <FormHeading inline={inline} title={title} description={description} />
       <FormShell inline={inline} className="flex flex-col gap-4" onSubmit={() => void submit()}>
+        <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
         <Field>
           <FieldLabel htmlFor={idPrefix}>{label}</FieldLabel>
           <Input
@@ -68,6 +69,7 @@ export function NameForm({
           />
         </Field>
         {error ? <FieldError>{error}</FieldError> : null}
+        </DialogBody>
         <FormActions inline={inline}>
           <FormCancel inline={inline} onClose={onClose}>
             Cancel

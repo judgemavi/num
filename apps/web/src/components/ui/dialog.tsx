@@ -152,9 +152,6 @@ function DialogDescription({
   )
 }
 
-Object.assign(DialogHeader, { dialogSlot: "header" as const });
-Object.assign(DialogFooter, { dialogSlot: "footer" as const });
-
 export {
   Dialog,
   DialogClose,

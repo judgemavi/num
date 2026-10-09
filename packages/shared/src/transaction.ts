@@ -4,6 +4,7 @@ import { isoDateSchema } from "./date";
 import { skippedRowSchema } from "./inbox";
 import { listQuerySchema, pagedResponseSchema } from "./list";
 import { autoReasons } from "./matching";
+import { centsSchema } from "./money";
 
 export const transactionStatuses = ["open", "cleared"] as const;
 
@@ -17,7 +18,6 @@ export const transactionSources = ["import", "manual", "mcp"] as const;
 
 export type TransactionSource = (typeof transactionSources)[number];
 
-const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 
 const optionalText = z.string().trim().min(1).nullable().optional();
 

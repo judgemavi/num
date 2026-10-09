@@ -20,7 +20,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { PanelLeftIcon } from "lucide-react"
@@ -71,7 +70,7 @@ function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(() => readSidebarOpen(defaultOpen))
+  const [_open, _setOpen] = React.useState(defaultOpen)
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -128,7 +127,6 @@ function SidebarProvider({
 
   return (
     <SidebarContext.Provider value={contextValue}>
-      <TooltipProvider delayDuration={0}>
       <div
         data-slot="sidebar-wrapper"
         style={
@@ -146,21 +144,8 @@ function SidebarProvider({
       >
         {children}
       </div>
-      </TooltipProvider>
     </SidebarContext.Provider>
   )
-}
-
-function readSidebarOpen(defaultOpen: boolean): boolean {
-  if (typeof document === "undefined") {
-    return defaultOpen
-  }
-  const prefix = `${SIDEBAR_COOKIE_NAME}=`
-  const found = document.cookie.split("; ").find((part) => part.startsWith(prefix))
-  if (!found) {
-    return defaultOpen
-  }
-  return found.slice(prefix.length) === "true"
 }
 
 function Sidebar({

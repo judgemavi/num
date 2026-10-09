@@ -20,7 +20,7 @@ import { ManagedPicker } from "@/editors/managed-picker";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogForm } from "@/editors/form-chrome";
+import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,7 +31,6 @@ type MortgageFormProps = {
   terms: MortgageTerms | null;
   accounts: Account[];
   categories: Category[];
-  onClose: () => void;
   onSaved: (id: string) => void;
 };
 
@@ -168,6 +167,7 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
         <DialogDescription>These terms calculate the schedule. They do not create payments.</DialogDescription>
       </DialogHeader>
       <DialogForm onSubmit={(event) => void onSubmit(event)}>
+        <DialogBody>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="mortgage-principal">Amount owed</FieldLabel>
@@ -286,6 +286,7 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
           />
         </Field>
         {error ? <FieldError>{error}</FieldError> : null}
+        </DialogBody>
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="outline">Cancel</Button>

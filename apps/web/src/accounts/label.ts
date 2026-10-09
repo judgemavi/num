@@ -24,6 +24,6 @@ export function accountLabels(accounts: (NamedAccount & { id: string })[]): Map<
   return new Map(accounts.map((account) => [account.id, accountLabel(account)]));
 }
 
-export function accountLabelOf(accounts: (NamedAccount & { id: string })[], id: string, fallback: string): string {
-  return accountLabels(accounts).get(id) ?? fallback;
+export function accountLabelOf(labels: Map<string, string>, id: string, fallback: string): string {
+  return labels.get(id) ?? fallback;
 }

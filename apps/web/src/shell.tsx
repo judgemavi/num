@@ -2,7 +2,6 @@ import { inboxSchema, setupStatusSchema } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Ellipsis, type LucideIcon } from "lucide-react";
-import { useState } from "react";
 import { localAsOf } from "@/as-of";
 import { EditorHost } from "@/editors/editor-host";
 import { moreNav, phoneMoreNav, primaryNav, settingsNav, type NavPath } from "@/nav";
@@ -10,7 +9,7 @@ import { apiRequest } from "@/request";
 import { SetupScreen } from "@/setup-screen";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   Sidebar,
   SidebarContent,
@@ -109,8 +108,16 @@ function AppSidebar({ pathname, inboxCount }: { pathname: string; inboxCount?: n
   );
 }
 
+function sidebarDefaultOpen(): boolean {
+  const prefix = "sidebar_state=";
+  const found = document.cookie.split("; ").find((part) => part.startsWith(prefix));
+  if (!found) {
+    return true;
+  }
+  return found.slice(prefix.length) === "true";
+}
+
 function PhoneTabs({ pathname, inboxCount }: { pathname: string; inboxCount?: number }) {
-  const [moreOpen, setMoreOpen] = useState(false);
   const moreCurrent = phoneMoreNav.some((item) => isCurrent(pathname, item.to));
   const tabs = primaryNav.filter((item) => item.to !== "/accounts");
   return (
@@ -137,42 +144,42 @@ function PhoneTabs({ pathname, inboxCount }: { pathname: string; inboxCount?: nu
             </Link>
           );
         })}
-        <button
-          type="button"
-          aria-current={moreCurrent ? "page" : undefined}
-          aria-expanded={moreOpen}
-          onClick={() => setMoreOpen(true)}
-          className={`grid min-h-[52px] justify-items-center gap-0.5 pt-1.5 text-[11px] font-semibold ${moreCurrent ? "text-primary" : "text-muted-foreground"}`}
-        >
-          <Ellipsis size={24} strokeWidth={1.8} aria-hidden="true" />
-          More
-        </button>
+        <Sheet>
+          <SheetTrigger asChild>
+            <button
+              type="button"
+              aria-current={moreCurrent ? "page" : undefined}
+              className={`grid min-h-[52px] justify-items-center gap-0.5 pt-1.5 text-[11px] font-semibold ${moreCurrent ? "text-primary" : "text-muted-foreground"}`}
+            >
+              <Ellipsis size={24} strokeWidth={1.8} aria-hidden="true" />
+              More
+            </button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="rounded-t-[20px] pb-[calc(16px+env(safe-area-inset-bottom))]">
+            <SheetHeader>
+              <SheetTitle className="font-display text-2xl font-extrabold uppercase [font-stretch:72%]">More</SheetTitle>
+            </SheetHeader>
+            <nav aria-label="More" className="grid px-2">
+              {phoneMoreNav.map((item) => {
+                const Icon = item.icon;
+                const current = isCurrent(pathname, item.to);
+                return (
+                  <SheetClose asChild key={item.to}>
+                    <Link
+                      to={item.to}
+                      aria-current={current ? "page" : undefined}
+                      className={`flex min-h-11 items-center gap-3 rounded-[10px] px-3 font-semibold ${current ? "bg-primary-soft text-primary" : ""}`}
+                    >
+                      <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+                      {item.label}
+                    </Link>
+                  </SheetClose>
+                );
+              })}
+            </nav>
+          </SheetContent>
+        </Sheet>
       </nav>
-      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom" className="rounded-t-[20px] pb-[calc(16px+env(safe-area-inset-bottom))]">
-          <SheetHeader>
-            <SheetTitle className="font-display text-2xl font-extrabold uppercase [font-stretch:72%]">More</SheetTitle>
-          </SheetHeader>
-          <nav aria-label="More" className="grid px-2">
-            {phoneMoreNav.map((item) => {
-              const Icon = item.icon;
-              const current = isCurrent(pathname, item.to);
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  aria-current={current ? "page" : undefined}
-                  onClick={() => setMoreOpen(false)}
-                  className={`flex min-h-11 items-center gap-3 rounded-[10px] px-3 font-semibold ${current ? "bg-primary-soft text-primary" : ""}`}
-                >
-                  <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </SheetContent>
-      </Sheet>
     </>
   );
 }
@@ -191,7 +198,7 @@ function AppShell() {
     },
   });
   return (
-    <SidebarProvider className="h-svh overflow-hidden bg-background">
+    <SidebarProvider defaultOpen={sidebarDefaultOpen()} className="h-svh overflow-hidden bg-background">
       <AppSidebar pathname={pathname} inboxCount={inbox.data?.count} />
       <SidebarInset className="min-h-0 overflow-y-auto bg-background">
         <main className="grid content-start gap-5 px-4 pt-2 pb-[calc(96px+env(safe-area-inset-bottom))] md:px-8 md:py-7 md:pb-9">

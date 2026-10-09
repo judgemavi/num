@@ -18,7 +18,7 @@ import { LoadError, LoadingLine } from "@/editors/load-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogForm } from "@/editors/form-chrome";
+import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { FieldError, FieldLabel } from "@/components/ui/field";
 import { apiRequest } from "@/request";
 import { formatMoney as formatDisplayMoney } from "@/money";
@@ -31,11 +31,10 @@ type GroupEditorProps = {
   accounts: Account[];
   categories: Category[];
   merchants: Merchant[];
-  onClose: () => void;
   onSaved: (id: string) => void;
 };
 
-export function GroupEditor({ ids, currency, accounts, categories, merchants, onClose, onSaved }: GroupEditorProps) {
+export function GroupEditor({ ids, currency, accounts, categories, merchants, onSaved }: GroupEditorProps) {
   const queryClient = useQueryClient();
   const loaded = useQueries({
     queries: ids.map((id) => ({
@@ -65,7 +64,6 @@ export function GroupEditor({ ids, currency, accounts, categories, merchants, on
       accounts={accounts}
       categories={categories}
       merchants={merchants}
-      onClose={onClose}
       onSaved={async (id) => {
         await queryClient.invalidateQueries({ queryKey: ["transactions"] });
         await queryClient.invalidateQueries({ queryKey: ["transaction"] });
@@ -89,7 +87,6 @@ function GroupForm({
   accounts: Account[];
   categories: Category[];
   merchants: Merchant[];
-  onClose: () => void;
   onSaved: (id: string) => void;
 }) {
   const direction = transactions.filter((item) => item.amount > 0).length > transactions.filter((item) => item.amount < 0).length ? "in" : "out";
@@ -166,6 +163,7 @@ function GroupForm({
         </DialogTitle>
         <DialogDescription>This applies to every transaction you leave in the list.</DialogDescription>
       </DialogHeader>
+      <DialogBody>
       <ul className="grid gap-2">
         {transactions.map((item) => (
           <li key={item.id} className="flex items-center gap-2">
@@ -216,6 +214,7 @@ function GroupForm({
       />
       {notice ? <p role="status">{notice}</p> : null}
       {error ? <FieldError>{error}</FieldError> : null}
+      </DialogBody>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">

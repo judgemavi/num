@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { Temporal } from "temporal-polyfill";
 import { isoDateSchema } from "./date";
+import { centsSchema } from "./money";
 
-const centsSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 
 export const openingSuggestionSchema = z.object({
   amount: centsSchema,

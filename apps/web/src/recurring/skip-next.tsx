@@ -4,21 +4,21 @@ import { planError } from "@/recurring/format";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogForm } from "@/editors/form-chrome";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { DialogBody, DialogForm } from "@/editors/form-chrome";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 type SkipNextProps = {
   plan: Plan | null;
   reason: string;
   asOf: string;
+  error: string | null;
   onReason: (value: string) => void;
-  onClose: () => void;
   onDone: () => void;
   onError: (value: string) => void;
 };
 
-export function SkipNext({ plan, reason, asOf, onReason, onDone, onError }: SkipNextProps) {
+export function SkipNext({ plan, reason, asOf, error, onReason, onDone, onError }: SkipNextProps) {
   const [saving, setSaving] = useState(false);
   if (!plan) {
     return null;
@@ -59,10 +59,13 @@ export function SkipNext({ plan, reason, asOf, onReason, onDone, onError }: Skip
         <DialogTitle>Skip next</DialogTitle>
         <DialogDescription>Skip the next open or missed occurrence of {plan.name}.</DialogDescription>
       </DialogHeader>
-      <Field>
-        <FieldLabel htmlFor="skip-next-reason">Reason</FieldLabel>
-        <Input id="skip-next-reason" value={reason} onChange={(event) => onReason(event.target.value)} />
-      </Field>
+      <DialogBody>
+        <Field>
+          <FieldLabel htmlFor="skip-next-reason">Reason</FieldLabel>
+          <Input id="skip-next-reason" value={reason} onChange={(event) => onReason(event.target.value)} />
+        </Field>
+        {error ? <FieldError>{error}</FieldError> : null}
+      </DialogBody>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">

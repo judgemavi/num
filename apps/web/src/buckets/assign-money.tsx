@@ -4,7 +4,7 @@ import { bucketError, today } from "@/buckets/format";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogForm } from "@/editors/form-chrome";
+import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
@@ -83,6 +83,7 @@ export function AssignMoney({ currency, bucket, kind, onSaved }: AssignMoneyProp
           {bucket.name}. {labels.text}
         </DialogDescription>
       </DialogHeader>
+      <DialogBody>
       <Field>
         <FieldLabel htmlFor="assign-amount">Amount</FieldLabel>
         <Input id="assign-amount" inputMode="decimal" value={amount} required onChange={(event) => setAmount(event.target.value)} />
@@ -96,6 +97,7 @@ export function AssignMoney({ currency, bucket, kind, onSaved }: AssignMoneyProp
         <Input id="assign-note" value={note} onChange={(event) => setNote(event.target.value)} />
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
+      </DialogBody>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">

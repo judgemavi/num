@@ -14,7 +14,7 @@ import { useState, type FormEvent } from "react";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DialogForm } from "@/editors/form-chrome";
+import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { FieldError } from "@/components/ui/field";
 import { accountLabel, accountOptionLabel } from "@/accounts/label";
 import { formatMoney } from "@/money";
@@ -206,7 +206,6 @@ export function TransactionForm({
     }
     onSaved(result.data.id);
   }
-
   const summary = `${formatDate(date)} · ${accountName} · ${direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(imported && transaction ? transaction.amount : (totalMinor ?? 0)))} · ${payee}`;
 
   return (
@@ -217,6 +216,7 @@ export function TransactionForm({
           {amountLocked ? "This side follows the other account. Change the amount there." : "Say where the money went."}
         </DialogDescription>
       </DialogHeader>
+      <DialogBody>
       {decisions.map((row) => (
         <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
           <span>{row.text}</span>
@@ -370,6 +370,7 @@ export function TransactionForm({
       />
       {notice ? <p role="status">{notice}</p> : null}
       {error ? <FieldError>{error}</FieldError> : null}
+      </DialogBody>
       <DialogFooter>
         {transaction && !reconciled ? (
           <DeleteMenu

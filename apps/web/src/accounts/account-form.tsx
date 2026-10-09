@@ -14,7 +14,7 @@ import {
   type AccountKind,
   type PaymentPolicy,
 } from "@num/shared";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { accountError, policyLabel } from "@/accounts/format";
 import { KindPicker } from "@/accounts/kind-picker";
 import { sameClassKinds } from "@/accounts/groups";
@@ -22,7 +22,7 @@ import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
-import { FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
+import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -33,6 +33,7 @@ type AccountFormProps = {
   currency: string;
   account: Account | null;
   inline?: boolean;
+  below?: ReactNode;
   onClose: () => void;
   onSaved: (id: string) => void;
 };
@@ -70,7 +71,7 @@ function isPolicy(value: string): value is PaymentPolicy {
   return value === "full" || value === "fixed" || value === "manual";
 }
 
-export function AccountForm({ currency, account, initialName, inline = false, onClose, onSaved }: AccountFormProps) {
+export function AccountForm({ currency, account, initialName, inline = false, below, onClose, onSaved }: AccountFormProps) {
   const [name, setName] = useState(account?.name ?? initialName ?? "");
   const [institution, setInstitution] = useState(account?.institution ?? "");
   const [kind, setKind] = useState<AccountKind>(account?.kind ?? "chequing");
@@ -174,6 +175,7 @@ export function AccountForm({ currency, account, initialName, inline = false, on
         description={account ? "Change the details of this account." : "Add an account to the book."}
       />
       <FormShell inline={inline} className="grid gap-4" onSubmit={() => void onSubmit()}>
+        <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
         <Field>
           <FieldLabel htmlFor="account-name">Name</FieldLabel>
           <Input id="account-name" value={name} required onChange={(event) => setName(event.target.value)} />
@@ -273,6 +275,8 @@ export function AccountForm({ currency, account, initialName, inline = false, on
           </CollapsibleContent>
         </Collapsible>
         {error ? <FieldError>{error}</FieldError> : null}
+        {below}
+        </DialogBody>
         <FormActions inline={inline}>
           <FormCancel inline={inline} onClose={onClose}>
             Cancel
