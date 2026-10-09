@@ -6,6 +6,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { importStatusLabel } from "@/accounts/import-format";
+import { accountLabel } from "@/accounts/label";
 import { formatDate } from "@/transactions/format";
 import { OptionCombobox } from "@/transactions/option-combobox";
 
@@ -47,7 +48,8 @@ function applySort(value: string): Partial<ImportViewQuery> {
 
 export function ImportFilterBar({ search, accounts, onChange }: ImportFilterBarProps) {
   const [draft, setDraft] = useState<Draft>(() => draftFrom(search));
-  const accountName = accounts.find((account) => account.id === search.accountId)?.name;
+  const selectedAccount = accounts.find((account) => account.id === search.accountId);
+  const accountName = selectedAccount ? accountLabel(selectedAccount) : undefined;
 
   const badges: FilterBadge[] = [];
   if (search.accountId && accountName) {
@@ -97,7 +99,7 @@ export function ImportFilterBar({ search, accounts, onChange }: ImportFilterBarP
             <OptionCombobox
               id="import-filter-account"
               value={draft.accountId ?? null}
-              options={accounts.map((account) => ({ id: account.id, label: account.name }))}
+              options={accounts.map((account) => ({ id: account.id, label: accountLabel(account) }))}
               placeholder="Any account"
               emptyLabel="Any account"
               onChange={(accountId) => setDraft({ ...draft, accountId: accountId ?? undefined })}

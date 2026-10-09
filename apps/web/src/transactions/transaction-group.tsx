@@ -13,10 +13,12 @@ import {
 } from "@num/shared";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { accountLabel } from "@/accounts/label";
 import { LoadError, LoadingLine } from "@/editors/load-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogForm } from "@/editors/form-chrome";
 import { FieldError, FieldLabel } from "@/components/ui/field";
 import { apiRequest } from "@/request";
 import { formatMoney as formatDisplayMoney } from "@/money";
@@ -80,7 +82,6 @@ function GroupForm({
   accounts,
   categories,
   merchants,
-  onClose,
   onSaved,
 }: {
   currency: string;
@@ -108,10 +109,10 @@ function GroupForm({
   const accountId = included[0]?.accountId ?? transactions[0]?.accountId ?? "";
   const transferOptions = accounts
     .filter((account) => account.id !== accountId && account.archivedAt === null)
-    .map((account) => ({ id: account.id, label: account.name }));
+    .map((account) => ({ id: account.id, label: accountLabel(account) }));
   const archivedAccounts = accounts
     .filter((account) => account.archivedAt !== null && account.id !== accountId)
-    .map((account) => ({ id: account.id, label: account.name }));
+    .map((account) => ({ id: account.id, label: accountLabel(account) }));
   const merchantOptions = merchants
     .filter((merchant) => merchant.archivedAt === null || merchant.id === merchantId)
     .map((merchant) => ({ id: merchant.id, label: merchant.name }));
@@ -153,8 +154,7 @@ function GroupForm({
   }
 
   return (
-    <form
-      className="grid gap-4"
+    <DialogForm
       onSubmit={(event) => {
         event.preventDefault();
         void save();
@@ -217,9 +217,11 @@ function GroupForm({
       {notice ? <p role="status">{notice}</p> : null}
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
+        <DialogClose asChild>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
+        </DialogClose>
         {notice ? (
           <Button type="button" onClick={() => onSaved(included[0]?.id ?? "")}>
             Done
@@ -230,6 +232,6 @@ function GroupForm({
           </Button>
         )}
       </DialogFooter>
-    </form>
+    </DialogForm>
   );
 }

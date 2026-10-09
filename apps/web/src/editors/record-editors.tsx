@@ -10,6 +10,7 @@ import {
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AccountForm } from "@/accounts/account-form";
+import { accountLabel } from "@/accounts/label";
 import { MortgageForm } from "@/accounts/mortgage-form";
 import { AccountImports } from "@/accounts/account-imports";
 import { BucketForm } from "@/buckets/bucket-form";
@@ -80,7 +81,7 @@ export function AccountRecord({ props, onClose, onSaved }: { props: EditorInput[
         onSaved={save}
       />
       {props.id && account.data ? (
-        <AccountImports accountId={props.id} accountName={account.data.name} currency={currency.data} />
+        <AccountImports accountId={props.id} accountName={accountLabel(account.data)} currency={currency.data} />
       ) : null}
     </>
   );

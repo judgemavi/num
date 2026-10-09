@@ -7,6 +7,7 @@ import { MortgagePanel } from "@/accounts/mortgage-panel";
 import { AccountTransactions } from "@/accounts/account-transactions";
 import { CheckpointHistory } from "@/accounts/checkpoint-history";
 import { accountDetail, kindLabel } from "@/accounts/format";
+import { accountLabel } from "@/accounts/label";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
 import { PageHeader } from "@/components/page-header";
@@ -80,7 +81,7 @@ export function AccountScreen() {
     <>
       <PageHeader
         kicker={kindLabel(row.kind)}
-        title={row.name}
+        title={accountLabel(row)}
         actions={
           <>
             <Button type="button" variant="outline" onClick={() => void openEditor("account", { id: accountId })}>
@@ -106,7 +107,6 @@ export function AccountScreen() {
         <Link to="/accounts" search={{ page: 1, pageSize: 50, archived: false }} className="font-semibold text-primary">
           Accounts
         </Link>
-        {row.institution ? <span className="text-muted-foreground"> · {row.institution}</span> : null}
         {detail ? <span className="text-muted-foreground"> · {detail}</span> : null}
       </p>
       <p className="text-sm text-muted-foreground">
@@ -123,7 +123,7 @@ export function AccountScreen() {
           }}
         />
         <CheckpointHistory accountId={row.id} currency={bookCurrency} owed={accountClass(row.kind) === "liability"} />
-        <AccountImports accountId={row.id} accountName={row.name} currency={bookCurrency} />
+        <AccountImports accountId={row.id} accountName={accountLabel(row)} currency={bookCurrency} />
       </div>
     </>
   );

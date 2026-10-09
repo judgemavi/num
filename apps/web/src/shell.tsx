@@ -24,6 +24,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 function isCurrent(pathname: string, to: NavPath) {
@@ -51,11 +53,11 @@ function NavItem({
   const current = isCurrent(pathname, to);
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={current}>
+      <SidebarMenuButton asChild isActive={current} tooltip={label}>
         <Link to={to} aria-current={current ? "page" : undefined} onClick={onClick}>
           <Icon strokeWidth={1.8} aria-hidden="true" />
           <span>{label}</span>
-          {count !== undefined && count > 0 ? <Badge variant="count" className="ml-auto">{count}</Badge> : null}
+          {count !== undefined && count > 0 ? <Badge variant="count" className="ml-auto group-data-[collapsible=icon]:hidden">{count}</Badge> : null}
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -64,14 +66,17 @@ function NavItem({
 
 function AppSidebar({ pathname, inboxCount }: { pathname: string; inboxCount?: number }) {
   return (
-    <Sidebar collapsible="none" className="hidden h-svh shrink-0 border-r bg-card md:flex">
-      <SidebarHeader className="px-3 pt-5">
-        <Link to="/" aria-label="Num home" className="font-display flex items-center gap-2.5 px-3 text-2xl leading-none font-extrabold [font-stretch:72%]">
-          <span className="grid size-7 place-items-center rounded-lg bg-foreground text-base text-background" aria-hidden="true">
-            N
-          </span>
-          Num
-        </Link>
+    <Sidebar collapsible="icon" className="h-svh border-r bg-card">
+      <SidebarHeader className="px-2 pt-4">
+        <div className="flex items-center gap-1 group-data-[collapsible=icon]:flex-col">
+          <Link to="/" aria-label="Num home" className="font-display flex min-w-0 flex-1 items-center gap-2.5 px-2 text-2xl leading-none font-extrabold [font-stretch:72%] group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:px-0">
+            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-foreground text-base text-background" aria-hidden="true">
+              N
+            </span>
+            <span className="group-data-[collapsible=icon]:hidden">Num</span>
+          </Link>
+          <SidebarTrigger />
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -99,6 +104,7 @@ function AppSidebar({ pathname, inboxCount }: { pathname: string; inboxCount?: n
           <NavItem {...settingsNav} pathname={pathname} />
         </SidebarMenu>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

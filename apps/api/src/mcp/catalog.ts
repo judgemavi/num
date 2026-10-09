@@ -34,6 +34,7 @@ export type McpRoute = {
   params?: z.ZodType;
   query?: z.ZodType;
   body?: z.ZodType;
+  schemas: z.ZodType[];
   multipart: boolean;
 };
 
@@ -50,6 +51,125 @@ type RouteConfig = {
 };
 
 const methods = new Set(["get", "post", "put", "patch", "delete"]);
+
+const amountKeys = new Set([
+  "amount",
+  "openingBalance",
+  "balance",
+  "statementBalance",
+  "calculatedBalance",
+  "difference",
+  "closingBalance",
+  "principal",
+  "payment",
+  "interest",
+  "totalInterest",
+  "lumpSum",
+  "onBudgetTotal",
+  "unassigned",
+  "refillTo",
+  "target",
+  "fixedAmount",
+  "fixedPayment",
+  "held",
+  "need",
+  "savings",
+  "expectedAmount",
+  "actualAmount",
+  "forecastAmount",
+  "safeAmount",
+  "safeToSpend",
+  "runningBalance",
+  "refundedAmount",
+  "median",
+  "delta",
+  "income",
+  "spending",
+  "planned",
+  "actual",
+  "inflow",
+  "assets",
+  "liabilities",
+  "net",
+  "surplus",
+  "tolerance",
+  "perPaycheck",
+  "limit",
+  "known",
+  "estimated",
+]);
+
+type ZodDef = {
+  shape?: Record<string, z.ZodType>;
+  innerType?: z.ZodType;
+  element?: z.ZodType;
+  options?: z.ZodType[];
+  in?: z.ZodType;
+  out?: z.ZodType;
+};
+
+function schemaHasAmount(schema: z.ZodType, seen: WeakSet<object>): boolean {
+  if (seen.has(schema)) {
+    return false;
+  }
+  seen.add(schema);
+  const def = (schema as { def?: ZodDef }).def;
+  if (!def) {
+    return false;
+  }
+  if (def.shape) {
+    for (const [key, value] of Object.entries(def.shape)) {
+      if (amountKeys.has(key) || schemaHasAmount(value, seen)) {
+        return true;
+      }
+    }
+  }
+  if (def.innerType && schemaHasAmount(def.innerType, seen)) {
+    return true;
+  }
+  if (def.element && schemaHasAmount(def.element, seen)) {
+    return true;
+  }
+  if (def.in && schemaHasAmount(def.in, seen)) {
+    return true;
+  }
+  if (def.out && schemaHasAmount(def.out, seen)) {
+    return true;
+  }
+  for (const option of def.options ?? []) {
+    if (schemaHasAmount(option, seen)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function routeSchemas(route: RouteConfig, body: z.ZodType | undefined): z.ZodType[] {
+  const schemas: z.ZodType[] = [];
+  if (route.request?.params) {
+    schemas.push(route.request.params);
+  }
+  if (route.request?.query) {
+    schemas.push(route.request.query);
+  }
+  if (body) {
+    schemas.push(body);
+  }
+  const responses = (route as { responses?: Record<string, { content?: Record<string, { schema?: z.ZodType }> }> }).responses ?? {};
+  for (const response of Object.values(responses)) {
+    for (const content of Object.values(response.content ?? {})) {
+      if (content.schema) {
+        schemas.push(content.schema);
+      }
+    }
+  }
+  return schemas;
+}
+
+function routeHasAmount(schemas: z.ZodType[]): boolean {
+  const seen = new WeakSet<object>();
+  return schemas.some((schema) => schemaHasAmount(schema, seen));
+}
 
 function isMethod(value: string): value is McpRoute["method"] {
   return methods.has(value);
@@ -115,6 +235,7 @@ export function mcpRoutes(app: OpenAPIHono): McpRoute[] {
       params: route.request?.params,
       query: route.request?.query,
       body: body.schema,
+      schemas: routeSchemas(route, body.schema),
       multipart: body.multipart,
     });
   }
@@ -160,10 +281,11 @@ function inputSchema(route: McpRoute): z.ZodType {
 }
 
 function toolDescription(route: McpRoute): string {
-  if (route.description.includes("minor units")) {
-    return route.description;
+  const base = route.description.replaceAll(` ${moneyText}`, "").replaceAll(moneyText, "").trim();
+  if (!routeHasAmount(route.schemas)) {
+    return base;
   }
-  return `${route.description} ${moneyText}`;
+  return `${base} ${moneyText}`;
 }
 
 export function registerGeneratedTools(server: McpServer, app: OpenAPIHono, db: Db): void {

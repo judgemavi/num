@@ -13,7 +13,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useActiveBuckets } from "@/editors/lookups";
-import { FormActions, FormHeading, FormShell } from "@/editors/form-chrome";
+import { FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { categoryError } from "@/settings/format";
 import { NameForm } from "@/settings/name-form";
@@ -217,9 +217,9 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
         ) : null}
         {error ? <FieldError>{error}</FieldError> : null}
         <FormActions inline={inline}>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <FormCancel inline={inline} onClose={onClose}>
             Cancel
-          </Button>
+          </FormCancel>
           <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void submit() : undefined}>
             {saving ? "Saving category" : "Save category"}
           </Button>

@@ -3,7 +3,8 @@ import { useState } from "react";
 import { planError } from "@/recurring/format";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogForm } from "@/editors/form-chrome";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
@@ -17,14 +18,13 @@ type SkipNextProps = {
   onError: (value: string) => void;
 };
 
-export function SkipNext({ plan, reason, asOf, onReason, onClose, onDone, onError }: SkipNextProps) {
+export function SkipNext({ plan, reason, asOf, onReason, onDone, onError }: SkipNextProps) {
   const [saving, setSaving] = useState(false);
   if (!plan) {
     return null;
   }
   return (
-    <form
-      className="grid gap-4"
+    <DialogForm
       onSubmit={(event) => {
         event.preventDefault();
         setSaving(true);
@@ -64,13 +64,15 @@ export function SkipNext({ plan, reason, asOf, onReason, onClose, onDone, onErro
         <Input id="skip-next-reason" value={reason} onChange={(event) => onReason(event.target.value)} />
       </Field>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
+        <DialogClose asChild>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
+        </DialogClose>
         <Button type="submit" disabled={saving || reason.trim().length === 0}>
           Skip
         </Button>
       </DialogFooter>
-    </form>
+    </DialogForm>
   );
 }

@@ -12,6 +12,7 @@ import {
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
+import { accountLabels } from "@/accounts/label";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
 import { PaycheckSplitIllustration } from "@/components/illustrations";
@@ -108,7 +109,7 @@ export function MonthsScreen() {
   });
 
   const bookCurrency = currency.data ?? "USD";
-  const accountNames = namesFrom(accounts.data?.items);
+  const accountNames = accountLabels(accounts.data?.items ?? []);
   const story = detail.data;
 
   async function refresh() {

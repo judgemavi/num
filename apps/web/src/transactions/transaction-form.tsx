@@ -13,8 +13,10 @@ import {
 import { useState, type FormEvent } from "react";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogForm } from "@/editors/form-chrome";
 import { FieldError } from "@/components/ui/field";
+import { accountLabel, accountOptionLabel } from "@/accounts/label";
 import { formatMoney } from "@/money";
 import { inboxError } from "@/inbox/format";
 import { formatDate, refundedText, transactionError } from "@/transactions/format";
@@ -35,7 +37,6 @@ export function TransactionForm({
   merchants,
   rawLine,
   initialAccountId,
-  onClose,
   onSaved,
   onDelete,
   deleteKind = "plain",
@@ -91,20 +92,20 @@ export function TransactionForm({
     setMerchantId,
   });
 
-  const accountName = accounts.find((item) => item.id === accountId)?.name ?? "Account";
+  const accountName = accountLabel(accounts.find((item) => item.id === accountId) ?? { name: "Account" });
   const accountOptions = accounts
     .filter((account) => account.archivedAt === null || account.id === accountId)
-    .map((account) => ({ id: account.id, label: account.archivedAt ? `${account.name} (archived)` : account.name }));
+    .map((account) => ({ id: account.id, label: accountOptionLabel(account) }));
   const transferOptions = accounts
     .filter((account) => account.id !== accountId && (account.archivedAt === null || account.id === transferAccountId || lines.some((line) => line.transferAccountId === account.id)))
-    .map((account) => ({ id: account.id, label: account.archivedAt ? `${account.name} (archived)` : account.name }));
+    .map((account) => ({ id: account.id, label: accountOptionLabel(account) }));
   const merchantOptions = merchants
     .filter((merchant) => merchant.archivedAt === null || merchant.id === merchantId)
     .map((merchant) => ({ id: merchant.id, label: merchant.name }));
   const archivedMerchants = merchants.filter((merchant) => merchant.archivedAt).map((merchant) => ({ id: merchant.id, label: merchant.name }));
   const archivedAccounts = accounts
     .filter((account) => account.archivedAt !== null && account.id !== accountId)
-    .map((account) => ({ id: account.id, label: account.name }));
+    .map((account) => ({ id: account.id, label: accountLabel(account) }));
   const totalMinor = hintAmount;
   const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, lines) : null;
   const saveDisabled =
@@ -209,7 +210,7 @@ export function TransactionForm({
   const summary = `${formatDate(date)} · ${accountName} · ${direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(imported && transaction ? transaction.amount : (totalMinor ?? 0)))} · ${payee}`;
 
   return (
-    <form onSubmit={(event) => void onSubmit(event)} className="grid gap-4">
+    <DialogForm onSubmit={(event) => void onSubmit(event)}>
       <DialogHeader>
         <DialogTitle>{transaction ? "Edit transaction" : "New transaction"}</DialogTitle>
         <DialogDescription>
@@ -381,9 +382,7 @@ export function TransactionForm({
             }}
           />
         ) : null}
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
+        <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
         {savedId ? (
           <Button type="button" onClick={() => onSaved(savedId)}>
             Done
@@ -394,6 +393,6 @@ export function TransactionForm({
           </Button>
         )}
       </DialogFooter>
-    </form>
+    </DialogForm>
   );
 }

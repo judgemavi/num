@@ -1,4 +1,4 @@
-import { currencyUpdateSchema, importDetailSchema, importUndoSchema, type ImportDetailRow } from "@num/shared";
+import { accountSchema, currencyUpdateSchema, importDetailSchema, importUndoSchema, type ImportDetailRow } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -13,6 +13,7 @@ import {
   undoBlockLabel,
   unreadableLabel,
 } from "@/accounts/import-format";
+import { accountLabel } from "@/accounts/label";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow, listName } from "@/components/list-card";
@@ -53,6 +54,19 @@ export function ImportDetailScreen() {
     }
     document.getElementById(id)?.scrollIntoView({ block: "center" });
   }, [detail.data]);
+
+  const accountId = detail.data?.item.accountId;
+  const account = useQuery({
+    queryKey: ["account", accountId],
+    enabled: Boolean(accountId),
+    queryFn: async () => {
+      const result = await apiRequest(`/api/accounts/${accountId}`, accountSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
+    },
+  });
 
   async function undoImport(filename: string) {
     const ok = await confirm({
@@ -121,7 +135,7 @@ export function ImportDetailScreen() {
   return (
     <>
       <PageHeader
-        kicker={`${item.accountName} · ${formatImportDate(item.createdAt)}`}
+        kicker={`${account.data ? accountLabel(account.data) : item.accountName} · ${formatImportDate(item.createdAt)}`}
         title={filename}
         actions={
           <>

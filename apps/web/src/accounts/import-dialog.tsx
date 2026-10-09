@@ -20,7 +20,8 @@ import { localAsOf } from "@/as-of";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogPanel } from "@/editors/form-chrome";
 
 export function ImportForm({
   account,
@@ -296,7 +297,7 @@ export function ImportForm({
           onImport={(map) => finishMap(map)}
         />
       ) : (
-        <div className="grid gap-4">
+        <DialogPanel>
           {finished ? null : (
             <ImportDropZone
               inputRef={fileRef}
@@ -340,21 +341,23 @@ export function ImportForm({
           ) : null}
           <DialogFooter>
             {finished ? (
-              <Button type="button" onClick={onClose}>
-                Done
-              </Button>
+              <DialogClose asChild>
+                <Button type="button">Done</Button>
+              </DialogClose>
             ) : (
               <>
-                <Button type="button" variant="secondary" onClick={onClose}>
-                  Cancel
-                </Button>
+                <DialogClose asChild>
+                  <Button type="button" variant="secondary">
+                    Cancel
+                  </Button>
+                </DialogClose>
                 <Button type="button" disabled={busy || rows.length === 0} onClick={() => void importAll()}>
                   {pending ? "Importing" : importLabel}
                 </Button>
               </>
             )}
           </DialogFooter>
-        </div>
+        </DialogPanel>
       )}
     </>
   );

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
 import { AccountIcon } from "@/accounts/account-icon";
 import { accountCountLabel, accountDetail, accountError, formatBalance, formatMoney, kindLabel } from "@/accounts/format";
+import { accountLabel } from "@/accounts/label";
 import { groupAccounts, groupHue, groupLabel, worthOf } from "@/accounts/groups";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
@@ -194,8 +195,7 @@ export function AccountsScreen() {
                         <AccountIcon kind={account.kind} />
                       </IconTile>
                       <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-                        {account.name}
-                        {account.institution ? <small>{account.institution}</small> : null}
+                        {accountLabel(account)}
                       </div>
                       <div className="hidden w-40 shrink-0 text-[13px] text-muted-foreground md:block">
                         {account.archivedAt ? <Badge variant="attention">Archived</Badge> : kindLabel(account.kind)}
@@ -204,7 +204,7 @@ export function AccountsScreen() {
                         <Amount currency={bookCurrency} minor={account.balance} owed={accountClass(account.kind) === "liability"} />
                         {detail ? <small>{detail}</small> : null}
                       </div>
-                      <RowMenu label={`Actions for ${account.name}`}>
+                      <RowMenu label={`Actions for ${accountLabel(account)}`}>
                         <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("account", { id: account.id })}>
                           Edit
                         </DropdownMenuItem>
@@ -230,10 +230,10 @@ export function AccountsScreen() {
                             void confirm({
                               title: restore ? "Restore this account?" : "Archive this account?",
                               description: restore
-                                ? `Restore ${account.name}. It returns to the active list.`
+                                ? `Restore ${accountLabel(account)}. It returns to the active list.`
                                 : account.balance !== 0
-                                  ? `${account.name} has a balance of ${formatBalance(bookCurrency, account.kind, account.balance)}. Archive it only if you mean to.`
-                                  : `Archive ${account.name}. It leaves the active list.`,
+                                  ? `${accountLabel(account)} has a balance of ${formatBalance(bookCurrency, account.kind, account.balance)}. Archive it only if you mean to.`
+                                  : `Archive ${accountLabel(account)}. It leaves the active list.`,
                               confirmLabel: restore ? "Restore account" : "Archive account",
                             }).then((ok) => {
                               if (ok) {
@@ -260,7 +260,7 @@ export function AccountsScreen() {
               {cards.map((account) => (
                 <ListRow key={account.id} simple>
                   <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-                    {account.name}
+                    {accountLabel(account)}
                     <small>{account.paymentPolicy === "full" ? "Pays the full statement" : ""}</small>
                   </div>
                   <div className="ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">

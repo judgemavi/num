@@ -1,5 +1,61 @@
-import type { FormEvent, KeyboardEvent, ReactNode } from "react";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Children, isValidElement, type ComponentProps, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+function slotOf(node: ReactNode): "header" | "footer" | "body" {
+  if (!isValidElement(node)) {
+    return "body";
+  }
+  const slot = (node.type as { dialogSlot?: string }).dialogSlot;
+  if (slot === "header" || slot === "footer") {
+    return slot;
+  }
+  return "body";
+}
+
+/** Header and footer stay fixed. Only the middle scrolls. */
+export function DialogRegions({ children }: { children: ReactNode }) {
+  const header: ReactNode[] = [];
+  const body: ReactNode[] = [];
+  const footer: ReactNode[] = [];
+  for (const child of Children.toArray(children)) {
+    const slot = slotOf(child);
+    if (slot === "header") {
+      header.push(child);
+    } else if (slot === "footer") {
+      footer.push(child);
+    } else {
+      body.push(child);
+    }
+  }
+  return (
+    <>
+      {header}
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        <div className="grid gap-4">{body}</div>
+      </div>
+      {footer}
+    </>
+  );
+}
+
+const frameClass = "flex min-h-0 flex-1 flex-col overflow-hidden";
+
+export function DialogForm({ className, children, ...props }: ComponentProps<"form">) {
+  return (
+    <form className={className ? `${frameClass} ${className}` : frameClass} {...props}>
+      <DialogRegions>{children}</DialogRegions>
+    </form>
+  );
+}
+
+export function DialogPanel({ className, children, ...props }: ComponentProps<"div">) {
+  return (
+    <div className={className ? `${frameClass} ${className}` : frameClass} {...props}>
+      <DialogRegions>{children}</DialogRegions>
+    </div>
+  );
+}
 
 export function FormHeading({ inline = false, title, description }: { inline?: boolean; title: string; description: string }) {
   if (inline) {
@@ -18,11 +74,32 @@ export function FormHeading({ inline = false, title, description }: { inline?: b
   );
 }
 
+Object.assign(FormHeading, { dialogSlot: "header" as const });
+
 export function FormActions({ inline = false, children }: { inline?: boolean; children: ReactNode }) {
   if (inline) {
     return <div className="flex flex-row justify-end gap-2">{children}</div>;
   }
   return <DialogFooter>{children}</DialogFooter>;
+}
+
+Object.assign(FormActions, { dialogSlot: "footer" as const });
+
+export function FormCancel({ inline = false, onClose, children }: { inline?: boolean; onClose: () => void; children: ReactNode }) {
+  if (inline) {
+    return (
+      <Button type="button" variant="outline" onClick={onClose}>
+        {children}
+      </Button>
+    );
+  }
+  return (
+    <DialogClose asChild>
+      <Button type="button" variant="outline">
+        {children}
+      </Button>
+    </DialogClose>
+  );
 }
 
 /** Inline create sits inside another form. A nested form submits the parent in React 19. */
@@ -40,13 +117,13 @@ export function FormShell({
   if (!inline) {
     return (
       <form
-        className={className}
+        className={frameClass}
         onSubmit={(event: FormEvent) => {
           event.preventDefault();
           onSubmit();
         }}
       >
-        {children}
+        <DialogRegions>{children}</DialogRegions>
       </form>
     );
   }

@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { PanelLeftIcon } from "lucide-react"
@@ -70,7 +71,7 @@ function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen)
+  const [_open, _setOpen] = React.useState(() => readSidebarOpen(defaultOpen))
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -127,6 +128,7 @@ function SidebarProvider({
 
   return (
     <SidebarContext.Provider value={contextValue}>
+      <TooltipProvider delayDuration={0}>
       <div
         data-slot="sidebar-wrapper"
         style={
@@ -144,8 +146,21 @@ function SidebarProvider({
       >
         {children}
       </div>
+      </TooltipProvider>
     </SidebarContext.Provider>
   )
+}
+
+function readSidebarOpen(defaultOpen: boolean): boolean {
+  if (typeof document === "undefined") {
+    return defaultOpen
+  }
+  const prefix = `${SIDEBAR_COOKIE_NAME}=`
+  const found = document.cookie.split("; ").find((part) => part.startsWith(prefix))
+  if (!found) {
+    return defaultOpen
+  }
+  return found.slice(prefix.length) === "true"
 }
 
 function Sidebar({
@@ -466,7 +481,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button flex w-full items-center gap-3 overflow-hidden rounded-[10px] px-3 text-left text-[15px] font-semibold outline-hidden transition-[width,height,padding] hover:bg-sunken focus-visible:ring-2 active:bg-sunken disabled:pointer-events-none disabled:opacity-50 data-active:bg-primary-soft data-active:text-primary [&_svg]:size-5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+  "peer/menu-button group/menu-button flex w-full items-center gap-3 overflow-hidden rounded-[10px] px-3 text-left text-[15px] font-semibold outline-hidden transition-[width,height,padding] group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! hover:bg-sunken focus-visible:ring-2 active:bg-sunken disabled:pointer-events-none disabled:opacity-50 data-active:bg-primary-soft data-active:text-primary [&_svg]:size-5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
   {
     variants: {
       variant: {

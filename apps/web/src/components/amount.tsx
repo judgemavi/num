@@ -21,12 +21,12 @@ export function Amount({ currency, minor, owed = false, hero = false, className 
   }
   const parts = moneyParts(currency, signed < 0 ? -signed : signed);
   return (
-    <span className="font-display text-[60px] leading-[0.9] font-extrabold whitespace-nowrap tabular-nums [font-stretch:72%] max-md:text-5xl">
-      {showOwed ? <span className="mr-1.5 align-middle text-xs font-semibold tracking-wide text-muted-foreground uppercase">Owed</span> : null}
-      {signed < 0 ? "−" : null}
-      <span className="mr-0.5 align-[0.8em] text-[0.5em] font-semibold">{parts.currency}</span>
-      {parts.integer}
-      {parts.fraction.length > 0 ? <sup className="ml-px align-[1.05em] text-[0.42em]">{parts.fraction}</sup> : null}
+    <span className={`mt-1 inline-flex items-start font-display text-[60px] leading-none font-extrabold whitespace-nowrap tabular-nums [font-stretch:72%] max-md:text-5xl ${className ?? ""}`}>
+      {showOwed ? <span className="mr-1.5 self-center text-xs font-semibold tracking-wide text-muted-foreground uppercase">Owed</span> : null}
+      {signed < 0 ? <span className="self-center">−</span> : null}
+      <span className="mr-1 pt-[0.28em] text-[0.5em] leading-none font-semibold">{parts.currency}</span>
+      <span className="leading-none">{parts.integer}</span>
+      {parts.fraction.length > 0 ? <span className="ml-px pt-[0.55em] text-[0.42em] leading-none">{parts.fraction}</span> : null}
     </span>
   );
 }

@@ -19,21 +19,29 @@ function digitsFor(currency: string): number {
   return digits;
 }
 
-export function formatMoney(currency: string, minor: number): string {
+export type MoneyDisplay = "book" | "other";
+
+function currencyDisplay(display: MoneyDisplay): "narrowSymbol" | "code" {
+  return display === "book" ? "narrowSymbol" : "code";
+}
+
+export function formatMoney(currency: string, minor: number, display: MoneyDisplay = "book"): string {
   const digits = digitsFor(currency);
   return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency,
+    currencyDisplay: currencyDisplay(display),
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(minorToNumber(minor, digits));
 }
 
-export function moneyParts(currency: string, minor: number): { currency: string; integer: string; fraction: string } {
+export function moneyParts(currency: string, minor: number, display: MoneyDisplay = "book"): { currency: string; integer: string; fraction: string } {
   const digits = digitsFor(currency);
   const parts = new Intl.NumberFormat(undefined, {
     style: "currency",
     currency,
+    currencyDisplay: currencyDisplay(display),
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).formatToParts(minorToNumber(Math.abs(minor), digits));

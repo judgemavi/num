@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
+import { accountLabels } from "@/accounts/label";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
 import { PageHeader } from "@/components/page-header";
@@ -76,7 +77,7 @@ export function PlanScreen() {
   });
 
   const bookCurrency = currency.data ?? "USD";
-  const names = new Map((accounts.data?.items ?? []).map((account) => [account.id, account.name]));
+  const names = accountLabels(accounts.data?.items ?? []);
   const selected = forecast.data?.accounts.find((account) => account.accountId === accountId);
   const series = selected ?? forecast.data?.total;
   const lowest = selected?.lowest ?? forecast.data?.lowest;

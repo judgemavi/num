@@ -3,7 +3,8 @@ import { useState, type FormEvent } from "react";
 import { bucketError, today } from "@/buckets/format";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogForm } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
@@ -28,7 +29,7 @@ const copy = {
   },
 } as const;
 
-export function AssignMoney({ currency, bucket, kind, onClose, onSaved }: AssignMoneyProps) {
+export function AssignMoney({ currency, bucket, kind, onSaved }: AssignMoneyProps) {
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today());
   const [note, setNote] = useState("");
@@ -75,7 +76,7 @@ export function AssignMoney({ currency, bucket, kind, onClose, onSaved }: Assign
   }
 
   return (
-    <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
+    <DialogForm onSubmit={(event) => void onSubmit(event)}>
       <DialogHeader>
         <DialogTitle>{labels.title}</DialogTitle>
         <DialogDescription>
@@ -96,13 +97,15 @@ export function AssignMoney({ currency, bucket, kind, onClose, onSaved }: Assign
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
+        <DialogClose asChild>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
+        </DialogClose>
         <Button type="submit" disabled={saving}>
           {labels.action}
         </Button>
       </DialogFooter>
-    </form>
+    </DialogForm>
   );
 }

@@ -22,7 +22,7 @@ import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
-import { FormActions, FormHeading, FormShell } from "@/editors/form-chrome";
+import { FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -274,9 +274,9 @@ export function AccountForm({ currency, account, initialName, inline = false, on
         </Collapsible>
         {error ? <FieldError>{error}</FieldError> : null}
         <FormActions inline={inline}>
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <FormCancel inline={inline} onClose={onClose}>
             Cancel
-          </Button>
+          </FormCancel>
           <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void onSubmit() : undefined}>
             {saving ? "Saving account" : account ? "Save account" : "Add account"}
           </Button>

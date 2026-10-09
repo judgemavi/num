@@ -1,6 +1,7 @@
 import type { Account, Merchant, Plan, RecurringSignals } from "@num/shared";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { Amount } from "@/components/amount";
+import { accountLabels } from "@/accounts/label";
 import { formatDate } from "@/recurring/format";
 
 type ReviewListProps = {
@@ -15,7 +16,7 @@ type ReviewListProps = {
 
 export function ReviewList({ signals, plans, accounts, merchants, currency, onOpenPlan, onUseProposal }: ReviewListProps) {
   const planName = new Map(plans.map((plan) => [plan.id, plan]));
-  const accountName = new Map(accounts.map((account) => [account.id, account.name]));
+  const accountName = accountLabels(accounts);
   const merchantName = new Map(merchants.map((merchant) => [merchant.id, merchant.name]));
   const rows = signals.changed.length + signals.missed.length + signals.ambiguous.length + signals.proposals.length;
   if (rows === 0) {

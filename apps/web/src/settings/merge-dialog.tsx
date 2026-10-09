@@ -1,7 +1,8 @@
 import { merchantSchema, type Merchant } from "@num/shared";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogPanel } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { apiRequest } from "@/request";
@@ -14,7 +15,7 @@ type MergeDialogProps = {
   onMerged: () => void;
 };
 
-export function MergeDialog({ source, merchants, onClose, onMerged }: MergeDialogProps) {
+export function MergeDialog({ source, merchants, onMerged }: MergeDialogProps) {
   const [targetId, setTargetId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -40,7 +41,7 @@ export function MergeDialog({ source, merchants, onClose, onMerged }: MergeDialo
   }
 
   return (
-    <div className="grid gap-4">
+    <DialogPanel>
       <DialogHeader>
         <DialogTitle>Merge this merchant?</DialogTitle>
         <DialogDescription>
@@ -59,13 +60,15 @@ export function MergeDialog({ source, merchants, onClose, onMerged }: MergeDialo
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
+        <DialogClose asChild>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
+        </DialogClose>
         <Button type="button" disabled={saving} onClick={() => void merge()}>
           {saving ? "Merging" : "Merge merchants"}
         </Button>
       </DialogFooter>
-    </div>
+    </DialogPanel>
   );
 }

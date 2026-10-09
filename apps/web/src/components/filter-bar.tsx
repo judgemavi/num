@@ -105,13 +105,6 @@ export function FilterBar({
     setOpen(false);
   }
 
-  const panel = (
-    <div className="grid gap-4">
-      {fields}
-      <PanelActions onApply={apply} onClear={onClear} />
-    </div>
-  );
-
   return (
     <div className="grid gap-3">
       <div className="flex min-w-0 flex-nowrap items-center gap-2">
@@ -134,11 +127,14 @@ export function FilterBar({
             <SheetTrigger asChild>
               <FiltersButton count={activeCount} />
             </SheetTrigger>
-            <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-[20px] p-4">
-              <SheetHeader className="px-0">
+            <SheetContent side="bottom" className="flex max-h-[85vh] flex-col gap-0 overflow-hidden rounded-t-[20px] p-0">
+              <SheetHeader className="shrink-0 px-4 pt-4">
                 <SheetTitle className="font-display text-2xl font-extrabold uppercase [font-stretch:72%]">Filters</SheetTitle>
               </SheetHeader>
-              {panel}
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{fields}</div>
+              <div className="shrink-0 px-4 py-3">
+                <PanelActions onApply={apply} onClear={onClear} />
+              </div>
             </SheetContent>
           </Sheet>
         ) : (
@@ -146,9 +142,12 @@ export function FilterBar({
             <PopoverTrigger asChild>
               <FiltersButton count={activeCount} />
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-[min(24rem,calc(100vw-2rem))] p-4">
-              <p className="text-base font-semibold">Filters</p>
-              {panel}
+            <PopoverContent align="start" className="flex max-h-[70vh] w-[min(24rem,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0">
+              <p className="shrink-0 px-4 pt-4 text-base font-semibold">Filters</p>
+              <div className="min-h-0 overflow-y-auto px-4 py-4">{fields}</div>
+              <div className="shrink-0 px-4 pb-4">
+                <PanelActions onApply={apply} onClear={onClear} />
+              </div>
             </PopoverContent>
           </Popover>
         )}

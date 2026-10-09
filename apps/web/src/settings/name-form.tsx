@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FormActions, FormHeading, FormShell } from "@/editors/form-chrome";
+import { FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
@@ -69,9 +69,9 @@ export function NameForm({
         </Field>
         {error ? <FieldError>{error}</FieldError> : null}
         <FormActions inline={inline}>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <FormCancel inline={inline} onClose={onClose}>
             Cancel
-          </Button>
+          </FormCancel>
           <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void submit() : undefined}>
             {saving ? savingLabel : submitLabel}
           </Button>

@@ -30,7 +30,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogForm } from "@/editors/form-chrome";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -60,7 +61,7 @@ function readMoney(currency: string, text: string): number {
   return toMinorUnits(currency, text.trim());
 }
 
-export function BucketForm({ currency, draft, nextColor, suggestedPriority, onClose, onSaved }: BucketFormProps) {
+export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSaved }: BucketFormProps) {
   const current = draft === "new" ? null : draft;
   const [name, setName] = useState(current?.name ?? "");
   const [kind, setKind] = useState<BucketKind>(current?.kind ?? "spending");
@@ -158,7 +159,7 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onCl
   }
 
   return (
-    <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
+    <DialogForm onSubmit={(event) => void onSubmit(event)}>
       <DialogHeader>
         <DialogTitle>{current ? "Edit bucket" : "New bucket"}</DialogTitle>
         <DialogDescription>A bucket keeps money for one purpose. The balance carries over.</DialogDescription>
@@ -261,14 +262,16 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onCl
       </Collapsible>
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
+        <DialogClose asChild>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
+        </DialogClose>
         <Button type="submit" disabled={saving}>
           Save
         </Button>
       </DialogFooter>
-    </form>
+    </DialogForm>
   );
 }
 

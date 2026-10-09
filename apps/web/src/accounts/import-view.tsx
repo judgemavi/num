@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useCallback, useEffect } from "react";
 import { ImportFilterBar } from "@/accounts/import-filters";
+import { accountLabelOf } from "@/accounts/label";
 import { formatImportDate, formatImportPeriod, importCountText, importStatusLabel } from "@/accounts/import-format";
 import { importViewPath } from "@/accounts/import-query";
 import { apiRequest } from "@/request";
@@ -104,7 +105,11 @@ export function ImportViewScreen() {
           <p className="px-5 py-4 text-muted-foreground">{filtered ? "No imports match." : "No imports yet."}</p>
         ) : (
           page.items.map((item) => (
-            <ImportListRow key={item.id} item={item} />
+            <ImportListRow
+              key={item.id}
+              item={item}
+              accountName={accountLabelOf(accounts.data?.items ?? [], item.accountId, item.accountName)}
+            />
           ))
         )}
       </ListCard>
@@ -136,14 +141,14 @@ export function ImportViewScreen() {
   );
 }
 
-function ImportListRow({ item }: { item: ImportViewItem }) {
+function ImportListRow({ item, accountName }: { item: ImportViewItem; accountName: string }) {
   const navigate = importsRoute.useNavigate();
   return (
     <ListRow onOpen={() => void navigate({ to: "/accounts/imports/$importId", params: { importId: item.id } })}>
       <div className={listName}>
         <p>{item.filename ?? "Statement"}</p>
         <small>
-          {formatImportDate(item.createdAt)} · {item.accountName} · {formatImportPeriod(item.periodStart, item.periodEnd)}
+          {formatImportDate(item.createdAt)} · {accountName} · {formatImportPeriod(item.periodStart, item.periodEnd)}
         </small>
         <small>{importCountText(item.counts)}</small>
       </div>

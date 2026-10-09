@@ -8,12 +8,13 @@ import {
   type FundingProposal,
 } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { bucketError, formatDate } from "@/buckets/format";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogForm, DialogPanel } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,12 +53,8 @@ export function FundPaycheck({ currency, asOf, incomeTransactionId, onClose, onS
     },
   });
 
-  return (
-    <div className="grid gap-4">
-      <DialogHeader>
-        <DialogTitle>Fund this paycheck</DialogTitle>
-        <DialogDescription>Assign this deposit to buckets. You can change the amounts before you confirm.</DialogDescription>
-      </DialogHeader>
+  const status = (
+    <>
       {paychecks.isPending ? <p className="text-muted-foreground">Loading paychecks.</p> : null}
       {paychecks.isError ? (
         <div className="grid gap-3">
@@ -94,26 +91,49 @@ export function FundPaycheck({ currency, asOf, incomeTransactionId, onClose, onS
           </Button>
         </div>
       ) : null}
+    </>
+  );
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Fund this paycheck</DialogTitle>
+        <DialogDescription>Assign this deposit to buckets. You can change the amounts before you confirm.</DialogDescription>
+      </DialogHeader>
       {proposal.data ? (
-        <ProposalForm key={`${proposal.data.incomeTransactionId}:${proposal.data.lines.map((line) => line.amount).join(",")}`} currency={currency} asOf={asOf} proposal={proposal.data} onClose={onClose} onSaved={onSaved} />
+        <ProposalForm
+          key={`${proposal.data.incomeTransactionId}:${proposal.data.lines.map((line) => line.amount).join(",")}`}
+          leading={status}
+          currency={currency}
+          asOf={asOf}
+          proposal={proposal.data}
+          onClose={onClose}
+          onSaved={onSaved}
+        />
       ) : (
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Close
-          </Button>
-        </DialogFooter>
+        <DialogPanel>
+          {status}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Close
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogPanel>
       )}
-    </div>
+    </>
   );
 }
 
 function ProposalForm({
+  leading,
   currency,
   asOf,
   proposal,
-  onClose,
   onSaved,
 }: {
+  leading: ReactNode;
   currency: string;
   asOf: string;
   proposal: FundingProposal;
@@ -185,7 +205,8 @@ function ProposalForm({
   }
 
   return (
-    <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
+    <DialogForm onSubmit={(event) => void onSubmit(event)}>
+      {leading}
       <p className="text-sm text-muted-foreground">
         {proposal.payee} · {formatDate(proposal.date)}. Assign up to <Amount currency={currency} minor={proposal.limit} />. That is the smaller of the paycheck and Unassigned.
       </p>
@@ -203,13 +224,15 @@ function ProposalForm({
       ))}
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
+        <DialogClose asChild>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
+        </DialogClose>
         <Button type="submit" disabled={saving || proposal.lines.length === 0}>
           Fund this paycheck
         </Button>
       </DialogFooter>
-    </form>
+    </DialogForm>
   );
 }

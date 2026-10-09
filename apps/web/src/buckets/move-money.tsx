@@ -3,7 +3,8 @@ import { useState, type FormEvent } from "react";
 import { bucketError, today } from "@/buckets/format";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogForm } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,7 +17,7 @@ type MoveMoneyProps = {
   onSaved: () => void;
 };
 
-export function MoveMoney({ currency, buckets, fromId, onClose, onSaved }: MoveMoneyProps) {
+export function MoveMoney({ currency, buckets, fromId, onSaved }: MoveMoneyProps) {
   const active = buckets.filter((bucket) => !bucket.archivedAt);
   const [from, setFrom] = useState(fromId ?? active[0]?.id ?? "");
   const [to, setTo] = useState(active.find((bucket) => bucket.id !== (fromId ?? active[0]?.id))?.id ?? "");
@@ -70,7 +71,7 @@ export function MoveMoney({ currency, buckets, fromId, onClose, onSaved }: MoveM
   }
 
   return (
-    <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
+    <DialogForm onSubmit={(event) => void onSubmit(event)}>
       <DialogHeader>
         <DialogTitle>Move money</DialogTitle>
         <DialogDescription>Move money from one bucket to another. This does not move money between accounts.</DialogDescription>
@@ -121,13 +122,15 @@ export function MoveMoney({ currency, buckets, fromId, onClose, onSaved }: MoveM
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
+        <DialogClose asChild>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
+        </DialogClose>
         <Button type="submit" disabled={saving}>
           Move
         </Button>
       </DialogFooter>
-    </form>
+    </DialogForm>
   );
 }

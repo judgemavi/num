@@ -1,7 +1,7 @@
 import { inboxDecisionListSchema, merchantSchema, type Category, type Merchant } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { FormActions, FormHeading, FormShell } from "@/editors/form-chrome";
+import { FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { useRestoreNamed } from "@/editors/restore-named";
 import { undoDecision } from "@/inbox/actions";
@@ -147,9 +147,9 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
       <FormActions inline={inline}>
-        <Button type="button" variant="ghost" onClick={onClose}>
+        <FormCancel inline={inline} onClose={onClose}>
           Cancel
-        </Button>
+        </FormCancel>
         <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void submit() : undefined}>
           {saving ? "Saving" : merchant ? "Save merchant" : "Add merchant"}
         </Button>

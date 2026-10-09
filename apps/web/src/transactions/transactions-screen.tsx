@@ -16,6 +16,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect } from "react";
+import { accountLabelOf } from "@/accounts/label";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { Amount } from "@/components/amount";
@@ -256,7 +257,7 @@ export function TransactionsScreen() {
                 }}
               >
                 <TableCell>{formatDate(row.date)}</TableCell>
-                <TableCell>{row.accountName}</TableCell>
+                <TableCell>{accountLabelOf(accounts.data, row.accountId, row.accountName)}</TableCell>
                 <TableCell>
                   <div>{row.payeeRaw}</div>
                   {row.merchantName ? <div className="text-muted-foreground">{row.merchantName}</div> : null}

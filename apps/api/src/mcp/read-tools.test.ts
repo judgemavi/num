@@ -239,6 +239,25 @@ test("date tools reject a call without asOf", async () => {
   }
 });
 
+test("the money sentence is only on tools that carry amounts", async () => {
+  const book = tempBook();
+  try {
+    const listed = await post(book.app, "tools/list", {});
+    const tools = (listed.body.result?.tools ?? []) as { name: string; description?: string }[];
+    const sentence = "Amounts are integer minor units. Money that enters the account is positive.";
+    function text(name: string): string {
+      return tools.find((tool) => tool.name === name)?.description ?? "";
+    }
+    expect(text("get_health")).not.toContain("minor units");
+    expect(text("get_tags")).not.toContain("minor units");
+    expect(text("get_forecast")).toContain(sentence);
+    expect(text("list_accounts")).toContain(sentence);
+    expect(text("search_transactions")).toContain(sentence);
+  } finally {
+    book.close();
+  }
+});
+
 test("an unknown tool or bad input returns an error code", async () => {
   const book = tempBook();
   try {

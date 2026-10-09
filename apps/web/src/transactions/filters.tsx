@@ -1,5 +1,6 @@
 import type { Account, Category, CategoryGroup, Merchant, Tag, TransactionListQuery } from "@num/shared";
 import { useEffect, useState } from "react";
+import { accountLabel } from "@/accounts/label";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
 import { sortChoice } from "@/components/sort-choice";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -40,7 +41,7 @@ const sortOptions = [
 ];
 
 function namedOptions(items: { id: string; name: string; archivedAt?: string | null }[]) {
-  return items.filter((item) => !item.archivedAt).map((item) => ({ id: item.id, label: item.name }));
+  return items.filter((item) => !item.archivedAt).map((item) => ({ id: item.id, label: accountLabel(item) }));
 }
 
 function draftFrom(search: TransactionListQuery): Draft {
@@ -98,7 +99,8 @@ export function TransactionFilterBar({ search, accounts, categories, groups, mer
   }
 
   const badges: FilterBadge[] = [];
-  const accountName = nameOf(accounts, search.accountId);
+  const selectedAccount = accounts.find((account) => account.id === search.accountId);
+  const accountName = selectedAccount ? accountLabel(selectedAccount) : undefined;
   if (search.accountId && accountName) {
     badges.push({ key: "account", label: `Account: ${accountName}`, onRemove: () => onChange({ accountId: undefined }) });
   }

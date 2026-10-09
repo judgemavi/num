@@ -1,5 +1,6 @@
 import type { Account, PlanKind, PlanListQuery } from "@num/shared";
 import { useEffect, useState } from "react";
+import { accountLabel } from "@/accounts/label";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
 import { sortChoice } from "@/components/sort-choice";
 import { kindLabel } from "@/recurring/format";
@@ -63,7 +64,8 @@ export function PlanFilters({ search, accounts, onChange }: PlanFiltersProps) {
     return () => window.clearTimeout(handle);
   }, [onChange, search.q, text]);
 
-  const accountName = accounts.find((account) => account.id === search.accountId)?.name;
+  const selectedAccount = accounts.find((account) => account.id === search.accountId);
+  const accountName = selectedAccount ? accountLabel(selectedAccount) : undefined;
   const badges: FilterBadge[] = [];
   if (search.kind) {
     badges.push({ key: "kind", label: `Kind: ${kindLabel(search.kind)}`, onRemove: () => onChange({ kind: undefined }) });
@@ -132,7 +134,7 @@ export function PlanFilters({ search, accounts, onChange }: PlanFiltersProps) {
             <OptionCombobox
               id="plan-account"
               value={draft.accountId ?? null}
-              options={accounts.filter((item) => !item.archivedAt).map((item) => ({ id: item.id, label: item.name }))}
+              options={accounts.filter((item) => !item.archivedAt).map((item) => ({ id: item.id, label: accountLabel(item) }))}
               placeholder="Any account"
               emptyLabel="Any account"
               onChange={(accountId) => setDraft({ ...draft, accountId: accountId ?? undefined })}

@@ -17,7 +17,8 @@ import { apiRequest } from "@/request";
 import { MergeDialog } from "@/settings/merge-dialog";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogForm, DialogPanel } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
@@ -32,9 +33,9 @@ function useRefresh(keys: string[][]) {
   };
 }
 
-export function ImportInfoEditor({ props, onClose }: { props: EditorInput["importInfo"]; onClose: () => void }) {
+export function ImportInfoEditor({ props }: { props: EditorInput["importInfo"]; onClose: () => void }) {
   return (
-    <>
+    <DialogPanel>
       <DialogHeader>
         <DialogTitle>Import detail</DialogTitle>
         <DialogDescription>
@@ -42,7 +43,7 @@ export function ImportInfoEditor({ props, onClose }: { props: EditorInput["impor
         </DialogDescription>
       </DialogHeader>
       {props.unreadable.length > 0 ? (
-        <ul className="grid max-h-64 gap-3 overflow-y-auto">
+        <ul className="grid gap-3">
           {props.unreadable.map((row) => (
             <li key={`${row.line}-${row.raw}`} className="grid gap-1 border-t pt-3 text-sm">
               <p className="font-semibold">
@@ -56,11 +57,11 @@ export function ImportInfoEditor({ props, onClose }: { props: EditorInput["impor
         <p className="text-sm text-muted-foreground">Every row was read.</p>
       )}
       <DialogFooter>
-        <Button type="button" onClick={onClose}>
-          Close
-        </Button>
+        <DialogClose asChild>
+          <Button type="button">Close</Button>
+        </DialogClose>
       </DialogFooter>
-    </>
+    </DialogPanel>
   );
 }
 
@@ -115,7 +116,7 @@ export function SkipNextEditor({ props, onClose, onSaved }: { props: EditorInput
   );
 }
 
-export function SkipOccurrenceEditor({ props, onClose, onSaved }: { props: EditorInput["skipOccurrence"] } & Finish) {
+export function SkipOccurrenceEditor({ props, onSaved }: { props: EditorInput["skipOccurrence"] } & Finish) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const refresh = useRefresh([["occurrences"], ["recurring-signals"], ["recurring-sync"]]);
@@ -138,8 +139,7 @@ export function SkipOccurrenceEditor({ props, onClose, onSaved }: { props: Edito
   }
 
   return (
-    <form
-      className="grid gap-4"
+    <DialogForm
       onSubmit={(event) => {
         event.preventDefault();
         void skip();
@@ -156,18 +156,20 @@ export function SkipOccurrenceEditor({ props, onClose, onSaved }: { props: Edito
       {reason.trim().length === 0 ? <FieldError>Enter a reason.</FieldError> : null}
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
+        <DialogClose asChild>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
+        </DialogClose>
         <Button type="submit" disabled={reason.trim().length === 0}>
           Skip
         </Button>
       </DialogFooter>
-    </form>
+    </DialogForm>
   );
 }
 
-export function LinkOccurrenceEditor({ props, onClose, onSaved }: { props: EditorInput["linkOccurrence"] } & Finish) {
+export function LinkOccurrenceEditor({ props, onSaved }: { props: EditorInput["linkOccurrence"] } & Finish) {
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const refresh = useRefresh([["occurrences"], ["recurring-signals"], ["recurring-sync"]]);
@@ -201,8 +203,7 @@ export function LinkOccurrenceEditor({ props, onClose, onSaved }: { props: Edito
   }
 
   return (
-    <form
-      className="grid gap-4"
+    <DialogForm
       onSubmit={(event) => {
         event.preventDefault();
         void link();
@@ -227,14 +228,16 @@ export function LinkOccurrenceEditor({ props, onClose, onSaved }: { props: Edito
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
+        <DialogClose asChild>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
+        </DialogClose>
         <Button type="submit" disabled={!transactionId}>
           Link
         </Button>
       </DialogFooter>
-    </form>
+    </DialogForm>
   );
 }
 

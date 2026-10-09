@@ -23,7 +23,9 @@ import { ManagedPicker } from "@/editors/managed-picker";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogForm } from "@/editors/form-chrome";
+import { accountLabel } from "@/accounts/label";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -57,7 +59,7 @@ function monthValue(day: number | null | undefined): string {
   return String(day);
 }
 
-export function PlanForm({ currency, draft, accounts, categories, merchants, initialKind, onClose, onSaved }: PlanFormProps) {
+export function PlanForm({ currency, draft, accounts, categories, merchants, initialKind, onSaved }: PlanFormProps) {
   const current = isPlan(draft) ? draft : null;
   const seed = draft === "new" ? null : draft;
   const [name, setName] = useState(seed && "name" in seed ? seed.name : "");
@@ -81,7 +83,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
   const [saving, setSaving] = useState(false);
   const [more, setMore] = useState(Boolean(current?.merchantId || current?.categoryId || current?.endDate));
 
-  const accountOptions = accounts.filter((item) => !item.archivedAt).map((item) => ({ id: item.id, label: item.name }));
+  const accountOptions = accounts.filter((item) => !item.archivedAt).map((item) => ({ id: item.id, label: accountLabel(item) }));
   const categoryOptions = categories
     .filter((item) => !item.archivedAt && item.kind === (kind === "income" ? "income" : "expense"))
     .map((item) => ({ id: item.id, label: item.name }));
@@ -157,7 +159,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
           {current ? "Change what you expect and when." : "Add a payment or deposit you expect on a schedule."}
         </DialogDescription>
       </DialogHeader>
-      <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
+      <DialogForm onSubmit={(event) => void onSubmit(event)}>
         <Field>
           <FieldLabel htmlFor="plan-name">Name</FieldLabel>
           <Input id="plan-name" value={name} required onChange={(event) => setName(event.target.value)} />
@@ -185,7 +187,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
             options={accountOptions}
             placeholder="Choose an account"
             noun="account"
-            archived={accounts.filter((item) => item.archivedAt).map((item) => ({ id: item.id, label: item.name }))}
+            archived={accounts.filter((item) => item.archivedAt).map((item) => ({ id: item.id, label: accountLabel(item) }))}
             onChange={setAccountId}
             renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
           />
@@ -339,14 +341,16 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
         </Collapsible>
         {error ? <FieldError>{error}</FieldError> : null}
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
           <Button type="submit" disabled={saving}>
             {saving ? "Saving" : current ? "Save" : "Add"}
           </Button>
         </DialogFooter>
-      </form>
+      </DialogForm>
     </>
   );
 }

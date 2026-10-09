@@ -16,11 +16,13 @@ import { useState } from "react";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import {
+  DialogClose,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DialogForm } from "@/editors/form-chrome";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { loadAccount, setOpeningBalance } from "@/accounts/opening-action";
@@ -158,8 +160,7 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
         <DialogTitle>Reconcile</DialogTitle>
         <DialogDescription>Enter the statement date and the balance on that date.</DialogDescription>
       </DialogHeader>
-      <form
-        className="grid gap-4"
+      <DialogForm
         onSubmit={(event) => {
           event.preventDefault();
           if (compare?.balanced) {
@@ -287,9 +288,11 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
         ) : null}
         {error ? <FieldError>{error}</FieldError> : null}
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
           {compare?.balanced ? (
             <Button type="submit" disabled={saving}>
               Save checkpoint
@@ -300,7 +303,7 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
             </Button>
           )}
         </DialogFooter>
-      </form>
+      </DialogForm>
     </>
   );
 }

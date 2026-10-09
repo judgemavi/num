@@ -2,6 +2,7 @@ import type { Account, ColumnMap, ImportCounts, OpeningSuggestion, Preset, State
 import { Link } from "@tanstack/react-router";
 import { useState, type DragEvent, type RefObject } from "react";
 import { formatImportDate, importCountText, unreadableLabel } from "@/accounts/import-format";
+import { accountLabel } from "@/accounts/label";
 import { loadAccount, setOpeningBalance } from "@/accounts/opening-action";
 import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
@@ -120,7 +121,7 @@ export function ImportFileList({
   onOpenImport,
   onOpeningApplied,
 }: ImportFileListProps) {
-  const options = accounts.map((account) => ({ id: account.id, label: account.name }));
+  const options = accounts.map((account) => ({ id: account.id, label: accountLabel(account) }));
 
   return (
     <div className="grid gap-4">

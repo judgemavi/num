@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Upload } from "lucide-react";
 import { useState } from "react";
+import { accountLabel, accountLabels } from "@/accounts/label";
 import { localAsOf } from "@/as-of";
 import { useEditors } from "@/editors/editor-api";
 import { loadBuckets } from "@/buckets/query";
@@ -116,7 +117,7 @@ export function InboxScreen() {
   }
 
   const bookCurrency = currency.data ?? "USD";
-  const accountNames = new Map((accounts.data?.items ?? []).map((account) => [account.id, account.name]));
+  const accountNames = accountLabels(accounts.data?.items ?? []);
   const merchantNames = new Map((merchants.data?.items ?? []).map((merchant) => [merchant.id, merchant.name]));
   const planRows = new Map<string, Plan>((plans.data?.items ?? []).map((plan) => [plan.id, plan]));
   const categoryRows = categories.data?.items ?? [];
@@ -157,7 +158,7 @@ export function InboxScreen() {
           forecast.data ? (
             <Amount currency={bookCurrency} minor={forecast.data.safeToSpend} hero />
           ) : (
-            <p className="font-display text-[60px] leading-[0.9] font-extrabold [font-stretch:72%] max-md:text-5xl">…</p>
+            <p className="mt-1 font-display text-[60px] leading-none font-extrabold [font-stretch:72%] max-md:text-5xl">…</p>
           )
         }
         hint={
@@ -181,7 +182,7 @@ export function InboxScreen() {
             {forecast.data ? (
               <>
                 {primary ? (
-                  <Fact label={`In ${primary.name}`}>
+                  <Fact label={`In ${accountLabel(primary)}`}>
                     <Amount currency={bookCurrency} minor={primary.balance} />
                   </Fact>
                 ) : null}
