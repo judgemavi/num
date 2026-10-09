@@ -155,6 +155,7 @@ export function isDestructive(method: string, path: string): boolean {
     text.includes("undo") ||
     text.includes("/import") ||
     text.includes("/funding") ||
+    text === "/api/transactions/approve" ||
     text.includes("checkpoint") ||
     text.startsWith("/api/accounts")
   );

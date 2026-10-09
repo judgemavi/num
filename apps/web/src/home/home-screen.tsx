@@ -8,7 +8,6 @@ import {
   monthPlanSchema,
   overspentListSchema,
   recurringSignalsSchema,
-  transactionListSchema,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -25,13 +24,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ForecastChart } from "@/plan/forecast-chart";
 import { MonthDetails, MonthFlow } from "@/plan/month-board";
 import { useEditors } from "@/editors/editor-api";
-import { useActiveBuckets, useBookCurrency, useCategories } from "@/editors/lookups";
-import { paydayHint } from "@/inbox/format";
+import { useActiveBuckets, useActivePlans, useBookCurrency, useCategories, useReviewSummary } from "@/editors/lookups";
+import { inboxError, paydayHint } from "@/review/format";
 import { HygienePanel } from "@/insights/hygiene-panel";
-import { levelLabel } from "@/transactions/format";
+import { signedMoney } from "@/insights/format";
+import { formatDate, levelLabel } from "@/transactions/format";
 import { apiRequest } from "@/request";
 import { useState } from "react";
-import { decideItem } from "@/inbox/actions";
+import { decideItem } from "@/review/actions";
 
 export function HomeScreen() {
   const asOf = localAsOf();
@@ -42,8 +42,11 @@ export function HomeScreen() {
   const categories = useCategories();
   const buckets = useActiveBuckets();
   const { openEditor } = useEditors();
+  const plans = useActivePlans();
   const [coverFrom, setCoverFrom] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
   const bookCurrency = currency.data ?? "USD";
+  const planName = new Map((plans.data?.items ?? []).map((item) => [item.id, item.name]));
   const categoryName = new Map((categories.data ?? []).map((item) => [item.id, item.name]));
 
   const forecast = useQuery({
@@ -86,16 +89,7 @@ export function HomeScreen() {
       return result.data;
     },
   });
-  const review = useQuery({
-    queryKey: ["needs-review-count", asOf],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/transactions?needsReview=true&asOf=${asOf}&pageSize=1`, transactionListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const review = useReviewSummary();
   const paychecks = useQuery({
     queryKey: ["funding-paychecks"],
     queryFn: async () => {
@@ -137,15 +131,22 @@ export function HomeScreen() {
     },
   });
 
-  const counts = review.data?.reviewCounts;
+  const counts = review.data?.counts;
   const reviewTotal = review.data?.total ?? 0;
   const clear = reviewTotal === 0 && (hygiene.data?.checks.every((item) => item.pass) ?? false) && (paychecks.data?.length ?? 0) === 0 && (signals.data?.missed.length ?? 0) === 0 && (overspent.data?.length ?? 0) === 0;
+  const feasibility = plan.data?.feasibility;
+  const behind = feasibility && feasibility.shortfall > 0 ? feasibility.buckets.filter((bucket) => bucket.kind === "goal") : [];
   const worth = insights.data?.netWorth.slice(-12) ?? [];
   const latestWorth = worth.at(-1);
 
   return (
     <>
       <PageHeader kicker={clear ? "All clear" : "This week"} title="Home" />
+      {error ? (
+        <p role="alert" className="text-sm text-attn">
+          {error}
+        </p>
+      ) : null}
       <SummaryStrip
         tint="home"
         label="Safe to spend until payday"
@@ -153,7 +154,7 @@ export function HomeScreen() {
         hint={forecast.data ? paydayHint(bookCurrency, asOf, forecast.data.nextIncomeDate, forecast.data.safeToSpend) : "Loading the forecast."}
         facts={
           <>
-            <Fact label="Payday">{forecast.data?.nextIncomeDate ?? "No paycheck"}</Fact>
+            <Fact label="Payday">{forecast.data?.nextIncomeDate ? formatDate(forecast.data.nextIncomeDate) : "No paycheck"}</Fact>
             <Fact label="Buffer">
               <Amount currency={bookCurrency} minor={forecast.data?.bufferAmount ?? 0} />
             </Fact>
@@ -165,7 +166,7 @@ export function HomeScreen() {
         <CardHeader className="flex flex-row items-center justify-between px-5 pt-5">
           <CardTitle className="text-base font-bold">{reviewTotal === 0 ? "Nothing needs review" : `${reviewTotal} need review`}</CardTitle>
           <Button type="button" variant="secondary" asChild>
-            <Link to="/transactions" search={{ page: 1, pageSize: 50, needsReview: true, asOf, uncategorized: false, automatic: false }}>
+            <Link to="/transactions" search={{ page: 1, pageSize: 50, needsReview: true, uncategorized: false, automatic: false }}>
               Transactions
             </Link>
           </Button>
@@ -211,8 +212,14 @@ export function HomeScreen() {
                 variant="ghost"
                 onClick={(event) => {
                   event.stopPropagation();
-                  void decideItem(asOf, `paycheck_funding:${item.incomeTransactionId}`, "keep_unassigned").then(() => {
-                    void paychecks.refetch();
+                  void decideItem(asOf, `paycheck_funding:${item.incomeTransactionId}`, "keep_unassigned").then(async (result) => {
+                    if (!result.ok) {
+                      setError(inboxError(result.code));
+                      return;
+                    }
+                    setError(null);
+                    await queryClient.invalidateQueries({ queryKey: ["funding-paychecks"] });
+                    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
                   });
                 }}
               >
@@ -227,8 +234,8 @@ export function HomeScreen() {
           {signals.data.missed.map((item) => (
             <ListRow key={`${item.planId}-${item.dueDate}`}>
               <span className={listName}>
-                Missed payment
-                <small>{item.dueDate}</small>
+                {planName.get(item.planId) ?? "Recurring payment"}
+                <small>Missed · due {formatDate(item.dueDate)}</small>
               </span>
               <Button type="button" variant="ghost" onClick={() => void openEditor("plan", { id: item.planId })}>
                 Link a transaction
@@ -236,6 +243,22 @@ export function HomeScreen() {
               <Button type="button" variant="ghost" onClick={() => void openEditor("skipOccurrence", { planId: item.planId, dueDate: item.dueDate })}>
                 Skip
               </Button>
+            </ListRow>
+          ))}
+        </ListCard>
+      ) : null}
+      {behind.length > 0 ? (
+        <ListCard label="Goals behind" title="Goals behind">
+          {behind.map((goal) => (
+            <ListRow key={goal.bucketId} simple onOpen={() => void navigate({ to: "/buckets", search: { page: 1, pageSize: 50, archived: false } })}>
+              <span className={listName}>
+                {goal.name}
+                <small>{goal.laterDate ? `Needs more each paycheck. A date of ${formatDate(goal.laterDate)} fits.` : "Needs more each paycheck."}</small>
+              </span>
+              <span className={listAmt}>
+                <Amount currency={bookCurrency} minor={goal.perPaycheck} />
+                <small>each paycheck</small>
+              </span>
             </ListRow>
           ))}
         </ListCard>
@@ -256,7 +279,15 @@ export function HomeScreen() {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ fromBucketId, date: asOf }),
-            }).then(() => queryClient.invalidateQueries({ queryKey: ["buckets", "overspent"] }));
+            }).then(async (result) => {
+              if (!result.ok) {
+                setError(inboxError(result.code));
+                return;
+              }
+              setError(null);
+              await queryClient.invalidateQueries({ queryKey: ["buckets", "overspent"] });
+              await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
+            });
           }}
         />
       ) : null}
@@ -276,7 +307,7 @@ export function HomeScreen() {
               <small>Up</small>
             </span>
             <span className={listAmt}>
-              <Amount currency={bookCurrency} minor={item.delta} />
+              {signedMoney(bookCurrency, item.delta)}
             </span>
           </ListRow>
         ))}
@@ -287,7 +318,7 @@ export function HomeScreen() {
               <small>Down</small>
             </span>
             <span className={listAmt}>
-              <Amount currency={bookCurrency} minor={item.delta} />
+              {signedMoney(bookCurrency, item.delta)}
             </span>
           </ListRow>
         ))}

@@ -1,6 +1,6 @@
-import type { TransactionListQuery } from "@num/shared";
+import type { TransactionFilter, TransactionListQuery } from "@num/shared";
 
-export function transactionPath(search: TransactionListQuery): string {
+export function transactionPath(search: TransactionListQuery, asOf: string): string {
   const params = new URLSearchParams();
   if (search.page !== 1) {
     params.set("page", String(search.page));
@@ -46,9 +46,7 @@ export function transactionPath(search: TransactionListQuery): string {
   }
   if (search.needsReview) {
     params.set("needsReview", "true");
-  }
-  if (search.asOf) {
-    params.set("asOf", search.asOf);
+    params.set("asOf", asOf);
   }
   const text = params.toString();
   return text.length === 0 ? "/api/transactions" : `/api/transactions?${text}`;
@@ -68,4 +66,20 @@ export function hasFilters(search: TransactionListQuery): boolean {
       search.automatic ||
       search.needsReview,
   );
+}
+
+/** The filters that choose which rows a bulk approval covers. */
+export function filterBody(search: TransactionListQuery): TransactionFilter {
+  return {
+    q: search.q,
+    accountId: search.accountId,
+    categoryId: search.categoryId,
+    groupId: search.groupId,
+    merchantId: search.merchantId,
+    tagId: search.tagId,
+    from: search.from,
+    to: search.to,
+    uncategorized: search.uncategorized,
+    automatic: search.automatic,
+  };
 }

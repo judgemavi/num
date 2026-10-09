@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { reviewLevel } from "./review-level";
 import {
   amountsWithinOnePercent,
   buildTrigramIndex,
@@ -6,10 +7,7 @@ import {
   combineConfidence,
   confidenceMilli,
   learnedConfidence,
-  confidenceLevel,
-  confidenceThresholds,
   matchLevel,
-  reviewLevel,
   scoreMatch,
   similarPayees,
   trigramCosine,
@@ -32,15 +30,7 @@ function score(patch: Partial<ScoreInput> & Pick<ScoreInput, "amountRows" | "pay
   });
 }
 
-test("level comes from confidence and the automatic threshold", () => {
-  expect(confidenceLevel(0.95, confidenceThresholds.careful)).toBe("sure");
-  expect(confidenceLevel(0.85, confidenceThresholds.careful)).toBe("likely");
-  expect(confidenceLevel(0.75, confidenceThresholds.balanced)).toBe("likely");
-  expect(confidenceLevel(0.85, confidenceThresholds.balanced)).toBe("sure");
-  expect(confidenceLevel(0.75, confidenceThresholds.eager)).toBe("sure");
-  expect(confidenceLevel(0.74, confidenceThresholds.eager)).toBe("maybe");
-  expect(confidenceLevel(0.6, confidenceThresholds.balanced)).toBe("maybe");
-  expect(confidenceLevel(0.59, confidenceThresholds.eager)).toBe("none");
+test("Sure is an automatic label and a suggestion is Likely or Maybe", () => {
   expect(reviewLevel(true, 0.5)).toBe("sure");
   expect(reviewLevel(false, 0.8)).toBe("likely");
   expect(reviewLevel(false, 0.7)).toBe("maybe");

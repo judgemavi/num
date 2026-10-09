@@ -5,6 +5,7 @@ import { auditLog, migrateDatabase, openDatabase, transactions } from "@num/db";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
+import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { createCheckpoint } from "./checkpoints";
@@ -12,6 +13,7 @@ import { decideInboxItem } from "./inbox-decisions";
 import { closeMonth, listMonths } from "./months";
 import { approveReviewLevel, listNeedsReview } from "./needs-review";
 import { linkOccurrence, skipOccurrence } from "./recurring-links";
+import { filteredReviewHits } from "./transaction-list";
 import { createPlan } from "./recurring-plans";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
@@ -46,6 +48,13 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
     ...saved,
   });
 }
+
+function approve(db: Db, level: "sure" | "likely", count: number, filter: Parameters<typeof filteredReviewHits>[1], at: string) {
+  const targets = filteredReviewHits(db, filter, asOf).filter((hit) => hit.review.level === level);
+  return approveReviewLevel(db, targets, level, count, { source: "ui", at });
+}
+
+const noFilter = { uncategorized: false, automatic: false };
 
 function stampAuto(db: Db, id: string, sourceId: string) {
   db.update(transactions)
@@ -152,7 +161,7 @@ test("approve all Sure confirms only the Sure rows in one write and counts as co
     const marketKnown = pay(db, cash.id, "2026-03-05", -2_000, "Market", food.id);
     const likely = pay(db, cash.id, "2026-03-06", -2_000, "Market");
     const at = "2026-04-02T18:00:00Z";
-    const result = approveReviewLevel(db, asOf, "sure", { source: "ui", at });
+    const result = approve(db, "sure", 2, noFilter, at);
     expect(result.ids.sort()).toEqual([sureA.id, sureB.id].sort());
     expect(result.count).toBe(2);
     expect(getTransaction(db, sureA.id)?.autoReason).toBeNull();
@@ -174,11 +183,30 @@ test("approve all Likely applies the suggestion", () => {
     const likely = pay(db, cash.id, "2026-03-02", -2_000, "Market");
     const sure = pay(db, cash.id, "2026-03-03", -900, "Cafe", food.id);
     stampAuto(db, sure.id, sure.id);
-    const result = approveReviewLevel(db, asOf, "likely", { source: "ui", at: "2026-04-02T18:05:00Z" });
+    const result = approve(db, "likely", 1, noFilter, "2026-04-02T18:05:00Z");
     expect(result.ids).toEqual([likely.id]);
     expect(getTransaction(db, likely.id)?.lines[0]?.categoryId).toBe(food.id);
     expect(getTransaction(db, likely.id)?.autoReason).toBeNull();
     expect(getTransaction(db, sure.id)?.autoReason).toBe("learned_amount");
+  });
+});
+
+test("approval uses the active filters and stops when the count changed", () => {
+  withBook((db) => {
+    const cash = account(db, "Cash");
+    const other = account(db, "Other");
+    const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
+    const known = pay(db, cash.id, "2026-03-01", -1_000, "Cafe", food.id);
+    const here = pay(db, cash.id, "2026-03-02", -1_000, "Cafe", food.id);
+    const there = pay(db, other.id, "2026-03-03", -1_000, "Cafe", food.id);
+    stampAuto(db, here.id, known.id);
+    stampAuto(db, there.id, known.id);
+    expect(filteredReviewHits(db, { ...noFilter, accountId: cash.id }, asOf).map((hit) => hit.id)).toEqual([here.id]);
+    expect(() => approve(db, "sure", 2, { ...noFilter, accountId: cash.id }, "2026-04-02T18:10:00Z")).toThrow(ServiceError);
+    expect(getTransaction(db, here.id)?.autoReason).not.toBeNull();
+    const result = approve(db, "sure", 1, { ...noFilter, accountId: cash.id }, "2026-04-02T18:11:00Z");
+    expect(result.ids).toEqual([here.id]);
+    expect(getTransaction(db, there.id)?.autoReason).not.toBeNull();
   });
 });
 

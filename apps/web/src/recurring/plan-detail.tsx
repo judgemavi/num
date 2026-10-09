@@ -8,8 +8,8 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
-import { undoDecision } from "@/inbox/actions";
-import { decisionText, inboxError } from "@/inbox/format";
+import { undoDecision } from "@/review/actions";
+import { decisionText, inboxError } from "@/review/format";
 import { formatDate, planError } from "@/recurring/format";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
@@ -137,7 +137,7 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
                     }
                     setError(null);
                     await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
-                    await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+                    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
                   });
                 }}
               >

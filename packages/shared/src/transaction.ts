@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { accountKinds } from "./account";
 import { isoDateSchema } from "./date";
-import { skippedRowSchema } from "./inbox";
+import { approveLevels, skippedRowSchema } from "./review";
 import { listQuerySchema, pagedResponseSchema } from "./list";
 import { autoReasons } from "./matching";
 import { centsSchema } from "./money";
@@ -111,7 +111,12 @@ const optionalIdOrNone = z.preprocess(blankQuery, z.union([z.uuid(), z.literal("
 
 export const transactionSortColumns = ["date", "amount", "payeeRaw"] as const;
 
-export const transactionListQuerySchema = listQuerySchema(transactionSortColumns).extend({
+const queryFlag = z
+  .union([z.boolean(), z.enum(["true", "false"])])
+  .optional()
+  .transform((value) => value === true || value === "true");
+
+export const transactionFilterSchema = z.object({
   q: optionalQueryText,
   accountId: optionalQueryId,
   categoryId: optionalQueryId,
@@ -120,19 +125,21 @@ export const transactionListQuerySchema = listQuerySchema(transactionSortColumns
   tagId: optionalIdOrNone,
   from: optionalQueryDate,
   to: optionalQueryDate,
-  uncategorized: z
-    .union([z.boolean(), z.enum(["true", "false"])])
-    .optional()
-    .transform((value) => value === true || value === "true"),
-  automatic: z
-    .union([z.boolean(), z.enum(["true", "false"])])
-    .optional()
-    .transform((value) => value === true || value === "true"),
-  needsReview: z
-    .union([z.boolean(), z.enum(["true", "false"])])
-    .optional()
-    .transform((value) => value === true || value === "true"),
+  uncategorized: queryFlag,
+  automatic: queryFlag,
+});
+
+export const transactionListQuerySchema = listQuerySchema(transactionSortColumns)
+  .extend(transactionFilterSchema.shape)
+  .extend({ needsReview: queryFlag });
+
+export const transactionListApiQuerySchema = transactionListQuerySchema.extend({
   asOf: optionalQueryDate,
+});
+
+export const approveLevelSchema = transactionFilterSchema.extend({
+  level: z.enum(approveLevels),
+  count: z.number().int().nonnegative(),
 });
 
 export const transactionListItemSchema = z.object({
@@ -168,6 +175,8 @@ export const transactionListSchema = pagedResponseSchema(transactionListItemSche
   reviewCounts: reviewCountSchema.nullable(),
 });
 
+export type TransactionFilter = z.output<typeof transactionFilterSchema>;
+export type ApproveLevel = z.infer<typeof approveLevelSchema>;
 export type TransactionLineInput = z.infer<typeof transactionLineInputSchema>;
 export type TransactionLine = z.infer<typeof transactionLineSchema>;
 export type TransactionCreate = z.infer<typeof transactionCreateSchema>;

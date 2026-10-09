@@ -3,8 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LoadError, LoadingLine } from "@/editors/load-state";
 import { useAccounts, useBookCurrency, useCategories, useMerchants, useTags } from "@/editors/lookups";
 import { apiRequest } from "@/request";
-import { undoDecision } from "@/inbox/actions";
-import { decisionText } from "@/inbox/format";
+import { undoDecision } from "@/review/actions";
+import { decisionText } from "@/review/format";
 import { transactionError } from "@/transactions/format";
 import { GroupEditor } from "@/transactions/transaction-group";
 import { TransactionForm } from "@/transactions/transaction-form";
@@ -104,7 +104,7 @@ function SingleEditor({ id, rawLine, initialAccountId, onClose, onSaved }: Trans
     await queryClient.invalidateQueries({ queryKey: ["transaction"] });
     await queryClient.invalidateQueries({ queryKey: ["accounts"] });
     await queryClient.invalidateQueries({ queryKey: ["account"] });
-    await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
     await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
     await queryClient.invalidateQueries({ queryKey: ["import-detail"] });
   }
@@ -146,7 +146,7 @@ function SingleEditor({ id, rawLine, initialAccountId, onClose, onSaved }: Trans
           return result;
         }
         await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
-        await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+        await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
         return result;
       }}
       currency={currency.data}

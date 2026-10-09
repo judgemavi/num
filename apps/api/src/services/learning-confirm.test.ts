@@ -10,7 +10,7 @@ import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { undoImportBatch } from "./import-undo";
 import { importStatement } from "./imports";
-import { listInbox } from "./inbox";
+import { listNeedsReview } from "./needs-review";
 import { createMerchant } from "./merchants";
 import { acceptTransferPair } from "./suggestions";
 import { acceptLooksRight, createTransaction, getTransaction, updateTransaction } from "./transactions";
@@ -308,13 +308,9 @@ test("a conflict suggests the most recent confirmation and does not label", () =
     });
     expect(getTransaction(sample.db, open.id)?.autoReason).toBeNull();
     expect(lineCategory(sample.db, open.id)).toBeNull();
-    const item = listInbox(sample.db, asOf).items.find((row) => row.kind === "uncategorized" && row.transactionId === open.id);
-    expect(item?.kind).toBe("uncategorized");
-    if (item?.kind === "uncategorized") {
-      expect(item.suggestion.sure).toBe(false);
-      expect(item.suggestion.reason).toBe("none");
-      expect(item.suggestion.categoryId).toBeNull();
-    }
+    const hit = listNeedsReview(sample.db, asOf).find((row) => row.id === open.id);
+    expect(hit?.review.level).toBe("none");
+    expect(hit?.review.suggestion).toBeNull();
   } finally {
     sample.close();
   }

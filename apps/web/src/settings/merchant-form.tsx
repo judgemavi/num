@@ -4,8 +4,8 @@ import { useState } from "react";
 import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { useRestoreNamed } from "@/editors/restore-named";
-import { undoDecision } from "@/inbox/actions";
-import { decisionText, inboxError } from "@/inbox/format";
+import { undoDecision } from "@/review/actions";
+import { decisionText, inboxError } from "@/review/format";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -92,7 +92,7 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
                 }
                 setUndoError(null);
                 await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
-                await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+                await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
               });
             }}
           >

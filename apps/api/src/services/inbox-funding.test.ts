@@ -6,10 +6,10 @@ import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createBucketEvent } from "./bucket-events";
-import { createBucket, readBucket } from "./buckets";
+import { createBucket, listOverspent, readBucket } from "./buckets";
 import { createCategory } from "./categories";
+import { listFundingPaychecks } from "./funding-paychecks";
 import { createFundingRun, undoFundingRun } from "./funding-runs";
-import { listInbox } from "./inbox";
 import { linkOccurrence } from "./recurring-links";
 import { createPlan } from "./recurring-plans";
 import { createTransaction } from "./transactions";
@@ -73,20 +73,19 @@ test("cover from Unassigned uses a fund event and clears the overspent item", ()
       lines: [{ amount: -4_200, categoryId: dining.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });
-    const key = `bucket_overspent:${meals.id}:2026-10`;
-    expect(listInbox(sample.db, asOf).items.some((item) => item.itemKey === key)).toBe(true);
+    expect(listOverspent(sample.db).items.some((item) => item.id === meals.id)).toBe(true);
     const event = createBucketEvent(sample.db, meals.id, { kind: "fund", amount: 4_200, date: asOf, asOf, ...saved });
     expect(event.kind).toBe("fund");
     expect(event.otherBucketId).toBeNull();
     expect(event.fundingRunId).toBeNull();
     expect(readBucket(sample.db, meals.id).balance).toBe(0);
-    expect(listInbox(sample.db, asOf).items.some((item) => item.itemKey === key)).toBe(false);
+    expect(listOverspent(sample.db).items.some((item) => item.id === meals.id)).toBe(false);
   } finally {
     sample.close();
   }
 });
 
-test("a linked paycheck is an inbox item until its funding run, and returns after undo", () => {
+test("a linked paycheck is waiting for funding until its funding run, and returns after undo", () => {
   const sample = book();
   try {
     const cash = account(sample.db, 50_000);
@@ -135,17 +134,17 @@ test("a linked paycheck is an inbox item until its funding run, and returns afte
       fixedAmount: null,
       ...saved,
     });
-    const key = `paycheck_funding:${deposit.id}`;
-    expect(listInbox(sample.db, asOf).items.some((item) => item.kind === "paycheck_funding" && item.itemKey === key)).toBe(true);
+    const waiting = () => listFundingPaychecks(sample.db).items.some((item) => item.incomeTransactionId === deposit.id);
+    expect(waiting()).toBe(true);
     const run = createFundingRun(sample.db, {
       incomeTransactionId: deposit.id,
       lines: [{ bucketId: food.id, amount: 1_000 }],
       asOf,
       ...saved,
     });
-    expect(listInbox(sample.db, asOf).items.some((item) => item.itemKey === key)).toBe(false);
+    expect(waiting()).toBe(false);
     undoFundingRun(sample.db, run.id, saved);
-    expect(listInbox(sample.db, asOf).items.some((item) => item.itemKey === key)).toBe(true);
+    expect(waiting()).toBe(true);
   } finally {
     sample.close();
   }

@@ -28,8 +28,7 @@ import {
   type PlanFrequency,
   type PlanSchedule,
 } from "@num/shared";
-import { and, eq, gt, inArray, isNotNull, isNull } from "drizzle-orm";
-import type { Db } from "../db";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
 import { bucketBalances, type Reader } from "./bucket-balance";
@@ -63,7 +62,7 @@ function bucketKind(value: string): BucketKind {
   return value as BucketKind;
 }
 
-function amountMode(value: string): FundingPaycheck["amountMode"] {
+export function amountMode(value: string): FundingPaycheck["amountMode"] {
   if (value !== "fixed" && value !== "variable") {
     throw new Error("Unknown amount mode");
   }
@@ -281,48 +280,6 @@ export function activeFundingRun(db: Reader, incomeTransactionId: string) {
     .from(fundingRuns)
     .where(and(eq(fundingRuns.incomeTransactionId, incomeTransactionId), isNull(fundingRuns.undoneAt)))
     .get();
-}
-
-export function listFundingPaychecks(db: Db): { items: FundingPaycheck[] } {
-  const rows = db
-    .select({
-      incomeTransactionId: transactions.id,
-      date: transactions.date,
-      dueDate: occurrenceLinks.dueDate,
-      amount: transactions.amount,
-      payee: transactions.payeeRaw,
-      amountMode: recurringPlans.amountMode,
-    })
-    .from(occurrenceLinks)
-    .innerJoin(recurringPlans, eq(occurrenceLinks.planId, recurringPlans.id))
-    .innerJoin(transactions, eq(occurrenceLinks.transactionId, transactions.id))
-    .leftJoin(fundingRuns, and(eq(fundingRuns.incomeTransactionId, transactions.id), isNull(fundingRuns.undoneAt)))
-    .where(
-      and(
-        eq(recurringPlans.kind, "income"),
-        eq(recurringPlans.fundsBuckets, true),
-        eq(occurrenceLinks.skipped, false),
-        isNotNull(occurrenceLinks.transactionId),
-        gt(transactions.amount, 0),
-        isNull(fundingRuns.id),
-      ),
-    )
-    .all();
-  const items = rows.map((row) => ({
-    incomeTransactionId: row.incomeTransactionId,
-    date: row.date,
-    dueDate: row.dueDate,
-    amount: row.amount,
-    payee: row.payee,
-    amountMode: amountMode(row.amountMode),
-  }));
-  items.sort((left, right) => {
-    if (left.date !== right.date) {
-      return left.date < right.date ? 1 : -1;
-    }
-    return left.incomeTransactionId < right.incomeTransactionId ? 1 : -1;
-  });
-  return { items };
 }
 
 function proposalIncomes(book: Book, dueDate: string): FundingIncome[] {

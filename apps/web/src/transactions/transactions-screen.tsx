@@ -60,7 +60,7 @@ export function TransactionsScreen() {
       return;
     }
     void queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    void queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    void queryClient.invalidateQueries({ queryKey: ["needs-review"] });
   }
 
   const currency = useQuery({
@@ -77,7 +77,7 @@ export function TransactionsScreen() {
   const transactions = useQuery({
     queryKey: ["transactions", search],
     queryFn: async () => {
-      const result = await apiRequest(transactionPath(search), transactionListSchema);
+      const result = await apiRequest(transactionPath(search, localAsOf()), transactionListSchema);
       if (!result.ok) {
         throw new Error(result.code);
       }
@@ -206,9 +206,7 @@ export function TransactionsScreen() {
               variant={search.needsReview ? "default" : "secondary"}
               onClick={() => {
                 void navigate({
-                  search: search.needsReview
-                    ? { ...search, needsReview: false, asOf: undefined, page: 1 }
-                    : { ...search, needsReview: true, asOf: localAsOf(), page: 1 },
+                  search: { ...search, needsReview: !search.needsReview, page: 1 },
                 });
               }}
             >
@@ -233,6 +231,7 @@ export function TransactionsScreen() {
       {search.needsReview ? (
         <NeedsReviewList
           currency={bookCurrency}
+          search={search}
           items={rows}
           counts={page.reviewCounts ?? { sure: 0, likely: 0, maybe: 0, none: 0 }}
         />

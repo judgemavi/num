@@ -2,6 +2,7 @@ import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import { autoReasons, type AutoReason, type MatchResult } from "./matching";
 import { dayDistance } from "./recurring-calc";
+import { reviewLevel, reviewLevels } from "./review-level";
 
 export const suggestionReasons = [...autoReasons, "none"] as const;
 
@@ -12,7 +13,7 @@ export const suggestionSchema = z.object({
   categoryId: z.uuid().nullable(),
   transferAccountId: z.uuid().nullable(),
   reason: z.enum(suggestionReasons),
-  sure: z.boolean(),
+  level: z.enum(reviewLevels),
   sourceId: z.uuid().nullable(),
   confidence: z.number().int().min(0).max(1000),
 });
@@ -40,7 +41,7 @@ const none: Suggestion = {
   categoryId: null,
   transferAccountId: null,
   reason: "none",
-  sure: false,
+  level: "none",
   sourceId: null,
   confidence: 0,
 };
@@ -55,7 +56,7 @@ export function suggestionFromMatch(result: MatchResult): Suggestion {
     categoryId: result.categoryId,
     transferAccountId: result.transferAccountId,
     reason,
-    sure: false,
+    level: reviewLevel(false, result.confidenceMilli / 1000),
     sourceId: result.sourceId,
     confidence: result.confidenceMilli,
   };
@@ -71,7 +72,7 @@ export function alternateFromMatch(result: MatchResult): Suggestion | null {
     categoryId: next.categoryId,
     transferAccountId: next.transferAccountId,
     reason: next.reason,
-    sure: false,
+    level: reviewLevel(false, next.confidenceMilli / 1000),
     sourceId: next.sourceId,
     confidence: next.confidenceMilli,
   };

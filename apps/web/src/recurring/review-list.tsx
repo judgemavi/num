@@ -1,8 +1,9 @@
-import type { Merchant, RecurringSignals } from "@num/shared";
+import { planProposalKey, type Merchant, type RecurringSignals } from "@num/shared";
 import { useState } from "react";
 import { localAsOf } from "@/as-of";
-import { createProposedPlan, decideItem } from "@/inbox/actions";
-import { repeatLabel } from "@/inbox/format";
+import { createProposedPlan, decideItem } from "@/review/actions";
+import { repeatLabel } from "@/review/format";
+import { formatDate } from "@/transactions/format";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,13 +34,13 @@ export function ReviewList({ signals, merchants, onDone }: DetectedListProps) {
       {error ? <p className="px-5 py-2 text-sm text-attn">{error}</p> : null}
       {signals.proposals.map((item) => {
         const name = merchantName.get(item.merchantId) ?? "Merchant";
-        const itemKey = `plan_proposal:${item.accountId}:${item.merchantId}:${item.startDate}:${item.freq}:${item.interval}`;
+        const itemKey = planProposalKey(item);
         return (
           <ListRow key={itemKey}>
             <div className={listName}>
               {name}
               <small>
-                {repeatLabel(item.freq, item.interval)} from {item.startDate}
+                {repeatLabel(item.freq, item.interval)} from {formatDate(item.startDate)}
               </small>
             </div>
             <Button

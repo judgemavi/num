@@ -221,7 +221,7 @@ export function MonthsScreen() {
           {detail.isError ? <p className="text-sm">The month story did not load.</p> : null}
           {story?.status !== "closed"
             ? story?.blockers.map((blocker) => (
-                <p key={`${blocker.code}-${blocker.accountId ?? "inbox"}`} className="text-sm">
+                <p key={`${blocker.code}-${blocker.accountId ?? "none"}`} className="text-sm">
                   {blockerText(blocker.code, blocker.accountId ? (accountNames.get(blocker.accountId) ?? null) : null)}
                 </p>
               ))

@@ -1,11 +1,13 @@
 import { importBatches, inboxDecisions } from "@num/db";
-import { utcNow, type InboxDecision, type InboxDecisionCode, type InboxItem } from "@num/shared";
+import { planProposalKey, utcNow, type InboxDecision, type InboxDecisionCode } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { openUnreadableKeys } from "./book-settings";
+import { listFundingPaychecks } from "./funding-paychecks";
 import { readUnreadable } from "./import-read";
-import { collectInbox } from "./inbox-collect";
-import { uncategorizedInbox } from "./inbox-uncategorized";
+import { recurringSignals } from "./recurring-view";
+import { listTransferPairs } from "./suggestions";
 import { write, type AuditSource } from "./write";
 
 type WriteInput = {
@@ -13,7 +15,7 @@ type WriteInput = {
   at?: string;
 };
 
-const codeForKind: Partial<Record<InboxItem["kind"], InboxDecisionCode>> = {
+const codeForKind: Record<string, InboxDecisionCode | undefined> = {
   transfer_pair: "not_transfer",
   recurring_changed: "keep_plan_amount",
   plan_proposal: "not_recurring",
@@ -43,19 +45,28 @@ function itemKind(itemKey: string): string {
   return split === -1 ? itemKey : itemKey.slice(0, split);
 }
 
-function openKeys(db: Db, asOf: string): Set<string> {
-  const hidden = decidedKeys(db);
-  const collected = collectInbox(db, asOf);
-  const keys = new Set<string>();
-  for (const item of collected.items) {
-    if (!hidden.has(item.itemKey)) {
-      keys.add(item.itemKey);
-    }
+function pairKey(leftId: string, rightId: string): string {
+  return leftId < rightId ? `transfer_pair:${leftId}:${rightId}` : `transfer_pair:${rightId}:${leftId}`;
+}
+
+function isOpen(db: Db, asOf: string, itemKey: string): boolean {
+  if (decidedKeys(db).has(itemKey)) {
+    return false;
   }
-  for (const item of uncategorizedInbox(db, hidden)) {
-    keys.add(item.itemKey);
+  switch (itemKind(itemKey)) {
+    case "transfer_pair":
+      return listTransferPairs(db, asOf).items.some((pair) => pairKey(pair.leftId, pair.rightId) === itemKey);
+    case "recurring_changed":
+      return recurringSignals(db, asOf).changed.some((item) => `recurring_changed:${item.planId}:${item.dueDate}` === itemKey);
+    case "plan_proposal":
+      return recurringSignals(db, asOf).proposals.some((item) => planProposalKey(item) === itemKey);
+    case "paycheck_funding":
+      return listFundingPaychecks(db).items.some((item) => `paycheck_funding:${item.incomeTransactionId}` === itemKey);
+    case "import_unreadable":
+      return openUnreadableKeys(db).includes(itemKey);
+    default:
+      return false;
   }
-  return keys;
 }
 
 export function decideInboxItem(
@@ -66,10 +77,10 @@ export function decideInboxItem(
   input: WriteInput,
 ): InboxDecision {
   const kind = itemKind(itemKey);
-  if (codeForKind[kind as InboxItem["kind"]] !== decision) {
+  if (codeForKind[kind] !== decision) {
     throw new ServiceError("invalid_body", 400, { field: "decision" });
   }
-  if (!openKeys(db, asOf).has(itemKey)) {
+  if (!isOpen(db, asOf, itemKey)) {
     throw new ServiceError("inbox_item_not_found", 404);
   }
   const at = input.at ?? utcNow();
@@ -124,7 +135,7 @@ function unreadableParts(itemKey: string): { batchId: string; line: number } | n
 
 export function acceptUnreadableLine(db: Db, asOf: string, itemKey: string, input: WriteInput): { itemKey: string } {
   const parts = unreadableParts(itemKey);
-  if (!parts || !openKeys(db, asOf).has(itemKey)) {
+  if (!parts || !isOpen(db, asOf, itemKey)) {
     throw new ServiceError("inbox_item_not_found", 404);
   }
   const batch = db.select().from(importBatches).where(eq(importBatches.id, parts.batchId)).get();

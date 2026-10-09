@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { importBatches, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
-import { columnMapSchema, uncategorizedLineKey, type ColumnMap, type InboxDecisionCode } from "@num/shared";
+import { columnMapSchema, planProposalKey, type ColumnMap, type InboxDecisionCode } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
@@ -11,8 +11,11 @@ import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { readUnreadable } from "./import-read";
 import { importStatement } from "./imports";
-import { acceptUnreadableLine, decideInboxItem, undoInboxDecision } from "./inbox-decisions";
-import { listInbox } from "./inbox";
+import { openUnreadableKeys } from "./book-settings";
+import { listFundingPaychecks } from "./funding-paychecks";
+import { acceptUnreadableLine, decidedKeys, decideInboxItem, undoInboxDecision } from "./inbox-decisions";
+import { listNeedsReview } from "./needs-review";
+import { recurringSignals } from "./recurring-view";
 import { createMerchant } from "./merchants";
 import { linkOccurrence, restoreSkip, skipOccurrence } from "./recurring-links";
 import { createPlan } from "./recurring-plans";
@@ -73,7 +76,20 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
 }
 
 function hasKey(db: Db, asOfDate: string, itemKey: string): boolean {
-  return listInbox(db, asOfDate).items.some((item) => item.itemKey === itemKey);
+  if (listNeedsReview(db, asOfDate).some((hit) => hit.review.itemKey === itemKey)) {
+    return true;
+  }
+  const signals = recurringSignals(db, asOfDate);
+  if (signals.missed.some((item) => `recurring_missed:${item.planId}:${item.dueDate}` === itemKey)) {
+    return true;
+  }
+  if (signals.proposals.some((item) => planProposalKey(item) === itemKey)) {
+    return true;
+  }
+  if (listFundingPaychecks(db).items.some((item) => `paycheck_funding:${item.incomeTransactionId}` === itemKey)) {
+    return true;
+  }
+  return openUnreadableKeys(db).includes(itemKey) && !decidedKeys(db).has(itemKey);
 }
 
 function roundTrip(db: Db, asOfDate: string, itemKey: string, decision: InboxDecisionCode) {
@@ -84,7 +100,7 @@ function roundTrip(db: Db, asOfDate: string, itemKey: string, decision: InboxDec
   expect(hasKey(db, asOfDate, itemKey)).toBe(true);
 }
 
-test("each no decision hides its inbox item until undo", () => {
+test("each no decision hides its review item until undo", () => {
   const sample = book();
   try {
     const cash = account(sample.db, "Cash");
@@ -151,10 +167,10 @@ test("each no decision hides its inbox item until undo", () => {
     for (const date of ["2026-01-15", "2026-02-15", "2026-03-15"]) {
       pay(sample.db, savings.id, date, -1500, "Stream", food.id, stream.id);
     }
-    const proposal = listInbox(sample.db, asOf).items.find((item) => item.kind === "plan_proposal");
-    expect(proposal?.kind).toBe("plan_proposal");
-    if (proposal?.kind === "plan_proposal") {
-      roundTrip(sample.db, asOf, proposal.itemKey, "not_recurring");
+    const proposal = recurringSignals(sample.db, asOf).proposals[0];
+    expect(proposal).toBeDefined();
+    if (proposal) {
+      roundTrip(sample.db, asOf, planProposalKey(proposal), "not_recurring");
     }
 
     const payCategory = createCategory(sample.db, { name: "Pay", kind: "income", essential: false, ...saved });
@@ -191,22 +207,21 @@ test("each no decision hides its inbox item until undo", () => {
       bytes: new TextEncoder().encode("date,description,amount\n03/01/2026,GOOD ROW,-1.00\nxx/yy/2026,BAD ROW,1.00\n"),
       columnMap: map,
     });
-    const unreadable = listInbox(sample.db, asOf).items.find((item) => item.kind === "import_unreadable");
-    expect(unreadable?.kind).toBe("import_unreadable");
-    if (unreadable?.kind === "import_unreadable") {
-      roundTrip(sample.db, asOf, unreadable.itemKey, "not_a_transaction");
-      decideInboxItem(sample.db, asOf, unreadable.itemKey, "not_a_transaction", saved);
-      expect(hasKey(sample.db, asOf, unreadable.itemKey)).toBe(false);
-      undoInboxDecision(sample.db, unreadable.itemKey, saved);
-      acceptUnreadableLine(sample.db, asOf, unreadable.itemKey, saved);
-      expect(hasKey(sample.db, asOf, unreadable.itemKey)).toBe(false);
-      const batch = sample.db.select().from(importBatches).where(eq(importBatches.id, unreadable.batchId)).get();
-      expect(readUnreadable(batch?.unreadableJson ?? "[]").some((row) => row.line === unreadable.line)).toBe(false);
-    }
+    const unreadableKey = openUnreadableKeys(sample.db)[0] ?? "";
+    expect(unreadableKey).not.toBe("");
+    const [, batchId = "", line = ""] = unreadableKey.split(":");
+    roundTrip(sample.db, asOf, unreadableKey, "not_a_transaction");
+    decideInboxItem(sample.db, asOf, unreadableKey, "not_a_transaction", saved);
+    expect(hasKey(sample.db, asOf, unreadableKey)).toBe(false);
+    undoInboxDecision(sample.db, unreadableKey, saved);
+    acceptUnreadableLine(sample.db, asOf, unreadableKey, saved);
+    expect(hasKey(sample.db, asOf, unreadableKey)).toBe(false);
+    const batch = sample.db.select().from(importBatches).where(eq(importBatches.id, batchId)).get();
+    expect(readUnreadable(batch?.unreadableJson ?? "[]").some((row) => String(row.line) === line)).toBe(false);
 
-    const open = pay(sample.db, cash.id, "2026-03-04", -100, "Needs a category", null);
-    const lineKey = uncategorizedLineKey(open.lines[0]?.id ?? "");
-    expect(() => decideInboxItem(sample.db, asOf, lineKey, "not_transfer", saved)).toThrow(ServiceError);
+    expect(() => decideInboxItem(sample.db, asOf, `transfer_pair:${crypto.randomUUID()}:${crypto.randomUUID()}`, "not_transfer", saved)).toThrow(
+      ServiceError,
+    );
   } finally {
     sample.close();
   }

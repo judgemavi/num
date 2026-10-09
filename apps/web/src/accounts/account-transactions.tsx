@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { apiRequest } from "@/request";
 import { formatDate, reconciledLabel, refundOfText, refundedText, statusLabel } from "@/transactions/format";
+import { localAsOf } from "@/as-of";
 import { transactionPath } from "@/transactions/query";
 
 const selectionLimit = 200;
@@ -51,7 +52,7 @@ export function AccountTransactions({ accountId, currency, page, onPage }: Accou
     queryKey: ["transactions", accountId, page],
     queryFn: async () => {
       const result = await apiRequest(
-        transactionPath({ page, pageSize: 50, accountId, uncategorized: false, automatic: false, needsReview: false }),
+        transactionPath({ page, pageSize: 50, accountId, uncategorized: false, automatic: false, needsReview: false }, localAsOf()),
         transactionListSchema,
       );
       if (!result.ok) {

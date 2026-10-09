@@ -23,7 +23,7 @@ function useRefresh(keys: string[][]) {
 
 export function ImportEditor({ props, onClose, onSaved }: { props: EditorInput["import"] } & Finish) {
   const account = useRecord("account", props.accountId, `/api/accounts/${props.accountId ?? ""}`, accountSchema);
-  const refresh = useRefresh([["imports"], ["accounts"], ["account"], ["transactions"], ["inbox"]]);
+  const refresh = useRefresh([["imports"], ["accounts"], ["account"], ["transactions"], ["needs-review"]]);
   if (props.accountId && account.isPending) {
     return <LoadingLine label="Loading the account." />;
   }
@@ -56,7 +56,7 @@ export function ReconcileEditor({ props, onClose }: { props: EditorInput["reconc
 
 export function FundEditor({ props, onSaved }: { props: EditorInput["fundPaycheck"] } & Finish) {
   const currency = useBookCurrency();
-  const refresh = useRefresh([["buckets"], ["funding-position"], ["funding-paychecks"], ["funding-proposal"], ["funding-runs"], ["inbox"]]);
+  const refresh = useRefresh([["buckets"], ["funding-position"], ["funding-paychecks"], ["funding-proposal"], ["funding-runs"], ["needs-review"]]);
   if (!currency.data) {
     return <LoadingLine label="Loading the paycheck." />;
   }

@@ -1,48 +1,50 @@
 import {
   approveLevelResultSchema,
-  planListSchema,
+  transactionListSchema,
   transactionSchema,
   type Plan,
   type ReviewLevel,
   type TransactionListItem,
+  type TransactionListQuery,
 } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { localAsOf } from "@/as-of";
-import { acceptPair, applyInboxGroup, decideItem, linkOccurrence, updatePlanAmount } from "@/inbox/actions";
+import { inboxError } from "@/review/format";
+import { acceptPair, applyInboxGroup, decideItem, linkOccurrence, updatePlanAmount } from "@/review/actions";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useEditors } from "@/editors/editor-api";
+import { useActivePlans } from "@/editors/lookups";
 import { apiRequest } from "@/request";
-import { loadAllPages } from "@/settings/load-all-pages";
 import { formatDate, levelLabel, plainReason } from "@/transactions/format";
+import { filterBody, transactionPath } from "@/transactions/query";
 
 const groups: ReviewLevel[] = ["sure", "likely", "maybe", "none"];
 
 type NeedsReviewListProps = {
   currency: string;
+  search: TransactionListQuery;
   items: TransactionListItem[];
   counts: { sure: number; likely: number; maybe: number; none: number };
 };
 
-export function NeedsReviewList({ currency, items, counts }: NeedsReviewListProps) {
+export function NeedsReviewList({ currency, search, items, counts }: NeedsReviewListProps) {
   const asOf = localAsOf();
   const queryClient = useQueryClient();
   const { openEditor, confirm } = useEditors();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const plans = useQuery({
-    queryKey: ["plans", "needs-review"],
-    queryFn: () => loadAllPages("/api/recurring", planListSchema, { archived: false, sort: "name", dir: "asc" }),
-  });
+  const plans = useActivePlans();
   const planById = new Map((plans.data?.items ?? []).map((plan) => [plan.id, plan]));
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    await queryClient.invalidateQueries({ queryKey: ["needs-review-count"] });
+    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
+    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
   }
 
   async function run(action: () => Promise<{ ok: boolean }>) {
@@ -57,23 +59,39 @@ export function NeedsReviewList({ currency, items, counts }: NeedsReviewListProp
     await refresh();
   }
 
-  async function approve(level: "sure" | "likely") {
-    const count = counts[level];
+  async function approve(level: "sure" | "likely", count = counts[level]) {
+    if (count === 0) {
+      return;
+    }
+    const name = level === "sure" ? "Sure" : "Likely";
     const ok = await confirm({
-      title: level === "sure" ? "Approve all Sure?" : "Approve all Likely?",
-      description: `Confirm ${count} ${count === 1 ? "transaction" : "transactions"}. Each one counts as your answer.`,
-      confirmLabel: level === "sure" ? "Approve all Sure" : "Approve all Likely",
+      title: `Approve all ${count} ${name}?`,
+      description: `This confirms ${count} ${count === 1 ? "transaction" : "transactions"} on every page that match your filters. Each one counts as your answer.`,
+      confirmLabel: `Approve all ${count} ${name}`,
     });
     if (!ok) {
       return;
     }
-    await run(async () =>
-      apiRequest(`/api/transactions/approve?asOf=${asOf}`, approveLevelResultSchema, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ level }),
-      }),
-    );
+    setPending(true);
+    const result = await apiRequest(`/api/transactions/approve?asOf=${asOf}`, approveLevelResultSchema, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...filterBody(search), level, count }),
+    });
+    setPending(false);
+    if (!result.ok) {
+      setError(inboxError(result.code));
+      if (result.code === "review_changed") {
+        await refresh();
+        const fresh = await apiRequest(transactionPath({ ...search, page: 1, pageSize: 1, needsReview: true }, asOf), transactionListSchema);
+        if (fresh.ok && fresh.data.reviewCounts) {
+          await approve(level, fresh.data.reviewCounts[level]);
+        }
+      }
+      return;
+    }
+    setError(null);
+    await refresh();
   }
 
   if (items.length === 0) {
@@ -97,7 +115,7 @@ export function NeedsReviewList({ currency, items, counts }: NeedsReviewListProp
             actions={
               level === "sure" || level === "likely" ? (
                 <Button type="button" disabled={pending || counts[level] === 0} onClick={() => void approve(level)}>
-                  {level === "sure" ? "Approve all Sure" : "Approve all Likely"}
+                  {level === "sure" ? `Approve all ${counts[level]} Sure` : `Approve all ${counts[level]} Likely`}
                 </Button>
               ) : null
             }
@@ -248,9 +266,8 @@ function RowAnswers({
   }
   if (review.question === "recurring_ambiguous" && review.recurring) {
     const recurring = review.recurring;
-    const id = recurring.transactionIds[0];
     return (
-      <Button type="button" disabled={pending || !id} onClick={() => void onRun(() => linkOccurrence(recurring.planId, recurring.dueDate, id ?? ""))}>
+      <Button type="button" disabled={pending} onClick={() => void onRun(() => linkOccurrence(recurring.planId, recurring.dueDate, row.id))}>
         Link this payment
       </Button>
     );

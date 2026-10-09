@@ -6,6 +6,7 @@ import {
   suggestionFromMatch,
   utcNow,
   type AutoReason,
+  type RecurringSignals,
   type ReviewCounts,
   type ReviewLevel,
   type Suggestion,
@@ -15,7 +16,7 @@ import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listOverspent } from "./buckets";
-import { listFundingPaychecks } from "./funding-book";
+import { listFundingPaychecks } from "./funding-paychecks";
 import { decidedKeys } from "./inbox-decisions";
 import { applySuggestion } from "./inbox-group";
 import { loadMatchBook, scorePayee } from "./match-book";
@@ -113,11 +114,15 @@ function emptyReview(level: ReviewLevel, reason: AutoReason | null): Transaction
   };
 }
 
-export function listNeedsReview(db: Db, asOf: string): NeedsReviewHit[] {
+export function listNeedsReview(
+  db: Db,
+  asOf: string,
+  known?: { signals: RecurringSignals; pairs: { leftId: string; rightId: string }[] },
+): NeedsReviewHit[] {
   requireAsOf(asOf);
   const hidden = decidedKeys(db);
-  const signals = recurringSignals(db, asOf);
-  const pairs = listTransferPairs(db, asOf).items.filter((pair) => !hidden.has(pairKey(pair.leftId, pair.rightId)));
+  const signals = known?.signals ?? recurringSignals(db, asOf);
+  const pairs = (known?.pairs ?? listTransferPairs(db, asOf).items).filter((pair) => !hidden.has(pairKey(pair.leftId, pair.rightId)));
   const changed = signals.changed.filter((item) => !hidden.has(`recurring_changed:${item.planId}:${item.dueDate}`));
   const pairById = new Map<string, { otherId: string; itemKey: string }>();
   for (const pair of pairs) {
@@ -243,20 +248,34 @@ export function reviewCounts(hits: readonly NeedsReviewHit[]): ReviewCounts {
   return counts;
 }
 
-export function needsReviewMonths(db: Db, asOf: string): Set<string> {
-  return new Set(listNeedsReview(db, asOf).map((hit) => hit.date.slice(0, 7)));
+export type ReviewState = {
+  signals: RecurringSignals;
+  hits: NeedsReviewHit[];
+  paychecks: { date: string }[];
+};
+
+/** Reads the review sources once so one request does not compute them again. */
+export function loadReviewState(db: Db, asOf: string): ReviewState {
+  requireAsOf(asOf);
+  const signals = recurringSignals(db, asOf);
+  const pairs = listTransferPairs(db, asOf).items;
+  return {
+    signals,
+    hits: listNeedsReview(db, asOf, { signals, pairs }),
+    paychecks: listFundingPaychecks(db).items,
+  };
 }
 
-export function homeOpenMonths(db: Db, asOf: string): Set<string> {
-  requireAsOf(asOf);
-  const hidden = decidedKeys(db);
+export function needsReviewMonths(state: ReviewState): Set<string> {
+  return new Set(state.hits.map((hit) => hit.date.slice(0, 7)));
+}
+
+export function homeOpenMonths(db: Db, asOf: string, state: ReviewState): Set<string> {
   const months = new Set<string>();
-  for (const item of listFundingPaychecks(db).items) {
-    if (!hidden.has(`paycheck_funding:${item.incomeTransactionId}`)) {
-      months.add(item.date.slice(0, 7));
-    }
+  for (const item of state.paychecks) {
+    months.add(item.date.slice(0, 7));
   }
-  for (const item of recurringSignals(db, asOf).missed) {
+  for (const item of state.signals.missed) {
     months.add(item.dueDate.slice(0, 7));
   }
   if (listOverspent(db).items.length > 0) {
@@ -297,12 +316,14 @@ function applyLikely(tx: WriteTx, hit: NeedsReviewHit, at: string): boolean {
 
 export function approveReviewLevel(
   db: Db,
-  asOf: string,
+  targets: readonly NeedsReviewHit[],
   level: "sure" | "likely",
+  expectedCount: number,
   input: WriteInput,
 ): { level: "sure" | "likely"; count: number; ids: string[] } {
-  requireAsOf(asOf);
-  const targets = listNeedsReview(db, asOf).filter((hit) => hit.review.level === level);
+  if (targets.length !== expectedCount) {
+    throw new ServiceError("review_changed", 409, { count: String(targets.length) });
+  }
   const at = input.at ?? utcNow();
   const ids: string[] = [];
   if (targets.length === 0) {

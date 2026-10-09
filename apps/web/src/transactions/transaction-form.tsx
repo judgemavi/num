@@ -18,7 +18,7 @@ import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { FieldError } from "@/components/ui/field";
 import { accountLabel, accountOptionLabel } from "@/accounts/label";
 import { formatMoney } from "@/money";
-import { inboxError } from "@/inbox/format";
+import { inboxError } from "@/review/format";
 import { formatDate, refundedText, transactionError } from "@/transactions/format";
 import { MortgageSplitWatch } from "@/transactions/mortgage-split-watch";
 import { AutomaticReason, DeleteMenu, MoneySection, MoreDetails, type TransactionFormProps } from "@/transactions/transaction-parts";

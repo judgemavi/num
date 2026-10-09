@@ -14,7 +14,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { loadMonthStory } from "./month-story";
 import { effectiveOpeningDate } from "./opening-date";
-import { homeOpenMonths, needsReviewMonths } from "./needs-review";
+import { homeOpenMonths, loadReviewState, needsReviewMonths, type ReviewState } from "./needs-review";
 import { write, type AuditSource } from "./write";
 
 type WriteInput = {
@@ -110,12 +110,12 @@ function endBlocker(month: string, asOf: string): Blocker[] {
   return [{ code: "month_not_ended", accountId: null }];
 }
 
-export function blockersFor(db: Db, month: string, asOf: string): Blocker[] {
+export function blockersFor(db: Db, month: string, asOf: string, state: ReviewState = loadReviewState(db, asOf)): Blocker[] {
   const blockers = [
     ...endBlocker(month, asOf),
     ...accountBlockers(month, db.select().from(accounts).all(), db.select().from(checkpoints).all()),
   ];
-  return withReview(blockers, month, needsReviewMonths(db, asOf), homeOpenMonths(db, asOf));
+  return withReview(blockers, month, needsReviewMonths(state), homeOpenMonths(db, asOf, state));
 }
 
 function isClosed(row: CloseRow | undefined): boolean {
@@ -139,13 +139,13 @@ function liveDetail(db: Db, month: string, asOf: string, blockers: Blocker[], cl
   };
 }
 
-export function listMonths(db: Db, asOf: string): MonthList {
+export function listMonths(db: Db, asOf: string, state: ReviewState = loadReviewState(db, asOf)): MonthList {
   requireAsOf(asOf);
   const closes = new Map(db.select().from(monthCloses).all().map((row) => [row.month, row]));
   const accountRows = db.select().from(accounts).all();
   const checkpointRows = db.select().from(checkpoints).all();
-  const reviewMonths = needsReviewMonths(db, asOf);
-  const homeMonths = homeOpenMonths(db, asOf);
+  const reviewMonths = needsReviewMonths(state);
+  const homeMonths = homeOpenMonths(db, asOf, state);
   return {
     asOf,
     items: monthsInBook(db, asOf).map((month) => {

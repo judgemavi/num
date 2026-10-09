@@ -67,7 +67,7 @@ export function GroupEditor({ ids, currency, accounts, categories, merchants, on
       onSaved={async (id) => {
         await queryClient.invalidateQueries({ queryKey: ["transactions"] });
         await queryClient.invalidateQueries({ queryKey: ["transaction"] });
-        await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+        await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
         onSaved(id);
       }}
     />

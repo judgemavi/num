@@ -4,7 +4,9 @@ import {
   categoryListSchema,
   currencyUpdateSchema,
   merchantListSchema,
+  planListSchema,
   tagListSchema,
+  transactionListSchema,
   type Account,
   type Category,
   type CategoryGroup,
@@ -13,6 +15,7 @@ import {
 } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { loadBuckets } from "@/buckets/query";
+import { localAsOf } from "@/as-of";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
 
@@ -97,5 +100,27 @@ export function useRecord<T>(key: string, id: string | null, path: string, schem
       }
       return result.data;
     },
+  });
+}
+
+/** The Needs review total and level counts. The shell and Home share this one query. */
+export function useReviewSummary() {
+  const asOf = localAsOf();
+  return useQuery({
+    queryKey: ["needs-review", asOf],
+    queryFn: async () => {
+      const result = await apiRequest(`/api/transactions?needsReview=true&asOf=${asOf}&pageSize=1`, transactionListSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return { total: result.data.total, counts: result.data.reviewCounts };
+    },
+  });
+}
+
+export function useActivePlans() {
+  return useQuery({
+    queryKey: ["plans", "active"],
+    queryFn: () => loadAllPages("/api/recurring", planListSchema, { archived: false, sort: "name", dir: "asc" }),
   });
 }

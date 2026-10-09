@@ -5,7 +5,7 @@ import {
   errorSchema,
   refundPurchaseListSchema,
   refundPurchaseQuerySchema,
-  transactionListQuerySchema,
+  transactionListApiQuerySchema,
   transactionListSchema,
   skippedRowSchema,
   transactionSchema,
@@ -15,7 +15,7 @@ import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { approveReviewLevel } from "../services/needs-review";
-import { listTransactions } from "../services/transaction-list";
+import { filteredReviewHits, listTransactions } from "../services/transaction-list";
 import { listRefundPurchases } from "../services/refund-link";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
 
@@ -72,7 +72,7 @@ const refundPurchasesRoute = createRoute({
 
 const approveRoute = createRoute({
   operationId: "post_transactions_approve",
-  description: "Confirm every Needs review row at one level. Sure clears the automatic reason. Likely applies the suggestion. One write. This counts as a confirmation.",
+  description: "Confirm every Needs review row at one level that matches the filters. Send the count that the person saw. A different count gives a 409. Sure clears the automatic reason. Likely applies the suggestion. One write. This counts as a confirmation.",
   method: "post",
   path: "/api/transactions/approve",
   request: {
@@ -85,16 +85,17 @@ const approveRoute = createRoute({
       content: { "application/json": { schema: approveLevelResultSchema } },
     },
     400: errorResponse,
+    409: errorResponse,
   },
 });
 
 const listRoute = createRoute({
   operationId: "search_transactions",
-  description: "Read transactions. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read transactions. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive. The needsReview filter needs asOf (an ISO date).",
   method: "get",
   path: "/api/transactions",
   request: {
-    query: transactionListQuerySchema,
+    query: transactionListApiQuerySchema,
   },
   responses: {
     200: {
@@ -204,8 +205,9 @@ const deleteRoute = createRoute({
 
 export function registerTransactions(app: OpenAPIHono, db: Db) {
   app.openapi(approveRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(approveReviewLevel(db, c.req.valid("query").asOf, body.level, { source: "ui" }), 200);
+    const { level, count, ...filter } = c.req.valid("json");
+    const targets = filteredReviewHits(db, filter, c.req.valid("query").asOf).filter((hit) => hit.review.level === level);
+    return c.json(approveReviewLevel(db, targets, level, count, { source: "ui" }), 200);
   });
   app.openapi(refundPurchasesRoute, (c) => c.json({ items: listRefundPurchases(db, c.req.valid("query")) }, 200));
   app.openapi(listRoute, (c) => c.json(listTransactions(db, c.req.valid("query")), 200));

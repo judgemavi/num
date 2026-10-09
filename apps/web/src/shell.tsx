@@ -1,9 +1,9 @@
-import { setupStatusSchema, transactionListSchema } from "@num/shared";
+import { setupStatusSchema } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Ellipsis, type LucideIcon } from "lucide-react";
-import { localAsOf } from "@/as-of";
 import { EditorHost } from "@/editors/editor-host";
+import { useReviewSummary } from "@/editors/lookups";
 import { moreNav, phoneMoreNav, primaryNav, settingsNav, type NavPath } from "@/nav";
 import { apiRequest } from "@/request";
 import { SetupScreen } from "@/setup-screen";
@@ -186,26 +186,16 @@ function PhoneTabs({ pathname, reviewCount }: { pathname: string; reviewCount?: 
 
 function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const asOf = localAsOf();
-  const review = useQuery({
-    queryKey: ["needs-review-count", asOf],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/transactions?needsReview=true&asOf=${asOf}&pageSize=1`, transactionListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.total;
-    },
-  });
+  const review = useReviewSummary();
   return (
     <SidebarProvider defaultOpen={sidebarDefaultOpen()} className="h-svh overflow-hidden bg-background">
-      <AppSidebar pathname={pathname} reviewCount={review.data} />
+      <AppSidebar pathname={pathname} reviewCount={review.data?.total} />
       <SidebarInset className="min-h-0 overflow-y-auto bg-background">
         <main className="grid content-start gap-5 px-4 pt-2 pb-[calc(96px+env(safe-area-inset-bottom))] md:px-8 md:py-7 md:pb-9">
           <Outlet />
         </main>
       </SidebarInset>
-      <PhoneTabs pathname={pathname} reviewCount={review.data} />
+      <PhoneTabs pathname={pathname} reviewCount={review.data?.total} />
     </SidebarProvider>
   );
 }

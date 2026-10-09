@@ -2,22 +2,25 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { auditLog, importRows, merchants, migrateDatabase, occurrenceLinks, openDatabase, settings, transactions } from "@num/db";
-import { columnMapSchema, uncategorizedLineKey, type ColumnMap, type InboxKind } from "@num/shared";
+import { columnMapSchema, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { coverBucket, createBucketEvent } from "./bucket-events";
-import { createBucket } from "./buckets";
+import { createBucket, listOverspent } from "./buckets";
 import { createCategory } from "./categories";
+import { getImportDetail } from "./import-list";
 import { undoImportBatch } from "./import-undo";
 import { importStatement } from "./imports";
 import { resolveImportReview } from "./import-review";
 import { decideInboxItem } from "./inbox-decisions";
-import { listInbox } from "./inbox";
+import { listNeedsReview } from "./needs-review";
+import { openUnreadableKeys } from "./book-settings";
+import { recurringSignals } from "./recurring-view";
 import { createPlan, updatePlan } from "./recurring-plans";
 import { linkOccurrence, skipOccurrence } from "./recurring-links";
-import { acceptTransferPair } from "./suggestions";
+import { acceptTransferPair, listTransferPairs } from "./suggestions";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
@@ -88,8 +91,28 @@ function openCount(db: Db): number {
   return db.select({ id: transactions.id }).from(transactions).all().length;
 }
 
-function keys(db: Db, kind: InboxKind) {
-  return listInbox(db, asOf).items.filter((item) => item.kind === kind).map((item) => item.itemKey);
+function questionIds(db: Db): string[] {
+  return listNeedsReview(db, asOf)
+    .filter((hit) => hit.review.question === "categorize" && hit.review.level === "none")
+    .map((hit) => hit.id);
+}
+
+function pairKeys(db: Db): string[] {
+  return listTransferPairs(db, asOf).items.map((pair) =>
+    pair.leftId < pair.rightId ? `transfer_pair:${pair.leftId}:${pair.rightId}` : `transfer_pair:${pair.rightId}:${pair.leftId}`,
+  );
+}
+
+function overspentIds(db: Db): string[] {
+  return listOverspent(db).items.map((item) => item.id);
+}
+
+function dueKeys(items: { planId: string; dueDate: string }[]): string[] {
+  return items.map((item) => `${item.planId}:${item.dueDate}`);
+}
+
+function reviewRowIds(db: Db, batchId: string): string[] {
+  return getImportDetail(db, batchId).rows.filter((row) => row.outcome === "needs_review").map((row) => row.id);
 }
 
 function planFields(accountId: string, merchantId: string | null, expectedAmount: number, startDate: string) {
@@ -114,7 +137,7 @@ function planFields(accountId: string, merchantId: string | null, expectedAmount
   };
 }
 
-test("each inbox kind appears and leaves after its action", () => {
+test("each review source appears and leaves after its action", () => {
   const sample = book();
   try {
     const cash = account(sample.db, "Cash");
@@ -124,7 +147,7 @@ test("each inbox kind appears and leaves after its action", () => {
     const stream = merchant(sample.db, "Stream Co");
 
     const open = pay(sample.db, cash.id, "2026-03-02", -6400, "Corner market", null);
-    expect(keys(sample.db, "uncategorized")).toEqual([uncategorizedLineKey(open.lines[0]?.id ?? "")]);
+    expect(questionIds(sample.db)).toEqual([open.id]);
     updateTransaction(sample.db, open.id, {
       accountId: open.accountId,
       date: open.date,
@@ -136,13 +159,13 @@ test("each inbox kind appears and leaves after its action", () => {
       lines: [{ amount: open.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });
-    expect(keys(sample.db, "uncategorized")).toEqual([]);
+    expect(questionIds(sample.db)).toEqual([]);
 
     const left = pay(sample.db, cash.id, "2026-03-05", -50000, "Move", food.id);
     sample.db.update(transactions).set({ source: "import" }).where(eq(transactions.id, left.id)).run();
     const right = pay(sample.db, savings.id, "2026-03-06", 50000, "Move", food.id);
     const pairKey = left.id < right.id ? `transfer_pair:${left.id}:${right.id}` : `transfer_pair:${right.id}:${left.id}`;
-    expect(keys(sample.db, "transfer_pair")).toEqual([pairKey]);
+    expect(pairKeys(sample.db)).toEqual([pairKey]);
     const beforePair = openCount(sample.db);
     acceptTransferPair(sample.db, asOf, left.id, right.id, saved);
     expect(openCount(sample.db)).toBe(beforePair);
@@ -152,7 +175,7 @@ test("each inbox kind appears and leaves after its action", () => {
     expect(getTransaction(sample.db, right.id)?.lines).toEqual([
       expect.objectContaining({ transferAccountId: left.accountId }),
     ]);
-    expect(keys(sample.db, "transfer_pair")).toEqual([]);
+    expect(pairKeys(sample.db)).toEqual([]);
 
     const meals = createBucket(sample.db, {
       name: "Meals",
@@ -190,38 +213,36 @@ test("each inbox kind appears and leaves after its action", () => {
     });
     pay(sample.db, cash.id, "2026-03-08", -4200, "Dining out", dining.id);
     createBucketEvent(sample.db, spare.id, { kind: "fund", amount: 5000, date: "2026-03-01", asOf, ...saved });
-    const marchKey = `bucket_overspent:${meals.id}:2026-03`;
-    expect(keys(sample.db, "bucket_overspent")).toEqual([marchKey]);
-    expect(listInbox(sample.db, "2026-04-20").items.some((item) => item.itemKey === `bucket_overspent:${meals.id}:2026-04`)).toBe(true);
+    expect(overspentIds(sample.db)).toEqual([meals.id]);
     coverBucket(sample.db, meals.id, { fromBucketId: spare.id, date: asOf, ...saved });
-    expect(keys(sample.db, "bucket_overspent")).toEqual([]);
+    expect(overspentIds(sample.db)).toEqual([]);
 
     const changedPlan = createPlan(sample.db, { ...planFields(cash.id, null, -1000, "2026-03-15"), ...saved });
     const changedPay = pay(sample.db, cash.id, "2026-03-15", -1999, "Stream", food.id);
     linkOccurrence(sample.db, changedPlan.id, "2026-03-15", changedPay.id, saved);
-    expect(keys(sample.db, "recurring_changed")).toEqual([`recurring_changed:${changedPlan.id}:2026-03-15`]);
+    expect(dueKeys(recurringSignals(sample.db, asOf).changed)).toEqual([`${changedPlan.id}:2026-03-15`]);
     updatePlan(sample.db, changedPlan.id, { ...planFields(cash.id, null, -1999, "2026-03-15"), name: changedPlan.name, ...saved });
-    expect(keys(sample.db, "recurring_changed")).toEqual([]);
+    expect(recurringSignals(sample.db, asOf).changed).toEqual([]);
 
     const missedPlan = createPlan(sample.db, { ...planFields(cash.id, null, -1000, "2026-01-15"), endDate: null, name: "Gym", ...saved });
-    expect(keys(sample.db, "recurring_missed")).toContain(`recurring_missed:${missedPlan.id}:2026-02-15`);
+    expect(dueKeys(recurringSignals(sample.db, asOf).missed)).toContain(`${missedPlan.id}:2026-02-15`);
     skipOccurrence(sample.db, missedPlan.id, "2026-02-15", "Closed", saved);
-    expect(keys(sample.db, "recurring_missed")).not.toContain(`recurring_missed:${missedPlan.id}:2026-02-15`);
+    expect(dueKeys(recurringSignals(sample.db, asOf).missed)).not.toContain(`${missedPlan.id}:2026-02-15`);
 
     const ambiguousPlan = createPlan(sample.db, { ...planFields(savings.id, null, -1000, "2026-03-15"), name: "Phone", ...saved });
     const first = pay(sample.db, savings.id, "2026-03-15", -1000, "Phone a", food.id);
     const second = pay(sample.db, savings.id, "2026-03-16", -1000, "Phone b", food.id);
-    expect(keys(sample.db, "recurring_ambiguous")).toEqual([`recurring_ambiguous:${ambiguousPlan.id}:2026-03-15`]);
+    expect(dueKeys(recurringSignals(sample.db, asOf).ambiguous)).toEqual([`${ambiguousPlan.id}:2026-03-15`]);
     linkOccurrence(sample.db, ambiguousPlan.id, "2026-03-15", first.id, saved);
-    expect(keys(sample.db, "recurring_ambiguous")).toEqual([]);
+    expect(recurringSignals(sample.db, asOf).ambiguous).toEqual([]);
     expect(second.id).not.toBe(first.id);
 
     for (const date of ["2026-01-15", "2026-02-15", "2026-03-15"]) {
       pay(sample.db, savings.id, date, -1500, "Stream", food.id, stream);
     }
-    const proposal = listInbox(sample.db, asOf).items.find((item) => item.kind === "plan_proposal");
-    expect(proposal?.kind).toBe("plan_proposal");
-    if (proposal?.kind === "plan_proposal") {
+    const proposal = recurringSignals(sample.db, asOf).proposals[0];
+    expect(proposal).toBeDefined();
+    if (proposal) {
       createPlan(sample.db, {
         name: "Stream",
         kind: "bill",
@@ -243,7 +264,7 @@ test("each inbox kind appears and leaves after its action", () => {
         ...saved,
       });
     }
-    expect(keys(sample.db, "plan_proposal")).toEqual([]);
+    expect(recurringSignals(sample.db, asOf).proposals).toEqual([]);
 
     const older = pay(sample.db, cash.id, "2026-01-09", -500, "Match one", food.id);
     pay(sample.db, cash.id, "2026-01-11", -500, "Match two", food.id);
@@ -257,21 +278,23 @@ test("each inbox kind appears and leaves after its action", () => {
       columnMap: map,
     });
     expect(imported.kind).toBe("batch");
-    const review = listInbox(sample.db, asOf).items.find((item) => item.kind === "import_review");
-    expect(review?.kind).toBe("import_review");
-    if (review?.kind === "import_review") {
+    const reviewId = imported.kind === "batch" ? reviewRowIds(sample.db, imported.id)[0] : undefined;
+    expect(reviewId).toBeDefined();
+    if (imported.kind === "batch" && reviewId) {
       const beforeMatch = openCount(sample.db);
-      resolveImportReview(sample.db, review.importRowId, { decision: "match", transactionId: older.id }, saved);
-      const matched = sample.db.select().from(importRows).where(eq(importRows.id, review.importRowId)).get();
+      resolveImportReview(sample.db, reviewId, { decision: "match", transactionId: older.id }, saved);
+      const matched = sample.db.select().from(importRows).where(eq(importRows.id, reviewId)).get();
       expect(matched?.outcome).toBe("matched");
       expect(matched?.transactionId).toBe(older.id);
       expect(openCount(sample.db)).toBe(beforeMatch);
     }
-    expect(keys(sample.db, "import_review")).toEqual([]);
+    if (imported.kind === "batch") {
+      expect(reviewRowIds(sample.db, imported.id)).toEqual([]);
+    }
 
     pay(sample.db, cash.id, "2026-02-09", -700, "Create one", food.id);
     pay(sample.db, cash.id, "2026-02-11", -700, "Create two", food.id);
-    importStatement(sample.db, sample.dir, {
+    const createBatch = importStatement(sample.db, sample.dir, {
       source: "import",
       at,
       accountId: cash.id,
@@ -280,17 +303,19 @@ test("each inbox kind appears and leaves after its action", () => {
       bytes: new TextEncoder().encode("date,description,amount\n02/10/2026,CREATE ROW,-7.00\n"),
       columnMap: map,
     });
-    const createdReview = listInbox(sample.db, asOf).items.find((item) => item.kind === "import_review");
-    expect(createdReview?.kind).toBe("import_review");
-    if (createdReview?.kind === "import_review") {
+    const createdId = createBatch.kind === "batch" ? reviewRowIds(sample.db, createBatch.id)[0] : undefined;
+    expect(createdId).toBeDefined();
+    if (createBatch.kind === "batch" && createdId) {
       const beforeCreate = openCount(sample.db);
-      resolveImportReview(sample.db, createdReview.importRowId, { decision: "create" }, saved);
-      const created = sample.db.select().from(importRows).where(eq(importRows.id, createdReview.importRowId)).get();
+      resolveImportReview(sample.db, createdId, { decision: "create" }, saved);
+      const created = sample.db.select().from(importRows).where(eq(importRows.id, createdId)).get();
       expect(created?.outcome).toBe("created");
       expect(created?.transactionId).toBeTruthy();
       expect(openCount(sample.db)).toBe(beforeCreate + 1);
     }
-    expect(keys(sample.db, "import_review")).toEqual([]);
+    if (createBatch.kind === "batch") {
+      expect(reviewRowIds(sample.db, createBatch.id)).toEqual([]);
+    }
 
     importStatement(sample.db, sample.dir, {
       source: "import",
@@ -301,12 +326,11 @@ test("each inbox kind appears and leaves after its action", () => {
       bytes: new TextEncoder().encode("date,description,amount\n03/01/2026,GOOD ROW,-1.00\nxx/yy/2026,BAD ROW,1.00\n"),
       columnMap: map,
     });
-    const unreadable = listInbox(sample.db, asOf).items.find((item) => item.kind === "import_unreadable");
-    expect(unreadable?.kind).toBe("import_unreadable");
+    const unreadable = openUnreadableKeys(sample.db)[0];
+    expect(unreadable).toBeDefined();
     if (unreadable) {
-      decideInboxItem(sample.db, asOf, unreadable.itemKey, "not_a_transaction", saved);
+      decideInboxItem(sample.db, asOf, unreadable, "not_a_transaction", saved);
     }
-    expect(keys(sample.db, "import_unreadable")).toEqual([]);
   } finally {
     sample.close();
   }

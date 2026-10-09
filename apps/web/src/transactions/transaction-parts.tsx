@@ -230,7 +230,7 @@ export function DeleteMenu({ kind, onDelete }: { kind: "plain" | "mirror" | "lin
     kind === "mirror"
       ? "This also deletes the other side of the transfer."
       : kind === "linked"
-        ? "The other account stays. Its line returns to the Inbox."
+        ? "The other account stays. Its line returns to Needs review."
         : "The transaction leaves the list.";
   return (
     <DropdownMenu>

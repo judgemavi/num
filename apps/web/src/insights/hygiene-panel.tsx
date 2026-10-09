@@ -1,6 +1,5 @@
 import { reviewAgeDays, type Hygiene, type HygieneCheck } from "@num/shared";
 import { useNavigate } from "@tanstack/react-router";
-import { localAsOf } from "@/as-of";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { Badge } from "@/components/ui/badge";
 import { monthTitle, rateText, signedMoney } from "@/insights/format";
@@ -136,11 +135,11 @@ export function HygienePanel({
       return;
     }
     if (check.code === "review") {
-      void go({ to: "/transactions", search: { page: 1, pageSize: 50, needsReview: true, asOf: localAsOf(), uncategorized: false, automatic: false } });
+      void go({ to: "/transactions", search: { page: 1, pageSize: 50, needsReview: true, uncategorized: false, automatic: false } });
       return;
     }
     if (check.code === "recurring") {
-      void go({ to: "/recurring", search: listSearch });
+      void go({ to: "/transactions", search: { page: 1, pageSize: 50, needsReview: true, uncategorized: false, automatic: false } });
       return;
     }
     if (check.code === "month_closed" && check.status !== "none") {

@@ -103,6 +103,7 @@ test("every route has a tool when AI writes are on", async () => {
     expect(tools.find((tool) => tool.name === "get_forecast")?.annotations?.readOnlyHint).toBe(true);
     expect(tools.find((tool) => tool.name === "post_imports")?.annotations?.destructiveHint).toBe(true);
     expect(tools.find((tool) => tool.name === "delete_transactions_id")?.annotations?.destructiveHint).toBe(true);
+    expect(tools.find((tool) => tool.name === "post_transactions_approve")?.annotations?.destructiveHint).toBe(true);
   } finally {
     book.close();
   }

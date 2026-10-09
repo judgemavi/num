@@ -169,6 +169,10 @@ export const planProposalSchema = z.object({
   transactionIds: z.array(z.uuid()),
 });
 
+export function planProposalKey(item: Pick<PlanProposal, "accountId" | "merchantId" | "startDate" | "freq" | "interval">): string {
+  return `plan_proposal:${item.accountId}:${item.merchantId}:${item.startDate}:${item.freq}:${item.interval}`;
+}
+
 export const recurringSignalsSchema = z.object({
   changed: z.array(changedOccurrenceSchema),
   missed: z.array(missedOccurrenceSchema),

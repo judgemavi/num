@@ -5,7 +5,6 @@ import {
   type Category,
   type CategoryKind,
   type MoneyDirection,
-  reviewLevel,
   type Suggestion,
   type SuggestionReason,
   type WhatChoice,
@@ -20,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/money";
 import { type Option, type OptionGroup } from "@/transactions/option-combobox";
 import { RefundOfField } from "@/transactions/refund-of-field";
+import { levelLabel } from "@/transactions/format";
 import { splitRemainder, type SplitLine } from "@/transactions/what-choice";
 
 const choiceLabel: Record<WhatChoice, string> = {
@@ -115,9 +115,9 @@ function suggestionText(suggestion: Suggestion, merchants: Option[], categories:
   if (parts.length === 0) {
     return null;
   }
-  const level = reviewLevel(false, suggestion.confidence / 1000);
-  const label = level === "likely" ? "Likely" : level === "maybe" ? "Maybe" : "Sure";
-  return `${label}. ${parts.join(". ")}. ${reasonText(suggestion.reason)}`;
+  const label = suggestion.level === "none" ? null : levelLabel(suggestion.level);
+  const text = `${parts.join(". ")}. ${reasonText(suggestion.reason)}`;
+  return label ? `${label}. ${text}` : text;
 }
 
 export function WhatIsThis({

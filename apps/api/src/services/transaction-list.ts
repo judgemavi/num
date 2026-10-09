@@ -1,5 +1,5 @@
 import { accounts } from "@num/db";
-import { accountKinds, autoReasons, transactionStatuses, type AccountKind, type AutoReason, type TransactionListItem, type TransactionListQuery, type TransactionReview, type TransactionStatus } from "@num/shared";
+import { accountKinds, autoReasons, transactionStatuses, type AccountKind, type AutoReason, type TransactionFilter, type TransactionListItem, type TransactionListQuery, type TransactionReview, type TransactionStatus } from "@num/shared";
 import { eq, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -65,7 +65,7 @@ function orderSql(query: TransactionListQuery): SQL {
   return sql.raw(`${column} ${direction}, t.id ${direction}`);
 }
 
-function filters(query: TransactionListQuery): SQL {
+function filters(query: TransactionFilter): SQL {
   const parts: SQL[] = [];
   if (query.accountId) {
     parts.push(sql`t.account_id = ${query.accountId}`);
@@ -262,12 +262,35 @@ function rowsForIds(db: Db, ids: readonly string[]): ListRow[] {
   `);
 }
 
-export function listTransactions(db: Db, query: TransactionListQuery) {
+function hasFilter(filter: TransactionFilter): boolean {
+  return Object.values(filter).some((value) => value !== undefined && value !== false);
+}
+
+/** Needs review rows that also match the other filters. Bulk approval uses the same set. */
+export function filteredReviewHits(db: Db, filter: TransactionFilter, asOf: string): NeedsReviewHit[] {
+  const hits = listNeedsReview(db, asOf);
+  if (!hasFilter(filter)) {
+    return hits;
+  }
+  const matching = new Set(
+    db
+      .all<{ id: string }>(sql`
+        select t.id as id
+        from transactions t
+        ${filter.q ? sql`left join merchants m on m.id = t.merchant_id` : sql``}
+        where ${filters(filter)}
+      `)
+      .map((row) => row.id),
+  );
+  return hits.filter((hit) => matching.has(hit.id));
+}
+
+export function listTransactions(db: Db, query: TransactionListQuery & { asOf?: string }) {
   if (query.needsReview) {
     if (!query.asOf) {
       throw new ServiceError("as_of_invalid", 400, { asOf: "" });
     }
-    const hits = listNeedsReview(db, query.asOf);
+    const hits = filteredReviewHits(db, query, query.asOf);
     const page = pageHits(hits, query);
     const byId = new Map(rowsForIds(db, page.map((hit) => hit.id)).map((row) => [row.id, row]));
     return {

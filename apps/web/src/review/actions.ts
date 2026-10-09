@@ -1,6 +1,4 @@
 import {
-  bucketEventSchema,
-  importReviewResultSchema,
   inboxDecisionSchema,
   inboxDecisionUndoSchema,
   inboxGroupApplyResultSchema,
@@ -9,7 +7,6 @@ import {
   planSchema,
   transferPairSchema,
   type InboxDecisionCode,
-  type InboxItem,
   type Plan,
   type Suggestion,
 } from "@num/shared";
@@ -32,11 +29,6 @@ export function applyInboxGroup(accountId: string, transactionIds: string[], sug
     transferAccountId: suggestion.transferAccountId,
     merchantId: suggestion.transferAccountId ? null : suggestion.merchantId,
   }));
-}
-
-export function resolveReview(item: Extract<InboxItem, { kind: "import_review" }>, transactionId: string | null) {
-  const body = transactionId ? { decision: "match" as const, transactionId } : { decision: "create" as const };
-  return apiRequest(`/api/imports/rows/${item.importRowId}/resolve`, importReviewResultSchema, json(body));
 }
 
 export function updatePlanAmount(plan: Plan, expectedAmount: number) {
@@ -111,14 +103,6 @@ export function createProposedPlan(
 
 export function acceptPair(asOf: string, leftId: string, rightId: string) {
   return apiRequest(`/api/transfer-pairs?asOf=${asOf}`, transferPairSchema, json({ leftId, rightId }));
-}
-
-export function coverOverspent(bucketId: string, fromBucketId: string, date: string) {
-  return apiRequest(`/api/buckets/${bucketId}/cover`, bucketEventSchema, json({ fromBucketId, date }));
-}
-
-export function fundFromUnassigned(bucketId: string, amount: number, asOf: string) {
-  return apiRequest(`/api/buckets/${bucketId}/events?asOf=${asOf}`, bucketEventSchema, json({ kind: "fund", amount, date: asOf }));
 }
 
 export function decideItem(asOf: string, itemKey: string, decision: InboxDecisionCode) {

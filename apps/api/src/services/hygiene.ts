@@ -16,11 +16,10 @@ import { listAccounts } from "./accounts";
 import { listBuckets, listOverspent } from "./buckets";
 import { cardLedger } from "./card-statements";
 import { monthlyBills } from "./funding-book";
-import { importFreshness, settingNumber } from "./inbox-collect";
+import { importFreshness, settingNumber } from "./book-settings";
 import { decidedKeys } from "./inbox-decisions";
-import { listNeedsReview } from "./needs-review";
+import { loadReviewState, type ReviewState } from "./needs-review";
 import { closedStories, listMonths } from "./months";
-import { recurringSignals } from "./recurring-view";
 import { listPlans } from "./recurring-plans";
 
 const pageSize = 200;
@@ -158,9 +157,9 @@ function monthClosed(asOf: string, months: MonthList) {
   return { code: "month_closed" as const, pass: status === "closed" || status === "none", month, status };
 }
 
-function reviewAge(db: Db, asOf: string) {
+function reviewAge(state: ReviewState, asOf: string) {
   const limit = Temporal.PlainDate.from(asOf).subtract({ days: reviewAgeDays }).toString();
-  const old = listNeedsReview(db, asOf).filter((item) => item.date < limit);
+  const old = state.hits.filter((item) => item.date < limit);
   let oldestDate: string | null = null;
   for (const item of old) {
     if (oldestDate === null || item.date < oldestDate) {
@@ -193,9 +192,9 @@ function savingsRate(db: Db, months: MonthList, asOf: string) {
   return { code: "savings_rate" as const, pass: rows.every((item) => item.savings >= 0), months: rows };
 }
 
-function recurring(db: Db, asOf: string) {
+function recurring(db: Db, state: ReviewState) {
   const hidden = decidedKeys(db);
-  const signals = recurringSignals(db, asOf);
+  const signals = state.signals;
   const changed = signals.changed.filter((item) => !hidden.has(`recurring_changed:${item.planId}:${item.dueDate}`)).length;
   const missed = signals.missed.length;
   return { code: "recurring" as const, pass: changed === 0 && missed === 0, changed, missed };
@@ -209,7 +208,8 @@ function overspent(db: Db) {
 
 export function readHygiene(db: Db, asOf: string): Hygiene {
   requireAsOf(asOf);
-  const months = listMonths(db, asOf);
+  const state = loadReviewState(db, asOf);
+  const months = listMonths(db, asOf, state);
   return hygieneSchema.parse({
     asOf,
     checks: [
@@ -217,10 +217,10 @@ export function readHygiene(db: Db, asOf: string): Hygiene {
       cardsPaid(db, asOf),
       importsCurrent(db, asOf),
       monthClosed(asOf, months),
-      reviewAge(db, asOf),
+      reviewAge(state, asOf),
       sinkingFunds(db),
       savingsRate(db, months, asOf),
-      recurring(db, asOf),
+      recurring(db, state),
       overspent(db),
     ],
   });

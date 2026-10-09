@@ -11,7 +11,8 @@ import {
 } from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { fundingPosition, fundingProposalFor, listFundingPaychecks } from "../services/funding-book";
+import { fundingPosition, fundingProposalFor } from "../services/funding-book";
+import { listFundingPaychecks } from "../services/funding-paychecks";
 import { createFundingRun, listFundingRuns, undoFundingRun } from "../services/funding-runs";
 
 const errorResponse = {
