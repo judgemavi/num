@@ -1,7 +1,8 @@
-import { checkpoints, importBatches, transactions } from "@num/db";
-import { dayBefore, openingFromFirstRow, reconcileOpening, type OpeningSuggestion } from "@num/shared";
+import { checkpoints, importBatches } from "@num/db";
+import { openingFromFirstRow, reconcileOpening, type OpeningSuggestion } from "@num/shared";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
+import { earliestTransactionDate, effectiveOpeningDate } from "./opening-date";
 import type { WriteTx } from "./write";
 
 type Reader = Db | WriteTx;
@@ -33,21 +34,6 @@ function hadRunningBalanceImport(db: Reader, accountId: string): boolean {
   );
 }
 
-function earliestTransactionDate(db: Reader, accountId: string): string | null {
-  const rows = db
-    .select({ date: transactions.date })
-    .from(transactions)
-    .where(and(eq(transactions.accountId, accountId)))
-    .all();
-  let earliest: string | null = null;
-  for (const row of rows) {
-    if (earliest === null || row.date < earliest) {
-      earliest = row.date;
-    }
-  }
-  return earliest;
-}
-
 export function importOpeningSuggestion(
   db: Reader,
   accountId: string,
@@ -61,7 +47,7 @@ export function importOpeningSuggestion(
 
 export function checkpointOpeningSuggestion(
   db: Reader,
-  account: { id: string; openingBalance: number; openingDate: string },
+  account: { id: string; openingBalance: number; openingDate: string | null },
   input: { calculatedBalance: number; statementBalance: number },
 ): OpeningSuggestion | null {
   const first = earliestTransactionDate(db, account.id);
@@ -70,6 +56,6 @@ export function checkpointOpeningSuggestion(
     openingBalance: account.openingBalance,
     calculatedBalance: input.calculatedBalance,
     statementBalance: input.statementBalance,
-    date: first ? dayBefore(first) : account.openingDate,
+    date: effectiveOpeningDate(db, { id: account.id, openingDate: first ? null : account.openingDate }),
   });
 }

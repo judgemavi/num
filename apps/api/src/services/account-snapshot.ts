@@ -17,7 +17,7 @@ export function accountAuditSnapshot(row: {
   institution: string | null;
   kind: string;
   onBudget: boolean;
-  openingDate: string;
+  openingDate: string | null;
   openingBalance: number;
   archivedAt: string | null;
   paymentPolicy: string | null;

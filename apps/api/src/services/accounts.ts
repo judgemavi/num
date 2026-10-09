@@ -1,10 +1,8 @@
-import { accounts, transactions } from "@num/db";
+import { accounts } from "@num/db";
 import {
   accountKinds,
-  dayBefore,
   defaultOnBudget,
   paymentPolicies,
-  Temporal,
   type Account,
   type AccountCreate,
   type AccountKind,
@@ -13,12 +11,13 @@ import {
   type PaymentPolicy,
   utcNow,
 } from "@num/shared";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
 import { assertCanArchive, assertSameClass, cardFields, interestRate, type CardFields } from "./account-rules";
 import { accountAuditSnapshot, readColumnMap } from "./account-snapshot";
+import { effectiveOpeningDate } from "./opening-date";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
@@ -45,33 +44,11 @@ function asPolicy(value: string | null): PaymentPolicy | null {
   return value as PaymentPolicy;
 }
 
-function creationDate(at: string): string {
-  return Temporal.Instant.from(at).toZonedDateTimeISO("UTC").toPlainDate().toString();
-}
-
-function earliestTransactionDate(db: Db | WriteTx, accountId: string): string | null {
-  const rows = db
-    .select({ date: transactions.date })
-    .from(transactions)
-    .where(and(eq(transactions.accountId, accountId)))
-    .all();
-  let earliest: string | null = null;
-  for (const row of rows) {
-    if (earliest === null || row.date < earliest) {
-      earliest = row.date;
-    }
-  }
-  return earliest;
-}
-
-function resolveOpening(db: Db | WriteTx, accountId: string | null, input: { openingDate?: string; openingBalance?: number }, at: string, storedDate: string | null) {
-  const openingBalance = input.openingBalance ?? 0;
-  if (input.openingDate) {
-    return { openingDate: input.openingDate, openingBalance };
-  }
-  const first = accountId === null ? null : earliestTransactionDate(db, accountId);
-  const openingDate = first ? dayBefore(first) : (storedDate ?? creationDate(at));
-  return { openingDate, openingBalance };
+function resolveOpening(input: { openingDate?: string | null; openingBalance?: number }, storedDate: string | null) {
+  return {
+    openingDate: input.openingDate === undefined ? storedDate : input.openingDate,
+    openingBalance: input.openingBalance ?? 0,
+  };
 }
 
 function blankToNull(value: string | null | undefined): string | null {
@@ -82,14 +59,17 @@ function blankToNull(value: string | null | undefined): string | null {
   return trimmed.length === 0 ? null : trimmed;
 }
 
-function toAccount(row: AccountRow, balance: number): Account {
+function toAccount(db: Db | WriteTx, row: AccountRow, balance: number): Account {
+  const automaticOpeningDate = effectiveOpeningDate(db, { id: row.id, openingDate: null });
   return {
     id: row.id,
     name: row.name,
     institution: row.institution,
     kind: asKind(row.kind),
     onBudget: row.onBudget,
-    openingDate: row.openingDate,
+    openingDate: row.openingDate ?? automaticOpeningDate,
+    openingAutomatic: row.openingDate === null,
+    automaticOpeningDate,
     openingBalance: row.openingBalance,
     archivedAt: row.archivedAt,
     paymentPolicy: asPolicy(row.paymentPolicy),
@@ -106,7 +86,7 @@ function storedFields(input: {
   institution: string | null;
   kind: AccountKind;
   onBudget: boolean;
-  openingDate: string;
+  openingDate: string | null;
   openingBalance: number;
   archivedAt: string | null;
   card: CardFields;
@@ -152,7 +132,7 @@ export function listAccounts(db: Db, query: AccountListQuery) {
     .filter((row) => (query.archived ? row.archivedAt !== null : row.archivedAt === null));
   const totals = transactionTotals(db);
   const latest = latestValuations(db);
-  const items = rows.map((row) => toAccount(row, balanceOf(db, { ...row, kind: asKind(row.kind) }, totals, latest)));
+  const items = rows.map((row) => toAccount(db, row, balanceOf(db, { ...row, kind: asKind(row.kind) }, totals, latest)));
   const sort = query.sort ?? "name";
   const dir = query.dir === "desc" ? -1 : 1;
   items.sort((left, right) => {
@@ -175,7 +155,7 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
   const card = cardFields(input.kind, input);
   const rate = interestRate(input.kind, input.interestRateMilliPct);
   const at = input.at ?? utcNow();
-  const opening = resolveOpening(db, null, input, at, null);
+  const opening = resolveOpening(input, null);
   const id = crypto.randomUUID();
   const row = {
     id,
@@ -203,7 +183,7 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
       after: accountAuditSnapshot(row),
     });
   });
-  return toAccount(row, row.openingBalance);
+  return toAccount(db, row, row.openingBalance);
 }
 
 export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteInput): Account {
@@ -218,7 +198,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
     assertSameClass(currentKind, input.kind);
     const card = cardFields(input.kind, input);
     const rate = interestRate(input.kind, input.interestRateMilliPct);
-    const opening = resolveOpening(tx, id, input, at, existing.openingDate);
+    const opening = resolveOpening(input, existing.openingDate);
     const next = storedFields({
       name: input.name.trim(),
       institution: blankToNull(input.institution),
@@ -239,6 +219,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
       after: accountAuditSnapshot({ ...existing, ...next }),
     });
     updated = toAccount(
+      tx,
       { ...existing, ...next },
       balanceOf(tx, { id, kind: input.kind, openingBalance: next.openingBalance }),
     );
@@ -300,7 +281,7 @@ export function archiveAccount(
       before: accountAuditSnapshot(existing),
       after: accountAuditSnapshot(next),
     });
-    archived = toAccount(next, balance);
+    archived = toAccount(tx, next, balance);
   });
   if (!archived) {
     throw new Error("Archive did not return an account");
@@ -328,7 +309,7 @@ export function restoreAccount(db: Db, id: string, input: WriteInput): Account {
       before: accountAuditSnapshot(existing),
       after: accountAuditSnapshot(next),
     });
-    restored = toAccount(next, balanceOf(tx, { id, kind, openingBalance: existing.openingBalance }));
+    restored = toAccount(tx, next, balanceOf(tx, { id, kind, openingBalance: existing.openingBalance }));
   });
   if (!restored) {
     throw new Error("Restore did not return an account");
@@ -341,5 +322,5 @@ export function getAccount(db: Db, id: string): Account {
   if (!row) {
     throw new ServiceError("account_not_found", 404);
   }
-  return toAccount(row, balanceOf(db, { id: row.id, kind: asKind(row.kind), openingBalance: row.openingBalance }));
+  return toAccount(db, row, balanceOf(db, { id: row.id, kind: asKind(row.kind), openingBalance: row.openingBalance }));
 }

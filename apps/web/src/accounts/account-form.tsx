@@ -9,6 +9,7 @@ import {
   fromMinorUnits,
   milliPctToPercent,
   percentToMilliPct,
+  Temporal,
   toMinorUnits,
   type Account,
   type AccountKind,
@@ -19,11 +20,12 @@ import { accountError, policyLabel } from "@/accounts/format";
 import { KindPicker } from "@/accounts/kind-picker";
 import { sameClassKinds } from "@/accounts/groups";
 import { apiRequest } from "@/request";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
 import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -71,12 +73,18 @@ function isPolicy(value: string): value is PaymentPolicy {
   return value === "full" || value === "fixed" || value === "manual";
 }
 
+function localToday(): string {
+  return Temporal.Now.plainDateISO().toString();
+}
+
 export function AccountForm({ currency, account, initialName, inline = false, below, onClose, onSaved }: AccountFormProps) {
   const [name, setName] = useState(account?.name ?? initialName ?? "");
   const [institution, setInstitution] = useState(account?.institution ?? "");
   const [kind, setKind] = useState<AccountKind>(account?.kind ?? "chequing");
   const [onBudget, setOnBudget] = useState(account?.onBudget ?? true);
-  const [openingDate, setOpeningDate] = useState(account?.openingDate ?? "");
+  const automaticDate = account?.automaticOpeningDate ?? localToday();
+  const [automatic, setAutomatic] = useState(account ? account.openingAutomatic : true);
+  const [openingDate, setOpeningDate] = useState(account?.openingDate ?? automaticDate);
   const [openingBalance, setOpeningBalance] = useState(account ? fromMinorUnits(currency, account.openingBalance) : "");
   const [paymentPolicy, setPaymentPolicy] = useState<PaymentPolicy | null>(account?.paymentPolicy ?? null);
   const [fixedPayment, setFixedPayment] = useState(
@@ -91,6 +99,16 @@ export function AccountForm({ currency, account, initialName, inline = false, be
   const [saving, setSaving] = useState(false);
   const liability = accountClass(kind) === "liability";
   const allowed = account ? sameClassKinds(account.kind) : accountKinds;
+
+  function changeOpeningDate(value: string) {
+    setOpeningDate(value);
+    setAutomatic(false);
+  }
+
+  function useAutomaticDate() {
+    setAutomatic(true);
+    setOpeningDate(automaticDate);
+  }
 
   function changeKind(value: string) {
     if (!isKind(value)) {
@@ -115,6 +133,10 @@ export function AccountForm({ currency, account, initialName, inline = false, be
         setError("Choose how you pay this card.");
         return;
       }
+      if (!automatic && openingDate.trim().length === 0) {
+        setError("Enter the date, or use the automatic date.");
+        return;
+      }
       const card =
         kind === "credit_card"
           ? {
@@ -130,7 +152,7 @@ export function AccountForm({ currency, account, initialName, inline = false, be
         institution: institution.trim().length === 0 ? null : institution.trim(),
         kind,
         onBudget,
-        ...(openingDate.trim().length === 0 ? {} : { openingDate }),
+        openingDate: automatic ? null : openingDate,
         ...(openingBalance.trim().length === 0
           ? {}
           : { openingBalance: readAmount(currency, openingBalance, liability ? "the amount you owed" : "the balance") }),
@@ -197,12 +219,22 @@ export function AccountForm({ currency, account, initialName, inline = false, be
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="opening-date">On this date</FieldLabel>
-            <Input id="opening-date" type="date" value={openingDate} onChange={(event) => setOpeningDate(event.target.value)} />
+            <div className="flex min-h-11 items-center gap-2">
+              <FieldLabel htmlFor="opening-date">On this date</FieldLabel>
+              {automatic ? <Badge variant="neutral">Automatic</Badge> : null}
+            </div>
+            <Input id="opening-date" type="date" value={openingDate} onChange={(event) => changeOpeningDate(event.target.value)} />
+            {automatic ? (
+              <FieldDescription>This date follows the first transaction.</FieldDescription>
+            ) : (
+              <Button type="button" variant="link" className="h-11 min-h-11 justify-start px-0" onClick={useAutomaticDate}>
+                Use automatic date
+              </Button>
+            )}
           </Field>
         </div>
         <p className="text-sm text-muted-foreground" style={{ marginTop: 0 }}>
-          Leave the balance blank to start at 0. Leave the date blank to use today. Num counts forward from this date.
+          Leave the balance blank to start at 0. Num counts forward from this date.
         </p>
         {kind === "credit_card" ? (
           <>

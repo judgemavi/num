@@ -7,7 +7,7 @@ export const accounts = sqliteTable("accounts", {
   institution: text("institution"),
   kind: text("kind").notNull(),
   onBudget: integer("on_budget", { mode: "boolean" }).notNull(),
-  openingDate: text("opening_date").notNull(),
+  openingDate: text("opening_date"),
   openingBalance: integer("opening_balance").notNull(),
   archivedAt: text("archived_at"),
   paymentPolicy: text("payment_policy"),

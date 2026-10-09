@@ -12,6 +12,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { calculatedBalance } from "./checkpoint-balance";
 import { checkpointHelp } from "./checkpoint-help";
+import { effectiveOpeningDate } from "./opening-date";
 import { checkpointOpeningSuggestion } from "./opening-suggestion";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -25,7 +26,7 @@ type Reader = Db | WriteTx;
 type AccountRow = {
   id: string;
   kind: AccountKind;
-  openingDate: string;
+  openingDate: string | null;
   openingBalance: number;
 };
 
@@ -100,6 +101,7 @@ export function compareCheckpoint(
   input: { date: string; statementBalance: number },
 ): CheckpointCompare {
   const account = requireAccount(db, accountId);
+  const openingDate = effectiveOpeningDate(db, account);
   const calculated = calculatedBalance(db, account, input.date);
   const difference = calculated - input.statementBalance;
   return {
@@ -111,9 +113,9 @@ export function compareCheckpoint(
       difference === 0
         ? []
         : checkpointHelp({
-            openingDate: account.openingDate,
+            openingDate,
             statementDate: input.date,
-            transactions: helpTransactions(db, accountId, account.openingDate, input.date),
+            transactions: helpTransactions(db, accountId, openingDate, input.date),
           }),
     openingSuggestion: checkpointOpeningSuggestion(db, account, {
       calculatedBalance: calculated,

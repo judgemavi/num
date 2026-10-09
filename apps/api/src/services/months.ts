@@ -14,6 +14,7 @@ import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listInbox } from "./inbox";
+import { effectiveOpeningDate } from "./opening-date";
 import { loadMonthStory } from "./month-story";
 import { write, type AuditSource } from "./write";
 
@@ -42,9 +43,12 @@ function monthsInBook(db: Db, asOf: string): string[] {
   if (txnMonth && txnMonth < start) {
     start = txnMonth;
   }
-  for (const row of db.select({ openingDate: accounts.openingDate, onBudget: accounts.onBudget }).from(accounts).all()) {
-    const month = row.openingDate.slice(0, 7);
-    if (row.onBudget && month < start) {
+  for (const row of db.select({ id: accounts.id, openingDate: accounts.openingDate, onBudget: accounts.onBudget }).from(accounts).all()) {
+    if (!row.onBudget) {
+      continue;
+    }
+    const month = effectiveOpeningDate(db, row).slice(0, 7);
+    if (month < start) {
       start = month;
     }
   }
