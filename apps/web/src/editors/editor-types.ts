@@ -1,4 +1,4 @@
-import type { CategoryKind, ImportBatch } from "@num/shared";
+import type { CategoryKind, ImportBatch, PlanKind } from "@num/shared";
 import type { PlanSeed } from "@/recurring/plan-form";
 import type { RecordEditorKind } from "@/editors/edit-url";
 
@@ -15,7 +15,7 @@ export type EditorInput = {
   tag: { id: string | null; name?: string };
   merchant: { id: string | null; name?: string };
   bucket: { id: string | null };
-  plan: { id: string | null; seed?: PlanSeed };
+  plan: { id: string | null; seed?: PlanSeed; kind?: PlanKind };
   mortgage: { id: string | null };
   import: { accountId: string | null };
   reconcile: { accountId: string };

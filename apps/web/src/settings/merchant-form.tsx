@@ -1,35 +1,38 @@
-import { categoryKindForChoice, inboxDecisionListSchema, merchantSchema, type Category, type Merchant } from "@num/shared";
+import { inboxDecisionListSchema, merchantSchema, type Category, type Merchant } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { useEditors } from "@/editors/editor-api";
+import { FormActions, FormHeading } from "@/editors/form-chrome";
+import { ManagedPicker } from "@/editors/managed-picker";
 import { useRestoreNamed } from "@/editors/restore-named";
 import { undoDecision } from "@/inbox/actions";
 import { decisionText, inboxError } from "@/inbox/format";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { OptionCombobox } from "@/transactions/option-combobox";
 import { apiRequest } from "@/request";
 import { merchantError } from "@/settings/format";
+import { CategoryForm } from "@/settings/category-form";
+import { useGroups } from "@/editors/lookups";
 
 type MerchantFormProps = {
   merchant: Merchant | null;
   initialName?: string;
   categories: Category[];
+  inline?: boolean;
+  depth?: number;
   onClose: () => void;
   onSaved: (id: string) => void;
 };
 
-export function MerchantForm({ merchant, initialName, categories, onClose, onSaved }: MerchantFormProps) {
+export function MerchantForm({ merchant, initialName, categories, inline = false, depth = 0, onClose, onSaved }: MerchantFormProps) {
   const [name, setName] = useState(merchant?.name ?? initialName ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(merchant?.defaultCategoryId ?? null);
   const [error, setError] = useState<string | null>(null);
   const [undoError, setUndoError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [extra, setExtra] = useState<Category[]>([]);
-  const { openEditor } = useEditors();
   const restoreNamed = useRestoreNamed();
+  const groups = useGroups();
   const queryClient = useQueryClient();
   const decisions = useQuery({
     queryKey: ["inbox-decisions", merchant?.id],
@@ -70,10 +73,11 @@ export function MerchantForm({ merchant, initialName, categories, onClose, onSav
 
   return (
     <form onSubmit={(event) => void submit(event)} className="grid gap-4">
-      <DialogHeader>
-        <DialogTitle>{merchant ? "Edit merchant" : "New merchant"}</DialogTitle>
-        <DialogDescription>The default category is used when nothing else matches.</DialogDescription>
-      </DialogHeader>
+      <FormHeading
+        inline={inline}
+        title={merchant ? "Edit merchant" : "New merchant"}
+        description="The default category is used when nothing else matches."
+      />
       {(decisions.data ?? []).map((row) => (
         <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
           <span>{decisionText(row.decision)}</span>
@@ -102,17 +106,19 @@ export function MerchantForm({ merchant, initialName, categories, onClose, onSav
         </p>
       ) : null}
       <Field data-invalid={error !== null || undefined}>
-        <FieldLabel htmlFor="merchant-name">Name</FieldLabel>
-        <Input id="merchant-name" value={name} onChange={(event) => setName(event.target.value)} />
+        <FieldLabel htmlFor={inline ? `merchant-${depth}-name` : "merchant-name"}>Name</FieldLabel>
+        <Input id={inline ? `merchant-${depth}-name` : "merchant-name"} value={name} onChange={(event) => setName(event.target.value)} />
       </Field>
       <Field>
-        <FieldLabel htmlFor="merchant-category">Default category</FieldLabel>
-        <OptionCombobox
-          id="merchant-category"
+        <FieldLabel htmlFor={inline ? `merchant-${depth}-category` : "merchant-category"}>Default category</FieldLabel>
+        <ManagedPicker
+          id={inline ? `merchant-${depth}-category` : "merchant-category"}
           value={categoryId}
           options={categoryOptions}
           placeholder="No default category"
           emptyLabel="No default category"
+          noun="category"
+          depth={depth}
           archived={archivedCategories}
           onRestore={(id) => {
             void restoreNamed(`/api/categories/${id}/restore`).then((restored) => {
@@ -121,30 +127,34 @@ export function MerchantForm({ merchant, initialName, categories, onClose, onSav
               }
             });
           }}
-          create={{
-            noun: "category",
-            onCreate: (typed) => {
-              void openEditor("category", { id: null, name: typed, kind: categoryKindForChoice("spending") ?? "expense" }).then((id) => {
-                if (!id) {
-                  return;
-                }
-                setExtra((current) => [...current, { id, name: typed, kind: "expense", groupId: null, essential: false, archivedAt: null }]);
-                setCategoryId(id);
-              });
-            },
-          }}
           onChange={setCategoryId}
+          renderForm={(typed, finish) => (
+            <CategoryForm
+              inline
+              depth={depth + 1}
+              category={null}
+              groups={groups.data ?? []}
+              initialName={typed}
+              initialKind="expense"
+              onClose={() => finish(null)}
+              onSaved={(id) => {
+                setExtra((current) => [...current, { id, name: typed, kind: "expense", groupId: null, essential: false, archivedAt: null }]);
+                void queryClient.invalidateQueries({ queryKey: ["categories"] });
+                finish(id);
+              }}
+            />
+          )}
         />
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
-      <DialogFooter>
+      <FormActions inline={inline}>
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
         <Button type="submit" disabled={saving}>
           {saving ? "Saving" : merchant ? "Save merchant" : "Add merchant"}
         </Button>
-      </DialogFooter>
+      </FormActions>
     </form>
   );
 }

@@ -44,7 +44,7 @@ export function MergeDialog({ source, merchants, onClose, onMerged }: MergeDialo
       <DialogHeader>
         <DialogTitle>Merge this merchant?</DialogTitle>
         <DialogDescription>
-          Move transactions and recurring plans from {source.name} to the merchant you choose. {source.name} is then archived.
+          Move transactions and recurring items from {source.name} to the merchant you choose. {source.name} is then archived.
         </DialogDescription>
       </DialogHeader>
       <Field data-invalid={error !== null || undefined}>

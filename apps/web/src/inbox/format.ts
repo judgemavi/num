@@ -77,7 +77,7 @@ export function decisionText(code: InboxDecisionCode): string {
     case "not_transfer":
       return "Not a transfer";
     case "keep_plan_amount":
-      return "Kept the plan amount";
+      return "Kept the recurring amount";
     case "not_recurring":
       return "Not a repeating payment";
     case "keep_unassigned":
@@ -154,11 +154,11 @@ export function itemWhy(item: InboxItem, names: Names, currency: string): string
     case "uncategorized":
       return `${shortDate(item.date)} · ${names.account(item.accountId)} · ${formatMoney(currency, item.amount)}`;
     case "recurring_changed":
-      return `Charged ${shortDate(item.date)}. Update the plan?`;
+      return `Charged ${shortDate(item.date)}. Update this recurring amount?`;
     case "recurring_missed":
       return `Due ${shortDate(item.dueDate)}. Skip it, or link the payment.`;
     case "recurring_ambiguous":
-      return `Due ${shortDate(item.dueDate)}. Pick the payment that belongs to this plan.`;
+      return `Due ${shortDate(item.dueDate)}. Pick the payment that belongs to this recurring item.`;
     case "plan_proposal":
       return `${repeatLabel(item.freq, item.interval)} · ${formatMoney(currency, item.expectedAmount)} · from ${shortDate(item.startDate)}`;
     case "transfer_pair":

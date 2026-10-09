@@ -170,12 +170,19 @@ export function EditorHost({ children }: { children: ReactNode }) {
           return again;
         }
       }
+      const previous = stack.frames.map((frame) => ({ key: frame.key, info: meta.get(frame.key) }));
+      for (const frame of previous) {
+        closeFrame(frame.key, null);
+      }
+      const hadUrl = previous.some((frame) => frame.info?.trackUrl);
       const editValue = editValueOf(kind, props);
       const opened = stack.open(kind, props);
       pending.set(opened.key, opened.done);
-      meta.set(opened.key, { trackUrl: editValue !== null, pushed: editValue !== null, editValue });
+      meta.set(opened.key, { trackUrl: editValue !== null, pushed: editValue !== null && !hadUrl, editValue });
       if (editValue) {
-        writeEdit(editValue, false);
+        writeEdit(editValue, hadUrl);
+      } else if (hadUrl) {
+        writeEdit(undefined, true);
       }
       return opened.done;
     },
@@ -215,14 +222,18 @@ export function EditorHost({ children }: { children: ReactNode }) {
   return (
     <EditorContext.Provider value={stableApi}>
       {children}
-      {frames.map((frame, index) => (
+      {frames.length > 0 ? (
         <HostedFrame
-          key={frame.key}
-          frame={frame}
-          active={index === frames.length - 1}
-          onFinish={(result) => closeUser(frame.key, result)}
+          frame={frames[frames.length - 1] as EditorFrame}
+          active
+          onFinish={(result) => {
+            const frame = frames[frames.length - 1];
+            if (frame) {
+              closeUser(frame.key, result);
+            }
+          }}
         />
-      ))}
+      ) : null}
       <AlertDialog
         open={confirmState !== null}
         onOpenChange={(open) => {

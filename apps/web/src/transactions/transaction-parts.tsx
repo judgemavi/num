@@ -2,7 +2,9 @@ import type { Account, AutoReason, Category, Merchant, MoneyDirection, Tag, Tran
 import { ChevronRight, Ellipsis } from "lucide-react";
 import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
+import { InlineNamed } from "@/editors/inline-records";
 import { useRestoreNamed } from "@/editors/restore-named";
+import { ManagedPicker } from "@/editors/managed-picker";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -122,7 +124,6 @@ export function MoreDetails({
   onCleared: (cleared: boolean) => void;
   clearedLocked: boolean;
 }) {
-  const { openEditor } = useEditors();
   const restoreNamed = useRestoreNamed();
   const [created, setCreated] = useState<Tag[]>([]);
   const allTags = [...tags, ...created.filter((tag) => !tags.some((item) => item.id === tag.id))];
@@ -143,23 +144,12 @@ export function MoreDetails({
         </Field>
         <Field>
           <FieldLabel htmlFor="txn-tag">Tags</FieldLabel>
-          <OptionCombobox
+          <ManagedPicker
             id="txn-tag"
             value={null}
             options={options}
             placeholder="Add a tag"
-            create={{
-              noun: "tag",
-              onCreate: (name) => {
-                void openEditor("tag", { id: null, name }).then((id) => {
-                  if (!id) {
-                    return;
-                  }
-                  setCreated((current) => [...current, { id, name, archivedAt: null }]);
-                  onTags([...tagIds, id]);
-                });
-              },
-            }}
+            noun="tag"
             archived={allTags.filter((tag) => tag.archivedAt).map((tag) => ({ id: tag.id, label: tag.name }))}
             onRestore={(id) => {
               void restoreNamed(`/api/tags/${id}/restore`).then((restored) => {
@@ -173,6 +163,22 @@ export function MoreDetails({
                 onTags([...tagIds, tagId]);
               }
             }}
+            renderForm={(name, finish) => (
+              <InlineNamed
+                noun="tag"
+                title="New tag"
+                description="Use a tag for a trip or a project."
+                name={name}
+                path="/api/tags"
+                idPrefix="inline-tag-name"
+                onDone={(id) => {
+                  if (id) {
+                    setCreated((current) => [...current, { id, name, archivedAt: null }]);
+                  }
+                  finish(id);
+                }}
+              />
+            )}
           />
           {selected.length > 0 ? (
             <div className="flex flex-wrap gap-2">

@@ -32,7 +32,7 @@ import { RowMenu } from "@/components/row-menu";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const recurringRoute = getRouteApi("/recurring");
 const asOf = localAsOf();
@@ -135,12 +135,12 @@ export function RecurringScreen() {
     .filter((group) => group.items.length > 0);
 
   if (currency.isPending || plans.isPending || accounts.isPending || sync.isPending) {
-    return <p className="text-muted-foreground">Loading plans.</p>;
+    return <p className="text-muted-foreground">Loading recurring.</p>;
   }
   if (currency.isError || plans.isError || !bookCurrency || accounts.isError) {
     return (
       <div className="grid content-start gap-5">
-        <p>The plans did not load.</p>
+        <p>Recurring did not load.</p>
         <Button type="button" onClick={() => void refresh()}>
           Try again
         </Button>
@@ -160,18 +160,33 @@ export function RecurringScreen() {
   return (
     <>
       <PageHeader
-        kicker={rows.length === 1 ? "1 plan" : `${plans.data?.total ?? 0} plans`}
+        kicker={rows.length === 1 ? "1 recurring" : `${plans.data?.total ?? 0} recurring`}
         title="Recurring"
         actions={
-          <Button type="button" onClick={() => void openEditor("plan", { id: null })}>
-            <Plus aria-hidden="true" />
-            New plan
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button">
+                <Plus aria-hidden="true" />
+                Add
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("plan", { id: null, kind: "bill" })}>
+                Add a recurring payment
+              </DropdownMenuItem>
+              <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("plan", { id: null, kind: "income" })}>
+                Add recurring income
+              </DropdownMenuItem>
+              <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("plan", { id: null, kind: "transfer" })}>
+                Add a recurring transfer
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
       <SummaryStrip
         tint="plan"
-        label="Plans"
+        label="Recurring"
         amount={<span className="font-display text-5xl leading-none font-extrabold tabular-nums">{plans.data?.total ?? 0}</span>}
         hint="Payments and deposits you expect on a schedule."
         facts={
@@ -202,9 +217,9 @@ export function RecurringScreen() {
               onUseProposal={openProposal}
             />
           ) : null}
-          <ListCard label="Plans">
+          <ListCard label="Recurring">
             {grouped.length === 0 ? (
-              <p className="px-5 py-5 text-muted-foreground">{search.q || search.kind || search.accountId || search.archived ? "No plans match." : "No plans yet."}</p>
+              <p className="px-5 py-5 text-muted-foreground">{search.q || search.kind || search.accountId || search.archived ? "No matches." : "No recurring items yet."}</p>
             ) : (
               grouped.map((group) => (
                 <div key={group.kind}>
@@ -233,11 +248,11 @@ export function RecurringScreen() {
                           onSelect={() => {
                             const restore = plan.archivedAt !== null;
                             void confirm({
-                              title: restore ? "Restore this plan?" : "Archive this plan?",
+                              title: restore ? "Restore this?" : "Archive this?",
                               description: restore
                                 ? `Restore ${plan.name}. It returns to the active list.`
                                 : `Archive ${plan.name}. It leaves the active list.`,
-                              confirmLabel: restore ? "Restore plan" : "Archive plan",
+                              confirmLabel: restore ? "Restore" : "Archive",
                             }).then((ok) => {
                               if (ok) {
                                 void archivePlan(plan);
@@ -267,7 +282,7 @@ export function RecurringScreen() {
         {selected ? (
           <PlanDetail plan={selected} currency={bookCurrency} asOf={asOf} onEdit={() => void openEditor("plan", { id: selected.id })} />
         ) : (
-          <p className="text-sm text-muted-foreground">Add a plan to see its occurrences.</p>
+          <p className="text-sm text-muted-foreground">Add a recurring payment or recurring income to see its dates.</p>
         )}
       </div>
     </>

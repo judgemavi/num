@@ -84,8 +84,8 @@ export function PlanFilters({ search, accounts, onChange }: PlanFiltersProps) {
       search={{
         id: "plan-search",
         value: text,
-        placeholder: "Search plans",
-        label: "Search plans",
+        placeholder: "Search recurring",
+        label: "Search recurring",
         onChange: setText,
       }}
       activeCount={badges.length}
@@ -103,7 +103,7 @@ export function PlanFilters({ search, accounts, onChange }: PlanFiltersProps) {
       }}
       sort={{
         id: "plan-sort",
-        label: "Sort plans",
+        label: "Sort recurring",
         value: sortChoice(search.sort, search.dir, "name", "asc"),
         options: sortOptions,
         onChange: (value) => onChange(applySort(value)),

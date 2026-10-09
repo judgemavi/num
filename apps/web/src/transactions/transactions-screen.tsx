@@ -26,7 +26,7 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TransactionFilterBar } from "@/transactions/filters";
-import { automaticReasonText, formatDate, statusLabel } from "@/transactions/format";
+import { automaticReasonText, formatDate, refundOfText, refundedText, statusLabel } from "@/transactions/format";
 import { hasFilters, transactionPath } from "@/transactions/query";
 import { useEditors } from "@/editors/editor-api";
 import { useGroups } from "@/editors/lookups";
@@ -260,6 +260,8 @@ export function TransactionsScreen() {
                 <TableCell>
                   <div>{row.payeeRaw}</div>
                   {row.merchantName ? <div className="text-muted-foreground">{row.merchantName}</div> : null}
+                  {row.refundOf ? <div className="text-muted-foreground">{refundOfText(bookCurrency, row.refundOf.date, row.refundOf.amount)}</div> : null}
+                  {row.refundedAmount ? <div className="text-muted-foreground">{refundedText(bookCurrency, row.refundedAmount)}</div> : null}
                   {row.autoReason ? (
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <span className="text-sm text-muted-foreground">

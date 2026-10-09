@@ -273,10 +273,10 @@ export function PlanRecord({ props, onClose, onSaved }: { props: EditorInput["pl
   const plan = useRecord("plan", props.id, `/api/recurring/${props.id ?? ""}`, planSchema);
   const save = useSaved([["plans"], ["plan"], ["recurring-signals"], ["occurrences"], ["month-plan"], ["forecast"]], onSaved);
   if (!currency.data || accounts.isPending || categories.isPending || merchants.isPending || (props.id && plan.isPending)) {
-    return <LoadingLine label="Loading the plan." />;
+    return <LoadingLine label="Loading recurring." />;
   }
   if (currency.isError || accounts.isError || categories.isError || merchants.isError || plan.isError || !accounts.data || !categories.data || !merchants.data) {
-    return <LoadError label="The plan did not load." onRetry={() => void plan.refetch()} />;
+    return <LoadError label="Recurring did not load." onRetry={() => void plan.refetch()} />;
   }
   const draft = props.id ? (plan.data ?? "new") : (props.seed ?? "new");
   return (
@@ -287,6 +287,7 @@ export function PlanRecord({ props, onClose, onSaved }: { props: EditorInput["pl
       accounts={accounts.data}
       categories={categories.data}
       merchants={merchants.data}
+      initialKind={props.kind}
       onClose={onClose}
       onSaved={save}
     />

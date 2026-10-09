@@ -13,10 +13,10 @@ import {
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
 import { compoundingLabels, frequencyLabels, mortgageError } from "@/accounts/mortgage-format";
-import { useEditors } from "@/editors/editor-api";
 import { useRestoreNamed } from "@/editors/restore-named";
+import { InlineAccount, InlineCategory } from "@/editors/inline-records";
+import { ManagedPicker } from "@/editors/managed-picker";
 import { apiRequest } from "@/request";
-import { OptionCombobox } from "@/transactions/option-combobox";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -72,7 +72,6 @@ function isFrequency(value: string): value is PaymentFrequency {
 }
 
 export function MortgageForm({ accountId, currency, terms, accounts, categories, onClose, onSaved }: MortgageFormProps) {
-  const { openEditor } = useEditors();
   const restoreNamed = useRestoreNamed();
   const [principal, setPrincipal] = useState(terms ? fromMinorUnits(currency, terms.principal) : "");
   const [principalAsOf, setPrincipalAsOf] = useState(terms?.principalAsOf ?? "");
@@ -231,19 +230,12 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
         </Field>
         <Field>
           <FieldLabel htmlFor="mortgage-pay-from">Pay from</FieldLabel>
-          <OptionCombobox
+          <ManagedPicker
             id="mortgage-pay-from"
             value={paymentAccountId}
             options={paymentOptions}
             placeholder="Choose an account"
-            create={{
-              noun: "account",
-              onCreate: (name) => {
-                void openEditor("account", { id: null, name }).then((id) => {
-                  if (id) setPaymentAccountId(id);
-                });
-              },
-            }}
+            noun="account"
             archived={archivedAccounts}
             onRestore={(id) => {
               void restoreNamed(`/api/accounts/${id}/restore`).then((restored) => {
@@ -251,23 +243,17 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
               });
             }}
             onChange={setPaymentAccountId}
+            renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
           />
         </Field>
         <Field>
           <FieldLabel htmlFor="mortgage-interest">Interest category</FieldLabel>
-          <OptionCombobox
+          <ManagedPicker
             id="mortgage-interest"
             value={interestCategoryId}
             options={interestOptions}
             placeholder="Choose a category"
-            create={{
-              noun: "category",
-              onCreate: (name) => {
-                void openEditor("category", { id: null, name, kind: "expense" }).then((id) => {
-                  if (id) setInterestCategoryId(id);
-                });
-              },
-            }}
+            noun="category"
             archived={archivedInterest}
             onRestore={(id) => {
               void restoreNamed(`/api/categories/${id}/restore`).then((restored) => {
@@ -275,24 +261,18 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
               });
             }}
             onChange={setInterestCategoryId}
+            renderForm={(name, finish) => <InlineCategory name={name} kind="expense" depth={1} onDone={finish} />}
           />
         </Field>
         <Field>
           <FieldLabel htmlFor="mortgage-property">Property</FieldLabel>
-          <OptionCombobox
+          <ManagedPicker
             id="mortgage-property"
             value={propertyAccountId}
             options={propertyOptions}
             placeholder="No property"
             emptyLabel="No property"
-            create={{
-              noun: "account",
-              onCreate: (name) => {
-                void openEditor("account", { id: null, name }).then((id) => {
-                  if (id) setPropertyAccountId(id);
-                });
-              },
-            }}
+            noun="account"
             archived={archivedProperties}
             onRestore={(id) => {
               void restoreNamed(`/api/accounts/${id}/restore`).then((restored) => {
@@ -300,6 +280,7 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
               });
             }}
             onChange={setPropertyAccountId}
+            renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
           />
         </Field>
         {error ? <FieldError>{error}</FieldError> : null}

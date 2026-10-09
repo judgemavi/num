@@ -32,7 +32,7 @@ export function ReviewList({ signals, plans, accounts, merchants, currency, onOp
           }
         }}>
           <div className={listName}>
-            {planName.get(item.planId)?.name ?? "Plan"}
+            {planName.get(item.planId)?.name ?? "Recurring"}
             <small>Missed {formatDate(item.dueDate)}</small>
           </div>
         </ListRow>
@@ -45,7 +45,7 @@ export function ReviewList({ signals, plans, accounts, merchants, currency, onOp
           }
         }}>
           <div className={listName}>
-            {planName.get(item.planId)?.name ?? "Plan"}
+            {planName.get(item.planId)?.name ?? "Recurring"}
             <small>Amount changed on {formatDate(item.dueDate)}</small>
           </div>
           <div className="text-right text-sm">
@@ -58,7 +58,7 @@ export function ReviewList({ signals, plans, accounts, merchants, currency, onOp
       {signals.ambiguous.map((item) => (
         <ListRow key={`ambiguous-${item.planId}-${item.dueDate}`} simple>
           <div className={listName}>
-            {planName.get(item.planId)?.name ?? "Plan"}
+            {planName.get(item.planId)?.name ?? "Recurring"}
             <small>
               {item.transactionIds.length} possible matches on {formatDate(item.dueDate)}
             </small>

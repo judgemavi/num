@@ -1,4 +1,5 @@
 import { Temporal, type AutoReason, type TransactionStatus } from "@num/shared";
+import { formatMoney } from "@/money";
 
 const statusLabels: Record<TransactionStatus, string> = {
   open: "Open",
@@ -40,6 +41,15 @@ export function automaticReasonText(input: {
   return parts.join(" · ");
 }
 
+export function refundOfText(currency: string, date: string, amount: number): string {
+  const day = Temporal.PlainDate.from(date).toLocaleString(undefined, { month: "short", day: "numeric" });
+  return `Refund of ${day} · ${formatMoney(currency, Math.abs(amount))}`;
+}
+
+export function refundedText(currency: string, amount: number): string {
+  return `Refunded ${formatMoney(currency, amount)}`;
+}
+
 export function transactionError(code: string): string {
   switch (code) {
     case "lines_sum_mismatch":
@@ -73,6 +83,8 @@ export function transactionError(code: string): string {
       return "That account is not in the book.";
     case "transaction_not_found":
       return "That transaction is not in the book.";
+    case "refund_link_invalid":
+      return "Choose a recent purchase for this refund.";
     case "invalid_body":
       return "Check the transaction fields.";
     default:

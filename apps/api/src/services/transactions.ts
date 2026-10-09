@@ -15,6 +15,7 @@ import {
   type TxRow,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
+import { assertRefundLink, clearRefundLinks } from "./refund-link";
 import { spreadSureLabels } from "./match-apply";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -194,6 +195,7 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
   const recordSourceName = recordSource(source);
   const id = crypto.randomUUID();
   assertLineShape(header.accountId, header.amount, lines);
+  assertRefundLink(tx, header, null);
   assertReferences(tx, header, lines, { accountId: null, transferAccountId: null });
   tx.insert(transactions)
     .values({
@@ -250,6 +252,7 @@ export function applyTransactionUpdate(
   assertReconciledMoney(existing, existingLines, peer, header, lines);
   assertPayee(existing, header.payeeRaw);
   assertLineShape(header.accountId, header.amount, lines);
+  assertRefundLink(tx, header, id);
   const previousTarget = existingLines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null;
   assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
   const savedHeader = existing.status === "reconciled" ? { ...header, status: "reconciled" as const } : header;
@@ -328,6 +331,7 @@ export function deleteTransaction(db: Db, id: string, input: WriteInput): Transa
     const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
     const peerLines = peer ? loadLines(tx, peer.id) : [];
     assertDeletable(existing, peer);
+    clearRefundLinks(tx, existing.id);
     const before = toTransaction(tx, existing, existingLines);
     tx.update(transactions).set({ deletedAt: at }).where(eq(transactions.id, existing.id)).run();
     auditTransaction(tx, existing.id, "delete", before, readTransaction(tx, existing.id));

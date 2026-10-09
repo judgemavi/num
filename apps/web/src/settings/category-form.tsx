@@ -4,20 +4,23 @@ import {
   categoryCreateSchema,
   categoryKinds,
   categorySchema,
+  categoryGroupSchema,
   categoryUpdateSchema,
   type Category,
   type CategoryGroup,
   type CategoryKind,
 } from "@num/shared";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { useEditors } from "@/editors/editor-api";
 import { useActiveBuckets } from "@/editors/lookups";
+import { FormActions, FormHeading } from "@/editors/form-chrome";
+import { ManagedPicker } from "@/editors/managed-picker";
 import { categoryError } from "@/settings/format";
+import { NameForm } from "@/settings/name-form";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,6 +32,8 @@ type CategoryFormProps = {
   groups: CategoryGroup[];
   initialName?: string;
   initialKind?: CategoryKind;
+  inline?: boolean;
+  depth?: number;
   onClose: () => void;
   onSaved: (id: string) => void;
 };
@@ -37,8 +42,8 @@ function isKind(value: string): value is CategoryKind {
   return (categoryKinds as readonly string[]).includes(value);
 }
 
-export function CategoryForm({ category, groups, initialName, initialKind, onClose, onSaved }: CategoryFormProps) {
-  const { openEditor } = useEditors();
+export function CategoryForm({ category, groups, initialName, initialKind, inline = false, depth = 0, onClose, onSaved }: CategoryFormProps) {
+  const queryClient = useQueryClient();
   const buckets = useActiveBuckets();
   const [name, setName] = useState(category?.name ?? initialName ?? "");
   const [kind, setKind] = useState<CategoryKind>(category?.kind ?? initialKind ?? "expense");
@@ -48,6 +53,7 @@ export function CategoryForm({ category, groups, initialName, initialKind, onClo
   const [bucketId, setBucketId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const fieldId = inline ? `category-${depth}` : "category";
   const expense = kind === "expense";
   const groupOptions = [...groups, ...extraGroups.filter((group) => !groups.some((item) => item.id === group.id))].map((group) => ({
     id: group.id,
@@ -106,21 +112,20 @@ export function CategoryForm({ category, groups, initialName, initialKind, onClo
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>{category ? "Edit category" : "New category"}</DialogTitle>
-        <DialogDescription>
-          {category
-            ? "Change the name, the kind, the group, or whether it is essential."
-            : "Add a category for income or expenses."}
-        </DialogDescription>
-      </DialogHeader>
+      <FormHeading
+        inline={inline}
+        title={category ? "Edit category" : "New category"}
+        description={
+          category ? "Change the name, the kind, the group, or whether it is essential." : "Add a category for income or expenses."
+        }
+      />
       <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
         <Field>
-          <FieldLabel htmlFor="category-name">Name</FieldLabel>
-          <Input id="category-name" value={name} autoComplete="off" onChange={(event) => setName(event.target.value)} />
+          <FieldLabel htmlFor={`${fieldId}-name`}>Name</FieldLabel>
+          <Input id={`${fieldId}-name`} value={name} autoComplete="off" onChange={(event) => setName(event.target.value)} />
         </Field>
         <Field>
-          <FieldLabel htmlFor="category-kind">Kind</FieldLabel>
+          <FieldLabel htmlFor={`${fieldId}-kind`}>Kind</FieldLabel>
           <Select
             value={kind}
             onValueChange={(value) => {
@@ -133,7 +138,7 @@ export function CategoryForm({ category, groups, initialName, initialKind, onClo
               }
             }}
           >
-            <SelectTrigger id="category-kind" className="w-full">
+            <SelectTrigger id={`${fieldId}-kind`} className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -143,33 +148,53 @@ export function CategoryForm({ category, groups, initialName, initialKind, onClo
           </Select>
         </Field>
         <Field>
-          <FieldLabel htmlFor="category-group">Group</FieldLabel>
-          <OptionCombobox
-            id="category-group"
+          <FieldLabel htmlFor={`${fieldId}-group`}>Group</FieldLabel>
+          <ManagedPicker
+            id={`${fieldId}-group`}
             value={groupId === noGroup ? null : groupId}
             options={groupOptions}
             placeholder="No group"
             emptyLabel="No group"
-            create={{
-              noun: "group",
-              onCreate: (typed) => {
-                void openEditor("group", { id: null, name: typed }).then((id) => {
-                  if (!id) {
-                    return;
-                  }
-                  setExtraGroups((current) => [...current, { id, name: typed }]);
-                  setGroupId(id);
-                });
-              },
-            }}
+            noun="group"
+            depth={depth}
             onChange={(id) => setGroupId(id ?? noGroup)}
+            renderForm={(typed, finish) => {
+              let createdGroup: string | null = null;
+              return (
+              <NameForm
+                inline
+                idPrefix={`${fieldId}-group-name`}
+                title="New group"
+                description="A group only organizes categories."
+                label="Name"
+                submitLabel="Add group"
+                savingLabel="Saving group"
+                initialName={typed}
+                onClose={() => finish(createdGroup)}
+                onSubmit={async (groupName) => {
+                  const result = await apiRequest("/api/category-groups", categoryGroupSchema, {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ name: groupName }),
+                  });
+                  if (!result.ok) {
+                    return categoryError(result.code);
+                  }
+                  createdGroup = result.data.id;
+                  setExtraGroups((current) => [...current, { id: result.data.id, name: groupName }]);
+                  await queryClient.invalidateQueries({ queryKey: ["category-groups"] });
+                  return null;
+                }}
+              />
+              );
+            }}
           />
         </Field>
         {!category && expense ? (
           <Field>
-            <FieldLabel htmlFor="category-bucket">Add to a bucket</FieldLabel>
+            <FieldLabel htmlFor={`${fieldId}-bucket`}>Add to a bucket</FieldLabel>
             <OptionCombobox
-              id="category-bucket"
+              id={`${fieldId}-bucket`}
               value={bucketId}
               options={(buckets.data?.items ?? []).map((bucket) => ({ id: bucket.id, label: bucket.name }))}
               placeholder="No bucket"
@@ -181,25 +206,25 @@ export function CategoryForm({ category, groups, initialName, initialKind, onClo
         {expense ? (
           <Field orientation="horizontal">
             <Checkbox
-              id="category-essential"
+              id={`${fieldId}-essential`}
               checked={essential}
               onCheckedChange={(checked) => setEssential(checked === true)}
             />
             <FieldContent>
-              <FieldLabel htmlFor="category-essential">Essential</FieldLabel>
+              <FieldLabel htmlFor={`${fieldId}-essential`}>Essential</FieldLabel>
               <FieldDescription>A cost you must pay. The emergency fund check uses this flag.</FieldDescription>
             </FieldContent>
           </Field>
         ) : null}
         {error ? <FieldError>{error}</FieldError> : null}
-        <DialogFooter>
+        <FormActions inline={inline}>
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" disabled={saving}>
             {saving ? "Saving category" : "Save category"}
           </Button>
-        </DialogFooter>
+        </FormActions>
       </form>
     </>
   );

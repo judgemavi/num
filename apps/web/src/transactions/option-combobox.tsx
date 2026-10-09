@@ -37,6 +37,7 @@ type OptionComboboxProps = {
   create?: CreateAction;
   archived?: ArchivedMatch[];
   onRestore?: (id: string) => void;
+  preserveOrder?: boolean;
   onChange: (id: string | null) => void;
 };
 
@@ -44,9 +45,12 @@ function sameName(left: string, right: string): boolean {
   return left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
 }
 
-function visibleOptions(options: Option[], query: string): Option[] {
+function visibleOptions(options: Option[], query: string, preserveOrder: boolean): Option[] {
   const needle = query.trim().toLocaleLowerCase();
   const matched = needle.length === 0 ? options : options.filter((option) => option.label.toLocaleLowerCase().includes(needle));
+  if (preserveOrder) {
+    return matched;
+  }
   return [...matched].sort((left, right) => {
     const leftExact = sameName(left.label, query) ? 0 : 1;
     const rightExact = sameName(right.label, query) ? 0 : 1;
@@ -68,21 +72,20 @@ export function OptionCombobox({
   create,
   archived,
   onRestore,
+  preserveOrder = false,
   onChange,
 }: OptionComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const selected = options.find((option) => option.id === value) ?? groups?.flatMap((group) => group.options).find((option) => option.id === value);
   const query = search.trim();
-  const createName = query.length > 0 ? query : (create?.suggestedName?.trim() ?? "");
+  const prefill = query.length > 0 ? query : (create?.suggestedName?.trim() ?? "");
   const pool = groups ? groups.flatMap((group) => group.options) : options;
-  const exact = pool.some((option) => sameName(option.label, createName));
   const archivedHit = archivedNameMatch(
-    createName,
+    query,
     pool.map((option) => option.label),
     (archived ?? []).map((item) => ({ id: item.id, name: item.label })),
   );
-  const showCreate = Boolean(create) && createName.length > 0 && !exact && archivedHit === null;
 
   function pick(next: string | null) {
     onChange(next);
@@ -90,7 +93,7 @@ export function OptionCombobox({
     setSearch("");
   }
 
-  const filteredGroups = groups?.map((group) => ({ label: group.label, options: visibleOptions(group.options, query) })).filter((group) => group.options.length > 0);
+  const filteredGroups = groups?.map((group) => ({ label: group.label, options: visibleOptions(group.options, query, preserveOrder) })).filter((group) => group.options.length > 0);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -104,7 +107,35 @@ export function OptionCombobox({
         <Command shouldFilter={false}>
           <CommandInput placeholder="Search" value={search} onValueChange={setSearch} />
           <CommandList>
-            <CommandEmpty>{showCreate ? "No matches." : "No matches."}</CommandEmpty>
+            {create ? (
+              <CommandGroup>
+                <CommandItem
+                  value={`create-${create.noun}`}
+                  onSelect={() => {
+                    create.onCreate(prefill);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  + Create new {create.noun}
+                </CommandItem>
+              </CommandGroup>
+            ) : null}
+            {archivedHit && onRestore ? (
+              <CommandGroup>
+                <CommandItem
+                  value={`restore-${archivedHit.id}`}
+                  onSelect={() => {
+                    onRestore(archivedHit.id);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  Restore '{archivedHit.name}'
+                </CommandItem>
+              </CommandGroup>
+            ) : null}
+            <CommandEmpty>No matches.</CommandEmpty>
             {emptyLabel ? (
               <CommandGroup>
                 <CommandItem value={emptyLabel} onSelect={() => pick(null)}>
@@ -124,41 +155,13 @@ export function OptionCombobox({
               ))
             ) : (
               <CommandGroup>
-                {visibleOptions(options, query).map((option) => (
+                {visibleOptions(options, query, preserveOrder).map((option) => (
                   <CommandItem key={option.id} value={option.label} onSelect={() => pick(option.id)}>
                     {option.label}
                   </CommandItem>
                 ))}
               </CommandGroup>
             )}
-            {archivedHit && onRestore ? (
-              <CommandGroup>
-                <CommandItem
-                  value={`restore-${archivedHit.id}`}
-                  onSelect={() => {
-                    onRestore(archivedHit.id);
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                >
-                  Restore '{archivedHit.name}'
-                </CommandItem>
-              </CommandGroup>
-            ) : null}
-            {showCreate && create ? (
-              <CommandGroup>
-                <CommandItem
-                  value={`create-${createName}`}
-                  onSelect={() => {
-                    create.onCreate(createName);
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                >
-                  Create {createName}
-                </CommandItem>
-              </CommandGroup>
-            ) : null}
           </CommandList>
         </Command>
       </PopoverContent>

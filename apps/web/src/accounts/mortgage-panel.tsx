@@ -2,6 +2,7 @@ import { milliPctToPercent, mortgageViewSchema, Temporal, toMinorUnits } from "@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { frequencyLabels } from "@/accounts/mortgage-format";
+import { MortgageSchedule } from "@/accounts/mortgage-schedule";
 import { useEditors } from "@/editors/editor-api";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
@@ -129,20 +130,7 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
         ) : (
           <p className="text-sm">This payment does not pay off the loan.</p>
         )}
-        <div className="grid gap-2">
-          <p className="text-sm font-semibold">Next payments</p>
-          {row.nextPayments.length === 0 ? <p className="text-sm text-muted-foreground">No payments remain.</p> : null}
-          <ul className="grid gap-2">
-            {row.nextPayments.map((payment) => (
-              <li key={payment.date} className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-                <span>{formatDay(payment.date)}</span>
-                <span className="text-muted-foreground">
-                  {formatMoney(currency, payment.payment)} · Principal {formatMoney(currency, payment.principal)} · Interest {formatMoney(currency, payment.interest)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <MortgageSchedule currency={currency} asOf={asOf} payments={row.payments} actuals={row.actualPayments} />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="mortgage-extra">Extra on each payment</FieldLabel>

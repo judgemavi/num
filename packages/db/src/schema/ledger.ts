@@ -40,6 +40,7 @@ export const transactions = sqliteTable(
     autoReason: text("auto_reason"),
     autoConfidence: integer("auto_confidence"),
     autoSourceId: text("auto_source_id"),
+    refundOfId: text("refund_of_id").references((): AnySQLiteColumn => transactions.id),
     deletedAt: text("deleted_at"),
   },
   (table) => [
@@ -55,6 +56,11 @@ export const transactions = sqliteTable(
       "transactions_transfer_peer",
       sql`${table.transferPeerId} is null or ${table.transferPeerId} <> ${table.id}`,
     ),
+    check(
+      "transactions_refund_of_self",
+      sql`${table.refundOfId} is null or ${table.refundOfId} <> ${table.id}`,
+    ),
+    index("transactions_refund_of").on(table.refundOfId),
     index("transactions_active_date")
       .on(table.date, table.id)
       .where(sql`${table.deletedAt} is null`),

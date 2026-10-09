@@ -15,9 +15,10 @@ import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FieldError } from "@/components/ui/field";
+import { localAsOf } from "@/as-of";
 import { formatMoney } from "@/money";
 import { inboxError } from "@/inbox/format";
-import { formatDate, transactionError } from "@/transactions/format";
+import { formatDate, refundedText, transactionError } from "@/transactions/format";
 import { MortgageSplitWatch } from "@/transactions/mortgage-split-watch";
 import { AutomaticReason, DeleteMenu, MoneySection, MoreDetails, type TransactionFormProps } from "@/transactions/transaction-parts";
 import { alreadyChosen, choiceOf, linesOf, signedTotal, useApplySuggestion } from "@/transactions/transaction-draft";
@@ -55,6 +56,7 @@ export function TransactionForm({
   const [notes, setNotes] = useState(transaction?.notes ?? "");
   const [cleared, setCleared] = useState(transaction?.status === "cleared" || transaction?.status === "reconciled");
   const [merchantId, setMerchantId] = useState<string | null>(transaction?.merchantId ?? null);
+  const [refundOfId, setRefundOfId] = useState<string | null>(transaction?.refundOfId ?? null);
   const [choice, setChoice] = useState<WhatChoice>(choiceOf(transaction, categories));
   const [categoryId, setCategoryId] = useState<string | null>(transaction?.lines[0]?.categoryId ?? null);
   const [transferAccountId, setTransferAccountId] = useState<string | null>(transaction?.lines[0]?.transferAccountId ?? null);
@@ -117,6 +119,9 @@ export function TransactionForm({
     setTouched(true);
     setChoice(next);
     setMerchantId((current) => merchantForChoice(next, current));
+    if (next !== "refund") {
+      setRefundOfId(null);
+    }
     if (next !== "transfer" && next !== "split") {
       const kind = categories.find((category) => category.id === categoryId)?.kind ?? null;
       if (kind && kind !== categoryKindForChoice(next)) {
@@ -176,6 +181,7 @@ export function TransactionForm({
       transferAccountId,
       lines,
       tagIds,
+      refundOfId,
     });
     setSaving(false);
     if (!result.ok) {
@@ -337,7 +343,14 @@ export function TransactionForm({
         }}
         payee={payee}
         suggestion={suggestion}
+        refundOfId={refundOfId}
+        onRefundOf={(id) => {
+          setTouched(true);
+          setRefundOfId(id);
+        }}
+        asOf={localAsOf()}
       />
+      {transaction?.refundedAmount ? <p className="text-sm text-muted-foreground">{refundedText(currency, transaction.refundedAmount)}</p> : null}
       <MoreDetails
         open={more}
         onOpenChange={setMore}

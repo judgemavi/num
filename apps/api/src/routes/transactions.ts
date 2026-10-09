@@ -1,5 +1,7 @@
 import {
   errorSchema,
+  refundPurchaseListSchema,
+  refundPurchaseQuerySchema,
   transactionListQuerySchema,
   transactionListSchema,
   skippedRowSchema,
@@ -10,6 +12,7 @@ import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listTransactions } from "../services/transaction-list";
+import { listRefundPurchases } from "../services/refund-link";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
 
 const errorResponse = {
@@ -47,6 +50,19 @@ const transactionSaveResponse = {
     },
   },
 } as const;
+
+const refundPurchasesRoute = createRoute({
+  method: "get",
+  path: "/api/transactions/refund-purchases",
+  request: { query: refundPurchaseQuerySchema },
+  responses: {
+    200: {
+      description: "Recent spending a refund can link to",
+      content: { "application/json": { schema: refundPurchaseListSchema } },
+    },
+    400: errorResponse,
+  },
+});
 
 const listRoute = createRoute({
   method: "get",
@@ -151,6 +167,7 @@ const deleteRoute = createRoute({
 });
 
 export function registerTransactions(app: OpenAPIHono, db: Db) {
+  app.openapi(refundPurchasesRoute, (c) => c.json({ items: listRefundPurchases(db, c.req.valid("query")) }, 200));
   app.openapi(listRoute, (c) => c.json(listTransactions(db, c.req.valid("query")), 200));
 
   app.openapi(readRoute, (c) => {

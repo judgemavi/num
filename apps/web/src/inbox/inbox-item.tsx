@@ -90,7 +90,7 @@ export function InboxItemRow({
   const [choice, setChoice] = useState("");
   const names = {
     account: (id: string) => accounts.get(id) ?? "Account",
-    plan: (id: string) => plans.get(id)?.name ?? "Plan",
+    plan: (id: string) => plans.get(id)?.name ?? "Recurring",
     merchant: (id: string) => merchants.get(id) ?? "Merchant",
     category: (id: string) => categories.find((category) => category.id === id)?.name ?? "Category",
     bucket: (id: string) => buckets.find((bucket) => bucket.id === id)?.name ?? "Bucket",
@@ -141,7 +141,7 @@ export function InboxItemRow({
         }
       },
     };
-    no = { label: "Keep the plan amount", run: () => void run(() => onDecide(item.itemKey, "keep_plan_amount")) };
+    no = { label: "Keep the recurring amount", run: () => void run(() => onDecide(item.itemKey, "keep_plan_amount")) };
   } else if (item.kind === "recurring_missed") {
     primary = { label: "Link a transaction", disabled: false, run: () => onLink(item.planId, item.dueDate) };
     no = { label: "Skip", run: () => onSkip(item.planId, item.dueDate) };
@@ -158,7 +158,7 @@ export function InboxItemRow({
     };
   } else if (item.kind === "plan_proposal") {
     primary = {
-      label: "Create the plan",
+      label: item.expectedAmount >= 0 ? "Add recurring income" : "Add a recurring payment",
       disabled: false,
       run: () => void run(() => createProposedPlan(item, names.merchant(item.merchantId))),
     };

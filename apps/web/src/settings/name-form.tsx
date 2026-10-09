@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormActions, FormHeading } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
@@ -11,6 +11,8 @@ type NameFormProps = {
   submitLabel: string;
   savingLabel: string;
   initialName: string;
+  inline?: boolean;
+  idPrefix?: string;
   onClose: () => void;
   onSubmit: (name: string) => Promise<string | null>;
 };
@@ -22,6 +24,8 @@ export function NameForm({
   submitLabel,
   savingLabel,
   initialName,
+  inline = false,
+  idPrefix = "record-name",
   onClose,
   onSubmit,
 }: NameFormProps) {
@@ -53,29 +57,26 @@ export function NameForm({
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
-      </DialogHeader>
+      <FormHeading inline={inline} title={title} description={description} />
       <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
         <Field>
-          <FieldLabel htmlFor="record-name">{label}</FieldLabel>
+          <FieldLabel htmlFor={idPrefix}>{label}</FieldLabel>
           <Input
-            id="record-name"
+            id={idPrefix}
             value={name}
             autoComplete="off"
             onChange={(event) => setName(event.target.value)}
           />
         </Field>
         {error ? <FieldError>{error}</FieldError> : null}
-        <DialogFooter>
+        <FormActions inline={inline}>
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" disabled={saving}>
             {saving ? savingLabel : submitLabel}
           </Button>
-        </DialogFooter>
+        </FormActions>
       </form>
     </>
   );

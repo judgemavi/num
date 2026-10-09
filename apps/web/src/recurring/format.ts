@@ -6,6 +6,19 @@ const kindLabels: Record<PlanKind, string> = {
   transfer: "Transfer",
 };
 
+export function recurringTitle(kind: PlanKind, editing: boolean): string {
+  if (editing) {
+    return "Edit recurring";
+  }
+  if (kind === "income") {
+    return "Add recurring income";
+  }
+  if (kind === "transfer") {
+    return "Add a recurring transfer";
+  }
+  return "Add a recurring payment";
+}
+
 export function kindLabel(kind: PlanKind): string {
   return kindLabels[kind];
 }
@@ -49,13 +62,13 @@ export function amountFromForm(kind: PlanKind, minor: number): number {
 export function planError(code: string): string {
   switch (code) {
     case "plan_not_found":
-      return "That plan is not in the book.";
+      return "That recurring item is not in the book.";
     case "plan_archived":
-      return "Restore the plan before you change it.";
+      return "Restore it before you change it.";
     case "plan_not_archived":
-      return "This plan is already active.";
+      return "This is already active.";
     case "plan_fields_invalid":
-      return "Check the plan details and try again.";
+      return "Check the details and try again.";
     case "account_not_found":
     case "account_archived":
       return "Choose an account that is still in use.";
@@ -66,11 +79,11 @@ export function planError(code: string): string {
     case "merchant_archived":
       return "Choose a merchant that is still in use.";
     case "occurrence_not_found":
-      return "That date is not on this plan.";
+      return "That date is not on this recurring item.";
     case "occurrence_taken":
       return "This occurrence already has a link or a skip.";
     case "transaction_already_linked":
-      return "That transaction is already linked to a plan.";
+      return "That transaction is already linked.";
     case "transaction_not_found":
       return "That transaction is not in the book.";
     case "link_not_found":

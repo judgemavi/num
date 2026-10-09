@@ -38,6 +38,7 @@ export const errorCodes = [
   "tag_not_archived",
   "tag_name_taken",
   "transaction_not_found",
+  "refund_link_invalid",
   "transaction_reconciled",
   "transaction_status_invalid",
   "checkpoint_not_found",

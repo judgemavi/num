@@ -27,6 +27,10 @@ type ListRow = {
   autoConfidence: number | null;
   autoSourceName: string | null;
   autoLearnedCount: number | null;
+  refundOfDate: string | null;
+  refundOfAmount: number | null;
+  refundOfKey: string | null;
+  refundedAmount: number | null;
 };
 
 function asKind(value: string): AccountKind {
@@ -148,6 +152,11 @@ function toItem(row: ListRow): TransactionListItem {
     autoConfidence: row.autoConfidence,
     autoSourceName: row.autoSourceName,
     autoLearnedCount: row.autoLearnedCount === null ? null : Number(row.autoLearnedCount),
+    refundOf:
+      row.refundOfKey === null || row.refundOfDate === null || row.refundOfAmount === null
+        ? null
+        : { id: row.refundOfKey, date: row.refundOfDate, amount: integerSum(row.refundOfAmount) },
+    refundedAmount: row.refundedAmount === null ? null : integerSum(row.refundedAmount),
   };
 }
 
@@ -224,7 +233,11 @@ export function listTransactions(db: Db, query: TransactionListQuery) {
         inner join transaction_lines cl on cl.transaction_id = c.id
         where c.deleted_at is null and c.auto_reason is null and c.payee_normalized = t.payee_normalized
           and cl.category_id is not null and cl.transfer_account_id is null
-      ) end as autoLearnedCount
+      ) end as autoLearnedCount,
+      (select p.id from transactions p where p.id = t.refund_of_id and p.deleted_at is null) as refundOfKey,
+      (select p.date from transactions p where p.id = t.refund_of_id and p.deleted_at is null) as refundOfDate,
+      (select p.amount from transactions p where p.id = t.refund_of_id and p.deleted_at is null) as refundOfAmount,
+      (select sum(r.amount) from transactions r where r.refund_of_id = t.id and r.deleted_at is null) as refundedAmount
     from transactions t
     join accounts a on a.id = t.account_id
     ${merchantJoin}

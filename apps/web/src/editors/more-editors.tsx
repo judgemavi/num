@@ -92,10 +92,10 @@ export function SkipNextEditor({ props, onClose, onSaved }: { props: EditorInput
   const plan = useRecord("plan", props.planId, `/api/recurring/${props.planId}`, planSchema);
   const refresh = useRefresh([["plans"], ["occurrences"], ["recurring-signals"], ["recurring-sync"]]);
   if (plan.isPending) {
-    return <LoadingLine label="Loading the plan." />;
+    return <LoadingLine label="Loading recurring." />;
   }
   if (plan.isError || !plan.data) {
-    return <LoadError label="The plan did not load." onRetry={() => void plan.refetch()} />;
+    return <LoadError label="Recurring did not load." onRetry={() => void plan.refetch()} />;
   }
   return (
     <div className="grid gap-4">

@@ -27,6 +27,7 @@ type SubmitInput = {
   transferAccountId: string | null;
   lines: SplitLine[];
   tagIds: string[];
+  refundOfId: string | null;
 };
 
 export type SubmitResult =
@@ -67,6 +68,7 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
     payeeRaw: input.payee.trim(),
     status: input.reconciled ? "open" : input.cleared ? "cleared" : "open",
     lines: built,
+    refundOfId: input.choice === "refund" ? input.refundOfId : null,
   };
   const parsed = transactionWriteSchema.safeParse(body);
   if (!parsed.success) {

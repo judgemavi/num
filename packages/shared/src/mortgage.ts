@@ -349,6 +349,14 @@ export const mortgageViewSchema = z.object({
   paymentAmount: positiveCents,
   paymentFrequency: z.enum(paymentFrequencies),
   nextPayments: z.array(mortgagePaymentSchema),
+  payments: z.array(mortgagePaymentSchema),
+  actualPayments: z.array(
+    z.object({
+      id: z.uuid(),
+      date: isoDateSchema,
+      amount: cents,
+    }),
+  ),
   extra: z
     .object({
       amount: cents,

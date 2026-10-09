@@ -17,8 +17,9 @@ import {
 } from "@num/shared";
 import { ChevronRight } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { amountForForm, amountFromForm, kindLabel, planError } from "@/recurring/format";
-import { OptionCombobox } from "@/transactions/option-combobox";
+import { amountForForm, amountFromForm, kindLabel, planError, recurringTitle } from "@/recurring/format";
+import { InlineAccount, InlineCategory, InlineMerchant } from "@/editors/inline-records";
+import { ManagedPicker } from "@/editors/managed-picker";
 import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -37,6 +38,7 @@ type PlanFormProps = {
   accounts: Account[];
   categories: Category[];
   merchants: Merchant[];
+  initialKind?: PlanKind;
   onClose: () => void;
   onSaved: (id: string) => void;
 };
@@ -55,11 +57,11 @@ function monthValue(day: number | null | undefined): string {
   return String(day);
 }
 
-export function PlanForm({ currency, draft, accounts, categories, merchants, onClose, onSaved }: PlanFormProps) {
+export function PlanForm({ currency, draft, accounts, categories, merchants, initialKind, onClose, onSaved }: PlanFormProps) {
   const current = isPlan(draft) ? draft : null;
   const seed = draft === "new" ? null : draft;
   const [name, setName] = useState(seed && "name" in seed ? seed.name : "");
-  const [kind, setKind] = useState<PlanKind>(seed && "kind" in seed ? seed.kind : "bill");
+  const [kind, setKind] = useState<PlanKind>(seed && "kind" in seed ? seed.kind : (initialKind ?? "bill"));
   const [accountId, setAccountId] = useState<string | null>(seed?.accountId ?? null);
   const [transferAccountId, setTransferAccountId] = useState<string | null>(current?.transferAccountId ?? null);
   const [categoryId, setCategoryId] = useState<string | null>(current?.categoryId ?? null);
@@ -125,7 +127,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, onC
     };
     const parsed = (current ? planUpdateSchema : planCreateSchema).safeParse(body);
     if (!parsed.success) {
-      setError("Check the plan details and try again.");
+      setError("Check the details and try again.");
       return;
     }
     setSaving(true);
@@ -141,7 +143,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, onC
       }
       onSaved(result.data.id);
     } catch {
-      setError("The plan did not save. Try again.");
+      setError("This did not save. Try again.");
     } finally {
       setSaving(false);
     }
@@ -150,7 +152,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, onC
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{current ? "Edit plan" : "New plan"}</DialogTitle>
+        <DialogTitle>{recurringTitle(kind, current !== null)}</DialogTitle>
         <DialogDescription>
           {current ? "Change what you expect and when." : "Add a payment or deposit you expect on a schedule."}
         </DialogDescription>
@@ -177,17 +179,28 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, onC
         </Field>
         <Field>
           <FieldLabel htmlFor="plan-account-field">Account</FieldLabel>
-          <OptionCombobox id="plan-account-field" value={accountId} options={accountOptions} placeholder="Choose an account" onChange={setAccountId} />
+          <ManagedPicker
+            id="plan-account-field"
+            value={accountId}
+            options={accountOptions}
+            placeholder="Choose an account"
+            noun="account"
+            archived={accounts.filter((item) => item.archivedAt).map((item) => ({ id: item.id, label: item.name }))}
+            onChange={setAccountId}
+            renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
+          />
         </Field>
         {kind === "transfer" ? (
           <Field>
             <FieldLabel htmlFor="plan-transfer">Other account</FieldLabel>
-            <OptionCombobox
+            <ManagedPicker
               id="plan-transfer"
               value={transferAccountId}
               options={accountOptions.filter((item) => item.id !== accountId)}
               placeholder="Choose an account"
+              noun="account"
               onChange={setTransferAccountId}
+              renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
             />
           </Field>
         ) : null}
@@ -266,25 +279,32 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, onC
             {kind === "transfer" ? null : (
               <Field>
                 <FieldLabel htmlFor="plan-category">Category</FieldLabel>
-                <OptionCombobox
+                <ManagedPicker
                   id="plan-category"
                   value={categoryId}
                   options={categoryOptions}
                   placeholder="No category"
                   emptyLabel="No category"
+                  noun="category"
                   onChange={setCategoryId}
+                  renderForm={(name, finish) => (
+                    <InlineCategory name={name} kind={kind === "income" ? "income" : "expense"} depth={1} onDone={finish} />
+                  )}
                 />
               </Field>
             )}
             <Field>
               <FieldLabel htmlFor="plan-merchant">Merchant</FieldLabel>
-              <OptionCombobox
+              <ManagedPicker
                 id="plan-merchant"
                 value={merchantId}
                 options={merchants.filter((item) => item.archivedAt === null || item.id === merchantId).map((item) => ({ id: item.id, label: item.name }))}
                 placeholder="Any merchant"
                 emptyLabel="Any merchant"
+                noun="merchant"
+                archived={merchants.filter((item) => item.archivedAt).map((item) => ({ id: item.id, label: item.name }))}
                 onChange={setMerchantId}
+                renderForm={(name, finish) => <InlineMerchant name={name} depth={1} categories={categories} onDone={finish} />}
               />
             </Field>
             <Field>
@@ -323,7 +343,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, onC
             Cancel
           </Button>
           <Button type="submit" disabled={saving}>
-            {saving ? "Saving plan" : current ? "Save plan" : "Add plan"}
+            {saving ? "Saving" : current ? "Save" : "Add"}
           </Button>
         </DialogFooter>
       </form>

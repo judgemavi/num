@@ -9,15 +9,16 @@ import {
   type SuggestionReason,
   type WhatChoice,
 } from "@num/shared";
-import { useState } from "react";
-import { useEditors } from "@/editors/editor-api";
 import { useRestoreNamed } from "@/editors/restore-named";
+import { InlineAccount, InlineCategory, InlineMerchant } from "@/editors/inline-records";
+import { ManagedPicker } from "@/editors/managed-picker";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/money";
-import { OptionCombobox, type Option, type OptionGroup } from "@/transactions/option-combobox";
+import { type Option, type OptionGroup } from "@/transactions/option-combobox";
+import { RefundOfField } from "@/transactions/refund-of-field";
 import { splitRemainder, type SplitLine } from "@/transactions/what-choice";
 
 const choiceLabel: Record<WhatChoice, string> = {
@@ -56,6 +57,10 @@ type WhatIsThisProps = {
   onMerchantId: (id: string | null) => void;
   payee: string;
   suggestion: Suggestion | null;
+  refundOfId?: string | null;
+  onRefundOf?: (id: string | null) => void;
+  asOf?: string;
+  depth?: number;
 };
 
 function reasonText(reason: SuggestionReason): string {
@@ -141,20 +146,17 @@ export function WhatIsThis({
   onMerchantId,
   payee,
   suggestion,
+  refundOfId = null,
+  onRefundOf,
+  asOf = "",
+  depth = 0,
 }: WhatIsThisProps) {
-  const { openEditor } = useEditors();
   const restoreNamed = useRestoreNamed();
-  const [extraMerchants, setExtraMerchants] = useState<Option[]>([]);
-  const [extraCategories, setExtraCategories] = useState<Category[]>([]);
-  const [extraAccounts, setExtraAccounts] = useState<Option[]>([]);
   const transferLabel = direction === "out" ? "To account" : "From account";
   const choices = choicesForDirection(direction, groupMode);
-  const allCategories = [...categories, ...extraCategories.filter((item) => !categories.some((category) => category.id === item.id))];
-  const categoryList = categoryGroups(allCategories, choice, categoryId);
-  const merchantOptions = [...merchants, ...extraMerchants.filter((item) => !merchants.some((merchant) => merchant.id === item.id))];
-  const accountOptions = [...accounts, ...extraAccounts.filter((item) => !accounts.some((account) => account.id === item.id))];
+  const categoryList = categoryGroups(categories, choice, categoryId);
   const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, lines) : choice === "split" ? null : 0;
-  const hint = suggestion && choice !== "transfer" ? suggestionText(suggestion, merchantOptions, allCategories, accountOptions) : null;
+  const hint = suggestion && choice !== "transfer" ? suggestionText(suggestion, merchants, categories, accounts) : null;
   const suggestedMerchant = merchantNameFromPayee(payee);
   const categoryKind = categoryKindForChoice(choice);
   const archivedCategoryOptions = categories
@@ -179,17 +181,6 @@ export function WhatIsThis({
 
   function updateLine(key: string, patch: Partial<SplitLine>) {
     onLines(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
-  }
-
-  function createCategory(name: string, onPicked: (id: string) => void) {
-    const kind = categoryKindForChoice(choice) ?? "expense";
-    void openEditor("category", { id: null, name, kind }).then((id) => {
-      if (!id) {
-        return;
-      }
-      setExtraCategories((current) => [...current, { id, name, kind, groupId: null, essential: false, archivedAt: null }]);
-      onPicked(id);
-    });
   }
 
   return (
@@ -218,54 +209,58 @@ export function WhatIsThis({
       {choice === "spending" || choice === "income" || choice === "refund" ? (
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-category`}>Category</FieldLabel>
-          <OptionCombobox
+          <ManagedPicker
             id={`${idPrefix}-category`}
             value={categoryId}
             options={categoryList.options}
             placeholder="Choose a category"
             emptyLabel={allowEmptyCategory ? "No category" : undefined}
             disabled={categoryLocked}
-            create={{
-              noun: "category",
-              onCreate: (name) => createCategory(name, onCategoryId),
-            }}
+            noun="category"
+            depth={depth}
             archived={archivedCategoryOptions}
             onRestore={(id) => restoreCategory(id, onCategoryId)}
             onChange={onCategoryId}
+            renderForm={(name, finish) => (
+              <InlineCategory name={name} kind={categoryKind ?? "expense"} depth={depth + 1} onDone={finish} />
+            )}
           />
         </Field>
+      ) : null}
+      {choice === "refund" && onRefundOf && asOf.length > 0 ? (
+        <RefundOfField
+          id={`${idPrefix}-refund-of`}
+          asOf={asOf}
+          payee={payee}
+          merchantId={merchantId}
+          value={refundOfId}
+          currency={currency}
+          onChange={onRefundOf}
+          onCategory={onCategoryId}
+        />
       ) : null}
       {choice === "transfer" ? (
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-transfer`}>{transferLabel}</FieldLabel>
-          <OptionCombobox
+          <ManagedPicker
             id={`${idPrefix}-transfer`}
             value={transferAccountId}
-            options={accountOptions}
+            options={accounts}
             placeholder="Choose an account"
             disabled={transferLocked}
-            create={{
-              noun: "account",
-              onCreate: (name) => {
-                void openEditor("account", { id: null, name }).then((id) => {
-                  if (!id) {
-                    return;
-                  }
-                  setExtraAccounts((current) => [...current, { id, label: name }]);
-                  onTransferAccountId(id);
-                });
-              },
-            }}
+            noun="account"
+            depth={depth}
             archived={archivedAccounts}
             onRestore={(id) => restoreAccount(id, onTransferAccountId)}
             onChange={onTransferAccountId}
+            renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
           />
         </Field>
       ) : null}
       {choice === "split" ? (
         <div className="grid gap-3">
           {lines.map((line, index) => {
-            const lineCategories = categoryGroups(allCategories, "split", line.categoryId);
+            const lineCategories = categoryGroups(categories, "split", line.categoryId);
             return (
               <div key={line.key} className="grid gap-3 sm:grid-cols-[auto_8rem_1fr_1fr]">
                 <Field>
@@ -297,7 +292,7 @@ export function WhatIsThis({
                 </Field>
                 <Field>
                   <FieldLabel htmlFor={`${idPrefix}-line-${index}-category`}>Category</FieldLabel>
-                  <OptionCombobox
+                  <ManagedPicker
                     id={`${idPrefix}-line-${index}-category`}
                     value={line.categoryId}
                     options={[]}
@@ -305,36 +300,29 @@ export function WhatIsThis({
                     placeholder="Category"
                     emptyLabel="No category"
                     disabled={categoryLocked}
-                    create={{ noun: "category", onCreate: (name) => createCategory(name, (id) => updateLine(line.key, { categoryId: id, transferAccountId: null })) }}
+                    noun="category"
+                    depth={depth}
                     archived={archivedCategoryOptions}
                     onRestore={(id) => restoreCategory(id, (restored) => updateLine(line.key, { categoryId: restored, transferAccountId: null }))}
                     onChange={(id) => updateLine(line.key, { categoryId: id, transferAccountId: id ? null : line.transferAccountId })}
+                    renderForm={(name, finish) => <InlineCategory name={name} kind="expense" depth={depth + 1} onDone={finish} />}
                   />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor={`${idPrefix}-line-${index}-account`}>Account</FieldLabel>
-                  <OptionCombobox
+                  <ManagedPicker
                     id={`${idPrefix}-line-${index}-account`}
                     value={line.transferAccountId}
-                    options={accountOptions}
+                    options={accounts}
                     placeholder="Account"
                     emptyLabel="No account"
                     disabled={transferLocked || amountsLocked}
-                    create={{
-                      noun: "account",
-                      onCreate: (name) => {
-                        void openEditor("account", { id: null, name }).then((id) => {
-                          if (!id) {
-                            return;
-                          }
-                          setExtraAccounts((current) => [...current, { id, label: name }]);
-                          updateLine(line.key, { transferAccountId: id, categoryId: null });
-                        });
-                      },
-                    }}
+                    noun="account"
+                    depth={depth}
                     archived={archivedAccounts}
                     onRestore={(id) => restoreAccount(id, (restored) => updateLine(line.key, { transferAccountId: restored, categoryId: null }))}
                     onChange={(id) => updateLine(line.key, { transferAccountId: id, categoryId: id ? null : line.categoryId })}
+                    renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
                   />
                 </Field>
                 {lines.length > 1 && !amountsLocked ? (
@@ -362,25 +350,15 @@ export function WhatIsThis({
       {choice === "transfer" ? null : (
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-merchant`}>Merchant</FieldLabel>
-          <OptionCombobox
+          <ManagedPicker
             id={`${idPrefix}-merchant`}
             value={merchantId}
-            options={merchantOptions}
+            options={merchants}
             placeholder="No merchant"
             emptyLabel="No merchant"
-            create={{
-              noun: "merchant",
-              suggestedName: suggestedMerchant,
-              onCreate: (name) => {
-                void openEditor("merchant", { id: null, name }).then((id) => {
-                  if (!id) {
-                    return;
-                  }
-                  setExtraMerchants((current) => [...current, { id, label: name }]);
-                  onMerchantId(id);
-                });
-              },
-            }}
+            noun="merchant"
+            depth={depth}
+            suggestedName={suggestedMerchant}
             archived={archivedMerchants}
             onRestore={(id) => {
               void restoreNamed(`/api/merchants/${id}/restore`).then((restored) => {
@@ -390,6 +368,7 @@ export function WhatIsThis({
               });
             }}
             onChange={onMerchantId}
+            renderForm={(name, finish) => <InlineMerchant name={name} depth={depth + 1} categories={categories} onDone={finish} />}
           />
           {hint ? <FieldDescription role="status">{hint}</FieldDescription> : null}
         </Field>

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { apiRequest } from "@/request";
-import { formatDate, statusLabel } from "@/transactions/format";
+import { formatDate, refundOfText, refundedText, statusLabel } from "@/transactions/format";
 import { transactionPath } from "@/transactions/query";
 
 const selectionLimit = 200;
@@ -208,6 +208,8 @@ function TransactionLine({
       <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
         {row.payeeRaw}
         <small>{formatDate(row.date)}</small>
+        {row.refundOf ? <small>{refundOfText(currency, row.refundOf.date, row.refundOf.amount)}</small> : null}
+        {row.refundedAmount ? <small>{refundedText(currency, row.refundedAmount)}</small> : null}
       </div>
       {row.status === "open" ? null : <Badge variant={row.status === "reconciled" ? "neutral" : "positive"}>{statusLabel(row.status)}</Badge>}
       <div className="ml-auto text-right">

@@ -22,7 +22,7 @@ import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormActions, FormHeading } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,6 +32,7 @@ type AccountFormProps = {
   initialName?: string;
   currency: string;
   account: Account | null;
+  inline?: boolean;
   onClose: () => void;
   onSaved: (id: string) => void;
 };
@@ -69,7 +70,7 @@ function isPolicy(value: string): value is PaymentPolicy {
   return value === "full" || value === "fixed" || value === "manual";
 }
 
-export function AccountForm({ currency, account, initialName, onClose, onSaved }: AccountFormProps) {
+export function AccountForm({ currency, account, initialName, inline = false, onClose, onSaved }: AccountFormProps) {
   const [name, setName] = useState(account?.name ?? initialName ?? "");
   const [institution, setInstitution] = useState(account?.institution ?? "");
   const [kind, setKind] = useState<AccountKind>(account?.kind ?? "chequing");
@@ -168,12 +169,11 @@ export function AccountForm({ currency, account, initialName, onClose, onSaved }
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>{account ? "Edit account" : "Add an account"}</DialogTitle>
-        <DialogDescription>
-          {account ? "Change the details of this account." : "Add an account to the book."}
-        </DialogDescription>
-      </DialogHeader>
+      <FormHeading
+        inline={inline}
+        title={account ? "Edit account" : "Add an account"}
+        description={account ? "Change the details of this account." : "Add an account to the book."}
+      />
       <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
         <Field>
           <FieldLabel htmlFor="account-name">Name</FieldLabel>
@@ -274,14 +274,14 @@ export function AccountForm({ currency, account, initialName, onClose, onSaved }
           </CollapsibleContent>
         </Collapsible>
         {error ? <FieldError>{error}</FieldError> : null}
-        <DialogFooter>
+        <FormActions inline={inline}>
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" disabled={saving}>
             {saving ? "Saving account" : account ? "Save account" : "Add account"}
           </Button>
-        </DialogFooter>
+        </FormActions>
       </form>
     </>
   );

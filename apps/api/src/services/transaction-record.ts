@@ -12,7 +12,7 @@ import {
   type TransactionSource,
   type TransactionStatus,
 } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { loadLines, type StoredLine } from "./transaction-lines";
@@ -31,6 +31,7 @@ export type Header = {
   payeeRaw: string;
   payeeNormalized: string;
   status: TransactionInputStatus | "reconciled";
+  refundOfId?: string | null;
 };
 
 export type TransactionBody = Omit<TransactionCreate, "status"> & { status: string };
@@ -104,7 +105,35 @@ export function headerFrom(input: TransactionBody): Header {
     notes: blankToNull(input.notes),
     ...storedPayee(requireText(input.payeeRaw, "payeeRaw")),
     status: inputStatus(input.status),
+    refundOfId: input.refundOfId ?? null,
   };
+}
+
+function refundFacts(db: Reader, row: TxRow): { refundOf: { id: string; date: string; amount: number } | null; refundedAmount: number | null } {
+  let refundOf: { id: string; date: string; amount: number } | null = null;
+  if (row.refundOfId) {
+    const purchase = db
+      .select({ id: transactions.id, date: transactions.date, amount: transactions.amount, deletedAt: transactions.deletedAt })
+      .from(transactions)
+      .where(eq(transactions.id, row.refundOfId))
+      .get();
+    if (purchase && purchase.deletedAt === null) {
+      refundOf = { id: purchase.id, date: purchase.date, amount: purchase.amount };
+    }
+  }
+  const linked = db
+    .select({ amount: transactions.amount })
+    .from(transactions)
+    .where(and(eq(transactions.refundOfId, row.id), isNull(transactions.deletedAt)))
+    .all();
+  if (linked.length === 0) {
+    return { refundOf, refundedAmount: null };
+  }
+  const total = linked.reduce((sum, item) => sum + item.amount, 0);
+  if (!Number.isSafeInteger(total) || total === 0) {
+    return { refundOf, refundedAmount: null };
+  }
+  return { refundOf, refundedAmount: total };
 }
 
 export function toTransaction(db: Reader, row: TxRow, lines: StoredLine[]): Transaction {
@@ -126,6 +155,8 @@ export function toTransaction(db: Reader, row: TxRow, lines: StoredLine[]): Tran
     autoSourceId: row.autoSourceId,
     autoConfidence: row.autoConfidence,
     ...labelFacts(db, row),
+    refundOfId: row.refundOfId,
+    ...refundFacts(db, row),
     deletedAt: row.deletedAt,
     lines,
   };
@@ -148,6 +179,7 @@ function snapshot(record: Transaction) {
     autoReason: record.autoReason,
     autoSourceId: record.autoSourceId,
     autoConfidence: record.autoConfidence,
+    refundOfId: record.refundOfId,
     deletedAt: record.deletedAt,
     lines: record.lines.map((line) => ({
       id: line.id,

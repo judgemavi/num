@@ -132,7 +132,7 @@ export function registerReadTools(server: McpServer, db: Db) {
     server,
     "list_plans",
     {
-      description: "List recurring plans.",
+      description: "List recurring items.",
       inputSchema: planListQuerySchema,
     },
     (args) => listPlans(db, planListQuerySchema.parse(args)),
@@ -142,7 +142,7 @@ export function registerReadTools(server: McpServer, db: Db) {
     server,
     "list_occurrences",
     {
-      description: "List occurrences for one recurring plan. Requires asOf.",
+      description: "List occurrences for one recurring item. Requires asOf.",
       inputSchema: occurrenceReadSchema,
     },
     (args) => {

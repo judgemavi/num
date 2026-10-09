@@ -226,7 +226,19 @@ export {
   type MerchantUpdate,
 } from "./merchant";
 export { archivedNameMatch, type NamedId } from "./name-match";
+export { canOfferInlineCreate, finishInlineCreate, inlineCreateMaxDepth, type InlineCreateResult } from "./inline-create";
 export { merchantNameFromPayee, normalizePayee, storedPayee } from "./payee";
+export {
+  categoryForRefund,
+  rankRefundPurchases,
+  refundLinkAllowed,
+  refundPurchaseListSchema,
+  refundPurchaseQuerySchema,
+  refundWindowDays,
+  refundWindowStart,
+  type RefundPurchase,
+  type RefundPurchaseItem,
+} from "./refund-link";
 export { oppositeTransferAccount, transferHintQuerySchema, transferHintSchema } from "./transfer-hint";
 export { uncategorizedLineKey } from "./payee";
 export {
@@ -493,6 +505,12 @@ export {
   type MortgageView,
   type PaymentFrequency,
 } from "./mortgage";
+export {
+  matchMortgageActuals,
+  type MortgageActualPayment,
+  type MortgageScheduleMatch,
+  type ScheduledMortgagePayment,
+} from "./mortgage-match";
 export {
   transactionCreateSchema,
   transactionInputStatuses,

@@ -48,6 +48,7 @@ const transactionFields = {
   payeeRaw: z.string().trim().min(1),
   status: z.enum(transactionInputStatuses),
   lines: z.array(transactionLineInputSchema).min(1),
+  refundOfId: z.uuid().nullable().optional(),
 };
 
 export const transactionCreateSchema = z.object(transactionFields);
@@ -75,6 +76,15 @@ export const transactionSchema = z.object({
   autoConfidence: z.number().int().min(0).max(1000).nullable(),
   autoSourceName: z.string().nullable(),
   autoLearnedCount: z.number().int().min(0).nullable(),
+  refundOfId: z.uuid().nullable(),
+  refundOf: z
+    .object({
+      id: z.uuid(),
+      date: isoDateSchema,
+      amount: centsSchema,
+    })
+    .nullable(),
+  refundedAmount: centsSchema.nullable(),
   deletedAt: z.string().refine(isUtcTimestamp).nullable(),
   lines: z.array(transactionLineSchema),
 });
@@ -133,6 +143,14 @@ export const transactionListItemSchema = z.object({
   autoConfidence: z.number().int().min(0).max(1000).nullable(),
   autoSourceName: z.string().nullable(),
   autoLearnedCount: z.number().int().min(0).nullable(),
+  refundOf: z
+    .object({
+      id: z.uuid(),
+      date: isoDateSchema,
+      amount: centsSchema,
+    })
+    .nullable(),
+  refundedAmount: centsSchema.nullable(),
 });
 
 export const transactionListSchema = pagedResponseSchema(transactionListItemSchema);

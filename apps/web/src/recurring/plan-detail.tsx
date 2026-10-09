@@ -171,7 +171,7 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
         text={plan.amountMode === "variable" ? "The amount changes each time. The forecast uses recent actuals." : "The amount stays the same."}
         action={
           <Button type="button" variant="secondary" onClick={onEdit}>
-            Edit plan
+            Edit recurring
           </Button>
         }
       >

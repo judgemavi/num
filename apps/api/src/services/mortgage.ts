@@ -10,8 +10,9 @@ import {
   type MortgageValuation,
   type MortgageView,
 } from "@num/shared";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
+import { integerSum } from "../integer-sum";
 import { balanceOf } from "./account-balance";
 import { ServiceError } from "../service-error";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -134,6 +135,22 @@ export function saveMortgageTerms(db: Db, accountId: string, input: MortgageTerm
   });
 }
 
+function actualPayments(db: Db, accountId: string): MortgageView["actualPayments"] {
+  const rows = db.all<{ id: string; date: string; amount: unknown }>(sql`
+    select t.id as id, t.date as date, -t.amount as amount
+    from transactions t
+    where t.deleted_at is null
+      and t.mirror = 0
+      and t.amount < 0
+      and exists (
+        select 1 from transaction_lines l
+        where l.transaction_id = t.id and l.transfer_account_id = ${accountId}
+      )
+    order by t.date asc, t.id asc
+  `);
+  return rows.map((row) => ({ id: row.id, date: row.date, amount: integerSum(row.amount) }));
+}
+
 export function mortgageAccountView(
   db: Db,
   accountId: string,
@@ -156,6 +173,8 @@ export function mortgageAccountView(
     paymentAmount: terms.paymentAmount,
     paymentFrequency: terms.paymentFrequency,
     nextPayments: mortgageNextPayments(schedule, asOf, 6),
+    payments: schedule.payments,
+    actualPayments: actualPayments(db, accountId),
     extra: effect
       ? {
           amount: perPayment,
