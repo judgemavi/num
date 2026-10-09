@@ -1,7 +1,6 @@
 import { accounts, checkpoints, monthCloses, transactions } from "@num/db";
 import {
   isIsoDate,
-  type Inbox,
   isMonthKey,
   monthLastDay,
   Temporal,
@@ -13,9 +12,9 @@ import {
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { listInbox } from "./inbox";
-import { effectiveOpeningDate } from "./opening-date";
 import { loadMonthStory } from "./month-story";
+import { effectiveOpeningDate } from "./opening-date";
+import { homeOpenMonths, needsReviewMonths } from "./needs-review";
 import { write, type AuditSource } from "./write";
 
 type WriteInput = {
@@ -94,9 +93,12 @@ function accountBlockers(
     .sort((left, right) => ((left.accountId ?? "") < (right.accountId ?? "") ? -1 : 1));
 }
 
-function withInbox(blockers: Blocker[], month: string, inboxMonths: ReadonlySet<string>): Blocker[] {
-  if (inboxMonths.has(month)) {
-    blockers.push({ code: "inbox_open", accountId: null });
+function withReview(blockers: Blocker[], month: string, reviewMonths: ReadonlySet<string>, homeMonths: ReadonlySet<string>): Blocker[] {
+  if (reviewMonths.has(month)) {
+    blockers.push({ code: "needs_review", accountId: null });
+  }
+  if (homeMonths.has(month)) {
+    blockers.push({ code: "home_open", accountId: null });
   }
   return blockers;
 }
@@ -113,8 +115,7 @@ export function blockersFor(db: Db, month: string, asOf: string): Blocker[] {
     ...endBlocker(month, asOf),
     ...accountBlockers(month, db.select().from(accounts).all(), db.select().from(checkpoints).all()),
   ];
-  const inboxMonths = new Set(listInbox(db, asOf).items.map((item) => item.date.slice(0, 7)));
-  return withInbox(blockers, month, inboxMonths);
+  return withReview(blockers, month, needsReviewMonths(db, asOf), homeOpenMonths(db, asOf));
 }
 
 function isClosed(row: CloseRow | undefined): boolean {
@@ -138,19 +139,21 @@ function liveDetail(db: Db, month: string, asOf: string, blockers: Blocker[], cl
   };
 }
 
-export function listMonths(db: Db, asOf: string, knownInbox?: Inbox): MonthList {
+export function listMonths(db: Db, asOf: string): MonthList {
   requireAsOf(asOf);
   const closes = new Map(db.select().from(monthCloses).all().map((row) => [row.month, row]));
   const accountRows = db.select().from(accounts).all();
   const checkpointRows = db.select().from(checkpoints).all();
-  const inboxMonths = new Set((knownInbox ?? listInbox(db, asOf)).items.map((item) => item.date.slice(0, 7)));
+  const reviewMonths = needsReviewMonths(db, asOf);
+  const homeMonths = homeOpenMonths(db, asOf);
   return {
     asOf,
     items: monthsInBook(db, asOf).map((month) => {
-      const blockers = withInbox(
+      const blockers = withReview(
         [...endBlocker(month, asOf), ...accountBlockers(month, accountRows, checkpointRows)],
         month,
-        inboxMonths,
+        reviewMonths,
+        homeMonths,
       );
       return { month, status: statusOf(isClosed(closes.get(month)), blockers), blockers };
     }),

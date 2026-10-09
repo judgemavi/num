@@ -17,6 +17,37 @@ export const confidenceThresholds: Record<ConfidenceMode, number> = {
 };
 
 export const suggestionFloor = 0.6;
+export const likelyMinimum = 0.75;
+
+export const confidenceLevels = ["sure", "likely", "maybe", "none"] as const;
+
+export type ConfidenceLevel = (typeof confidenceLevels)[number];
+
+/** Level of a confidence score against the automatic threshold. Sure is at or above the threshold. */
+export function confidenceLevel(confidence: number, threshold: number): ConfidenceLevel {
+  if (confidence >= threshold) {
+    return "sure";
+  }
+  if (confidence >= likelyMinimum) {
+    return "likely";
+  }
+  if (confidence >= suggestionFloor) {
+    return "maybe";
+  }
+  return "none";
+}
+
+/** Shown level. An applied automatic label is Sure. A suggestion is Likely from 0.75 and Maybe below that. */
+export function reviewLevel(automatic: boolean, confidence: number | null): ConfidenceLevel {
+  if (automatic) {
+    return "sure";
+  }
+  if (confidence === null) {
+    return "none";
+  }
+  const level = confidenceLevel(confidence, 1);
+  return level === "sure" ? "likely" : level;
+}
 export const leadMinimum = 0.2;
 export const similarMinimum = 0.8;
 export const recurringConfidence = 0.99;

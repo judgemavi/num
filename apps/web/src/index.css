@@ -50,7 +50,7 @@
     --color-row-hover: #efeffc;
     --color-sunken: #ededf2;
     --color-surface: #ffffff;
-    --color-tint-inbox: #ffefe7;
+    --color-tint-home: #ffefe7;
     --color-tint-accounts: #fff6d6;
     --color-tint-buckets: #e6f4ec;
     --color-tint-plan: #eeeefe;
@@ -113,7 +113,7 @@
     --row-hover: #efeffc;
     --scrim: rgb(23 23 28 / 0.45);
     --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 16px 40px rgb(23 23 28 / 0.14);
-    --tint-inbox: #ffefe7;
+    --tint-home: #ffefe7;
     --tint-accounts: #fff6d6;
     --tint-buckets: #e6f4ec;
     --tint-plan: #eeeefe;

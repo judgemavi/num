@@ -126,7 +126,7 @@ function GroupForm({
     }
     setSaving(true);
     setError(null);
-    const result = await apiRequest("/api/inbox/groups", inboxGroupApplyResultSchema, {
+    const result = await apiRequest("/api/transactions/group", inboxGroupApplyResultSchema, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

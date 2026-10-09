@@ -24,7 +24,7 @@ function json(body: unknown): RequestInit {
 }
 
 export function applyInboxGroup(accountId: string, transactionIds: string[], suggestion: Suggestion) {
-  return apiRequest("/api/inbox/groups", inboxGroupApplyResultSchema, json({
+  return apiRequest("/api/transactions/group", inboxGroupApplyResultSchema, json({
     accountId,
     transactionIds,
     excludedIds: [],
@@ -73,7 +73,20 @@ export function linkOccurrence(planId: string, dueDate: string, transactionId: s
   );
 }
 
-export function createProposedPlan(item: Extract<InboxItem, { kind: "plan_proposal" }>, name: string) {
+export function createProposedPlan(
+  item: {
+    accountId: string;
+    merchantId: string;
+    expectedAmount: number;
+    tolerance: number;
+    amountMode: "fixed" | "variable";
+    startDate: string;
+    freq: "weekly" | "monthly" | "yearly";
+    interval: number;
+    monthDay: number | null;
+  },
+  name: string,
+) {
   const body = {
     name,
     kind: item.expectedAmount < 0 ? "bill" : "income",
@@ -109,13 +122,13 @@ export function fundFromUnassigned(bucketId: string, amount: number, asOf: strin
 }
 
 export function decideItem(asOf: string, itemKey: string, decision: InboxDecisionCode) {
-  return apiRequest(`/api/inbox/decisions?asOf=${asOf}`, inboxDecisionSchema, json({ itemKey, decision }));
+  return apiRequest(`/api/review/decisions?asOf=${asOf}`, inboxDecisionSchema, json({ itemKey, decision }));
 }
 
 export function undoDecision(itemKey: string) {
-  return apiRequest("/api/inbox/decisions/undo", inboxDecisionUndoSchema, json({ itemKey }));
+  return apiRequest("/api/review/decisions/undo", inboxDecisionUndoSchema, json({ itemKey }));
 }
 
 export function acceptUnreadable(asOf: string, itemKey: string) {
-  return apiRequest(`/api/inbox/unreadable?asOf=${asOf}`, inboxUnreadableAcceptSchema, json({ itemKey }));
+  return apiRequest(`/api/imports/unreadable?asOf=${asOf}`, inboxUnreadableAcceptSchema, json({ itemKey }));
 }

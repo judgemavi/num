@@ -160,14 +160,14 @@ test("a missing checkpoint blocks the close", () => {
   }
 });
 
-test("an unresolved Inbox item blocks the close", () => {
+test("a transaction that needs review blocks the close", () => {
   const book = tempDatabase();
   try {
     const account = cash(book.db, 1_000);
     post(book.db, account.id, "2026-03-10", -40);
     createCheckpoint(book.db, account.id, { date: "2026-03-31", statementBalance: 960, ...saved });
     const ready = listMonths(book.db, asOf).items.find((item) => item.month === "2026-03");
-    expect(ready?.blockers.map((item) => item.code)).toEqual(["inbox_open"]);
+    expect(ready?.blockers.map((item) => item.code)).toEqual(["needs_review"]);
     expect(ready?.status).toBe("open");
     expectCode(() => closeMonth(book.db, "2026-03", asOf, saved), "month_not_ready");
     expect(book.db.select().from(monthCloses).all()).toEqual([]);

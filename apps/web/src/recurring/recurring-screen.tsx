@@ -8,7 +8,6 @@ import {
   recurringSignalsSchema,
   type Plan,
   type PlanListQuery,
-  type PlanProposal,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
@@ -17,7 +16,6 @@ import { useCallback, useState } from "react";
 import { PlanFilters } from "@/recurring/filters";
 import { kindLabel, localAsOf, planError, scheduleLabel } from "@/recurring/format";
 import { PlanDetail } from "@/recurring/plan-detail";
-import { type PlanSeed } from "@/recurring/plan-form";
 import { useEditors } from "@/editors/editor-api";
 import { planPath } from "@/recurring/query";
 import { ReviewList } from "@/recurring/review-list";
@@ -148,15 +146,6 @@ export function RecurringScreen() {
     );
   }
 
-  function openProposal(proposal: PlanProposal, name: string) {
-    const seed: PlanSeed = {
-      ...proposal,
-      name,
-      kind: proposal.expectedAmount >= 0 ? "income" : "bill",
-    };
-    void openEditor("plan", { id: null, seed });
-  }
-
   return (
     <>
       <PageHeader
@@ -193,7 +182,7 @@ export function RecurringScreen() {
           <>
             <Fact label="Income">{rows.filter((plan) => plan.kind === "income").length}</Fact>
             <Fact label="Bills">{rows.filter((plan) => plan.kind === "bill").length}</Fact>
-            <Fact label="Missed">{signals.data?.missed.length ?? 0}</Fact>
+            <Fact label="Detected">{signals.data?.proposals.length ?? 0}</Fact>
           </>
         }
         illustration={<PaydayIllustration />}
@@ -207,15 +196,7 @@ export function RecurringScreen() {
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <div className="grid gap-5">
           {signals.data ? (
-            <ReviewList
-              signals={signals.data}
-              plans={rows}
-              accounts={accounts.data?.items ?? []}
-              merchants={merchants.data?.items ?? []}
-              currency={bookCurrency}
-              onOpenPlan={(plan) => setSelectedId(plan.id)}
-              onUseProposal={openProposal}
-            />
+            <ReviewList signals={signals.data} merchants={merchants.data?.items ?? []} onDone={() => void signals.refetch()} />
           ) : null}
           <ListCard label="Recurring">
             {grouped.length === 0 ? (

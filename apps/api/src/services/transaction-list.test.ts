@@ -26,7 +26,7 @@ function tempDatabase() {
 
 const saved = { source: "ui" as const, at: "2026-10-07T16:00:00Z" };
 
-const page: TransactionListQuery = { page: 1, pageSize: 50, uncategorized: false, automatic: false };
+const page: TransactionListQuery = { page: 1, pageSize: 50, uncategorized: false, automatic: false, needsReview: false };
 
 function book() {
   const handle = tempDatabase();

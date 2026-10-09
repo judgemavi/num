@@ -8,7 +8,7 @@ type Search = TransactionListQuery & { edit?: string };
 export const Route = createFileRoute("/transactions")({
   validateSearch: (search: Record<string, unknown>): Search => withEdit(transactionListQuerySchema, search),
   search: {
-    middlewares: [stripSearchParams<Search>({ page: 1, pageSize: 50, uncategorized: false, automatic: false, edit: undefined })],
+    middlewares: [stripSearchParams<Search>({ page: 1, pageSize: 50, uncategorized: false, automatic: false, needsReview: false, edit: undefined })],
   },
   component: TransactionsScreen,
 });

@@ -7,8 +7,6 @@ import {
   inboxDecisionUndoSchema,
   inboxGroupApplyResultSchema,
   inboxGroupApplySchema,
-  inboxQuerySchema,
-  inboxSchema,
   inboxUnreadableAcceptSchema,
   payeeCountQuerySchema,
   payeeCountSchema,
@@ -16,42 +14,28 @@ import {
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { acceptUnreadableLine, decideInboxItem, decisionRows, undoInboxDecision } from "../services/inbox-decisions";
-import { listInbox } from "../services/inbox";
 import { applyInboxGroup, countOtherUncategorized } from "../services/inbox-group";
-import { autoLink } from "../services/recurring-view";
 
 const errorResponse = {
   description: "The request is not valid",
   content: { "application/json": { schema: errorSchema } },
 } as const;
 
-const listRoute = createRoute({
-  operationId: "list_inbox",
-  description: "Read the Inbox. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
-  method: "get",
-  path: "/api/inbox",
-  request: { query: inboxQuerySchema },
-  responses: {
-    200: { description: "Inbox items for this date", content: { "application/json": { schema: inboxSchema } } },
-    400: errorResponse,
-  },
-});
-
 const decisionsRoute = createRoute({
-  operationId: "get_inbox_decisions",
-  description: "Read the Inbox. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  operationId: "get_review_decisions",
+  description: "Read review decisions. This does not create, change or delete a record.",
   method: "get",
-  path: "/api/inbox/decisions",
+  path: "/api/review/decisions",
   responses: {
-    200: { description: "Recorded inbox decisions", content: { "application/json": { schema: inboxDecisionListSchema } } },
+    200: { description: "Recorded review decisions", content: { "application/json": { schema: inboxDecisionListSchema } } },
   },
 });
 
 const decideRoute = createRoute({
-  operationId: "post_inbox_decisions",
-  description: "Create or run the Inbox. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  operationId: "post_review_decisions",
+  description: "Record a review decision. A no answer keeps the same question from coming back.",
   method: "post",
-  path: "/api/inbox/decisions",
+  path: "/api/review/decisions",
   request: {
     query: asOfQuerySchema,
     body: { required: true, content: { "application/json": { schema: inboxDecisionCreateSchema } } },
@@ -64,10 +48,10 @@ const decideRoute = createRoute({
 });
 
 const undoRoute = createRoute({
-  operationId: "post_inbox_decisions_undo",
-  description: "Undo the Inbox (undo). This reverses that change. It does not remove the audit log. Amounts are integer minor units. Money that enters the account is positive.",
+  operationId: "post_review_decisions_undo",
+  description: "Undo a review decision. This reverses that change. It does not remove the audit log.",
   method: "post",
-  path: "/api/inbox/decisions/undo",
+  path: "/api/review/decisions/undo",
   request: {
     body: { required: true, content: { "application/json": { schema: inboxDecisionUndoSchema } } },
   },
@@ -79,10 +63,10 @@ const undoRoute = createRoute({
 });
 
 const acceptRoute = createRoute({
-  operationId: "post_inbox_unreadable",
-  description: "Create or run the Inbox. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  operationId: "post_imports_unreadable",
+  description: "Add an unreadable import row by hand.",
   method: "post",
-  path: "/api/inbox/unreadable",
+  path: "/api/imports/unreadable",
   request: {
     query: asOfQuerySchema,
     body: { required: true, content: { "application/json": { schema: inboxUnreadableAcceptSchema } } },
@@ -95,10 +79,10 @@ const acceptRoute = createRoute({
 });
 
 const groupRoute = createRoute({
-  operationId: "post_inbox_groups",
-  description: "Create or run the Inbox. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  operationId: "post_transactions_group",
+  description: "Apply one category, transfer or merchant to selected transactions.",
   method: "post",
-  path: "/api/inbox/groups",
+  path: "/api/transactions/group",
   request: { body: { required: true, content: { "application/json": { schema: inboxGroupApplySchema } } } },
   responses: {
     200: { description: "The group was categorized", content: { "application/json": { schema: inboxGroupApplyResultSchema } } },
@@ -109,10 +93,10 @@ const groupRoute = createRoute({
 });
 
 const payeeCountRoute = createRoute({
-  operationId: "get_inbox_payee_count",
-  description: "Read the Inbox. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  operationId: "get_transactions_payee_count",
+  description: "Count other uncategorized rows for this payee.",
   method: "get",
-  path: "/api/inbox/payee-count",
+  path: "/api/transactions/payee-count",
   request: { query: payeeCountQuerySchema },
   responses: {
     200: { description: "Other uncategorized rows for this payee", content: { "application/json": { schema: payeeCountSchema } } },
@@ -142,14 +126,5 @@ export function registerInbox(app: OpenAPIHono, db: Db) {
   app.openapi(acceptRoute, (c) => {
     const body = c.req.valid("json");
     return c.json(acceptUnreadableLine(db, c.req.valid("query").asOf, body.itemKey, { source: "ui" }), 200);
-  });
-  app.openapi(listRoute, (c) => {
-    const query = c.req.valid("query");
-    try {
-      autoLink(db, query.asOf, { source: "ui" });
-    } catch (error) {
-      console.error("Recurring auto-link failed", error);
-    }
-    return c.json(listInbox(db, query.asOf), 200);
   });
 }

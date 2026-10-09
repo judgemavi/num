@@ -1,6 +1,7 @@
 import {
   bucketEventSchema,
   bucketSchema,
+  monthPlanSchema,
   currencyUpdateSchema,
   fundingPositionSchema,
   overspentListSchema,
@@ -16,6 +17,7 @@ import { BucketRow } from "@/buckets/bucket-row";
 import { useEditors } from "@/editors/editor-api";
 import { FundingHistory } from "@/buckets/funding-history";
 import { OverspentPanel } from "@/buckets/overspent-panel";
+import { GoalFeasibility } from "@/plan/month-board";
 import { BucketFilterBar } from "@/buckets/filters";
 import { bucketError, today } from "@/buckets/format";
 import { formatMoney } from "@/money";
@@ -63,6 +65,16 @@ export function BucketsScreen() {
     queryKey: ["funding-position", asOf],
     queryFn: async () => {
       const result = await apiRequest(`/api/funding/position?asOf=${asOf}`, fundingPositionSchema);
+      if (!result.ok) {
+        throw new Error(result.code);
+      }
+      return result.data;
+    },
+  });
+  const monthPlan = useQuery({
+    queryKey: ["month-plan", asOf, asOf.slice(0, 7)],
+    queryFn: async () => {
+      const result = await apiRequest(`/api/plan?asOf=${asOf}&month=${asOf.slice(0, 7)}`, monthPlanSchema);
       if (!result.ok) {
         throw new Error(result.code);
       }
@@ -205,6 +217,7 @@ export function BucketsScreen() {
           {actionError}
         </p>
       ) : null}
+      {monthPlan.data ? <GoalFeasibility plan={monthPlan.data} currency={bookCurrency} /> : null}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <div className="grid gap-5">
         <ListCard label="All buckets">

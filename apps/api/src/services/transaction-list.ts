@@ -1,7 +1,9 @@
 import { accounts } from "@num/db";
-import { accountKinds, autoReasons, transactionStatuses, type AccountKind, type AutoReason, type TransactionListItem, type TransactionListQuery, type TransactionStatus } from "@num/shared";
+import { accountKinds, autoReasons, transactionStatuses, type AccountKind, type AutoReason, type TransactionListItem, type TransactionListQuery, type TransactionReview, type TransactionStatus } from "@num/shared";
 import { eq, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
+import { ServiceError } from "../service-error";
+import { listNeedsReview, reviewCounts, type NeedsReviewHit } from "./needs-review";
 const sortColumns = {
   date: "t.date",
   amount: "t.amount",
@@ -138,7 +140,7 @@ function filters(query: TransactionListQuery): SQL {
   return sql.join(parts, sql` and `);
 }
 
-function toItem(row: ListRow): TransactionListItem {
+function toItem(row: ListRow, review: TransactionReview | null): TransactionListItem {
   return {
     id: row.id,
     accountId: row.accountId,
@@ -161,6 +163,13 @@ function toItem(row: ListRow): TransactionListItem {
         ? null
         : { id: row.refundOfKey, date: row.refundOfDate, amount: row.refundOfAmount, payeeRaw: row.refundOfPayee },
     refundedAmount: row.refundedAmount,
+    review:
+      review === null
+        ? null
+        : {
+            ...review,
+            learnedCount: review.learnedCount ?? (row.autoLearnedCount === null ? null : Number(row.autoLearnedCount)),
+          },
   };
 }
 
@@ -200,7 +209,78 @@ function fillRunningBalances(db: Db, accountId: string, rows: ListRow[]): void {
   }
 }
 
+function pageHits(hits: readonly NeedsReviewHit[], query: TransactionListQuery): NeedsReviewHit[] {
+  const offset = (query.page - 1) * query.pageSize;
+  return hits.slice(offset, offset + query.pageSize);
+}
+
+function rowsForIds(db: Db, ids: readonly string[]): ListRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  const list = sql.join(ids.map((id) => sql`${id}`), sql`, `);
+  return db.all<ListRow>(sql`
+    select
+      t.id as id,
+      t.account_id as accountId,
+      a.name as accountName,
+      a.kind as accountKind,
+      t.date as date,
+      t.amount as amount,
+      t.payee_raw as payeeRaw,
+      t.merchant_id as merchantId,
+      m.name as merchantName,
+      t.status as status,
+      case when t.date <= (
+        select max(c.date) from checkpoints c
+        where c.account_id = t.account_id and c.unlocked_at is null
+      ) then 1 else 0 end as reconciled,
+      a.opening_balance as accountOpening,
+      null as runningBalance,
+      t.auto_reason as autoReason,
+      t.auto_confidence as autoConfidence,
+      case
+        when t.auto_reason = 'recurring' then (select p.name from recurring_plans p where p.id = t.auto_source_id)
+        when t.auto_reason = 'merchant_default' then (select m2.name from merchants m2 where m2.id = t.auto_source_id)
+        else (select s.payee_normalized from transactions s where s.id = t.auto_source_id)
+      end as autoSourceName,
+      case when t.auto_reason is null then null else (
+        select count(*) from transactions c
+        inner join transaction_lines cl on cl.transaction_id = c.id
+        where c.auto_reason is null and c.payee_normalized = t.payee_normalized
+          and cl.category_id is not null and cl.transfer_account_id is null
+      ) end as autoLearnedCount,
+      (select p.id from transactions p where p.id = t.refund_of_id) as refundOfKey,
+      (select p.date from transactions p where p.id = t.refund_of_id) as refundOfDate,
+      (select p.amount from transactions p where p.id = t.refund_of_id) as refundOfAmount,
+      (select p.payee_raw from transactions p where p.id = t.refund_of_id) as refundOfPayee,
+      (select sum(r.amount) from transactions r where r.refund_of_id = t.id) as refundedAmount
+    from transactions t
+    join accounts a on a.id = t.account_id
+    left join merchants m on m.id = t.merchant_id
+    where t.id in (${list})
+  `);
+}
+
 export function listTransactions(db: Db, query: TransactionListQuery) {
+  if (query.needsReview) {
+    if (!query.asOf) {
+      throw new ServiceError("as_of_invalid", 400, { asOf: "" });
+    }
+    const hits = listNeedsReview(db, query.asOf);
+    const page = pageHits(hits, query);
+    const byId = new Map(rowsForIds(db, page.map((hit) => hit.id)).map((row) => [row.id, row]));
+    return {
+      items: page.flatMap((hit) => {
+        const row = byId.get(hit.id);
+        return row ? [toItem(row, hit.review)] : [];
+      }),
+      page: query.page,
+      pageSize: query.pageSize,
+      total: hits.length,
+      reviewCounts: reviewCounts(hits),
+    };
+  }
   const where = filters(query);
   const merchantJoin = sql`left join merchants m on m.id = t.merchant_id`;
   const totalRows = db.all<{ total: number }>(sql`
@@ -258,9 +338,10 @@ export function listTransactions(db: Db, query: TransactionListQuery) {
     fillRunningBalances(db, query.accountId, rows);
   }
   return {
-    items: rows.map(toItem),
+    items: rows.map((row) => toItem(row, null)),
     page: query.page,
     pageSize: query.pageSize,
     total,
+    reviewCounts: null,
   };
 }

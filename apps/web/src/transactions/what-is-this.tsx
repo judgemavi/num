@@ -5,6 +5,7 @@ import {
   type Category,
   type CategoryKind,
   type MoneyDirection,
+  reviewLevel,
   type Suggestion,
   type SuggestionReason,
   type WhatChoice,
@@ -67,15 +68,14 @@ type WhatIsThisProps = {
 function reasonText(reason: SuggestionReason): string {
   switch (reason) {
     case "recurring":
-      return "This matches a recurring item.";
+      return "Matches your recurring payment";
     case "learned_amount":
-      return "This matches the payee and the amount.";
     case "learned_payee":
-      return "This matches past answers for the payee.";
+      return "You chose this for this payee";
     case "similar":
-      return "This looks like another payee.";
+      return "Same as a similar payee";
     case "merchant_default":
-      return "This comes from the merchant.";
+      return "This merchant's usual category";
     case "none":
       return "";
   }
@@ -115,8 +115,9 @@ function suggestionText(suggestion: Suggestion, merchants: Option[], categories:
   if (parts.length === 0) {
     return null;
   }
-  const sure = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 0 }).format(suggestion.confidence / 1000);
-  return `Suggested. ${sure} sure. ${parts.join(". ")}. ${reasonText(suggestion.reason)}`;
+  const level = reviewLevel(false, suggestion.confidence / 1000);
+  const label = level === "likely" ? "Likely" : level === "maybe" ? "Maybe" : "Sure";
+  return `${label}. ${parts.join(". ")}. ${reasonText(suggestion.reason)}`;
 }
 
 export function WhatIsThis({

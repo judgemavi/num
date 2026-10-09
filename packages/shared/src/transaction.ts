@@ -5,6 +5,7 @@ import { skippedRowSchema } from "./inbox";
 import { listQuerySchema, pagedResponseSchema } from "./list";
 import { autoReasons } from "./matching";
 import { centsSchema } from "./money";
+import { reviewCountSchema, transactionReviewSchema } from "./review";
 
 export const transactionStatuses = ["open", "cleared"] as const;
 
@@ -127,6 +128,11 @@ export const transactionListQuerySchema = listQuerySchema(transactionSortColumns
     .union([z.boolean(), z.enum(["true", "false"])])
     .optional()
     .transform((value) => value === true || value === "true"),
+  needsReview: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .optional()
+    .transform((value) => value === true || value === "true"),
+  asOf: optionalQueryDate,
 });
 
 export const transactionListItemSchema = z.object({
@@ -155,9 +161,12 @@ export const transactionListItemSchema = z.object({
     })
     .nullable(),
   refundedAmount: centsSchema.nullable(),
+  review: transactionReviewSchema.nullable(),
 });
 
-export const transactionListSchema = pagedResponseSchema(transactionListItemSchema);
+export const transactionListSchema = pagedResponseSchema(transactionListItemSchema).extend({
+  reviewCounts: reviewCountSchema.nullable(),
+});
 
 export type TransactionLineInput = z.infer<typeof transactionLineInputSchema>;
 export type TransactionLine = z.infer<typeof transactionLineSchema>;

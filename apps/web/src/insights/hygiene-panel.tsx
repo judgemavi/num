@@ -1,5 +1,6 @@
-import { inboxAgeDays, type Hygiene, type HygieneCheck } from "@num/shared";
+import { reviewAgeDays, type Hygiene, type HygieneCheck } from "@num/shared";
 import { useNavigate } from "@tanstack/react-router";
+import { localAsOf } from "@/as-of";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { Badge } from "@/components/ui/badge";
 import { monthTitle, rateText, signedMoney } from "@/insights/format";
@@ -48,11 +49,11 @@ function detail(check: HygieneCheck, currency: string): string {
     }
     return `${monthTitle(check.month)} is still open.`;
   }
-  if (check.code === "inbox_age") {
+  if (check.code === "review") {
     if (check.oldCount === 0) {
-      return `Nothing is older than ${inboxAgeDays} days.`;
+      return `Nothing is older than ${reviewAgeDays} days.`;
     }
-    return `${check.oldCount} older than ${inboxAgeDays} days.`;
+    return `${check.oldCount} older than ${reviewAgeDays} days.`;
   }
   if (check.code === "sinking_funds") {
     if (check.yearly === 0) {
@@ -86,7 +87,7 @@ const titles: Record<HygieneCheck["code"], string> = {
   cards_paid: "Cards paid in full",
   imports_current: "Imports are current",
   month_closed: "Previous month",
-  inbox_age: "Inbox",
+  review: "Review",
   sinking_funds: "Sinking funds",
   savings_rate: "Savings rate",
   recurring: "Recurring",
@@ -98,7 +99,7 @@ const places: Record<HygieneCheck["code"], string> = {
   cards_paid: "Accounts",
   imports_current: "Imports",
   month_closed: "This month",
-  inbox_age: "Inbox",
+  review: "Review",
   sinking_funds: "Buckets",
   savings_rate: "Months",
   recurring: "Recurring",
@@ -134,8 +135,8 @@ export function HygienePanel({
       void go({ to: "/accounts/imports", search: { page: 1, pageSize: 50 } });
       return;
     }
-    if (check.code === "inbox_age") {
-      void go({ to: "/" });
+    if (check.code === "review") {
+      void go({ to: "/transactions", search: { page: 1, pageSize: 50, needsReview: true, asOf: localAsOf(), uncategorized: false, automatic: false } });
       return;
     }
     if (check.code === "recurring") {

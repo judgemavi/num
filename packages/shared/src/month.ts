@@ -9,7 +9,7 @@ export const monthStatuses = ["open", "ready", "closed"] as const;
 
 export type MonthStatus = (typeof monthStatuses)[number];
 
-export const closeBlockerCodes = ["month_not_ended", "checkpoint_missing", "inbox_open"] as const;
+export const closeBlockerCodes = ["month_not_ended", "checkpoint_missing", "needs_review", "home_open"] as const;
 
 export type CloseBlockerCode = (typeof closeBlockerCodes)[number];
 

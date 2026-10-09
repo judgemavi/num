@@ -1,4 +1,4 @@
-import { accountSchema, currencyUpdateSchema, importDetailSchema, importUndoSchema, type ImportDetailRow } from "@num/shared";
+import { accountSchema, currencyUpdateSchema, importDetailSchema, importReviewResultSchema, importUndoSchema, type ImportDetailRow } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -24,7 +24,8 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
-import { undoDecision } from "@/inbox/actions";
+import { decideItem, undoDecision } from "@/inbox/actions";
+import { localAsOf } from "@/as-of";
 import { inboxError } from "@/inbox/format";
 
 const detailRoute = getRouteApi("/accounts_/imports_/$importId");
@@ -175,7 +176,25 @@ export function ImportDetailScreen() {
           <p className="px-5 py-4 text-muted-foreground">This file has no rows.</p>
         ) : null}
         {detail.data.rows.map((row) => (
-          <DetailRow key={row.id} row={row} onOpenTransaction={(id) => void openEditor("transaction", { id })} />
+          <DetailRow
+            key={row.id}
+            row={row}
+            onOpenTransaction={(id) => void openEditor("transaction", { id })}
+            onAddNew={() => {
+              void apiRequest(`/api/imports/rows/${row.id}/resolve`, importReviewResultSchema, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ decision: "create" }),
+              }).then(async (result) => {
+                if (!result.ok) {
+                  setError(importError(result.code));
+                  return;
+                }
+                setError(null);
+                await queryClient.invalidateQueries({ queryKey: ["import-detail", importId] });
+              });
+            }}
+          />
         ))}
         {detail.data.unreadable.map((row) => (
           <ListRow key={`line-${row.line}`}>
@@ -205,7 +224,28 @@ export function ImportDetailScreen() {
                 Undo
               </Button>
             ) : (
-              <Badge variant="attention">Unreadable</Badge>
+              <span className="flex flex-wrap gap-2">
+                <Badge variant="attention">Unreadable</Badge>
+                <Button type="button" onClick={() => void openEditor("transaction", { id: null, rawLine: row.raw, initialAccountId: detail.data?.item.accountId })}>
+                  Add by hand
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    void decideItem(localAsOf(), `import_unreadable:${importId}:${row.line}`, "not_a_transaction").then(async (result) => {
+                      if (!result.ok) {
+                        setError(inboxError(result.code ?? "internal_error"));
+                        return;
+                      }
+                      setError(null);
+                      await queryClient.invalidateQueries({ queryKey: ["import-detail", importId] });
+                    });
+                  }}
+                >
+                  Not a transaction
+                </Button>
+              </span>
             )}
           </ListRow>
         ))}
@@ -214,7 +254,15 @@ export function ImportDetailScreen() {
   );
 }
 
-function DetailRow({ row, onOpenTransaction }: { row: ImportDetailRow; onOpenTransaction: (id: string) => void }) {
+function DetailRow({
+  row,
+  onOpenTransaction,
+  onAddNew,
+}: {
+  row: ImportDetailRow;
+  onOpenTransaction: (id: string) => void;
+  onAddNew: () => void;
+}) {
   return (
     <ListRow>
       <div id={`import-row-${row.id}`} className={listName}>
@@ -224,6 +272,11 @@ function DetailRow({ row, onOpenTransaction }: { row: ImportDetailRow; onOpenTra
         </small>
         <RowLinks row={row} onOpenTransaction={onOpenTransaction} />
       </div>
+      {row.outcome === "needs_review" ? (
+        <Button type="button" onClick={onAddNew}>
+          Add as new
+        </Button>
+      ) : null}
       <RowAmount row={row} />
     </ListRow>
   );

@@ -288,7 +288,6 @@ export function AutomaticReason({
     <div className="flex flex-wrap items-center gap-2">
       <p className="text-sm text-muted-foreground">
         {automaticReasonText({
-          confidence: transaction.autoConfidence,
           reason: transaction.autoReason,
           sourceName: transaction.autoSourceName,
           learnedCount: transaction.autoLearnedCount,

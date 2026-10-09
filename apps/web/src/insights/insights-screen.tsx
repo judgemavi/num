@@ -22,6 +22,7 @@ import { useBookCurrency, useCategories, useGroups, useMerchants, useTags } from
 import { monthTitle } from "@/insights/format";
 import { formatMoney } from "@/money";
 import { ForecastChart } from "@/plan/forecast-chart";
+import { ForecastPanel } from "@/insights/forecast-panel";
 import { apiRequest } from "@/request";
 import { OptionCombobox } from "@/transactions/option-combobox";
 
@@ -144,6 +145,7 @@ export function InsightsScreen() {
         pageSize: 50,
         uncategorized: row.kind === "uncategorized",
         automatic: false,
+        needsReview: false,
         from: data.from,
         to: data.to,
         categoryId: by === "category" && row.kind === "item" ? (row.id ?? undefined) : undefined,
@@ -229,6 +231,7 @@ export function InsightsScreen() {
           </Button>
         </div>
       ) : null}
+      <ForecastPanel currency={bookCurrency} />
       {data ? (
         <SummaryStrip
           label="Spending"

@@ -5,7 +5,7 @@ import { centsSchema as cents } from "./money";
 
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
-export const inboxAgeDays = 7;
+export const reviewAgeDays = 7;
 
 const emergencyFundCheckSchema = z.object({
   code: z.literal("emergency_fund"),
@@ -54,10 +54,10 @@ const monthClosedCheckSchema = z.object({
   status: z.enum(["open", "ready", "closed", "none"]),
 });
 
-const inboxAgeCheckSchema = z.object({
-  code: z.literal("inbox_age"),
+const reviewCheckSchema = z.object({
+  code: z.literal("review"),
   pass: z.boolean(),
-  limitDays: z.literal(inboxAgeDays),
+  limitDays: z.literal(reviewAgeDays),
   oldCount: nonNegative,
   oldestDate: isoDateSchema.nullable(),
 });
@@ -105,7 +105,7 @@ export const hygieneCheckSchema = z.discriminatedUnion("code", [
   cardsPaidCheckSchema,
   importsCheckSchema,
   monthClosedCheckSchema,
-  inboxAgeCheckSchema,
+  reviewCheckSchema,
   sinkingCheckSchema,
   savingsRateCheckSchema,
   recurringCheckSchema,
@@ -119,7 +119,7 @@ export const hygieneSchema = z.object({
     cardsPaidCheckSchema,
     importsCheckSchema,
     monthClosedCheckSchema,
-    inboxAgeCheckSchema,
+    reviewCheckSchema,
     sinkingCheckSchema,
     savingsRateCheckSchema,
     recurringCheckSchema,

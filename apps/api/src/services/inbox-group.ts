@@ -82,7 +82,7 @@ function bodyFor(transaction: Transaction, patch: Patch): TransactionBody {
   };
 }
 
-function applyOne(tx: WriteTx, id: string, patch: Patch, at: string): GroupSkip | null {
+export function applySuggestion(tx: WriteTx, id: string, patch: Patch, at: string): GroupSkip | null {
   let transaction: Transaction;
   try {
     transaction = readTransaction(tx, id);
@@ -127,7 +127,7 @@ export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { 
   const confirmed: string[] = [];
   write(db, { source: input.source, at }, (tx) => {
     for (const id of targets) {
-      const skip = applyOne(tx, id, input, at);
+      const skip = applySuggestion(tx, id, input, at);
       if (skip) {
         skipped.push(skip);
       } else {

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const tints = {
-  inbox: "bg-tint-inbox",
+  home: "bg-tint-home",
   accounts: "bg-tint-accounts",
   buckets: "bg-tint-buckets",
   plan: "bg-tint-plan",

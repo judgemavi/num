@@ -44,6 +44,12 @@ export function transactionPath(search: TransactionListQuery): string {
   if (search.automatic) {
     params.set("automatic", "true");
   }
+  if (search.needsReview) {
+    params.set("needsReview", "true");
+  }
+  if (search.asOf) {
+    params.set("asOf", search.asOf);
+  }
   const text = params.toString();
   return text.length === 0 ? "/api/transactions" : `/api/transactions?${text}`;
 }
@@ -59,6 +65,7 @@ export function hasFilters(search: TransactionListQuery): boolean {
       search.from ||
       search.to ||
       search.uncategorized ||
-      search.automatic,
+      search.automatic ||
+      search.needsReview,
   );
 }

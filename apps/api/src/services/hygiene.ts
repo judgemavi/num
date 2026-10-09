@@ -1,13 +1,12 @@
 import {
   cardStatements,
   hygieneSchema,
-  inboxAgeDays,
   isIsoDate,
+  reviewAgeDays,
   Temporal,
   type AccountListQuery,
   type BucketListQuery,
   type Hygiene,
-  type Inbox,
   type MonthList,
   type PlanListQuery,
 } from "@num/shared";
@@ -17,9 +16,11 @@ import { listAccounts } from "./accounts";
 import { listBuckets, listOverspent } from "./buckets";
 import { cardLedger } from "./card-statements";
 import { monthlyBills } from "./funding-book";
-import { settingNumber } from "./inbox-collect";
-import { listInbox } from "./inbox";
+import { importFreshness, settingNumber } from "./inbox-collect";
+import { decidedKeys } from "./inbox-decisions";
+import { listNeedsReview } from "./needs-review";
 import { closedStories, listMonths } from "./months";
+import { recurringSignals } from "./recurring-view";
 import { listPlans } from "./recurring-plans";
 
 const pageSize = 200;
@@ -131,9 +132,9 @@ function cardsPaid(db: Db, asOf: string) {
   return { code: "cards_paid" as const, pass: items.every((item) => item.pass), items };
 }
 
-function importsCurrent(db: Db, asOf: string, inbox: Inbox) {
+function importsCurrent(db: Db, asOf: string) {
   const staleImportDays = settingNumber(db, "staleImportDays", 10);
-  const imported = new Map(inbox.imports.map((row) => [row.accountId, row.lastImportAt]));
+  const imported = new Map(importFreshness(db, asOf).map((row) => [row.accountId, row.lastImportAt]));
   const items = accounts(db)
     .filter((account) => account.onBudget)
     .map((account) => {
@@ -157,16 +158,16 @@ function monthClosed(asOf: string, months: MonthList) {
   return { code: "month_closed" as const, pass: status === "closed" || status === "none", month, status };
 }
 
-function inboxAge(asOf: string, inbox: Inbox) {
-  const limit = Temporal.PlainDate.from(asOf).subtract({ days: inboxAgeDays }).toString();
-  const old = inbox.items.filter((item) => item.date < limit);
+function reviewAge(db: Db, asOf: string) {
+  const limit = Temporal.PlainDate.from(asOf).subtract({ days: reviewAgeDays }).toString();
+  const old = listNeedsReview(db, asOf).filter((item) => item.date < limit);
   let oldestDate: string | null = null;
   for (const item of old) {
     if (oldestDate === null || item.date < oldestDate) {
       oldestDate = item.date;
     }
   }
-  return { code: "inbox_age" as const, pass: old.length === 0, limitDays: inboxAgeDays, oldCount: old.length, oldestDate };
+  return { code: "review" as const, pass: old.length === 0, limitDays: reviewAgeDays, oldCount: old.length, oldestDate };
 }
 
 function sinkingFunds(db: Db) {
@@ -192,16 +193,11 @@ function savingsRate(db: Db, months: MonthList, asOf: string) {
   return { code: "savings_rate" as const, pass: rows.every((item) => item.savings >= 0), months: rows };
 }
 
-function recurring(inbox: Inbox) {
-  let changed = 0;
-  let missed = 0;
-  for (const item of inbox.items) {
-    if (item.kind === "recurring_changed") {
-      changed += 1;
-    } else if (item.kind === "recurring_missed") {
-      missed += 1;
-    }
-  }
+function recurring(db: Db, asOf: string) {
+  const hidden = decidedKeys(db);
+  const signals = recurringSignals(db, asOf);
+  const changed = signals.changed.filter((item) => !hidden.has(`recurring_changed:${item.planId}:${item.dueDate}`)).length;
+  const missed = signals.missed.length;
   return { code: "recurring" as const, pass: changed === 0 && missed === 0, changed, missed };
 }
 
@@ -213,19 +209,18 @@ function overspent(db: Db) {
 
 export function readHygiene(db: Db, asOf: string): Hygiene {
   requireAsOf(asOf);
-  const inbox = listInbox(db, asOf);
-  const months = listMonths(db, asOf, inbox);
+  const months = listMonths(db, asOf);
   return hygieneSchema.parse({
     asOf,
     checks: [
       emergencyFund(db, asOf),
       cardsPaid(db, asOf),
-      importsCurrent(db, asOf, inbox),
+      importsCurrent(db, asOf),
       monthClosed(asOf, months),
-      inboxAge(asOf, inbox),
+      reviewAge(db, asOf),
       sinkingFunds(db),
       savingsRate(db, months, asOf),
-      recurring(inbox),
+      recurring(db, asOf),
       overspent(db),
     ],
   });

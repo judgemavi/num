@@ -17,6 +17,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { accountLabelOf, accountLabels } from "@/accounts/label";
+import { localAsOf } from "@/as-of";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { Amount } from "@/components/amount";
@@ -28,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TransactionFilterBar } from "@/transactions/filters";
 import { automaticReasonText, formatDate, reconciledLabel, refundOfText, refundedText, statusLabel } from "@/transactions/format";
+import { NeedsReviewList } from "@/transactions/needs-review-list";
 import { hasFilters, transactionPath } from "@/transactions/query";
 import { useEditors } from "@/editors/editor-api";
 import { useGroups } from "@/editors/lookups";
@@ -198,10 +200,25 @@ export function TransactionsScreen() {
         kicker={page.total === 1 ? "1 transaction" : `${page.total} transactions`}
         title="Transactions"
         actions={
-          <Button type="button" disabled={accounts.data.every((account) => account.archivedAt)} onClick={() => void openEditor("transaction", { id: null })}>
-            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
-            New transaction
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant={search.needsReview ? "default" : "secondary"}
+              onClick={() => {
+                void navigate({
+                  search: search.needsReview
+                    ? { ...search, needsReview: false, asOf: undefined, page: 1 }
+                    : { ...search, needsReview: true, asOf: localAsOf(), page: 1 },
+                });
+              }}
+            >
+              Needs review
+            </Button>
+            <Button type="button" disabled={accounts.data.every((account) => account.archivedAt)} onClick={() => void openEditor("transaction", { id: null })}>
+              <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
+              New transaction
+            </Button>
+          </>
         }
       />
       <TransactionFilterBar
@@ -213,6 +230,13 @@ export function TransactionsScreen() {
         tags={tags.data}
         onChange={changeFilters}
       />
+      {search.needsReview ? (
+        <NeedsReviewList
+          currency={bookCurrency}
+          items={rows}
+          counts={page.reviewCounts ?? { sure: 0, likely: 0, maybe: 0, none: 0 }}
+        />
+      ) : (
       <div className="overflow-hidden rounded-[16px] border border-border bg-card">
       <Table>
         <TableHeader>
@@ -268,7 +292,6 @@ export function TransactionsScreen() {
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <span className="text-sm text-muted-foreground">
                         {automaticReasonText({
-                          confidence: row.autoConfidence,
                           reason: row.autoReason,
                           sourceName: row.autoSourceName,
                           learnedCount: row.autoLearnedCount,
@@ -342,6 +365,7 @@ export function TransactionsScreen() {
         </TableBody>
       </Table>
       </div>
+      )}
       {page.total > page.pageSize ? (
         <div className="flex items-center justify-end gap-2">
           <Button

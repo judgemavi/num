@@ -93,7 +93,7 @@ export function MonthFlow({ plan, currency }: { plan: MonthPlan; currency: strin
   );
 }
 
-function Feasibility({ plan, currency }: { plan: MonthPlan; currency: string }) {
+export function GoalFeasibility({ plan, currency }: { plan: MonthPlan; currency: string }) {
   const { openEditor } = useEditors();
   const item = plan.feasibility;
   if (!item || (item.shortfall === 0 && item.buckets.length === 0)) {
@@ -136,7 +136,6 @@ export function MonthDetails({ plan, currency }: { plan: MonthPlan; currency: st
   const { openEditor } = useEditors();
   return (
     <>
-      <Feasibility plan={plan} currency={currency} />
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <ListCard label="Bills" title="Bills" actions={<span className="text-sm font-semibold tabular-nums">{formatMoney(currency, plan.bills.planned)}</span>}>
           {plan.bills.items.length === 0 ? <p className="px-5 py-5 text-muted-foreground">No bills this month.</p> : null}

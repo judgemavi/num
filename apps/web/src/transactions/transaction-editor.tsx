@@ -64,7 +64,7 @@ function SingleEditor({ id, rawLine, initialAccountId, onClose, onSaved }: Trans
     queryKey: ["inbox-decisions"],
     enabled: id !== null,
     queryFn: async () => {
-      const result = await apiRequest("/api/inbox/decisions", inboxDecisionListSchema);
+      const result = await apiRequest("/api/review/decisions", inboxDecisionListSchema);
       if (!result.ok) {
         throw new Error(result.code);
       }

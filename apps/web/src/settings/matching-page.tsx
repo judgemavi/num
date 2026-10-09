@@ -8,9 +8,9 @@ import { apiRequest } from "@/request";
 import { SettingsBack } from "@/settings/settings-nav";
 
 const labels: Record<ConfidenceMode, string> = {
-  careful: "Careful",
-  balanced: "Balanced",
-  eager: "Eager",
+  careful: "Only when very sure",
+  balanced: "When sure",
+  eager: "More often",
 };
 
 export function MatchingPage() {
@@ -51,7 +51,7 @@ export function MatchingPage() {
       {setting.isPending ? <p className="text-muted-foreground">Loading matching.</p> : null}
       {setting.data ? (
         <Field>
-          <FieldLabel htmlFor="auto-confidence">When to label automatically</FieldLabel>
+          <FieldLabel htmlFor="auto-confidence">Label for me</FieldLabel>
           <Select value={setting.data.autoConfidence} onValueChange={(value) => void save(value)}>
             <SelectTrigger id="auto-confidence" className="w-full">
               <SelectValue />
@@ -64,7 +64,7 @@ export function MatchingPage() {
               ))}
             </SelectContent>
           </Select>
-          <FieldDescription>Careful waits until the app is very sure. Eager labels sooner. Balanced is the default.</FieldDescription>
+          <FieldDescription>Only when very sure, when sure, or more often. The app never shows a percentage.</FieldDescription>
         </Field>
       ) : null}
       {error ? <p role="alert">{error}</p> : null}

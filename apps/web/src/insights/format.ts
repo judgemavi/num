@@ -42,8 +42,11 @@ export function blockerText(code: CloseBlockerCode, accountName: string | null):
   if (code === "month_not_ended") {
     return "This month has not ended.";
   }
-  if (code === "inbox_open") {
-    return "The Inbox still has something from this month.";
+  if (code === "needs_review") {
+    return "A transaction in this month still needs review.";
+  }
+  if (code === "home_open") {
+    return "Home still has an open item for this month.";
   }
   return `${accountName ?? "An account"} needs a statement on or after the last day of this month.`;
 }

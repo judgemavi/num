@@ -38,7 +38,7 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
     queryKey: ["inbox-decisions", merchant?.id],
     enabled: merchant !== null,
     queryFn: async () => {
-      const result = await apiRequest("/api/inbox/decisions", inboxDecisionListSchema);
+      const result = await apiRequest("/api/review/decisions", inboxDecisionListSchema);
       if (!result.ok) {
         throw new Error(result.code);
       }

@@ -266,7 +266,7 @@ function unreadableItems(db: Db): InboxItem[] {
   return items;
 }
 
-function importFreshness(db: Db, asOf: string): { accountId: string; lastImportAt: string | null }[] {
+export function importFreshness(db: Db, asOf: string): { accountId: string; lastImportAt: string | null }[] {
   const open = db
     .select({ id: accounts.id })
     .from(accounts)

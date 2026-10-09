@@ -1,81 +1,84 @@
-import type { Account, Merchant, Plan, RecurringSignals } from "@num/shared";
+import type { Merchant, RecurringSignals } from "@num/shared";
+import { useState } from "react";
+import { localAsOf } from "@/as-of";
+import { createProposedPlan, decideItem } from "@/inbox/actions";
+import { repeatLabel } from "@/inbox/format";
 import { ListCard, ListRow, listName } from "@/components/list-card";
-import { Amount } from "@/components/amount";
-import { accountLabels } from "@/accounts/label";
-import { formatDate } from "@/recurring/format";
+import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
 
-type ReviewListProps = {
+type DetectedListProps = {
   signals: RecurringSignals;
-  plans: Plan[];
-  accounts: Account[];
   merchants: Merchant[];
-  currency: string;
-  onOpenPlan: (plan: Plan) => void;
-  onUseProposal: (proposal: RecurringSignals["proposals"][number], name: string) => void;
+  onDone: () => void;
 };
 
-export function ReviewList({ signals, plans, accounts, merchants, currency, onOpenPlan, onUseProposal }: ReviewListProps) {
-  const planName = new Map(plans.map((plan) => [plan.id, plan]));
-  const accountName = accountLabels(accounts);
+export function ReviewList({ signals, merchants, onDone }: DetectedListProps) {
+  const asOf = localAsOf();
+  const queryClient = useQueryClient();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const merchantName = new Map(merchants.map((merchant) => [merchant.id, merchant.name]));
-  const rows = signals.changed.length + signals.missed.length + signals.ambiguous.length + signals.proposals.length;
-  if (rows === 0) {
+  if (signals.proposals.length === 0) {
     return null;
   }
 
+  async function refresh() {
+    await queryClient.invalidateQueries({ queryKey: ["recurring-signals"] });
+    onDone();
+  }
+
   return (
-    <ListCard label="To review" title="To review">
-      {signals.missed.map((item) => (
-        <ListRow key={`missed-${item.planId}-${item.dueDate}`} simple onOpen={() => {
-          const plan = planName.get(item.planId);
-          if (plan) {
-            onOpenPlan(plan);
-          }
-        }}>
-          <div className={listName}>
-            {planName.get(item.planId)?.name ?? "Recurring"}
-            <small>Missed {formatDate(item.dueDate)}</small>
-          </div>
-        </ListRow>
-      ))}
-      {signals.changed.map((item) => (
-        <ListRow key={`changed-${item.planId}-${item.dueDate}`} simple onOpen={() => {
-          const plan = planName.get(item.planId);
-          if (plan) {
-            onOpenPlan(plan);
-          }
-        }}>
-          <div className={listName}>
-            {planName.get(item.planId)?.name ?? "Recurring"}
-            <small>Amount changed on {formatDate(item.dueDate)}</small>
-          </div>
-          <div className="text-right text-sm">
-            <Amount currency={currency} minor={item.expectedAmount} />
-            <span className="text-muted-foreground"> to </span>
-            <Amount currency={currency} minor={item.actualAmount} />
-          </div>
-        </ListRow>
-      ))}
-      {signals.ambiguous.map((item) => (
-        <ListRow key={`ambiguous-${item.planId}-${item.dueDate}`} simple>
-          <div className={listName}>
-            {planName.get(item.planId)?.name ?? "Recurring"}
-            <small>
-              {item.transactionIds.length} possible matches on {formatDate(item.dueDate)}
-            </small>
-          </div>
-        </ListRow>
-      ))}
+    <ListCard label="Detected" title="Detected">
+      {error ? <p className="px-5 py-2 text-sm text-attn">{error}</p> : null}
       {signals.proposals.map((item) => {
         const name = merchantName.get(item.merchantId) ?? "Merchant";
+        const itemKey = `plan_proposal:${item.accountId}:${item.merchantId}:${item.startDate}:${item.freq}:${item.interval}`;
         return (
-          <ListRow key={`proposal-${item.accountId}-${item.merchantId}-${item.startDate}`} simple onOpen={() => onUseProposal(item, name)}>
+          <ListRow key={itemKey}>
             <div className={listName}>
               {name}
               <small>
-                Possible plan on {accountName.get(item.accountId) ?? "an account"}, from {formatDate(item.startDate)}
+                {repeatLabel(item.freq, item.interval)} from {item.startDate}
               </small>
             </div>
+            <Button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                setPending(true);
+                void createProposedPlan(item, name).then(async (result) => {
+                  setPending(false);
+                  if (!result.ok) {
+                    setError("The plan was not created.");
+                    return;
+                  }
+                  setError(null);
+                  await refresh();
+                });
+              }}
+            >
+              {item.expectedAmount >= 0 ? "Add recurring income" : "Add a recurring payment"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => {
+                setPending(true);
+                void decideItem(asOf, itemKey, "not_recurring").then(async (result) => {
+                  setPending(false);
+                  if (!result.ok) {
+                    setError("That answer did not save.");
+                    return;
+                  }
+                  setError(null);
+                  await refresh();
+                });
+              }}
+            >
+              Not recurring
+            </Button>
           </ListRow>
         );
       })}

@@ -270,7 +270,7 @@ test("the inbox passes when every item is within 7 days", () => {
       lines: [{ amount: -10 }],
       ...saved,
     });
-    expect(check(db, "2026-02-01", "inbox_age")).toMatchObject({ pass: true, limitDays: 7, oldCount: 0, oldestDate: null });
+    expect(check(db, "2026-02-01", "review")).toMatchObject({ pass: true, limitDays: 7, oldCount: 0, oldestDate: null });
   });
 });
 
@@ -286,7 +286,7 @@ test("the inbox fails when an item is older than 7 days", () => {
       lines: [{ amount: -10 }],
       ...saved,
     });
-    expect(check(db, "2026-02-01", "inbox_age")).toMatchObject({ pass: false, oldCount: 1, oldestDate: "2026-01-01" });
+    expect(check(db, "2026-02-01", "review")).toMatchObject({ pass: false, oldCount: 1, oldestDate: "2026-01-01" });
   });
 });
 

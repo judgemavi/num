@@ -18,30 +18,50 @@ export function formatDate(iso: string): string {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { dateStyle: "medium" });
 }
 
+export function levelLabel(level: "sure" | "likely" | "maybe" | "none"): string {
+  if (level === "sure") {
+    return "Sure";
+  }
+  if (level === "likely") {
+    return "Likely";
+  }
+  if (level === "maybe") {
+    return "Maybe";
+  }
+  return "No suggestion";
+}
+
+export function plainReason(input: {
+  reason: AutoReason | null;
+  sourceName: string | null;
+  learnedCount: number | null;
+}): string {
+  if (input.reason === "recurring") {
+    return input.sourceName ? `Matches your ${input.sourceName} payment` : "Matches your recurring payment";
+  }
+  if (input.reason === "learned_amount" || input.reason === "learned_payee") {
+    if (input.learnedCount === null) {
+      return "You chose this for this payee";
+    }
+    const times = input.learnedCount === 1 ? "1 time" : `${input.learnedCount} times`;
+    return `You chose this ${times} for this payee`;
+  }
+  if (input.reason === "similar") {
+    return "Same as a similar payee";
+  }
+  if (input.reason === "merchant_default") {
+    return "This merchant's usual category";
+  }
+  return "";
+}
+
 export function automaticReasonText(input: {
-  confidence: number | null;
   reason: AutoReason;
   sourceName: string | null;
   learnedCount: number | null;
 }): string {
-  const parts: string[] = [];
-  if (input.confidence !== null) {
-    parts.push(`${new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 0 }).format(input.confidence / 1000)} sure`);
-  }
-  if (input.reason === "recurring") {
-    parts.push(input.sourceName ? `Recurring: ${input.sourceName}` : "Recurring");
-  }
-  if (input.reason === "similar" && input.sourceName) {
-    parts.push(`Similar: ${input.sourceName}`);
-  }
-  if (input.reason === "merchant_default") {
-    parts.push(input.sourceName ? `Merchant: ${input.sourceName}` : "Merchant default");
-  }
-  if (input.learnedCount && input.learnedCount > 0 && input.reason !== "merchant_default") {
-    const answers = input.learnedCount === 1 ? "answer" : "answers";
-    parts.push(`learned from ${input.learnedCount} ${answers}`);
-  }
-  return parts.join(" · ");
+  const reason = plainReason(input);
+  return reason.length > 0 ? `Sure · ${reason}` : "Sure";
 }
 
 export function refundOfText(currency: string, date: string, amount: number): string {

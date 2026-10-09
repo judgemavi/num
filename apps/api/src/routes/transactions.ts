@@ -1,4 +1,7 @@
 import {
+  approveLevelResultSchema,
+  approveLevelSchema,
+  asOfQuerySchema,
   errorSchema,
   refundPurchaseListSchema,
   refundPurchaseQuerySchema,
@@ -11,6 +14,7 @@ import {
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { approveReviewLevel } from "../services/needs-review";
 import { listTransactions } from "../services/transaction-list";
 import { listRefundPurchases } from "../services/refund-link";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
@@ -61,6 +65,24 @@ const refundPurchasesRoute = createRoute({
     200: {
       description: "Recent spending a refund can link to",
       content: { "application/json": { schema: refundPurchaseListSchema } },
+    },
+    400: errorResponse,
+  },
+});
+
+const approveRoute = createRoute({
+  operationId: "post_transactions_approve",
+  description: "Confirm every Needs review row at one level. Sure clears the automatic reason. Likely applies the suggestion. One write. This counts as a confirmation.",
+  method: "post",
+  path: "/api/transactions/approve",
+  request: {
+    query: asOfQuerySchema,
+    body: { required: true, content: { "application/json": { schema: approveLevelSchema } } },
+  },
+  responses: {
+    200: {
+      description: "The rows that were confirmed",
+      content: { "application/json": { schema: approveLevelResultSchema } },
     },
     400: errorResponse,
   },
@@ -181,6 +203,10 @@ const deleteRoute = createRoute({
 });
 
 export function registerTransactions(app: OpenAPIHono, db: Db) {
+  app.openapi(approveRoute, (c) => {
+    const body = c.req.valid("json");
+    return c.json(approveReviewLevel(db, c.req.valid("query").asOf, body.level, { source: "ui" }), 200);
+  });
   app.openapi(refundPurchasesRoute, (c) => c.json({ items: listRefundPurchases(db, c.req.valid("query")) }, 200));
   app.openapi(listRoute, (c) => c.json(listTransactions(db, c.req.valid("query")), 200));
 

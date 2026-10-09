@@ -1,4 +1,4 @@
-import { inboxSchema, setupStatusSchema } from "@num/shared";
+import { setupStatusSchema, transactionListSchema } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Ellipsis, type LucideIcon } from "lucide-react";
@@ -63,7 +63,7 @@ function NavItem({
   );
 }
 
-function AppSidebar({ pathname, inboxCount }: { pathname: string; inboxCount?: number }) {
+function AppSidebar({ pathname, reviewCount }: { pathname: string; reviewCount?: number }) {
   return (
     <Sidebar collapsible="icon" className="h-svh border-r bg-card">
       <SidebarHeader className="px-2 pt-4">
@@ -82,7 +82,7 @@ function AppSidebar({ pathname, inboxCount }: { pathname: string; inboxCount?: n
           <SidebarGroupContent>
             <SidebarMenu>
               {primaryNav.map((item) => (
-                <NavItem key={item.to} {...item} pathname={pathname} count={item.to === "/" ? inboxCount : undefined} />
+                <NavItem key={item.to} {...item} pathname={pathname} count={item.to === "/" ? reviewCount : undefined} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -117,9 +117,9 @@ function sidebarDefaultOpen(): boolean {
   return found.slice(prefix.length) === "true";
 }
 
-function PhoneTabs({ pathname, inboxCount }: { pathname: string; inboxCount?: number }) {
+function PhoneTabs({ pathname, reviewCount }: { pathname: string; reviewCount?: number }) {
   const moreCurrent = phoneMoreNav.some((item) => isCurrent(pathname, item.to));
-  const tabs = primaryNav.filter((item) => item.to !== "/accounts");
+  const tabs = primaryNav;
   return (
     <>
       <nav
@@ -138,8 +138,8 @@ function PhoneTabs({ pathname, inboxCount }: { pathname: string; inboxCount?: nu
             >
               <Icon size={24} strokeWidth={1.8} aria-hidden="true" />
               {item.label}
-              {item.to === "/" && inboxCount !== undefined && inboxCount > 0 ? (
-                <Badge variant="count" className="absolute top-0 left-[calc(50%+6px)]">{inboxCount}</Badge>
+              {item.to === "/" && reviewCount !== undefined && reviewCount > 0 ? (
+                <Badge variant="count" className="absolute top-0 left-[calc(50%+6px)]">{reviewCount}</Badge>
               ) : null}
             </Link>
           );
@@ -187,25 +187,25 @@ function PhoneTabs({ pathname, inboxCount }: { pathname: string; inboxCount?: nu
 function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const asOf = localAsOf();
-  const inbox = useQuery({
-    queryKey: ["inbox", asOf],
+  const review = useQuery({
+    queryKey: ["needs-review-count", asOf],
     queryFn: async () => {
-      const result = await apiRequest(`/api/inbox?asOf=${asOf}`, inboxSchema);
+      const result = await apiRequest(`/api/transactions?needsReview=true&asOf=${asOf}&pageSize=1`, transactionListSchema);
       if (!result.ok) {
         throw new Error(result.code);
       }
-      return result.data;
+      return result.data.total;
     },
   });
   return (
     <SidebarProvider defaultOpen={sidebarDefaultOpen()} className="h-svh overflow-hidden bg-background">
-      <AppSidebar pathname={pathname} inboxCount={inbox.data?.count} />
+      <AppSidebar pathname={pathname} reviewCount={review.data} />
       <SidebarInset className="min-h-0 overflow-y-auto bg-background">
         <main className="grid content-start gap-5 px-4 pt-2 pb-[calc(96px+env(safe-area-inset-bottom))] md:px-8 md:py-7 md:pb-9">
           <Outlet />
         </main>
       </SidebarInset>
-      <PhoneTabs pathname={pathname} inboxCount={inbox.data?.count} />
+      <PhoneTabs pathname={pathname} reviewCount={review.data} />
     </SidebarProvider>
   );
 }

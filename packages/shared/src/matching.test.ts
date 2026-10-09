@@ -6,7 +6,10 @@ import {
   combineConfidence,
   confidenceMilli,
   learnedConfidence,
+  confidenceLevel,
+  confidenceThresholds,
   matchLevel,
+  reviewLevel,
   scoreMatch,
   similarPayees,
   trigramCosine,
@@ -28,6 +31,21 @@ function score(patch: Partial<ScoreInput> & Pick<ScoreInput, "amountRows" | "pay
     ...patch,
   });
 }
+
+test("level comes from confidence and the automatic threshold", () => {
+  expect(confidenceLevel(0.95, confidenceThresholds.careful)).toBe("sure");
+  expect(confidenceLevel(0.85, confidenceThresholds.careful)).toBe("likely");
+  expect(confidenceLevel(0.75, confidenceThresholds.balanced)).toBe("likely");
+  expect(confidenceLevel(0.85, confidenceThresholds.balanced)).toBe("sure");
+  expect(confidenceLevel(0.75, confidenceThresholds.eager)).toBe("sure");
+  expect(confidenceLevel(0.74, confidenceThresholds.eager)).toBe("maybe");
+  expect(confidenceLevel(0.6, confidenceThresholds.balanced)).toBe("maybe");
+  expect(confidenceLevel(0.59, confidenceThresholds.eager)).toBe("none");
+  expect(reviewLevel(true, 0.5)).toBe("sure");
+  expect(reviewLevel(false, 0.8)).toBe("likely");
+  expect(reviewLevel(false, 0.7)).toBe("maybe");
+  expect(reviewLevel(false, null)).toBe("none");
+});
 
 test("one confirmation and three that agree follow the learned formula", () => {
   const one = learnedConfidence([row("a", "2026-01-01", "rent")]);

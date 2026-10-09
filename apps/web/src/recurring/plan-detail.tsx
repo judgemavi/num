@@ -50,7 +50,7 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
   const decisions = useQuery({
     queryKey: ["inbox-decisions"],
     queryFn: async () => {
-      const result = await apiRequest("/api/inbox/decisions", inboxDecisionListSchema);
+      const result = await apiRequest("/api/review/decisions", inboxDecisionListSchema);
       if (!result.ok) {
         throw new Error(result.code);
       }
