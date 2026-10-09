@@ -343,9 +343,10 @@ Month close fields: `month` (`YYYY-MM`), `closedAt`, `reopenedAt?`, `reopenReaso
 
 A proposal is a change that MCP suggests (§12).
 
-Fields: `kind`, `payloadJson`, `source`, `status` (`pending | approved | rejected`), `resultRef?`, `createdAt`, `decidedAt?`.
+Fields: `kind` (the operation), `payloadJson` (the inputs), `source`, `status` (`pending | applied | expired`), `tokenHash`,
+`expiresAt`, `resultRef?`, `createdAt`, `decidedAt?`.
 
-When the user approves a proposal, the app makes the change with the same code that the UI uses.
+A proposal is a pending MCP write preview (§12). Applying it runs the same code that the UI uses.
 
 ### 5.15 Inbox decision
 
@@ -388,6 +389,7 @@ It stores the forecast of the on-budget total for the last day of the month (§8
 | `emergencyFundMonths` | 3 | Hygiene check |
 | `staleImportDays` | 10 | Hygiene check |
 | `recurringGraceDays` | 3 | Date window for recurring links |
+| `aiCanWrite` | false | MCP write tools are listed only when true (§12) |
 | `autoConfidence` | `balanced` | `careful` (0.95), `balanced` (0.85) or `eager` (0.75): when labels become automatic |
 
 ## 6. Calculated values
@@ -702,17 +704,24 @@ To correct other records, the user edits them. The audit log records each edit.
 
 ## 12. MCP
 
-- Transport: streamable HTTP. The API serves it. The proxy in front of the app protects it (§13).
-- **Read tools:** accounts, balances, transaction search, categories, merchants, buckets, plan, forecast, insights, inbox,
-  imports. Read tools never write (the forecast tool does not store the month snapshot).
-- **Write tools create proposals only:**
-  - `propose_transactions`: for example, rows from a PDF statement, with the closing balance.
-  - `propose_categorization`
-  - `propose_merchant`
-  - `propose_valuation`
-- Proposals show in the Inbox. Approval uses the same code as the UI.
-- Proposed transactions go through import matching and duplicate checks (§7.2), the same as a CSV.
-- REST and MCP use the same service functions. MCP has no business logic of its own.
+- Transport: streamable HTTP, served by the API in the same Hono app (`@hono/mcp`). The proxy in front of the app
+  protects it (§13).
+- **Full parity, generated:** every API route defined with `@hono/zod-openapi` is an MCP tool, generated from the OpenAPI
+  registry (name from the operationId, input from the route schemas). A tool runs the route in-process through the same
+  Hono app, so validation, error codes and the audit log are the same as REST. A new route is a new tool.
+- **Read tools** (GET routes) run directly and never write (the forecast read does not store the month snapshot).
+- **Write tools use two steps (decision 0019):**
+  1. **Preview:** the call without a token is a dry run. It changes nothing. It returns what would change (counts,
+     records, before/after) and a confirmation token.
+  2. **Apply:** the AI shows the preview to the user. After the user confirms, the AI calls the same tool with the token.
+     The app executes only when the token matches that exact request (same inputs), is unused, and is younger than
+     10 minutes. A write without a valid token is refused.
+- Pending previews are stored as Proposals (§5.14): kind = the operation, payload = the inputs, token hash, expiry.
+- Tool annotations: GET = read-only; DELETE, undo, import, funding, checkpoint and account changes = destructive.
+- Setting `aiCanWrite` (default false): when false, only read tools are listed.
+- Bulk document entry (for example rows from a PDF statement) uses the import route: preview shows what the import
+  pipeline would create, match and skip (§7.2); apply runs the same pipeline as a CSV.
+- Every applied change is audited with source `mcp` and is undoable like a UI change.
 
 ## 13. Platform
 
