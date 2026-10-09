@@ -8,7 +8,6 @@ import {
 } from "@num/shared";
 import { and, eq, gte, lt, lte } from "drizzle-orm";
 import type { Db } from "../db";
-import { whole } from "../whole";
 import { ServiceError } from "../service-error";
 import { auditTransaction, readTransaction, type Header } from "./transaction-record";
 import type { WriteTx } from "./write";
@@ -103,7 +102,7 @@ export function listRefundPurchases(
       {
         id: row.id,
         date: row.date,
-        amount: whole(row.amount),
+        amount: row.amount,
         payeeRaw: row.payeeRaw,
         categoryId: row.categoryId,
       },

@@ -1,5 +1,5 @@
 import { transactionLines, transactions } from "@num/db";
-import { chooseTransferMatch } from "@num/shared";
+import { chooseTransferMatch, utcNow } from "@num/shared";
 import { eq, sql } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import { transactionReconciled } from "./reconciled";
@@ -16,6 +16,7 @@ export function insertMirror(
   source: string,
   targetAccountId: string,
   line: NormalizedLine,
+  markEdited: boolean,
 ): void {
   const matchId = findTransferMatch(tx, {
     sourceId,
@@ -24,7 +25,7 @@ export function insertMirror(
     lineAmount: line.amount,
   });
   if (matchId) {
-    linkMatch(tx, sourceId, header.accountId, matchId);
+    linkMatch(tx, sourceId, header.accountId, matchId, markEdited);
     return;
   }
   const id = crypto.randomUUID();
@@ -59,7 +60,7 @@ export function insertMirror(
   auditTransaction(tx, id, "create", null, readTransaction(tx, id));
 }
 
-function linkMatch(tx: WriteTx, sourceId: string, sourceAccountId: string, matchId: string): void {
+function linkMatch(tx: WriteTx, sourceId: string, sourceAccountId: string, matchId: string, markEdited: boolean): void {
   const match = tx.select().from(transactions).where(eq(transactions.id, matchId)).get();
   if (!match || match.transferPeerId) {
     throw new Error("Transfer match is missing");
@@ -69,7 +70,13 @@ function linkMatch(tx: WriteTx, sourceId: string, sourceAccountId: string, match
   const line = matchLines[0];
   tx.update(transactions).set({ transferPeerId: matchId }).where(eq(transactions.id, sourceId)).run();
   tx.update(transactions)
-    .set({ transferPeerId: sourceId, autoReason: null, autoSourceId: null, autoConfidence: null })
+    .set({
+      transferPeerId: sourceId,
+      autoReason: null,
+      autoSourceId: null,
+      autoConfidence: null,
+      ...(markEdited ? { editedAt: utcNow() } : {}),
+    })
     .where(eq(transactions.id, matchId))
     .run();
   replaceLines(tx, matchId, [
@@ -110,7 +117,14 @@ function findTransferMatch(tx: WriteTx, input: { sourceId: string; targetAccount
   );
 }
 
-export function attachTransfer(tx: WriteTx, sourceId: string, header: Header, source: string, line: NormalizedLine): void {
+export function attachTransfer(
+  tx: WriteTx,
+  sourceId: string,
+  header: Header,
+  source: string,
+  line: NormalizedLine,
+  markEdited = true,
+): void {
   const target = line.transferAccountId;
   if (!target) {
     throw new Error("Transfer line is missing");
@@ -122,10 +136,10 @@ export function attachTransfer(tx: WriteTx, sourceId: string, header: Header, so
     lineAmount: line.amount,
   });
   if (matchId) {
-    linkMatch(tx, sourceId, header.accountId, matchId);
+    linkMatch(tx, sourceId, header.accountId, matchId, markEdited);
     return;
   }
-  insertMirror(tx, sourceId, header, source, target, line);
+  insertMirror(tx, sourceId, header, source, target, line, markEdited);
 }
 
 function releasePeer(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: StoredLine[]): void {
@@ -136,7 +150,10 @@ function releasePeer(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: Stor
     auditTransaction(tx, peer.id, "delete", before, null);
     return;
   }
-  tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, peer.id)).run();
+  tx.update(transactions)
+    .set({ transferPeerId: null, editedAt: utcNow() })
+    .where(eq(transactions.id, peer.id))
+    .run();
   replaceLines(
     tx,
     peer.id,

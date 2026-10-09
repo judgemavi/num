@@ -85,6 +85,7 @@ export const errorCodes = [
   "event_not_found",
   "event_undone",
   "paycheck_not_found",
+  "paycheck_funded",
   "funding_run_exists",
   "funding_over_limit",
   "funding_lines_invalid",

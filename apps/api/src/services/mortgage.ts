@@ -12,7 +12,6 @@ import {
 } from "@num/shared";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { whole } from "../whole";
 import { balanceOf } from "./account-balance";
 import { ServiceError } from "../service-error";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -136,7 +135,7 @@ export function saveMortgageTerms(db: Db, accountId: string, input: MortgageTerm
 }
 
 function actualPayments(db: Db, accountId: string): MortgageView["actualPayments"] {
-  const rows = db.all<{ id: string; date: string; amount: unknown }>(sql`
+  const rows = db.all<{ id: string; date: string; amount: number }>(sql`
     select t.id as id, t.date as date, -t.amount as amount
     from transactions t
     where 1 = 1
@@ -148,7 +147,7 @@ function actualPayments(db: Db, accountId: string): MortgageView["actualPayments
       )
     order by t.date asc, t.id asc
   `);
-  return rows.map((row) => ({ id: row.id, date: row.date, amount: whole(row.amount) }));
+  return rows.map((row) => ({ id: row.id, date: row.date, amount: row.amount }));
 }
 
 export function mortgageAccountView(

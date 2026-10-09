@@ -1,5 +1,5 @@
 import { occurrenceLinks, recurringPlans, transactions } from "@num/db";
-import { occurrenceDates, type OccurrenceLink, type PlanSchedule } from "@num/shared";
+import { occurrenceDates, utcNow, type OccurrenceLink, type PlanSchedule } from "@num/shared";
 import { and, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -114,7 +114,8 @@ export function linkOccurrence(
       before: null,
       after: linkSnapshot(row),
     });
-    applyLinkedPlan(tx, plan, transactionId);
+    applyLinkedPlan(tx, plan, transactionId, true);
+    tx.update(transactions).set({ editedAt: input.at ?? utcNow() }).where(eq(transactions.id, transactionId)).run();
     linked = toLink(row);
   });
   if (!linked) {

@@ -2,24 +2,20 @@ import { transactions, valuations } from "@num/db";
 import type { AccountKind } from "@num/shared";
 import { and, eq, gt, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { whole } from "../whole";
 import { accountBalance } from "./account-rules";
 import type { WriteTx } from "./write";
 
 type Reader = Db | WriteTx;
 
-function readSum(row: { total: unknown } | undefined): number {
-  if (!row) {
-    return 0;
-  }
-  return whole(row.total);
+function readSum(row: { total: number } | undefined): number {
+  return row?.total ?? 0;
 }
 
 export function transactionTotals(db: Reader, asOf?: string): Map<string, number> {
   const rows = db
     .select({
       accountId: transactions.accountId,
-      total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)`,
+      total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
     })
     .from(transactions)
     .where(and(asOf ? lte(transactions.date, asOf) : undefined))
@@ -27,7 +23,7 @@ export function transactionTotals(db: Reader, asOf?: string): Map<string, number
     .all();
   const totals = new Map<string, number>();
   for (const row of rows) {
-    totals.set(row.accountId, whole(row.total));
+    totals.set(row.accountId, row.total);
   }
   return totals;
 }
@@ -35,7 +31,7 @@ export function transactionTotals(db: Reader, asOf?: string): Map<string, number
 function sumAfter(db: Reader, accountId: string, date: string, asOf?: string): number {
   const row = db
     .select({
-      total: sql<unknown>`coalesce(sum(${transactions.amount}), 0)`,
+      total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
     })
     .from(transactions)
     .where(

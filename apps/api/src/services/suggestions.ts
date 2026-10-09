@@ -5,6 +5,7 @@ import {
   suggestionFromMatch,
   Temporal,
   transferPairs,
+  utcNow,
   type Suggestion,
   type TransferPair,
 } from "@num/shared";
@@ -119,12 +120,13 @@ export function acceptTransferPair(db: Db, asOf: string, leftId: string, rightId
     const rightLines = loadLines(tx, right.id);
     const leftBefore = toTransaction(tx, left, leftLines);
     const rightBefore = toTransaction(tx, right, rightLines);
+    const editedAt = input.at ?? utcNow();
     tx.update(transactions)
-      .set({ transferPeerId: right.id, autoReason: null, autoSourceId: null, autoConfidence: null })
+      .set({ transferPeerId: right.id, autoReason: null, autoSourceId: null, autoConfidence: null, editedAt })
       .where(eq(transactions.id, left.id))
       .run();
     tx.update(transactions)
-      .set({ transferPeerId: left.id, autoReason: null, autoSourceId: null, autoConfidence: null })
+      .set({ transferPeerId: left.id, autoReason: null, autoSourceId: null, autoConfidence: null, editedAt })
       .where(eq(transactions.id, right.id))
       .run();
     replaceLines(tx, left.id, [

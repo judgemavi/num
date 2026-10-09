@@ -120,6 +120,9 @@ export function bucketError(code: ErrorCode): string {
   if (code === "event_funding_run") {
     return "This event belongs to a paycheck. Undo the paycheck to undo it.";
   }
+  if (code === "paycheck_funded") {
+    return "Undo the funding first.";
+  }
   if (code === "paycheck_not_found") {
     return "That paycheck is not ready to fund.";
   }

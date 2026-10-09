@@ -1,6 +1,5 @@
-import { accounts, buckets, occurrenceLinks, recurringPlans, transactions } from "@num/db";
+import { buckets, occurrenceLinks, recurringPlans, transactions } from "@num/db";
 import {
-  accountKinds,
   buildMonthStory,
   businessDayShifts,
   isIsoDate,
@@ -10,7 +9,6 @@ import {
   planFrequencies,
   storyThrough,
   priorMonths,
-  type AccountKind,
   type BusinessDayShift,
   type MonthStory,
   type PlanFrequency,
@@ -22,17 +20,9 @@ import { sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
-import { balanceAsOf } from "./forecast";
 import { loadLedgerLines } from "./ledger-lines";
 
 type PlanRow = typeof recurringPlans.$inferSelect;
-
-function asAccountKind(value: string): AccountKind {
-  if (!(accountKinds as readonly string[]).includes(value)) {
-    throw new Error("Unknown account kind");
-  }
-  return value as AccountKind;
-}
 
 function scheduleOf(row: PlanRow): PlanSchedule {
   if (!(planFrequencies as readonly string[]).includes(row.freq)) {
@@ -56,17 +46,6 @@ function amountModeOf(value: string): StoryOccurrence["amountMode"] {
     return value;
   }
   throw new Error("Unknown amount mode");
-}
-
-export function onBudgetTotal(db: Db, asOf: string): number {
-  let total = 0;
-  for (const account of db.select().from(accounts).all()) {
-    if (!account.onBudget || account.archivedAt !== null) {
-      continue;
-    }
-    total += balanceAsOf(db, { id: account.id, kind: asAccountKind(account.kind), openingBalance: account.openingBalance }, asOf);
-  }
-  return total;
 }
 
 function storyLines(db: Db, from: string, through: string): StoryLine[] {

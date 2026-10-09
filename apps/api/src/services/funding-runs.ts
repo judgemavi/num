@@ -2,7 +2,6 @@ import { bucketEvents, buckets, fundingRuns, transactions } from "@num/db";
 import { fundingLimit, isIsoDate, utcNow, type FundingRun, type FundingRunCreate } from "@num/shared";
 import { eq, isNotNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { whole } from "../whole";
 import { ServiceError } from "../service-error";
 import { activeFundingRun, fundingPosition, requirePaycheck } from "./funding-book";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -162,7 +161,7 @@ function runTotals(db: Db): Map<string, number> {
   const rows = db
     .select({
       fundingRunId: bucketEvents.fundingRunId,
-      total: sql<unknown>`coalesce(sum(${bucketEvents.amount}), 0)`,
+      total: sql<number>`coalesce(sum(${bucketEvents.amount}), 0)`,
     })
     .from(bucketEvents)
     .where(isNotNull(bucketEvents.fundingRunId))
@@ -170,7 +169,7 @@ function runTotals(db: Db): Map<string, number> {
     .all();
   for (const row of rows) {
     if (row.fundingRunId) {
-      totals.set(row.fundingRunId, whole(row.total));
+      totals.set(row.fundingRunId, row.total);
     }
   }
   return totals;

@@ -5,23 +5,9 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { presentBatch } from "./import-read";
 import { transactionReconciled } from "./reconciled";
-import { eraseTransaction } from "./transaction-erase";
+import { hasActiveFundingRun, removeTransaction } from "./transaction-erase";
 import { auditTransaction, readTransaction, type TxRow } from "./transaction-record";
-import { write, type AuditSource, type WriteTx } from "./write";
-
-function removeMirror(tx: WriteTx, sourceId: string): void {
-  const source = tx.select().from(transactions).where(eq(transactions.id, sourceId)).get();
-  if (!source?.transferPeerId) {
-    return;
-  }
-  const peer = tx.select().from(transactions).where(eq(transactions.id, source.transferPeerId)).get();
-  if (!peer || !peer.mirror) {
-    return;
-  }
-  const before = readTransaction(tx, peer.id);
-  eraseTransaction(tx, peer.id);
-  auditTransaction(tx, peer.id, "delete", before, null);
-}
+import { write, type AuditSource } from "./write";
 
 function blockReason(db: Db, txn: TxRow | undefined): UndoBlockReason | "removed" | null {
   if (!txn) {
@@ -30,7 +16,13 @@ function blockReason(db: Db, txn: TxRow | undefined): UndoBlockReason | "removed
   if (transactionReconciled(db, txn.accountId, txn.date)) {
     return "reconciled";
   }
-  if (txn.editedAt !== null) {
+  if (txn.transferPeerId) {
+    const peer = db.select().from(transactions).where(eq(transactions.id, txn.transferPeerId)).get();
+    if (peer?.mirror && transactionReconciled(db, peer.accountId, peer.date)) {
+      return "reconciled";
+    }
+  }
+  if (txn.editedAt !== null || hasActiveFundingRun(db, txn.id)) {
     return "edited";
   }
   return null;
@@ -93,11 +85,8 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
       if (!row?.transactionId) {
         continue;
       }
-      const before = readTransaction(tx, row.transactionId);
-      removeMirror(tx, row.transactionId);
       tx.update(importRows).set({ active: false, transactionId: null }).where(eq(importRows.id, row.id)).run();
-      eraseTransaction(tx, row.transactionId);
-      auditTransaction(tx, row.transactionId, "delete", before, null);
+      removeTransaction(tx, row.transactionId);
     }
     for (const rowId of unlinkIds) {
       const row = tx.select().from(importRows).where(eq(importRows.id, rowId)).get();

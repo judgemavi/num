@@ -1,5 +1,5 @@
 import { accounts, mortgageTerms, occurrenceLinks, transactionLines, transactions, valuations } from "@num/db";
-import { mortgagePrefillLines, mortgageSplitForDate, similarPayees, type Compounding, type MatchResult, type PaymentFrequency } from "@num/shared";
+import { mortgagePrefillLines, mortgageSplitForDate, similarPayees, utcNow, type Compounding, type MatchResult, type PaymentFrequency } from "@num/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { auditTransaction, readTransaction } from "./transaction-record";
@@ -68,6 +68,7 @@ export function applyLinkedPlan(
   tx: WriteTx,
   plan: { id: string; name: string; categoryId: string | null; merchantId: string | null; transferAccountId: string | null },
   transactionId: string,
+  markEdited = false,
 ): void {
   const txn = tx.select().from(transactions).where(eq(transactions.id, transactionId)).get();
   if (!txn) {
@@ -106,6 +107,7 @@ export function applyLinkedPlan(
       autoReason: "recurring",
       autoSourceId: plan.id,
       autoConfidence: 990,
+      ...(markEdited ? { editedAt: utcNow() } : {}),
     })
     .where(eq(transactions.id, transactionId))
     .run();
@@ -124,7 +126,7 @@ export function applyLinkedPlan(
           payeeRaw: current.payeeRaw,
           payeeNormalized: current.payeeNormalized,
           status: current.status === "cleared" ? current.status : "open",
-        }, current.source, principal);
+        }, current.source, principal, false);
       }
     }
   } else if (plan.categoryId) {

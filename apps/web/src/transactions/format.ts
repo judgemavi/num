@@ -76,6 +76,8 @@ export function transactionError(code: string): string {
       return "This side of the transfer has one line.";
     case "transaction_reconciled":
       return "Unlock the checkpoint before you change this transaction.";
+    case "paycheck_funded":
+      return "Undo the funding first.";
     case "payee_raw_locked":
       return "The bank text stays as it was imported.";
     case "account_archived":

@@ -1,7 +1,6 @@
 import { bucketCategories, bucketEvents, fundingRuns, transactionLines, transactions } from "@num/db";
 import { and, eq, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { whole } from "../whole";
 import type { WriteTx } from "./write";
 
 export type Reader = Db | WriteTx;
@@ -44,7 +43,7 @@ export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
   const lines = db
     .select({
       bucketId: bucketCategories.bucketId,
-      total: sql<unknown>`coalesce(sum(${transactionLines.amount}), 0)`,
+      total: sql<number>`coalesce(sum(${transactionLines.amount}), 0)`,
     })
     .from(transactionLines)
     .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
@@ -54,7 +53,7 @@ export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
     .all();
 
   for (const line of lines) {
-    add(balances, line.bucketId, whole(line.total));
+    add(balances, line.bucketId, line.total);
   }
   return balances;
 }

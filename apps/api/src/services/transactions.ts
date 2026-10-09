@@ -16,10 +16,10 @@ import {
   type TxRow,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
-import { assertRefundLink, clearRefundLinks } from "./refund-link";
+import { assertRefundLink } from "./refund-link";
 import { spreadSureLabels } from "./match-apply";
 import { transactionReconciled } from "./reconciled";
-import { eraseTransaction } from "./transaction-erase";
+import { removeTransaction } from "./transaction-erase";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -330,36 +330,9 @@ export function deleteTransaction(db: Db, id: string, input: WriteInput): Transa
   let deleted: Transaction | undefined;
   write(db, { source: input.source, at }, (tx) => {
     const existing = requireActive(tx, id);
-    const existingLines = loadLines(tx, id);
     const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
-    const peerLines = peer ? loadLines(tx, peer.id) : [];
     assertDeletable(tx, existing, peer);
-    clearRefundLinks(tx, existing.id);
-    const before = toTransaction(tx, existing, existingLines);
-    if (peer?.mirror) {
-      const peerBefore = toTransaction(tx, peer, peerLines);
-      eraseTransaction(tx, peer.id);
-      auditTransaction(tx, peer.id, "delete", peerBefore, null);
-    } else if (peer) {
-      const peerBefore = toTransaction(tx, peer, peerLines);
-      tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, existing.id)).run();
-      tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, peer.id)).run();
-      replaceLines(
-        tx,
-        peer.id,
-        peerLines.map((line) => ({
-          amount: line.amount,
-          memo: line.memo,
-          categoryId: line.transferAccountId ? null : line.categoryId,
-          transferAccountId: null,
-          tagIds: line.tagIds,
-        })),
-      );
-      auditTransaction(tx, peer.id, "update", peerBefore, readTransaction(tx, peer.id));
-    }
-    eraseTransaction(tx, existing.id);
-    auditTransaction(tx, existing.id, "delete", before, null);
-    deleted = before;
+    deleted = removeTransaction(tx, id);
   });
   if (!deleted) {
     throw new Error("Delete did not return a transaction");

@@ -2,8 +2,6 @@ import { accounts } from "@num/db";
 import { accountKinds, autoReasons, transactionStatuses, type AccountKind, type AutoReason, type TransactionListItem, type TransactionListQuery, type TransactionStatus } from "@num/shared";
 import { eq, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
-import { whole } from "../whole";
-
 const sortColumns = {
   date: "t.date",
   amount: "t.amount",
@@ -147,13 +145,13 @@ function toItem(row: ListRow): TransactionListItem {
     accountName: row.accountName,
     accountKind: asKind(row.accountKind),
     date: row.date,
-    amount: whole(row.amount),
+    amount: row.amount,
     payeeRaw: row.payeeRaw,
     merchantId: row.merchantId,
     merchantName: row.merchantName,
     status: asStatus(row.status),
     reconciled: row.reconciled === 1,
-    runningBalance: row.runningBalance === null ? null : whole(row.runningBalance),
+    runningBalance: row.runningBalance,
     autoReason: asAutoReason(row.autoReason),
     autoConfidence: row.autoConfidence,
     autoSourceName: row.autoSourceName,
@@ -161,8 +159,8 @@ function toItem(row: ListRow): TransactionListItem {
     refundOf:
       row.refundOfKey === null || row.refundOfDate === null || row.refundOfAmount === null || row.refundOfPayee === null
         ? null
-        : { id: row.refundOfKey, date: row.refundOfDate, amount: whole(row.refundOfAmount), payeeRaw: row.refundOfPayee },
-    refundedAmount: row.refundedAmount === null ? null : whole(row.refundedAmount),
+        : { id: row.refundOfKey, date: row.refundOfDate, amount: row.refundOfAmount, payeeRaw: row.refundOfPayee },
+    refundedAmount: row.refundedAmount,
   };
 }
 
@@ -179,7 +177,7 @@ function fillRunningBalances(db: Db, accountId: string, rows: ListRow[]): void {
     rows.map((row) => sql`${row.id}`),
     sql`, `,
   );
-  const balances = db.all<{ id: string; spent: unknown }>(sql`
+  const balances = db.all<{ id: string; spent: number }>(sql`
     select id, spent from (
       select tx.id as id,
         sum(tx.amount) over (order by tx.date asc, tx.id asc) as spent
@@ -188,13 +186,13 @@ function fillRunningBalances(db: Db, accountId: string, rows: ListRow[]): void {
     )
     where id in (${ids})
   `);
-  const spentById = new Map(balances.map((row) => [row.id, whole(row.spent)]));
+  const spentById = new Map(balances.map((row) => [row.id, row.spent]));
   for (const row of rows) {
     const spent = spentById.get(row.id);
     if (spent === undefined) {
       throw new Error("Running balance is missing");
     }
-    const balance = whole(row.accountOpening) + spent;
+    const balance = row.accountOpening + spent;
     if (!Number.isSafeInteger(balance)) {
       throw new Error("Sum is not an integer");
     }
@@ -205,13 +203,13 @@ function fillRunningBalances(db: Db, accountId: string, rows: ListRow[]): void {
 export function listTransactions(db: Db, query: TransactionListQuery) {
   const where = filters(query);
   const merchantJoin = sql`left join merchants m on m.id = t.merchant_id`;
-  const totalRows = db.all<{ total: unknown }>(sql`
+  const totalRows = db.all<{ total: number }>(sql`
     select count(*) as total
     from transactions t
     ${query.q ? merchantJoin : sql``}
     where ${where}
   `);
-  const total = whole(totalRows[0]?.total ?? 0);
+  const total = totalRows[0]?.total ?? 0;
   const offset = (query.page - 1) * query.pageSize;
   const rows = db.all<ListRow>(sql`
     select

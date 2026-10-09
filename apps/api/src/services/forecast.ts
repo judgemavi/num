@@ -136,7 +136,7 @@ function planAmount(plan: PlanRow, links: { planId: string; dueDate: string; tra
   return variableAmounts(actuals, plan.expectedAmount).forecast;
 }
 
-export function readForecastOnly(db: Db, asOf: string): Forecast {
+export function readForecast(db: Db, asOf: string): Forecast {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
@@ -282,9 +282,7 @@ export function readForecastOnly(db: Db, asOf: string): Forecast {
       from transactions t
       inner join transactions peer on peer.id = t.transfer_peer_id
       where t.account_id = ${account.id}
-       
         and t.amount > 0
-       
     `);
     const fromHistory = usualAccount(payments);
     const chequing = openAccounts.filter((row) => row.kind === "chequing");
@@ -317,8 +315,4 @@ export function readForecastOnly(db: Db, asOf: string): Forecast {
     cards,
   });
   return forecast;
-}
-
-export function readForecast(db: Db, asOf: string): Forecast {
-  return readForecastOnly(db, asOf);
 }

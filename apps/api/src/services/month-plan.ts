@@ -22,7 +22,6 @@ import {
 } from "@num/shared";
 import { and, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { whole } from "../whole";
 import { ServiceError } from "../service-error";
 
 type PlanRow = typeof recurringPlans.$inferSelect;
@@ -194,7 +193,7 @@ function balancesBefore(db: Db, start: string): Map<string, number> {
   const lines = db
     .select({
       bucketId: bucketCategories.bucketId,
-      total: sql<unknown>`coalesce(sum(${transactionLines.amount}), 0)`,
+      total: sql<number>`coalesce(sum(${transactionLines.amount}), 0)`,
     })
     .from(transactionLines)
     .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
@@ -203,7 +202,7 @@ function balancesBefore(db: Db, start: string): Map<string, number> {
     .groupBy(bucketCategories.bucketId)
     .all();
   for (const line of lines) {
-    add(line.bucketId, whole(line.total));
+    add(line.bucketId, line.total);
   }
   return balances;
 }
