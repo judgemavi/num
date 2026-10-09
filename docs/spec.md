@@ -704,7 +704,7 @@ To correct other records, the user edits them. The audit log records each edit.
 
 ## 12. MCP
 
-- Transport: streamable HTTP, served by the API in the same Hono app (`@hono/mcp`). The proxy in front of the app
+- Transport: streamable HTTP, served by the API in the same Hono app with the MCP Hono adapter (`@modelcontextprotocol/hono`, `createMcpHonoApp`, as in v1). The proxy in front of the app
   protects it (§13).
 - **Full parity, generated:** every API route defined with `@hono/zod-openapi` is an MCP tool, generated from the OpenAPI
   registry (name from the operationId, input from the route schemas). A tool runs the route in-process through the same

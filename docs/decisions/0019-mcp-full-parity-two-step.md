@@ -13,7 +13,7 @@ reads can contain hidden instructions.
 
 ## Decision
 
-- Generate one MCP tool for each `@hono/zod-openapi` route; run it in-process through the same Hono app (`@hono/mcp`).
+- Generate one MCP tool for each `@hono/zod-openapi` route; run it in-process through the same Hono app (MCP Hono adapter `@modelcontextprotocol/hono`, as in v1).
 - Read tools run directly. Write tools need two steps: a dry-run preview that returns a confirmation token, then the
   same call with the token after the user confirms. The server refuses a write without a valid token (same inputs,
   unused, younger than 10 minutes).
