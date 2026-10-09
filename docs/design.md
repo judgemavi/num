@@ -9,9 +9,9 @@ The visual reference is `docs/design/signal-reference.html`. Open it in a browse
 
 1. **Colour is a signal.** Strong colour tells the user one of three things:
    - Iris: "you can do this" (main buttons, selection, progress, links).
-   - Tomato: "this needs you" (Inbox count, over budget, old imports, lowest forecast point).
+   - Tomato: "this needs you" (needs-review count, over budget, old imports, lowest forecast point).
    - Green: "this is on track" (paid, on track, net worth went up).
-2. **Pastel colour is identity.** Each bucket, account group and Inbox item kind has its own hue everywhere.
+2. **Pastel colour is identity.** Each bucket, account group and Home item kind has its own hue everywhere.
    Always a soft fill with a deep glyph.
 3. **Everything else is neutral:** text, borders, group labels, navigation.
 4. **One page pattern** on every main screen (§5).
@@ -57,7 +57,7 @@ Put these in `apps/web/src/index.css` as CSS variables. Map them to the shadcn v
 | pink | `#FCE7F1` | `#A3326B` |
 | teal | `#DDF3F1` | `#11706A` |
 
-**Page tints** (summary strip background only): Inbox `#FFEFE7`, Accounts `#FFF6D6`, Buckets `#E6F4EC`, Plan `#EEEEFE`.
+**Page tints** (summary strip background only): Home `#FFEFE7`, Accounts `#FFF6D6`, Buckets `#E6F4EC`, Insights `#EEEEFE`.
 Other screens use the surface colour.
 
 **Radius:** cards 16px, inputs 12px, dialogs 20px, icon tiles 10px, buttons and chips fully round (999px).
@@ -83,12 +83,12 @@ Other screens use the surface colour.
 - **Desktop:** a 232px sidebar on the left. The user can collapse it to icons (shadcn Sidebar `collapsible="icon"`);
   the app remembers the choice.
   - Brand at the top.
-  - Primary: Inbox (with the tomato count), Transactions, Buckets, Plan, Accounts.
+  - Primary: Home (with the tomato needs-review count), Transactions, Buckets, Accounts.
   - Group "More": Insights, Recurring.
   - Settings at the bottom.
   - Items are 44px high, radius 10px. Current item: `primary-soft` fill, `primary` text and icon.
-- **Phone (width < 768px):** a bottom tab bar: Inbox, Transactions, Buckets, Plan, More.
-  More opens a sheet with Accounts, Insights, Recurring and Settings.
+- **Phone (width < 768px):** a bottom tab bar: Home, Transactions, Buckets, Accounts, More.
+  More opens a sheet with Insights, Recurring and Settings.
 - Icons: lucide icons, stroke 1.8, 20px.
 
 ## 5. Page pattern
@@ -160,7 +160,7 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 
 ## 6a. Transaction editor
 
-The transaction editor is one shared editor (§6b). The Inbox, Transactions, import detail and Recurring open it.
+The transaction editor is one shared editor (§6b). Home, Transactions, import detail and Recurring open it.
 
 Order, top to bottom:
 1. **Money out / Money in** (ToggleGroup) and **Amount** as a positive number. The sign comes from the toggle.
@@ -179,8 +179,9 @@ Order, top to bottom:
 **Group mode:** opened with several transactions that the user selected. Header: "12 transactions · $84.20".
 Category, transfer and merchant apply to all; the user can exclude items. Split is not available.
 
-An Inbox row is one transaction: payee, date, amount, suggestion chips (one click). The whole row opens the editor; a chevron at the right shows this. No "Other…" button, no dismiss, no queue mode.
-An automatic label shows its reason ("Rule: NETFLIX", "Learned from Mar 12").
+A Needs review row is one transaction: payee, date, amount, the level (Sure, Likely, Maybe as a Badge, never a percentage) and one-click answers. The whole row opens the editor; a chevron at the right shows this. No "Other…" button, no dismiss, no queue mode.
+The view groups rows by level, each group with its count and, for Sure and Likely, an "Approve all" button (shared confirm).
+An automatic label shows its level and reason ("Sure · You chose this 4 times for this payee").
 
 ## 6b. Shared editors and the dialog host
 
@@ -201,8 +202,8 @@ form → "+ Create new group"). An archived match shows "Restore 'X'".
 
 ## 7. Illustrations
 
-Four small duotone illustrations, one for each tinted summary strip: payday (Inbox), balance scale (Accounts),
-jars (Buckets), paycheck split (Plan). Port them from the reference file into React SVG components.
+Four small duotone illustrations, one for each tinted summary strip: payday (Home), balance scale (Accounts),
+jars (Buckets), paycheck split (Insights). Port them from the reference file into React SVG components.
 Stroke ink 2.5px, fills from the identity hues and `#F4CD55` as the one warm highlight. They are decoration:
 give each one an accessible label, or `aria-hidden` when the text already says the same thing.
 
@@ -211,7 +212,7 @@ give each one an accessible label, or `aria-hidden` when the text already says t
 - **Account groups:** Cash & cards = sky, Savings = mint, Investments & property = butter, Loans & mortgage = lilac.
   Group by kind: chequing, cash, credit card → Cash & cards. Savings → Savings. Investment, property, receivable,
   other asset → Investments & property. Mortgage, loan, other liability → Loans & mortgage.
-- **Inbox item kinds:** paycheck funding = mint, categorize = sky, recurring change = lilac, transfer = butter,
+- **Review and Home item kinds:** paycheck funding = mint, categorize = sky, recurring change = lilac, transfer = butter,
   over budget = attention (tomato).
 - **Buckets:** each bucket has a `color` (one identity hue) and an `icon` (from a fixed lucide set). The user picks them.
   The app suggests a hue in rotation for a new bucket.

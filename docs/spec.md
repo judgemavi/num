@@ -18,7 +18,7 @@ All features must support one of these three loops:
 
 | Loop | When | Time | Result |
 |---|---|---|---|
-| Weekly review | One time each week | 10 min | Statements are imported. The Inbox is empty. |
+| Weekly review | One time each week | 10 min | Statements are imported. Nothing needs review. Home is all clear. |
 | Paycheck funding | At each paycheck | 2 min | The paycheck is assigned to buckets with one click. |
 | Monthly close | At the start of each month | 15 min | Balances agree with statements. The month is marked as reviewed. The month story is available. |
 
@@ -34,7 +34,8 @@ If a screen or feature does not support one of these loops, do not add it.
 4. **Reversible.** The user can undo imports and funding. The user can open a closed month again.
    The user can restore archived accounts, categories, tags, merchants, recurring items and buckets.
    The audit log records each of these actions.
-5. **Exceptions only.** The user works on the Inbox. The user does not examine each transaction.
+5. **Exceptions only.** Home shows only what needs the user. The user approves sure labels in bulk and answers the rest.
+   The user does not examine each transaction.
 6. **Plain language.** The UI does not use accounting words. Do not show "debit", "credit", "equity", "split" or "ledger".
 7. **Small.** Use the smallest possible number of concepts. Each new concept needs a decision record.
 8. **For everyone.** The code must not contain one person's banks, data or region as fixed values.
@@ -82,7 +83,7 @@ The owner finds information about unknown merchants with Claude through MCP.
   - The API returns raw integers, ISO dates, ISO timestamps and codes. The API does not return formatted numbers,
     formatted dates or formatted currency.
   - The browser formats with `Intl` and the browser locale.
-  - The API returns codes and parameters, not English sentences. Examples: Inbox item kinds, error codes, suggestion reasons.
+  - The API returns codes and parameters, not English sentences. Examples: review question kinds, error codes, suggestion reasons.
     The browser makes the text. Thus, translation is possible later.
 - **Lists:** Filter, sort and page state is in the URL. The URL agrees 1:1 with the API query.
   Pagination is on the server (decision 0004).
@@ -178,7 +179,7 @@ Line fields:
 Rules:
 - The sum of the lines must be equal to the transaction amount.
 - A transaction has one or more lines.
-- A line without a category and without a transfer is **uncategorized**. It shows in the Inbox.
+- A line without a category and without a transfer is **uncategorized**. It needs review (§7.3).
 - **Transfers:**
   - A line with `transferAccountId` has a **mirror transaction** in the target account.
   - The mirror amount = −(line amount). The mirror date = the line's transaction date.
@@ -193,7 +194,7 @@ Rules:
   - Unlink (the user removes the transfer, or changes it to a category):
     - A peer with `mirror` = true is deleted.
     - A peer with `mirror` = false is never deleted. Its transfer link is cleared and its line becomes uncategorized
-      (it shows in the Inbox again).
+      (it needs review again).
   - A change to the date, amount or target of a transfer updates the peer only when the peer is a mirror.
     If the peer is not a mirror, the app unlinks the pair instead. The app never rewrites imported bank data.
   - Deleting one side of a pair: a mirror peer is deleted with it; a non-mirror peer is unlinked.
@@ -249,7 +250,7 @@ Rules:
   - For the forecast: the median of the last 6 linked actual amounts.
   - For goal feasibility (§7.8): the lowest of the last 6 linked actual amounts. This is the safe value.
   - If there are fewer than 3 linked actuals, use `expectedAmount` for both.
-  - A `variable` plan does not create "changed amount" Inbox items. `tolerance` applies only to linking.
+  - A `variable` plan does not create "changed amount" questions. `tolerance` applies only to linking.
 
 ### 5.8 Bucket
 
@@ -312,7 +313,7 @@ Batch fields: `accountId`, `documentId`, `parser`, `periodStart`, `periodEnd`, `
 
 Row fields: `batchId`, `rowIndex`, `date`, `amount`, `payeeRaw`, `bankId?`, `identity`,
 `outcome` (`created | matched | needs_review | duplicate | ignored`), `transactionId?`.
-- `needs_review`: more than one match candidate. The row holds its identity. The Inbox shows it. The user's decision changes it to `matched` or `created`.
+- `needs_review`: more than one match candidate. The row holds its identity. The import detail shows it. The user's decision changes it to `matched` or `created`.
 
 Identity:
 - If the bank gives a transaction ID: `identity` = `bank:<bankId>`.
@@ -349,11 +350,11 @@ Month close fields: `month` (`YYYY-MM`), `closedAt`. A month close is a "reviewe
 
 Proposals are removed (decision 0019). MCP calls the same API as the UI.
 
-### 5.15 Inbox decision
+### 5.15 Review decision
 
 Fields: `itemKey`, `decision` (code), `reason?` (text), `decidedAt`.
 
-The app calculates most Inbox items from other records. It does not store them.
+The app calculates review questions and Home items from other records. It does not store them.
 `itemKey` is a stable key for one item: the item kind and the IDs of its records.
 There is no generic dismiss. Each item kind has its own answers (decision 0016). A "no" answer is a decision that the
 app records, so the same question does not come back:
@@ -440,7 +441,7 @@ The user can create, edit and archive accounts.
 4. If not, the app looks for a match: a transaction in the same account, with the same amount,
    a date within ±3 days, and no import row.
    - One candidate: the outcome is `matched`. The app links the row. The batch summary shows it.
-   - More than one candidate: the row goes to the Inbox.
+   - More than one candidate: the row needs review in its import detail.
 5. If there is no match, the outcome is `created`. The app creates a transaction with one line.
    §7.3 gives the merchant and category.
 6. If the file has a running balance, the app stores `closingBalance` and `closingDate`.
@@ -510,17 +511,24 @@ Exception: a recurring link is the user's own intent. It always labels (automati
 It applies on every link: automatic link on import, and a manual link in the UI.
 
 Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default, Eager 0.75):
-- confidence ≥ `autoConfidence` and a clear lead: **automatic**.
-- confidence ≥ 0.60: **suggestion** in the Inbox (preselected).
-- less: Inbox without a suggestion.
+- confidence ≥ `autoConfidence` and a clear lead: **automatic** (the label is applied; it still needs review).
+- confidence ≥ 0.60: **suggestion** (preselected, not applied).
+- less: no suggestion.
+
+**Levels (decision 0021).** The UI never shows a percentage. It shows a level and a plain reason:
+- **Sure:** automatic. **Likely:** a suggestion with confidence ≥ 0.75. **Maybe:** a suggestion below 0.75.
+  No level: no suggestion.
+- Reasons: "Matches your Rent payment" (recurring), "You chose this N times for this payee" (learned),
+  "Same as a similar payee" (similar), "This merchant's usual category" (merchant default).
+- Settings → Matching shows `autoConfidence` as "Label for me: only when very sure (careful) · when sure (balanced) ·
+  more often (eager)".
 
 **Automatic labels.**
 - The app sets category and merchant automatically on import (only the rows of that import, so undo removes them all),
   and after each user confirmation on the other uncategorized transactions whose confidence is now above the threshold.
   It keeps a merchant that the user set.
 - An automatic label stores `autoReason` (the strongest signal code), `autoConfidence` (0–1000) and `autoSourceId`.
-  The UI shows the confidence and the reasons: "94% sure · Recurring: Rent · learned from 4 answers".
-  The Transactions "Automatic" filter can sort by confidence (lowest first).
+  The UI shows the level and the reason (see Levels).
 - A confirmation clears `autoReason`. Other edits (notes, tags) are not confirmations.
 - When a transaction becomes a transfer or a split, the automatic fields are cleared.
 - Transfers are never automatic (evidence only preselects Transfer). Splits are never automatic, except the mortgage split
@@ -540,8 +548,15 @@ Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default,
    both groups with labels (this also covers returned income).
 The best candidate (§7.3) preselects the choice: a category, or a learned transfer.
 
-**Inbox, one row for each transaction.** The Inbox shows each transaction that the app cannot categorize. The whole row
-opens the transaction editor (a chevron at the right shows this). Suggestion chips on the row apply with one click.
+**Needs review (decision 0021).** A transaction needs review when it has an automatic label, a suggestion, no category,
+or an open question (possible transfer, more than one recurring candidate, changed recurring amount).
+Transactions has a "Needs review" view (a server filter) with one row for each transaction. The row shows the question,
+the level and one-click answers. The whole row opens the transaction editor (a chevron at the right shows this).
+- **Approve by level:** the view groups its rows by level (Sure, Likely, Maybe, No suggestion) with counts.
+  "Approve all Sure" and "Approve all Likely" apply each row's label or suggestion as a confirmation (shared confirm
+  with the count; audited; one write). Maybe and No suggestion are answered one row at a time.
+- An approval is a confirmation (it counts for learning).
+- Home shows the count and links to the view.
 The editor's group mode stays available for bulk edits that the user starts (for example from a selection on Transactions).
 
 **Create on the spot.** Every picker of user-managed things shows "+ Create new <thing>" as its first option (decision 0018).
@@ -550,7 +565,7 @@ Save creates the record, selects it and closes the section. A merchant name is s
 ("SQ *BLUE BOTTLE 0423" → "Blue Bottle").
 
 **Transfer detection.** An imported row can have an opposite amount to an unlinked row in a different on-budget account,
-within ±3 days. Then the Inbox suggests a transfer pair. The user accepts with one click.
+within ±3 days. Then the transaction needs review with a transfer pair question. The user accepts with one click.
 Look only at unlinked, not deleted transactions from the last 90 days. Each transaction is in a maximum of one pair.
 
 ### 7.4 Recurring
@@ -559,18 +574,18 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
   the plan's account, a date within ±`recurringGraceDays`, the plan's merchant (if set),
   and an amount within the tolerance.
   - One candidate: the app links it automatically.
-  - More than one candidate: the Inbox shows it.
-- **Changed amount.** If a linked amount is outside the tolerance, the Inbox shows it.
+  - More than one candidate: the transaction needs review.
+- **Changed amount.** If a linked amount is outside the tolerance, the transaction needs review.
   Example: "Netflix $16.99 → $19.99. Update the plan?"
-- **Missed.** If an occurrence is older than the grace period, has no link and is not skipped, the Inbox shows it.
-- **Detection.** The Inbox suggests a new plan when a merchant has:
+- **Missed.** If an occurrence is older than the grace period, has no link and is not skipped, Home shows it (This month).
+- **Detection.** Recurring → "Detected" suggests a new plan (Home shows a count) when a merchant has:
   - 3 or more transactions.
   - Gaps that agree with weekly, biweekly, monthly or yearly, within ±3 days.
   - Amounts within 10% of their median.
-- **Time windows** (they keep the work small and the Inbox calm):
+- **Time windows** (they keep the work small and Home calm):
   - Link candidates: occurrences from the later of `startDate` and `asOf` − 13 months.
   - Missed: only occurrences in the last 35 days. Older unlinked occurrences show in the plan history.
-    The user can skip them, but they are not Inbox items.
+    The user can skip them, but Home does not show them.
   - Detection: only transactions from the last 18 months. Look only for the most recent run of regular
     transactions for each merchant (the run that ends at the merchant's latest transaction).
   - Read only the transactions inside these windows from the database. Do not load all transactions.
@@ -589,14 +604,14 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
 
 **Month close.** The user can close a month only when the month has ended (`asOf` is after its last day) and:
 - Each on-budget account has a checkpoint on or after the last day of the month.
-- The Inbox has no items with a date in that month.
+- No transaction in that month needs review, and Home has no open item for that month.
 
 A month close records that the user reviewed the month. It does not lock the month and it stores no summary: the month
 story is always calculated from current data (§9). The user can open the month again; this removes the mark (audited).
 
 ### 7.6 Paycheck funding
 
-1. A transaction links to a `fundsBuckets` income occurrence. The Inbox shows "Fund this paycheck".
+1. A transaction links to a `fundsBuckets` income occurrence. Home shows "Fund this paycheck".
 2. The app calculates a proposal. It uses bucket priority order. It stops when the paycheck amount or Unassigned is used,
    whichever is smaller.
    - Spending: `refillTo − balance` at the first paycheck of the month. At other paychecks: 0.
@@ -609,7 +624,7 @@ story is always calculated from current data (§9). The user can open the month 
 
 ### 7.7 Overspending
 
-If a bucket balance is less than zero, the Inbox shows it.
+If a bucket balance is less than zero, Home and Buckets show it.
 Example: "Groceries is −$42. Cover from…".
 The user can move money with one click, from Unassigned or from a different bucket.
 
@@ -618,7 +633,7 @@ Expense lines in categories without a bucket decrease Unassigned directly.
 ### 7.8 Goal feasibility
 
 For each goal and sinking bucket, the app calculates the amount for each paycheck (§7.6).
-The Plan screen compares the total with the paycheck surplus.
+Buckets (goals) compares the total with the paycheck surplus.
 
 Paycheck surplus = expected paycheck − bills for each paycheck − spending refills for each paycheck.
 
@@ -653,7 +668,7 @@ The forecast is daily, for 90 days. It shows each on-budget account and the tota
 - Safe to spend (§6).
 - Each account that goes below zero or below the buffer.
 
-After 90 days, show only the monthly net values from the Plan screen. Do not show daily values.
+After 90 days, show only the monthly net values (Home, this month). Do not show daily values.
 
 ## 9. Insights
 
@@ -679,7 +694,7 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 | Cards paid in full | The last statement balance of each `full` card was paid by its derived due date (§5.13) |
 | Imports are current | Each on-budget account has an import in the last `staleImportDays` days |
 | Months are closed | The previous month is closed |
-| Inbox | No items are older than 7 days |
+| Review | No transaction has needed review for more than 7 days |
 | Sinking funds | Each yearly `bill` plan has a sinking bucket for its category |
 | Savings rate | The savings rate of the last 3 closed months is 0% or more. Show the percentage. |
 | Recurring | There are no changed or missed occurrences |
@@ -753,17 +768,16 @@ To correct other records, the user edits them. The audit log records each edit.
 
 ## 14. Screens
 
-There are 8 screens.
+There are 7 screens (decision 0021).
 
 | Screen | Contents |
 |---|---|
-| Inbox | All items that need a decision. The user clears it to zero. |
-| Transactions | Search and filter, detail and edit, lines, tags, transfers |
-| Plan | Monthly: income → bills → bucket funding → left to save (the month remainder, not the Unassigned balance). Goal feasibility. Forecast chart. |
-| Buckets | Balances, funding history, moves, settings |
-| Insights | Month story, categories, merchants, tags, net worth, mortgage, hygiene panel |
-| Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports (§7.2). |
-| Recurring | Plans, occurrences, links, skips |
-| Settings | Subpages: Groups, Categories, Tags, Merchants, Matching (`autoConfidence`), Backup. |
+| Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Transactions → Needs review); hygiene checks (§10); this month: income → bills → bucket funding → left to save, "Fund this paycheck", missed payments, overspent buckets, goal status; spending changes this month; net worth. Each card links to its screen. |
+| Transactions | Search and filter, Needs review view (§7.3), detail and edit, lines, tags, transfers |
+| Buckets | Balances, funding history, moves, goals (feasibility), settings |
+| Insights | Month story, categories, merchants, tags, trends, net worth, mortgage, forecast chart |
+| Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
+| Recurring | Plans, occurrences, links, skips, Detected (new plan suggestions) |
+| Settings | Subpages: Groups, Categories, Tags, Merchants, Matching (`autoConfidence`), AI access, Backup. |
 
-The first-run setup screen (§7.0) is not one of the 8 screens. It shows only one time.
+The first-run setup screen (§7.0) is not one of the 7 screens. It shows only one time.
