@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { normalizePayee } from "./payee";
+import { merchantNameFromPayee, normalizePayee } from "./payee";
 
 const cases: [string, string][] = [
   ["SQ *BLUE BOTTLE COFFEE TORONTO ON", "BLUE BOTTLE COFFEE TORONTO"],
@@ -75,6 +75,16 @@ const cases: [string, string][] = [
   ["Пятёрочка", "ПЯТЁРОЧКА"],
   ["SHOP NO 55", "SHOP"],
   ["CAFE #88", "CAFE"],
+  ["CIBC MC      Q7A5J4", "CIBC MC"],
+  ["E-TRANSFER ***q4E", "E-TRANSFER"],
+  ["E-TFR ***6Xf EPAY", "E-TFR EPAY"],
+  ["CRA B&C      K4K8X6", "CRA B&C"],
+  ["CLGRY TAX    H8W2H4", "CLGRY TAX"],
+  ["CIBC MC Z9Y8X7", "CIBC MC"],
+  ["PETRO-CANADA 1234", "PETRO-CANADA 1234"],
+  ["7-ELEVEN", "7-ELEVEN"],
+  ["GROCERY MART **1234", "GROCERY MART"],
+  ["SHOP ***abc", "SHOP"],
 ];
 
 test("normalizePayee cleans bank payee text", () => {
@@ -82,4 +92,14 @@ test("normalizePayee cleans bank payee text", () => {
   for (const [input, expected] of cases) {
     expect({ input, output: normalizePayee(input) }).toEqual({ input, output: expected });
   }
+});
+
+test("payments with different reference codes share one payee key", () => {
+  expect(normalizePayee("CIBC MC Q7A5J4")).toBe(normalizePayee("CIBC MC Z9Y8X7"));
+  expect(normalizePayee("E-TRANSFER ***q4E")).toBe(normalizePayee("E-TRANSFER ***9kL"));
+  expect(normalizePayee("CRA B&C K4K8X6")).toBe(normalizePayee("CRA B&C P3Q7R1"));
+  expect(normalizePayee("CLGRY TAX H8W2H4")).toBe(normalizePayee("CLGRY TAX M4N5P6"));
+  expect(merchantNameFromPayee("CIBC MC Q7A5J4")).toBe("Cibc Mc");
+  expect(merchantNameFromPayee("PETRO-CANADA 1234")).toBe("Petro-canada");
+  expect(merchantNameFromPayee("7-ELEVEN")).toBe("7-eleven");
 });

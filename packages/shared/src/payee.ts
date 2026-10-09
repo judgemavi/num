@@ -1,32 +1,33 @@
-const PREFIXES: RegExp[] = [
-  /^INTERAC\s+E-?TRANSFER(?:\s+TO)?\s+/,
-  /^E-?TRANSFER(?:\s+TO)?\s+/,
-  /^CARD\s+PAYMENT\s+TO\s+/,
-  /^PRE-?AUTHORIZED(?:\s+(?:PAYMENT|DEBIT))?\s+/,
-  /^SEPA(?:\s+LASTSCHRIFT)?\s+/,
-  /^LASTSCHRIFT\s+/,
-  /^PAIEMENT(?:\s+CARTE)?\s+/,
-  /^ACHAT\s+/,
-  /^VISA\s+DEBIT\s+/,
-  /^DEBIT\s+CARD\s+/,
-  /^POS\s+DEBIT\s+/,
-  /^POS\s+PURCHASE\s+/,
-  /^CHECKCARD\s+/,
-  /^MASTERCARD\s+/,
-  /^PURCHASE\s+/,
-  /^PAYPAL\s*\*\s*/,
-  /^PYPL\s*\*\s*/,
-  /^PP\s*\*\s*/,
-  /^SQ\s*\*\s*/,
-  /^TST\s*\*\s*/,
-  /^STRIPE\s*\*\s*/,
-  /^GOOGLE\s*\*\s*/,
-  /^VENMO\s*\*\s*/,
-  /^APL\s*\*\s*/,
-  /^CK\s*\*\s*/,
-  /^SP\s+/,
-  /^POS\s+/,
-  /^ACH\s+/,
+/** A rail stays when only a code follows. A processor prefix always goes. */
+const PREFIXES: { pattern: RegExp; rail: boolean }[] = [
+  { pattern: /^INTERAC\s+E-?TRANSFER(?:\s+TO)?\s+/, rail: true },
+  { pattern: /^E-?TRANSFER(?:\s+TO)?\s+/, rail: true },
+  { pattern: /^CARD\s+PAYMENT\s+TO\s+/, rail: true },
+  { pattern: /^PRE-?AUTHORIZED(?:\s+(?:PAYMENT|DEBIT))?\s+/, rail: true },
+  { pattern: /^SEPA(?:\s+LASTSCHRIFT)?\s+/, rail: true },
+  { pattern: /^LASTSCHRIFT\s+/, rail: true },
+  { pattern: /^PAIEMENT(?:\s+CARTE)?\s+/, rail: true },
+  { pattern: /^ACHAT\s+/, rail: true },
+  { pattern: /^VISA\s+DEBIT\s+/, rail: true },
+  { pattern: /^DEBIT\s+CARD\s+/, rail: true },
+  { pattern: /^POS\s+DEBIT\s+/, rail: true },
+  { pattern: /^POS\s+PURCHASE\s+/, rail: true },
+  { pattern: /^CHECKCARD\s+/, rail: true },
+  { pattern: /^MASTERCARD\s+/, rail: true },
+  { pattern: /^PURCHASE\s+/, rail: true },
+  { pattern: /^PAYPAL\s*\*\s*/, rail: false },
+  { pattern: /^PYPL\s*\*\s*/, rail: false },
+  { pattern: /^PP\s*\*\s*/, rail: false },
+  { pattern: /^SQ\s*\*\s*/, rail: false },
+  { pattern: /^TST\s*\*\s*/, rail: false },
+  { pattern: /^STRIPE\s*\*\s*/, rail: false },
+  { pattern: /^GOOGLE\s*\*\s*/, rail: false },
+  { pattern: /^VENMO\s*\*\s*/, rail: false },
+  { pattern: /^APL\s*\*\s*/, rail: false },
+  { pattern: /^CK\s*\*\s*/, rail: false },
+  { pattern: /^SP\s+/, rail: false },
+  { pattern: /^POS\s+/, rail: false },
+  { pattern: /^ACH\s+/, rail: false },
 ];
 
 const REGIONS = new Set([
@@ -41,7 +42,17 @@ const REGIONS = new Set([
 function stripPrefixes(value: string): string {
   let current = value;
   for (let pass = 0; pass < 4; pass += 1) {
-    const next = PREFIXES.reduce((text, prefix) => (prefix.test(text) ? text.replace(prefix, "") : text), current).trim();
+    let next = current;
+    for (const prefix of PREFIXES) {
+      if (!prefix.pattern.test(next)) {
+        continue;
+      }
+      const remainder = next.replace(prefix.pattern, "").trim();
+      if (prefix.rail && !hasRealWord(finish(remainder))) {
+        return next;
+      }
+      next = remainder;
+    }
     if (next === current) {
       return current;
     }
@@ -50,12 +61,30 @@ function stripPrefixes(value: string): string {
   return current;
 }
 
+/** A per-payment code: 3+ letters and digits, with no hyphen or other mark. */
+function isReferenceCode(token: string): boolean {
+  return token.length >= 3 && /^[\p{L}\p{N}]+$/u.test(token) && /\p{L}/u.test(token) && /\p{N}/u.test(token);
+}
+
+function hasRealWord(value: string): boolean {
+  return value.split(" ").some((word) => /\p{L}{2,}/u.test(word) && !isReferenceCode(word) && !REGIONS.has(word));
+}
+
+function stripTrailingCodes(value: string): string {
+  const words = value.split(" ").filter((word) => word.length > 0);
+  while (words.length > 1 && isReferenceCode(words[words.length - 1] ?? "")) {
+    words.pop();
+  }
+  return words.join(" ");
+}
+
 function stripNoise(value: string): string {
   return value
     .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
     .replace(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, " ")
     .replace(/\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/g, " ")
     .replace(/[X*]{2,}\d{2,4}/g, " ")
+    .replace(/\*{2,}[\p{L}\p{N}]+/gu, " ")
     .replace(/\b\d{4}[X*]{2,}\d{0,4}\b/g, " ")
     .replace(/#\s*\d+\b/g, " ")
     .replace(
@@ -82,6 +111,10 @@ function tidy(value: string): string {
   return value.replace(/\s+/g, " ").trim().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
 }
 
+function finish(value: string): string {
+  return tidy(stripTrailingCodes(stripPlace(stripNoise(value))));
+}
+
 export function storedPayee(payeeRaw: string): { payeeRaw: string; payeeNormalized: string } {
   return { payeeRaw, payeeNormalized: normalizePayee(payeeRaw) };
 }
@@ -89,7 +122,7 @@ export function storedPayee(payeeRaw: string): { payeeRaw: string; payeeNormaliz
 /** Normalized payee for rules, history and merchant defaults (spec §7.3). */
 export function normalizePayee(description: string): string {
   const upper = description.toUpperCase().replace(/[,'"`()]+/g, " ").replace(/\s+/g, " ").trim();
-  return tidy(stripPlace(stripNoise(stripPrefixes(upper))));
+  return finish(stripPrefixes(upper));
 }
 
 function titleWord(word: string): string {
