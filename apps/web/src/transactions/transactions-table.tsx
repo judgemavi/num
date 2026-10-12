@@ -1,13 +1,16 @@
 import { accountClass, type Account, type Category, type Merchant, type ReviewCounts, type TransactionListItem, type TransactionListQuery } from "@num/shared";
+import { Lock } from "lucide-react";
 import { Fragment } from "react";
 import { accountLabelOf, accountLabels } from "@/accounts/label";
 import { Amount } from "@/components/amount";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEditors } from "@/editors/editor-api";
-import { CategoryCell, type Names } from "@/transactions/category-cell";
-import { formatDate, levelLabel, reconciledLabel, refundOfText, refundedText, statusLabel } from "@/transactions/format";
+import { CategoryCell } from "@/transactions/category-cell";
+import type { Names } from "@/transactions/names";
+import { formatDate, levelLabel, refundOfText, refundedText } from "@/transactions/format";
+import { ReviewCell } from "@/transactions/review-cell";
 import { hasFilters } from "@/transactions/query";
 import { useReviewActions } from "@/transactions/use-review-actions";
 
@@ -82,17 +85,24 @@ export function TransactionsTable(props: Props) {
           {row.refundedAmount ? <div className="text-muted-foreground">{refundedText(currency, row.refundedAmount)}</div> : null}
         </TableCell>
         <TableCell>
-          <CategoryCell row={row} currency={currency} names={names} pending={actions.pending} planById={actions.planById} run={actions.run} />
+          <CategoryCell row={row} names={names} />
         </TableCell>
         <TableCell className="text-right">
-          <Amount currency={currency} minor={row.amount} />
-        </TableCell>
-        <TableCell>
-          {row.reconciled ? (
-            <Badge variant="neutral">{reconciledLabel()}</Badge>
-          ) : row.status === "open" ? null : (
-            <Badge variant="positive">{statusLabel(row.status)}</Badge>
-          )}
+          <div className="flex items-center justify-end gap-2">
+            {row.reconciled ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span role="img" aria-label="Checked against your balance" tabIndex={0}>
+                    <Lock className="size-3.5 text-muted-foreground" aria-hidden />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Checked against your balance</TooltipContent>
+              </Tooltip>
+            ) : row.status === "open" ? (
+              <span className="text-sm text-muted-foreground">Pending</span>
+            ) : null}
+            <Amount currency={currency} minor={row.amount} />
+          </div>
         </TableCell>
         {showBalance ? (
           <TableCell className="text-right">
@@ -101,6 +111,9 @@ export function TransactionsTable(props: Props) {
             )}
           </TableCell>
         ) : null}
+        <TableCell>
+          <ReviewCell row={row} currency={currency} names={names} pending={actions.pending} planById={actions.planById} run={actions.run} />
+        </TableCell>
       </TableRow>
     );
   }
@@ -145,8 +158,8 @@ export function TransactionsTable(props: Props) {
               <SortHead column="payeeRaw" label="Payee" props={props} />
               <TableHead>Category</TableHead>
               <SortHead column="amount" label="Amount" props={props} className="text-right" />
-              <TableHead>Status</TableHead>
               {showBalance ? <TableHead className="text-right">Balance</TableHead> : null}
+              <TableHead>Review</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

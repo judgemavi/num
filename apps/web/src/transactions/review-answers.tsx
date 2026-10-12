@@ -20,7 +20,7 @@ function looksRight(id: string) {
   return apiRequest(`/api/transactions/${id}/looks-right`, transactionSchema, { method: "POST" });
 }
 
-/** The one-click answers in the Category cell. */
+/** The one-click answers in the Review cell. */
 export function ReviewAnswers({ row, currency, pending, planById, run }: Props) {
   const { openEditor } = useEditors();
   const review = row.review;
