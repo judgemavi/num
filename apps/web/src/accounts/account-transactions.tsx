@@ -76,7 +76,6 @@ export function AccountTransactions({ accountId, currency, showBalance, page, on
 
   const rows = transactions.data?.items ?? [];
   const selectable = rows.filter((row) => !row.reconciled);
-  const selectedOnPage = selectable.filter((row) => selected.includes(row.id));
   const lastPage = transactions.data ? Math.max(1, Math.ceil(transactions.data.total / transactions.data.pageSize)) : 1;
 
   function applySelection(ids: string[], on: boolean) {
