@@ -18,7 +18,7 @@ import {
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
 import { linkAutomatic } from "./auto-link";
 import { recordRefundNo } from "./refund-auto";
-import { recordPairNo } from "./transfer-auto";
+import { linkLearnedTransfers, recordPairNo } from "./transfer-auto";
 import { assertRefundLink, withRefundPurchase } from "./refund-link";
 import { spreadSureLabels } from "./match-apply";
 import { transactionReconciled } from "./reconciled";
@@ -285,6 +285,9 @@ export function applyTransactionUpdate(
   }
   if (peer && !peer.mirror && saved.transferPeerId === null) {
     recordPairNo(tx, id, peer.id, at);
+  }
+  if (saved.transferPeerId !== null && !saved.mirror && saved.autoReason === null && saved.lines.some((line) => line.transferAccountId !== null)) {
+    linkLearnedTransfers(tx, [id]);
   }
   if (spread && changed && isUserConfirmation(saved)) {
     spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));

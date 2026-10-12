@@ -8,6 +8,8 @@ import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
+import { decideInboxItem } from "./inbox-decisions";
+import { acceptTransferPair } from "./suggestions";
 import { applyInboxGroup } from "./inbox-group";
 import { importStatement } from "./imports";
 import { undoImportBatch } from "./import-undo";
@@ -257,5 +259,26 @@ test("two same-day fees of the same amount ask which one", () => {
     const rebate = refundOf(db, ids, "2026-03-01", 1_795, ids.fees, "ACCT BAL REBATE");
     expect(getTransaction(db, rebate.id)?.refundOfId).toBeNull();
     expect(review(db, rebate.id)?.question).toBe("refund_purchase");
+  });
+});
+
+test("confirming one pair links the other open pairs of the same payee, except a recorded no", () => {
+  withBook((db, ids) => {
+    const dates = ["02/03", "02/17", "03/03", "03/10"];
+    statement(db, ids, ids.cheque, "out", dates.map((day) => `${day}/2026,CIBC PAYMENT,-50.00`));
+    statement(db, ids, ids.savings, "in", dates.map((day) => `${day}/2026,PAYMENT RECEIVED,50.00`));
+    const outs = rowsOf(db, -5_000).sort((a, b) => a.date.localeCompare(b.date));
+    const ins = rowsOf(db, 5_000).sort((a, b) => a.date.localeCompare(b.date));
+    expect(outs.every((row) => row.transferPeerId === null)).toBe(true);
+    const skipped = [outs[1]?.id ?? "", ins[1]?.id ?? ""].sort();
+    decideInboxItem(db, asOf, `transfer_pair:${skipped.join(":")}`, "not_transfer", saved);
+    acceptTransferPair(db, asOf, outs[0]?.id ?? "", ins[0]?.id ?? "", saved);
+    for (const index of [2, 3]) {
+      const out = getTransaction(db, outs[index]?.id ?? "");
+      expect(out?.transferPeerId).toBe(ins[index]?.id ?? "missing");
+      expect(out?.autoReason).toBe("transfer_match");
+      expect(review(db, outs[index]?.id ?? "")?.level).toBe("sure");
+    }
+    expect(getTransaction(db, outs[1]?.id ?? "")?.transferPeerId).toBeNull();
   });
 });

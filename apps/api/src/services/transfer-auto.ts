@@ -122,3 +122,28 @@ export function recordPairNo(tx: WriteTx, leftId: string, rightId: string, at: s
   tx.insert(inboxDecisions).values(row).run();
   tx.audit({ entity: "inbox_decisions", entityId: itemKey, action: "create", before: null, after: row });
 }
+
+/**
+ * The person confirmed a transfer (accepted a pair, set Transfer, or approved a transfer suggestion). The payee is
+ * now a learned transfer: link the other open rows of the same payee key within 90 days of the confirmed row.
+ */
+export function linkLearnedTransfers(tx: WriteTx, confirmedIds: readonly string[]): void {
+  for (const id of confirmedIds) {
+    const row = tx.all<{ payee: string; date: string }>(sql`
+      select payee_normalized as payee, date from transactions where id = ${id} and mirror = 0
+    `)[0];
+    if (!row || row.payee.length === 0) {
+      continue;
+    }
+    const from = Temporal.PlainDate.from(row.date).subtract({ days: 90 }).toString();
+    const to = Temporal.PlainDate.from(row.date).add({ days: 90 }).toString();
+    const others = tx.all<{ id: string }>(sql`
+      select t.id as id from transactions t
+      where t.payee_normalized = ${row.payee} and t.id <> ${id} and t.transfer_peer_id is null
+        and t.date >= ${from} and t.date <= ${to}
+    `);
+    for (const other of others) {
+      linkTransferIfSure(tx, other.id);
+    }
+  }
+}

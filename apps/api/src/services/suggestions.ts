@@ -16,6 +16,7 @@ import { transactionReconciled } from "./reconciled";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { loadLines, replaceLines } from "./transaction-lines";
 import { auditTransaction, readTransaction, toTransaction } from "./transaction-record";
+import { linkLearnedTransfers } from "./transfer-auto";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
@@ -155,6 +156,7 @@ export function acceptTransferPair(db: Db, asOf: string, leftId: string, rightId
   }
   write(db, { source: input.source, at: input.at }, (tx) => {
     linkTransferPair(tx, leftId, rightId, input.at ?? utcNow());
+    linkLearnedTransfers(tx, [leftId, rightId]);
   });
   return { leftId, rightId };
 }
