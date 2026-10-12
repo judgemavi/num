@@ -19,7 +19,7 @@ const PREFIXES: { pattern: RegExp; rail: boolean }[] = [
   { pattern: /^PYPL\s*\*\s*/, rail: false },
   { pattern: /^PP\s*\*\s*/, rail: false },
   { pattern: /^SQ\s*\*\s*/, rail: false },
-  { pattern: /^TST\s*\*\s*/, rail: false },
+  { pattern: /^TST\s*[*-]\s*/, rail: false },
   { pattern: /^STRIPE\s*\*\s*/, rail: false },
   { pattern: /^GOOGLE\s*\*\s*/, rail: false },
   { pattern: /^VENMO\s*\*\s*/, rail: false },

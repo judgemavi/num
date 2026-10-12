@@ -6,12 +6,10 @@ import {
   merchantForChoice,
   moneyDirection,
   Temporal,
-  transactionSchema,
   type MoneyDirection,
   type WhatChoice,
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
-import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
@@ -19,7 +17,7 @@ import { FieldError } from "@/components/ui/field";
 import { accountLabel, accountOptionLabel } from "@/accounts/label";
 import { formatMoney } from "@/money";
 import { inboxError } from "@/review/format";
-import { formatDate, refundedText, transactionError } from "@/transactions/format";
+import { formatDate, refundedText } from "@/transactions/format";
 import { MortgageSplitWatch } from "@/transactions/mortgage-split-watch";
 import { AutomaticReason, DeleteMenu, MoneySection, MoreDetails, type TransactionFormProps } from "@/transactions/transaction-parts";
 import { alreadyChosen, choiceOf, linesOf, signedTotal, useApplySuggestion } from "@/transactions/transaction-draft";
@@ -195,17 +193,6 @@ export function TransactionForm({
     }
     onSaved(result.id);
   }
-  async function markRight() {
-    if (!transaction) return;
-    setSaving(true);
-    const result = await apiRequest(`/api/transactions/${transaction.id}/looks-right`, transactionSchema, { method: "POST" });
-    setSaving(false);
-    if (!result.ok) {
-      setError(transactionError(result.code));
-      return;
-    }
-    onSaved(result.data.id);
-  }
   const summary = `${formatDate(date)} · ${accountName} · ${direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(imported && transaction ? transaction.amount : (totalMinor ?? 0)))} · ${payee}`;
 
   return (
@@ -254,7 +241,7 @@ export function TransactionForm({
         <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, notes, category and tags can change.</p>
       ) : null}
       {transaction?.autoReason ? (
-        <AutomaticReason transaction={{ ...transaction, autoReason: transaction.autoReason }} saving={saving} onLooksRight={() => void markRight()} />
+        <AutomaticReason transaction={{ ...transaction, autoReason: transaction.autoReason }} />
       ) : null}
       {imported ? (
         <p className="text-sm">{summary}</p>

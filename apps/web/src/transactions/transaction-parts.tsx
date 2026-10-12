@@ -279,27 +279,18 @@ export type TransactionFormProps = {
 
 export function AutomaticReason({
   transaction,
-  saving,
-  onLooksRight,
 }: {
   transaction: Pick<Transaction, "autoReason" | "autoConfidence" | "autoSourceName" | "autoLearnedCount" | "refundOf"> & { autoReason: AutoReason };
-  saving: boolean;
-  onLooksRight: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <p className="text-sm text-muted-foreground">
-        {automaticReasonText({
-          reason: transaction.autoReason,
-          sourceName: transaction.autoSourceName,
-          learnedCount: transaction.autoLearnedCount,
-          purchaseDate: transaction.refundOf?.date ?? null,
-          purchasePayee: transaction.refundOf?.payeeRaw ?? null,
-        })}
-      </p>
-      <Button type="button" variant="outline" disabled={saving} onClick={onLooksRight}>
-        Looks right
-      </Button>
-    </div>
+    <p className="text-sm text-muted-foreground">
+      {automaticReasonText({
+        reason: transaction.autoReason,
+        sourceName: transaction.autoSourceName,
+        learnedCount: transaction.autoLearnedCount,
+        purchaseDate: transaction.refundOf?.date ?? null,
+        purchasePayee: transaction.refundOf?.payeeRaw ?? null,
+      })}
+    </p>
   );
 }

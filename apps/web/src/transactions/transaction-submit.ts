@@ -2,8 +2,10 @@ import {
   merchantForChoice,
   signedAmount,
   transactionSaveResultSchema,
+  transactionSchema,
   transactionWriteSchema,
   type Transaction,
+  type TransactionUpdate as TransactionWrite,
   type WhatChoice,
 } from "@num/shared";
 import { apiRequest } from "@/request";
@@ -34,6 +36,49 @@ type SubmitInput = {
 export type SubmitResult =
   | { ok: true; id: string; skipped: number; applied: number }
   | { ok: false; error: string };
+
+function sameTags(a: string[], b: string[]): boolean {
+  return a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
+}
+
+function unchanged(existing: Transaction, body: TransactionWrite): boolean {
+  if (
+    existing.accountId !== body.accountId ||
+    existing.date !== body.date ||
+    existing.amount !== body.amount ||
+    existing.merchantId !== body.merchantId ||
+    (existing.notes ?? null) !== body.notes ||
+    existing.payeeRaw !== body.payeeRaw ||
+    (existing.status === "cleared") !== (body.status === "cleared") ||
+    (existing.refundOfId ?? null) !== (body.refundOfId ?? null) ||
+    existing.lines.length !== body.lines.length
+  ) {
+    return false;
+  }
+  return existing.lines.every((line, index) => {
+    const next = body.lines[index];
+    return (
+      next !== undefined &&
+      line.amount === next.amount &&
+      (line.categoryId ?? null) === (next.categoryId ?? null) &&
+      (line.transferAccountId ?? null) === (next.transferAccountId ?? null) &&
+      sameTags(line.tagIds, next.tagIds ?? [])
+    );
+  });
+}
+
+function looksRight(id: string) {
+  return apiRequest(`/api/transactions/${id}/looks-right`, transactionSchema, { method: "POST" });
+}
+
+/** On a row that needs review, Save is the answer: the automatic label is confirmed. */
+async function saveAsAnswer(existing: Transaction, body: TransactionWrite): Promise<SubmitResult | null> {
+  if (!unchanged(existing, body)) {
+    return null;
+  }
+  const result = await looksRight(existing.id);
+  return result.ok ? { ok: true, id: result.data.id, skipped: 0, applied: 0 } : { ok: false, error: transactionError(result.code) };
+}
 
 export async function submitTransaction(input: SubmitInput): Promise<SubmitResult> {
   const memoAt = (index: number) => input.transaction?.lines[index]?.memo ?? null;
@@ -75,6 +120,12 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
   if (!parsed.success) {
     return { ok: false, error: "Check the transaction fields." };
   }
+  if (input.transaction?.autoReason) {
+    const answered = await saveAsAnswer(input.transaction, parsed.data);
+    if (answered) {
+      return answered;
+    }
+  }
   const result = await apiRequest(input.transaction ? `/api/transactions/${input.transaction.id}` : "/api/transactions", transactionSaveResultSchema, {
     method: input.transaction ? "PATCH" : "POST",
     headers: { "content-type": "application/json" },
@@ -82,6 +133,12 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
   });
   if (!result.ok) {
     return { ok: false, error: transactionError(result.code) };
+  }
+  if (input.transaction?.autoReason && result.data.autoReason !== null) {
+    const confirmed = await looksRight(result.data.id);
+    if (!confirmed.ok) {
+      return { ok: false, error: transactionError(confirmed.code) };
+    }
   }
   return {
     ok: true,

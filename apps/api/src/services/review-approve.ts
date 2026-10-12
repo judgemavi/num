@@ -53,7 +53,7 @@ function applyLikely(tx: WriteTx, hit: NeedsReviewHit, at: string): boolean {
   return skip === null;
 }
 
-function targetsOf(db: Db, asOf: string, filter: TransactionFilter, level: ApproveLevel): NeedsReviewHit[] {
+function targetsOf(db: Db | WriteTx, asOf: string, filter: TransactionFilter, level: ApproveLevel): NeedsReviewHit[] {
   return filteredReviewHits(db, filter, asOf).filter((hit) => hit.review.question === "categorize" && hit.review.level === level);
 }
 
@@ -82,7 +82,7 @@ export function approveFiltered(
   const ids: string[] = [];
   const peers = new Set<string>();
   write(db, { source: input.source, at }, (tx) => {
-    const targets = targetsOf(db, asOf, filter, level);
+    const targets = targetsOf(tx, asOf, filter, level);
     if (targets.length !== expectedCount) {
       throw changed(targets.length);
     }
