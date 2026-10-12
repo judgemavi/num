@@ -78,7 +78,11 @@ export function clearRefundLinks(tx: WriteTx, purchaseId: string): void {
     .all();
   for (const row of rows) {
     const before = readTransaction(tx, row.id);
-    tx.update(transactions).set({ refundOfId: null }).where(eq(transactions.id, row.id)).run();
+    const lost = before.autoReason === "refund_match" && before.autoSourceId === purchaseId;
+    tx.update(transactions)
+      .set(lost ? { refundOfId: null, autoReason: null, autoSourceId: null, autoConfidence: null } : { refundOfId: null })
+      .where(eq(transactions.id, row.id))
+      .run();
     auditTransaction(tx, row.id, "update", before, readTransaction(tx, row.id));
   }
 }

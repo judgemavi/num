@@ -9,7 +9,7 @@ import { createCategory } from "./categories";
 import { decideInboxItem } from "./inbox-decisions";
 import { createMerchant } from "./merchants";
 import { listNeedsReview } from "./needs-review";
-import { createTransaction, getTransaction, updateTransaction } from "./transactions";
+import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at: "2026-04-02T16:00:00Z" };
 const asOf = "2026-04-02";
@@ -157,5 +157,20 @@ test("a refund with no candidate has no question", () => {
   withBook((db, ids) => {
     const refund = money(db, ids.account, "2026-03-10", 2_000, ids.food);
     expect(questionOf(db, refund.id)).toBeUndefined();
+  });
+});
+
+test("deleting the purchase removes the automatic label from its refund", () => {
+  withBook((db, ids) => {
+    const purchase = money(db, ids.account, "2026-03-01", -2_000, ids.food);
+    const other = money(db, ids.account, "2026-03-02", -2_500, ids.food);
+    const refund = money(db, ids.account, "2026-03-10", 2_000, ids.food);
+    expect(getTransaction(db, refund.id)?.autoReason).toBe("refund_match");
+    deleteTransaction(db, purchase.id, saved);
+    const stored = getTransaction(db, refund.id);
+    expect(stored?.refundOfId).toBeNull();
+    expect(stored?.autoReason).toBeNull();
+    expect(stored?.autoSourceId).toBeNull();
+    expect(questionOf(db, refund.id)?.refund?.purchases.map((item) => item.id)).toEqual([other.id]);
   });
 });
