@@ -175,9 +175,9 @@ Order, top to bottom:
 4. **Merchant** Combobox, with the suggestion and its reason. Hidden for Transfer.
 6. **More details** (Collapsible, closed): notes, tags, bank text, "Cleared" checkbox. No "status" word in the UI.
 7. Footer: Save (primary). Delete goes in a More menu (shared confirm).
-   When the transaction needs review (automatic label or suggestion) and the user changed nothing, the primary button
-   is "Looks right" (Sure) or "Use this" (a suggestion), and it confirms. After any change, the primary button is Save,
-   and Save is the user's answer (it confirms too). The header shows only the level and the reason; no action buttons.
+   There is one primary button, Save. When the transaction needs review, Save is the user's answer: with no change it
+   confirms the automatic label or applies the suggestion shown in the form; with a change it saves and confirms.
+   The header shows only the level and the reason; no action buttons.
 
 **Group mode:** opened with several transactions that the user selected. Header: "12 transactions · $84.20".
 Category, transfer and merchant apply to all; the user can exclude items. Split is not available.
