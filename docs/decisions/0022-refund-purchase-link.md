@@ -29,6 +29,7 @@ A **candidate** purchase:
    partial-amount candidates), the row needs review with the question "Refund of which purchase?".
    The row shows up to 3 candidates (same amount first, then the most recent) as one-click answers, and
    "Not linked to a purchase". That answer is a recorded "no" (decision 0016, key `refund_link:<transaction id>`).
+   When the user removes a link in the editor, the app records the same "no".
 3. **No candidate:** no question. The refund stays unlinked.
 4. A partial refund (smaller than the purchase) is never linked automatically.
 5. A read never writes (decision 0020). The automatic link is written by the same service write that sets the category.
