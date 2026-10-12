@@ -179,9 +179,11 @@ Order, top to bottom:
 **Group mode:** opened with several transactions that the user selected. Header: "12 transactions · $84.20".
 Category, transfer and merchant apply to all; the user can exclude items. Split is not available.
 
-A Needs review row is one transaction: payee, date, amount, the level (Sure, Likely, Maybe as a Badge, never a percentage) and one-click answers. The whole row opens the editor; a chevron at the right shows this. No "Other…" button, no dismiss, no queue mode.
-The view groups rows by level, each group with its count and, for Sure and Likely, an "Approve all" button (shared confirm).
-An automatic label shows its level and reason ("Sure · You chose this 4 times for this payee").
+Needs review is the Transactions table with the Needs review filter on (decision 0021). There is no second list component.
+The table has a "Category" column for all rows: the category, "Transfer to <account>", or "Uncategorized", and the merchant below it.
+When a row needs review, the same cell also shows the level (Sure, Likely, Maybe as a Badge, never a percentage), the proposed answer in plain words ("Groceries · Loblaws?" or "Transfer to TD Savings?"), the reason ("You chose this 4 times for this payee") and one-click answers ("Looks right" for Sure, "Yes" for a suggestion, the question answers for a transfer pair or a recurring question).
+The whole row opens the editor. No "Other…" button, no dismiss, no queue mode.
+With the Needs review filter on, the table puts rows in groups by level: Sure, Likely, Maybe, Questions. Each group starts with a header row that shows the count and, for Sure and Likely, "Approve all N" (shared confirm).
 
 ## 6b. Shared editors and the dialog host
 

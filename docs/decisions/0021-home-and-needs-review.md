@@ -18,6 +18,8 @@ who is not technical. The owner does not want to give attention to each sure lab
 - **The Inbox is removed.** Transaction questions move to Transactions → "Needs review" (a server filter).
   Other items move to Home (funding, missed, overspent), Recurring → Detected (new plans) and Imports (import problems).
   Recorded "no" decisions (decision 0016) stay. No payee groups (decision 0015).
+  Needs review uses the same Transactions table as the normal view, with the review cells and level groups
+  (`docs/design.md` §6). There is no separate list component (owner, 2026-10-12).
 - **The Plan screen is removed.** Its content goes to Home; goal feasibility goes to Buckets; the forecast chart goes to
   Insights. The hygiene panel moves from Insights to Home.
 - **Levels, not percentages:** Sure (automatic), Likely (≥ 0.75), Maybe (< 0.75). Plain reasons. The engine does not
