@@ -3,6 +3,7 @@ import {
   autoRefundPurchase,
   refundCandidates,
   refundQuestionLimit,
+  refundWindowStart,
   type RefundCandidate,
 } from "@num/shared";
 import { eq, sql } from "drizzle-orm";
@@ -39,7 +40,8 @@ function loadRefunds(db: Reader, id?: string): RefundRow[] {
   `);
 }
 
-function loadPurchases(db: Reader, payees: readonly string[]): RefundCandidate[] {
+/** Purchases of these payees dated on or after `from`. An older purchase cannot be a candidate. */
+function loadPurchases(db: Reader, payees: readonly string[], from: string): RefundCandidate[] {
   const found: RefundCandidate[] = [];
   const unique = [...new Set(payees)];
   for (let index = 0; index < unique.length; index += 400) {
@@ -50,7 +52,7 @@ function loadPurchases(db: Reader, payees: readonly string[]): RefundCandidate[]
           t.payee_normalized as payeeNormalized,
           coalesce((select sum(r.amount) from transactions r where r.refund_of_id = t.id), 0) as refunded
         from transactions t
-        where t.mirror = 0 and t.amount < 0 and t.payee_normalized in (${list})
+        where t.mirror = 0 and t.amount < 0 and t.date >= ${from} and t.payee_normalized in (${list})
           and ${expenseLine}
       `),
     );
@@ -70,9 +72,16 @@ export function refundQuestions(db: Reader, hidden: ReadonlySet<string>): Map<st
   if (refunds.length === 0) {
     return asks;
   }
-  const purchases = loadPurchases(db, refunds.map((row) => row.payee));
+  const earliest = refunds.reduce((min, row) => (row.date < min ? row.date : min), refunds[0]?.date ?? "");
+  const byPayee = new Map<string, RefundCandidate[]>();
+  for (const row of loadPurchases(db, refunds.map((item) => item.payee), refundWindowStart(earliest))) {
+    byPayee.set(row.payeeNormalized, [...(byPayee.get(row.payeeNormalized) ?? []), row]);
+  }
   for (const refund of refunds) {
-    const found = refundCandidates({ date: refund.date, amount: refund.amount, payeeNormalized: refund.payee }, purchases);
+    const found = refundCandidates(
+      { date: refund.date, amount: refund.amount, payeeNormalized: refund.payee },
+      byPayee.get(refund.payee) ?? [],
+    );
     if (found.length > 0) {
       asks.set(refund.id, {
         itemKey: refundItemKey(refund.id),
@@ -96,7 +105,7 @@ export function linkRefundIfSure(tx: WriteTx, transactionId: string): void {
   }
   const found = refundCandidates(
     { date: refund.date, amount: refund.amount, payeeNormalized: refund.payee },
-    loadPurchases(tx, [refund.payee]),
+    loadPurchases(tx, [refund.payee], refundWindowStart(refund.date)),
   );
   const purchaseRef = autoRefundPurchase(refund, found);
   if (!purchaseRef) {
@@ -124,4 +133,15 @@ export function linkRefundIfSure(tx: WriteTx, transactionId: string): void {
     .run();
   tx.update(transactionLines).set({ categoryId: category }).where(eq(transactionLines.transactionId, refund.id)).run();
   auditTransaction(tx, refund.id, "label", before, readTransaction(tx, refund.id));
+}
+
+/** The person removed a link: record the same "no" as "Not linked to a purchase" (decision 0022). */
+export function recordRefundNo(tx: WriteTx, transactionId: string, at: string): void {
+  const itemKey = refundItemKey(transactionId);
+  if (tx.select().from(inboxDecisions).where(eq(inboxDecisions.itemKey, itemKey)).get()) {
+    return;
+  }
+  const row = { itemKey, decision: "not_linked", reason: null, decidedAt: at };
+  tx.insert(inboxDecisions).values(row).run();
+  tx.audit({ entity: "inbox_decisions", entityId: itemKey, action: "create", before: null, after: row });
 }

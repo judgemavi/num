@@ -31,34 +31,9 @@ export function applyInboxGroup(accountId: string, transactionIds: string[], sug
   }));
 }
 
-/** Link a refund to a purchase. One update of the transaction, so the link is one audited write. */
-export async function linkRefund(refundId: string, purchaseId: string): Promise<{ ok: boolean }> {
-  const current = await apiRequest(`/api/transactions/${refundId}`, transactionSchema);
-  if (!current.ok) {
-    return { ok: false };
-  }
-  const { data } = current;
-  return apiRequest(`/api/transactions/${refundId}`, transactionSchema, {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      accountId: data.accountId,
-      date: data.date,
-      amount: data.amount,
-      merchantId: data.merchantId,
-      notes: data.notes,
-      payeeRaw: data.payeeRaw,
-      status: data.status,
-      lines: data.lines.map((line) => ({
-        amount: line.amount,
-        memo: line.memo,
-        categoryId: line.categoryId,
-        transferAccountId: line.transferAccountId,
-        tagIds: line.tagIds,
-      })),
-      refundOfId: purchaseId,
-    }),
-  });
+/** Link a refund to a purchase. One audited write on the server. */
+export function linkRefund(refundId: string, purchaseId: string) {
+  return apiRequest(`/api/transactions/${refundId}/refund-of`, transactionSchema, json({ purchaseId }));
 }
 
 export function updatePlanAmount(plan: Plan, expectedAmount: number) {

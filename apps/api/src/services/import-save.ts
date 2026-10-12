@@ -59,7 +59,7 @@ function insertCreated(
   row: PlannedImportRow,
   result: MatchResult,
   dueDate: string | null,
-): void {
+): string {
   const rowId = crypto.randomUUID();
   const transactionId = crypto.randomUUID();
   const planned = scoredLabel(tx, accountId, row, result);
@@ -145,7 +145,7 @@ function insertCreated(
   auditTransaction(tx, transactionId, "create", null, readTransaction(tx, transactionId), {
     suggestionReason: result.reason ?? "none",
   });
-  linkRefundIfSure(tx, transactionId);
+  return transactionId;
 }
 
 function insertMatched(tx: WriteTx, batchId: string, accountId: string, row: PlannedImportRow): void {
@@ -302,15 +302,20 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
       const hit = recurring.get(`import:${row.rowIndex}`) ?? null;
       scores.set(row.rowIndex, scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: hit }));
     }
+    const createdIds: string[] = [];
     for (const row of input.rows) {
       if (row.outcome === "created") {
         const hit = recurring.get(`import:${row.rowIndex}`);
-        insertCreated(tx, batchId, input.accountId, row, scores.get(row.rowIndex) ?? scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: null }), hit?.dueDate ?? null);
+        const newId = insertCreated(tx, batchId, input.accountId, row, scores.get(row.rowIndex) ?? scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: null }), hit?.dueDate ?? null);
+        createdIds.push(newId);
       } else if (row.outcome === "matched") {
         insertMatched(tx, batchId, input.accountId, row);
       } else {
         insertPlain(tx, batchId, input.accountId, row);
       }
+    }
+    for (const newId of createdIds) {
+      linkRefundIfSure(tx, newId);
     }
     saveFormat(tx, input.accountId, input.presetId, input.columnMap);
     const batch = tx.select().from(importBatches).where(eq(importBatches.id, batchId)).get();

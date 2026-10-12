@@ -16,7 +16,7 @@ import {
   type TxRow,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
-import { linkRefundIfSure } from "./refund-auto";
+import { linkRefundIfSure, recordRefundNo } from "./refund-auto";
 import { assertRefundLink, withRefundPurchase } from "./refund-link";
 import { spreadSureLabels } from "./match-apply";
 import { transactionReconciled } from "./reconciled";
@@ -228,11 +228,10 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
   }
   const created = readTransaction(tx, id);
   auditTransaction(tx, id, "create", null, created);
-  linkRefundIfSure(tx, id);
   if (spread && isUserConfirmation(created)) {
     spreadSureLabels(tx, [created.payeeNormalized], new Set([created.id]));
   }
-  return readTransaction(tx, id);
+  return created;
 }
 
 export function createTransaction(db: Db, input: TransactionBody & WriteInput): Transaction {
@@ -279,13 +278,13 @@ export function applyTransactionUpdate(
     applySourceEdit(tx, existing, existingLines, peer, peerLines, linked.header, linked.lines, at, auto);
   }
   const saved = readTransaction(tx, id);
-  if (changed && existing.refundOfId === null && linked.header.refundOfId == null) {
-    linkRefundIfSure(tx, id);
+  if (existing.refundOfId !== null && linked.header.refundOfId == null) {
+    recordRefundNo(tx, id, at);
   }
   if (spread && changed && isUserConfirmation(saved)) {
     spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));
   }
-  return readTransaction(tx, id);
+  return saved;
 }
 
 export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transaction {
@@ -303,7 +302,8 @@ export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transac
     if (isUserConfirmation(saved)) {
       spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));
     }
-    accepted = saved;
+    linkRefundIfSure(tx, id);
+    accepted = readTransaction(tx, id);
   });
   if (!accepted) {
     throw new Error("Confirm did not return a transaction");

@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { applySuggestion } from "./inbox-group";
+import { linkRefundIfSure } from "./refund-auto";
 import { requireAsOf, type NeedsReviewHit } from "./needs-review";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { filteredReviewHits } from "./transaction-list";
@@ -24,6 +25,7 @@ function confirmSure(tx: WriteTx, id: string, at: string): boolean {
   const before = readTransaction(tx, id);
   tx.update(transactions).set({ ...clearedAuto, editedAt: at }).where(eq(transactions.id, id)).run();
   auditTransaction(tx, id, "update", before, readTransaction(tx, id));
+  linkRefundIfSure(tx, id);
   return true;
 }
 

@@ -17,6 +17,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { approveFiltered } from "../services/review-approve";
 import { listTransactions } from "../services/transaction-list";
+import { linkRefundToPurchase } from "../services/refund-answer";
 import { listRefundPurchases } from "../services/refund-link";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
 
@@ -117,6 +118,26 @@ const looksRightRoute = createRoute({
   method: "post",
   path: "/api/transactions/{id}/looks-right",
   request: { params: idParams },
+  responses: {
+    200: transactionResponse,
+    400: errorResponse,
+    404: errorResponse,
+    409: errorResponse,
+  },
+});
+
+const refundOfRoute = createRoute({
+  operationId: "post_transactions_id_refund_of",
+  description: "Link a refund to the purchase it returns. This changes only the refund and its automatic label. Amounts are integer minor units. Money that enters the account is positive.",
+  method: "post",
+  path: "/api/transactions/{id}/refund-of",
+  request: {
+    params: idParams,
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ purchaseId: z.uuid() }) } },
+    },
+  },
   responses: {
     200: transactionResponse,
     400: errorResponse,
@@ -229,6 +250,12 @@ export function registerTransactions(app: OpenAPIHono, db: Db) {
   app.openapi(looksRightRoute, (c) => {
     const { id } = c.req.valid("param");
     return c.json(acceptLooksRight(db, id, { source: "ui" }), 200);
+  });
+
+  app.openapi(refundOfRoute, (c) => {
+    const { id } = c.req.valid("param");
+    const { purchaseId } = c.req.valid("json");
+    return c.json(linkRefundToPurchase(db, id, purchaseId, { source: "ui" }), 200);
   });
 
   app.openapi(updateRoute, (c) => {

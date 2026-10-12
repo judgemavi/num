@@ -30,7 +30,7 @@ export const reviewRecurringSchema = z.object({
 });
 
 export const reviewRefundSchema = z.object({
-  itemKey: z.string(),
+  itemKey,
   purchases: z.array(
     z.object({
       id: z.uuid(),
