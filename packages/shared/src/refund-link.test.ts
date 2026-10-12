@@ -44,17 +44,17 @@ describe("refund link", () => {
       { id: "in-window", date: "2026-01-01", amount: -100, payeeRaw: "Shop", payeeNormalized: "SHOP", merchantId: null, categoryId: "food" },
       { id: "too-old", date: "2025-10-01", amount: -100, payeeRaw: "Shop", payeeNormalized: "SHOP", merchantId: null, categoryId: "food" },
     ];
-    expect(rankRefundPurchases("2026-03-20", "SHOP", null, rows).map((row) => row.id)).toEqual(["in-window"]);
-    expect(rankRefundPurchases("2026-06-01", "SHOP", null, rows).map((row) => row.id)).toEqual([]);
+    expect(rankRefundPurchases("2026-03-20", "SHOP", rows).map((row) => row.id)).toEqual(["in-window"]);
+    expect(rankRefundPurchases("2026-06-01", "SHOP", rows).map((row) => row.id)).toEqual([]);
   });
 
-  test("lists the same payee or merchant before other spending in the last 90 days", () => {
+  test("lists the same payee before other spending in the last 90 days", () => {
     const rows = [
       { id: "other", date: "2026-03-01", amount: -100, payeeRaw: "Other", payeeNormalized: "OTHER", merchantId: null, categoryId: "food" },
       { id: "same", date: "2026-02-01", amount: -8000, payeeRaw: "Cafe", payeeNormalized: "CAFE", merchantId: "m1", categoryId: "food" },
       { id: "old", date: "2025-01-01", amount: -8000, payeeRaw: "Cafe", payeeNormalized: "CAFE", merchantId: "m1", categoryId: "food" },
       { id: "income", date: "2026-03-02", amount: 500, payeeRaw: "Cafe", payeeNormalized: "CAFE", merchantId: "m1", categoryId: "pay" },
     ];
-    expect(rankRefundPurchases("2026-03-20", "CAFE", "m1", rows).map((row) => row.id)).toEqual(["same", "other"]);
+    expect(rankRefundPurchases("2026-03-20", "CAFE", rows).map((row) => row.id)).toEqual(["same", "other"]);
   });
 });

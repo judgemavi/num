@@ -1,6 +1,6 @@
 import { categoryForRefund, refundPurchaseListSchema } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { refundPurchaseLabel } from "@/transactions/format";
 import { apiRequest } from "@/request";
 import { OptionCombobox } from "@/transactions/option-combobox";
@@ -9,32 +9,33 @@ export function RefundOfField({
   id,
   asOf,
   payee,
-  merchantId,
   value,
+  categoryName,
+  merchantName,
   currency,
   linked,
   onChange,
   onCategory,
+  onMerchant,
 }: {
   id: string;
   asOf: string;
   payee: string;
-  merchantId: string | null;
   value: string | null;
+  categoryName: string | null;
+  merchantName: string | null;
   currency: string;
   linked: { id: string; date: string; amount: number; payeeRaw: string } | null;
   onChange: (id: string | null) => void;
   onCategory: (id: string | null) => void;
+  onMerchant: (id: string | null) => void;
 }) {
   const purchases = useQuery({
-    queryKey: ["refund-purchases", asOf, payee, merchantId],
+    queryKey: ["refund-purchases", asOf, payee],
     queryFn: async () => {
       const params = new URLSearchParams({ asOf });
       if (payee.trim().length > 0) {
         params.set("payee", payee);
-      }
-      if (merchantId) {
-        params.set("merchantId", merchantId);
       }
       const result = await apiRequest(`/api/transactions/refund-purchases?${params.toString()}`, refundPurchaseListSchema);
       if (!result.ok) {
@@ -66,9 +67,15 @@ export function RefundOfField({
           const item = purchases.data?.find((row) => row.id === next);
           if (item) {
             onCategory(categoryForRefund(item));
+            onMerchant(item.merchantId);
           }
         }}
       />
+      {value ? (
+        <FieldDescription>
+          {[categoryName ?? "No category", merchantName].filter((part) => part !== null).join(" · ")} (from the purchase)
+        </FieldDescription>
+      ) : null}
     </Field>
   );
 }

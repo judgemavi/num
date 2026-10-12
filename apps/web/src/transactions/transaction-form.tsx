@@ -24,6 +24,7 @@ import { MortgageSplitWatch } from "@/transactions/mortgage-split-watch";
 import { AutomaticReason, DeleteMenu, MoneySection, MoreDetails, type TransactionFormProps } from "@/transactions/transaction-parts";
 import { alreadyChosen, choiceOf, linesOf, signedTotal, useApplySuggestion } from "@/transactions/transaction-draft";
 import { submitTransaction } from "@/transactions/transaction-submit";
+import { merchantOptionLists } from "@/transactions/merchant-options";
 import { splitRemainder, type SplitLine } from "@/transactions/what-choice";
 import { WhatIsThis } from "@/transactions/what-is-this";
 
@@ -100,10 +101,7 @@ export function TransactionForm({
   const transferOptions = accounts
     .filter((account) => account.id !== accountId && (account.archivedAt === null || account.id === transferAccountId || lines.some((line) => line.transferAccountId === account.id)))
     .map((account) => ({ id: account.id, label: accountOptionLabel(account) }));
-  const merchantOptions = merchants
-    .filter((merchant) => merchant.archivedAt === null || merchant.id === merchantId)
-    .map((merchant) => ({ id: merchant.id, label: merchant.name }));
-  const archivedMerchants = merchants.filter((merchant) => merchant.archivedAt).map((merchant) => ({ id: merchant.id, label: merchant.name }));
+  const { merchantOptions, archivedMerchants } = merchantOptionLists(merchants, merchantId);
   const archivedAccounts = accounts
     .filter((account) => account.archivedAt !== null && account.id !== accountId)
     .map((account) => ({ id: account.id, label: accountLabel(account) }));
@@ -182,7 +180,8 @@ export function TransactionForm({
       transferAccountId,
       lines,
       tagIds,
-      refundOfId, unreadableItemKey,
+      refundOfId,
+      unreadableItemKey,
     });
     setSaving(false);
     if (!result.ok) {

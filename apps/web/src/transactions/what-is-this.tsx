@@ -209,7 +209,22 @@ export function WhatIsThis({
           ))}
         </ToggleGroup>
       </Field>
-      {choice === "spending" || choice === "income" || choice === "refund" ? (
+      {choice === "refund" && onRefundOf && asOf.length > 0 ? (
+        <RefundOfField
+          id={`${idPrefix}-refund-of`}
+          asOf={asOf}
+          payee={payee}
+          categoryName={categories.find((item) => item.id === categoryId)?.name ?? null}
+          merchantName={merchants.find((item) => item.id === merchantId)?.label ?? null}
+          value={refundOfId}
+          currency={currency}
+          linked={linkedRefund}
+          onChange={onRefundOf}
+          onCategory={onCategoryId}
+          onMerchant={onMerchantId}
+        />
+      ) : null}
+      {choice === "spending" || choice === "income" || (choice === "refund" && refundOfId === null) ? (
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-category`}>Category</FieldLabel>
           <ManagedPicker
@@ -229,19 +244,6 @@ export function WhatIsThis({
             )}
           />
         </Field>
-      ) : null}
-      {choice === "refund" && onRefundOf && asOf.length > 0 ? (
-        <RefundOfField
-          id={`${idPrefix}-refund-of`}
-          asOf={asOf}
-          payee={payee}
-          merchantId={merchantId}
-          value={refundOfId}
-          currency={currency}
-          linked={linkedRefund}
-          onChange={onRefundOf}
-          onCategory={onCategoryId}
-        />
       ) : null}
       {choice === "transfer" ? (
         <Field>
@@ -351,7 +353,7 @@ export function WhatIsThis({
           </p>
         </div>
       ) : null}
-      {choice === "transfer" ? null : (
+      {choice === "transfer" || (choice === "refund" && refundOfId !== null) ? null : (
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-merchant`}>Merchant</FieldLabel>
           <ManagedPicker

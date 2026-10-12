@@ -10,6 +10,7 @@ import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { createCheckpoint } from "./checkpoints";
 import { createCategory } from "./categories";
+import { createMerchant } from "./merchants";
 import { createTag } from "./tags";
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
 
@@ -477,5 +478,44 @@ test("updateTransaction links an existing opposite row", () => {
     expect(book.sqlite.query("select count(*) as n from transactions").get()).toEqual({ n: 2 });
   } finally {
     book.close();
+  }
+});
+
+test("a linked refund takes the category and merchant of the purchase and ignores client values", () => {
+  const { db, close } = tempDatabase();
+  try {
+    const checking = account(db, "Checking", "chequing");
+    const groceries = createCategory(db, { name: "Groceries", kind: "expense", ...saved });
+    const fun = createCategory(db, { name: "Fun", kind: "expense", ...saved });
+    const store = createMerchant(db, { name: "Store", ...saved });
+    const other = createMerchant(db, { name: "Other", ...saved });
+    const purchase = createTransaction(db, {
+      ...entry(checking.id, -8_000, [{ amount: -8_000, categoryId: groceries.id }]),
+      merchantId: store.id,
+    });
+    const refund = createTransaction(db, {
+      ...entry(checking.id, 3_000, [{ amount: 3_000, categoryId: fun.id }], "2026-03-10"),
+      merchantId: other.id,
+      refundOfId: purchase.id,
+    });
+    expect(refund.merchantId).toBe(store.id);
+    expect(refund.lines[0]?.categoryId).toBe(groceries.id);
+    const edited = updateTransaction(db, refund.id, {
+      ...entry(checking.id, 3_000, [{ amount: 3_000, categoryId: fun.id }], "2026-03-10"),
+      merchantId: other.id,
+    });
+    expect(edited.merchantId).toBe(store.id);
+    expect(edited.lines[0]?.categoryId).toBe(groceries.id);
+    const plain = createTransaction(db, {
+      ...entry(checking.id, -500, [{ amount: -500, categoryId: groceries.id }]),
+    });
+    const noMerchant = createTransaction(db, {
+      ...entry(checking.id, 100, [{ amount: 100, categoryId: fun.id }], "2026-03-10"),
+      merchantId: other.id,
+      refundOfId: plain.id,
+    });
+    expect(noMerchant.merchantId).toBeNull();
+  } finally {
+    close();
   }
 });

@@ -9,6 +9,7 @@ import {
 import { and, eq, gte, lt, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import type { NormalizedLine } from "./transaction-rules";
 import { auditTransaction, readTransaction, type Header } from "./transaction-record";
 import type { WriteTx } from "./write";
 
@@ -44,6 +45,31 @@ export function assertRefundLink(tx: WriteTx, header: Header, selfId: string | n
   }
 }
 
+/** A linked refund takes the category and the merchant of its purchase. The client values do not count. */
+export function withRefundPurchase(
+  tx: WriteTx,
+  header: Header,
+  lines: NormalizedLine[],
+): { header: Header; lines: NormalizedLine[] } {
+  if (header.refundOfId == null || lines.length !== 1 || lines[0]?.transferAccountId !== null) {
+    return { header, lines };
+  }
+  const purchase = tx.select().from(transactions).where(eq(transactions.id, header.refundOfId)).get();
+  const category = tx
+    .select({ categoryId: transactionLines.categoryId })
+    .from(transactionLines)
+    .where(eq(transactionLines.transactionId, header.refundOfId))
+    .all()
+    .find((line) => line.categoryId !== null);
+  if (!purchase || !category?.categoryId) {
+    throw new ServiceError("refund_link_invalid", 400);
+  }
+  return {
+    header: { ...header, merchantId: purchase.merchantId },
+    lines: lines.map((line) => ({ ...line, categoryId: category.categoryId })),
+  };
+}
+
 export function clearRefundLinks(tx: WriteTx, purchaseId: string): void {
   const rows = tx
     .select({ id: transactions.id })
@@ -59,7 +85,7 @@ export function clearRefundLinks(tx: WriteTx, purchaseId: string): void {
 
 export function listRefundPurchases(
   db: Db,
-  input: { asOf: string; payee?: string; merchantId?: string },
+  input: { asOf: string; payee?: string },
 ): RefundPurchaseItem[] {
   const start = refundWindowStart(input.asOf);
   const rows = db
@@ -94,7 +120,7 @@ export function listRefundPurchases(
     return [{ ...row, categoryId: line.categoryId }];
   });
   const payee = normalizePayee(input.payee ?? "");
-  return rankRefundPurchases(input.asOf, payee, input.merchantId ?? null, withCategory).flatMap((row) => {
+  return rankRefundPurchases(input.asOf, payee, withCategory).flatMap((row) => {
     if (row.categoryId === null) {
       return [];
     }
@@ -105,6 +131,7 @@ export function listRefundPurchases(
         amount: row.amount,
         payeeRaw: row.payeeRaw,
         categoryId: row.categoryId,
+        merchantId: row.merchantId,
       },
     ];
   });

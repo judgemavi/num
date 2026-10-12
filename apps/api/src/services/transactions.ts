@@ -16,7 +16,7 @@ import {
   type TxRow,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
-import { assertRefundLink } from "./refund-link";
+import { assertRefundLink, withRefundPurchase } from "./refund-link";
 import { spreadSureLabels } from "./match-apply";
 import { transactionReconciled } from "./reconciled";
 import { removeTransaction } from "./transaction-erase";
@@ -198,12 +198,13 @@ function headerFor(input: TransactionBody, lines: ReturnType<typeof normalizeLin
 }
 
 export function insertTransaction(tx: WriteTx, input: TransactionBody, source: AuditSource, spread = true): Transaction {
-  const lines = input.lines.map(normalizeLine);
-  const header = headerFor(input, lines);
+  const typed = input.lines.map(normalizeLine);
   const recordSourceName = recordSource(source);
   const id = crypto.randomUUID();
-  assertLineShape(header.accountId, header.amount, lines);
-  assertRefundLink(tx, header, null);
+  const typedHeader = headerFor(input, typed);
+  assertLineShape(typedHeader.accountId, typedHeader.amount, typed);
+  assertRefundLink(tx, typedHeader, null);
+  const { header, lines } = withRefundPurchase(tx, typedHeader, typed);
   assertReferences(tx, header, lines, { accountId: null, transferAccountId: null });
   tx.insert(transactions)
     .values({
@@ -267,12 +268,13 @@ export function applyTransactionUpdate(
   assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
   const savedHeader = headerForWrite(existing.refundOfId, header);
   assertRefundLink(tx, savedHeader, id);
-  const changed = labelChanged(existing, existingLines, savedHeader, lines);
+  const linked = withRefundPurchase(tx, savedHeader, lines);
+  const changed = labelChanged(existing, existingLines, linked.header, linked.lines);
   const auto: AutoStamp = changed || isTransferOrSplit(lines) ? clearedAuto : keptAuto(existing);
   if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {
-    applyMirrorEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at, auto);
+    applyMirrorEdit(tx, existing, existingLines, peer, peerLines, linked.header, linked.lines, at, auto);
   } else {
-    applySourceEdit(tx, existing, existingLines, peer, peerLines, savedHeader, lines, at, auto);
+    applySourceEdit(tx, existing, existingLines, peer, peerLines, linked.header, linked.lines, at, auto);
   }
   const saved = readTransaction(tx, id);
   if (spread && changed && isUserConfirmation(saved)) {

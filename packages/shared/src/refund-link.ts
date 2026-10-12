@@ -19,7 +19,6 @@ export type RefundPurchase = {
 export const refundPurchaseQuerySchema = z.object({
   asOf: isoDateSchema,
   payee: z.string().trim().optional(),
-  merchantId: z.uuid().optional(),
 });
 
 export const refundPurchaseItemSchema = z.object({
@@ -28,6 +27,7 @@ export const refundPurchaseItemSchema = z.object({
   amount: centsSchema,
   payeeRaw: z.string(),
   categoryId: z.uuid(),
+  merchantId: z.uuid().nullable(),
 });
 
 export const refundPurchaseListSchema = z.object({
@@ -69,24 +69,20 @@ export function refundLinkAllowed(input: {
   return daySpan(input.purchaseDate, input.refundDate) <= refundWindowDays;
 }
 
-function preferred(row: RefundPurchase, payeeNormalized: string, merchantId: string | null): boolean {
-  if (merchantId !== null && row.merchantId === merchantId) {
-    return true;
-  }
+function preferred(row: RefundPurchase, payeeNormalized: string): boolean {
   return payeeNormalized.length > 0 && row.payeeNormalized === payeeNormalized;
 }
 
 export function rankRefundPurchases(
   asOf: string,
   payeeNormalized: string,
-  merchantId: string | null,
   rows: readonly RefundPurchase[],
 ): RefundPurchase[] {
   const start = refundWindowStart(asOf);
   return rows
     .filter((row) => row.amount < 0 && row.categoryId !== null && row.date >= start && row.date <= asOf)
     .sort((left, right) => {
-      const rank = Number(preferred(right, payeeNormalized, merchantId)) - Number(preferred(left, payeeNormalized, merchantId));
+      const rank = Number(preferred(right, payeeNormalized)) - Number(preferred(left, payeeNormalized));
       if (rank !== 0) {
         return rank;
       }
