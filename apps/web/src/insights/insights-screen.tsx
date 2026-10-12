@@ -16,7 +16,7 @@ import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/date-field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBookCurrency, useCategories, useGroups, useMerchants, useTags } from "@/editors/lookups";
 import { monthTitle } from "@/insights/format";
@@ -181,16 +181,15 @@ export function InsightsScreen() {
       <div className="flex flex-wrap items-end gap-3">
         <Field className="w-44">
           <FieldLabel htmlFor="insights-from">From</FieldLabel>
-          <Input
+          <DateField
             id="insights-from"
-            type="date"
             value={search.from ?? ""}
-            onChange={(event) => patchSearch({ from: event.target.value || undefined })}
+            onChange={(value) => patchSearch({ from: value || undefined })}
           />
         </Field>
         <Field className="w-44">
           <FieldLabel htmlFor="insights-to">To</FieldLabel>
-          <Input id="insights-to" type="date" value={search.to ?? ""} onChange={(event) => patchSearch({ to: event.target.value || undefined })} />
+          <DateField id="insights-to" value={search.to ?? ""} onChange={(value) => patchSearch({ to: value || undefined })} />
         </Field>
         <Field className="w-44">
           <FieldLabel htmlFor="insights-by">Show</FieldLabel>

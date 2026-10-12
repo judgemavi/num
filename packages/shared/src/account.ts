@@ -116,6 +116,7 @@ export const accountSchema = z.object({
   openingDate: isoDateSchema,
   openingAutomatic: z.boolean(),
   automaticOpeningDate: isoDateSchema,
+  automaticFollowsTransactions: z.boolean(),
   openingBalance: centsSchema,
   archivedAt: z.string().refine(isUtcTimestamp).nullable(),
   paymentPolicy: z.enum(paymentPolicies).nullable(),

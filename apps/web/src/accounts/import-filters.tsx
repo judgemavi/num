@@ -3,7 +3,7 @@ import { useState } from "react";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
 import { sortChoice } from "@/components/sort-choice";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/date-field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { importStatusLabel } from "@/accounts/import-format";
 import { accountLabel } from "@/accounts/label";
@@ -129,20 +129,18 @@ export function ImportFilterBar({ search, accounts, onChange }: ImportFilterBarP
           </Field>
           <Field>
             <FieldLabel htmlFor="import-filter-from">From</FieldLabel>
-            <Input
+            <DateField
               id="import-filter-from"
-              type="date"
               value={draft.from ?? ""}
-              onChange={(event) => setDraft({ ...draft, from: event.target.value || undefined })}
+              onChange={(value) => setDraft({ ...draft, from: value || undefined })}
             />
           </Field>
           <Field>
             <FieldLabel htmlFor="import-filter-to">To</FieldLabel>
-            <Input
+            <DateField
               id="import-filter-to"
-              type="date"
               value={draft.to ?? ""}
-              onChange={(event) => setDraft({ ...draft, to: event.target.value || undefined })}
+              onChange={(value) => setDraft({ ...draft, to: value || undefined })}
             />
           </Field>
         </>

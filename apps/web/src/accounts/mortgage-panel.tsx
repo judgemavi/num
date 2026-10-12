@@ -9,6 +9,7 @@ import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
+import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/money";
 import { apiRequest } from "@/request";
@@ -142,7 +143,7 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
           </Field>
           <Field>
             <FieldLabel htmlFor="mortgage-lump-date">Date of the one-time extra</FieldLabel>
-            <Input id="mortgage-lump-date" type="date" value={lumpDateText} onChange={(event) => setLumpDateText(event.target.value)} />
+            <DateField id="mortgage-lump-date" value={lumpDateText} onChange={setLumpDateText} />
           </Field>
           <Button type="button" variant="outline" className="self-end" onClick={showExtra}>Show the effect</Button>
         </div>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -115,7 +116,7 @@ export function MoveMoney({ currency, buckets, fromId, onSaved }: MoveMoneyProps
       </Field>
       <Field>
         <FieldLabel htmlFor="move-date">Date</FieldLabel>
-        <Input id="move-date" type="date" value={date} required onChange={(event) => setDate(event.target.value)} />
+        <DateField id="move-date" value={date} required onChange={setDate} />
       </Field>
       <Field>
         <FieldLabel htmlFor="move-note">Note</FieldLabel>

@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Toggle } from "@/components/ui/toggle";
@@ -102,7 +103,7 @@ export function MoneySection({
         </Field>
         <Field>
           <FieldLabel htmlFor="txn-date">Date</FieldLabel>
-          <Input id="txn-date" type="date" value={date} disabled={accountLocked} onChange={(event) => onDate(event.target.value)} required />
+          <DateField id="txn-date" value={date} disabled={accountLocked} onChange={onDate} required />
         </Field>
       </div>
     </>

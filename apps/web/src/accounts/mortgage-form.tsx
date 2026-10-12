@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -175,7 +176,7 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
           </Field>
           <Field>
             <FieldLabel htmlFor="mortgage-principal-date">On this date</FieldLabel>
-            <Input id="mortgage-principal-date" type="date" value={principalAsOf} required onChange={(event) => setPrincipalAsOf(event.target.value)} />
+            <DateField id="mortgage-principal-date" value={principalAsOf} required onChange={setPrincipalAsOf} />
           </Field>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -219,11 +220,11 @@ export function MortgageForm({ accountId, currency, terms, accounts, categories,
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="mortgage-first">First payment</FieldLabel>
-            <Input id="mortgage-first" type="date" value={firstPaymentDate} required onChange={(event) => setFirstPaymentDate(event.target.value)} />
+            <DateField id="mortgage-first" value={firstPaymentDate} required onChange={setFirstPaymentDate} />
           </Field>
           <Field>
             <FieldLabel htmlFor="mortgage-term-end">Term ends</FieldLabel>
-            <Input id="mortgage-term-end" type="date" value={termEnd} required onChange={(event) => setTermEnd(event.target.value)} />
+            <DateField id="mortgage-term-end" value={termEnd} required onChange={setTermEnd} />
           </Field>
         </div>
         <Field>

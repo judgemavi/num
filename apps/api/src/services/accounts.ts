@@ -17,7 +17,7 @@ import { ServiceError } from "../service-error";
 import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
 import { assertCanArchive, assertSameClass, cardFields, interestRate, type CardFields } from "./account-rules";
 import { accountAuditSnapshot, readColumnMap } from "./account-snapshot";
-import { effectiveOpeningDate } from "./opening-date";
+import { earliestTransactionDate, effectiveOpeningDate } from "./opening-date";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
@@ -70,6 +70,7 @@ function toAccount(db: Db | WriteTx, row: AccountRow, balance: number): Account 
     openingDate: row.openingDate ?? automaticOpeningDate,
     openingAutomatic: row.openingDate === null,
     automaticOpeningDate,
+    automaticFollowsTransactions: earliestTransactionDate(db, row.id) !== null,
     openingBalance: row.openingBalance,
     archivedAt: row.archivedAt,
     paymentPolicy: asPolicy(row.paymentPolicy),

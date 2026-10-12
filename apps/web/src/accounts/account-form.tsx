@@ -26,6 +26,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronRight } from "lucide-react";
 import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -219,13 +220,15 @@ export function AccountForm({ currency, account, initialName, inline = false, be
             />
           </Field>
           <Field>
-            <div className="flex min-h-11 items-center gap-2">
-              <FieldLabel htmlFor="opening-date">On this date</FieldLabel>
-              {automatic ? <Badge variant="neutral">Automatic</Badge> : null}
-            </div>
-            <Input id="opening-date" type="date" value={openingDate} onChange={(event) => changeOpeningDate(event.target.value)} />
+            <FieldLabel htmlFor="opening-date">On this date</FieldLabel>
+            <DateField id="opening-date" value={openingDate} onChange={changeOpeningDate} />
             {automatic ? (
-              <FieldDescription>This date follows the first transaction.</FieldDescription>
+              <FieldDescription className="flex flex-wrap items-center gap-2">
+                <Badge variant="neutral">Automatic</Badge>
+                {account?.automaticFollowsTransactions
+                  ? "This date follows the first transaction."
+                  : "Num uses today until you add transactions."}
+              </FieldDescription>
             ) : (
               <Button type="button" variant="link" className="h-11 min-h-11 justify-start px-0" onClick={useAutomaticDate}>
                 Use automatic date

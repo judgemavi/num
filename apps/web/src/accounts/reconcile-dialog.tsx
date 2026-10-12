@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { loadAccount, setOpeningBalance } from "@/accounts/opening-action";
 import { apiRequest } from "@/request";
@@ -175,13 +176,12 @@ export function ReconcileDialog({ accountId, currency, kind, onClose }: Reconcil
         <DialogBody>
         <Field>
           <FieldLabel htmlFor="statement-date">Statement date</FieldLabel>
-          <Input
+          <DateField
             id="statement-date"
-            type="date"
             value={date}
             required
-            onChange={(event) => {
-              setDate(event.target.value);
+            onChange={(value) => {
+              setDate(value);
               setCompare(null);
             }}
           />

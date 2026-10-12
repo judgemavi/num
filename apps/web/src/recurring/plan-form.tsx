@@ -27,6 +27,7 @@ import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { accountLabel } from "@/accounts/label";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -229,7 +230,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="plan-start">Starts</FieldLabel>
-            <Input id="plan-start" type="date" value={startDate} required onChange={(event) => setStartDate(event.target.value)} />
+            <DateField id="plan-start" value={startDate} required onChange={setStartDate} />
           </Field>
           <Field>
             <FieldLabel htmlFor="plan-every">Every</FieldLabel>
@@ -330,7 +331,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
             </Field>
             <Field>
               <FieldLabel htmlFor="plan-end">Ends</FieldLabel>
-              <Input id="plan-end" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+              <DateField id="plan-end" value={endDate} onChange={setEndDate} />
             </Field>
             {kind === "income" ? (
               <Field orientation="horizontal">

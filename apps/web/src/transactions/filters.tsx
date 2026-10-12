@@ -4,7 +4,7 @@ import { accountLabel } from "@/accounts/label";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
 import { sortChoice } from "@/components/sort-choice";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/date-field";
 import { Switch } from "@/components/ui/switch";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { formatDate } from "@/transactions/format";
@@ -255,20 +255,18 @@ export function TransactionFilterBar({ search, accounts, categories, groups, mer
           </Field>
           <Field>
             <FieldLabel htmlFor="filter-from">From</FieldLabel>
-            <Input
+            <DateField
               id="filter-from"
-              type="date"
               value={draft.from ?? ""}
-              onChange={(event) => setDraft({ ...draft, from: event.target.value || undefined })}
+              onChange={(value) => setDraft({ ...draft, from: value || undefined })}
             />
           </Field>
           <Field>
             <FieldLabel htmlFor="filter-to">To</FieldLabel>
-            <Input
+            <DateField
               id="filter-to"
-              type="date"
               value={draft.to ?? ""}
-              onChange={(event) => setDraft({ ...draft, to: event.target.value || undefined })}
+              onChange={(value) => setDraft({ ...draft, to: value || undefined })}
             />
           </Field>
           <Field orientation="horizontal">

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 
 type AssignMoneyProps = {
@@ -90,7 +91,7 @@ export function AssignMoney({ currency, bucket, kind, onSaved }: AssignMoneyProp
       </Field>
       <Field>
         <FieldLabel htmlFor="assign-date">Date</FieldLabel>
-        <Input id="assign-date" type="date" value={date} required onChange={(event) => setDate(event.target.value)} />
+        <DateField id="assign-date" value={date} required onChange={setDate} />
       </Field>
       <Field>
         <FieldLabel htmlFor="assign-note">Note</FieldLabel>

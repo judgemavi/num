@@ -33,6 +33,7 @@ import {
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup } from "@/components/ui/radio-group";
@@ -191,7 +192,7 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
           </Field>
           <Field>
             <FieldLabel htmlFor="bucket-due">Due date</FieldLabel>
-            <Input id="bucket-due" type="date" value={dueDate} required onChange={(event) => setDueDate(event.target.value)} />
+            <DateField id="bucket-due" value={dueDate} required onChange={setDueDate} />
           </Field>
           <Field>
             <FieldLabel htmlFor="bucket-repeat">Repeat</FieldLabel>
@@ -228,7 +229,7 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
           {goalMode === "date" ? (
             <Field>
               <FieldLabel htmlFor="bucket-target-date">Target date</FieldLabel>
-              <Input id="bucket-target-date" type="date" value={targetDate} required onChange={(event) => setTargetDate(event.target.value)} />
+              <DateField id="bucket-target-date" value={targetDate} required onChange={setTargetDate} />
             </Field>
           ) : (
             <Field>
