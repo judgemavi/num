@@ -18,7 +18,7 @@ function blockReason(db: Db, txn: TxRow | undefined): UndoBlockReason | "removed
   }
   if (txn.transferPeerId) {
     const peer = db.select().from(transactions).where(eq(transactions.id, txn.transferPeerId)).get();
-    if (peer?.mirror && transactionReconciled(db, peer.accountId, peer.date)) {
+    if (peer && transactionReconciled(db, peer.accountId, peer.date)) {
       return "reconciled";
     }
   }
@@ -86,7 +86,7 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
         continue;
       }
       tx.update(importRows).set({ active: false, transactionId: null }).where(eq(importRows.id, row.id)).run();
-      removeTransaction(tx, row.transactionId);
+      removeTransaction(tx, row.transactionId, at);
     }
     for (const rowId of unlinkIds) {
       const row = tx.select().from(importRows).where(eq(importRows.id, rowId)).get();

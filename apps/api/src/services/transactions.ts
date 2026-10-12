@@ -241,6 +241,7 @@ export function createTransaction(db: Db, input: TransactionBody & WriteInput): 
   let created: Transaction | undefined;
   write(db, { source: input.source, at }, (tx) => {
     created = insertTransaction(tx, input, input.source);
+    linkLearnedTransfers(tx, [created.id], new Set([created.id]));
     if (input.unreadableItemKey) {
       clearUnreadableLine(tx, input.unreadableItemKey);
     }
@@ -286,9 +287,6 @@ export function applyTransactionUpdate(
   if (peer && !peer.mirror && saved.transferPeerId === null) {
     recordPairNo(tx, id, peer.id, at);
   }
-  if (saved.transferPeerId !== null && !saved.mirror && saved.autoReason === null && saved.lines.some((line) => line.transferAccountId !== null)) {
-    linkLearnedTransfers(tx, [id]);
-  }
   if (spread && changed && isUserConfirmation(saved)) {
     spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));
   }
@@ -296,17 +294,18 @@ export function applyTransactionUpdate(
 }
 
 /** "Looks right" on one row of an automatic pair confirms the other row too. */
-function confirmLinkedPeer(tx: WriteTx, row: TxRow, at: string): void {
+export function confirmLinkedPeer(tx: WriteTx, row: TxRow, at: string): string | null {
   if (row.autoReason !== "transfer_match" || !row.transferPeerId) {
-    return;
+    return null;
   }
   const peer = requireActive(tx, row.transferPeerId);
   if (peer.autoReason !== "transfer_match") {
-    return;
+    return null;
   }
   const before = readTransaction(tx, peer.id);
   tx.update(transactions).set({ ...clearedAuto, editedAt: at }).where(eq(transactions.id, peer.id)).run();
   auditTransaction(tx, peer.id, "update", before, readTransaction(tx, peer.id));
+  return peer.id;
 }
 
 export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transaction {
@@ -326,6 +325,7 @@ export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transac
       spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));
     }
     linkAutomatic(tx, id);
+    linkLearnedTransfers(tx, [id], new Set([id, ...(existing.transferPeerId ? [existing.transferPeerId] : [])]));
     accepted = readTransaction(tx, id);
   });
   if (!accepted) {
@@ -334,7 +334,16 @@ export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transac
   return accepted;
 }
 
-export function spreadAfterConfirmations(tx: WriteTx, ids: readonly string[], alsoExcept: ReadonlySet<string> = new Set()): void {
+/**
+ * Runs once after a batch of confirmations. `batch` holds every id of the batch (targets and excluded rows):
+ * the learned-transfer link leaves them alone.
+ */
+export function spreadAfterConfirmations(
+  tx: WriteTx,
+  ids: readonly string[],
+  alsoExcept: ReadonlySet<string> = new Set(),
+  batch: ReadonlySet<string> = new Set(),
+): void {
   const except = new Set<string>(alsoExcept);
   const payees: string[] = [];
   for (const id of ids) {
@@ -345,13 +354,19 @@ export function spreadAfterConfirmations(tx: WriteTx, ids: readonly string[], al
     }
   }
   spreadSureLabels(tx, payees, except);
+  linkLearnedTransfers(tx, ids, new Set([...batch, ...ids, ...alsoExcept]));
 }
 
 export function updateTransaction(db: Db, id: string, input: TransactionBody & WriteInput): Transaction {
   const at = input.at ?? utcNow();
   let updated: Transaction | undefined;
   write(db, { source: input.source, at }, (tx) => {
+    const before = readTransaction(tx, id);
+    const wasTransfer = before.lines.some((line) => line.transferAccountId !== null);
     updated = applyTransactionUpdate(tx, id, input, at);
+    if (!wasTransfer || (before.autoReason !== null && updated.autoReason === null)) {
+      linkLearnedTransfers(tx, [id], new Set([id]));
+    }
   });
   if (!updated) {
     throw new Error("Update did not return a transaction");
@@ -366,7 +381,7 @@ export function deleteTransaction(db: Db, id: string, input: WriteInput): Transa
     const existing = requireActive(tx, id);
     const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
     assertDeletable(tx, existing, peer);
-    deleted = removeTransaction(tx, id);
+    deleted = removeTransaction(tx, id, at);
   });
   if (!deleted) {
     throw new Error("Delete did not return a transaction");

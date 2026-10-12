@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { inboxDecisions, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
+import { checkpoints, inboxDecisions, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
 import { columnMapSchema } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
@@ -15,6 +15,7 @@ import { importStatement } from "./imports";
 import { undoImportBatch } from "./import-undo";
 import { loadMatchBook } from "./match-book";
 import { listNeedsReview } from "./needs-review";
+import { approveFiltered } from "./review-approve";
 import { acceptLooksRight, createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const at = "2026-03-20T16:00:00.000Z";
@@ -91,8 +92,9 @@ function review(db: Db, id: string) {
 }
 
 function pairImport(db: Db, ids: Ids, outPayee: string, inPayee: string) {
-  statement(db, ids, ids.cheque, "out", [`03/10/2026,${outPayee},-50.00`]);
-  return statement(db, ids, ids.savings, "in", [`03/11/2026,${inPayee},50.00`]);
+  const out = statement(db, ids, ids.cheque, "out", [`03/10/2026,${outPayee},-50.00`]);
+  const incoming = statement(db, ids, ids.savings, "in", [`03/11/2026,${inPayee},50.00`]);
+  return Object.assign(incoming, { outId: out.id });
 }
 
 test("a pair with a learned transfer payee links by itself and both rows are Sure", () => {
@@ -280,5 +282,65 @@ test("confirming one pair links the other open pairs of the same payee, except a
       expect(review(db, outs[index]?.id ?? "")?.level).toBe("sure");
     }
     expect(getTransaction(db, outs[1]?.id ?? "")?.transferPeerId).toBeNull();
+  });
+});
+
+test("undoing the second import and then the first both work", () => {
+  withBook((db, ids) => {
+    learnTransfer(db, ids, "MOVE TO SAVINGS");
+    const batch = pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
+    expect(undoImportBatch(db, batch.id, saved).blocked).toEqual([]);
+    const [out] = rowsOf(db, -5_000);
+    expect(out?.editedAt).toBeNull();
+    expect(undoImportBatch(db, batch.outId, saved).blocked).toEqual([]);
+    expect(rowsOf(db, -5_000)).toHaveLength(0);
+  });
+});
+
+test("undo is blocked when the linked peer is reconciled", () => {
+  withBook((db, ids) => {
+    learnTransfer(db, ids, "MOVE TO SAVINGS");
+    const batch = pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
+    db.insert(checkpoints).values({ id: crypto.randomUUID(), accountId: ids.savings, date: "2026-03-15", statementBalance: 0, createdAt: at }).run();
+    const result = undoImportBatch(db, batch.outId, saved);
+    expect(result.blocked.map((item) => item.reason)).toEqual(["reconciled"]);
+    expect(rowsOf(db, -5_000)).toHaveLength(1);
+    expect(rowsOf(db, -5_000)[0]?.transferPeerId).not.toBeNull();
+  });
+});
+
+test("a group answer does not auto-link rows of its own batch or excluded rows", () => {
+  withBook((db, ids) => {
+    const dates = ["01/05", "01/12", "01/19", "01/26", "02/02"];
+    statement(db, ids, ids.cheque, "out", dates.map((day) => `${day}/2026,CIBC PAYMENT,-50.00`));
+    statement(db, ids, ids.savings, "in", dates.map((day) => `${day}/2026,PAYMENT RECEIVED,50.00`));
+    const outs = rowsOf(db, -5_000).sort((a, b) => a.date.localeCompare(b.date));
+    const result = applyInboxGroup(db, {
+      accountId: ids.cheque,
+      transactionIds: outs.map((row) => row.id),
+      excludedIds: [outs[4]?.id ?? ""],
+      categoryId: null,
+      transferAccountId: ids.savings,
+      merchantId: null,
+      ...saved,
+    });
+    expect(result.applied).toBe(4);
+    for (const row of outs.slice(0, 4)) {
+      const stored = getTransaction(db, row.id);
+      expect(stored?.transferPeerId).not.toBeNull();
+      expect(stored?.autoReason).toBeNull();
+    }
+    expect(getTransaction(db, outs[4]?.id ?? "")?.transferPeerId).toBeNull();
+  });
+});
+
+test("Approve all Sure confirms an automatic pair as one transfer", () => {
+  withBook((db, ids) => {
+    learnTransfer(db, ids, "MOVE TO SAVINGS");
+    pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
+    const result = approveFiltered(db, asOf, { uncategorized: false, automatic: false }, "sure", 2, saved);
+    expect(result.count).toBe(2);
+    expect(rowsOf(db, -5_000)[0]?.autoReason).toBeNull();
+    expect(rowsOf(db, 5_000)[0]?.autoReason).toBeNull();
   });
 });

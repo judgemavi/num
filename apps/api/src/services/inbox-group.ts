@@ -137,7 +137,7 @@ export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { 
         confirmed.push(id);
       }
     }
-    spreadAfterConfirmations(tx, confirmed, excluded);
+    spreadAfterConfirmations(tx, confirmed, excluded, new Set(groupIds));
   });
   return { applied, skipped };
 }

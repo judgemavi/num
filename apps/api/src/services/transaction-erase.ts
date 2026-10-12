@@ -8,13 +8,12 @@ import {
   transactionLines,
   transactions,
 } from "@num/db";
-import { utcNow } from "@num/shared";
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { clearRefundLinks } from "./refund-link";
 import { loadLines, replaceLines } from "./transaction-lines";
-import { auditTransaction, readTransaction, toTransaction, type TxRow } from "./transaction-record";
+import { auditTransaction, automaticPair, readTransaction, toTransaction, type TxRow } from "./transaction-record";
 import type { WriteTx } from "./write";
 
 type Reader = Db | WriteTx;
@@ -134,12 +133,12 @@ export function eraseTransaction(tx: WriteTx, id: string): void {
   tx.delete(transactions).where(eq(transactions.id, id)).run();
 }
 
-function unlinkPeer(tx: WriteTx, sourceId: string, peer: TxRow): void {
+function unlinkPeer(tx: WriteTx, sourceId: string, peer: TxRow, at: string): void {
   const peerLines = loadLines(tx, peer.id);
   const before = toTransaction(tx, peer, peerLines);
   tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, sourceId)).run();
   tx.update(transactions)
-    .set({ transferPeerId: null, autoReason: null, autoSourceId: null, autoConfidence: null, editedAt: utcNow() })
+    .set({ transferPeerId: null, autoReason: null, autoSourceId: null, autoConfidence: null, ...(automaticPair(peer) ? {} : { editedAt: at }) })
     .where(eq(transactions.id, peer.id))
     .run();
   replaceLines(
@@ -157,7 +156,7 @@ function unlinkPeer(tx: WriteTx, sourceId: string, peer: TxRow): void {
 }
 
 /** Deletes one transaction. A mirror peer is deleted with it. A non-mirror peer is unlinked. */
-export function removeTransaction(tx: WriteTx, id: string) {
+export function removeTransaction(tx: WriteTx, id: string, at: string) {
   const existing = tx.select().from(transactions).where(eq(transactions.id, id)).get();
   if (!existing) {
     throw new ServiceError("transaction_not_found", 404);
@@ -177,7 +176,7 @@ export function removeTransaction(tx: WriteTx, id: string) {
     eraseTransaction(tx, peer.id);
     auditTransaction(tx, peer.id, "delete", peerBefore, null);
   } else if (peer) {
-    unlinkPeer(tx, existing.id, peer);
+    unlinkPeer(tx, existing.id, peer, at);
   }
   eraseTransaction(tx, existing.id);
   auditTransaction(tx, existing.id, "delete", before, null);

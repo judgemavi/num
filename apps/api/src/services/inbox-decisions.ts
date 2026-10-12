@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { openUnreadableKeys } from "./book-settings";
-import { decidedKeys } from "./decision-keys";
+import { decidedKeys, pairKey } from "./decision-keys";
 import { openFundingPaychecks } from "./funding-paychecks";
 import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
@@ -41,10 +41,6 @@ export function decisionRows(db: Db): InboxDecision[] {
 function itemKind(itemKey: string): string {
   const split = itemKey.indexOf(":");
   return split === -1 ? itemKey : itemKey.slice(0, split);
-}
-
-function pairKey(leftId: string, rightId: string): string {
-  return leftId < rightId ? `transfer_pair:${leftId}:${rightId}` : `transfer_pair:${rightId}:${leftId}`;
 }
 
 function isOpen(db: Db, asOf: string, itemKey: string): boolean {

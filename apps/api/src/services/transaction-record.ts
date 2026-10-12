@@ -232,3 +232,8 @@ export function auditTransaction(
     after: after ? { ...snapshot(after), ...extra } : null,
   });
 }
+
+/** A peer that only the app linked (no edit by the person) stays unedited when the link goes away, so its import can be undone. */
+export function automaticPair(peer: TxRow): boolean {
+  return peer.autoReason === "transfer_match" && peer.editedAt === null;
+}

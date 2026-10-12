@@ -15,7 +15,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listOverspent } from "./buckets";
 import { openFundingPaychecks } from "./funding-paychecks";
-import { decidedKeys } from "./decision-keys";
+import { decidedKeys, pairKey } from "./decision-keys";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
@@ -55,10 +55,6 @@ function asReason(value: string | null): AutoReason | null {
     return value as AutoReason;
   }
   return null;
-}
-
-function pairKey(leftId: string, rightId: string): string {
-  return leftId < rightId ? `transfer_pair:${leftId}:${rightId}` : `transfer_pair:${rightId}:${leftId}`;
 }
 
 function chunks<T>(values: readonly T[], size: number): T[][] {

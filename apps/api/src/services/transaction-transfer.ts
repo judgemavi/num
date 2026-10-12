@@ -5,7 +5,7 @@ import { ServiceError } from "../service-error";
 import { transactionReconciled } from "./reconciled";
 import { eraseTransaction } from "./transaction-erase";
 import { loadLines, replaceLines, type StoredLine } from "./transaction-lines";
-import { auditTransaction, headerForWrite, readTransaction, toTransaction, type Header, type TxRow } from "./transaction-record";
+import { auditTransaction, automaticPair, headerForWrite, readTransaction, toTransaction, type Header, type TxRow } from "./transaction-record";
 import { transferLine, type NormalizedLine } from "./transaction-rules";
 import type { WriteTx } from "./write";
 
@@ -142,7 +142,7 @@ export function attachTransfer(
   insertMirror(tx, sourceId, header, source, target, line, markEdited);
 }
 
-function releasePeer(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: StoredLine[]): void {
+function releasePeer(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: StoredLine[], at: string): void {
   const before = toTransaction(tx, peer, peerLines);
   tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, sourceId)).run();
   if (peer.mirror) {
@@ -151,7 +151,7 @@ function releasePeer(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: Stor
     return;
   }
   tx.update(transactions)
-    .set({ transferPeerId: null, autoReason: null, autoSourceId: null, autoConfidence: null, editedAt: utcNow() })
+    .set({ transferPeerId: null, autoReason: null, autoSourceId: null, autoConfidence: null, ...(automaticPair(peer) ? {} : { editedAt: at }) })
     .where(eq(transactions.id, peer.id))
     .run();
   replaceLines(
@@ -237,7 +237,7 @@ export function applyMirrorEdit(
       .run();
     auditTransaction(tx, peer.id, "update", peerBefore, readTransaction(tx, peer.id));
   } else if (moneyChanged) {
-    releasePeer(tx, existing.id, peer, peerLines);
+    releasePeer(tx, existing.id, peer, peerLines, at);
   }
   auditTransaction(tx, existing.id, "update", before, readTransaction(tx, existing.id));
 }
@@ -262,7 +262,7 @@ export function applySourceEdit(
   const line = transferLine(lines);
   if (!line?.transferAccountId) {
     if (peer) {
-      releasePeer(tx, existing.id, peer, peerLines);
+      releasePeer(tx, existing.id, peer, peerLines, at);
     }
     auditTransaction(tx, existing.id, "update", before, readTransaction(tx, existing.id));
     return;
@@ -276,7 +276,7 @@ export function applySourceEdit(
   if (peer?.mirror) {
     rewriteMirror(tx, existing, peer, peerLines, header, line);
   } else if (peer && moneyChanged) {
-    releasePeer(tx, existing.id, peer, peerLines);
+    releasePeer(tx, existing.id, peer, peerLines, at);
     attachTransfer(tx, existing.id, header, existing.source, line);
   } else if (!peer) {
     attachTransfer(tx, existing.id, header, existing.source, line);

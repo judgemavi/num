@@ -9,3 +9,8 @@ export function decidedKeys(db: Db, kind?: string): Set<string> {
     : db.select({ itemKey: inboxDecisions.itemKey }).from(inboxDecisions).all();
   return new Set(rows.map((row) => row.itemKey));
 }
+
+/** The item key of a transfer pair question. The smaller id comes first. */
+export function pairKey(leftId: string, rightId: string): string {
+  return leftId < rightId ? `transfer_pair:${leftId}:${rightId}` : `transfer_pair:${rightId}:${leftId}`;
+}

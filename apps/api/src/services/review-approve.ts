@@ -8,7 +8,7 @@ import { linkAutomatic } from "./auto-link";
 import { requireAsOf, type NeedsReviewHit } from "./needs-review";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { filteredReviewHits } from "./transaction-list";
-import { spreadAfterConfirmations } from "./transactions";
+import { confirmLinkedPeer, spreadAfterConfirmations } from "./transactions";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = { source: AuditSource; at?: string };
@@ -17,14 +17,19 @@ type ApproveLevel = "sure" | "likely";
 
 const clearedAuto = { autoReason: null, autoSourceId: null, autoConfidence: null };
 
-function confirmSure(tx: WriteTx, id: string, at: string): boolean {
+/** `peers` holds the rows that an earlier row of this batch confirmed with its pair. */
+function confirmSure(tx: WriteTx, id: string, at: string, peers: Set<string>): boolean {
   const existing = tx.select().from(transactions).where(eq(transactions.id, id)).get();
   if (!existing?.autoReason) {
-    return false;
+    return peers.has(id);
   }
   const before = readTransaction(tx, id);
   tx.update(transactions).set({ ...clearedAuto, editedAt: at }).where(eq(transactions.id, id)).run();
   auditTransaction(tx, id, "update", before, readTransaction(tx, id));
+  const peer = confirmLinkedPeer(tx, existing, at);
+  if (peer) {
+    peers.add(peer);
+  }
   linkAutomatic(tx, id);
   return true;
 }
@@ -75,20 +80,21 @@ export function approveFiltered(
   }
   const at = input.at ?? utcNow();
   const ids: string[] = [];
+  const peers = new Set<string>();
   write(db, { source: input.source, at }, (tx) => {
     const targets = targetsOf(db, asOf, filter, level);
     if (targets.length !== expectedCount) {
       throw changed(targets.length);
     }
     for (const hit of targets) {
-      if (level === "sure" ? confirmSure(tx, hit.id, at) : applyLikely(tx, hit, at)) {
+      if (level === "sure" ? confirmSure(tx, hit.id, at, peers) : applyLikely(tx, hit, at)) {
         ids.push(hit.id);
       }
     }
     if (ids.length !== targets.length) {
       throw changed(ids.length);
     }
-    spreadAfterConfirmations(tx, ids);
+    spreadAfterConfirmations(tx, ids, new Set(), new Set(targets.map((hit) => hit.id)));
   });
   return { level, count: ids.length, ids };
 }
