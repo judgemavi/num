@@ -38,6 +38,19 @@ function showDate(date: Date): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
 }
 
+const captionFormat = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" });
+const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "short" });
+const dayLabelFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "full" });
+
+const calendarFormatters = {
+  formatCaption: (month: Date) => captionFormat.format(month),
+  formatWeekdayName: (weekday: Date) => weekdayFormat.format(weekday),
+};
+
+const calendarLabels = {
+  labelDayButton: (day: Date) => dayLabelFormat.format(day),
+};
+
 export function DateField({ id, value, onChange, disabled, required, placeholder = "Pick a date", className }: DateFieldProps) {
   const [open, setOpen] = useState(false);
   const selected = toCalendarDate(value);
@@ -63,6 +76,8 @@ export function DateField({ id, value, onChange, disabled, required, placeholder
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="single"
+          formatters={calendarFormatters}
+          labels={calendarLabels}
           selected={selected}
           defaultMonth={selected}
           onSelect={(date) => {
