@@ -151,7 +151,7 @@ function releasePeer(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: Stor
     return;
   }
   tx.update(transactions)
-    .set({ transferPeerId: null, editedAt: utcNow() })
+    .set({ transferPeerId: null, autoReason: null, autoSourceId: null, autoConfidence: null, editedAt: utcNow() })
     .where(eq(transactions.id, peer.id))
     .run();
   replaceLines(

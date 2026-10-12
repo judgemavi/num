@@ -78,6 +78,10 @@ function reasonText(reason: SuggestionReason): string {
       return "This merchant's usual category";
     case "refund_match":
       return "Same payee and amount as a purchase";
+    case "refund_reversal":
+      return "Same amount and category as a purchase";
+    case "transfer_match":
+      return "Same amount moved between your accounts";
     case "none":
       return "";
   }

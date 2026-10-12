@@ -23,7 +23,18 @@ export function plainReason(input: {
   sourceName: string | null;
   learnedCount: number | null;
   purchaseDate?: string | null;
+  purchasePayee?: string | null;
 }): string {
+  if (input.reason === "transfer_match") {
+    return "Same amount moved between your accounts. You marked this payee as a transfer before.";
+  }
+  if (input.reason === "refund_reversal") {
+    if (!input.purchaseDate || !input.purchasePayee) {
+      return "Same amount and category as a purchase";
+    }
+    const day = Temporal.PlainDate.from(input.purchaseDate).toLocaleString(undefined, { month: "short", day: "numeric" });
+    return `Same amount and category as ${input.purchasePayee} on ${day}`;
+  }
   if (input.reason === "refund_match") {
     if (!input.purchaseDate) {
       return "Same payee and amount as a purchase";
@@ -55,6 +66,7 @@ export function automaticReasonText(input: {
   sourceName: string | null;
   learnedCount: number | null;
   purchaseDate?: string | null;
+  purchasePayee?: string | null;
 }): string {
   const reason = plainReason(input);
   return reason.length > 0 ? `Sure · ${reason}` : "Sure";

@@ -10,7 +10,7 @@ import type { PlannedImportRow } from "./import-plan";
 import { labelFields, linkRecurring, mortgageSplitLines } from "./match-apply";
 import { loadMatchBook, recurringForRows, scorePayee } from "./match-book";
 import { insertMirror } from "./transaction-transfer";
-import { linkRefundIfSure } from "./refund-auto";
+import { linkAutomatic } from "./auto-link";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -315,7 +315,7 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
       }
     }
     for (const newId of createdIds) {
-      linkRefundIfSure(tx, newId);
+      linkAutomatic(tx, newId);
     }
     saveFormat(tx, input.accountId, input.presetId, input.columnMap);
     const batch = tx.select().from(importBatches).where(eq(importBatches.id, batchId)).get();

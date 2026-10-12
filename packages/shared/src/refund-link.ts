@@ -96,6 +96,8 @@ export function rankRefundPurchases(
 /** A spending row that a refund can point to. `refunded` is the sum of refunds that already point to it. */
 export type RefundCandidate = {
   id: string;
+  accountId: string;
+  categoryId: string | null;
   date: string;
   amount: number;
   payeeRaw: string;
@@ -103,30 +105,50 @@ export type RefundCandidate = {
   refunded: number;
 };
 
+export const reversalWindowDays = 3;
+
+/** "payee": same payee key within 90 days. "reversal": same account, category and amount within 3 days (decision 0023). */
+export type RefundCandidateKind = "payee" | "reversal";
+
+export type RefundSubject = {
+  date: string;
+  amount: number;
+  payeeNormalized: string;
+  accountId: string;
+  categoryId: string | null;
+};
+
+export function refundReversalStart(date: string): string {
+  return Temporal.PlainDate.from(date).subtract({ days: reversalWindowDays }).toString();
+}
+
+export function candidateKind(refund: RefundSubject, row: RefundCandidate): RefundCandidateKind | null {
+  if (row.amount >= 0 || refund.amount <= 0 || row.date > refund.date || row.refunded + refund.amount > -row.amount) {
+    return null;
+  }
+  if (refund.payeeNormalized.length > 0 && row.payeeNormalized === refund.payeeNormalized && row.date >= refundWindowStart(refund.date)) {
+    return "payee";
+  }
+  const reversal =
+    refund.categoryId !== null &&
+    row.categoryId === refund.categoryId &&
+    row.accountId === refund.accountId &&
+    row.amount === -refund.amount &&
+    row.date >= refundReversalStart(refund.date);
+  return reversal ? "reversal" : null;
+}
+
 export const refundQuestionLimit = 3;
 
 /**
- * Purchases that a refund can point to (decision 0022): same payee key, on or up to 90 days before
- * the refund, with room left for this refund. The same amount comes first, then the most recent.
+ * Purchases that a refund can point to (decisions 0022 and 0023): same payee key within 90 days, or the same
+ * account, category and amount within 3 days with any payee. Each has room left for this refund.
+ * The same amount comes first, then the most recent.
  */
-export function refundCandidates(
-  refund: { date: string; amount: number; payeeNormalized: string },
-  purchases: readonly RefundCandidate[],
-): RefundCandidate[] {
-  if (refund.payeeNormalized.length === 0 || refund.amount <= 0) {
-    return [];
-  }
-  const start = refundWindowStart(refund.date);
+export function refundCandidates(refund: RefundSubject, purchases: readonly RefundCandidate[]): RefundCandidate[] {
   const exact = (row: RefundCandidate) => row.amount === -refund.amount;
   return purchases
-    .filter(
-      (row) =>
-        row.amount < 0 &&
-        row.payeeNormalized === refund.payeeNormalized &&
-        row.date >= start &&
-        row.date <= refund.date &&
-        row.refunded + refund.amount <= -row.amount,
-    )
+    .filter((row) => candidateKind(refund, row) !== null)
     .sort((left, right) => {
       const rank = Number(exact(right)) - Number(exact(left));
       if (rank !== 0) {

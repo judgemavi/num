@@ -8,7 +8,7 @@ import {
 } from "@num/shared";
 import { sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { linkRefundIfSure } from "./refund-auto";
+import { linkAutomatic } from "./auto-link";
 import { readTransaction, type TransactionBody } from "./transaction-record";
 import { applyTransactionUpdate, spreadAfterConfirmations } from "./transactions";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -95,7 +95,7 @@ export function applySuggestion(tx: WriteTx, id: string, patch: Patch, at: strin
     return { id, reason };
   }
   applyTransactionUpdate(tx, id, bodyFor(transaction, patch), at, false);
-  linkRefundIfSure(tx, id);
+  linkAutomatic(tx, id);
   return null;
 }
 

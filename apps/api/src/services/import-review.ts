@@ -5,7 +5,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { labelFields } from "./match-apply";
 import { loadMatchBook, scorePayee } from "./match-book";
-import { linkRefundIfSure } from "./refund-auto";
+import { linkAutomatic } from "./auto-link";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -76,7 +76,7 @@ function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>): s
   auditTransaction(tx, transactionId, "create", null, readTransaction(tx, transactionId), {
     suggestionReason: scored.reason ?? "none",
   });
-  linkRefundIfSure(tx, transactionId);
+  linkAutomatic(tx, transactionId);
   return transactionId;
 }
 

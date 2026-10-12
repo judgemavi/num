@@ -45,6 +45,7 @@ function reasonText(row: TransactionListItem): string {
     sourceName: row.autoSourceName,
     learnedCount: review?.learnedCount ?? row.autoLearnedCount,
     purchaseDate: row.refundOf?.date ?? null,
+    purchasePayee: row.refundOf?.payeeRaw ?? null,
   });
 }
 

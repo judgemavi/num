@@ -230,17 +230,22 @@ export { canOfferInlineCreate, finishInlineCreate, inlineCreateMaxDepth, type In
 export { merchantNameFromPayee, normalizePayee, storedPayee } from "./payee";
 export {
   autoRefundPurchase,
+  candidateKind,
   categoryForRefund,
   rankRefundPurchases,
   refundCandidates,
   refundQuestionLimit,
+  refundReversalStart,
   refundLinkAllowed,
   refundOfIdAfterEdit,
   refundPurchaseListSchema,
   refundPurchaseQuerySchema,
   refundWindowDays,
   refundWindowStart,
+  reversalWindowDays,
   type RefundCandidate,
+  type RefundCandidateKind,
+  type RefundSubject,
   type RefundPurchase,
   type RefundPurchaseItem,
 } from "./refund-link";

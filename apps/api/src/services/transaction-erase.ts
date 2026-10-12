@@ -139,7 +139,7 @@ function unlinkPeer(tx: WriteTx, sourceId: string, peer: TxRow): void {
   const before = toTransaction(tx, peer, peerLines);
   tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, sourceId)).run();
   tx.update(transactions)
-    .set({ transferPeerId: null, editedAt: utcNow() })
+    .set({ transferPeerId: null, autoReason: null, autoSourceId: null, autoConfidence: null, editedAt: utcNow() })
     .where(eq(transactions.id, peer.id))
     .run();
   replaceLines(

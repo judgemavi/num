@@ -2,7 +2,7 @@ import { similarPayees as rankSimilar, type TrigramIndex } from "./trigram";
 
 export { buildTrigramIndex, characterTrigrams, trigramCosine, type TrigramIndex } from "./trigram";
 
-export const autoReasons = ["recurring", "learned_amount", "learned_payee", "similar", "merchant_default", "refund_match"] as const;
+export const autoReasons = ["recurring", "learned_amount", "learned_payee", "similar", "merchant_default", "refund_match", "refund_reversal", "transfer_match"] as const;
 
 export type AutoReason = (typeof autoReasons)[number];
 

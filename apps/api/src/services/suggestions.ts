@@ -16,7 +16,7 @@ import { transactionReconciled } from "./reconciled";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { loadLines, replaceLines } from "./transaction-lines";
 import { auditTransaction, readTransaction, toTransaction } from "./transaction-record";
-import { write, type AuditSource } from "./write";
+import { write, type AuditSource, type WriteTx } from "./write";
 
 type WriteInput = {
   source: AuditSource;
@@ -96,6 +96,55 @@ export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[]
   };
 }
 
+/** The fields of one side of a linked pair. An automatic link is not an edit, so the import can still be undone. */
+function linkFields(peerId: string, editedAt: string | null) {
+  if (editedAt === null) {
+    return { transferPeerId: peerId, autoReason: "transfer_match", autoSourceId: peerId, autoConfidence: 990 };
+  }
+  return { transferPeerId: peerId, autoReason: null, autoSourceId: null, autoConfidence: null, editedAt };
+}
+
+/** Links two existing rows as a transfer pair (no new mirror). With `editedAt` null, both rows become an automatic label. */
+export function linkTransferPair(tx: WriteTx, leftId: string, rightId: string, editedAt: string | null): void {
+  const left = tx.select().from(transactions).where(eq(transactions.id, leftId)).get();
+  const right = tx.select().from(transactions).where(eq(transactions.id, rightId)).get();
+  if (!left || !right || left.accountId === right.accountId) {
+    throw new ServiceError("transfer_pair_not_found", 404);
+  }
+  if (left.transferPeerId || right.transferPeerId) {
+    throw new ServiceError("transfer_pair_not_found", 404);
+  }
+  if (transactionReconciled(tx, left.accountId, left.date) || transactionReconciled(tx, right.accountId, right.date)) {
+    throw new ServiceError("transaction_reconciled", 409);
+  }
+  const leftLines = loadLines(tx, left.id);
+  const rightLines = loadLines(tx, right.id);
+  const leftBefore = toTransaction(tx, left, leftLines);
+  const rightBefore = toTransaction(tx, right, rightLines);
+  tx.update(transactions).set(linkFields(right.id, editedAt)).where(eq(transactions.id, left.id)).run();
+  tx.update(transactions).set(linkFields(left.id, editedAt)).where(eq(transactions.id, right.id)).run();
+  replaceLines(tx, left.id, [
+    {
+      amount: left.amount,
+      memo: leftLines.length === 1 ? (leftLines[0]?.memo ?? null) : null,
+      categoryId: null,
+      transferAccountId: right.accountId,
+      tagIds: [...new Set(leftLines.flatMap((line) => line.tagIds))],
+    },
+  ]);
+  replaceLines(tx, right.id, [
+    {
+      amount: right.amount,
+      memo: rightLines.length === 1 ? (rightLines[0]?.memo ?? null) : null,
+      categoryId: null,
+      transferAccountId: left.accountId,
+      tagIds: [...new Set(rightLines.flatMap((line) => line.tagIds))],
+    },
+  ]);
+  auditTransaction(tx, left.id, "update", leftBefore, readTransaction(tx, left.id));
+  auditTransaction(tx, right.id, "update", rightBefore, readTransaction(tx, right.id));
+}
+
 export function acceptTransferPair(db: Db, asOf: string, leftId: string, rightId: string, input: WriteInput) {
   const ready = listTransferPairs(db, asOf).items.some(
     (pair) =>
@@ -105,50 +154,7 @@ export function acceptTransferPair(db: Db, asOf: string, leftId: string, rightId
     throw new ServiceError("transfer_pair_not_found", 404);
   }
   write(db, { source: input.source, at: input.at }, (tx) => {
-    const left = tx.select().from(transactions).where(eq(transactions.id, leftId)).get();
-    const right = tx.select().from(transactions).where(eq(transactions.id, rightId)).get();
-    if (!left || !right || left.accountId === right.accountId) {
-      throw new ServiceError("transfer_pair_not_found", 404);
-    }
-    if (left.transferPeerId || right.transferPeerId) {
-      throw new ServiceError("transfer_pair_not_found", 404);
-    }
-    if (transactionReconciled(tx, left.accountId, left.date) || transactionReconciled(tx, right.accountId, right.date)) {
-      throw new ServiceError("transaction_reconciled", 409);
-    }
-    const leftLines = loadLines(tx, left.id);
-    const rightLines = loadLines(tx, right.id);
-    const leftBefore = toTransaction(tx, left, leftLines);
-    const rightBefore = toTransaction(tx, right, rightLines);
-    const editedAt = input.at ?? utcNow();
-    tx.update(transactions)
-      .set({ transferPeerId: right.id, autoReason: null, autoSourceId: null, autoConfidence: null, editedAt })
-      .where(eq(transactions.id, left.id))
-      .run();
-    tx.update(transactions)
-      .set({ transferPeerId: left.id, autoReason: null, autoSourceId: null, autoConfidence: null, editedAt })
-      .where(eq(transactions.id, right.id))
-      .run();
-    replaceLines(tx, left.id, [
-      {
-        amount: left.amount,
-        memo: leftLines.length === 1 ? (leftLines[0]?.memo ?? null) : null,
-        categoryId: null,
-        transferAccountId: right.accountId,
-        tagIds: [...new Set(leftLines.flatMap((line) => line.tagIds))],
-      },
-    ]);
-    replaceLines(tx, right.id, [
-      {
-        amount: right.amount,
-        memo: rightLines.length === 1 ? (rightLines[0]?.memo ?? null) : null,
-        categoryId: null,
-        transferAccountId: left.accountId,
-        tagIds: [...new Set(rightLines.flatMap((line) => line.tagIds))],
-      },
-    ]);
-    auditTransaction(tx, left.id, "update", leftBefore, readTransaction(tx, left.id));
-    auditTransaction(tx, right.id, "update", rightBefore, readTransaction(tx, right.id));
+    linkTransferPair(tx, leftId, rightId, input.at ?? utcNow());
   });
   return { leftId, rightId };
 }

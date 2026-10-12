@@ -294,6 +294,7 @@ export function AutomaticReason({
           sourceName: transaction.autoSourceName,
           learnedCount: transaction.autoLearnedCount,
           purchaseDate: transaction.refundOf?.date ?? null,
+          purchasePayee: transaction.refundOf?.payeeRaw ?? null,
         })}
       </p>
       <Button type="button" variant="outline" disabled={saving} onClick={onLooksRight}>

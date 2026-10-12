@@ -16,7 +16,9 @@ import {
   type TxRow,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
-import { linkRefundIfSure, recordRefundNo } from "./refund-auto";
+import { linkAutomatic } from "./auto-link";
+import { recordRefundNo } from "./refund-auto";
+import { recordPairNo } from "./transfer-auto";
 import { assertRefundLink, withRefundPurchase } from "./refund-link";
 import { spreadSureLabels } from "./match-apply";
 import { transactionReconciled } from "./reconciled";
@@ -281,10 +283,27 @@ export function applyTransactionUpdate(
   if (existing.refundOfId !== null && linked.header.refundOfId == null) {
     recordRefundNo(tx, id, at);
   }
+  if (peer && !peer.mirror && saved.transferPeerId === null) {
+    recordPairNo(tx, id, peer.id, at);
+  }
   if (spread && changed && isUserConfirmation(saved)) {
     spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));
   }
   return saved;
+}
+
+/** "Looks right" on one row of an automatic pair confirms the other row too. */
+function confirmLinkedPeer(tx: WriteTx, row: TxRow, at: string): void {
+  if (row.autoReason !== "transfer_match" || !row.transferPeerId) {
+    return;
+  }
+  const peer = requireActive(tx, row.transferPeerId);
+  if (peer.autoReason !== "transfer_match") {
+    return;
+  }
+  const before = readTransaction(tx, peer.id);
+  tx.update(transactions).set({ ...clearedAuto, editedAt: at }).where(eq(transactions.id, peer.id)).run();
+  auditTransaction(tx, peer.id, "update", before, readTransaction(tx, peer.id));
 }
 
 export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transaction {
@@ -297,12 +316,13 @@ export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transac
     }
     const before = readTransaction(tx, id);
     tx.update(transactions).set({ ...clearedAuto, editedAt: at }).where(eq(transactions.id, id)).run();
+    confirmLinkedPeer(tx, existing, at);
     const saved = readTransaction(tx, id);
     auditTransaction(tx, id, "update", before, saved);
     if (isUserConfirmation(saved)) {
       spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));
     }
-    linkRefundIfSure(tx, id);
+    linkAutomatic(tx, id);
     accepted = readTransaction(tx, id);
   });
   if (!accepted) {
