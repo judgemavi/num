@@ -1,22 +1,22 @@
-import { clearanceResultSchema, transactionListSchema, type TransactionListItem } from "@num/shared";
+import { clearanceResultSchema, transactionListSchema, type TransactionListQuery } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Amount } from "@/components/amount";
-import { ListCard, ListRow } from "@/components/list-card";
-import { Badge } from "@/components/ui/badge";
+import { ListCard } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { useAccounts, useCategories, useMerchants } from "@/editors/lookups";
 import { apiRequest } from "@/request";
-import { formatDate, reconciledLabel, refundOfText, refundedText, statusLabel } from "@/transactions/format";
 import { localAsOf } from "@/as-of";
 import { transactionPath } from "@/transactions/query";
+import { TransactionsTable } from "@/transactions/transactions-table";
 
 const selectionLimit = 200;
+
+type SortColumn = NonNullable<TransactionListQuery["sort"]>;
 
 type AccountTransactionsProps = {
   accountId: string;
   currency: string;
+  showBalance: boolean;
   page: number;
   onPage: (page: number) => void;
 };
@@ -41,20 +41,32 @@ function withLimit(current: string[], ids: string[], on: boolean): { next: strin
   return { next, capped };
 }
 
-export function AccountTransactions({ accountId, currency, page, onPage }: AccountTransactionsProps) {
+export function AccountTransactions({ accountId, currency, showBalance, page, onPage }: AccountTransactionsProps) {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string[]>([]);
   const [capped, setCapped] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  const [sort, setSort] = useState<SortColumn>("date");
+  const [dir, setDir] = useState<"asc" | "desc">("desc");
+  const accounts = useAccounts();
+  const categories = useCategories();
+  const merchants = useMerchants();
+  const search: TransactionListQuery = {
+    page,
+    pageSize: 50,
+    accountId,
+    uncategorized: false,
+    automatic: false,
+    needsReview: false,
+    ...(sort === "date" && dir === "desc" ? {} : { sort, dir }),
+  };
+
   const transactions = useQuery({
-    queryKey: ["transactions", accountId, page],
+    queryKey: ["transactions", accountId, page, sort, dir],
     queryFn: async () => {
-      const result = await apiRequest(
-        transactionPath({ page, pageSize: 50, accountId, uncategorized: false, automatic: false, needsReview: false }, localAsOf()),
-        transactionListSchema,
-      );
+      const result = await apiRequest(transactionPath(search, localAsOf()), transactionListSchema);
       if (!result.ok) {
         throw new Error(result.code);
       }
@@ -82,6 +94,19 @@ export function AccountTransactions({ accountId, currency, page, onPage }: Accou
       selectable.map((row) => row.id),
       on,
     );
+  }
+
+  function sortBy(column: SortColumn) {
+    setDir(sort === column ? (dir === "asc" ? "desc" : "asc") : column === "date" ? "desc" : "asc");
+    setSort(column);
+    onPage(1);
+  }
+
+  function sortState(column: SortColumn): "ascending" | "descending" | "none" {
+    if (sort !== column) {
+      return "none";
+    }
+    return dir === "asc" ? "ascending" : "descending";
   }
 
   async function mark(status: "open" | "cleared") {
@@ -137,29 +162,22 @@ export function AccountTransactions({ accountId, currency, page, onPage }: Accou
       {transactions.data && rows.length === 0 ? (
         <p className="px-5 py-5 text-muted-foreground">No transactions in this account.</p>
       ) : null}
-      {selectable.length > 0 ? (
-        <div className="flex min-h-11 items-center gap-3 border-b px-5">
-          <Field orientation="horizontal" className="min-h-11">
-            <Checkbox
-              id="select-page"
-              checked={
-                selectedOnPage.length === 0 ? false : selectedOnPage.length === selectable.length ? true : "indeterminate"
-              }
-              onCheckedChange={(value) => togglePage(value === true)}
-            />
-            <FieldLabel htmlFor="select-page">Select transactions on this page</FieldLabel>
-          </Field>
-        </div>
-      ) : null}
-      {rows.map((row) => (
-        <TransactionLine
-          key={row.id}
-          row={row}
+      {transactions.data && accounts.data && categories.data && merchants.data && rows.length > 0 ? (
+        <TransactionsTable
+          search={search}
+          rows={rows}
+          counts={null}
           currency={currency}
-          checked={selected.includes(row.id)}
-          onChecked={(on) => toggle(row.id, on)}
+          accounts={accounts.data}
+          categories={categories.data}
+          merchants={merchants.data}
+          showBalance={showBalance}
+          hideAccount
+          selection={{ ids: selected, onToggle: toggle, onTogglePage: togglePage }}
+          sortState={sortState}
+          onSort={sortBy}
         />
-      ))}
+      ) : null}
       {capped || selected.length >= selectionLimit ? (
         <p role="status" className="px-5 py-3 text-sm text-muted-foreground">
           You can mark 200 transactions at a time.
@@ -181,43 +199,5 @@ export function AccountTransactions({ accountId, currency, page, onPage }: Accou
         </div>
       ) : null}
     </ListCard>
-  );
-}
-
-function TransactionLine({
-  row,
-  currency,
-  checked,
-  onChecked,
-}: {
-  row: TransactionListItem;
-  currency: string;
-  checked: boolean;
-  onChecked: (on: boolean) => void;
-}) {
-  const locked = row.reconciled;
-  return (
-    <ListRow simple>
-      {locked ? (
-        <span className="size-11 shrink-0" />
-      ) : (
-        <Field orientation="horizontal" className="size-11 shrink-0 justify-center">
-          <Checkbox id={`select-${row.id}`} checked={checked} onCheckedChange={(value) => onChecked(value === true)} />
-          <FieldLabel htmlFor={`select-${row.id}`} className="sr-only">
-            Select {row.payeeRaw}
-          </FieldLabel>
-        </Field>
-      )}
-      <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-        {row.payeeRaw}
-        <small>{formatDate(row.date)}</small>
-        {row.refundOf ? <small>{refundOfText(currency, row.refundOf.date, row.refundOf.amount)}</small> : null}
-        {row.refundedAmount ? <small>{refundedText(currency, row.refundedAmount)}</small> : null}
-      </div>
-      {row.reconciled ? <Badge variant="neutral">{reconciledLabel()}</Badge> : row.status === "open" ? null : <Badge variant="positive">{statusLabel(row.status)}</Badge>}
-      <div className="ml-auto text-right">
-        <Amount currency={currency} minor={row.amount} />
-      </div>
-    </ListRow>
   );
 }

@@ -1,18 +1,5 @@
-import { Temporal, type AutoReason, type TransactionStatus } from "@num/shared";
+import { Temporal, type AutoReason } from "@num/shared";
 import { formatMoney } from "@/money";
-
-const statusLabels: Record<TransactionStatus, string> = {
-  open: "Open",
-  cleared: "Cleared",
-};
-
-export function reconciledLabel(): string {
-  return "Reconciled";
-}
-
-export function statusLabel(status: TransactionStatus): string {
-  return statusLabels[status];
-}
 
 export function formatDate(iso: string): string {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { dateStyle: "medium" });

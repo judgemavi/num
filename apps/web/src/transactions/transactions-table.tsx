@@ -5,6 +5,7 @@ import { accountLabelOf, accountLabels } from "@/accounts/label";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEditors } from "@/editors/editor-api";
 import { CategoryCell } from "@/transactions/category-cell";
@@ -27,6 +28,12 @@ function groupOf(item: TransactionListItem): GroupKey {
   return "questions";
 }
 
+export type Selection = {
+  ids: string[];
+  onToggle: (id: string, on: boolean) => void;
+  onTogglePage: (on: boolean) => void;
+};
+
 type Props = {
   search: TransactionListQuery;
   rows: TransactionListItem[];
@@ -36,6 +43,8 @@ type Props = {
   categories: Category[];
   merchants: Merchant[];
   showBalance: boolean;
+  hideAccount?: boolean;
+  selection?: Selection;
   sortState: (column: SortColumn) => "ascending" | "descending" | "none";
   onSort: (column: SortColumn) => void;
 };
@@ -51,7 +60,7 @@ function SortHead({ column, label, props, className }: { column: SortColumn; lab
 }
 
 export function TransactionsTable(props: Props) {
-  const { search, rows, counts, currency, accounts, categories, merchants, showBalance } = props;
+  const { search, rows, counts, currency, accounts, categories, merchants, showBalance, hideAccount, selection } = props;
   const { openEditor } = useEditors();
   const actions = useReviewActions(search);
   const accountNames = accountLabels(accounts);
@@ -60,7 +69,9 @@ export function TransactionsTable(props: Props) {
     accounts: accountNames,
     merchants: new Map(merchants.map((merchant) => [merchant.id, merchant.name])),
   };
-  const columns = showBalance ? 7 : 6;
+  const columns = 5 + (showBalance ? 1 : 0) + (hideAccount ? 0 : 1) + (selection ? 1 : 0) + 1;
+  const selectable = selection ? rows.filter((row) => !row.reconciled) : [];
+  const selectedOnPage = selection ? selectable.filter((row) => selection.ids.includes(row.id)) : [];
   const grouped = search.needsReview === true && counts !== null;
 
   function renderRow(row: TransactionListItem) {
@@ -77,8 +88,19 @@ export function TransactionsTable(props: Props) {
           open();
         }}
       >
+        {selection ? (
+          <TableCell onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+            {row.reconciled ? null : (
+              <Checkbox
+                aria-label={`Select ${row.payeeRaw}`}
+                checked={selection.ids.includes(row.id)}
+                onCheckedChange={(value) => selection.onToggle(row.id, value === true)}
+              />
+            )}
+          </TableCell>
+        ) : null}
         <TableCell>{formatDate(row.date)}</TableCell>
-        <TableCell>{accountLabelOf(accountNames, row.accountId, row.accountName)}</TableCell>
+        {hideAccount ? null : <TableCell>{accountLabelOf(accountNames, row.accountId, row.accountName)}</TableCell>}
         <TableCell>
           <div>{row.payeeRaw}</div>
           {row.refundOf ? <div className="text-muted-foreground">{refundOfText(currency, row.refundOf.date, row.refundOf.amount)}</div> : null}
@@ -153,8 +175,18 @@ export function TransactionsTable(props: Props) {
         <Table>
           <TableHeader>
             <TableRow>
+              {selection ? (
+                <TableHead>
+                  <Checkbox
+                    aria-label="Select transactions on this page"
+                    disabled={selectable.length === 0}
+                    checked={selectedOnPage.length === 0 ? false : selectedOnPage.length === selectable.length ? true : "indeterminate"}
+                    onCheckedChange={(value) => selection.onTogglePage(value === true)}
+                  />
+                </TableHead>
+              ) : null}
               <SortHead column="date" label="Date" props={props} />
-              <TableHead>Account</TableHead>
+              {hideAccount ? null : <TableHead>Account</TableHead>}
               <SortHead column="payeeRaw" label="Payee" props={props} />
               <TableHead>Category</TableHead>
               <SortHead column="amount" label="Amount" props={props} className="text-right" />

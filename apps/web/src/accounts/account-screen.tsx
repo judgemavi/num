@@ -117,6 +117,7 @@ export function AccountScreen() {
         <AccountTransactions
           accountId={row.id}
           currency={bookCurrency}
+          showBalance={row.kind !== "investment" && row.kind !== "property"}
           page={search.page}
           onPage={(page) => {
             void navigate({ search: { ...search, page } });
