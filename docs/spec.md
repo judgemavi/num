@@ -544,6 +544,8 @@ Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default,
    purchase, the user picks the category; merchant is optional, as for any transaction.
    The app links a refund to its purchase automatically only when exactly one purchase of the same payee has the same
    amount within 90 days; otherwise it asks "Refund of which purchase?" in Needs review (decision 0022).
+   A spending row in the same account, category and amount 0–3 days before is also a candidate, with any payee
+   (a fee and its rebate; decision 0023).
    **Income:** an income category. The list shows only income categories.
 2. **Transfer:** the other account. The app preselects Transfer only on evidence: an opposite transaction in another
    account within ±3 days, or a learned transfer for that payee. A transfer has no merchant. If that account has an unlinked transaction with the opposite amount within ±3 days,
@@ -573,6 +575,7 @@ Save creates the record, selects it and closes the section. A merchant name is s
 
 **Transfer detection.** An imported row can have an opposite amount to an unlinked row in a different on-budget account,
 within ±3 days. Then the transaction needs review with a transfer pair question. The user accepts with one click.
+If exactly one pair exists and its payee is a learned transfer, the app links the pair automatically (Sure; decision 0023).
 Look only at unlinked, not deleted transactions from the last 90 days. Each transaction is in a maximum of one pair.
 
 ### 7.4 Recurring
