@@ -542,6 +542,8 @@ Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default,
    **Refund** first asks "Refund of which purchase?" (optional; recent spending, same payee first, decision 0018).
    A linked purchase gives the refund its category and merchant; the editor hides those fields. Without a linked
    purchase, the user picks the category; merchant is optional, as for any transaction.
+   The app links a refund to its purchase automatically only when exactly one purchase of the same payee has the same
+   amount within 90 days; otherwise it asks "Refund of which purchase?" in Needs review (decision 0022).
    **Income:** an income category. The list shows only income categories.
 2. **Transfer:** the other account. The app preselects Transfer only on evidence: an opposite transaction in another
    account within ±3 days, or a learned transfer for that payee. A transfer has no merchant. If that account has an unlinked transaction with the opposite amount within ±3 days,
@@ -552,12 +554,14 @@ Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default,
 The best candidate (§7.3) preselects the choice: a category, or a learned transfer.
 
 **Needs review (decision 0021).** A transaction needs review when it has an automatic label, a suggestion, no category,
-or an open question (possible transfer, more than one recurring candidate, changed recurring amount).
+or an open question (possible transfer, more than one recurring candidate, changed recurring amount,
+refund of which purchase).
 Transactions has a "Needs review" view (a server filter) with one row for each transaction. The row shows the question,
 the level and one-click answers. The whole row opens the transaction editor (a chevron at the right shows this).
-- **Approve by level:** the view groups its rows by level (Sure, Likely, Maybe, No suggestion) with counts.
+- **Approve by level:** the view groups its rows by level (Sure, Likely, Maybe, Questions) with counts.
+  Questions holds the open questions and the rows with no suggestion.
   "Approve all Sure" and "Approve all Likely" apply each row's label or suggestion as a confirmation (shared confirm
-  with the count; audited; one write). Maybe and No suggestion are answered one row at a time.
+  with the count; audited; one write). Maybe and Questions are answered one row at a time.
 - An approval is a confirmation (it counts for learning).
 - Home shows the count and links to the view.
 The editor's group mode stays available for bulk edits that the user starts (for example from a selection on Transactions).
