@@ -19,7 +19,9 @@ A **candidate** purchase:
 - has a refunded amount, after this refund, that is not more than its own amount (decision 0018).
 
 1. **Automatic link.** Exactly one candidate has the same absolute amount as the refund: the app links the refund
-   to it when the refund gets its category (import, automatic label, user label or approval).
+   to it when the refund gets its category from the app: import, automatic label, or approval of a suggestion or
+   automatic label. A category that the user picks in the editor does not start an automatic link (the user's choice
+   stays; the question shows if candidates exist).
    The link is an automatic label: the row needs review at level Sure, with the reason
    "Same payee and amount as the purchase on <date>". "Looks right" and "Approve all Sure" confirm it.
    The link sets the refund's category and merchant from the purchase (§7.3).
