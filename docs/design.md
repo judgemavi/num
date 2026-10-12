@@ -180,8 +180,11 @@ Order, top to bottom:
 Category, transfer and merchant apply to all; the user can exclude items. Split is not available.
 
 Needs review is the Transactions table with the Needs review filter on (decision 0021). There is no second list component.
-The table has a "Category" column for all rows: the category, "Transfer to <account>", or "Uncategorized", and the merchant below it.
-When a row needs review, the same cell also shows the level (Sure, Likely, Maybe as a Badge, never a percentage), the proposed answer in plain words ("Groceries · Loblaws?" or "Transfer to TD Savings?"), the reason ("You chose this 4 times for this payee") and one-click answers ("Looks right" for Sure, "Yes" for a suggestion, the question answers for a transfer pair or a recurring question).
+Columns: Date, Account, Payee, Category, Amount, Review (and Balance when one account is shown). There is no Status column.
+The Category column shows the category, "Transfer to <account>", or "Uncategorized", and the merchant below it.
+The Amount cell shows only the exceptions: a lock icon for a reconciled row (Tooltip: "Checked against your balance on <date>")
+and "Pending" for an open row (entered by hand, not yet on a statement). A cleared row shows nothing.
+When a row needs review, the Review column (right-most) shows the level (Sure, Likely, Maybe as a Badge, never a percentage), the proposed answer in plain words ("Groceries · Loblaws?" or "Transfer to TD Savings?"), the reason ("You chose this 4 times for this payee") and one-click answers ("Looks right" for Sure, "Yes" for a suggestion, the question answers for a transfer pair or a recurring question).
 The whole row opens the editor. No "Other…" button, no dismiss, no queue mode.
 With the Needs review filter on, the table puts rows in groups by level: Sure, Likely, Maybe, Questions. Each group starts with a header row that shows the count and, for Sure and Likely, "Approve all N" (shared confirm).
 
