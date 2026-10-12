@@ -171,6 +171,7 @@ export const transactionListItemSchema = z.object({
     })
     .nullable(),
   refundedAmount: centsSchema.nullable(),
+  lines: z.array(z.object({ categoryId: z.uuid().nullable(), transferAccountId: z.uuid().nullable() })),
   review: transactionReviewSchema.nullable(),
 });
 

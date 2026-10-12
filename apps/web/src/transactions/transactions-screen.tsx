@@ -2,37 +2,27 @@ import {
   accountListSchema,
   categoryListSchema,
   currencyUpdateSchema,
-  merchantListSchema,
   tagListSchema,
   transactionListSchema,
-  transactionSchema,
   type Account,
   type Category,
   type Tag,
   type TransactionListQuery,
-  accountClass,
 } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect } from "react";
-import { accountLabelOf, accountLabels } from "@/accounts/label";
 import { localAsOf } from "@/as-of";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
-import { Amount } from "@/components/amount";
-import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TransactionFilterBar } from "@/transactions/filters";
-import { automaticReasonText, formatDate, reconciledLabel, refundOfText, refundedText, statusLabel } from "@/transactions/format";
-import { NeedsReviewList } from "@/transactions/needs-review-list";
-import { hasFilters, transactionPath } from "@/transactions/query";
+import { transactionPath } from "@/transactions/query";
+import { TransactionsTable } from "@/transactions/transactions-table";
 import { useEditors } from "@/editors/editor-api";
-import { useGroups } from "@/editors/lookups";
+import { useGroups, useMerchants } from "@/editors/lookups";
 
 const transactionsRoute = getRouteApi("/transactions");
 
@@ -51,17 +41,7 @@ export function TransactionsScreen() {
   const search = transactionsRoute.useSearch();
   const groups = useGroups();
   const navigate = transactionsRoute.useNavigate();
-  const queryClient = useQueryClient();
   const { openEditor } = useEditors();
-
-  async function looksRight(id: string) {
-    const result = await apiRequest(`/api/transactions/${id}/looks-right`, transactionSchema, { method: "POST" });
-    if (!result.ok) {
-      return;
-    }
-    void queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    void queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-  }
 
   const currency = useQuery({
     queryKey: ["book-currency"],
@@ -97,13 +77,7 @@ export function TransactionsScreen() {
     queryKey: ["tags", "options"],
     queryFn: () => loadNamed<Tag>("/api/tags", tagListSchema),
   });
-  const merchants = useQuery({
-    queryKey: ["merchants", "options"],
-    queryFn: async () => {
-      const page = await loadAllPages("/api/merchants", merchantListSchema, { archived: false });
-      return page.items;
-    },
-  });
+  const merchants = useMerchants();
 
   const changeFilters = useCallback(
     (patch: Partial<TransactionListQuery>) => {
@@ -179,7 +153,6 @@ export function TransactionsScreen() {
   const bookCurrency = currency.data;
   const page = transactions.data;
   const rows = page.items;
-  const accountNames = accountLabels(accounts.data);
   const lastPage = Math.max(1, Math.ceil(page.total / page.pageSize));
   const selectedAccount = accounts.data.find((account) => account.id === search.accountId);
   const showBalance =
@@ -224,147 +197,22 @@ export function TransactionsScreen() {
         accounts={accounts.data}
         categories={categories.data}
         groups={groups.data ?? []}
-        merchants={merchants.data}
+        merchants={merchants.data.filter((merchant) => !merchant.archivedAt)}
         tags={tags.data}
         onChange={changeFilters}
       />
-      {search.needsReview ? (
-        <NeedsReviewList
-          currency={bookCurrency}
-          search={search}
-          items={rows}
-          counts={page.reviewCounts ?? { sure: 0, likely: 0, maybe: 0, none: 0, questions: 0 }}
-        />
-      ) : (
-      <div className="overflow-hidden rounded-[16px] border border-border bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead aria-sort={sortState("date")}>
-              <Button type="button" variant="ghost" size="sm" onClick={() => sortBy("date")}>
-                Date
-              </Button>
-            </TableHead>
-            <TableHead>Account</TableHead>
-            <TableHead aria-sort={sortState("payeeRaw")}>
-              <Button type="button" variant="ghost" size="sm" onClick={() => sortBy("payeeRaw")}>
-                Payee
-              </Button>
-            </TableHead>
-            <TableHead aria-sort={sortState("amount")} className="text-right">
-              <Button type="button" variant="ghost" size="sm" onClick={() => sortBy("amount")}>
-                Amount
-              </Button>
-            </TableHead>
-            <TableHead>Status</TableHead>
-            {showBalance ? <TableHead className="text-right">Balance</TableHead> : null}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={showBalance ? 6 : 5} className="text-muted-foreground">
-                {hasFilters(search) ? "No transactions match." : "No transactions yet."}
-              </TableCell>
-            </TableRow>
-          ) : (
-            rows.map((row) => (
-              <TableRow
-                key={row.id}
-                className="cursor-pointer"
-                tabIndex={0}
-                onClick={() => void openEditor("transaction", { id: row.id })}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
-                  event.preventDefault();
-                  void openEditor("transaction", { id: row.id });
-                }}
-              >
-                <TableCell>{formatDate(row.date)}</TableCell>
-                <TableCell>{accountLabelOf(accountNames, row.accountId, row.accountName)}</TableCell>
-                <TableCell>
-                  <div>{row.payeeRaw}</div>
-                  {row.merchantName ? <div className="text-muted-foreground">{row.merchantName}</div> : null}
-                  {row.refundOf ? <div className="text-muted-foreground">{refundOfText(bookCurrency, row.refundOf.date, row.refundOf.amount)}</div> : null}
-                  {row.refundedAmount ? <div className="text-muted-foreground">{refundedText(bookCurrency, row.refundedAmount)}</div> : null}
-                  {row.autoReason ? (
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <span className="text-sm text-muted-foreground">
-                        {automaticReasonText({
-                          reason: row.autoReason,
-                          sourceName: row.autoSourceName,
-                          learnedCount: row.autoLearnedCount,
-                        })}
-                      </span>
-                      {search.automatic ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void looksRight(row.id);
-                          }}
-                        >
-                          Looks right
-                        </Button>
-                      ) : null}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void openEditor("transaction", { id: row.id });
-                        }}
-                      >
-                        Correct
-                      </Button>
-                      <RowMenu label={`Actions for ${row.payeeRaw}`}>
-                        <DropdownMenuItem
-                          onSelect={(event) => {
-                            event.stopPropagation();
-                            void looksRight(row.id);
-                          }}
-                        >
-                          Looks right
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={(event) => {
-                            event.stopPropagation();
-                            void openEditor("transaction", { id: row.id });
-                          }}
-                        >
-                          Correct
-                        </DropdownMenuItem>
-                      </RowMenu>
-                    </div>
-                  ) : null}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Amount currency={bookCurrency} minor={row.amount} />
-                </TableCell>
-                <TableCell>
-                  {row.reconciled ? (
-                    <Badge variant="neutral">{reconciledLabel()}</Badge>
-                  ) : row.status === "open" ? null : (
-                    <Badge variant="positive">{statusLabel(row.status)}</Badge>
-                  )}
-                </TableCell>
-                {showBalance ? (
-                  <TableCell className="text-right">
-                    {row.runningBalance === null ? null : (
-                      <Amount currency={bookCurrency} minor={row.runningBalance} owed={accountClass(row.accountKind) === "liability"} />
-                    )}
-                  </TableCell>
-                ) : null}
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      </div>
-      )}
+      <TransactionsTable
+        search={search}
+        rows={rows}
+        counts={page.reviewCounts}
+        currency={bookCurrency}
+        accounts={accounts.data}
+        categories={categories.data}
+        merchants={merchants.data}
+        showBalance={showBalance}
+        sortState={sortState}
+        onSort={sortBy}
+      />
       {page.total > page.pageSize ? (
         <div className="flex items-center justify-end gap-2">
           <Button

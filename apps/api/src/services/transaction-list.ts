@@ -3,6 +3,7 @@ import { accountKinds, autoReasons, transactionStatuses, type AccountKind, type 
 import { eq, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { linesForIds } from "./transaction-list-lines";
 import { listNeedsReview, reviewCounts, type NeedsReviewHit } from "./needs-review";
 const sortColumns = {
   date: "t.date",
@@ -140,7 +141,7 @@ function filters(query: TransactionFilter): SQL {
   return sql.join(parts, sql` and `);
 }
 
-function toItem(row: ListRow, review: TransactionReview | null): TransactionListItem {
+function toItem(row: ListRow, lines: TransactionListItem["lines"], review: TransactionReview | null): TransactionListItem {
   return {
     id: row.id,
     accountId: row.accountId,
@@ -163,6 +164,7 @@ function toItem(row: ListRow, review: TransactionReview | null): TransactionList
         ? null
         : { id: row.refundOfKey, date: row.refundOfDate, amount: row.refundOfAmount, payeeRaw: row.refundOfPayee },
     refundedAmount: row.refundedAmount,
+    lines,
     review:
       review === null
         ? null
@@ -293,10 +295,11 @@ export function listTransactions(db: Db, query: TransactionListQuery & { asOf?: 
     const hits = filteredReviewHits(db, query, query.asOf);
     const page = pageHits(hits, query);
     const byId = new Map(rowsForIds(db, page.map((hit) => hit.id)).map((row) => [row.id, row]));
+    const lines = linesForIds(db, page.map((hit) => hit.id));
     return {
       items: page.flatMap((hit) => {
         const row = byId.get(hit.id);
-        return row ? [toItem(row, hit.review)] : [];
+        return row ? [toItem(row, lines.get(hit.id) ?? [], hit.review)] : [];
       }),
       page: query.page,
       pageSize: query.pageSize,
@@ -360,8 +363,12 @@ export function listTransactions(db: Db, query: TransactionListQuery & { asOf?: 
   if (query.accountId && usesTransactionBalance(db, query.accountId)) {
     fillRunningBalances(db, query.accountId, rows);
   }
+  const lines = linesForIds(
+    db,
+    rows.map((row) => row.id),
+  );
   return {
-    items: rows.map((row) => toItem(row, null)),
+    items: rows.map((row) => toItem(row, lines.get(row.id) ?? [], null)),
     page: query.page,
     pageSize: query.pageSize,
     total,
