@@ -76,6 +76,8 @@ function reasonText(reason: SuggestionReason): string {
       return "Same as a similar payee";
     case "merchant_default":
       return "This merchant's usual category";
+    case "refund_match":
+      return "Same payee and amount as a purchase";
     case "none":
       return "";
   }

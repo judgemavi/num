@@ -3,12 +3,14 @@ import { localAsOf } from "@/as-of";
 import { Button } from "@/components/ui/button";
 import { useEditors } from "@/editors/editor-api";
 import { apiRequest } from "@/request";
-import { acceptPair, applyInboxGroup, decideItem, linkOccurrence, updatePlanAmount } from "@/review/actions";
+import { refundPurchaseLabel } from "@/transactions/format";
+import { acceptPair, applyInboxGroup, decideItem, linkOccurrence, linkRefund, updatePlanAmount } from "@/review/actions";
 
 type Run = (action: () => Promise<{ ok: boolean }>) => Promise<void>;
 
 type Props = {
   row: TransactionListItem;
+  currency: string;
   pending: boolean;
   planById: Map<string, Plan>;
   run: Run;
@@ -19,7 +21,7 @@ function looksRight(id: string) {
 }
 
 /** The one-click answers in the Category cell. */
-export function ReviewAnswers({ row, pending, planById, run }: Props) {
+export function ReviewAnswers({ row, currency, pending, planById, run }: Props) {
   const { openEditor } = useEditors();
   const review = row.review;
   if (!review) {
@@ -40,6 +42,21 @@ export function ReviewAnswers({ row, pending, planById, run }: Props) {
         </Button>
         <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => void run(() => decideItem(asOf, itemKey, "not_transfer"))}>
           Not a transfer
+        </Button>
+      </>
+    );
+  }
+  if (review.question === "refund_purchase" && review.refund) {
+    const itemKey = review.refund.itemKey;
+    return (
+      <>
+        {review.refund.purchases.map((purchase) => (
+          <Button key={purchase.id} type="button" size="sm" disabled={pending} onClick={() => void run(() => linkRefund(row.id, purchase.id))}>
+            {refundPurchaseLabel(currency, purchase.payeeRaw, purchase.date, purchase.amount)}
+          </Button>
+        ))}
+        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => void run(() => decideItem(asOf, itemKey, "not_linked"))}>
+          Not linked to a purchase
         </Button>
       </>
     );

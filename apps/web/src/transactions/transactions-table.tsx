@@ -82,7 +82,7 @@ export function TransactionsTable(props: Props) {
           {row.refundedAmount ? <div className="text-muted-foreground">{refundedText(currency, row.refundedAmount)}</div> : null}
         </TableCell>
         <TableCell>
-          <CategoryCell row={row} names={names} pending={actions.pending} planById={actions.planById} run={actions.run} />
+          <CategoryCell row={row} currency={currency} names={names} pending={actions.pending} planById={actions.planById} run={actions.run} />
         </TableCell>
         <TableCell className="text-right">
           <Amount currency={currency} minor={row.amount} />

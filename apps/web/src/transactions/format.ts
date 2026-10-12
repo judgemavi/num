@@ -35,7 +35,15 @@ export function plainReason(input: {
   reason: AutoReason | null;
   sourceName: string | null;
   learnedCount: number | null;
+  purchaseDate?: string | null;
 }): string {
+  if (input.reason === "refund_match") {
+    if (!input.purchaseDate) {
+      return "Same payee and amount as a purchase";
+    }
+    const day = Temporal.PlainDate.from(input.purchaseDate).toLocaleString(undefined, { month: "short", day: "numeric" });
+    return `Same payee and amount as the purchase on ${day}`;
+  }
   if (input.reason === "recurring") {
     return input.sourceName ? `Matches your ${input.sourceName} payment` : "Matches your recurring payment";
   }
@@ -59,6 +67,7 @@ export function automaticReasonText(input: {
   reason: AutoReason;
   sourceName: string | null;
   learnedCount: number | null;
+  purchaseDate?: string | null;
 }): string {
   const reason = plainReason(input);
   return reason.length > 0 ? `Sure · ${reason}` : "Sure";

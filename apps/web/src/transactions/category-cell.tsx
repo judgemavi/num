@@ -39,6 +39,9 @@ function questionText(row: TransactionListItem): string | null {
   if (review.question === "recurring_ambiguous") {
     return "Which payment is this?";
   }
+  if (review.question === "refund_purchase") {
+    return "Refund of which purchase?";
+  }
   if (review.question === "recurring_changed" && review.recurring?.actualAmount !== null && review.recurring?.expectedAmount !== null) {
     return "The amount changed. Update the plan?";
   }
@@ -65,11 +68,13 @@ function reasonText(row: TransactionListItem): string {
     reason: review ? (review.reason ?? (suggestionReason && suggestionReason !== "none" ? suggestionReason : null)) : row.autoReason,
     sourceName: row.autoSourceName,
     learnedCount: review?.learnedCount ?? row.autoLearnedCount,
+    purchaseDate: row.refundOf?.date ?? null,
   });
 }
 
 type Props = {
   row: TransactionListItem;
+  currency: string;
   names: Names;
   pending: boolean;
   planById: Map<string, Plan>;
@@ -77,7 +82,7 @@ type Props = {
 };
 
 /** The Category column. One cell for the label, the merchant and the review state. */
-export function CategoryCell({ row, names, pending, planById, run }: Props) {
+export function CategoryCell({ row, currency, names, pending, planById, run }: Props) {
   const review = row.review;
   const isQuestion = review !== null && review.question !== "categorize";
   const level = review ? review.level : row.autoReason ? "sure" : "none";
@@ -96,7 +101,7 @@ export function CategoryCell({ row, names, pending, planById, run }: Props) {
       {hasState && reason ? <div className="text-sm text-muted-foreground">{reason}</div> : null}
       {hasState ? (
         <div className="mt-1 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-          <ReviewAnswers row={row} pending={pending} planById={planById} run={run} />
+          <ReviewAnswers row={row} currency={currency} pending={pending} planById={planById} run={run} />
         </div>
       ) : null}
     </>

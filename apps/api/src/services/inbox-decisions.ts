@@ -6,6 +6,7 @@ import { ServiceError } from "../service-error";
 import { openUnreadableKeys } from "./book-settings";
 import { decidedKeys } from "./decision-keys";
 import { openFundingPaychecks } from "./funding-paychecks";
+import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
 import { listTransferPairs } from "./suggestions";
 import { write, type AuditSource } from "./write";
@@ -21,6 +22,7 @@ const codeForKind: Record<string, InboxDecisionCode | undefined> = {
   plan_proposal: "not_recurring",
   paycheck_funding: "keep_unassigned",
   import_unreadable: "not_a_transaction",
+  refund_link: "not_linked",
 };
 
 export function decisionRows(db: Db): InboxDecision[] {
@@ -60,6 +62,8 @@ function isOpen(db: Db, asOf: string, itemKey: string): boolean {
       return openFundingPaychecks(db).some((item) => `paycheck_funding:${item.incomeTransactionId}` === itemKey);
     case "import_unreadable":
       return openUnreadableKeys(db).includes(itemKey);
+    case "refund_link":
+      return [...refundQuestions(db, new Set()).values()].some((ask) => ask.itemKey === itemKey);
     default:
       return false;
   }

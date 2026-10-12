@@ -281,7 +281,7 @@ export function AutomaticReason({
   saving,
   onLooksRight,
 }: {
-  transaction: Pick<Transaction, "autoReason" | "autoConfidence" | "autoSourceName" | "autoLearnedCount"> & { autoReason: AutoReason };
+  transaction: Pick<Transaction, "autoReason" | "autoConfidence" | "autoSourceName" | "autoLearnedCount" | "refundOf"> & { autoReason: AutoReason };
   saving: boolean;
   onLooksRight: () => void;
 }) {
@@ -292,6 +292,7 @@ export function AutomaticReason({
           reason: transaction.autoReason,
           sourceName: transaction.autoSourceName,
           learnedCount: transaction.autoLearnedCount,
+          purchaseDate: transaction.refundOf?.date ?? null,
         })}
       </p>
       <Button type="button" variant="outline" disabled={saving} onClick={onLooksRight}>

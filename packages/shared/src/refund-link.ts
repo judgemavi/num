@@ -92,3 +92,58 @@ export function rankRefundPurchases(
       return left.id < right.id ? -1 : 1;
     });
 }
+
+/** A spending row that a refund can point to. `refunded` is the sum of refunds that already point to it. */
+export type RefundCandidate = {
+  id: string;
+  date: string;
+  amount: number;
+  payeeRaw: string;
+  payeeNormalized: string;
+  refunded: number;
+};
+
+export const refundQuestionLimit = 3;
+
+/**
+ * Purchases that a refund can point to (decision 0022): same payee key, on or up to 90 days before
+ * the refund, with room left for this refund. The same amount comes first, then the most recent.
+ */
+export function refundCandidates(
+  refund: { date: string; amount: number; payeeNormalized: string },
+  purchases: readonly RefundCandidate[],
+): RefundCandidate[] {
+  if (refund.payeeNormalized.length === 0 || refund.amount <= 0) {
+    return [];
+  }
+  const start = refundWindowStart(refund.date);
+  const exact = (row: RefundCandidate) => row.amount === -refund.amount;
+  return purchases
+    .filter(
+      (row) =>
+        row.amount < 0 &&
+        row.payeeNormalized === refund.payeeNormalized &&
+        row.date >= start &&
+        row.date <= refund.date &&
+        row.refunded + refund.amount <= -row.amount,
+    )
+    .sort((left, right) => {
+      const rank = Number(exact(right)) - Number(exact(left));
+      if (rank !== 0) {
+        return rank;
+      }
+      if (left.date !== right.date) {
+        return right.date < left.date ? -1 : 1;
+      }
+      return left.id < right.id ? -1 : 1;
+    });
+}
+
+/** The one purchase to link by itself: exactly one candidate has the same amount. Never a partial refund. */
+export function autoRefundPurchase(
+  refund: { amount: number },
+  candidates: readonly RefundCandidate[],
+): RefundCandidate | null {
+  const same = candidates.filter((row) => row.amount === -refund.amount);
+  return same.length === 1 ? (same[0] ?? null) : null;
+}

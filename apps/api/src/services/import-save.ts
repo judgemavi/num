@@ -10,6 +10,7 @@ import type { PlannedImportRow } from "./import-plan";
 import { labelFields, linkRecurring, mortgageSplitLines } from "./match-apply";
 import { loadMatchBook, recurringForRows, scorePayee } from "./match-book";
 import { insertMirror } from "./transaction-transfer";
+import { linkRefundIfSure } from "./refund-auto";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -144,6 +145,7 @@ function insertCreated(
   auditTransaction(tx, transactionId, "create", null, readTransaction(tx, transactionId), {
     suggestionReason: result.reason ?? "none",
   });
+  linkRefundIfSure(tx, transactionId);
 }
 
 function insertMatched(tx: WriteTx, batchId: string, accountId: string, row: PlannedImportRow): void {

@@ -46,6 +46,8 @@ export function decisionText(code: InboxDecisionCode): string {
       return "Kept in Unassigned";
     case "not_a_transaction":
       return "Not a transaction";
+    case "not_linked":
+      return "Not linked to a purchase";
   }
 }
 

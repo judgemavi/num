@@ -2,6 +2,7 @@ import { accounts, mortgageTerms, occurrenceLinks, transactionLines, transaction
 import { mortgagePrefillLines, mortgageSplitForDate, similarPayees, utcNow, type Compounding, type MatchResult, type PaymentFrequency } from "@num/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { loadMatchBook, scorePayee } from "./match-book";
+import { linkRefundIfSure } from "./refund-auto";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { replaceLines } from "./transaction-lines";
 import { attachTransfer } from "./transaction-transfer";
@@ -195,6 +196,7 @@ function applyRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
     .run();
   tx.update(transactionLines).set({ categoryId: label.categoryId }).where(eq(transactionLines.id, row.lineId)).run();
   auditTransaction(tx, row.id, "label", before, readTransaction(tx, row.id));
+  linkRefundIfSure(tx, row.id);
 }
 
 /** Labels uncategorized rows for these payees, and for payees similar to them. */

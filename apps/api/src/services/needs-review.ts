@@ -17,6 +17,7 @@ import { listOverspent } from "./buckets";
 import { openFundingPaychecks } from "./funding-paychecks";
 import { decidedKeys } from "./decision-keys";
 import { loadMatchBook, scorePayee } from "./match-book";
+import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
 import { listTransferPairs } from "./suggestions";
 type Base = {
@@ -117,6 +118,7 @@ function emptyReview(level: ReviewLevel, reason: AutoReason | null): Transaction
     itemKey: null,
     transfer: null,
     recurring: null,
+    refund: null,
   };
 }
 
@@ -145,6 +147,7 @@ export function listNeedsReview(
     }
   }
   const changedById = new Map(changed.map((item) => [item.transactionId, item]));
+  const refundById = refundQuestions(db, hidden);
   const openIds = db.all<{ id: string }>(sql`
     select t.id as id from transactions t
     where t.auto_reason is not null
@@ -158,6 +161,7 @@ export function listNeedsReview(
     ...pairById.keys(),
     ...ambiguousById.keys(),
     ...changedById.keys(),
+    ...refundById.keys(),
   ];
   const bases = loadBases(db, ids);
   const byId = new Map(bases.map((row) => [row.id, row]));
@@ -186,10 +190,12 @@ export function listNeedsReview(
     const pair = pairById.get(row.id);
     const ambiguous = ambiguousById.get(row.id);
     const amountChanged = changedById.get(row.id);
-    const asksQuestion = pair !== undefined || ambiguous !== undefined || amountChanged !== undefined;
+    const refundAsk = refundById.get(row.id);
+    const asksQuestion =
+      pair !== undefined || ambiguous !== undefined || amountChanged !== undefined || refundAsk !== undefined;
     const level = asksQuestion ? "none" : rowLevel(row, automatic, suggestion);
     const needs =
-      automatic || openLine || pair !== undefined || ambiguous !== undefined || amountChanged !== undefined;
+      automatic || openLine || asksQuestion;
     if (!needs) {
       continue;
     }
@@ -228,6 +234,10 @@ export function listNeedsReview(
         itemKey: review.itemKey,
         transactionIds: [amountChanged.transactionId],
       };
+    } else if (refundAsk) {
+      review.question = "refund_purchase";
+      review.itemKey = refundAsk.itemKey;
+      review.refund = refundAsk;
     } else {
       review.suggestion = suggestion;
     }

@@ -8,7 +8,7 @@ import { isUtcTimestamp } from "./time";
 
 const itemKey = z.string().trim().min(1).max(500);
 
-export const reviewQuestions = ["transfer_pair", "recurring_ambiguous", "recurring_changed", "categorize"] as const;
+export const reviewQuestions = ["transfer_pair", "recurring_ambiguous", "recurring_changed", "refund_purchase", "categorize"] as const;
 
 export type ReviewQuestion = (typeof reviewQuestions)[number];
 
@@ -29,6 +29,18 @@ export const reviewRecurringSchema = z.object({
   transactionIds: z.array(z.uuid()),
 });
 
+export const reviewRefundSchema = z.object({
+  itemKey: z.string(),
+  purchases: z.array(
+    z.object({
+      id: z.uuid(),
+      date: isoDateSchema,
+      amount: centsSchema,
+      payeeRaw: z.string(),
+    }),
+  ),
+});
+
 export const transactionReviewSchema = z.object({
   level: z.enum(reviewLevels),
   reason: z.enum(autoReasons).nullable(),
@@ -38,6 +50,7 @@ export const transactionReviewSchema = z.object({
   itemKey: z.string().nullable(),
   transfer: reviewTransferSchema.nullable(),
   recurring: reviewRecurringSchema.nullable(),
+  refund: reviewRefundSchema.nullable(),
 });
 
 export const reviewCountSchema = z.object({
@@ -65,6 +78,7 @@ export const inboxDecisionCodes = [
   "not_recurring",
   "keep_unassigned",
   "not_a_transaction",
+  "not_linked",
 ] as const;
 
 export type InboxDecisionCode = (typeof inboxDecisionCodes)[number];

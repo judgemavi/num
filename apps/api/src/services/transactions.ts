@@ -16,6 +16,7 @@ import {
   type TxRow,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
+import { linkRefundIfSure } from "./refund-auto";
 import { assertRefundLink, withRefundPurchase } from "./refund-link";
 import { spreadSureLabels } from "./match-apply";
 import { transactionReconciled } from "./reconciled";
@@ -45,7 +46,7 @@ function keptAuto(row: TxRow): AutoStamp {
 }
 
 function labelChanged(existing: TxRow, existingLines: StoredLine[], header: Header, lines: NormalizedLine[]): boolean {
-  if ((existing.merchantId ?? null) !== (header.merchantId ?? null)) {
+  if ((existing.merchantId ?? null) !== (header.merchantId ?? null) || (existing.refundOfId ?? null) !== (header.refundOfId ?? null)) {
     return true;
   }
   const before = existingLines.map((line) => line.categoryId).sort();
@@ -227,10 +228,11 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
   }
   const created = readTransaction(tx, id);
   auditTransaction(tx, id, "create", null, created);
+  linkRefundIfSure(tx, id);
   if (spread && isUserConfirmation(created)) {
     spreadSureLabels(tx, [created.payeeNormalized], new Set([created.id]));
   }
-  return created;
+  return readTransaction(tx, id);
 }
 
 export function createTransaction(db: Db, input: TransactionBody & WriteInput): Transaction {
@@ -277,10 +279,13 @@ export function applyTransactionUpdate(
     applySourceEdit(tx, existing, existingLines, peer, peerLines, linked.header, linked.lines, at, auto);
   }
   const saved = readTransaction(tx, id);
+  if (changed && existing.refundOfId === null && linked.header.refundOfId == null) {
+    linkRefundIfSure(tx, id);
+  }
   if (spread && changed && isUserConfirmation(saved)) {
     spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));
   }
-  return saved;
+  return readTransaction(tx, id);
 }
 
 export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transaction {

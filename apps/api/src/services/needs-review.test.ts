@@ -76,7 +76,7 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
     const quiet = pay(db, cash.id, "2026-03-05", -200, "Rent", food.id);
     const left = pay(db, cash.id, "2026-03-06", -5_000, "Move", food.id);
     db.update(transactions).set({ source: "import" }).where(eq(transactions.id, left.id)).run();
-    const right = pay(db, savings.id, "2026-03-06", 5_000, "Move in", food.id);
+    const right = pay(db, savings.id, "2026-03-06", 5_000, "Savings deposit", food.id);
     const pairKey = left.id < right.id ? `transfer_pair:${left.id}:${right.id}` : `transfer_pair:${right.id}:${left.id}`;
     const changedPlan = createPlan(db, {
       name: "Stream",

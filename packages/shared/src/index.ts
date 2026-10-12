@@ -229,14 +229,18 @@ export { archivedNameMatch, type NamedId } from "./name-match";
 export { canOfferInlineCreate, finishInlineCreate, inlineCreateMaxDepth, type InlineCreateResult } from "./inline-create";
 export { merchantNameFromPayee, normalizePayee, storedPayee } from "./payee";
 export {
+  autoRefundPurchase,
   categoryForRefund,
   rankRefundPurchases,
+  refundCandidates,
+  refundQuestionLimit,
   refundLinkAllowed,
   refundOfIdAfterEdit,
   refundPurchaseListSchema,
   refundPurchaseQuerySchema,
   refundWindowDays,
   refundWindowStart,
+  type RefundCandidate,
   type RefundPurchase,
   type RefundPurchaseItem,
 } from "./refund-link";
@@ -459,6 +463,7 @@ export {
   reviewCountSchema,
   reviewQuestions,
   reviewRecurringSchema,
+  reviewRefundSchema,
   reviewTransferSchema,
   skippedRowSchema,
   transactionReviewSchema,
