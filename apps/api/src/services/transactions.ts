@@ -25,6 +25,7 @@ import { transactionReconciled } from "./reconciled";
 import { assertPayee, assertReconciledMoney, assertReferences } from "./transaction-checks";
 import { removeTransaction } from "./transaction-erase";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
+import { isUncategorized, recordKeep } from "./decision-keep";
 import { clearUnreadableLine } from "./unreadable-line";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -256,7 +257,11 @@ export function spreadAfterConfirmations(
   linkLearnedTransfers(tx, ids, new Set([...batch, ...ids, ...alsoExcept]));
 }
 
-export function updateTransaction(db: Db, id: string, input: TransactionBody & WriteInput): Transaction {
+export function updateTransaction(
+  db: Db,
+  id: string,
+  input: TransactionBody & WriteInput & { keepUncategorized?: boolean },
+): Transaction {
   const at = input.at ?? utcNow();
   let updated: Transaction | undefined;
   write(db, { source: input.source, at }, (tx) => {
@@ -265,6 +270,9 @@ export function updateTransaction(db: Db, id: string, input: TransactionBody & W
     updated = applyTransactionUpdate(tx, id, input, at);
     if (!wasTransfer || (before.autoReason !== null && updated.autoReason === null)) {
       linkLearnedTransfers(tx, [id], new Set([id]));
+    }
+    if (input.keepUncategorized && isUncategorized(tx, id)) {
+      recordKeep(tx, id, at);
     }
   });
   if (!updated) {

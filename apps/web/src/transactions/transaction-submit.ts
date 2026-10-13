@@ -35,9 +35,7 @@ type SubmitInput = {
 
 export type SubmitResult =
   | { ok: true; id: string; skipped: number; applied: number }
-  | { ok: false; error: string; field?: "category" };
-
-export const CHOOSE_WHAT_ERROR = "Choose what this is: a category or a transfer.";
+  | { ok: false; error: string };
 
 function sameTags(a: string[], b: string[]): boolean {
   return a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
@@ -69,9 +67,8 @@ function unchanged(existing: Transaction, body: TransactionWrite): boolean {
   });
 }
 
-function uncategorized(existing: Transaction): boolean {
-  const [line] = existing.lines;
-  return existing.lines.length === 1 && line !== undefined && !line.categoryId && !line.transferAccountId;
+function hasOpenLine(lines: readonly { categoryId?: string | null; transferAccountId?: string | null }[]): boolean {
+  return lines.some((line) => !line.categoryId && !line.transferAccountId);
 }
 
 function looksRight(id: string) {
@@ -127,10 +124,8 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
   if (!parsed.success) {
     return { ok: false, error: "Check the transaction fields." };
   }
-  if (input.transaction && uncategorized(input.transaction) && unchanged(input.transaction, parsed.data)) {
-    return { ok: false, error: CHOOSE_WHAT_ERROR, field: "category" };
-  }
-  if (input.transaction?.autoReason) {
+  const keep = input.transaction !== null && hasOpenLine(input.transaction.lines) && hasOpenLine(parsed.data.lines);
+  if (input.transaction?.autoReason && !keep) {
     const answered = await saveAsAnswer(input.transaction, parsed.data);
     if (answered) {
       return answered;
@@ -139,7 +134,7 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
   const result = await apiRequest(input.transaction ? `/api/transactions/${input.transaction.id}` : "/api/transactions", transactionSaveResultSchema, {
     method: input.transaction ? "PATCH" : "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(input.transaction ? parsed.data : { ...parsed.data, unreadableItemKey: input.unreadableItemKey }),
+    body: JSON.stringify(input.transaction ? { ...parsed.data, keepUncategorized: keep } : { ...parsed.data, unreadableItemKey: input.unreadableItemKey }),
   });
   if (!result.ok) {
     return { ok: false, error: transactionError(result.code) };

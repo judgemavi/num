@@ -79,6 +79,7 @@ export const inboxDecisionCodes = [
   "keep_unassigned",
   "not_a_transaction",
   "not_linked",
+  "keep_uncategorized",
 ] as const;
 
 export type InboxDecisionCode = (typeof inboxDecisionCodes)[number];

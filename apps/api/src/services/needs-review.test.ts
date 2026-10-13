@@ -9,7 +9,8 @@ import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { createCheckpoint } from "./checkpoints";
-import { decideInboxItem } from "./inbox-decisions";
+import { readHygiene } from "./hygiene";
+import { decideInboxItem, decisionRows, undoInboxDecision } from "./inbox-decisions";
 import { closeMonth, listMonths } from "./months";
 import { listNeedsReview } from "./needs-review";
 import { approveFiltered } from "./review-approve";
@@ -288,5 +289,45 @@ test("month close uses needs review and an open Home item for that month", () =>
     ]);
     skipOccurrence(db, gym.id, "2026-03-15", "Away", saved);
     expect(closeMonth(db, "2026-03", asOf, saved).status).toBe("closed");
+  });
+});
+
+test("keeping a row uncategorized removes it from Needs review and Hygiene until it gets a category or the user undoes it", () => {
+  withBook((db) => {
+    const bank = account(db, "Bank");
+    const category = createCategory(db, { name: "Food", kind: "expense", groupId: null, ...saved });
+    const row = pay(db, bank.id, "2026-01-05", -2_000, "KEEP ME");
+    const body = {
+      accountId: bank.id,
+      date: "2026-01-05",
+      amount: -2_000,
+      payeeRaw: "KEEP ME",
+      status: "cleared" as const,
+      lines: [{ amount: -2_000 }],
+      ...saved,
+    };
+    const oldCount = () => {
+      const check = readHygiene(db, asOf).checks.find((item) => item.code === "review");
+      return check && "oldCount" in check ? check.oldCount : -1;
+    };
+    const keyOf = `uncategorized:${row.id}`;
+    expect(listNeedsReview(db, asOf).map((hit) => hit.id)).toEqual([row.id]);
+    expect(oldCount()).toBe(1);
+
+    updateTransaction(db, row.id, { ...body, keepUncategorized: true });
+    expect(decisionRows(db).map((item) => item.itemKey)).toEqual([keyOf]);
+    expect(listNeedsReview(db, asOf)).toEqual([]);
+    expect(oldCount()).toBe(0);
+
+    undoInboxDecision(db, keyOf, saved);
+    expect(listNeedsReview(db, asOf).map((hit) => hit.id)).toEqual([row.id]);
+
+    decideInboxItem(db, asOf, keyOf, "keep_uncategorized", saved);
+    expect(listNeedsReview(db, asOf)).toEqual([]);
+    expect(() => decideInboxItem(db, asOf, keyOf, "keep_uncategorized", saved)).toThrow();
+
+    updateTransaction(db, row.id, { ...body, lines: [{ amount: -2_000, categoryId: category.id }] });
+    expect(decisionRows(db)).toEqual([]);
+    expect(() => decideInboxItem(db, asOf, keyOf, "keep_uncategorized", saved)).toThrow();
   });
 });

@@ -58,7 +58,10 @@ export const transactionCreateSchema = z.object({
   unreadableItemKey: z.string().trim().min(1).max(500).optional(),
 });
 
-export const transactionUpdateSchema = z.object(transactionFields);
+export const transactionUpdateSchema = z.object({
+  ...transactionFields,
+  keepUncategorized: z.boolean().optional(),
+});
 
 export const transactionWriteSchema = transactionUpdateSchema;
 

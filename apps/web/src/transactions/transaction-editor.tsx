@@ -133,7 +133,8 @@ function SingleEditor({ id, rawLine, initialAccountId, unreadableItemKey, onClos
     }
     const transfer = row.decision === "not_transfer" && row.itemKey.split(":").includes(id);
     const paycheck = row.decision === "keep_unassigned" && row.itemKey === `paycheck_funding:${id}`;
-    if (!transfer && !paycheck) {
+    const kept = row.decision === "keep_uncategorized" && row.itemKey === `uncategorized:${id}`;
+    if (!transfer && !paycheck && !kept) {
       return [];
     }
     return [{ itemKey: row.itemKey, text: decisionText(row.decision) }];

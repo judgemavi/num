@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { auditLog, auditSources } from "@num/db";
 import { isUtcTimestamp, utcNow } from "@num/shared";
 import type { Db } from "../db";
+import { dropSettledKeeps } from "./decision-keep";
 
 function jsonText(value: unknown): string | null {
   if (value === undefined) {
@@ -58,6 +59,7 @@ export function write<T>(db: Db, options: { source: AuditSource; at?: string }, 
       },
     });
     const result = run(audited);
+    dropSettledKeeps(audited);
     if (entries.length === 0) {
       throw new Error("A write must record an audit entry");
     }

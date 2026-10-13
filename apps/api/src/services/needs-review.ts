@@ -15,6 +15,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listOverspent } from "./buckets";
 import { openFundingPaychecks } from "./funding-paychecks";
+import { keepKey } from "./decision-keep";
 import { decidedKeys, pairKey } from "./decision-keys";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { refundQuestions } from "./refund-auto";
@@ -190,8 +191,8 @@ export function listNeedsReview(
     const asksQuestion =
       pair !== undefined || ambiguous !== undefined || amountChanged !== undefined || refundAsk !== undefined;
     const level = asksQuestion ? "none" : rowLevel(row, automatic, suggestion);
-    const needs =
-      automatic || openLine || asksQuestion;
+    const kept = openLine && hidden.has(keepKey(row.id));
+    const needs = automatic || (openLine && !kept) || asksQuestion;
     if (!needs) {
       continue;
     }

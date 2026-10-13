@@ -4,7 +4,9 @@ import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { openUnreadableKeys } from "./book-settings";
+import { keepPrefix } from "./decision-keep";
 import { decidedKeys, pairKey } from "./decision-keys";
+import { isUncategorized } from "./decision-keep";
 import { openFundingPaychecks } from "./funding-paychecks";
 import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
@@ -23,6 +25,7 @@ const codeForKind: Record<string, InboxDecisionCode | undefined> = {
   paycheck_funding: "keep_unassigned",
   import_unreadable: "not_a_transaction",
   refund_link: "not_linked",
+  uncategorized: "keep_uncategorized",
 };
 
 export function decisionRows(db: Db): InboxDecision[] {
@@ -60,6 +63,8 @@ function isOpen(db: Db, asOf: string, itemKey: string): boolean {
       return openUnreadableKeys(db).includes(itemKey);
     case "refund_link":
       return [...refundQuestions(db, new Set()).values()].some((ask) => ask.itemKey === itemKey);
+    case "uncategorized":
+      return isUncategorized(db, itemKey.slice(keepPrefix.length));
     default:
       return false;
   }

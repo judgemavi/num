@@ -48,6 +48,8 @@ export function decisionText(code: InboxDecisionCode): string {
       return "Not a transaction";
     case "not_linked":
       return "Not linked to a purchase";
+    case "keep_uncategorized":
+      return "Kept without a category";
   }
 }
 
