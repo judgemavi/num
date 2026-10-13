@@ -1,8 +1,8 @@
 import { accounts, occurrenceLinks, transactionLines, transactions } from "@num/db";
-import { similarPayees, utcNow, type MatchResult } from "@num/shared";
+import { utcNow, type MatchResult } from "@num/shared";
 import { eq, sql } from "drizzle-orm";
 import { mortgageLinesFor } from "./mortgage-learned";
-import { loadMatchBook, scorePayee } from "./match-book";
+import { containedFor, loadMatchBook, scorePayee, type MatchBook } from "./match-book";
 import { linkRefundIfSure } from "./refund-auto";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { replaceLines } from "./transaction-lines";
@@ -160,29 +160,30 @@ function applyRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
   linkRefundIfSure(tx, row.id);
 }
 
-/** Labels uncategorized rows for these payees, and for payees similar to them. */
+/** Open payees that have no answers of their own and that contain one of these payees with no other words. */
+function containingPayees(tx: WriteTx, book: MatchBook, seeds: ReadonlySet<string>): string[] {
+  const open = tx.all<{ payee: string }>(sql`
+    select distinct t.payee_normalized as payee
+    from transactions t
+    inner join transaction_lines l on l.transaction_id = t.id
+    where t.mirror = 0 and l.category_id is null and l.transfer_account_id is null
+  `);
+  return open
+    .map((row) => row.payee)
+    .filter((payee) => {
+      const found = containedFor(book, payee);
+      return found?.kind === "same" && seeds.has(found.payee);
+    });
+}
+
+/** Labels uncategorized rows for these payees, and for payees that contain them. */
 export function spreadSureLabels(tx: WriteTx, payees: readonly string[], except: ReadonlySet<string>): void {
   const seeds = [...new Set(payees.filter((payee) => payee.length > 0))];
   if (seeds.length === 0) {
     return;
   }
   const book = loadMatchBook(tx);
-  const wanted = new Set<string>();
-  for (const payee of seeds) {
-    wanted.add(payee);
-    let similar = book.similarByPayee.get(payee);
-    if (!similar) {
-      similar = similarPayees(book.index, payee).map((hit) => ({
-        payee: hit.payee,
-        similarity: hit.similarity,
-        scores: book.payeeLearned.get(hit.payee) ?? [],
-      }));
-      book.similarByPayee.set(payee, similar);
-    }
-    for (const hit of similar) {
-      wanted.add(hit.payee);
-    }
-  }
+  const wanted = new Set<string>([...seeds, ...containingPayees(tx, book, new Set(seeds))]);
   const list = sql.join([...wanted].map((payee) => sql`${payee}`), sql`, `);
   const rows = tx.all<OpenRow>(sql`
     select t.id as id, t.account_id as accountId, t.date as date, t.amount as amount,

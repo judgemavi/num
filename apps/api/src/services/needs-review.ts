@@ -17,7 +17,7 @@ import { listOverspent } from "./buckets";
 import { openFundingPaychecks } from "./funding-paychecks";
 import { keepKey } from "./decision-keep";
 import { decidedKeys, pairKey } from "./decision-keys";
-import { loadMatchBook, scorePayee } from "./match-book";
+import { loadMatchBook, mortgageLearnedFor, scorePayee } from "./match-book";
 import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
 import { mortgageSuggestion } from "./mortgage-learned";
@@ -184,7 +184,7 @@ export function listNeedsReview(
         suggestion = cached.suggestion;
         learnedCount = cached.learnedCount;
       }
-      const mortgage = Number(row.lineCount) === 1 && Number(row.reconciled) === 0 ? mortgageSuggestion(db, book.mortgageLearned, row) : null;
+      const mortgage = Number(row.lineCount) === 1 && Number(row.reconciled) === 0 ? mortgageSuggestion(db, mortgageLearnedFor(book, row.payee), row) : null;
       if (mortgage && (suggestion === null || mortgage.suggestion.confidence > suggestion.confidence)) {
         suggestion = mortgage.suggestion;
         learnedCount = mortgage.learnedCount;

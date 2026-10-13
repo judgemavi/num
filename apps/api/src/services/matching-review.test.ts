@@ -321,3 +321,39 @@ test("a learned transfer preselects Transfer and is not automatic", () => {
     sample.close();
   }
 });
+
+test("a payee with a city word is the same payee, and a sub-brand is a similar suggestion", () => {
+  const sample = book();
+  try {
+    const food = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
+    const fares = createCategory(sample.db, { name: "Transit", kind: "expense", ...saved });
+    const add = (payeeRaw: string, categoryId: string | null, date: string) =>
+      createTransaction(sample.db, {
+        accountId: sample.account.id,
+        date,
+        amount: -400,
+        payeeRaw,
+        status: "open",
+        lines: [categoryId ? { amount: -400, categoryId } : { amount: -400 }],
+        ...saved,
+      });
+    for (const name of ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO"]) {
+      add(`${name} TORONTO`, null, "2026-01-01");
+    }
+    for (const date of ["2026-01-12", "2026-02-12", "2026-03-01"]) {
+      add("COSTCO WHOLESALE", food.id, date);
+      add("PRESTO", fares.id, date);
+    }
+    const loaded = loadMatchBook(sample.db);
+    const same = scorePayee(loaded, { payee: "COSTCO WHOLESALE TORONTO", amount: -400, recurring: null });
+    expect(same.categoryId).toBe(food.id);
+    expect(same.level).toBe("automatic");
+    const similar = scorePayee(loaded, { payee: "PRESTO FARE", amount: -400, recurring: null });
+    expect(similar.categoryId).toBe(fares.id);
+    expect(similar.reason).toBe("similar");
+    expect(similar.sourceName).toBe("PRESTO");
+    expect(similar.level).toBe("suggestion");
+  } finally {
+    sample.close();
+  }
+});

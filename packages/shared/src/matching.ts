@@ -1,7 +1,3 @@
-import { similarPayees as rankSimilar, type TrigramIndex } from "./trigram";
-
-export { buildTrigramIndex, characterTrigrams, trigramCosine, type TrigramIndex } from "./trigram";
-
 export const autoReasons = ["recurring", "learned_amount", "learned_payee", "similar", "merchant_default", "refund_match", "refund_reversal", "transfer_match"] as const;
 
 export type AutoReason = (typeof autoReasons)[number];
@@ -19,7 +15,7 @@ export const confidenceThresholds: Record<ConfidenceMode, number> = {
 export const suggestionFloor = 0.6;
 export const likelyMinimum = 0.75;
 export const leadMinimum = 0.2;
-export const similarMinimum = 0.8;
+export const similarFactor = 0.9;
 export const recurringConfidence = 0.99;
 export const merchantDefaultConfidence = 0.6;
 
@@ -49,11 +45,10 @@ export type RecurringSignal = {
   mortgage: boolean;
 };
 
+/** A learned payee that the new payee contains with other words left (decision 0026). */
 export type SimilarPayee = {
   payee: string;
-  similarity: number;
-  rows: readonly LearnedRow[];
-  scores?: readonly LearnedScore[];
+  scores: readonly LearnedScore[];
 };
 
 export type ScoreInput = {
@@ -63,7 +58,7 @@ export type ScoreInput = {
   payeeRows: readonly LearnedRow[];
   amountScores?: readonly LearnedScore[];
   payeeScores?: readonly LearnedScore[];
-  similar: readonly SimilarPayee[];
+  similar: SimilarPayee | null;
   merchant: { id: string; name: string; categoryId: string } | null;
   transferRows: readonly { id: string; date: string; transferAccountId: string }[];
 };
@@ -182,11 +177,11 @@ export function confidenceMilli(confidence: number): number {
   return Math.min(1000, Math.max(0, Math.round(confidence * 1000)));
 }
 
-export function matchLevel(confidence: number, lead: number, mode: ConfidenceMode, transfer: boolean): MatchLevel {
+export function matchLevel(confidence: number, lead: number, mode: ConfidenceMode, suggestionOnly: boolean): MatchLevel {
   if (confidence < suggestionFloor) {
     return "none";
   }
-  if (transfer || lead < leadMinimum) {
+  if (suggestionOnly || lead < leadMinimum) {
     return "suggestion";
   }
   return confidence >= confidenceThresholds[mode] ? "automatic" : "suggestion";
@@ -196,10 +191,6 @@ export function amountsWithinOnePercent(left: number, right: number): boolean {
   const delta = Math.abs(left - right);
   const scale = Math.max(Math.abs(left), Math.abs(right));
   return delta * 100 <= scale;
-}
-
-export function similarPayees(index: TrigramIndex, payee: string, minimum = similarMinimum) {
-  return rankSimilar(index, payee, minimum);
 }
 
 function pushLearned(
@@ -269,11 +260,8 @@ function collectSignals(input: ScoreInput): MatchSignal[] {
   }
   pushLearned(signals, input.amountScores ?? learnedConfidence(input.amountRows), "learned_amount", 1, null);
   pushLearned(signals, input.payeeScores ?? learnedConfidence(input.payeeRows), "learned_payee", 0.95, null);
-  for (const similar of input.similar) {
-    if (similar.similarity < similarMinimum) {
-      continue;
-    }
-    pushLearned(signals, similar.scores ?? learnedConfidence(similar.rows), "similar", similar.similarity, similar.payee);
+  if (input.similar) {
+    pushLearned(signals, input.similar.scores, "similar", similarFactor, input.similar.payee);
   }
   const transferLearned = learnedConfidence(
     input.transferRows.map((row) => ({ id: row.id, date: row.date, categoryId: row.transferAccountId, merchantId: null })),
@@ -348,8 +336,10 @@ function resultFrom(candidate: Candidate, second: number | null, mode: Confidenc
   const lead = second === null ? 1 : candidate.confidence - second;
   const transfer = candidate.transferAccountId !== null && candidate.categoryId === null;
   const learned = candidate.signals.find((signal) => signal.reason === "learned_amount" || signal.reason === "learned_payee" || signal.reason === "similar");
+  const similar = candidate.signals.some((signal) => signal.reason === "similar");
+  const level = mortgage ? "automatic" : matchLevel(candidate.confidence, lead, mode, transfer || similar);
   return {
-    level: mortgage ? "automatic" : matchLevel(candidate.confidence, lead, mode, transfer),
+    level,
     confidence: candidate.confidence,
     confidenceMilli: confidenceMilli(candidate.confidence),
     lead,
@@ -362,7 +352,7 @@ function resultFrom(candidate: Candidate, second: number | null, mode: Confidenc
     learnedCount: learned && learned.count > 0 ? learned.count : null,
     mortgage,
     signals: candidate.signals,
-    };
+  };
 }
 
 export function scoreMatch(input: ScoreInput): MatchResult {

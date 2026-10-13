@@ -6,7 +6,6 @@ import {
   type CategoryKind,
   type MoneyDirection,
   type Suggestion,
-  type SuggestionReason,
   type WhatChoice,
 } from "@num/shared";
 import { useRestoreNamed } from "@/editors/restore-named";
@@ -65,15 +64,15 @@ type WhatIsThisProps = {
   depth?: number;
 };
 
-function reasonText(reason: SuggestionReason): string {
-  switch (reason) {
+function reasonText(suggestion: Suggestion): string {
+  switch (suggestion.reason) {
     case "recurring":
       return "Matches your recurring payment";
     case "learned_amount":
     case "learned_payee":
       return "You chose this for this payee";
     case "similar":
-      return "Same as a similar payee";
+      return suggestion.sourceName ? `Same as ${suggestion.sourceName}` : "Same as a similar payee";
     case "merchant_default":
       return "This merchant's usual category";
     case "refund_match":
@@ -122,7 +121,7 @@ function suggestionText(suggestion: Suggestion, merchants: Option[], categories:
     return null;
   }
   const label = suggestion.level === "none" ? null : levelLabel(suggestion.level);
-  const text = `${parts.join(". ")}. ${reasonText(suggestion.reason)}`;
+  const text = `${parts.join(". ")}. ${reasonText(suggestion)}`;
   return label ? `${label}. ${text}` : text;
 }
 

@@ -2,19 +2,23 @@ import { settings } from "@num/db";
 import {
   Temporal,
   amountsWithinOnePercent,
-  buildTrigramIndex,
+  buildPayeeIndex,
+  containedMatch,
+  noiseWords,
   normalizePayee,
   confidenceModes,
   learnedConfidence,
   linkWindowStart,
-  similarPayees,
   matchLinks,
   occurrenceDates,
   scoreMatch,
+  similarFactor,
   type ConfidenceMode,
+  type ContainedMatch,
   type LearnedRow,
   type LinkTransaction,
   type MatchResult,
+  type PayeeIndex,
   type PlanSchedule,
   type RecurringSignal,
   type ScoreInput,
@@ -60,8 +64,10 @@ export type MatchBook = {
   mortgageLearned: Map<string, MortgageLearned>;
   payeeLearned: Map<string, ReturnType<typeof learnedConfidence>>;
   amountLearned: Map<string, ReturnType<typeof learnedConfidence>>;
-  similarByPayee: Map<string, { payee: string; similarity: number; scores: ReturnType<typeof learnedConfidence> }[]>;
-  index: ReturnType<typeof buildTrigramIndex>;
+  labels: Map<string, string>;
+  index: PayeeIndex;
+  mortgageIndex: PayeeIndex;
+  contained: Map<string, ContainedMatch | null>;
   merchants: { id: string; name: string; categoryId: string; payee: string }[];
 };
 
@@ -125,12 +131,27 @@ export function loadMatchBook(db: Reader): MatchBook {
       transfersByPayee.set(row.payee, [row]);
     }
   }
-  const payees = [...new Set([...byPayee.keys(), ...transfersByPayee.keys()])];
   const payeeLearned = new Map<string, ReturnType<typeof learnedConfidence>>();
+  const labels = new Map<string, string>();
   for (const [payee, rows] of byPayee) {
-    payeeLearned.set(payee, learnedConfidence(learnedOf(rows)));
+    const scores = learnedConfidence(learnedOf(rows));
+    payeeLearned.set(payee, scores);
+    const top = scores[0];
+    if (top) {
+      labels.set(payee, `${top.categoryId}\0${top.merchantId ?? ""}`);
+    }
   }
-  const index = buildTrigramIndex(payees);
+  for (const [payee, rows] of transfersByPayee) {
+    const top = learnedConfidence(rows.map((row) => ({ id: row.id, date: row.date, categoryId: row.transferAccountId, merchantId: null })))[0];
+    if (top && !labels.has(payee)) {
+      labels.set(payee, `transfer\0${top.categoryId}`);
+    }
+  }
+  const everyPayee = db.all<{ payee: string }>(sql`select distinct payee_normalized as payee from transactions where mirror = 0`);
+  const noise = noiseWords(everyPayee.map((row) => row.payee));
+  const mortgageLearned = loadMortgageLearned(db);
+  const index = buildPayeeIndex(noise, labels.keys());
+  const mortgageIndex = buildPayeeIndex(noise, mortgageLearned.keys());
   const merchants = db.all<{ id: string; name: string; categoryId: string }>(sql`
     select id as id, name as name, default_category_id as categoryId
     from merchants
@@ -140,11 +161,13 @@ export function loadMatchBook(db: Reader): MatchBook {
     mode: confidenceMode(db),
     byPayee,
     transfersByPayee,
-    mortgageLearned: loadMortgageLearned(db),
+    mortgageLearned,
     payeeLearned,
     amountLearned: new Map(),
-    similarByPayee: new Map(),
+    labels,
     index,
+    mortgageIndex,
+    contained: new Map(),
     merchants: merchants.map((merchant) => ({ ...merchant, payee: normalizePayee(merchant.name) })),
   };
 }
@@ -153,25 +176,45 @@ function learnedOf(rows: readonly ConfirmRow[]): LearnedRow[] {
   return rows.map((row) => ({ id: row.id, date: row.date, categoryId: row.categoryId, merchantId: row.merchantId }));
 }
 
+/** The learned payee that a payee without answers of its own contains (decision 0026). */
+export function containedFor(book: MatchBook, payee: string): ContainedMatch | null {
+  if (book.labels.has(payee)) {
+    return null;
+  }
+  let found = book.contained.get(payee);
+  if (found === undefined) {
+    found = containedMatch(book.index, payee, (learned) => book.labels.get(learned) ?? null);
+    book.contained.set(payee, found);
+  }
+  return found;
+}
+
+/** The mortgage payment that a payee teaches. A similar payee teaches it with less confidence. */
+export function mortgageLearnedFor(book: MatchBook, payee: string): MortgageLearned | null {
+  const exact = book.mortgageLearned.get(payee);
+  if (exact) {
+    return exact;
+  }
+  const found = containedMatch(book.mortgageIndex, payee, (learned) => book.mortgageLearned.get(learned)?.accountId ?? null);
+  const hit = found ? book.mortgageLearned.get(found.payee) : undefined;
+  if (!found || !hit) {
+    return null;
+  }
+  return found.kind === "same" ? hit : { ...hit, confidence: hit.confidence * similarFactor };
+}
+
 export function scorePayee(
   book: MatchBook,
   input: { payee: string; amount: number; recurring: RecurringSignal | null },
 ): MatchResult {
-  const same = book.byPayee.get(input.payee) ?? [];
-  const amountKey = `${input.payee}\0${input.amount}`;
+  const contained = containedFor(book, input.payee);
+  const learnedPayee = contained?.kind === "same" ? contained.payee : input.payee;
+  const same = book.byPayee.get(learnedPayee) ?? [];
+  const amountKey = `${learnedPayee}\0${input.amount}`;
   let amountScores = book.amountLearned.get(amountKey);
   if (!amountScores) {
     amountScores = learnedConfidence(learnedOf(same.filter((row) => amountsWithinOnePercent(row.amount, input.amount))));
     book.amountLearned.set(amountKey, amountScores);
-  }
-  let similar = book.similarByPayee.get(input.payee);
-  if (!similar) {
-    similar = similarPayees(book.index, input.payee).map((hit) => ({
-      payee: hit.payee,
-      similarity: hit.similarity,
-      scores: book.payeeLearned.get(hit.payee) ?? [],
-    }));
-    book.similarByPayee.set(input.payee, similar);
   }
   const merchantHits = book.merchants.filter((merchant) => merchant.payee === input.payee);
   const merchant = merchantHits.length === 1 ? merchantHits[0] : null;
@@ -181,15 +224,13 @@ export function scorePayee(
     amountRows: [],
     payeeRows: [],
     amountScores,
-    payeeScores: book.payeeLearned.get(input.payee) ?? [],
-    similar: (book.similarByPayee.get(input.payee) ?? []).map((hit) => ({
-      payee: hit.payee,
-      similarity: hit.similarity,
-      rows: [],
-      scores: hit.scores,
-    })),
+    payeeScores: book.payeeLearned.get(learnedPayee) ?? [],
+    similar:
+      contained?.kind === "similar"
+        ? { payee: contained.payee, scores: book.payeeLearned.get(contained.payee) ?? [] }
+        : null,
     merchant: merchant ? { id: merchant.id, name: merchant.name, categoryId: merchant.categoryId } : null,
-    transferRows: (book.transfersByPayee.get(input.payee) ?? []).map((row) => ({
+    transferRows: (book.transfersByPayee.get(learnedPayee) ?? []).map((row) => ({
       id: row.id,
       date: row.date,
       transferAccountId: row.transferAccountId,

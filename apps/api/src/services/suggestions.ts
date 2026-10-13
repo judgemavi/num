@@ -14,7 +14,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { mortgageSuggestion } from "./mortgage-learned";
 import { transactionReconciled } from "./reconciled";
-import { loadMatchBook, scorePayee } from "./match-book";
+import { loadMatchBook, mortgageLearnedFor, scorePayee } from "./match-book";
 import { linkLearnedTransfers, linkTransferPair } from "./transfer-auto";
 import { write, type AuditSource } from "./write";
 
@@ -75,7 +75,7 @@ export function suggestForPayee(db: Db, accountId: string, rawPayee: string, amo
   if (date === undefined || transactionReconciled(db, accountId, date)) {
     return base;
   }
-  const mortgage = mortgageSuggestion(db, book.mortgageLearned, { payee, accountId, date, amount });
+  const mortgage = mortgageSuggestion(db, mortgageLearnedFor(book, payee), { payee, accountId, date, amount });
   return mortgage && mortgage.suggestion.confidence > base.confidence ? mortgage.suggestion : base;
 }
 

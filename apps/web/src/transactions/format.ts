@@ -53,7 +53,7 @@ export function plainReason(input: {
     return `You chose this ${times} for this payee`;
   }
   if (input.reason === "similar") {
-    return "Same as a similar payee";
+    return input.sourceName ? `Same as ${input.sourceName}` : "Same as a similar payee";
   }
   if (input.reason === "merchant_default") {
     return "This merchant's usual category";

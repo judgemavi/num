@@ -95,10 +95,9 @@ export type MortgageRow = { payee: string; accountId: string; date: string; amou
 /** The "Mortgage payment" suggestion for an uncategorized, unreconciled money-out row. Always Likely at most. */
 export function mortgageSuggestion(
   db: Reader,
-  learned: ReadonlyMap<string, MortgageLearned>,
+  hit: MortgageLearned | null,
   row: MortgageRow,
 ): { suggestion: Suggestion; learnedCount: number } | null {
-  const hit = learned.get(row.payee);
   if (!hit || row.amount >= 0 || !mortgageLinesFor(db, hit.accountId, row.accountId, row.date, row.amount)) {
     return null;
   }
@@ -115,6 +114,7 @@ export function mortgageSuggestion(
       reason: "learned_payee",
       level,
       sourceId: hit.sourceId,
+      sourceName: null,
       confidence: Math.round(hit.confidence * 1000),
       mortgage: true,
     },

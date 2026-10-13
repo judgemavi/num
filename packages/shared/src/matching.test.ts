@@ -2,15 +2,11 @@ import { expect, test } from "bun:test";
 import { reviewLevel } from "./review-level";
 import {
   amountsWithinOnePercent,
-  buildTrigramIndex,
-  characterTrigrams,
   combineConfidence,
   confidenceMilli,
   learnedConfidence,
   matchLevel,
   scoreMatch,
-  similarPayees,
-  trigramCosine,
   type LearnedRow,
   type ScoreInput,
 } from "./matching";
@@ -23,7 +19,7 @@ function score(patch: Partial<ScoreInput> & Pick<ScoreInput, "amountRows" | "pay
   return scoreMatch({
     mode: "balanced",
     recurring: null,
-    similar: [],
+    similar: null,
     merchant: null,
     transferRows: [],
     ...patch,
@@ -58,18 +54,6 @@ test("a conflict splits the weight and does not make an automatic label", () => 
   expect(scores[0]?.confidence).toBeCloseTo((1 / 1.5) * (1 - 0.15 * 0.6), 10);
   const result = score({ amountRows: rows, payeeRows: rows, mode: "balanced" });
   expect(result.level).not.toBe("automatic");
-});
-
-test("trigram cosine separates close payees from different payees", () => {
-  const rent = characterTrigrams("RENT E TRANSFER");
-  expect(trigramCosine(rent, rent)).toBe(1);
-  expect(trigramCosine(characterTrigrams(""), rent)).toBe(0);
-  expect(trigramCosine(rent, characterTrigrams("RENT E TRANSFERR"))).toBeGreaterThanOrEqual(0.8);
-  expect(trigramCosine(rent, characterTrigrams("GROCERY MARKET"))).toBeLessThan(0.8);
-  const index = buildTrigramIndex(["RENT E TRANSFER", "GROCERY MARKET", "RENT E TRANSFERR"]);
-  const hits = similarPayees(index, "RENT E TRANSFER");
-  expect(hits.map((hit) => hit.payee)).toEqual(["RENT E TRANSFERR"]);
-  expect(similarPayees(index, "ZZZZZZZZ")).toEqual([]);
 });
 
 test("signals for one candidate combine and a small lead stays a suggestion", () => {
@@ -164,4 +148,25 @@ test("confidence millis stay inside 0 to 1000", () => {
   expect(confidenceMilli(0.994)).toBe(994);
   expect(confidenceMilli(1.2)).toBe(1000);
   expect(confidenceMilli(-1)).toBe(0);
+});
+
+test("a similar payee is never automatic, even when eager and combined with a merchant default", () => {
+  const scores = learnedConfidence([row("a", "2026-01-01", "fares"), row("b", "2026-01-02", "fares"), row("c", "2026-01-03", "fares")]);
+  const similar = { payee: "PRESTO", scores };
+  const alone = score({ amountRows: [], payeeRows: [], similar, mode: "eager" });
+  expect(alone.reason).toBe("similar");
+  expect(alone.sourceName).toBe("PRESTO");
+  expect(alone.confidence).toBeCloseTo((scores[0]?.confidence ?? 0) * 0.9, 10);
+  expect(alone.level).toBe("suggestion");
+  const merchant = { id: "m", name: "Presto", categoryId: "fares" };
+  const combined = score({ amountRows: [], payeeRows: [], similar, merchant, mode: "eager" });
+  expect(combined.confidence).toBeGreaterThan(0.75);
+  expect(combined.level).toBe("suggestion");
+});
+
+test("the same payee follows the normal formula and can be automatic", () => {
+  const rows = [row("a", "2026-01-01", "fares"), row("b", "2026-01-02", "fares"), row("c", "2026-01-03", "fares")];
+  const result = score({ amountRows: rows, payeeRows: rows, mode: "balanced" });
+  expect(result.reason).toBe("learned_amount");
+  expect(result.level).toBe("automatic");
 });

@@ -45,7 +45,7 @@ function reasonText(row: TransactionListItem): string {
   const suggestionReason = review?.suggestion?.reason;
   return plainReason({
     reason: review ? (review.reason ?? (suggestionReason && suggestionReason !== "none" ? suggestionReason : null)) : row.autoReason,
-    sourceName: row.autoSourceName,
+    sourceName: review?.suggestion?.sourceName ?? row.autoSourceName,
     learnedCount: review?.learnedCount ?? row.autoLearnedCount,
     purchaseDate: row.refundOf?.date ?? null,
     purchasePayee: row.refundOf?.payeeRaw ?? null,
