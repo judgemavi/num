@@ -49,6 +49,7 @@ export type RecurringSignal = {
 export type SimilarPayee = {
   payee: string;
   scores: readonly LearnedScore[];
+  transferRows: readonly { id: string; date: string; transferAccountId: string }[];
 };
 
 export type ScoreInput = {
@@ -218,6 +219,30 @@ function pushLearned(
   }
 }
 
+function pushTransfers(
+  signals: MatchSignal[],
+  rows: ScoreInput["transferRows"],
+  reason: AutoReason,
+  factor: number,
+  sourceName: string | null,
+): void {
+  const learned = learnedConfidence(
+    rows.map((row) => ({ id: row.id, date: row.date, categoryId: row.transferAccountId, merchantId: null })),
+  );
+  for (const score of learned) {
+    signals.push({
+      reason,
+      confidence: score.confidence * factor,
+      categoryId: null,
+      merchantId: null,
+      transferAccountId: score.categoryId,
+      sourceId: score.sourceId,
+      sourceName,
+      count: score.count,
+    });
+  }
+}
+
 function collectSignals(input: ScoreInput): MatchSignal[] {
   const signals: MatchSignal[] = [];
   if (input.recurring?.mortgage) {
@@ -262,22 +287,9 @@ function collectSignals(input: ScoreInput): MatchSignal[] {
   pushLearned(signals, input.payeeScores ?? learnedConfidence(input.payeeRows), "learned_payee", 0.95, null);
   if (input.similar) {
     pushLearned(signals, input.similar.scores, "similar", similarFactor, input.similar.payee);
+    pushTransfers(signals, input.similar.transferRows, "similar", similarFactor, input.similar.payee);
   }
-  const transferLearned = learnedConfidence(
-    input.transferRows.map((row) => ({ id: row.id, date: row.date, categoryId: row.transferAccountId, merchantId: null })),
-  );
-  for (const score of transferLearned) {
-    signals.push({
-      reason: "learned_payee",
-      confidence: score.confidence,
-      categoryId: null,
-      merchantId: null,
-      transferAccountId: score.categoryId,
-      sourceId: score.sourceId,
-      sourceName: null,
-      count: score.count,
-    });
-  }
+  pushTransfers(signals, input.transferRows, "learned_payee", 1, null);
   if (input.merchant) {
     signals.push({
       reason: "merchant_default",

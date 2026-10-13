@@ -54,6 +54,9 @@ export function loadMortgageLearned(db: Reader): Map<string, MortgageLearned> {
   return found;
 }
 
+/** A mortgage payee that the payee teaches. `similarTo` is the learned payee when the payee only contains it. */
+export type MortgageHit = MortgageLearned & { similarTo: string | null };
+
 /** The interest line and the principal line of a payment, from the terms and the schedule. Null when there is no split. */
 export function mortgageLinesFor(db: Reader, mortgageAccountId: string, fromAccountId: string, date: string, amount: number) {
   const terms = db.select().from(mortgageTerms).where(eq(mortgageTerms.accountId, mortgageAccountId)).get();
@@ -95,7 +98,7 @@ export type MortgageRow = { payee: string; accountId: string; date: string; amou
 /** The "Mortgage payment" suggestion for an uncategorized, unreconciled money-out row. Always Likely at most. */
 export function mortgageSuggestion(
   db: Reader,
-  hit: MortgageLearned | null,
+  hit: MortgageHit | null,
   row: MortgageRow,
 ): { suggestion: Suggestion; learnedCount: number } | null {
   if (!hit || row.amount >= 0 || !mortgageLinesFor(db, hit.accountId, row.accountId, row.date, row.amount)) {
@@ -111,10 +114,10 @@ export function mortgageSuggestion(
       merchantId: null,
       categoryId: null,
       transferAccountId: hit.accountId,
-      reason: "learned_payee",
+      reason: hit.similarTo ? "similar" : "learned_payee",
       level,
       sourceId: hit.sourceId,
-      sourceName: null,
+      sourceName: hit.similarTo,
       confidence: Math.round(hit.confidence * 1000),
       mortgage: true,
     },

@@ -4,7 +4,6 @@ import {
   amountsWithinOnePercent,
   buildPayeeIndex,
   containedMatch,
-  noiseWords,
   normalizePayee,
   confidenceModes,
   learnedConfidence,
@@ -14,7 +13,6 @@ import {
   scoreMatch,
   similarFactor,
   type ConfidenceMode,
-  type ContainedMatch,
   type LearnedRow,
   type LinkTransaction,
   type MatchResult,
@@ -25,7 +23,7 @@ import {
 } from "@num/shared";
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { loadMortgageLearned, type MortgageLearned } from "./mortgage-learned";
+import { loadMortgageLearned, type MortgageHit, type MortgageLearned } from "./mortgage-learned";
 type Reader = { all<T>(query: ReturnType<typeof sql>): T[] } & Pick<Db, "select">;
 
 type ConfirmRow = {
@@ -67,7 +65,8 @@ export type MatchBook = {
   labels: Map<string, string>;
   index: PayeeIndex;
   mortgageIndex: PayeeIndex;
-  contained: Map<string, ContainedMatch | null>;
+  contained: Map<string, string | null>;
+  mortgageContained: Map<string, MortgageHit | null>;
   merchants: { id: string; name: string; categoryId: string; payee: string }[];
 };
 
@@ -147,11 +146,9 @@ export function loadMatchBook(db: Reader): MatchBook {
       labels.set(payee, `transfer\0${top.categoryId}`);
     }
   }
-  const everyPayee = db.all<{ payee: string }>(sql`select distinct payee_normalized as payee from transactions where mirror = 0`);
-  const noise = noiseWords(everyPayee.map((row) => row.payee));
   const mortgageLearned = loadMortgageLearned(db);
-  const index = buildPayeeIndex(noise, labels.keys());
-  const mortgageIndex = buildPayeeIndex(noise, mortgageLearned.keys());
+  const index = buildPayeeIndex(labels.keys());
+  const mortgageIndex = buildPayeeIndex(mortgageLearned.keys());
   const merchants = db.all<{ id: string; name: string; categoryId: string }>(sql`
     select id as id, name as name, default_category_id as categoryId
     from merchants
@@ -168,6 +165,7 @@ export function loadMatchBook(db: Reader): MatchBook {
     index,
     mortgageIndex,
     contained: new Map(),
+    mortgageContained: new Map(),
     merchants: merchants.map((merchant) => ({ ...merchant, payee: normalizePayee(merchant.name) })),
   };
 }
@@ -177,7 +175,7 @@ function learnedOf(rows: readonly ConfirmRow[]): LearnedRow[] {
 }
 
 /** The learned payee that a payee without answers of its own contains (decision 0026). */
-export function containedFor(book: MatchBook, payee: string): ContainedMatch | null {
+export function containedFor(book: MatchBook, payee: string): string | null {
   if (book.labels.has(payee)) {
     return null;
   }
@@ -189,18 +187,20 @@ export function containedFor(book: MatchBook, payee: string): ContainedMatch | n
   return found;
 }
 
-/** The mortgage payment that a payee teaches. A similar payee teaches it with less confidence. */
-export function mortgageLearnedFor(book: MatchBook, payee: string): MortgageLearned | null {
+/** The mortgage payment that a payee teaches. A payee that contains a learned payee teaches it with less confidence. */
+export function mortgageLearnedFor(book: MatchBook, payee: string): MortgageHit | null {
   const exact = book.mortgageLearned.get(payee);
   if (exact) {
-    return exact;
+    return { ...exact, similarTo: null };
   }
-  const found = containedMatch(book.mortgageIndex, payee, (learned) => book.mortgageLearned.get(learned)?.accountId ?? null);
-  const hit = found ? book.mortgageLearned.get(found.payee) : undefined;
-  if (!found || !hit) {
-    return null;
+  let found = book.mortgageContained.get(payee);
+  if (found === undefined) {
+    const learned = containedMatch(book.mortgageIndex, payee, (name) => book.mortgageLearned.get(name)?.accountId ?? null);
+    const hit = learned ? book.mortgageLearned.get(learned) : undefined;
+    found = learned && hit ? { ...hit, confidence: hit.confidence * similarFactor, similarTo: learned } : null;
+    book.mortgageContained.set(payee, found);
   }
-  return found.kind === "same" ? hit : { ...hit, confidence: hit.confidence * similarFactor };
+  return found;
 }
 
 export function scorePayee(
@@ -208,9 +208,8 @@ export function scorePayee(
   input: { payee: string; amount: number; recurring: RecurringSignal | null },
 ): MatchResult {
   const contained = containedFor(book, input.payee);
-  const learnedPayee = contained?.kind === "same" ? contained.payee : input.payee;
-  const same = book.byPayee.get(learnedPayee) ?? [];
-  const amountKey = `${learnedPayee}\0${input.amount}`;
+  const same = book.byPayee.get(input.payee) ?? [];
+  const amountKey = `${input.payee}\0${input.amount}`;
   let amountScores = book.amountLearned.get(amountKey);
   if (!amountScores) {
     amountScores = learnedConfidence(learnedOf(same.filter((row) => amountsWithinOnePercent(row.amount, input.amount))));
@@ -224,17 +223,16 @@ export function scorePayee(
     amountRows: [],
     payeeRows: [],
     amountScores,
-    payeeScores: book.payeeLearned.get(learnedPayee) ?? [],
-    similar:
-      contained?.kind === "similar"
-        ? { payee: contained.payee, scores: book.payeeLearned.get(contained.payee) ?? [] }
-        : null,
+    payeeScores: book.payeeLearned.get(input.payee) ?? [],
+    similar: contained
+      ? {
+          payee: contained,
+          scores: book.payeeLearned.get(contained) ?? [],
+          transferRows: book.transfersByPayee.get(contained) ?? [],
+        }
+      : null,
     merchant: merchant ? { id: merchant.id, name: merchant.name, categoryId: merchant.categoryId } : null,
-    transferRows: (book.transfersByPayee.get(learnedPayee) ?? []).map((row) => ({
-      id: row.id,
-      date: row.date,
-      transferAccountId: row.transferAccountId,
-    })),
+    transferRows: book.transfersByPayee.get(input.payee) ?? [],
   };
   return scoreMatch(scored);
 }

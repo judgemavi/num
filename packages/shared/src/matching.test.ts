@@ -152,7 +152,7 @@ test("confidence millis stay inside 0 to 1000", () => {
 
 test("a similar payee is never automatic, even when eager and combined with a merchant default", () => {
   const scores = learnedConfidence([row("a", "2026-01-01", "fares"), row("b", "2026-01-02", "fares"), row("c", "2026-01-03", "fares")]);
-  const similar = { payee: "PRESTO", scores };
+  const similar = { payee: "PRESTO", scores, transferRows: [] };
   const alone = score({ amountRows: [], payeeRows: [], similar, mode: "eager" });
   expect(alone.reason).toBe("similar");
   expect(alone.sourceName).toBe("PRESTO");
@@ -164,9 +164,14 @@ test("a similar payee is never automatic, even when eager and combined with a me
   expect(combined.level).toBe("suggestion");
 });
 
-test("the same payee follows the normal formula and can be automatic", () => {
-  const rows = [row("a", "2026-01-01", "fares"), row("b", "2026-01-02", "fares"), row("c", "2026-01-03", "fares")];
-  const result = score({ amountRows: rows, payeeRows: rows, mode: "balanced" });
-  expect(result.reason).toBe("learned_amount");
-  expect(result.level).toBe("automatic");
+test("a learned transfer payee gives a transfer suggestion that is never automatic", () => {
+  const transferRows = [
+    { id: "a", date: "2026-01-01", transferAccountId: "visa" },
+    { id: "b", date: "2026-01-02", transferAccountId: "visa" },
+    { id: "c", date: "2026-01-03", transferAccountId: "visa" },
+  ];
+  const result = score({ amountRows: [], payeeRows: [], similar: { payee: "VISA PAYMENT", scores: [], transferRows }, mode: "eager" });
+  expect(result.transferAccountId).toBe("visa");
+  expect(result.reason).toBe("similar");
+  expect(result.level).toBe("suggestion");
 });

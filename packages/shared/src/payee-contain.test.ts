@@ -1,42 +1,13 @@
 import { expect, test } from "bun:test";
-import { buildPayeeIndex, containedMatch, noiseWords } from "./payee-contain";
+import { buildPayeeIndex, containedMatch } from "./payee-contain";
 
-const cities = ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO"];
-const cityPayees = cities.map((name) => `${name} TORONTO`);
-const everyPayee = [...cityPayees, "COSTCO WHOLESALE", "COSTCO GAS", "PRESTO", "UBER", "UBER EATS", "TORONTO HYDRO", "NOFRILLS", "SHELL GAS"];
-
-function match(payee: string, learned: string[], labels: Record<string, string> = {}, all: string[] = everyPayee) {
-  const index = buildPayeeIndex(noiseWords([...all, ...learned]), learned);
-  return containedMatch(index, payee, (name) => labels[name] ?? "same-label");
+function match(payee: string, learned: string[], labels: Record<string, string> = {}) {
+  return containedMatch(buildPayeeIndex(learned), payee, (name) => labels[name] ?? "same-label");
 }
 
-test("a word that follows 5 different first words is noise and one that follows 4 is not", () => {
-  expect(noiseWords([...cities.map((name) => `${name} OTTAWA`)]).has("OTTAWA")).toBe(true);
-  expect(noiseWords(cities.slice(0, 4).map((name) => `${name} OTTAWA`)).has("OTTAWA")).toBe(false);
-});
-
-test("a word that is a first word of any payee is never noise", () => {
-  expect(noiseWords(everyPayee).has("TORONTO")).toBe(false);
-});
-
-test("a word after only one merchant is not noise", () => {
-  const noise = noiseWords(["UBER EATS", "UBER EATS", "UBER TRIP", "LYFT RIDE"]);
-  expect(noise.has("EATS")).toBe(false);
-});
-
-test("a city word as noise gives the same payee", () => {
-  const noise = noiseWords([...cities.map((name) => `${name} TORONTO`), "COSTCO WHOLESALE"]);
-  expect(noise.has("TORONTO")).toBe(true);
-  expect(match("COSTCO WHOLESALE TORONTO", ["COSTCO WHOLESALE"], {}, [...cities.map((name) => `${name} TORONTO`)])).toEqual({
-    kind: "same",
-    payee: "COSTCO WHOLESALE",
-  });
-});
-
-test("a sub-brand is a similar payee and a payee with no extra word is the same payee", () => {
-  const all = [...cities.map((name) => `${name} TORONTO`)];
-  expect(match("PRESTO FARE TORONTO", ["PRESTO"], {}, all)).toEqual({ kind: "similar", payee: "PRESTO" });
-  expect(match("PRESTO TORONTO", ["PRESTO"], {}, all)).toEqual({ kind: "same", payee: "PRESTO" });
+test("a learned payee at the start of the new payee is contained, with a city after it", () => {
+  expect(match("COSTCO WHOLESALE W535 TORONTO", ["COSTCO WHOLESALE"])).toBe("COSTCO WHOLESALE");
+  expect(match("PRESTO FARE", ["PRESTO"])).toBe("PRESTO");
 });
 
 test("a different first word never matches", () => {
@@ -44,36 +15,38 @@ test("a different first word never matches", () => {
   expect(match("COSTCO GAS", ["SHELL GAS"])).toBeNull();
 });
 
-test("the longest match wins", () => {
-  expect(match("UBER EATS TORONTO", ["UBER", "UBER EATS"], { UBER: "ride", "UBER EATS": "food" }, cityPayees)).toEqual({
-    kind: "same",
-    payee: "UBER EATS",
-  });
-  expect(match("UBER TRIP", ["UBER", "UBER EATS"], { UBER: "ride", "UBER EATS": "food" })).toEqual({ kind: "similar", payee: "UBER" });
+test("a learned payee with more words than the new payee is not contained", () => {
+  expect(match("COSTCO", ["COSTCO GAS"])).toBeNull();
 });
 
-test("a cut first word or a cut last word matches", () => {
-  expect(match("NOFRILL", ["NOFRILLS"])).toEqual({ kind: "same", payee: "NOFRILLS" });
-  expect(match("NOFRILLS", ["NOFRILL"])).toEqual({ kind: "same", payee: "NOFRILL" });
-  expect(match("COSTCO WHOLESAL", ["COSTCO WHOLESALE"])).toEqual({ kind: "same", payee: "COSTCO WHOLESALE" });
-  expect(match("COSTCO WHOLESALE W535", ["COSTCO WHOLESAL"])).toEqual({ kind: "similar", payee: "COSTCO WHOLESAL" });
-  expect(match("ABC", ["ABCD"])).toBeNull();
+test("the longest match wins", () => {
+  const labels = { UBER: "ride", "UBER EATS": "food" };
+  expect(match("UBER EATS TORONTO", ["UBER", "UBER EATS"], labels)).toBe("UBER EATS");
+  expect(match("UBER TRIP", ["UBER", "UBER EATS"], labels)).toBe("UBER");
+});
+
+test("only the last word of the new payee may be cut, with 4 or more letters", () => {
+  expect(match("COSTCO WHOLES", ["COSTCO WHOLESALE"])).toBe("COSTCO WHOLESALE");
+  expect(match("COSTCO WHO", ["COSTCO WHOLESALE"])).toBeNull();
+  expect(match("COSTCO WHOLES GAS", ["COSTCO WHOLESALE"])).toBeNull();
+  expect(match("NOFRILL", ["NOFRILLS"])).toBeNull();
+});
+
+test("a first word that only starts with the learned word does not match", () => {
+  expect(match("APPLEBEES", ["APPLE"])).toBeNull();
+  expect(match("APPLEBEES GRILL", ["APPLE"])).toBeNull();
+});
+
+test("a repeated learned word must be repeated in the new payee", () => {
+  expect(match("PIZZA HUT", ["PIZZA PIZZA"])).toBeNull();
+  expect(match("PIZZA PIZZA TORONTO", ["PIZZA PIZZA"])).toBe("PIZZA PIZZA");
+  expect(match("PIZZA HUT", ["PIZZA PIZZA", "PIZZA"])).toBe("PIZZA");
 });
 
 test("two equal candidates with different labels give no match and with the same label give one", () => {
   const learned = ["COSTCO WHOLESALE", "COSTCO GAS"];
   expect(match("COSTCO WHOLESALE GAS", learned, { "COSTCO WHOLESALE": "food", "COSTCO GAS": "fuel" })).toBeNull();
   expect(match("COSTCO WHOLESALE GAS", learned, { "COSTCO WHOLESALE": "food", "COSTCO GAS": "food" })).not.toBeNull();
-});
-
-test("a city word that is also a first word keeps its anchor", () => {
-  expect(match("TORONTO HYDRO BILL", ["TORONTO HYDRO"])).toEqual({ kind: "similar", payee: "TORONTO HYDRO" });
-  expect(match("TORONTO TRANSIT", ["TORONTO HYDRO"])).toBeNull();
-});
-
-test("a word after fewer than 5 first words is not noise", () => {
-  const all = cities.slice(0, 4).map((name) => `${name} TORONTO`);
-  expect(match("PRESTO TORONTO", ["PRESTO"], {}, all)).toEqual({ kind: "similar", payee: "PRESTO" });
 });
 
 test("a payee does not match itself", () => {

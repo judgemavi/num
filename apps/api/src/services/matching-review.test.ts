@@ -322,37 +322,28 @@ test("a learned transfer preselects Transfer and is not automatic", () => {
   }
 });
 
-test("a payee with a city word is the same payee, and a sub-brand is a similar suggestion", () => {
+test("a payee that contains a learned payee is a similar suggestion and never automatic", () => {
   const sample = book();
   try {
     const food = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
-    const fares = createCategory(sample.db, { name: "Transit", kind: "expense", ...saved });
-    const add = (payeeRaw: string, categoryId: string | null, date: string) =>
+    for (const date of ["2026-01-12", "2026-02-12", "2026-03-01"]) {
       createTransaction(sample.db, {
         accountId: sample.account.id,
         date,
         amount: -400,
-        payeeRaw,
+        payeeRaw: "COSTCO WHOLESALE",
         status: "open",
-        lines: [categoryId ? { amount: -400, categoryId } : { amount: -400 }],
+        lines: [{ amount: -400, categoryId: food.id }],
         ...saved,
       });
-    for (const name of ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO"]) {
-      add(`${name} TORONTO`, null, "2026-01-01");
-    }
-    for (const date of ["2026-01-12", "2026-02-12", "2026-03-01"]) {
-      add("COSTCO WHOLESALE", food.id, date);
-      add("PRESTO", fares.id, date);
     }
     const loaded = loadMatchBook(sample.db);
-    const same = scorePayee(loaded, { payee: "COSTCO WHOLESALE TORONTO", amount: -400, recurring: null });
-    expect(same.categoryId).toBe(food.id);
-    expect(same.level).toBe("automatic");
-    const similar = scorePayee(loaded, { payee: "PRESTO FARE", amount: -400, recurring: null });
-    expect(similar.categoryId).toBe(fares.id);
+    const similar = scorePayee(loaded, { payee: "COSTCO WHOLESALE W535 TORONTO", amount: -400, recurring: null });
+    expect(similar.categoryId).toBe(food.id);
     expect(similar.reason).toBe("similar");
-    expect(similar.sourceName).toBe("PRESTO");
+    expect(similar.sourceName).toBe("COSTCO WHOLESALE");
     expect(similar.level).toBe("suggestion");
+    expect(scorePayee(loaded, { payee: "COSTCO", amount: -400, recurring: null }).level).toBe("none");
   } finally {
     sample.close();
   }
