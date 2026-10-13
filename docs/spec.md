@@ -227,9 +227,9 @@ Use tags for trips and projects. Example: "Italy Vacation 2026". Reports can fil
 
 ### 5.6 Merchant
 
-Fields: `name`, `defaultCategoryId?`, `archivedAt?`. The name is unique. The comparison ignores case.
+Fields: `name`, `archivedAt?`. The name is unique. The comparison ignores case.
 
-There are no rules (decision 0017). Matching uses recurring items, learning, similarity and confidence (§7.3).
+There are no rules (decision 0017). A merchant has no default category (decision 0028). Matching uses recurring items, learning, similarity and confidence (§7.3).
 
 ### 5.7 Recurring item
 
@@ -505,7 +505,6 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
 | Learned payee | learned formula × 0.95 |
 | Similar payee (decision 0026): a learned payee is contained, from the first word, in the new payee | that payee's learned confidence × 0.9, never automatic |
 | Brand family (decision 0026): 2 or more learned payees with the same first word all have the same label | lowest of their learned confidences × 0.85, never automatic |
-| Merchant default category | 0.60 |
 
 Learned formula: confidence = agreement × certainty.
 - agreement = a / t. a = recency-weighted confirmations for the candidate, t = recency-weighted confirmations for the key.
@@ -529,7 +528,7 @@ Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default,
 - **Sure:** automatic. **Likely:** a suggestion with confidence ≥ 0.75. **Maybe:** a suggestion below 0.75.
   No level: no suggestion.
 - Reasons: "Matches your Rent payment" (recurring), "You chose this N times for this payee" (learned),
-  "Same as <learned payee>" (similar), "Same as other <first word> payees" (family), "This merchant's usual category" (merchant default).
+  "Same as <learned payee>" (similar), "Same as other <first word> payees" (family).
 - Settings → Matching shows `autoConfidence` as "Label for me: only when very sure (careful) · when sure (balanced) ·
   more often (eager)".
 
