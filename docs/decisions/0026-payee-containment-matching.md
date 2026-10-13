@@ -30,6 +30,12 @@ Words are the words of the normalized payee (§7.3). A **learned payee** is a no
    brand (COSTCO GAS after COSTCO). The app cannot tell them apart without location data, so the user decides once:
    the confirmation makes the new payee a learned payee, and later imports match it exactly.
 6. The trigram signal is removed. Merchant default (0.60) does not change.
+7. **Brand family (added 2026-10-12).** When no learned payee is contained, look at the learned payees with the same
+   first word as the new payee. If there are 2 or more of them and all have the same learned label (no learned payee
+   with that first word has another label), suggest that label. Confidence = the lowest learned confidence of those
+   payees × 0.85. Never automatic. Reason: "Same as other <first word> payees".
+   Example: PRESTO SHEPPARD STN and PRESTO KING STN are Transit, so PRESTO DUNDAS STN gets Transit.
+   COSTCO WHOLESALE (Groceries) and COSTCO GAS (Fuel) disagree, so a new COSTCO payee gets no family suggestion.
 
 Review (2026-10-12): the first version had learned noise words and a "same payee" result that could be automatic.
 A probe showed wrong automatic labels (COSTCO GAS as COSTCO, APPLEBEES as APPLE) and a conflict with payees that start
@@ -44,4 +50,6 @@ with a city (TORONTO HYDRO). They are removed.
   APPLEBEES is never matched by a learned APPLE; PIZZA HUT is not contained in PIZZA PIZZA; two equal candidates with
   different labels give no match; a learned transfer payee gives a transfer suggestion; the cap holds with eager
   matching and merchant default.
+- Logic tests (brand family): two agreeing payees suggest; one payee does not; a disagreeing payee stops it;
+  containment wins over the family.
 - Performance: an index by first word.
