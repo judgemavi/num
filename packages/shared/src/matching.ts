@@ -1,4 +1,4 @@
-export const autoReasons = ["recurring", "learned_amount", "learned_payee", "similar", "merchant_default", "refund_match", "refund_reversal", "transfer_match"] as const;
+export const autoReasons = ["recurring", "learned_amount", "learned_payee", "similar", "family", "merchant_default", "refund_match", "refund_reversal", "transfer_match"] as const;
 
 export type AutoReason = (typeof autoReasons)[number];
 
@@ -16,6 +16,7 @@ export const suggestionFloor = 0.6;
 export const likelyMinimum = 0.75;
 export const leadMinimum = 0.2;
 export const similarFactor = 0.9;
+export const familyFactor = 0.85;
 export const recurringConfidence = 0.99;
 export const merchantDefaultConfidence = 0.6;
 
@@ -52,6 +53,18 @@ export type SimilarPayee = {
   transferRows: readonly { id: string; date: string; transferAccountId: string }[];
 };
 
+/** Other learned payees with the same first word that all teach one answer (decision 0026, rule 7). */
+export type FamilySignal = {
+  word: string;
+  categoryId: string | null;
+  merchantId: string | null;
+  transferAccountId: string | null;
+  /** The lowest learned confidence of the payees in the family. */
+  confidence: number;
+  sourceId: string;
+  count: number;
+};
+
 export type ScoreInput = {
   mode: ConfidenceMode;
   recurring: RecurringSignal | null;
@@ -60,6 +73,7 @@ export type ScoreInput = {
   amountScores?: readonly LearnedScore[];
   payeeScores?: readonly LearnedScore[];
   similar: SimilarPayee | null;
+  family?: FamilySignal | null;
   merchant: { id: string; name: string; categoryId: string } | null;
   transferRows: readonly { id: string; date: string; transferAccountId: string }[];
 };
@@ -289,6 +303,18 @@ function collectSignals(input: ScoreInput): MatchSignal[] {
     pushLearned(signals, input.similar.scores, "similar", similarFactor, input.similar.payee);
     pushTransfers(signals, input.similar.transferRows, "similar", similarFactor, input.similar.payee);
   }
+  if (input.family) {
+    signals.push({
+      reason: "family",
+      confidence: input.family.confidence * familyFactor,
+      categoryId: input.family.categoryId,
+      merchantId: input.family.merchantId,
+      transferAccountId: input.family.transferAccountId,
+      sourceId: input.family.sourceId,
+      sourceName: input.family.word,
+      count: input.family.count,
+    });
+  }
   pushTransfers(signals, input.transferRows, "learned_payee", 1, null);
   if (input.merchant) {
     signals.push({
@@ -347,8 +373,8 @@ function groupCandidates(signals: readonly MatchSignal[]): Candidate[] {
 function resultFrom(candidate: Candidate, second: number | null, mode: ConfidenceMode, mortgage: boolean): MatchResult {
   const lead = second === null ? 1 : candidate.confidence - second;
   const transfer = candidate.transferAccountId !== null && candidate.categoryId === null;
-  const learned = candidate.signals.find((signal) => signal.reason === "learned_amount" || signal.reason === "learned_payee" || signal.reason === "similar");
-  const similar = candidate.signals.some((signal) => signal.reason === "similar");
+  const learned = candidate.signals.find((signal) => signal.reason === "learned_amount" || signal.reason === "learned_payee" || signal.reason === "similar" || signal.reason === "family");
+  const similar = candidate.signals.some((signal) => signal.reason === "similar" || signal.reason === "family");
   const level = mortgage ? "automatic" : matchLevel(candidate.confidence, lead, mode, transfer || similar);
   return {
     level,

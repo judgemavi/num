@@ -164,6 +164,19 @@ test("a similar payee is never automatic, even when eager and combined with a me
   expect(combined.level).toBe("suggestion");
 });
 
+test("a brand family suggestion uses the lowest confidence times 0.85 and is never automatic", () => {
+  const family = { word: "PRESTO", categoryId: "transit", merchantId: null, transferAccountId: null, confidence: 0.91, sourceId: "a", count: 2 };
+  const alone = score({ amountRows: [], payeeRows: [], family, mode: "eager" });
+  expect(alone.reason).toBe("family");
+  expect(alone.sourceName).toBe("PRESTO");
+  expect(alone.confidence).toBeCloseTo(0.91 * 0.85, 10);
+  expect(alone.level).toBe("suggestion");
+  const merchant = { id: "m", name: "Presto", categoryId: "transit" };
+  const combined = score({ amountRows: [], payeeRows: [], family, merchant, mode: "eager" });
+  expect(combined.confidence).toBeGreaterThan(0.75);
+  expect(combined.level).toBe("suggestion");
+});
+
 test("a learned transfer payee gives a transfer suggestion that is never automatic", () => {
   const transferRows = [
     { id: "a", date: "2026-01-01", transferAccountId: "visa" },

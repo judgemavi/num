@@ -73,6 +73,8 @@ function reasonText(suggestion: Suggestion): string {
       return "You chose this for this payee";
     case "similar":
       return suggestion.sourceName ? `Same as ${suggestion.sourceName}` : "Same as a similar payee";
+    case "family":
+      return suggestion.sourceName ? `Same as other ${suggestion.sourceName} payees` : "Same as other payees of this brand";
     case "merchant_default":
       return "This merchant's usual category";
     case "refund_match":

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { buildPayeeIndex, containedMatch } from "./payee-contain";
+import { buildPayeeIndex, containedMatch, familyMatch } from "./payee-contain";
 
 function match(payee: string, learned: string[], labels: Record<string, string> = {}) {
   return containedMatch(buildPayeeIndex(learned), payee, (name) => labels[name] ?? "same-label");
@@ -51,4 +51,13 @@ test("two equal candidates with different labels give no match and with the same
 
 test("a payee does not match itself", () => {
   expect(match("PRESTO", ["PRESTO"])).toBeNull();
+});
+
+test("the brand family needs 2 or more learned payees that agree", () => {
+  const family = (payee: string, learned: string[], labels: Record<string, string> = {}) =>
+    familyMatch(buildPayeeIndex(learned), payee, (name) => labels[name] ?? "same");
+  expect(family("PRESTO DUNDAS STN", ["PRESTO SHEPPARD STN", "PRESTO KING STN"])?.word).toBe("PRESTO");
+  expect(family("PRESTO DUNDAS STN", ["PRESTO KING STN"])).toBeNull();
+  expect(family("PRESTO DUNDAS STN", ["PRESTO SHEPPARD STN", "PRESTO KING STN", "PRESTO LOAD"], { "PRESTO LOAD": "other" })).toBeNull();
+  expect(family("COSTCO BUSINESS CENTRE", ["COSTCO WHOLESALE", "COSTCO GAS"], { "COSTCO WHOLESALE": "food", "COSTCO GAS": "fuel" })).toBeNull();
 });

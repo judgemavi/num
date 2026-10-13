@@ -322,6 +322,61 @@ test("a learned transfer preselects Transfer and is not automatic", () => {
   }
 });
 
+function learn(sample: ReturnType<typeof book>, payeeRaw: string, categoryId: string) {
+  createTransaction(sample.db, {
+    accountId: sample.account.id,
+    date: "2026-01-12",
+    amount: -400,
+    payeeRaw,
+    status: "open",
+    lines: [{ amount: -400, categoryId }],
+    ...saved,
+  });
+}
+
+test("a brand family suggests when 2 learned payees agree, and stops when they disagree", () => {
+  const sample = book();
+  try {
+    const transit = createCategory(sample.db, { name: "Transit", kind: "expense", ...saved });
+    const food = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
+    const fuel = createCategory(sample.db, { name: "Fuel", kind: "expense", ...saved });
+    learn(sample, "PRESTO SHEPPARD STN", transit.id);
+    learn(sample, "COSTCO WHOLESALE", food.id);
+    learn(sample, "COSTCO GAS", fuel.id);
+    const one = scorePayee(loadMatchBook(sample.db), { payee: "COSTCO BUSINESS CENTRE", amount: -400, recurring: null });
+    expect(one.level).toBe("none");
+    expect(scorePayee(loadMatchBook(sample.db), { payee: "PRESTO DUNDAS STN", amount: -400, recurring: null }).level).toBe("none");
+    learn(sample, "PRESTO KING STN", transit.id);
+    const loaded = loadMatchBook(sample.db);
+    const family = scorePayee(loaded, { payee: "PRESTO DUNDAS STN", amount: -400, recurring: null });
+    expect(family.categoryId).toBe(transit.id);
+    expect(family.reason).toBe("family");
+    expect(family.sourceName).toBe("PRESTO");
+    expect(family.level).toBe("suggestion");
+    expect(scorePayee(loaded, { payee: "COSTCO BUSINESS CENTRE", amount: -400, recurring: null }).level).toBe("none");
+    learn(sample, "PRESTO LOAD", fuel.id);
+    expect(scorePayee(loadMatchBook(sample.db), { payee: "PRESTO DUNDAS STN", amount: -400, recurring: null }).level).toBe("none");
+  } finally {
+    sample.close();
+  }
+});
+
+test("containment wins over the brand family", () => {
+  const sample = book();
+  try {
+    const transit = createCategory(sample.db, { name: "Transit", kind: "expense", ...saved });
+    const fuel = createCategory(sample.db, { name: "Fuel", kind: "expense", ...saved });
+    learn(sample, "PRESTO SHEPPARD STN", transit.id);
+    learn(sample, "PRESTO KING STN", transit.id);
+    learn(sample, "PRESTO LOAD", fuel.id);
+    const result = scorePayee(loadMatchBook(sample.db), { payee: "PRESTO LOAD TORONTO", amount: -400, recurring: null });
+    expect(result.reason).toBe("similar");
+    expect(result.categoryId).toBe(fuel.id);
+  } finally {
+    sample.close();
+  }
+});
+
 test("a payee that contains a learned payee is a similar suggestion and never automatic", () => {
   const sample = book();
   try {

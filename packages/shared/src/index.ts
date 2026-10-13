@@ -254,7 +254,7 @@ export {
 } from "./refund-link";
 export { oppositeTransferAccount, transferHintQuerySchema, transferHintSchema } from "./transfer-hint";
 export { uncategorizedLineKey } from "./payee";
-export { buildPayeeIndex, containedMatch, type PayeeIndex } from "./payee-contain";
+export { buildPayeeIndex, containedMatch, familyMatch, type PayeeIndex } from "./payee-contain";
 export {
   amountsWithinOnePercent,
   autoReasons,
@@ -267,7 +267,9 @@ export {
   matchLevel,
   scoreMatch,
   similarFactor,
+  familyFactor,
   type AutoReason,
+  type FamilySignal,
   type ConfidenceMode,
   type LearnedRow,
   type MatchResult,

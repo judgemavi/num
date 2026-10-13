@@ -167,7 +167,7 @@ export function normalizePayee(description: string): string {
   const upper = description.toUpperCase().replace(/\s+/g, " ").trim();
   const region = /,\s*([A-Z]{2,3})$/.exec(upper)?.[1];
   const cityBeforeRegion = region !== undefined && REGIONS.has(region);
-  const plain = upper.replace(/[,'"`()]+/g, " ").replace(/\s+/g, " ").trim();
+  const plain = upper.replace(/[,'"`()]+/g, " ").replace(/(?<=\D)\s*\/|\/\s*(?=\D)/g, " ").replace(/\s+/g, " ").trim();
   return finish(stripPrefixes(plain), cityBeforeRegion);
 }
 

@@ -78,3 +78,21 @@ export function containedMatch(
   }
   return best.map((entry) => entry.payee).sort()[0] ?? null;
 }
+
+/**
+ * Brand family (decision 0026, rule 7): the other learned payees with the same first word as the new payee.
+ * Returns them when there are 2 or more and all teach the same answer. Otherwise null.
+ */
+export function familyMatch(
+  index: PayeeIndex,
+  payee: string,
+  labelOf: (learnedPayee: string) => string | null,
+): { word: string; payees: string[] } | null {
+  const word = wordsOf(payee)[0];
+  if (word === undefined) {
+    return null;
+  }
+  const payees = (index.get(word) ?? []).map((entry) => entry.payee).filter((name) => name !== payee);
+  const labels = new Set(payees.map((name) => labelOf(name) ?? `\0${name}`));
+  return payees.length >= 2 && labels.size === 1 ? { word, payees: payees.sort() } : null;
+}

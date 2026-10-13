@@ -4,6 +4,7 @@ import {
   amountsWithinOnePercent,
   buildPayeeIndex,
   containedMatch,
+  familyMatch,
   normalizePayee,
   confidenceModes,
   learnedConfidence,
@@ -15,6 +16,7 @@ import {
   type ConfidenceMode,
   type LearnedRow,
   type LinkTransaction,
+  type FamilySignal,
   type MatchResult,
   type PayeeIndex,
   type PlanSchedule,
@@ -63,10 +65,12 @@ export type MatchBook = {
   payeeLearned: Map<string, ReturnType<typeof learnedConfidence>>;
   amountLearned: Map<string, ReturnType<typeof learnedConfidence>>;
   labels: Map<string, string>;
+  tops: Map<string, Omit<FamilySignal, "word">>;
   index: PayeeIndex;
   mortgageIndex: PayeeIndex;
   contained: Map<string, string | null>;
   mortgageContained: Map<string, MortgageHit | null>;
+  families: Map<string, FamilySignal | null>;
   merchants: { id: string; name: string; categoryId: string; payee: string }[];
 };
 
@@ -132,18 +136,21 @@ export function loadMatchBook(db: Reader): MatchBook {
   }
   const payeeLearned = new Map<string, ReturnType<typeof learnedConfidence>>();
   const labels = new Map<string, string>();
+  const tops: MatchBook["tops"] = new Map();
   for (const [payee, rows] of byPayee) {
     const scores = learnedConfidence(learnedOf(rows));
     payeeLearned.set(payee, scores);
     const top = scores[0];
     if (top) {
       labels.set(payee, `${top.categoryId}\0${top.merchantId ?? ""}`);
+      tops.set(payee, { ...top, transferAccountId: null });
     }
   }
   for (const [payee, rows] of transfersByPayee) {
     const top = learnedConfidence(rows.map((row) => ({ id: row.id, date: row.date, categoryId: row.transferAccountId, merchantId: null })))[0];
     if (top && !labels.has(payee)) {
       labels.set(payee, `transfer\0${top.categoryId}`);
+      tops.set(payee, { ...top, categoryId: null, merchantId: null, transferAccountId: top.categoryId });
     }
   }
   const mortgageLearned = loadMortgageLearned(db);
@@ -162,10 +169,12 @@ export function loadMatchBook(db: Reader): MatchBook {
     payeeLearned,
     amountLearned: new Map(),
     labels,
+    tops,
     index,
     mortgageIndex,
     contained: new Map(),
     mortgageContained: new Map(),
+    families: new Map(),
     merchants: merchants.map((merchant) => ({ ...merchant, payee: normalizePayee(merchant.name) })),
   };
 }
@@ -183,6 +192,23 @@ export function containedFor(book: MatchBook, payee: string): string | null {
   if (found === undefined) {
     found = containedMatch(book.index, payee, (learned) => book.labels.get(learned) ?? null);
     book.contained.set(payee, found);
+  }
+  return found;
+}
+
+/** The answer that other learned payees with the same first word teach, when they all agree (decision 0026, rule 7). */
+export function familyFor(book: MatchBook, payee: string): FamilySignal | null {
+  if (book.labels.has(payee)) {
+    return null;
+  }
+  let found = book.families.get(payee);
+  if (found === undefined) {
+    const family = familyMatch(book.index, payee, (learned) => book.labels.get(learned) ?? null);
+    const tops = (family?.payees ?? []).map((name) => book.tops.get(name));
+    const first = tops[0];
+    const lowest = tops.reduce((low, top) => Math.min(low, top?.confidence ?? 0), 1);
+    found = family && first ? { ...first, word: family.word, confidence: lowest } : null;
+    book.families.set(payee, found);
   }
   return found;
 }
@@ -208,6 +234,7 @@ export function scorePayee(
   input: { payee: string; amount: number; recurring: RecurringSignal | null },
 ): MatchResult {
   const contained = containedFor(book, input.payee);
+  const family = contained ? null : familyFor(book, input.payee);
   const same = book.byPayee.get(input.payee) ?? [];
   const amountKey = `${input.payee}\0${input.amount}`;
   let amountScores = book.amountLearned.get(amountKey);
@@ -231,6 +258,7 @@ export function scorePayee(
           transferRows: book.transfersByPayee.get(contained) ?? [],
         }
       : null,
+    family,
     merchant: merchant ? { id: merchant.id, name: merchant.name, categoryId: merchant.categoryId } : null,
     transferRows: book.transfersByPayee.get(input.payee) ?? [],
   };

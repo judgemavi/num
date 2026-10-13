@@ -63,7 +63,7 @@ export function suggestionFromMatch(result: MatchResult): Suggestion {
     reason,
     level: reviewLevel(false, result.confidenceMilli / 1000),
     sourceId: result.sourceId,
-    sourceName: result.reason === "similar" ? result.sourceName : null,
+    sourceName: result.reason === "similar" || result.reason === "family" ? result.sourceName : null,
     confidence: result.confidenceMilli,
     mortgage: false,
   };
