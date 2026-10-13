@@ -497,8 +497,7 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
 | Recurring link (exactly one matching occurrence, §7.4) | 0.99 |
 | Learned payee + amount (the normalized payee and the same amount, ±1%) | learned formula |
 | Learned payee | learned formula × 0.95 |
-| Same payee (decision 0026): a learned payee is contained in the new payee, and only noise words are left | learned formula of that payee (as above) |
-| Similar payee (decision 0026): a learned payee is contained, and other words are left | that payee's learned confidence × 0.9, never automatic |
+| Similar payee (decision 0026): a learned payee is contained, from the first word, in the new payee | that payee's learned confidence × 0.9, never automatic |
 | Merchant default category | 0.60 |
 
 Learned formula: confidence = agreement × certainty.

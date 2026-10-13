@@ -14,33 +14,34 @@ Trained models (dedupe, libpostal) are not allowed (spec §2, deterministic).
 
 ## Decision
 
-Words are the words of the normalized payee (§7.3). A **learned payee** is a normalized payee with confirmations.
+Words are the words of the normalized payee (§7.3). A **learned payee** is a normalized payee with confirmations
+(a category, a merchant or a transfer).
 
-1. **Noise words (counted from the user's data, no lists).** A word is noise when it is never the first word of a
-   normalized payee and it comes after 5 or more different first words. Example: TORONTO, ON. A word that follows
-   only one merchant (EATS after UBER) is not noise. The normalization rules of §7.3 stay for the first imports.
-2. **Anchor.** A learned payee is a candidate only when its first word is equal to the first word of the new payee,
-   or one is a prefix of the other with 4 or more letters (a cut word).
-3. **Contained.** Every word of the learned payee that is not noise is in the new payee. The last word may be a prefix
-   (4 or more letters) of a word in the new payee, or the reverse (a cut word).
-4. **Longest match.** From the contained candidates, use the one with the most words that are not noise.
-   If two have the same count and different learned labels, there is no match.
-5. **Result.**
-   - **Same payee:** contained, and the new payee has no other words that are not noise. The new payee uses the
-     learned signals of that payee (learned payee + amount, learned payee), with the normal formula and levels.
-     It can be automatic. Reason: "You chose this N times for this payee".
-   - **Similar payee:** contained, and the new payee has other words that are not noise (PRESTO FARE after PRESTO,
-     UBER EATS after UBER). Confidence = learned confidence × 0.9. It is never automatic, whatever the setting.
-     Reason: "Same as <learned payee>".
-   - Otherwise there is no match from this signal.
+1. **Anchor.** A learned payee is a candidate only when its first word is equal to the first word of the new payee.
+2. **Contained.** The words of the learned payee are in the new payee, in the same order (a repeated word must be
+   repeated). The last word of the new payee may be the start (4 or more letters) of a word of the learned payee,
+   because banks cut long text.
+3. **Longest match.** From the contained candidates, use the one with the most words. If two have the same count and
+   different learned labels, there is no match.
+4. **Result: similar payee.** Confidence = that payee's learned confidence × 0.9. It is never automatic, whatever the
+   setting. The suggestion is the learned label (category and merchant, or the learned transfer).
+   Reason: "Same as <learned payee>".
+5. There is no automatic match by containment. Extra words can be a city (TORONTO) or a different business of the same
+   brand (COSTCO GAS after COSTCO). The app cannot tell them apart without location data, so the user decides once:
+   the confirmation makes the new payee a learned payee, and later imports match it exactly.
 6. The trigram signal is removed. Merchant default (0.60) does not change.
-7. When the user confirms the new payee, it becomes a learned payee itself (exact match from then on).
+
+Review (2026-10-12): the first version had learned noise words and a "same payee" result that could be automatic.
+A probe showed wrong automatic labels (COSTCO GAS as COSTCO, APPLEBEES as APPLE) and a conflict with payees that start
+with a city (TORONTO HYDRO). They are removed.
 
 ## Consequences
 
 - Spec §7.3 (signals table, reasons) changes. The `similar` reason stays as a code.
-- Logic tests: COSTCO WHOLESALE W535 TORONTO, ON → same payee as COSTCO WHOLESALE (after TORONTO is noise);
-  PRESTO FARE → similar to PRESTO, never automatic; SHELL GAS never matches COSTCO GAS; UBER EATS goes to a learned
-  UBER EATS before UBER; a cut first word (NOFRILL) matches NOFRILLS; two equal candidates with different labels give
-  no match; TORONTO HYDRO keeps TORONTO as its anchor; a word after fewer than 5 first words is not noise.
-- Performance: an index by first word; the noise counts are built from the distinct normalized payees.
+- Logic tests: COSTCO WHOLESALE W535 TORONTO → similar to COSTCO WHOLESALE (Likely, not automatic); PRESTO FARE →
+  similar to PRESTO; SHELL GAS never matches COSTCO GAS; COSTCO GAS never matches a learned COSTCO GAS when the new
+  payee is COSTCO; UBER EATS goes to a learned UBER EATS before UBER; COSTCO WHOLES (cut) → similar to COSTCO WHOLESALE;
+  APPLEBEES is never matched by a learned APPLE; PIZZA HUT is not contained in PIZZA PIZZA; two equal candidates with
+  different labels give no match; a learned transfer payee gives a transfer suggestion; the cap holds with eager
+  matching and merchant default.
+- Performance: an index by first word.
