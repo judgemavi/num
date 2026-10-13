@@ -11,6 +11,7 @@ export const buckets = sqliteTable("buckets", {
   essential: integer("essential", { mode: "boolean" }).notNull(),
   color: text("color").notNull(),
   icon: text("icon").notNull(),
+  startDate: text("start_date").notNull(),
   archivedAt: text("archived_at"),
   refillTo: integer("refill_to"),
   amount: integer("amount"),

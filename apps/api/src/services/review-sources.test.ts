@@ -192,6 +192,7 @@ test("each review source appears and leaves after its action", () => {
       target: null,
       targetDate: null,
       fixedAmount: null,
+      asOf: "2000-01-01",
       ...saved,
     });
     const spare = createBucket(sample.db, {
@@ -209,6 +210,7 @@ test("each review source appears and leaves after its action", () => {
       target: null,
       targetDate: null,
       fixedAmount: null,
+      asOf: "2000-01-01",
       ...saved,
     });
     pay(sample.db, cash.id, "2026-03-08", -4200, "Dining out", dining.id);

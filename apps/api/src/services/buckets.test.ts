@@ -60,6 +60,7 @@ function spending(db: Db, name: string, categoryIds: string[], refillTo = 10_000
     target: null,
     targetDate: null,
     fixedAmount: null,
+    asOf: "2000-01-01",
     ...saved,
   });
 }
@@ -216,6 +217,7 @@ test("each expense category is in one bucket only", () => {
       target: null,
       targetDate: null,
       fixedAmount: null,
+      startDate: "2000-01-01",
       ...saved,
     });
     const moved = updateBucket(book.db, other.id, {
@@ -233,6 +235,7 @@ test("each expense category is in one bucket only", () => {
       target: null,
       targetDate: null,
       fixedAmount: null,
+      startDate: "2000-01-01",
       ...saved,
     });
     expect(moved.categoryIds).toEqual([groceries.id]);
@@ -338,6 +341,7 @@ test("kind fields that do not match the kind are rejected", () => {
           target: null,
           targetDate: null,
           fixedAmount: null,
+          asOf: "2000-01-01",
           ...saved,
         }),
       "bucket_fields_invalid",
@@ -359,6 +363,7 @@ test("kind fields that do not match the kind are rejected", () => {
           target: 100,
           targetDate: "2027-06-01",
           fixedAmount: 20,
+          asOf: "2000-01-01",
           ...saved,
         }),
       "bucket_fields_invalid",

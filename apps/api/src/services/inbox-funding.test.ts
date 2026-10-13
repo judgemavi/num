@@ -62,6 +62,7 @@ test("cover from Unassigned uses a fund event and clears the overspent item", ()
       target: null,
       targetDate: null,
       fixedAmount: null,
+      asOf: "2000-01-01",
       ...saved,
     });
     createTransaction(sample.db, {
@@ -132,6 +133,7 @@ test("a linked paycheck is waiting for funding until its funding run, and return
       target: null,
       targetDate: null,
       fixedAmount: null,
+      asOf: "2000-01-01",
       ...saved,
     });
     const waiting = () => listFundingPaychecks(sample.db).items.some((item) => item.incomeTransactionId === deposit.id);

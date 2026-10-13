@@ -63,6 +63,7 @@ const bucketFields = {
   color: z.enum(bucketColors),
   icon: z.enum(bucketIcons),
   categoryIds: z.array(z.uuid()),
+  startDate: isoDateSchema,
   refillTo: cents.nullable(),
   amount: cents.nullable(),
   dueDate: isoDateSchema.nullable(),
@@ -117,6 +118,11 @@ export function kindFieldsValid(value: {
 }
 
 export const bucketWriteSchema = z.object(bucketFields).refine(kindFieldsValid, { path: ["kind"] });
+
+// A new bucket can leave out startDate. Then the bucket starts on asOf (decision 0029).
+export const bucketCreateSchema = z
+  .object({ ...bucketFields, startDate: isoDateSchema.optional() })
+  .refine(kindFieldsValid, { path: ["kind"] });
 
 export const bucketSchema = z.object({
   id: z.uuid(),
@@ -184,6 +190,7 @@ export function nextBucketColor(count: number): BucketColor {
 
 export type Bucket = z.infer<typeof bucketSchema>;
 export type BucketWrite = z.infer<typeof bucketWriteSchema>;
+export type BucketCreate = z.infer<typeof bucketCreateSchema>;
 export type BucketListQuery = z.output<typeof bucketListQuerySchema>;
 export type BucketEvent = z.infer<typeof bucketEventSchema>;
 export type BucketEventCreate = z.infer<typeof bucketEventCreateSchema>;

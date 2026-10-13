@@ -117,6 +117,7 @@ function spendBucket(db: Db, categoryId: string, essential: boolean, refillTo: n
     target: null,
     targetDate: null,
     fixedAmount: null,
+    asOf: "2000-01-01",
     ...saved,
   });
 }
@@ -157,6 +158,7 @@ test("the emergency fund fails when an essential goal is short, even if savings 
       target: 10_000,
       targetDate: "2027-01-01",
       fixedAmount: null,
+      asOf: "2000-01-01",
       ...saved,
     });
     const row = check(db, "2026-06-15", "emergency_fund");
@@ -310,6 +312,7 @@ test("sinking funds pass when each yearly bill has a sinking bucket for its cate
       target: null,
       targetDate: null,
       fixedAmount: null,
+      asOf: "2000-01-01",
       ...saved,
     });
     expect(check(db, "2026-06-15", "sinking_funds")).toMatchObject({ pass: true, yearly: 1, missing: [] });

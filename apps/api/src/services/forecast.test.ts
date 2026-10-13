@@ -129,6 +129,7 @@ test("bucket spending is not counted two times", () => {
       target: null,
       targetDate: null,
       fixedAmount: null,
+      asOf: "2000-01-01",
       ...saved,
     });
     for (const month of ["2026-07", "2026-08", "2026-09"]) {

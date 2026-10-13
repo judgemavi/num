@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { BucketPickers } from "@/buckets/bucket-pickers";
-import { bucketError } from "@/buckets/format";
+import { bucketError, today } from "@/buckets/format";
 import { loadBuckets } from "@/buckets/query";
 import { apiRequest } from "@/request";
 import { loadAllPages } from "@/settings/load-all-pages";
@@ -69,6 +69,7 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
   const [color, setColor] = useState<BucketColor>(current?.color ?? nextColor);
   const [icon, setIcon] = useState<BucketIcon>(current?.icon ?? "shopping-cart");
   const [categoryIds, setCategoryIds] = useState<string[]>(current?.categoryIds ?? []);
+  const [startDate, setStartDate] = useState(current?.startDate ?? today());
   const [refillTo, setRefillTo] = useState(money(currency, current?.refillTo ?? null));
   const [amount, setAmount] = useState(money(currency, current?.amount ?? null));
   const [dueDate, setDueDate] = useState(current?.dueDate ?? "");
@@ -123,6 +124,7 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
         color,
         icon,
         categoryIds,
+        startDate,
         refillTo: kind === "spending" ? readMoney(currency, refillTo) : null,
         amount: kind === "sinking" ? readMoney(currency, amount) : null,
         dueDate: kind === "sinking" ? dueDate : null,
@@ -142,7 +144,8 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
     }
     setSaving(true);
     try {
-      const result = await apiRequest(current ? `/api/buckets/${current.id}` : "/api/buckets", bucketSchema, {
+      const path = current ? `/api/buckets/${current.id}` : `/api/buckets?${new URLSearchParams({ asOf: today() })}`;
+      const result = await apiRequest(path, bucketSchema, {
         method: current ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
@@ -245,6 +248,11 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
         selected={categoryIds}
         onChange={setCategoryIds}
       />
+      <Field>
+        <FieldLabel htmlFor="bucket-start">Start date</FieldLabel>
+        <DateField id="bucket-start" value={startDate} required onChange={setStartDate} />
+        <FieldDescription>Spending in these categories counts from this date.</FieldDescription>
+      </Field>
       <Collapsible open={more} onOpenChange={setMore}>
         <CollapsibleTrigger className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary">
           <ChevronRight className={`size-4 transition-transform ${more ? "rotate-90" : ""}`} aria-hidden="true" />

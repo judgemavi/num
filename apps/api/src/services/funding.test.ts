@@ -86,6 +86,7 @@ function spend(db: Db, name: string, priority: number, refillTo = 10_000) {
     target: null,
     targetDate: null,
     fixedAmount: null,
+    asOf: "2000-01-01",
     ...saved,
   });
 }
@@ -136,6 +137,7 @@ test("a variable paycheck uses its actual amount", () => {
       target: 100_000,
       targetDate: null,
       fixedAmount: 5_000,
+      asOf: "2000-01-01",
       ...saved,
     });
     const proposal = fundingProposalFor(book.db, deposit.id, "2026-10-01");
@@ -169,6 +171,7 @@ test("a card purchase does not change Unassigned", () => {
       target: null,
       targetDate: null,
       fixedAmount: null,
+      asOf: "2000-01-01",
       ...saved,
     });
     createBucketEvent(book.db, food.id, { kind: "fund", amount: 5_000, date: "2026-10-01", asOf: "2026-10-01", ...saved });

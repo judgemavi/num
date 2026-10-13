@@ -43,6 +43,13 @@
       "when": 1791899122712,
       "tag": "0005_remove_merchant_default_category",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791900410692,
+      "tag": "0006_bucket_start_date",
+      "breakpoints": true
     }
   ]
 }

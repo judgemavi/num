@@ -1,6 +1,7 @@
 import {
   asOfQuerySchema,
   bucketCoverSchema,
+  bucketCreateSchema,
   bucketEventCreateSchema,
   bucketEventListSchema,
   bucketEventSchema,
@@ -81,7 +82,8 @@ const createRouteDef = createRoute({
   method: "post",
   path: "/api/buckets",
   request: {
-    body: { required: true, content: { "application/json": { schema: bucketWriteSchema } } },
+    query: asOfQuerySchema,
+    body: { required: true, content: { "application/json": { schema: bucketCreateSchema } } },
   },
   responses: {
     200: {
@@ -220,7 +222,9 @@ export function registerBuckets(app: OpenAPIHono, db: Db) {
   app.openapi(eventsRoute, (c) => c.json(listBucketEvents(db), 200));
   app.openapi(overspentRoute, (c) => c.json(listOverspent(db), 200));
   app.openapi(readRoute, (c) => c.json(readBucket(db, c.req.valid("param").id), 200));
-  app.openapi(createRouteDef, (c) => c.json(createBucket(db, { ...c.req.valid("json"), source: "ui" }), 200));
+  app.openapi(createRouteDef, (c) =>
+    c.json(createBucket(db, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200),
+  );
   app.openapi(updateRoute, (c) => {
     const { id } = c.req.valid("param");
     return c.json(updateBucket(db, id, { ...c.req.valid("json"), source: "ui" }), 200);

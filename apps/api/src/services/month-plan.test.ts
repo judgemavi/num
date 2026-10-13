@@ -87,6 +87,7 @@ test("funding and spending inside the month do not change the plan", () => {
       target: null,
       targetDate: null,
       fixedAmount: null,
+      asOf: "2000-01-01",
       ...saved,
     });
     const before = readMonthPlan(book.db, "2026-03-20", "2026-03");
@@ -152,6 +153,7 @@ test("a future month includes planned funding from earlier months", () => {
       target: 300,
       targetDate: "2026-04-01",
       fixedAmount: null,
+      asOf: "2000-01-01",
       ...saved,
     });
     const march = readMonthPlan(book.db, "2026-01-15", "2026-03");
@@ -222,6 +224,7 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       target: 10_000,
       targetDate: null,
       fixedAmount: 1_000,
+      asOf: "2000-01-01",
       ...saved,
     });
     const marchPay = createTransaction(book.db, {
@@ -256,6 +259,7 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       target: null,
       targetDate: null,
       fixedAmount: null,
+      asOf: "2000-01-01",
       ...saved,
     });
     createBucketEvent(book.db, old.id, { kind: "fund", amount: 2_000, date: "2026-03-04", asOf: "2026-03-20", ...saved });

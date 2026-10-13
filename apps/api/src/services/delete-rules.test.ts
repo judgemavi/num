@@ -122,6 +122,7 @@ function paycheck(db: Db) {
     target: null,
     targetDate: null,
     fixedAmount: null,
+    asOf: "2000-01-01",
     ...saved,
   });
   return { cash, deposit, food };

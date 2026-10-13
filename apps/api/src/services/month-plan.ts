@@ -1,4 +1,4 @@
-import { bucketCategories, bucketEvents, buckets, fundingRuns, occurrenceLinks, recurringPlans, transactionLines, transactions } from "@num/db";
+import { bucketEvents, buckets, fundingRuns, occurrenceLinks, recurringPlans, transactions } from "@num/db";
 import {
   bucketColors,
   bucketKinds,
@@ -20,9 +20,10 @@ import {
   type PlanKind,
   type PlanSchedule,
 } from "@num/shared";
-import { and, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { bucketBalances } from "./bucket-balance";
 
 type PlanRow = typeof recurringPlans.$inferSelect;
 type BucketRow = typeof buckets.$inferSelect;
@@ -114,7 +115,7 @@ export function readMonthPlan(db: Db, asOf: string, month: string | undefined): 
   for (const event of events) {
     funded.set(event.bucketId, (funded.get(event.bucketId) ?? 0) + event.amount);
   }
-  const balances = balancesBefore(db, originStart);
+  const balances = bucketBalances(db, Temporal.PlainDate.from(originStart).subtract({ days: 1 }).toString());
   const sources = db
     .select()
     .from(buckets)
@@ -164,45 +165,4 @@ function loadLinks(db: Db, asOf: string, windowStart: string, windowEnd: string)
     links.set(`${row.planId}|${row.dueDate}`, { planId: row.planId, dueDate: row.dueDate, skipped: row.skipped, actual });
   }
   return [...links.values()];
-}
-
-function balancesBefore(db: Db, start: string): Map<string, number> {
-  const balances = new Map<string, number>();
-  const add = (id: string, amount: number) => balances.set(id, (balances.get(id) ?? 0) + amount);
-  const events = db
-    .select({
-      kind: bucketEvents.kind,
-      bucketId: bucketEvents.bucketId,
-      otherBucketId: bucketEvents.otherBucketId,
-      amount: bucketEvents.amount,
-    })
-    .from(bucketEvents)
-    .leftJoin(fundingRuns, eq(bucketEvents.fundingRunId, fundingRuns.id))
-    .where(and(lt(bucketEvents.date, start), isNull(bucketEvents.undoneAt), or(isNull(bucketEvents.fundingRunId), isNull(fundingRuns.undoneAt))))
-    .all();
-  for (const event of events) {
-    if (event.kind === "fund") {
-      add(event.bucketId, event.amount);
-    } else if (event.kind === "release") {
-      add(event.bucketId, -event.amount);
-    } else if (event.kind === "move" && event.otherBucketId) {
-      add(event.bucketId, -event.amount);
-      add(event.otherBucketId, event.amount);
-    }
-  }
-  const lines = db
-    .select({
-      bucketId: bucketCategories.bucketId,
-      total: sql<number>`coalesce(sum(${transactionLines.amount}), 0)`,
-    })
-    .from(transactionLines)
-    .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
-    .innerJoin(bucketCategories, eq(transactionLines.categoryId, bucketCategories.categoryId))
-    .where(and(lt(transactions.date, start)))
-    .groupBy(bucketCategories.bucketId)
-    .all();
-  for (const line of lines) {
-    add(line.bucketId, line.total);
-  }
-  return balances;
 }

@@ -140,6 +140,7 @@ function seed(db: Db, dir: string) {
     target: null,
     targetDate: null,
     fixedAmount: null,
+    asOf: "2000-01-01",
     ...saved,
   });
   const plan = createPlan(db, {

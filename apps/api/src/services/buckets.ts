@@ -3,12 +3,14 @@ import {
   bucketColors,
   bucketIcons,
   bucketKinds,
+  isIsoDate,
   kindFieldsValid,
   nextBucketColor,
   sinkingRepeats,
   utcNow,
   type Bucket,
   type BucketColor,
+  type BucketCreate,
   type BucketIcon,
   type BucketKind,
   type BucketListQuery,
@@ -73,7 +75,7 @@ function asRepeat(value: string | null): SinkingRepeat | null {
   return oneOf(value, sinkingRepeats, "Unknown sinking repeat");
 }
 
-function assertKindFields(input: BucketWrite) {
+function assertKindFields(input: BucketCreate) {
   if (!kindFieldsValid(input)) {
     throw new ServiceError("bucket_fields_invalid", 400);
   }
@@ -110,6 +112,7 @@ function snapshot(row: BucketRow, categoryIds: string[]) {
     essential: row.essential,
     color: row.color,
     icon: row.icon,
+    startDate: row.startDate,
     archivedAt: row.archivedAt,
     refillTo: row.refillTo,
     amount: row.amount,
@@ -140,6 +143,7 @@ function toBucket(row: BucketRow, categoryIds: string[], balance: number): Bucke
     targetDate: row.targetDate,
     fixedAmount: row.fixedAmount,
     categoryIds,
+    startDate: row.startDate,
     balance,
   };
 }
@@ -185,6 +189,7 @@ function rowValues(id: string, input: BucketWrite, archivedAt: string | null): B
     essential: input.essential,
     color: input.color,
     icon: input.icon,
+    startDate: input.startDate,
     archivedAt,
     refillTo: input.refillTo,
     amount: input.amount,
@@ -262,11 +267,14 @@ export function listOverspent(db: Db): { items: OverspentBucket[] } {
   return { items };
 }
 
-export function createBucket(db: Db, input: BucketWrite & WriteInput): Bucket {
+export function createBucket(db: Db, input: BucketCreate & WriteInput & { asOf: string }): Bucket {
   assertKindFields(input);
+  if (!isIsoDate(input.asOf)) {
+    throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
+  }
   const id = crypto.randomUUID();
   write(db, { source: input.source, at: input.at }, (tx) => {
-    const row = rowValues(id, input, null);
+    const row = rowValues(id, { ...input, startDate: input.startDate ?? input.asOf }, null);
     tx.insert(buckets).values(row).run();
     const categoryIds = replaceCategories(tx, id, input.categoryIds);
     tx.audit({
@@ -297,6 +305,7 @@ export function updateBucket(db: Db, id: string, input: BucketWrite & WriteInput
         essential: row.essential,
         color: row.color,
         icon: row.icon,
+        startDate: row.startDate,
         refillTo: row.refillTo,
         amount: row.amount,
         dueDate: row.dueDate,

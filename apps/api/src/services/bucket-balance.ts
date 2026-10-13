@@ -1,5 +1,5 @@
-import { bucketCategories, bucketEvents, fundingRuns, transactionLines, transactions } from "@num/db";
-import { and, eq, isNull, lte, or, sql } from "drizzle-orm";
+import { bucketCategories, bucketEvents, buckets, fundingRuns, transactionLines, transactions } from "@num/db";
+import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import type { WriteTx } from "./write";
 
@@ -9,6 +9,7 @@ function add(balances: Map<string, number>, id: string, amount: number) {
   balances.set(id, (balances.get(id) ?? 0) + amount);
 }
 
+// Spec 5.8 and decision 0029: events count on all dates. Lines count only from the bucket's start date.
 export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
   const balances = new Map<string, number>();
   const events = db
@@ -48,7 +49,8 @@ export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
     .from(transactionLines)
     .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
     .innerJoin(bucketCategories, eq(transactionLines.categoryId, bucketCategories.categoryId))
-    .where(and(asOf ? lte(transactions.date, asOf) : undefined))
+    .innerJoin(buckets, eq(bucketCategories.bucketId, buckets.id))
+    .where(and(gte(transactions.date, buckets.startDate), asOf ? lte(transactions.date, asOf) : undefined))
     .groupBy(bucketCategories.bucketId)
     .all();
 
