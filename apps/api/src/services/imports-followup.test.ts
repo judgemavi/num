@@ -22,7 +22,7 @@ import { saveImportBatch } from "./import-save";
 import { undoImportBatch } from "./import-undo";
 import { importStatement, listImportBatches } from "./imports";
 import { createMerchant } from "./merchants";
-import { deleteTransaction } from "./transactions";
+import { createTransaction, deleteTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
 
@@ -270,7 +270,7 @@ test("a created row stores the normalized payee and the suggestion", () => {
     expect(txn?.payeeNormalized).toBe(normalizePayee("NORTH MARKET"));
     expect(txn?.merchantId).toBeNull();
     expect(txn?.autoReason).toBeNull();
-    expect(txn?.status).toBe("open");
+    expect(txn?.status).toBe("cleared");
     const audits = book.db
       .select()
       .from(auditLog)
@@ -300,6 +300,40 @@ test("unreadable rows are stored on the batch and listed", () => {
     const listed = listImportBatches(book.db, book.account.id).items[0];
     expect(listed?.counts.unreadable).toBe(1);
     expect(listed?.unreadable).toHaveLength(1);
+  } finally {
+    book.close();
+  }
+});
+
+test("an imported row is cleared, a match sets cleared, and undo restores the earlier status", () => {
+  const book = tempBook();
+  try {
+    createTransaction(book.db, {
+      accountId: book.account.id,
+      date: "2026-04-01",
+      amount: -1000,
+      payeeRaw: "RENT",
+      status: "open",
+      lines: [{ amount: -1000 }],
+      source: "ui",
+      at,
+    });
+    const result = importCsv(book.db, book.dir, book.account.id, "mix.csv", [
+      "04/02/2026,RENT PAYMENT,-10.00",
+      "01/09/2026,NEW SHOP,-2.00",
+    ]);
+    if (result.kind !== "batch") {
+      throw new Error("Import did not create a batch");
+    }
+    expect(result.counts.matched).toBe(1);
+    expect(result.counts.created).toBe(1);
+    const all = book.db.select().from(transactions).all();
+    expect(all.map((txn) => txn.status)).toEqual(["cleared", "cleared"]);
+    undoImportBatch(book.db, result.id, { source: "import", at: "2026-10-09T16:00:00Z" });
+    const after = book.db.select().from(transactions).all();
+    expect(after.length).toBe(1);
+    expect(after[0]?.status).toBe("open");
+    expect(after[0]?.importRowId).toBeNull();
   } finally {
     book.close();
   }

@@ -91,6 +91,7 @@ test("an import of older rows moves the effective opening date and checkpoint he
     if (!row) {
       throw new Error("Import did not create a transaction");
     }
+    book.db.update(transactions).set({ status: "open" }).where(eq(transactions.id, row.id)).run();
     const help = compareCheckpoint(book.db, account.id, { date: "2026-01-15", statementBalance: 0 });
     expect(help.help).toContainEqual({
       code: "uncleared",

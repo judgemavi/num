@@ -35,7 +35,9 @@ type SubmitInput = {
 
 export type SubmitResult =
   | { ok: true; id: string; skipped: number; applied: number }
-  | { ok: false; error: string };
+  | { ok: false; error: string; field?: "category" };
+
+export const CHOOSE_WHAT_ERROR = "Choose what this is: a category or a transfer.";
 
 function sameTags(a: string[], b: string[]): boolean {
   return a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
@@ -65,6 +67,11 @@ function unchanged(existing: Transaction, body: TransactionWrite): boolean {
       sameTags(line.tagIds, next.tagIds ?? [])
     );
   });
+}
+
+function uncategorized(existing: Transaction): boolean {
+  const [line] = existing.lines;
+  return existing.lines.length === 1 && line !== undefined && !line.categoryId && !line.transferAccountId;
 }
 
 function looksRight(id: string) {
@@ -119,6 +126,9 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
   const parsed = transactionWriteSchema.safeParse(body);
   if (!parsed.success) {
     return { ok: false, error: "Check the transaction fields." };
+  }
+  if (input.transaction && uncategorized(input.transaction) && unchanged(input.transaction, parsed.data)) {
+    return { ok: false, error: CHOOSE_WHAT_ERROR, field: "category" };
   }
   if (input.transaction?.autoReason) {
     const answered = await saveAsAnswer(input.transaction, parsed.data);

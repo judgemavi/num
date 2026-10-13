@@ -97,7 +97,7 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
         const current = tx.select().from(transactions).where(eq(transactions.id, row.transactionId)).get();
         if (current) {
           const before = readTransaction(tx, current.id);
-          tx.update(transactions).set({ importRowId: null }).where(eq(transactions.id, current.id)).run();
+          tx.update(transactions).set({ importRowId: null, status: row.previousStatus ?? current.status }).where(eq(transactions.id, current.id)).run();
           auditTransaction(tx, current.id, "update", before, readTransaction(tx, current.id));
         }
       }

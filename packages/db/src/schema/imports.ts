@@ -57,6 +57,7 @@ export const importRows = sqliteTable(
     outcome: text("outcome").notNull(),
     transactionId: text("transaction_id").references((): AnySQLiteColumn => transactions.id),
     active: integer("active", { mode: "boolean" }).notNull().default(true),
+    previousStatus: text("previous_status"),
   },
   (table) => [
     uniqueIndex("import_rows_batch_row_unique").on(table.batchId, table.rowIndex),

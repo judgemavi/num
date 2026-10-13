@@ -72,6 +72,7 @@ export function TransactionForm({
   const [more, setMore] = useState(false);
   const [touched, setTouched] = useState(alreadyChosen(transaction));
   const [error, setError] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const [undoError, setUndoError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -140,6 +141,7 @@ export function TransactionForm({
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setCategoryError(null);
     if (payee.trim().length === 0) {
       setError("Enter the bank text.");
       setMore(true);
@@ -183,6 +185,10 @@ export function TransactionForm({
     });
     setSaving(false);
     if (!result.ok) {
+      if (result.field === "category") {
+        setCategoryError(result.error);
+        return;
+      }
       setError(result.error);
       return;
     }
@@ -301,10 +307,12 @@ export function TransactionForm({
         categoryId={categoryId}
         onCategoryId={(id) => {
           setTouched(true);
+          setCategoryError(null);
           setCategoryId(id);
         }}
         categoryLocked={amountLocked}
         allowEmptyCategory
+        categoryError={categoryError}
         transferAccountId={transferAccountId}
         onTransferAccountId={(id) => {
           setTouched(true);

@@ -92,7 +92,7 @@ function insertCreated(
       notes: null,
       payeeRaw: payee.payeeRaw,
       payeeNormalized: payee.payeeNormalized,
-      status: "open",
+      status: "cleared",
       source: "import",
       importRowId: rowId,
       transferPeerId: null,
@@ -168,9 +168,10 @@ function insertMatched(tx: WriteTx, batchId: string, accountId: string, row: Pla
       outcome: "matched",
       transactionId: row.transactionId,
       active: true,
+      previousStatus: before.status,
     })
     .run();
-  tx.update(transactions).set({ importRowId: rowId, mirror: false }).where(eq(transactions.id, row.transactionId)).run();
+  tx.update(transactions).set({ importRowId: rowId, mirror: false, status: "cleared" }).where(eq(transactions.id, row.transactionId)).run();
   auditTransaction(tx, row.transactionId, "update", before, readTransaction(tx, row.transactionId));
 }
 

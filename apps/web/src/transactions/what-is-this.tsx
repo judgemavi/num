@@ -12,7 +12,7 @@ import {
 import { useRestoreNamed } from "@/editors/restore-named";
 import { InlineAccount, InlineCategory, InlineMerchant } from "@/editors/inline-records";
 import { ManagedPicker } from "@/editors/managed-picker";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ type WhatIsThisProps = {
   onCategoryId: (id: string | null) => void;
   categoryLocked: boolean;
   allowEmptyCategory: boolean;
+  categoryError?: string | null;
   transferAccountId: string | null;
   onTransferAccountId: (id: string | null) => void;
   transferLocked: boolean;
@@ -137,6 +138,7 @@ export function WhatIsThis({
   onCategoryId,
   categoryLocked,
   allowEmptyCategory,
+  categoryError = null,
   transferAccountId,
   onTransferAccountId,
   transferLocked,
@@ -249,6 +251,7 @@ export function WhatIsThis({
               <InlineCategory name={name} kind={categoryKind ?? "expense"} depth={depth + 1} onDone={finish} />
             )}
           />
+          {categoryError ? <FieldError>{categoryError}</FieldError> : null}
         </Field>
       ) : null}
       {choice === "transfer" ? (
