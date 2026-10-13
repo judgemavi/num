@@ -130,6 +130,7 @@ The app helps the user set it, always with one click and never without the user:
   Value = the first row's balance − the first row's amount, dated the day before the first row.
 - In reconcile (§7.5), when the account has no checkpoint and the balances are different:
   "Set the opening balance so this statement balances" (opening balance + the difference).
+- The app does not offer these two suggestions for a mortgage with terms. Its opening date is fixed (§5.2, decision 0027).
 
 ### 5.2 Mortgage terms
 
