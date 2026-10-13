@@ -179,7 +179,8 @@ Line fields:
 Rules:
 - The sum of the lines must be equal to the transaction amount.
 - A transaction has one or more lines.
-- A line without a category and without a transfer is **uncategorized**. It needs review (§7.3).
+- A line without a category and without a transfer is **uncategorized**. It needs review (§7.3), unless the user
+  kept it uncategorized (decision 0024).
 - **Transfers:**
   - A line with `transferAccountId` has a **mirror transaction** in the target account.
   - The mirror amount = −(line amount). The mirror date = the line's transaction date.
@@ -363,7 +364,7 @@ app records, so the same question does not come back:
 
 | Item | Answer that resolves it | Recorded "no" decision |
 |---|---|---|
-| Uncategorized | category, transfer or split | none (must be answered) |
+| Uncategorized | category, transfer or split | `keep_uncategorized` (Save with no category; decision 0024) |
 | Possible transfer | link | `not_transfer` |
 | Recurring amount changed | update the plan | `keep_plan_amount` |
 | Missed payment | link a transaction | `skipped` (+ reason, as a plan skip) |
