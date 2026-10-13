@@ -202,6 +202,8 @@ Rules:
   - If the source transaction has more than one line, the user cannot change the mirror amount.
     The user changes the amount on the source transaction.
 - The user and the API set `status` to `open` or `cleared`. Reconciled is calculated (§5.13).
+- An imported transaction is `cleared` (the bank shows it). An import row that is `matched` to a transaction sets that
+  transaction to `cleared`. Import undo sets a matched transaction back to its status before the import.
 - The user cannot add a transaction to an archived account, or move a transaction to an archived account.
 - A mortgage payment is one chequing transaction with two lines:
   - A transfer line for the principal. The target is the mortgage account.
