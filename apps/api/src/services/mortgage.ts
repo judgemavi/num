@@ -14,7 +14,6 @@ import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { balanceOf } from "./account-balance";
 import { ServiceError } from "../service-error";
-import { effectiveOpeningDate } from "./opening-date";
 import { termsSnapshot } from "./mortgage-terms";
 import type { WriteTx } from "./write";
 
@@ -27,6 +26,14 @@ function requireMortgage(db: Db | WriteTx, accountId: string) {
     throw new ServiceError("not_mortgage", 400);
   }
   return account;
+}
+
+/** A mortgage with terms always has a stored opening date (decision 0027). */
+function storedOpeningDate(account: { openingDate: string | null }): string {
+  if (account.openingDate === null) {
+    throw new Error("A mortgage with terms has no opening date");
+  }
+  return account.openingDate;
 }
 
 function activeValuations(db: Db | WriteTx, accountId: string): MortgageValuation[] {
@@ -71,7 +78,7 @@ export function mortgageAccountView(
 ): MortgageView {
   const account = requireMortgage(db, accountId);
   const terms = getMortgageTerms(db, accountId);
-  const loan = mortgageLoan(terms, { balance: account.openingBalance, date: effectiveOpeningDate(db, account) });
+  const loan = mortgageLoan(terms, { balance: account.openingBalance, date: storedOpeningDate(account) });
   const checkpoints = activeValuations(db, accountId);
   const schedule = mortgageSchedule(loan, checkpoints);
   const perPayment = options.extra ?? 0;
@@ -124,7 +131,7 @@ export function mortgagePrefill(db: Db, fromAccountId: string, toAccountId: stri
   }
   const split = mortgageSplitForDate({
     terms: termsSnapshot(row),
-    opening: { balance: account.openingBalance, date: effectiveOpeningDate(db, account) },
+    opening: { balance: account.openingBalance, date: storedOpeningDate(account) },
     valuations: activeValuations(db, targetId),
     date,
     fromAccountId,

@@ -39,6 +39,11 @@ export function draftFromTerms(currency: string, terms: MortgageTerms | null): M
   };
 }
 
+/** True when the first payment is on or before the opening date. The terms cannot be saved then. */
+export function firstPaymentNotAfterOpening(openingDate: string, draft: MortgageDraft): boolean {
+  return openingDate.length > 0 && draft.firstPaymentDate.length > 0 && draft.firstPaymentDate <= openingDate;
+}
+
 /** The terms are off while every field the user must fill is empty. */
 export function draftIsBlank(draft: MortgageDraft): boolean {
   return (

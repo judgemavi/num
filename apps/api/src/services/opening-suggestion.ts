@@ -2,6 +2,7 @@ import { checkpoints, importBatches } from "@num/db";
 import { openingFromFirstRow, reconcileOpening, type OpeningSuggestion } from "@num/shared";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
+import { hasTerms } from "./mortgage-terms";
 import { earliestTransactionDate, effectiveOpeningDate } from "./opening-date";
 import type { WriteTx } from "./write";
 
@@ -39,7 +40,7 @@ export function importOpeningSuggestion(
   accountId: string,
   firstRow: { date: string; amount: number; balance: number } | null,
 ): OpeningSuggestion | null {
-  if (!firstRow || hasActiveCheckpoint(db, accountId) || hadRunningBalanceImport(db, accountId)) {
+  if (!firstRow || hasTerms(db, accountId) || hasActiveCheckpoint(db, accountId) || hadRunningBalanceImport(db, accountId)) {
     return null;
   }
   return openingFromFirstRow(firstRow);
@@ -50,6 +51,9 @@ export function checkpointOpeningSuggestion(
   account: { id: string; openingBalance: number; openingDate: string | null },
   input: { calculatedBalance: number; statementBalance: number },
 ): OpeningSuggestion | null {
+  if (hasTerms(db, account.id)) {
+    return null;
+  }
   const first = earliestTransactionDate(db, account.id);
   return reconcileOpening({
     hasCheckpoint: hasActiveCheckpoint(db, account.id),

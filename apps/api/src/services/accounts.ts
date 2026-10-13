@@ -17,7 +17,7 @@ import { ServiceError } from "../service-error";
 import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
 import { assertCanArchive, assertSameClass, cardFields, interestRate, type CardFields } from "./account-rules";
 import { accountAuditSnapshot, readColumnMap } from "./account-snapshot";
-import { resolveTerms, saveTerms } from "./mortgage-terms";
+import { hasTerms, resolveTerms, saveTerms } from "./mortgage-terms";
 import { earliestTransactionDate, effectiveOpeningDate } from "./opening-date";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -185,7 +185,7 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
       before: null,
       after: accountAuditSnapshot(row),
     });
-    saveTerms(tx, id, row.openingDate, terms);
+    saveTerms(tx, id, { date: row.openingDate, balance: row.openingBalance }, terms);
   });
   return toAccount(db, row, row.openingBalance);
 }
@@ -225,7 +225,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
       before: accountAuditSnapshot(existing),
       after: accountAuditSnapshot({ ...existing, ...next }),
     });
-    saveTerms(tx, id, openingDate, terms);
+    saveTerms(tx, id, { date: openingDate, balance: next.openingBalance }, terms);
     updated = toAccount(
       tx,
       { ...existing, ...next },
@@ -246,6 +246,9 @@ export function applyOpeningSuggestion(
   const existing = db.select().from(accounts).where(eq(accounts.id, id)).get();
   if (!existing) {
     throw new ServiceError("account_not_found", 404);
+  }
+  if (hasTerms(db, id)) {
+    throw new ServiceError("opening_date_fixed", 400);
   }
   return updateAccount(db, id, {
     name: existing.name,

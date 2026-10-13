@@ -26,8 +26,15 @@
     {
       "idx": 3,
       "version": "6",
-      "when": 1791896485105,
-      "tag": "0003_wet_stranger",
+      "when": 1791896987418,
+      "tag": "0003_mortgage_opening_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791896990924,
+      "tag": "0004_remove_mortgage_principal",
       "breakpoints": true
     }
   ]

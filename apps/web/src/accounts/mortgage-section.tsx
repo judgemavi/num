@@ -2,11 +2,11 @@ import { mortgageFirstPaymentOffPeriod, type Account, type Category, type Compou
 import { ChevronRight } from "lucide-react";
 import { accountLabel } from "@/accounts/label";
 import { compoundingLabels, frequencyLabels } from "@/accounts/mortgage-format";
-import { draftIsBlank, type MortgageDraft } from "@/accounts/mortgage-draft";
+import { draftIsBlank, firstPaymentNotAfterOpening, type MortgageDraft } from "@/accounts/mortgage-draft";
 import { DateField } from "@/components/date-field";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InlineAccount, InlineCategory } from "@/editors/inline-records";
@@ -64,7 +64,9 @@ export function MortgageSection({ accountId, openingDate, draft, onChange, onCle
   const expense = categories.data.filter((category) => category.kind === "expense");
   const interest = expense.filter((category) => category.archivedAt === null || category.id === draft.interestCategoryId);
   const archivedInterest = expense.filter((category) => category.archivedAt !== null);
+  const beforeOpening = firstPaymentNotAfterOpening(openingDate, draft);
   const offPeriod =
+    !beforeOpening &&
     openingDate.length > 0 &&
     draft.firstPaymentDate.length > 0 &&
     mortgageFirstPaymentOffPeriod(openingDate, draft.firstPaymentDate, draft.frequency);
@@ -126,6 +128,7 @@ export function MortgageSection({ accountId, openingDate, draft, onChange, onCle
               <DateField id="mortgage-term-end" value={draft.termEnd} onChange={(value) => change({ termEnd: value })} />
             </Field>
           </div>
+          {beforeOpening ? <FieldError>The first payment must be after the opening date.</FieldError> : null}
           {offPeriod ? <p className="text-sm" role="status">{firstPaymentWarning}</p> : null}
           <Field>
             <FieldLabel htmlFor="mortgage-months">Months left on the amortization</FieldLabel>

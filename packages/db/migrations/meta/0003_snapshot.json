@@ -1,8 +1,8 @@
 {
+  "id": "abcc4faa-3dac-41bb-8920-47c7ea396440",
+  "prevId": "7dbb344a-dbe7-4a8f-89ce-66b69075f6e8",
   "version": "6",
   "dialect": "sqlite",
-  "id": "92a7021d-c4ca-49a4-bf99-60e32e34843c",
-  "prevId": "7dbb344a-dbe7-4a8f-89ce-66b69075f6e8",
   "tables": {
     "accounts": {
       "name": "accounts",
@@ -203,28 +203,28 @@
         "bucket_categories_category_id_categories_id_fk": {
           "name": "bucket_categories_category_id_categories_id_fk",
           "tableFrom": "bucket_categories",
-          "tableTo": "categories",
           "columnsFrom": [
             "category_id"
           ],
+          "tableTo": "categories",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "bucket_categories_bucket_id_buckets_id_fk": {
           "name": "bucket_categories_bucket_id_buckets_id_fk",
           "tableFrom": "bucket_categories",
-          "tableTo": "buckets",
           "columnsFrom": [
             "bucket_id"
           ],
+          "tableTo": "buckets",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -311,41 +311,41 @@
         "bucket_events_bucket_id_buckets_id_fk": {
           "name": "bucket_events_bucket_id_buckets_id_fk",
           "tableFrom": "bucket_events",
-          "tableTo": "buckets",
           "columnsFrom": [
             "bucket_id"
           ],
+          "tableTo": "buckets",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "bucket_events_other_bucket_id_buckets_id_fk": {
           "name": "bucket_events_other_bucket_id_buckets_id_fk",
           "tableFrom": "bucket_events",
-          "tableTo": "buckets",
           "columnsFrom": [
             "other_bucket_id"
           ],
+          "tableTo": "buckets",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "bucket_events_funding_run_id_funding_runs_id_fk": {
           "name": "bucket_events_funding_run_id_funding_runs_id_fk",
           "tableFrom": "bucket_events",
-          "tableTo": "funding_runs",
           "columnsFrom": [
             "funding_run_id"
           ],
+          "tableTo": "funding_runs",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -526,15 +526,15 @@
         "categories_group_id_category_groups_id_fk": {
           "name": "categories_group_id_category_groups_id_fk",
           "tableFrom": "categories",
-          "tableTo": "category_groups",
           "columnsFrom": [
             "group_id"
           ],
+          "tableTo": "category_groups",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -633,15 +633,15 @@
         "checkpoints_account_id_accounts_id_fk": {
           "name": "checkpoints_account_id_accounts_id_fk",
           "tableFrom": "checkpoints",
-          "tableTo": "accounts",
           "columnsFrom": [
             "account_id"
           ],
+          "tableTo": "accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -760,23 +760,23 @@
           "columns": [
             "income_transaction_id"
           ],
-          "isUnique": true,
-          "where": "\"funding_runs\".\"undone_at\" is null"
+          "where": "\"funding_runs\".\"undone_at\" is null",
+          "isUnique": true
         }
       },
       "foreignKeys": {
         "funding_runs_income_transaction_id_transactions_id_fk": {
           "name": "funding_runs_income_transaction_id_transactions_id_fk",
           "tableFrom": "funding_runs",
-          "tableTo": "transactions",
           "columnsFrom": [
             "income_transaction_id"
           ],
+          "tableTo": "transactions",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -870,28 +870,28 @@
         "import_batches_account_id_accounts_id_fk": {
           "name": "import_batches_account_id_accounts_id_fk",
           "tableFrom": "import_batches",
-          "tableTo": "accounts",
           "columnsFrom": [
             "account_id"
           ],
+          "tableTo": "accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "import_batches_document_id_documents_id_fk": {
           "name": "import_batches_document_id_documents_id_fk",
           "tableFrom": "import_batches",
-          "tableTo": "documents",
           "columnsFrom": [
             "document_id"
           ],
+          "tableTo": "documents",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1009,8 +1009,8 @@
             "account_id",
             "identity"
           ],
-          "isUnique": true,
-          "where": "\"import_rows\".\"active\" = 1 and \"import_rows\".\"outcome\" <> 'duplicate'"
+          "where": "\"import_rows\".\"active\" = 1 and \"import_rows\".\"outcome\" <> 'duplicate'",
+          "isUnique": true
         },
         "import_rows_batch": {
           "name": "import_rows_batch",
@@ -1024,41 +1024,41 @@
         "import_rows_batch_id_import_batches_id_fk": {
           "name": "import_rows_batch_id_import_batches_id_fk",
           "tableFrom": "import_rows",
-          "tableTo": "import_batches",
           "columnsFrom": [
             "batch_id"
           ],
+          "tableTo": "import_batches",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "import_rows_account_id_accounts_id_fk": {
           "name": "import_rows_account_id_accounts_id_fk",
           "tableFrom": "import_rows",
-          "tableTo": "accounts",
           "columnsFrom": [
             "account_id"
           ],
+          "tableTo": "accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "import_rows_transaction_id_transactions_id_fk": {
           "name": "import_rows_transaction_id_transactions_id_fk",
           "tableFrom": "import_rows",
-          "tableTo": "transactions",
           "columnsFrom": [
             "transaction_id"
           ],
+          "tableTo": "transactions",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1134,28 +1134,28 @@
         "line_tags_line_id_transaction_lines_id_fk": {
           "name": "line_tags_line_id_transaction_lines_id_fk",
           "tableFrom": "line_tags",
-          "tableTo": "transaction_lines",
           "columnsFrom": [
             "line_id"
           ],
+          "tableTo": "transaction_lines",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "line_tags_tag_id_tags_id_fk": {
           "name": "line_tags_tag_id_tags_id_fk",
           "tableFrom": "line_tags",
-          "tableTo": "tags",
           "columnsFrom": [
             "tag_id"
           ],
+          "tableTo": "tags",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1215,15 +1215,15 @@
         "merchants_default_category_id_categories_id_fk": {
           "name": "merchants_default_category_id_categories_id_fk",
           "tableFrom": "merchants",
-          "tableTo": "categories",
           "columnsFrom": [
             "default_category_id"
           ],
+          "tableTo": "categories",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1261,6 +1261,20 @@
           "name": "account_id",
           "type": "text",
           "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "principal": {
+          "name": "principal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "principal_as_of": {
+          "name": "principal_as_of",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -1340,54 +1354,54 @@
         "mortgage_terms_account_id_accounts_id_fk": {
           "name": "mortgage_terms_account_id_accounts_id_fk",
           "tableFrom": "mortgage_terms",
-          "tableTo": "accounts",
           "columnsFrom": [
             "account_id"
           ],
+          "tableTo": "accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "mortgage_terms_payment_account_id_accounts_id_fk": {
           "name": "mortgage_terms_payment_account_id_accounts_id_fk",
           "tableFrom": "mortgage_terms",
-          "tableTo": "accounts",
           "columnsFrom": [
             "payment_account_id"
           ],
+          "tableTo": "accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "mortgage_terms_interest_category_id_categories_id_fk": {
           "name": "mortgage_terms_interest_category_id_categories_id_fk",
           "tableFrom": "mortgage_terms",
-          "tableTo": "categories",
           "columnsFrom": [
             "interest_category_id"
           ],
+          "tableTo": "categories",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "mortgage_terms_property_account_id_accounts_id_fk": {
           "name": "mortgage_terms_property_account_id_accounts_id_fk",
           "tableFrom": "mortgage_terms",
-          "tableTo": "accounts",
           "columnsFrom": [
             "property_account_id"
           ],
+          "tableTo": "accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1461,28 +1475,28 @@
         "occurrence_links_plan_id_recurring_plans_id_fk": {
           "name": "occurrence_links_plan_id_recurring_plans_id_fk",
           "tableFrom": "occurrence_links",
-          "tableTo": "recurring_plans",
           "columnsFrom": [
             "plan_id"
           ],
+          "tableTo": "recurring_plans",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "occurrence_links_transaction_id_transactions_id_fk": {
           "name": "occurrence_links_transaction_id_transactions_id_fk",
           "tableFrom": "occurrence_links",
-          "tableTo": "transactions",
           "columnsFrom": [
             "transaction_id"
           ],
+          "tableTo": "transactions",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1631,54 +1645,54 @@
         "recurring_plans_account_id_accounts_id_fk": {
           "name": "recurring_plans_account_id_accounts_id_fk",
           "tableFrom": "recurring_plans",
-          "tableTo": "accounts",
           "columnsFrom": [
             "account_id"
           ],
+          "tableTo": "accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "recurring_plans_category_id_categories_id_fk": {
           "name": "recurring_plans_category_id_categories_id_fk",
           "tableFrom": "recurring_plans",
-          "tableTo": "categories",
           "columnsFrom": [
             "category_id"
           ],
+          "tableTo": "categories",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "recurring_plans_transfer_account_id_accounts_id_fk": {
           "name": "recurring_plans_transfer_account_id_accounts_id_fk",
           "tableFrom": "recurring_plans",
-          "tableTo": "accounts",
           "columnsFrom": [
             "transfer_account_id"
           ],
+          "tableTo": "accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "recurring_plans_merchant_id_merchants_id_fk": {
           "name": "recurring_plans_merchant_id_merchants_id_fk",
           "tableFrom": "recurring_plans",
-          "tableTo": "merchants",
           "columnsFrom": [
             "merchant_id"
           ],
+          "tableTo": "merchants",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1814,57 +1828,57 @@
           "columns": [
             "transaction_id"
           ],
-          "isUnique": false,
-          "where": "\"transaction_lines\".\"category_id\" is null and \"transaction_lines\".\"transfer_account_id\" is null"
+          "where": "\"transaction_lines\".\"category_id\" is null and \"transaction_lines\".\"transfer_account_id\" is null",
+          "isUnique": false
         },
         "transaction_lines_one_transfer": {
           "name": "transaction_lines_one_transfer",
           "columns": [
             "transaction_id"
           ],
-          "isUnique": true,
-          "where": "\"transaction_lines\".\"transfer_account_id\" is not null"
+          "where": "\"transaction_lines\".\"transfer_account_id\" is not null",
+          "isUnique": true
         }
       },
       "foreignKeys": {
         "transaction_lines_transaction_id_transactions_id_fk": {
           "name": "transaction_lines_transaction_id_transactions_id_fk",
           "tableFrom": "transaction_lines",
-          "tableTo": "transactions",
           "columnsFrom": [
             "transaction_id"
           ],
+          "tableTo": "transactions",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "transaction_lines_category_id_categories_id_fk": {
           "name": "transaction_lines_category_id_categories_id_fk",
           "tableFrom": "transaction_lines",
-          "tableTo": "categories",
           "columnsFrom": [
             "category_id"
           ],
+          "tableTo": "categories",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "transaction_lines_transfer_account_id_accounts_id_fk": {
           "name": "transaction_lines_transfer_account_id_accounts_id_fk",
           "tableFrom": "transaction_lines",
-          "tableTo": "accounts",
           "columnsFrom": [
             "transfer_account_id"
           ],
+          "tableTo": "accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2065,67 +2079,67 @@
         "transactions_account_id_accounts_id_fk": {
           "name": "transactions_account_id_accounts_id_fk",
           "tableFrom": "transactions",
-          "tableTo": "accounts",
           "columnsFrom": [
             "account_id"
           ],
+          "tableTo": "accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "transactions_merchant_id_merchants_id_fk": {
           "name": "transactions_merchant_id_merchants_id_fk",
           "tableFrom": "transactions",
-          "tableTo": "merchants",
           "columnsFrom": [
             "merchant_id"
           ],
+          "tableTo": "merchants",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "transactions_import_row_id_import_rows_id_fk": {
           "name": "transactions_import_row_id_import_rows_id_fk",
           "tableFrom": "transactions",
-          "tableTo": "import_rows",
           "columnsFrom": [
             "import_row_id"
           ],
+          "tableTo": "import_rows",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "transactions_transfer_peer_id_transactions_id_fk": {
           "name": "transactions_transfer_peer_id_transactions_id_fk",
           "tableFrom": "transactions",
-          "tableTo": "transactions",
           "columnsFrom": [
             "transfer_peer_id"
           ],
+          "tableTo": "transactions",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "transactions_refund_of_id_transactions_id_fk": {
           "name": "transactions_refund_of_id_transactions_id_fk",
           "tableFrom": "transactions",
-          "tableTo": "transactions",
           "columnsFrom": [
             "refund_of_id"
           ],
+          "tableTo": "transactions",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2192,28 +2206,28 @@
         "valuations_account_id_accounts_id_fk": {
           "name": "valuations_account_id_accounts_id_fk",
           "tableFrom": "valuations",
-          "tableTo": "accounts",
           "columnsFrom": [
             "account_id"
           ],
+          "tableTo": "accounts",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "valuations_document_id_documents_id_fk": {
           "name": "valuations_document_id_documents_id_fk",
           "tableFrom": "valuations",
-          "tableTo": "documents",
           "columnsFrom": [
             "document_id"
           ],
+          "tableTo": "documents",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2224,9 +2238,9 @@
   "views": {},
   "enums": {},
   "_meta": {
+    "columns": {},
     "schemas": {},
-    "tables": {},
-    "columns": {}
+    "tables": {}
   },
   "internal": {
     "indexes": {

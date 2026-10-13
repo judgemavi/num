@@ -80,6 +80,18 @@ export function accountError(code: string): string {
       return "Check the card fields.";
     case "interest_rate_invalid":
       return "This kind of account does not use an interest rate.";
+    case "mortgage_terms_invalid":
+      return "The first payment must be after the opening date. The term must end on or after the first payment.";
+    case "payment_account_invalid":
+      return "Choose an open account to pay from.";
+    case "interest_category_invalid":
+      return "Choose an expense category for the interest.";
+    case "property_account_invalid":
+      return "Choose a property account, or leave the property empty.";
+    case "opening_balance_required":
+      return "Enter the amount owed on the opening date.";
+    case "opening_date_fixed":
+      return "This mortgage has a fixed opening date. Change it in the account.";
     case "account_not_found":
       return "That account is not in the book.";
     case "account_archived":

@@ -65,8 +65,11 @@ export function resolveTerms(
   return existing ? termsValues(accountId, termsSnapshot(existing)) : null;
 }
 
-function assertTerms(db: Reader, accountId: string, openingDate: string, input: MortgageTermsWrite) {
-  if (input.firstPaymentDate < openingDate || input.termEnd < input.firstPaymentDate) {
+function assertTerms(db: Reader, accountId: string, opening: { date: string; balance: number }, input: MortgageTermsWrite) {
+  if (opening.balance === 0) {
+    throw new ServiceError("opening_balance_required", 400);
+  }
+  if (input.firstPaymentDate <= opening.date || input.termEnd < input.firstPaymentDate) {
     throw new ServiceError("mortgage_terms_invalid", 400);
   }
   const payment = db.select().from(accounts).where(eq(accounts.id, input.paymentAccountId)).get();
@@ -87,7 +90,12 @@ function assertTerms(db: Reader, accountId: string, openingDate: string, input: 
 }
 
 /** Writes the terms in the transaction of the account write. The account row must exist. */
-export function saveTerms(tx: WriteTx, accountId: string, openingDate: string | null, input: MortgageTermsWrite | null): void {
+export function saveTerms(
+  tx: WriteTx,
+  accountId: string,
+  opening: { date: string | null; balance: number },
+  input: MortgageTermsWrite | null,
+): void {
   const existing = readTerms(tx, accountId);
   if (input === null) {
     if (existing) {
@@ -96,10 +104,10 @@ export function saveTerms(tx: WriteTx, accountId: string, openingDate: string | 
     }
     return;
   }
-  if (openingDate === null) {
+  if (opening.date === null) {
     throw new ServiceError("mortgage_terms_invalid", 400);
   }
-  assertTerms(tx, accountId, openingDate, input);
+  assertTerms(tx, accountId, { date: opening.date, balance: opening.balance }, input);
   const values = termsValues(accountId, input);
   if (existing && JSON.stringify(termsSnapshot(existing)) === JSON.stringify(values)) {
     return;
@@ -116,4 +124,8 @@ export function saveTerms(tx: WriteTx, accountId: string, openingDate: string | 
     before: existing ? termsSnapshot(existing) : null,
     after: values,
   });
+}
+
+export function hasTerms(db: Reader, accountId: string): boolean {
+  return readTerms(db, accountId) !== undefined;
 }

@@ -6,9 +6,10 @@ import type { MortgageTermsWrite } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb } from "../db";
-import { createAccount, getAccount, updateAccount } from "./accounts";
+import { applyOpeningSuggestion, createAccount, getAccount, updateAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { mortgageAccountView } from "./mortgage";
+import { checkpointOpeningSuggestion, importOpeningSuggestion } from "./opening-suggestion";
 
 const at = "2026-10-08T16:00:00.000Z";
 const saved = { source: "ui" as const, at };
@@ -122,6 +123,37 @@ test("terms with a first payment before the opening date are not saved", () => {
       updateAccount(sample.db, mortgage.id, mortgageFields(-10_000_000, { ...sample.terms, firstPaymentDate: "2026-01-15" })),
     ).toThrow();
     expect(sample.db.select().from(mortgageTerms).all()).toHaveLength(0);
+  } finally {
+    sample.close();
+  }
+});
+
+test("terms need an amount owed and a first payment after the opening date", () => {
+  const sample = book();
+  try {
+    const mortgage = createAccount(sample.db, { name: "Home loan", kind: "mortgage", openingBalance: -10_000_000, ...saved });
+    expect(() => updateAccount(sample.db, mortgage.id, mortgageFields(0, sample.terms))).toThrow();
+    expect(() =>
+      updateAccount(sample.db, mortgage.id, mortgageFields(-10_000_000, { ...sample.terms, firstPaymentDate: "2026-02-01" })),
+    ).toThrow();
+    expect(sample.db.select().from(mortgageTerms).all()).toHaveLength(0);
+  } finally {
+    sample.close();
+  }
+});
+
+test("a mortgage with terms gets no opening balance suggestion, and the apply is refused", () => {
+  const sample = book();
+  try {
+    const mortgage = createAccount(sample.db, { ...mortgageFields(-10_000_000, sample.terms), onBudget: undefined });
+    const row = { date: "2026-04-02", amount: -500, balance: -9_000_000 };
+    expect(importOpeningSuggestion(sample.db, mortgage.id, row)).toBeNull();
+    const input = { calculatedBalance: -10_000_000, statementBalance: -9_000_000 };
+    expect(checkpointOpeningSuggestion(sample.db, mortgage, input)).toBeNull();
+    expect(() => applyOpeningSuggestion(sample.db, mortgage.id, { amount: -9_000_000, date: "2026-04-01", ...saved })).toThrow();
+    expect(getAccount(sample.db, mortgage.id).openingDate).toBe("2026-02-01");
+    const plain = createAccount(sample.db, { name: "Plain", kind: "mortgage", openingBalance: -10_000_000, ...saved });
+    expect(importOpeningSuggestion(sample.db, plain.id, row)).not.toBeNull();
   } finally {
     sample.close();
   }

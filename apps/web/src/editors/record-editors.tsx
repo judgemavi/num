@@ -75,7 +75,7 @@ export function AccountRecord({ props, onClose, onSaved }: { props: EditorInput[
     return <LoadingLine label="Loading the account." />;
   }
   if (currency.isError || account.isError || terms.isError) {
-    return <LoadError label="The account did not load." onRetry={() => void account.refetch()} />;
+    return <LoadError label="The account did not load." onRetry={() => void Promise.all([account.refetch(), terms.refetch()])} />;
   }
   return (
     <AccountForm

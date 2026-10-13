@@ -25,6 +25,8 @@ export const errorCodes = [
   "payment_account_invalid",
   "interest_category_invalid",
   "property_account_invalid",
+  "opening_balance_required",
+  "opening_date_fixed",
   "category_not_found",
   "category_archived",
   "category_not_archived",

@@ -20,7 +20,7 @@ import {
 } from "@num/shared";
 import { useState, type ReactNode } from "react";
 import { accountError, policyLabel } from "@/accounts/format";
-import { draftFromTerms, draftIsBlank, termsFromDraft, type MortgageDraft } from "@/accounts/mortgage-draft";
+import { draftFromTerms, draftIsBlank, firstPaymentNotAfterOpening, termsFromDraft, type MortgageDraft } from "@/accounts/mortgage-draft";
 import { MortgageSection, openingDateHelp } from "@/accounts/mortgage-section";
 import { KindPicker } from "@/accounts/kind-picker";
 import { sameClassKinds } from "@/accounts/groups";
@@ -107,7 +107,8 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const liability = accountClass(kind) === "liability";
-  const termsOn = kind === "mortgage" && !draftIsBlank(mortgage);
+  const hasSection = kind === "mortgage" && !inline;
+  const termsOn = hasSection && !draftIsBlank(mortgage);
   const allowed = account ? sameClassKinds(account.kind) : accountKinds;
 
   function changeOpeningDate(value: string) {
@@ -147,6 +148,14 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
         setError("Enter the date, or use the automatic date.");
         return;
       }
+      if (termsOn && firstPaymentNotAfterOpening(openingDate, mortgage)) {
+        setError("The first payment must be after the opening date.");
+        return;
+      }
+      if (termsOn && (openingBalance.trim().length === 0 || readAmount(currency, openingBalance, "the amount owed") === 0)) {
+        setError("Enter the amount owed on the opening date.");
+        return;
+      }
       const card =
         kind === "credit_card"
           ? {
@@ -173,7 +182,7 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
             }),
         interestRateMilliPct: allowsInterestRate(kind) ? readInterest(interestRate) : null,
         ...card,
-        ...(kind === "mortgage" ? { mortgageTerms: termsFromDraft(currency, mortgage) } : {}),
+        ...(hasSection ? { mortgageTerms: termsFromDraft(currency, mortgage) } : {}),
       };
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Check the account fields.");
@@ -256,7 +265,7 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
         <p className="text-sm text-muted-foreground" style={{ marginTop: 0 }}>
           Leave the balance blank to start at 0. Num counts forward from this date.
         </p>
-        {kind === "mortgage" ? (
+        {hasSection ? (
           <MortgageSection
             accountId={account?.id ?? null}
             openingDate={openingDate}
