@@ -124,18 +124,38 @@ function stripPlace(value: string): string {
 }
 
 /** A store code (W535) after the first word ends the name. The city after it goes too. */
-function stripStoreCode(value: string): string {
+function cutAtStoreCode(words: string[], numberIsCode: boolean): string[] | null {
+  const index = words.findIndex(
+    (word, position) => position >= 1 && (isReferenceCode(word) || (numberIsCode && /^\d{3,}$/.test(word))),
+  );
+  return index < 0 ? null : words.slice(0, index);
+}
+
+/** The bank format is "<name> <city>, <region>". Drop the city when a real word stays. */
+function cutCity(words: string[]): string[] {
+  const rest = words.slice(0, -1);
+  return rest.length > 0 && hasRealWord(rest.join(" ")) ? rest : words;
+}
+
+/** A bare number is a store code only when a region follows the place. */
+function stripLocation(value: string, hasRegion: boolean, cityBeforeRegion: boolean): string {
   const words = value.split(" ").filter((word) => word.length > 0);
-  const index = words.findIndex((word, position) => position >= 1 && isReferenceCode(word));
-  return index < 0 ? words.join(" ") : words.slice(0, index).join(" ");
+  const cut = cutAtStoreCode(words, hasRegion);
+  if (cut) {
+    return cut.join(" ");
+  }
+  return (cityBeforeRegion ? cutCity(words) : words).join(" ");
 }
 
 function tidy(value: string): string {
   return value.replace(/\s+/g, " ").trim().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
 }
 
-function finish(value: string): string {
-  return tidy(stripTrailingCodes(stripStoreCode(stripPlace(stripNoise(value)))));
+function finish(value: string, cityBeforeRegion = false): string {
+  const clean = stripNoise(value);
+  const words = clean.split(" ");
+  const hasRegion = words.length > 1 && REGIONS.has(words[words.length - 1] ?? "");
+  return tidy(stripTrailingCodes(stripLocation(stripPlace(clean), hasRegion, cityBeforeRegion)));
 }
 
 export function storedPayee(payeeRaw: string): { payeeRaw: string; payeeNormalized: string } {
@@ -144,8 +164,11 @@ export function storedPayee(payeeRaw: string): { payeeRaw: string; payeeNormaliz
 
 /** Normalized payee for rules, history and merchant defaults (spec §7.3). */
 export function normalizePayee(description: string): string {
-  const upper = description.toUpperCase().replace(/[,'"`()]+/g, " ").replace(/\s+/g, " ").trim();
-  return finish(stripPrefixes(upper));
+  const upper = description.toUpperCase().replace(/\s+/g, " ").trim();
+  const region = /,\s*([A-Z]{2,3})$/.exec(upper)?.[1];
+  const cityBeforeRegion = region !== undefined && REGIONS.has(region);
+  const plain = upper.replace(/[,'"`()]+/g, " ").replace(/\s+/g, " ").trim();
+  return finish(stripPrefixes(plain), cityBeforeRegion);
 }
 
 function titleWord(word: string): string {
