@@ -171,7 +171,10 @@ Order, top to bottom:
    - Money out: Spending · Transfer · Split. Money in: Income · Refund · Transfer · Split.
    - Spending / Refund: expense categories only. Income: income categories only.
    - Transfer: "To account" / "From account" Combobox (link an existing match or create the mirror). No merchant.
-   - Split: line rows (direction, amount, then category or account) and a live "$X left to assign". Save is disabled until it is 0.
+   - Split (decision 0025): line rows ("Category or account" picker, amount, remove). Lines take the transaction's
+     direction; a line menu has "Money in on this line". A new line starts with what is left; with two lines, one amount
+     sets the other. Under the lines: "+ Add a line" and "All assigned" or "$X left" with "Put it on the last line".
+     Save is disabled until nothing is left.
 4. **Merchant** Combobox, with the suggestion and its reason. Hidden for Transfer.
 6. **More details** (Collapsible, closed): notes, tags, bank text, "Cleared" checkbox. No "status" word in the UI.
 7. Footer: Save (primary). Delete goes in a More menu (shared confirm).

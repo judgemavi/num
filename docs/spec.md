@@ -536,6 +536,8 @@ Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default,
 - When a transaction becomes a transfer or a split, the automatic fields are cleared.
 - Transfers are never automatic (evidence only preselects Transfer). Splits are never automatic, except the mortgage split
   of a recurring mortgage item (§5.2, the user created the item).
+- A confirmed mortgage payment teaches its payee. The other transactions of that payee get the suggestion
+  "Mortgage payment" (Likely); Yes and Approve all apply the split from the terms (decision 0025).
 
 **What is this?** The choices follow the direction of the money (decision 0014):
 - Money out: **Spending** (default) · Transfer · Split.
