@@ -66,9 +66,9 @@ function isReferenceCode(token: string): boolean {
   return token.length >= 3 && /^[\p{L}\p{N}]+$/u.test(token) && /\p{L}/u.test(token) && /\p{N}/u.test(token);
 }
 
-/** * or XX at the start hides the rest of the token. Drop the whole token. */
+/** Two or more * , or * with a digit, or XX at the start hides the token. One * before a word is a separator. */
 function isMaskedToken(token: string): boolean {
-  return /^\*/.test(token) || /^X{2,}/.test(token) || /^X+\*/.test(token);
+  return /^\*{2,}/.test(token) || /^\*.*\d/.test(token) || /^X{2,}/.test(token) || /^X+\*/.test(token);
 }
 
 function isStoreNumber(token: string): boolean {
@@ -123,12 +123,19 @@ function stripPlace(value: string): string {
   return words.join(" ");
 }
 
+/** A store code (W535) after the first word ends the name. The city after it goes too. */
+function stripStoreCode(value: string): string {
+  const words = value.split(" ").filter((word) => word.length > 0);
+  const index = words.findIndex((word, position) => position >= 1 && isReferenceCode(word));
+  return index < 0 ? words.join(" ") : words.slice(0, index).join(" ");
+}
+
 function tidy(value: string): string {
   return value.replace(/\s+/g, " ").trim().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
 }
 
 function finish(value: string): string {
-  return tidy(stripTrailingCodes(stripPlace(stripNoise(value))));
+  return tidy(stripTrailingCodes(stripStoreCode(stripPlace(stripNoise(value)))));
 }
 
 export function storedPayee(payeeRaw: string): { payeeRaw: string; payeeNormalized: string } {
