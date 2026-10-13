@@ -40,6 +40,33 @@ export function accountClass(kind: AccountKind): AccountClass {
   return liabilityKinds.has(kind) ? "liability" : "asset";
 }
 
+/** The form shows a liability as a positive amount owed. The book stores it as a negative balance. */
+export function balanceFromEntry(kind: AccountKind, entered: number): number {
+  return accountClass(kind) === "liability" && entered !== 0 ? -entered : entered;
+}
+
+export function entryFromBalance(kind: AccountKind, balance: number): number {
+  return balanceFromEntry(kind, balance);
+}
+
+/** Assets add to "have". A liability in debt adds to "owe". A liability in credit adds to "have". */
+export function netWorthOf(accounts: readonly { kind: AccountKind; balance: number }[]): {
+  have: number;
+  owe: number;
+  net: number;
+} {
+  let have = 0;
+  let owe = 0;
+  for (const account of accounts) {
+    if (accountClass(account.kind) === "liability" && account.balance < 0) {
+      owe += -account.balance;
+    } else {
+      have += account.balance;
+    }
+  }
+  return { have, owe, net: have - owe };
+}
+
 export function defaultOnBudget(kind: AccountKind): boolean {
   return budgetKinds.has(kind);
 }
@@ -56,7 +83,9 @@ const accountFields = {
   institution: z.string().trim().min(1).nullable().optional(),
   kind: z.enum(accountKinds),
   openingDate: isoDateSchema.nullable().optional(),
-  openingBalance: centsSchema.optional(),
+  openingBalance: centsSchema
+    .optional()
+    .meta({ money: true, description: "Signed. A liability that is owed has a negative opening balance." }),
   paymentPolicy: z.enum(paymentPolicies).nullable().optional(),
   fixedPayment: nonNegativeCentsSchema.nullable().optional(),
   interestRateMilliPct: interestRateMilliPctSchema.nullable().optional(),

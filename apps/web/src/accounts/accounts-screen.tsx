@@ -1,4 +1,4 @@
-import { accountClass, accountListSchema, accountSchema, currencyUpdateSchema, type Account } from "@num/shared";
+import { accountClass, netWorthOf, accountListSchema, accountSchema, currencyUpdateSchema, type Account } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Upload } from "lucide-react";
@@ -7,7 +7,7 @@ import { useEditors } from "@/editors/editor-api";
 import { AccountIcon } from "@/accounts/account-icon";
 import { accountCountLabel, accountDetail, accountError, formatBalance, formatMoney, kindLabel } from "@/accounts/format";
 import { accountLabel } from "@/accounts/label";
-import { groupAccounts, groupHue, groupLabel, worthOf } from "@/accounts/groups";
+import { groupAccounts, groupHue, groupLabel } from "@/accounts/groups";
 import { loadAllPages } from "@/settings/load-all-pages";
 import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
@@ -100,7 +100,7 @@ export function AccountsScreen() {
   const bookCurrency = currency.data;
   const rows = accounts.data?.items ?? [];
   const groups = groupAccounts(rows);
-  const worth = worthOf(rows);
+  const worth = netWorthOf(rows);
   const cards = rows.filter((account) => account.kind === "credit_card");
 
   return (
@@ -139,7 +139,7 @@ export function AccountsScreen() {
       <SummaryStrip
         tint="accounts"
         label={search.archived ? "Archived balances" : "Net worth"}
-        amount={<Amount currency={bookCurrency} minor={worth.total} owed hero />}
+        amount={<Amount currency={bookCurrency} minor={worth.net} owed hero />}
         hint={search.archived ? "These accounts are not in the active list." : "What you have, minus what you owe."}
         facts={
           <>

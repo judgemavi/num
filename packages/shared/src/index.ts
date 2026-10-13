@@ -1,5 +1,8 @@
 export {
   accountClass,
+  balanceFromEntry,
+  entryFromBalance,
+  netWorthOf,
   accountClasses,
   accountCreateSchema,
   accountKinds,

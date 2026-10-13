@@ -53,18 +53,3 @@ export function groupAccounts(accounts: Account[]): { id: AccountGroupId; items:
     })
     .filter((group) => group.items.length > 0);
 }
-
-export function worthOf(accounts: Account[]): { have: number; owe: number; total: number } {
-  let assets = 0;
-  let liabilities = 0;
-  for (const account of accounts) {
-    if (accountClass(account.kind) === "liability") {
-      liabilities += account.balance;
-    } else {
-      assets += account.balance;
-    }
-  }
-  const have = assets + (liabilities > 0 ? liabilities : 0);
-  const owe = liabilities < 0 ? -liabilities : 0;
-  return { have, owe, total: assets + liabilities };
-}

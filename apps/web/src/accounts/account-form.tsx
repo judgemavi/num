@@ -5,6 +5,8 @@ import {
   accountSchema,
   accountUpdateSchema,
   allowsInterestRate,
+  balanceFromEntry,
+  entryFromBalance,
   defaultOnBudget,
   fromMinorUnits,
   milliPctToPercent,
@@ -86,7 +88,7 @@ export function AccountForm({ currency, account, initialName, inline = false, be
   const automaticDate = account?.automaticOpeningDate ?? localToday();
   const [automatic, setAutomatic] = useState(account ? account.openingAutomatic : true);
   const [openingDate, setOpeningDate] = useState(account?.openingDate ?? automaticDate);
-  const [openingBalance, setOpeningBalance] = useState(account ? fromMinorUnits(currency, account.openingBalance) : "");
+  const [openingBalance, setOpeningBalance] = useState(account ? fromMinorUnits(currency, entryFromBalance(account.kind, account.openingBalance)) : "");
   const [paymentPolicy, setPaymentPolicy] = useState<PaymentPolicy | null>(account?.paymentPolicy ?? null);
   const [fixedPayment, setFixedPayment] = useState(
     account?.fixedPayment === null || account?.fixedPayment === undefined ? "" : fromMinorUnits(currency, account.fixedPayment),
@@ -156,7 +158,12 @@ export function AccountForm({ currency, account, initialName, inline = false, be
         openingDate: automatic ? null : openingDate,
         ...(openingBalance.trim().length === 0
           ? {}
-          : { openingBalance: readAmount(currency, openingBalance, liability ? "the amount you owed" : "the balance") }),
+          : {
+              openingBalance: balanceFromEntry(
+                kind,
+                readAmount(currency, openingBalance, liability ? "the amount owed" : "the balance"),
+              ),
+            }),
         interestRateMilliPct: allowsInterestRate(kind) ? readInterest(interestRate) : null,
         ...card,
       };
@@ -210,7 +217,7 @@ export function AccountForm({ currency, account, initialName, inline = false, be
         <KindPicker kind={kind} allowed={allowed} onChange={changeKind} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="opening-balance">{liability ? "Amount you owed" : "Balance"}</FieldLabel>
+            <FieldLabel htmlFor="opening-balance">{liability ? "Amount owed" : "Balance"}</FieldLabel>
             <Input
               id="opening-balance"
               inputMode="decimal"
