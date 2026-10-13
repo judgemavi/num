@@ -498,6 +498,7 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
 | Learned payee + amount (the normalized payee and the same amount, ±1%) | learned formula |
 | Learned payee | learned formula × 0.95 |
 | Similar payee (decision 0026): a learned payee is contained, from the first word, in the new payee | that payee's learned confidence × 0.9, never automatic |
+| Brand family (decision 0026): 2 or more learned payees with the same first word all have the same label | lowest of their learned confidences × 0.85, never automatic |
 | Merchant default category | 0.60 |
 
 Learned formula: confidence = agreement × certainty.
@@ -522,7 +523,7 @@ Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default,
 - **Sure:** automatic. **Likely:** a suggestion with confidence ≥ 0.75. **Maybe:** a suggestion below 0.75.
   No level: no suggestion.
 - Reasons: "Matches your Rent payment" (recurring), "You chose this N times for this payee" (learned),
-  "Same as <learned payee>" (similar), "This merchant's usual category" (merchant default).
+  "Same as <learned payee>" (similar), "Same as other <first word> payees" (family), "This merchant's usual category" (merchant default).
 - Settings → Matching shows `autoConfidence` as "Label for me: only when very sure (careful) · when sure (balanced) ·
   more often (eager)".
 
