@@ -270,6 +270,8 @@ Fields:
 - `name`, `kind` (`spending | sinking | goal`), `priority`, `essential` (boolean), `archivedAt?`
 - `color` (`sky | mint | lilac | butter | pink | teal`) and `icon` (a name from a fixed icon set). Decision 0009.
 - `categoryIds[]`: each expense category is in a maximum of one bucket.
+- `startDate`: the first date of the lines that the bucket counts. A new bucket uses `asOf`. The user can change it
+  (audited). Decision 0029.
 
 Settings for each kind:
 - `spending`: `refillTo`. Each month, funding brings the balance up to this amount.
@@ -288,6 +290,7 @@ Bucket events (append only):
 - To archive a bucket, its balance must be 0. Archive removes its category mappings (audited).
 
 Bucket balance = funds + moves in − moves out − releases + the sum of the lines in the bucket's categories.
+Count only the lines of transactions with a date on or after `startDate`. Count events on all dates.
 Do not count events with `undoneAt`. Do not count events of a funding run with `undoneAt`.
 Spending lines are negative. Refund lines are positive.
 The balance carries over. There is no reset at the end of a cycle.
