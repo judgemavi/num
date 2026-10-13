@@ -2,7 +2,7 @@ import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { interestRateMilliPctSchema } from "./rate";
-import { nonNegativeCentsSchema as cents } from "./money";
+import { centsSchema, nonNegativeCentsSchema as cents } from "./money";
 
 export const compounding = ["monthly", "semiannual"] as const;
 export const paymentFrequencies = ["weekly", "biweekly", "semimonthly", "monthly"] as const;
@@ -302,7 +302,7 @@ export const mortgagePaymentSchema = z.object({
 });
 
 export const mortgageViewSchema = z.object({
-  balance: cents,
+  balance: centsSchema,
   rateMilliPct: interestRateMilliPctSchema,
   payoffDate: isoDateSchema.nullable(),
   nonAmortizing: z.boolean(),

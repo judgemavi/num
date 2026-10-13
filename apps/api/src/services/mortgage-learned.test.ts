@@ -2,13 +2,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrateDatabase, openDatabase, settings, valuations } from "@num/db";
-import { mortgageSplitForDate } from "@num/shared";
+import { mortgageSplitForDate, mortgageViewSchema } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { applyInboxGroup } from "./inbox-group";
-import { saveMortgageTerms } from "./mortgage";
+import { mortgageAccountView, saveMortgageTerms } from "./mortgage";
 import { suggestForPayee } from "./suggestions";
 import { listNeedsReview } from "./needs-review";
 import { approveFiltered } from "./review-approve";
@@ -227,6 +227,17 @@ test("the editor suggestion with a date is the mortgage suggestion of the Review
     expect(withDate.level).toBe("likely");
     expect(suggestForPayee(sample.db, sample.account.id, "STRIVE MTG", -58160).mortgage).toBe(false);
     expect(suggestForPayee(sample.db, sample.account.id, "STRIVE MTG", -58160, "2026-02-01").reason).toBe("none");
+  } finally {
+    sample.close();
+  }
+});
+
+test("the mortgage view gives a negative balance that the view schema accepts", () => {
+  const sample = book();
+  try {
+    const view = mortgageAccountView(sample.db, sample.mortgage.id, asOf, {});
+    expect(view.balance).toBe(-10_000_000);
+    expect(mortgageViewSchema.safeParse(view).success).toBe(true);
   } finally {
     sample.close();
   }
