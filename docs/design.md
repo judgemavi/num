@@ -211,6 +211,15 @@ merchants, accounts) is "+ Create new <thing>". Choosing it expands that entity'
 with the typed text. Save creates, selects and collapses; Cancel collapses. Inline forms nest at most two levels (category
 form → "+ Create new group"). An archived match shows "Restore 'X'".
 
+**Account editor, mortgage (decision 0027):** when the kind is mortgage, the Account form has a "Mortgage terms" section
+under the amount owed. It is open by default, with the help line "Add the terms to see the payment schedule and to split
+each payment into interest and principal." The opening date has the help line from decision 0027, and the form shows the
+first payment warning from decision 0027. There is no separate mortgage terms editor.
+
+**Mortgage schedule:** one ListCard for each year. Each row shows the date, the payment, the interest, the principal and
+the balance after the payment. A past row also shows the actual payment or "No payment". Past years are collapsed
+(`Collapsible`). On a phone, interest and principal go on the second line of the row.
+
 ## 7. Illustrations
 
 Four small duotone illustrations, one for each tinted summary strip: payday (Home), balance scale (Accounts),

@@ -133,16 +133,21 @@ The app helps the user set it, always with one click and never without the user:
 
 ### 5.2 Mortgage terms
 
-Each `mortgage` account has one row of current terms. There is no history of terms.
+Each `mortgage` account can have one row of current terms. There is no history of terms.
+The terms are optional. The user edits them in the account dialog (decision 0027).
 
 Fields:
-- `principal`, `principalAsOf`, `rateMilliPct`, `compounding` (`monthly | semiannual`)
+- `rateMilliPct`, `compounding` (`monthly | semiannual`)
 - `paymentAmount`, `paymentFrequency` (`weekly | biweekly | semimonthly | monthly`), `firstPaymentDate`
 - `termEnd`, `amortizationMonthsRemaining`
 - `paymentAccountId`, `interestCategoryId`, `propertyAccountId?`
 
+The schedule starts from the account's opening balance (the amount owed) on the account's opening date.
+A mortgage with terms has a fixed opening date: it does not follow the transactions.
+The correct opening date is the date of the last payment before the first payment in Num.
+
 Use the terms to:
-- Calculate the payment schedule.
+- Calculate the payment schedule. Each row has the date, the payment, the interest, the principal and the balance.
 - Fill the principal and interest amounts of a payment before the user confirms it.
 - Show the payoff date.
 
