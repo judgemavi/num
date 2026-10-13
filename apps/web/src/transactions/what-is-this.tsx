@@ -13,11 +13,11 @@ import { useRestoreNamed } from "@/editors/restore-named";
 import { InlineAccount, InlineCategory, InlineMerchant } from "@/editors/inline-records";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/money";
 import { type Option, type OptionGroup } from "@/transactions/option-combobox";
+import { SplitLineRow } from "@/transactions/split-line-row";
 import { RefundOfField } from "@/transactions/refund-of-field";
 import { levelLabel } from "@/transactions/format";
 import { splitRemainder, type SplitLine } from "@/transactions/what-choice";
@@ -271,80 +271,26 @@ export function WhatIsThis({
       ) : null}
       {choice === "split" ? (
         <div className="grid gap-3">
-          {lines.map((line, index) => {
-            const lineCategories = categoryGroups(categories, "split", line.categoryId);
-            return (
-              <div key={line.key} className="grid gap-3 sm:grid-cols-[auto_8rem_1fr_1fr]">
-                <Field>
-                  <FieldLabel>Line {index + 1}</FieldLabel>
-                  <ToggleGroup
-                    type="single"
-                    variant="outline"
-                    value={line.direction}
-                    disabled={amountsLocked}
-                    onValueChange={(value) => {
-                      if (value === "out" || value === "in") {
-                        updateLine(line.key, { direction: value });
-                      }
-                    }}
-                  >
-                    <ToggleGroupItem value="out">Money out</ToggleGroupItem>
-                    <ToggleGroupItem value="in">Money in</ToggleGroupItem>
-                  </ToggleGroup>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor={`${idPrefix}-line-${index}-amount`}>Amount</FieldLabel>
-                  <Input
-                    id={`${idPrefix}-line-${index}-amount`}
-                    inputMode="decimal"
-                    value={line.amount}
-                    disabled={amountsLocked}
-                    onChange={(event) => updateLine(line.key, { amount: event.target.value })}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor={`${idPrefix}-line-${index}-category`}>Category</FieldLabel>
-                  <ManagedPicker
-                    id={`${idPrefix}-line-${index}-category`}
-                    value={line.categoryId}
-                    options={[]}
-                    groups={lineCategories.groups}
-                    placeholder="Category"
-                    emptyLabel="No category"
-                    disabled={categoryLocked}
-                    noun="category"
-                    depth={depth}
-                    archived={archivedCategoryOptions}
-                    onRestore={(id) => restoreCategory(id, (restored) => updateLine(line.key, { categoryId: restored, transferAccountId: null }))}
-                    onChange={(id) => updateLine(line.key, { categoryId: id, transferAccountId: id ? null : line.transferAccountId })}
-                    renderForm={(name, finish) => <InlineCategory name={name} kind="expense" depth={depth + 1} onDone={finish} />}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor={`${idPrefix}-line-${index}-account`}>Account</FieldLabel>
-                  <ManagedPicker
-                    id={`${idPrefix}-line-${index}-account`}
-                    value={line.transferAccountId}
-                    options={accounts}
-                    placeholder="Account"
-                    emptyLabel="No account"
-                    disabled={transferLocked || amountsLocked}
-                    noun="account"
-                    depth={depth}
-                    archived={archivedAccounts}
-                    onRestore={(id) => restoreAccount(id, (restored) => updateLine(line.key, { transferAccountId: restored, categoryId: null }))}
-                    onChange={(id) => updateLine(line.key, { transferAccountId: id, categoryId: id ? null : line.categoryId })}
-                    renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
-                  />
-                </Field>
-                {lines.length > 1 && !amountsLocked ? (
-                  <Button type="button" variant="outline" className="sm:col-span-4" onClick={() => onLines(lines.filter((item) => item.key !== line.key))}>
-                    Remove line
-                  </Button>
-                ) : null}
-              </div>
-            );
-          })}
+          {lines.map((line, index) => (
+            <SplitLineRow
+              key={line.key}
+              idPrefix={idPrefix}
+              index={index}
+              line={line}
+              categoryGroups={categoryGroups(categories, "split", line.categoryId).groups ?? []}
+              accounts={accounts}
+              archivedCategories={archivedCategoryOptions}
+              archivedAccounts={archivedAccounts}
+              categoryLocked={categoryLocked}
+              transferLocked={transferLocked}
+              amountsLocked={amountsLocked}
+              depth={depth}
+              onChange={(patch) => updateLine(line.key, patch)}
+              onRemove={lines.length > 1 && !amountsLocked ? () => onLines(lines.filter((item) => item.key !== line.key)) : null}
+              onRestoreCategory={(id) => restoreCategory(id, (restored) => updateLine(line.key, { categoryId: restored, transferAccountId: null }))}
+              onRestoreAccount={(id) => restoreAccount(id, (restored) => updateLine(line.key, { transferAccountId: restored, categoryId: null }))}
+            />
+          ))}
           {!amountsLocked ? (
             <Button
               type="button"
