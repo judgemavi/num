@@ -12,6 +12,7 @@ import {
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { mortgageSuggestion } from "./mortgage-learned";
 import { transactionReconciled } from "./reconciled";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { linkLearnedTransfers, linkTransferPair } from "./transfer-auto";
@@ -63,13 +64,19 @@ export function transferHint(db: Db, input: { accountId: string; date: string; a
   };
 }
 
-export function suggestForPayee(db: Db, accountId: string, rawPayee: string, amount: number): Suggestion {
+export function suggestForPayee(db: Db, accountId: string, rawPayee: string, amount: number, date?: string): Suggestion {
   const account = db.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, accountId)).get();
   if (!account) {
     throw new ServiceError("account_not_found", 404);
   }
   const book = loadMatchBook(db);
-  return suggestionFromMatch(scorePayee(book, { payee: normalizePayee(rawPayee), amount, recurring: null }));
+  const payee = normalizePayee(rawPayee);
+  const base = suggestionFromMatch(scorePayee(book, { payee, amount, recurring: null }));
+  if (date === undefined || transactionReconciled(db, accountId, date)) {
+    return base;
+  }
+  const mortgage = mortgageSuggestion(db, book.mortgageLearned, { payee, accountId, date, amount });
+  return mortgage && mortgage.suggestion.confidence > base.confidence ? mortgage.suggestion : base;
 }
 
 export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[] } {

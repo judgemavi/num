@@ -80,7 +80,7 @@ export function registerSuggestions(app: OpenAPIHono, db: Db) {
   });
   app.openapi(suggestRoute, (c) => {
     const query = c.req.valid("query");
-    return c.json(suggestForPayee(db, query.accountId, query.payee, query.amount), 200);
+    return c.json(suggestForPayee(db, query.accountId, query.payee, query.amount, query.date), 200);
   });
   app.openapi(transfersRoute, (c) => c.json(listTransferPairs(db, c.req.valid("query").asOf), 200));
   app.openapi(pairRoute, (c) => {

@@ -9,6 +9,7 @@ import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { applyInboxGroup } from "./inbox-group";
 import { saveMortgageTerms } from "./mortgage";
+import { suggestForPayee } from "./suggestions";
 import { listNeedsReview } from "./needs-review";
 import { approveFiltered } from "./review-approve";
 import { createTransaction, getTransaction } from "./transactions";
@@ -211,6 +212,21 @@ test("a split that is not a mortgage payment teaches nothing", () => {
     const next = open(sample.db, sample.account.id, "2026-04-01", -58160);
     expect(wrongCategory.lines).toHaveLength(2);
     expect(reviewOf(sample.db, next.id)?.suggestion).toBeNull();
+  } finally {
+    sample.close();
+  }
+});
+
+test("the editor suggestion with a date is the mortgage suggestion of the Review column", () => {
+  const sample = book();
+  try {
+    confirmSplit(sample, "2026-03-01", -58160);
+    const withDate = suggestForPayee(sample.db, sample.account.id, "STRIVE MTG", -58160, "2026-04-01");
+    expect(withDate.mortgage).toBe(true);
+    expect(withDate.transferAccountId).toBe(sample.mortgage.id);
+    expect(withDate.level).toBe("likely");
+    expect(suggestForPayee(sample.db, sample.account.id, "STRIVE MTG", -58160).mortgage).toBe(false);
+    expect(suggestForPayee(sample.db, sample.account.id, "STRIVE MTG", -58160, "2026-02-01").reason).toBe("none");
   } finally {
     sample.close();
   }

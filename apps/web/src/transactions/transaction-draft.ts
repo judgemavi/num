@@ -112,10 +112,13 @@ type ApplyChoice = {
 
 export function useApplySuggestion(input: ApplyChoice): Suggestion | null {
   const suggestion = useQuery({
-    queryKey: ["suggestion", input.accountId, input.payee, input.amount],
+    queryKey: ["suggestion", input.accountId, input.payee, input.amount, input.date],
     enabled: input.accountId.length > 0 && input.payee.trim().length > 0 && input.amount !== null,
     queryFn: async () => {
       const params = new URLSearchParams({ accountId: input.accountId, payee: input.payee, amount: String(input.amount) });
+      if (/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
+        params.set("date", input.date);
+      }
       const result = await apiRequest(`/api/suggestions?${params.toString()}`, suggestionSchema);
       if (!result.ok) {
         throw new Error(result.code);

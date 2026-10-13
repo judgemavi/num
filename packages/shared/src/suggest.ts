@@ -23,6 +23,7 @@ export const suggestionQuerySchema = z.object({
   accountId: z.uuid(),
   payee: z.string().trim().min(1),
   amount: z.coerce.number().int(),
+  date: z.iso.date().optional(),
 });
 
 export const transferPairSchema = z.object({
