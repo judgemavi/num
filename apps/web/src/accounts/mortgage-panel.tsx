@@ -128,6 +128,8 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
             Payoff date {formatDay(row.payoffDate)}
             {row.payoffDate > row.termEnd ? <span className="text-muted-foreground">. This date uses the current rate after the term ends on {formatDay(row.termEnd)}.</span> : null}
           </p>
+        ) : row.nonAmortizing ? (
+          <p className="text-sm" role="alert">This payment does not cover the interest. Check the payment, rate and amount owed.</p>
         ) : (
           <p className="text-sm">This payment does not pay off the loan.</p>
         )}

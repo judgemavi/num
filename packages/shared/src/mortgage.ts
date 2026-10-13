@@ -199,21 +199,23 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
     const interest = Math.round(balance * rate);
     const sameDayLump = lump && !lumpUsed && lump.date === date ? lump.amount : 0;
     const payable = due + sameDayLump;
-    if (interest >= payable) {
+    if (Math.round(balance * regular) >= payable) {
       nonAmortizing = true;
       break;
     }
+    // A long first period or a gap can charge more than the payment. The payment is all interest. The rest is added to the balance.
+    const covered = Math.min(interest, payable);
     const payment = Math.min(payable, balance + interest);
-    const principal = payment - interest;
-    balance -= principal;
+    const principal = Math.max(0, payment - interest);
+    balance += interest - covered - principal;
     if (sameDayLump > 0) {
       lumpUsed = true;
     }
-    totalInterest += interest;
-    if (![balance, interest, payment, principal, totalInterest].every(Number.isSafeInteger)) {
+    totalInterest += covered;
+    if (![balance, covered, payment, principal, totalInterest].every(Number.isSafeInteger)) {
       throw new Error("Schedule amount is not a safe integer");
     }
-    payments.push({ date, payment, principal, interest, balance });
+    payments.push({ date, payment, principal, interest: covered, balance });
     if (cursor < checkpoints.length && checkpoints[cursor].date === date) {
       balance = owed(checkpoints[cursor].balance);
       payments[payments.length - 1].balance = balance;
@@ -303,6 +305,7 @@ export const mortgageViewSchema = z.object({
   balance: cents,
   rateMilliPct: interestRateMilliPctSchema,
   payoffDate: isoDateSchema.nullable(),
+  nonAmortizing: z.boolean(),
   totalInterest: cents,
   termEnd: isoDateSchema,
   paymentAmount: positiveCents,

@@ -167,6 +167,7 @@ export function mortgageAccountView(
     balance: balanceOf(db, { id: account.id, kind: "mortgage", openingBalance: account.openingBalance }, undefined, undefined, asOf),
     rateMilliPct: terms.rateMilliPct,
     payoffDate: schedule.payoffDate,
+    nonAmortizing: schedule.nonAmortizing,
     totalInterest: schedule.totalInterest,
     termEnd: terms.termEnd,
     paymentAmount: terms.paymentAmount,

@@ -200,4 +200,37 @@ describe("mortgage schedule", () => {
     expect(mortgagePaymentDate("2026-01-15", 1, "semimonthly")).toBe("2026-01-30");
     expect(mortgagePaymentDate("2026-01-15", 2, "semimonthly")).toBe("2026-02-15");
   });
+
+  const stubLoan: MortgageLoan = {
+    principal: 54_081_030,
+    principalAsOf: "2024-04-12",
+    rateMilliPct: 4_990,
+    compounding: "semiannual",
+    paymentAmount: 78_558,
+    paymentFrequency: "weekly",
+    firstPaymentDate: "2024-05-01",
+  };
+
+  test("a first period that charges more than the payment is all interest and the rest is added to the balance", () => {
+    const schedule = mortgageSchedule(stubLoan);
+    expect(schedule.nonAmortizing).toBe(false);
+    expect(schedule.payments.length).toBeGreaterThan(1000);
+    const first = schedule.payments[0];
+    expect(first).toMatchObject({ date: "2024-05-01", payment: 78_558, principal: 0, interest: 78_558 });
+    expect(first.balance).toBeGreaterThan(stubLoan.principal);
+    const regular = mortgagePeriodRate(4_990, "semiannual", "weekly");
+    const second = schedule.payments[1];
+    expect(second.interest).toBe(Math.round(first.balance * regular));
+    expect(second.principal).toBe(78_558 - second.interest);
+    expect(second.principal).toBeGreaterThan(0);
+    expect(schedule.payments.every((row) => row.principal >= 0 && row.interest >= 0)).toBe(true);
+    expect(schedule.payoffDate).not.toBeNull();
+  });
+
+  test("a payment below the regular interest is non-amortizing", () => {
+    const schedule = mortgageSchedule({ ...stubLoan, paymentAmount: 40_000 });
+    expect(schedule.nonAmortizing).toBe(true);
+    expect(schedule.payments).toEqual([]);
+    expect(schedule.payoffDate).toBeNull();
+  });
 });
