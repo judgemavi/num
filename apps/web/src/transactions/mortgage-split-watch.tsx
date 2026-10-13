@@ -76,14 +76,16 @@ export function MortgageSplitWatch({
           {
             key: crypto.randomUUID(),
             amount: fromMinorUnits(currency, amounts.principal),
-            direction: "out",
+            opposite: false,
+            edited: false,
             categoryId: null,
             transferAccountId: split.mortgageAccountId,
           },
           {
             key: crypto.randomUUID(),
             amount: fromMinorUnits(currency, amounts.interest),
-            direction: "out",
+            opposite: false,
+            edited: false,
             categoryId: split.interestCategoryId,
             transferAccountId: null,
           },

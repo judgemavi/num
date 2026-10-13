@@ -1,5 +1,6 @@
 import {
   merchantForChoice,
+  moneyDirection,
   signedAmount,
   transactionSaveResultSchema,
   transactionSchema,
@@ -11,7 +12,7 @@ import {
 import { apiRequest } from "@/request";
 import { transactionError } from "@/transactions/format";
 import { readPositive } from "@/transactions/transaction-draft";
-import type { SplitLine } from "@/transactions/what-choice";
+import { lineDirection, type SplitLine } from "@/transactions/what-choice";
 
 type SubmitInput = {
   currency: string;
@@ -91,7 +92,7 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
     built =
       input.choice === "split"
         ? input.lines.map((line, index) => ({
-            amount: signedAmount(line.direction, readPositive(input.currency, line.amount)),
+            amount: signedAmount(lineDirection(moneyDirection(input.totalMinor), line), readPositive(input.currency, line.amount)),
             memo: memoAt(index),
             categoryId: line.categoryId,
             transferAccountId: line.transferAccountId,

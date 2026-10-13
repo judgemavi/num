@@ -32,6 +32,9 @@ function proposalText(row: TransactionListItem, names: Names): string | null {
   if (!proposes || !(suggestion.categoryId || suggestion.transferAccountId)) {
     return null;
   }
+  if (suggestion.mortgage && suggestion.transferAccountId) {
+    return `Mortgage payment · ${names.accounts.get(suggestion.transferAccountId) ?? "your mortgage"}?`;
+  }
   const merchant = suggestion.merchantId ? names.merchants.get(suggestion.merchantId) : undefined;
   const label = targetText(suggestion, names);
   return `${suggestion.transferAccountId || !merchant ? label : `${label} · ${merchant}`}?`;

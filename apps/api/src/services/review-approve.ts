@@ -47,6 +47,7 @@ function applyLikely(tx: WriteTx, hit: NeedsReviewHit, at: string): boolean {
       categoryId: suggestion.categoryId,
       transferAccountId: suggestion.transferAccountId,
       merchantId: suggestion.merchantId ?? hit.merchantId,
+      mortgage: suggestion.mortgage,
     },
     at,
   );

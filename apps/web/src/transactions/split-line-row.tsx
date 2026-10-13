@@ -1,12 +1,13 @@
-import { X } from "lucide-react";
+import type { MoneyDirection } from "@num/shared";
+import { Ellipsis, X } from "lucide-react";
 import { InlineCategory } from "@/editors/inline-records";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { type Option, type OptionGroup } from "@/transactions/option-combobox";
-import { type SplitLine } from "@/transactions/what-choice";
+import { lineDirection, type SplitLine } from "@/transactions/what-choice";
 
 const categoryPrefix = "category:";
 const accountPrefix = "account:";
@@ -14,6 +15,7 @@ const accountPrefix = "account:";
 type SplitLineRowProps = {
   idPrefix: string;
   index: number;
+  direction: MoneyDirection;
   line: SplitLine;
   categoryGroups: OptionGroup[];
   accounts: Option[];
@@ -24,6 +26,7 @@ type SplitLineRowProps = {
   amountsLocked: boolean;
   depth: number;
   onChange: (patch: Partial<SplitLine>) => void;
+  onAmount: (text: string) => void;
   onRemove: (() => void) | null;
   onRestoreCategory: (id: string) => void;
   onRestoreAccount: (id: string) => void;
@@ -39,6 +42,7 @@ function pickerValue(line: SplitLine): string | null {
 export function SplitLineRow({
   idPrefix,
   index,
+  direction,
   line,
   categoryGroups,
   accounts,
@@ -49,6 +53,7 @@ export function SplitLineRow({
   amountsLocked,
   depth,
   onChange,
+  onAmount,
   onRemove,
   onRestoreCategory,
   onRestoreAccount,
@@ -85,36 +90,11 @@ export function SplitLineRow({
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <Field className="w-auto">
-        <FieldLabel>Line {index + 1}</FieldLabel>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          value={line.direction}
-          disabled={amountsLocked}
-          onValueChange={(value) => {
-            if (value === "out" || value === "in") {
-              onChange({ direction: value });
-            }
-          }}
-        >
-          <ToggleGroupItem value="out">Money out</ToggleGroupItem>
-          <ToggleGroupItem value="in">Money in</ToggleGroupItem>
-        </ToggleGroup>
-      </Field>
-      <Field className="w-32">
-        <FieldLabel htmlFor={`${idPrefix}-line-${index}-amount`}>Amount</FieldLabel>
-        <Input
-          id={`${idPrefix}-line-${index}-amount`}
-          inputMode="decimal"
-          value={line.amount}
-          disabled={amountsLocked}
-          onChange={(event) => onChange({ amount: event.target.value })}
-        />
-      </Field>
-      <Field className="min-w-48 flex-1">
-        <FieldLabel htmlFor={`${idPrefix}-line-${index}-target`}>Category or account</FieldLabel>
+    <div className="flex flex-wrap items-end gap-x-2 gap-y-2">
+      <Field className="basis-full sm:min-w-48 sm:flex-1 sm:basis-0">
+        <FieldLabel className={index === 0 ? undefined : "sr-only"} htmlFor={`${idPrefix}-line-${index}-target`}>
+          Category or account
+        </FieldLabel>
         <ManagedPicker
           id={`${idPrefix}-line-${index}-target`}
           value={pickerValue(line)}
@@ -131,11 +111,47 @@ export function SplitLineRow({
           renderForm={(name, finish) => <InlineCategory name={name} kind="expense" depth={depth + 1} onDone={(saved) => finish(saved === null ? null : `${categoryPrefix}${saved}`)} />}
         />
       </Field>
-      {onRemove ? (
-        <Button type="button" variant="ghost" size="icon" className="size-11" aria-label={`Remove line ${index + 1}`} onClick={onRemove}>
-          <X />
-        </Button>
-      ) : null}
+      <div className="ml-auto flex items-center gap-1">
+        {line.opposite ? (
+          <span aria-hidden className="text-muted-foreground">
+            {direction === "out" ? "+" : "\u2212"}
+          </span>
+        ) : null}
+        <Field className="w-32">
+          <FieldLabel className="sr-only" htmlFor={`${idPrefix}-line-${index}-amount`}>
+            {`Amount of line ${index + 1}${line.opposite ? (direction === "out" ? ", money in" : ", money out") : ""}`}
+          </FieldLabel>
+          <Input
+            id={`${idPrefix}-line-${index}-amount`}
+            className="text-right"
+            inputMode="decimal"
+            value={line.amount}
+            disabled={amountsLocked}
+            onChange={(event) => onAmount(event.target.value)}
+          />
+        </Field>
+        {amountsLocked ? null : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" className="size-11" aria-label={`Options for line ${index + 1}`}>
+                <Ellipsis />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => onChange({ opposite: !line.opposite })}>
+                {lineDirection(direction, line) === "out" ? "Money in on this line" : "Money out on this line"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {onRemove ? (
+          <Button type="button" variant="ghost" size="icon" className="size-11" aria-label={`Remove line ${index + 1}`} onClick={onRemove}>
+            <X />
+          </Button>
+        ) : (
+          <span className="size-11" aria-hidden />
+        )}
+      </div>
     </div>
   );
 }

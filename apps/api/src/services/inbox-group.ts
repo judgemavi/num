@@ -10,6 +10,7 @@ import { sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { linkAutomatic } from "./auto-link";
 import { readTransaction, type TransactionBody } from "./transaction-record";
+import { mortgageLinesFor } from "./mortgage-learned";
 import { applyTransactionUpdate, spreadAfterConfirmations } from "./transactions";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -18,7 +19,7 @@ type WriteInput = {
   at?: string;
 };
 
-type Patch = Pick<InboxGroupApply, "categoryId" | "transferAccountId" | "merchantId" | "accountId">;
+type Patch = Pick<InboxGroupApply, "categoryId" | "transferAccountId" | "merchantId" | "accountId" | "mortgage">;
 
 function statusOf(transaction: Transaction): "open" | "cleared" {
   return transaction.status === "cleared" ? "cleared" : "open";
@@ -39,6 +40,19 @@ function skipReason(transaction: Transaction, patch: Patch): GroupSkipReason | n
     return "reconciled";
   }
   return null;
+}
+
+function mortgageBodyFor(transaction: Transaction, lines: NonNullable<ReturnType<typeof mortgageLinesFor>>): TransactionBody {
+  return {
+    accountId: transaction.accountId,
+    date: transaction.date,
+    amount: transaction.amount,
+    payeeRaw: transaction.payeeRaw,
+    merchantId: null,
+    notes: transaction.notes,
+    status: statusOf(transaction),
+    lines,
+  };
 }
 
 function bodyFor(transaction: Transaction, patch: Patch): TransactionBody {
@@ -94,7 +108,14 @@ export function applySuggestion(tx: WriteTx, id: string, patch: Patch, at: strin
   if (reason) {
     return { id, reason };
   }
-  applyTransactionUpdate(tx, id, bodyFor(transaction, patch), at, false);
+  const split =
+    patch.mortgage && patch.transferAccountId && transaction.amount < 0
+      ? mortgageLinesFor(tx, patch.transferAccountId, transaction.accountId, transaction.date, transaction.amount)
+      : null;
+  if (patch.mortgage && !split) {
+    return { id, reason: "no_split" };
+  }
+  applyTransactionUpdate(tx, id, split ? mortgageBodyFor(transaction, split) : bodyFor(transaction, patch), at, false);
   linkAutomatic(tx, id);
   return null;
 }

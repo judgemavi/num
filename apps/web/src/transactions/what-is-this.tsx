@@ -20,7 +20,7 @@ import { type Option, type OptionGroup } from "@/transactions/option-combobox";
 import { SplitLineRow } from "@/transactions/split-line-row";
 import { RefundOfField } from "@/transactions/refund-of-field";
 import { levelLabel } from "@/transactions/format";
-import { splitRemainder, type SplitLine } from "@/transactions/what-choice";
+import { addedLine, editLineAmount, restOnLastLine, splitBlank, splitRemainder, type SplitLine } from "@/transactions/what-choice";
 
 const choiceLabel: Record<WhatChoice, string> = {
   spending: "Spending",
@@ -126,6 +126,19 @@ function suggestionText(suggestion: Suggestion, merchants: Option[], categories:
   return label ? `${label}. ${text}` : text;
 }
 
+function splitStatus(currency: string, totalMinor: number | null, left: number | null, lines: SplitLine[]): string {
+  if (totalMinor === null) {
+    return "Enter the amount.";
+  }
+  if (left === null) {
+    return "Enter a positive amount on each line.";
+  }
+  if (left === 0) {
+    return splitBlank(lines) ? "Enter an amount on each line." : "All assigned";
+  }
+  return left > 0 ? `${formatMoney(currency, left)} left` : `${formatMoney(currency, -left)} too much`;
+}
+
 export function WhatIsThis({
   idPrefix,
   direction,
@@ -164,7 +177,8 @@ export function WhatIsThis({
   const transferLabel = direction === "out" ? "To account" : "From account";
   const choices = choicesForDirection(direction, groupMode);
   const categoryList = categoryGroups(categories, choice, categoryId);
-  const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, lines) : choice === "split" ? null : 0;
+  const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, direction, lines) : choice === "split" ? null : 0;
+  const lastLineRest = choice === "split" && totalMinor !== null ? restOnLastLine(currency, totalMinor, direction, lines) : null;
   const hint = suggestion && choice !== "transfer" ? suggestionText(suggestion, merchants, categories, accounts) : null;
   const suggestedMerchant = merchantNameFromPayee(payee);
   const categoryKind = categoryKindForChoice(choice);
@@ -276,6 +290,7 @@ export function WhatIsThis({
               key={line.key}
               idPrefix={idPrefix}
               index={index}
+              direction={direction}
               line={line}
               categoryGroups={categoryGroups(categories, "split", line.categoryId).groups ?? []}
               accounts={accounts}
@@ -286,23 +301,25 @@ export function WhatIsThis({
               amountsLocked={amountsLocked}
               depth={depth}
               onChange={(patch) => updateLine(line.key, patch)}
+              onAmount={(text) => onLines(editLineAmount(currency, totalMinor, direction, lines, line.key, text))}
               onRemove={lines.length > 1 && !amountsLocked ? () => onLines(lines.filter((item) => item.key !== line.key)) : null}
               onRestoreCategory={(id) => restoreCategory(id, (restored) => updateLine(line.key, { categoryId: restored, transferAccountId: null }))}
               onRestoreAccount={(id) => restoreAccount(id, (restored) => updateLine(line.key, { transferAccountId: restored, categoryId: null }))}
             />
           ))}
           {!amountsLocked ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onLines([...lines, { key: crypto.randomUUID(), amount: "", direction, categoryId: null, transferAccountId: null }])}
-            >
-              Add a line
+            <Button type="button" variant="ghost" className="justify-start" onClick={() => onLines([...lines, addedLine(currency, totalMinor, direction, lines)])}>
+              + Add a line
             </Button>
           ) : null}
-          <p className="text-sm font-semibold" role="status">
-            {totalMinor === null ? "Enter the amount." : left === null ? "Enter a positive amount on each line." : `${formatMoney(currency, left)} left to assign`}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2" role="status">
+            <p className="text-sm font-semibold">{splitStatus(currency, totalMinor, left, lines)}</p>
+            {!amountsLocked && totalMinor !== null && left !== null && left !== 0 && lastLineRest !== null ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => onLines(lastLineRest)}>
+                Put it on the last line
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : null}
       {choice === "transfer" || (choice === "refund" && refundOfId !== null) ? null : (

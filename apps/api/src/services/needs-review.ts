@@ -20,6 +20,7 @@ import { decidedKeys, pairKey } from "./decision-keys";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
+import { mortgageSuggestion } from "./mortgage-learned";
 import { listTransferPairs } from "./suggestions";
 type Base = {
   id: string;
@@ -182,6 +183,11 @@ export function listNeedsReview(
       if (cached.suggestion.categoryId || cached.suggestion.transferAccountId) {
         suggestion = cached.suggestion;
         learnedCount = cached.learnedCount;
+      }
+      const mortgage = Number(row.lineCount) === 1 && Number(row.reconciled) === 0 ? mortgageSuggestion(db, book.mortgageLearned, row) : null;
+      if (mortgage && (suggestion === null || mortgage.suggestion.confidence > suggestion.confidence)) {
+        suggestion = mortgage.suggestion;
+        learnedCount = mortgage.learnedCount;
       }
     }
     const pair = pairById.get(row.id);

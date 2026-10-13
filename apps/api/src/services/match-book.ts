@@ -21,6 +21,7 @@ import {
 } from "@num/shared";
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
+import { loadMortgageLearned, type MortgageLearned } from "./mortgage-learned";
 type Reader = { all<T>(query: ReturnType<typeof sql>): T[] } & Pick<Db, "select">;
 
 type ConfirmRow = {
@@ -56,6 +57,7 @@ export type MatchBook = {
   mode: ConfidenceMode;
   byPayee: Map<string, ConfirmRow[]>;
   transfersByPayee: Map<string, TransferRow[]>;
+  mortgageLearned: Map<string, MortgageLearned>;
   payeeLearned: Map<string, ReturnType<typeof learnedConfidence>>;
   amountLearned: Map<string, ReturnType<typeof learnedConfidence>>;
   similarByPayee: Map<string, { payee: string; similarity: number; scores: ReturnType<typeof learnedConfidence> }[]>;
@@ -138,6 +140,7 @@ export function loadMatchBook(db: Reader): MatchBook {
     mode: confidenceMode(db),
     byPayee,
     transfersByPayee,
+    mortgageLearned: loadMortgageLearned(db),
     payeeLearned,
     amountLearned: new Map(),
     similarByPayee: new Map(),

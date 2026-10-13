@@ -28,6 +28,7 @@ export function applyInboxGroup(accountId: string, transactionIds: string[], sug
     categoryId: suggestion.transferAccountId ? null : suggestion.categoryId,
     transferAccountId: suggestion.transferAccountId,
     merchantId: suggestion.transferAccountId ? null : suggestion.merchantId,
+    mortgage: suggestion.mortgage,
   }));
 }
 

@@ -124,7 +124,7 @@ export const transferPairAcceptSchema = z.object({
   rightId: z.uuid(),
 });
 
-export const groupSkipReasons = ["split", "reconciled", "other_account", "categorized"] as const;
+export const groupSkipReasons = ["split", "reconciled", "other_account", "categorized", "no_split"] as const;
 
 export type GroupSkipReason = (typeof groupSkipReasons)[number];
 
@@ -141,6 +141,7 @@ export const inboxGroupApplySchema = z
     categoryId: z.uuid().nullable(),
     transferAccountId: z.uuid().nullable(),
     merchantId: z.uuid().nullable(),
+    mortgage: z.boolean().optional(),
   })
   .refine((value) => (value.categoryId === null) !== (value.transferAccountId === null));
 

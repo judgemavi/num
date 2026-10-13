@@ -62,7 +62,8 @@ export function linesOf(currency: string, transaction: Transaction | null, amoun
     return transaction.lines.map((line) => ({
       key: line.id,
       amount: fromMinorUnits(currency, Math.abs(line.amount)),
-      direction: moneyDirection(line.amount),
+      opposite: moneyDirection(line.amount) !== direction,
+      edited: true,
       categoryId: line.categoryId,
       transferAccountId: line.transferAccountId,
     }));
@@ -72,11 +73,12 @@ export function linesOf(currency: string, transaction: Transaction | null, amoun
     {
       key: first?.id ?? crypto.randomUUID(),
       amount: amountText,
-      direction,
+      opposite: false,
+      edited: false,
       categoryId: first?.categoryId ?? null,
       transferAccountId: null,
     },
-    { key: crypto.randomUUID(), amount: "", direction, categoryId: null, transferAccountId: null },
+    { key: crypto.randomUUID(), amount: "", opposite: false, edited: false, categoryId: null, transferAccountId: null },
   ];
 }
 

@@ -23,7 +23,7 @@ import { AutomaticReason, DeleteMenu, MoneySection, MoreDetails, type Transactio
 import { alreadyChosen, choiceOf, linesOf, signedTotal, useApplySuggestion } from "@/transactions/transaction-draft";
 import { submitTransaction } from "@/transactions/transaction-submit";
 import { merchantOptionLists } from "@/transactions/merchant-options";
-import { splitRemainder, type SplitLine } from "@/transactions/what-choice";
+import { splitBlank, splitRemainder, type SplitLine } from "@/transactions/what-choice";
 import { WhatIsThis } from "@/transactions/what-is-this";
 
 export function TransactionForm({
@@ -104,13 +104,13 @@ export function TransactionForm({
     .filter((account) => account.archivedAt !== null && account.id !== accountId)
     .map((account) => ({ id: account.id, label: accountLabel(account) }));
   const totalMinor = hintAmount;
-  const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, lines) : null;
+  const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, direction, lines) : null;
   const saveDisabled =
     saving ||
     accountId.length === 0 ||
     totalMinor === null ||
     (choice === "transfer" && !transferAccountId) ||
-    (choice === "split" && left !== 0);
+    (choice === "split" && (left !== 0 || splitBlank(lines)));
 
   function choose(next: WhatChoice) {
     setTouched(true);
@@ -130,8 +130,8 @@ export function TransactionForm({
         current.length > 1
           ? current
           : [
-              { key: crypto.randomUUID(), amount, direction, categoryId, transferAccountId: null },
-              { key: crypto.randomUUID(), amount: "", direction, categoryId: null, transferAccountId: null },
+              { key: crypto.randomUUID(), amount, opposite: false, edited: false, categoryId, transferAccountId: null },
+              { key: crypto.randomUUID(), amount: "", opposite: false, edited: false, categoryId: null, transferAccountId: null },
             ],
       );
     }
@@ -157,7 +157,7 @@ export function TransactionForm({
       setError("Choose the other account.");
       return;
     }
-    if (choice === "split" && left !== 0) {
+    if (choice === "split" && (left !== 0 || splitBlank(lines))) {
       setError("Assign the whole amount.");
       return;
     }

@@ -16,6 +16,7 @@ export const suggestionSchema = z.object({
   level: z.enum(reviewLevels),
   sourceId: z.uuid().nullable(),
   confidence: z.number().int().min(0).max(1000),
+  mortgage: z.boolean(),
 });
 
 export const suggestionQuerySchema = z.object({
@@ -44,6 +45,7 @@ const none: Suggestion = {
   level: "none",
   sourceId: null,
   confidence: 0,
+  mortgage: false,
 };
 
 export function suggestionFromMatch(result: MatchResult): Suggestion {
@@ -59,6 +61,7 @@ export function suggestionFromMatch(result: MatchResult): Suggestion {
     level: reviewLevel(false, result.confidenceMilli / 1000),
     sourceId: result.sourceId,
     confidence: result.confidenceMilli,
+    mortgage: false,
   };
 }
 

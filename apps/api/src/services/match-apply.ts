@@ -1,6 +1,7 @@
-import { accounts, mortgageTerms, occurrenceLinks, transactionLines, transactions, valuations } from "@num/db";
-import { mortgagePrefillLines, mortgageSplitForDate, similarPayees, utcNow, type Compounding, type MatchResult, type PaymentFrequency } from "@num/shared";
-import { and, eq, sql } from "drizzle-orm";
+import { accounts, occurrenceLinks, transactionLines, transactions } from "@num/db";
+import { similarPayees, utcNow, type MatchResult } from "@num/shared";
+import { eq, sql } from "drizzle-orm";
+import { mortgageLinesFor } from "./mortgage-learned";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { linkRefundIfSure } from "./refund-auto";
 import { auditTransaction, readTransaction } from "./transaction-record";
@@ -22,47 +23,7 @@ export function mortgageSplitLines(tx: WriteTx, result: MatchResult, fromAccount
   if (!result.mortgage || !result.transferAccountId) {
     return null;
   }
-  const terms = tx.select().from(mortgageTerms).where(eq(mortgageTerms.accountId, result.transferAccountId)).get();
-  if (!terms || terms.paymentAccountId !== fromAccountId) {
-    return null;
-  }
-  const history = tx
-    .select({ date: valuations.date, balance: valuations.balance })
-    .from(valuations)
-    .where(and(eq(valuations.accountId, result.transferAccountId)))
-    .all();
-  const split = mortgageSplitForDate({
-    terms: {
-      ...terms,
-      compounding: terms.compounding as Compounding,
-      paymentFrequency: terms.paymentFrequency as PaymentFrequency,
-    },
-    valuations: history,
-    date,
-    fromAccountId,
-    toAccountId: result.transferAccountId,
-  });
-  if (!split) {
-    return null;
-  }
-  const fitted = mortgagePrefillLines(split.interest, split.principal, Math.abs(amount));
-  const sign = amount < 0 ? -1 : 1;
-  return [
-    {
-      amount: sign * fitted.interest,
-      memo: null,
-      categoryId: split.interestCategoryId,
-      transferAccountId: null,
-      tagIds: [] as string[],
-    },
-    {
-      amount: sign * fitted.principal,
-      memo: null,
-      categoryId: null,
-      transferAccountId: result.transferAccountId,
-      tagIds: [] as string[],
-    },
-  ];
+  return mortgageLinesFor(tx, result.transferAccountId, fromAccountId, date, amount);
 }
 
 export function applyLinkedPlan(
