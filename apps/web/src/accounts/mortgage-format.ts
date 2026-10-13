@@ -17,7 +17,7 @@ export function mortgageError(code: string): string {
     case "not_mortgage":
       return "These terms are only for a mortgage.";
     case "mortgage_terms_invalid":
-      return "The first payment is on or after the principal date. The term ends on or after the first payment.";
+      return "The first payment must be on or after the opening date. The term must end on or after the first payment.";
     case "payment_account_invalid":
       return "Choose an open account to pay from.";
     case "interest_category_invalid":

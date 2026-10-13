@@ -13,7 +13,6 @@ import {
   CategoryRecord,
   GroupRecord,
   MerchantRecord,
-  MortgageRecord,
   PlanRecord,
   TagRecord,
   TransactionRecord,
@@ -44,8 +43,6 @@ export function EditorBody({ kind, props, onClose, onSaved }: BodyProps) {
       return <BucketRecord props={props as EditorInput["bucket"]} onClose={onClose} onSaved={onSaved} />;
     case "plan":
       return <PlanRecord props={props as EditorInput["plan"]} onClose={onClose} onSaved={onSaved} />;
-    case "mortgage":
-      return <MortgageRecord props={props as EditorInput["mortgage"]} onClose={onClose} onSaved={onSaved} />;
     case "import":
       return <ImportEditor props={props as EditorInput["import"]} onClose={onClose} onSaved={onSaved} />;
     case "reconcile":

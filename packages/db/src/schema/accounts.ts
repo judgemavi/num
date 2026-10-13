@@ -21,8 +21,6 @@ export const mortgageTerms = sqliteTable("mortgage_terms", {
   accountId: text("account_id")
     .primaryKey()
     .references(() => accounts.id),
-  principal: integer("principal").notNull(),
-  principalAsOf: text("principal_as_of").notNull(),
   rateMilliPct: integer("rate_milli_pct").notNull(),
   compounding: text("compounding").notNull(),
   paymentAmount: integer("payment_amount").notNull(),

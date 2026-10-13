@@ -1,4 +1,4 @@
-import { mortgageTerms, valuations } from "@num/db";
+import { accounts, mortgageTerms, valuations } from "@num/db";
 import {
   learnedConfidence,
   mortgagePrefillLines,
@@ -60,7 +60,8 @@ export type MortgageHit = MortgageLearned & { similarTo: string | null };
 /** The interest line and the principal line of a payment, from the terms and the schedule. Null when there is no split. */
 export function mortgageLinesFor(db: Reader, mortgageAccountId: string, fromAccountId: string, date: string, amount: number) {
   const terms = db.select().from(mortgageTerms).where(eq(mortgageTerms.accountId, mortgageAccountId)).get();
-  if (!terms || terms.paymentAccountId !== fromAccountId) {
+  const account = db.select().from(accounts).where(eq(accounts.id, mortgageAccountId)).get();
+  if (!terms || !account?.openingDate || terms.paymentAccountId !== fromAccountId) {
     return null;
   }
   const history = db
@@ -74,6 +75,7 @@ export function mortgageLinesFor(db: Reader, mortgageAccountId: string, fromAcco
       compounding: terms.compounding as Compounding,
       paymentFrequency: terms.paymentFrequency as PaymentFrequency,
     },
+    opening: { balance: account.openingBalance, date: account.openingDate },
     valuations: history,
     date,
     fromAccountId,

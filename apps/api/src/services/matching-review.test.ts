@@ -11,7 +11,6 @@ import { createCategory } from "./categories";
 import { undoImportBatch } from "./import-undo";
 import { importStatement } from "./imports";
 import { loadMatchBook, scorePayee } from "./match-book";
-import { saveMortgageTerms } from "./mortgage";
 import { createPlan } from "./recurring-plans";
 import { createTransaction, getTransaction } from "./transactions";
 
@@ -77,23 +76,20 @@ test("undo removes the mortgage mirror created for an imported payment", () => {
       name: "Home loan",
       institution: null,
       kind: "mortgage",
-      openingDate: "2026-01-01",
+      openingDate: "2026-02-01",
       openingBalance: -10_000_000,
-      ...saved,
-    });
-    saveMortgageTerms(sample.db, mortgage.id, {
-      principal: 10_000_000,
-      principalAsOf: "2026-03-01",
-      rateMilliPct: 5000,
-      compounding: "semiannual",
-      paymentAmount: 58160,
-      paymentFrequency: "monthly",
-      firstPaymentDate: "2026-03-01",
-      termEnd: "2031-03-01",
-      amortizationMonthsRemaining: 300,
-      paymentAccountId: sample.account.id,
-      interestCategoryId: interest.id,
-      propertyAccountId: null,
+      mortgageTerms: {
+        rateMilliPct: 5000,
+        compounding: "semiannual",
+        paymentAmount: 58160,
+        paymentFrequency: "monthly",
+        firstPaymentDate: "2026-03-01",
+        termEnd: "2031-03-01",
+        amortizationMonthsRemaining: 300,
+        paymentAccountId: sample.account.id,
+        interestCategoryId: interest.id,
+        propertyAccountId: null,
+      },
       ...saved,
     });
     createPlan(sample.db, {
@@ -137,18 +133,7 @@ test("a mortgage import links an existing opposite row", () => {
   const sample = book();
   try {
     const interest = createCategory(sample.db, { name: "Interest", kind: "expense", ...saved });
-    const mortgage = createAccount(sample.db, {
-      name: "Home loan",
-      institution: null,
-      kind: "mortgage",
-      openingDate: "2026-01-01",
-      openingBalance: -10_000_000,
-      ...saved,
-    });
     const terms = {
-      accountId: mortgage.id,
-      principal: 10_000_000,
-      principalAsOf: "2026-03-01",
       rateMilliPct: 5000,
       compounding: "semiannual" as const,
       paymentAmount: 58160,
@@ -160,8 +145,18 @@ test("a mortgage import links an existing opposite row", () => {
       interestCategoryId: interest.id,
       propertyAccountId: null,
     };
+    const mortgage = createAccount(sample.db, {
+      name: "Home loan",
+      institution: null,
+      kind: "mortgage",
+      openingDate: "2026-02-01",
+      openingBalance: -10_000_000,
+      mortgageTerms: terms,
+      ...saved,
+    });
     const split = mortgageSplitForDate({
-      terms,
+      terms: { ...terms, accountId: mortgage.id },
+      opening: { balance: mortgage.openingBalance, date: "2026-02-01" },
       valuations: [],
       date: "2026-03-01",
       fromAccountId: sample.account.id,
@@ -170,7 +165,6 @@ test("a mortgage import links an existing opposite row", () => {
     if (!split) {
       throw new Error("Schedule row is missing");
     }
-    saveMortgageTerms(sample.db, mortgage.id, { ...terms, ...saved });
     const existing = createTransaction(sample.db, {
       accountId: mortgage.id,
       date: "2026-03-01",

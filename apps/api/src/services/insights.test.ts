@@ -10,7 +10,7 @@ import { createAccount, listAccounts } from "./accounts";
 import { createCategory, createCategoryGroup } from "./categories";
 import { readInsights } from "./insights";
 import { createMerchant } from "./merchants";
-import { mortgageAccountView, saveMortgageTerms } from "./mortgage";
+import { mortgageAccountView } from "./mortgage";
 import { createTag } from "./tags";
 import { createTransaction } from "./transactions";
 
@@ -193,11 +193,13 @@ test("net worth at the current month end equals the Accounts balance", () => {
   try {
     const chequing = account(book.db, "Chequing", "chequing", "2026-06-01", 100_000);
     const property = account(book.db, "House", "property", "2026-01-01");
-    const mortgage = account(book.db, "Home loan", "mortgage", "2026-01-01");
     const interest = createCategory(book.db, { name: "Interest", kind: "expense", ...saved });
-    saveMortgageTerms(book.db, mortgage.id, {
-      principal: 1_000_000,
-      principalAsOf: "2026-01-01",
+    const mortgage = createAccount(book.db, {
+      name: "Home loan",
+      kind: "mortgage",
+      openingDate: "2026-01-01",
+      openingBalance: -1_000_000,
+      mortgageTerms: {
       rateMilliPct: 0,
       compounding: "monthly",
       paymentAmount: 100_000,
@@ -208,6 +210,7 @@ test("net worth at the current month end equals the Accounts balance", () => {
       paymentAccountId: chequing.id,
       interestCategoryId: interest.id,
       propertyAccountId: property.id,
+      },
       ...saved,
     });
     spend(book.db, { accountId: chequing.id, date: "2026-05-15", amount: -2_000 });
@@ -227,7 +230,7 @@ test("net worth at the current month end equals the Accounts balance", () => {
     expect(listed.items.find((item) => item.id === mortgage.id)?.balance).toBe(-500_000);
     expect(mortgageAccountView(book.db, mortgage.id, asOf, {}).balance).toBe(-500_000);
     expect(june).toMatchObject({ assets: 98_000 + 2_050_000, liabilities: 500_000, net: 1_648_000 });
-    expect(may).toMatchObject({ date: "2026-05-31", net: 98_000 });
+    expect(may).toMatchObject({ date: "2026-05-31", net: 98_000 - 1_000_000 });
   } finally {
     book.close();
   }

@@ -22,6 +22,13 @@
       "when": 1791850049494,
       "tag": "0002_modern_lightspeed",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791896485105,
+      "tag": "0003_wet_stranger",
+      "breakpoints": true
     }
   ]
 }

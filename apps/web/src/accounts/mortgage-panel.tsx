@@ -52,7 +52,7 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
   });
 
   function openTerms() {
-    void openEditor("mortgage", { id: accountId });
+    void openEditor("account", { id: accountId });
   }
 
   if (view.isPending) {

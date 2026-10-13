@@ -13,8 +13,6 @@ export type PaymentFrequency = (typeof paymentFrequencies)[number];
 const positiveCents = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
 
 export const mortgageTermsWriteSchema = z.object({
-  principal: cents,
-  principalAsOf: isoDateSchema,
   rateMilliPct: interestRateMilliPctSchema,
   compounding: z.enum(compounding),
   paymentAmount: positiveCents,
@@ -33,6 +31,12 @@ export const mortgageTermsSchema = mortgageTermsWriteSchema.extend({
 
 export type MortgageTerms = z.infer<typeof mortgageTermsSchema>;
 export type MortgageTermsWrite = z.infer<typeof mortgageTermsWriteSchema>;
+
+/** The amount owed and the date of the account's opening balance. The schedule starts here (decision 0027). */
+export type MortgageOpening = {
+  balance: number;
+  date: string;
+};
 
 export type MortgageValuation = {
   date: string;
@@ -55,6 +59,18 @@ export type MortgageLoan = {
   extraPerPayment?: number;
   lumpSum?: MortgageLumpSum | null;
 };
+
+export function mortgageLoan(terms: MortgageTermsWrite, opening: MortgageOpening): MortgageLoan {
+  return {
+    principal: Math.abs(opening.balance),
+    principalAsOf: opening.date,
+    rateMilliPct: terms.rateMilliPct,
+    compounding: terms.compounding,
+    paymentAmount: terms.paymentAmount,
+    paymentFrequency: terms.paymentFrequency,
+    firstPaymentDate: terms.firstPaymentDate,
+  };
+}
 
 export type MortgagePaymentRow = {
   date: string;
@@ -116,6 +132,15 @@ export function mortgagePaymentDate(firstPaymentDate: string, index: number, fre
   const months = firstDay <= 15 ? Math.floor(index / 2) : Math.ceil(index / 2);
   const day = index % 2 === 0 ? firstDay : otherDay;
   return clampDay(start.with({ day: 1 }).add({ months }), day);
+}
+
+/** True when the first payment is not one payment period after the opening date. The user can still save. */
+export function mortgageFirstPaymentOffPeriod(
+  openingDate: string,
+  firstPaymentDate: string,
+  frequency: PaymentFrequency,
+): boolean {
+  return mortgagePaymentDate(openingDate, 1, frequency) !== firstPaymentDate;
 }
 
 function daysBetween(from: string, to: string): number {
@@ -272,6 +297,7 @@ export function mortgagePrefillLines(
 
 export function mortgageSplitForDate(input: {
   terms: MortgageTerms;
+  opening: MortgageOpening;
   valuations: MortgageValuation[];
   date: string;
   fromAccountId: string;
@@ -280,7 +306,7 @@ export function mortgageSplitForDate(input: {
   if (input.fromAccountId !== input.terms.paymentAccountId || input.toAccountId !== input.terms.accountId) {
     return null;
   }
-  const schedule = mortgageSchedule(input.terms, input.valuations);
+  const schedule = mortgageSchedule(mortgageLoan(input.terms, input.opening), input.valuations);
   const row = schedule.payments.filter((payment) => payment.date <= input.date).at(-1);
   if (!row) {
     return null;

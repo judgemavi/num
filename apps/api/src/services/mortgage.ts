@@ -1,12 +1,12 @@
-import { accounts, categories, mortgageTerms, valuations } from "@num/db";
+import { accounts, mortgageTerms, valuations } from "@num/db";
 import {
   mortgageExtraEffect,
+  mortgageLoan,
   mortgageNextPayments,
   mortgageSchedule,
   mortgageSplitForDate,
   type MortgagePrefill,
   type MortgageTerms,
-  type MortgageTermsWrite,
   type MortgageValuation,
   type MortgageView,
 } from "@num/shared";
@@ -14,32 +14,9 @@ import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { balanceOf } from "./account-balance";
 import { ServiceError } from "../service-error";
-import { write, type AuditSource, type WriteTx } from "./write";
-
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-type TermRow = typeof mortgageTerms.$inferSelect;
-
-function snapshot(row: TermRow): MortgageTerms {
-  return {
-    accountId: row.accountId,
-    principal: row.principal,
-    principalAsOf: row.principalAsOf,
-    rateMilliPct: row.rateMilliPct,
-    compounding: row.compounding as MortgageTerms["compounding"],
-    paymentAmount: row.paymentAmount,
-    paymentFrequency: row.paymentFrequency as MortgageTerms["paymentFrequency"],
-    firstPaymentDate: row.firstPaymentDate,
-    termEnd: row.termEnd,
-    amortizationMonthsRemaining: row.amortizationMonthsRemaining,
-    paymentAccountId: row.paymentAccountId,
-    interestCategoryId: row.interestCategoryId,
-    propertyAccountId: row.propertyAccountId,
-  };
-}
+import { effectiveOpeningDate } from "./opening-date";
+import { termsSnapshot } from "./mortgage-terms";
+import type { WriteTx } from "./write";
 
 function requireMortgage(db: Db | WriteTx, accountId: string) {
   const account = db.select().from(accounts).where(eq(accounts.id, accountId)).get();
@@ -50,27 +27,6 @@ function requireMortgage(db: Db | WriteTx, accountId: string) {
     throw new ServiceError("not_mortgage", 400);
   }
   return account;
-}
-
-function assertTerms(db: Db | WriteTx, accountId: string, input: MortgageTermsWrite) {
-  if (input.firstPaymentDate < input.principalAsOf || input.termEnd < input.firstPaymentDate) {
-    throw new ServiceError("mortgage_terms_invalid", 400);
-  }
-  const payment = db.select().from(accounts).where(eq(accounts.id, input.paymentAccountId)).get();
-  if (!payment || payment.archivedAt !== null || payment.id === accountId) {
-    throw new ServiceError("payment_account_invalid", 400);
-  }
-  const category = db.select().from(categories).where(eq(categories.id, input.interestCategoryId)).get();
-  if (!category || category.archivedAt !== null || category.kind !== "expense") {
-    throw new ServiceError("interest_category_invalid", 400);
-  }
-  if (input.propertyAccountId === null) {
-    return;
-  }
-  const property = db.select().from(accounts).where(eq(accounts.id, input.propertyAccountId)).get();
-  if (!property || property.archivedAt !== null || property.kind !== "property" || property.id === accountId) {
-    throw new ServiceError("property_account_invalid", 400);
-  }
 }
 
 function activeValuations(db: Db | WriteTx, accountId: string): MortgageValuation[] {
@@ -88,50 +44,7 @@ export function getMortgageTerms(db: Db, accountId: string): MortgageTerms {
   if (!row) {
     throw new ServiceError("mortgage_terms_not_found", 404);
   }
-  return snapshot(row);
-}
-
-export function saveMortgageTerms(db: Db, accountId: string, input: MortgageTermsWrite & WriteInput): MortgageTerms {
-  return write(db, { source: input.source, at: input.at }, (tx) => {
-    const account = requireMortgage(tx, accountId);
-    if (account.archivedAt !== null) {
-      throw new ServiceError("account_archived", 409);
-    }
-    assertTerms(tx, accountId, input);
-    const existing = tx.select().from(mortgageTerms).where(eq(mortgageTerms.accountId, accountId)).get();
-    const values = {
-      accountId,
-      principal: input.principal,
-      principalAsOf: input.principalAsOf,
-      rateMilliPct: input.rateMilliPct,
-      compounding: input.compounding,
-      paymentAmount: input.paymentAmount,
-      paymentFrequency: input.paymentFrequency,
-      firstPaymentDate: input.firstPaymentDate,
-      termEnd: input.termEnd,
-      amortizationMonthsRemaining: input.amortizationMonthsRemaining,
-      paymentAccountId: input.paymentAccountId,
-      interestCategoryId: input.interestCategoryId,
-      propertyAccountId: input.propertyAccountId,
-    };
-    if (existing) {
-      tx.update(mortgageTerms).set(values).where(eq(mortgageTerms.accountId, accountId)).run();
-    } else {
-      tx.insert(mortgageTerms).values(values).run();
-    }
-    const saved = tx.select().from(mortgageTerms).where(eq(mortgageTerms.accountId, accountId)).get();
-    if (!saved) {
-      throw new ServiceError("mortgage_terms_not_found", 404);
-    }
-    tx.audit({
-      entity: "mortgage_terms",
-      entityId: accountId,
-      action: existing ? "update" : "create",
-      before: existing ? snapshot(existing) : null,
-      after: snapshot(saved),
-    });
-    return snapshot(saved);
-  });
+  return termsSnapshot(row);
 }
 
 function actualPayments(db: Db, accountId: string): MortgageView["actualPayments"] {
@@ -158,11 +71,12 @@ export function mortgageAccountView(
 ): MortgageView {
   const account = requireMortgage(db, accountId);
   const terms = getMortgageTerms(db, accountId);
+  const loan = mortgageLoan(terms, { balance: account.openingBalance, date: effectiveOpeningDate(db, account) });
   const checkpoints = activeValuations(db, accountId);
-  const schedule = mortgageSchedule(terms, checkpoints);
+  const schedule = mortgageSchedule(loan, checkpoints);
   const perPayment = options.extra ?? 0;
   const lump = options.lumpSum && options.lumpSum > 0 && options.lumpDate ? { date: options.lumpDate, amount: options.lumpSum } : null;
-  const effect = perPayment > 0 || lump ? mortgageExtraEffect(terms, checkpoints, { perPayment, lumpSum: lump }) : null;
+  const effect = perPayment > 0 || lump ? mortgageExtraEffect(loan, checkpoints, { perPayment, lumpSum: lump }) : null;
   return {
     balance: balanceOf(db, { id: account.id, kind: "mortgage", openingBalance: account.openingBalance }, undefined, undefined, asOf),
     rateMilliPct: terms.rateMilliPct,
@@ -209,7 +123,8 @@ export function mortgagePrefill(db: Db, fromAccountId: string, toAccountId: stri
     return null;
   }
   const split = mortgageSplitForDate({
-    terms: snapshot(row),
+    terms: termsSnapshot(row),
+    opening: { balance: account.openingBalance, date: effectiveOpeningDate(db, account) },
     valuations: activeValuations(db, targetId),
     date,
     fromAccountId,

@@ -3,13 +3,12 @@ import {
   mortgagePrefillQuerySchema,
   mortgagePrefillSchema,
   mortgageTermsSchema,
-  mortgageTermsWriteSchema,
   mortgageViewQuerySchema,
   mortgageViewSchema,
 } from "@num/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { getMortgageTerms, mortgageAccountView, mortgagePrefill, saveMortgageTerms } from "../services/mortgage";
+import { getMortgageTerms, mortgageAccountView, mortgagePrefill } from "../services/mortgage";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -37,29 +36,6 @@ const readRoute = createRoute({
     },
     400: errorResponse,
     404: errorResponse,
-  },
-});
-
-const saveRoute = createRoute({
-  operationId: "put_accounts_id_mortgage_terms",
-  description: "Change accounts. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
-  method: "put",
-  path: "/api/accounts/{id}/mortgage-terms",
-  request: {
-    params: idParams,
-    body: {
-      required: true,
-      content: { "application/json": { schema: mortgageTermsWriteSchema } },
-    },
-  },
-  responses: {
-    200: {
-      description: "The saved mortgage terms",
-      content: { "application/json": { schema: mortgageTermsSchema } },
-    },
-    400: errorResponse,
-    404: errorResponse,
-    409: errorResponse,
   },
 });
 
@@ -99,10 +75,6 @@ const prefillRoute = createRoute({
 
 export function registerMortgage(app: OpenAPIHono, db: Db) {
   app.openapi(readRoute, (c) => c.json(getMortgageTerms(db, c.req.valid("param").id), 200));
-  app.openapi(saveRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(saveMortgageTerms(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
-  });
   app.openapi(viewRoute, (c) => {
     const { id } = c.req.valid("param");
     const query = c.req.valid("query");

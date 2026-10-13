@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   mortgageExtraEffect,
+  mortgageFirstPaymentOffPeriod,
+  mortgageLoan,
   mortgagePaymentDate,
   mortgagePeriodRate,
   mortgagePrefillLines,
@@ -111,8 +113,6 @@ describe("mortgage schedule", () => {
   test("prefill returns the principal and interest for a payment date", () => {
     const terms: MortgageTerms = {
       accountId: "00000000-0000-4000-8000-000000000001",
-      principal: hundredThousand,
-      principalAsOf: "2000-01-01",
       rateMilliPct: 5_000,
       compounding: "semiannual",
       paymentAmount: 58_160,
@@ -127,6 +127,7 @@ describe("mortgage schedule", () => {
     expect(
       mortgageSplitForDate({
         terms,
+        opening: { balance: -hundredThousand, date: "2000-01-01" },
         valuations: [],
         date: "2000-02-01",
         fromAccountId: terms.paymentAccountId,
@@ -141,6 +142,7 @@ describe("mortgage schedule", () => {
     expect(
       mortgageSplitForDate({
         terms,
+        opening: { balance: -hundredThousand, date: "2000-01-01" },
         valuations: [],
         date: "2000-02-02",
         fromAccountId: terms.paymentAccountId,
@@ -155,6 +157,7 @@ describe("mortgage schedule", () => {
     expect(
       mortgageSplitForDate({
         terms,
+        opening: { balance: -hundredThousand, date: "2000-01-01" },
         valuations: [],
         date: "2000-01-15",
         fromAccountId: terms.paymentAccountId,
@@ -166,6 +169,7 @@ describe("mortgage schedule", () => {
     expect(
       mortgageSplitForDate({
         terms,
+        opening: { balance: -hundredThousand, date: "2000-01-01" },
         valuations: [],
         date: "2000-02-01",
         fromAccountId: terms.accountId,
@@ -232,5 +236,59 @@ describe("mortgage schedule", () => {
     expect(schedule.nonAmortizing).toBe(true);
     expect(schedule.payments).toEqual([]);
     expect(schedule.payoffDate).toBeNull();
+  });
+});
+
+describe("opening balance and opening date (decision 0027)", () => {
+  const terms = {
+    rateMilliPct: 5_000,
+    compounding: "semiannual" as const,
+    paymentAmount: 58_160,
+    paymentFrequency: "monthly" as const,
+    firstPaymentDate: "2000-02-01",
+    termEnd: "2005-01-01",
+    amortizationMonthsRemaining: 300,
+    paymentAccountId: "00000000-0000-4000-8000-000000000002",
+    interestCategoryId: "00000000-0000-4000-8000-000000000003",
+    propertyAccountId: null,
+  };
+
+  test("the schedule starts from the amount owed on the opening date", () => {
+    const loan = mortgageLoan(terms, { balance: -hundredThousand, date: "2000-01-01" });
+    expect(loan).toMatchObject({ principal: hundredThousand, principalAsOf: "2000-01-01" });
+    const schedule = mortgageSchedule(loan);
+    expect(schedule.payments[0]).toMatchObject({ date: "2000-02-01", interest: 41_239, principal: 16_921 });
+  });
+
+  test("a different opening balance changes the schedule and the split", () => {
+    const base = mortgageSchedule(mortgageLoan(terms, { balance: -hundredThousand, date: "2000-01-01" }));
+    const lower = mortgageSchedule(mortgageLoan(terms, { balance: -50_000_00, date: "2000-01-01" }));
+    expect(lower.payments[0].interest).toBeLessThan(base.payments[0].interest);
+    expect(lower.payments[0].balance).toBeLessThan(base.payments[0].balance);
+    const split = (balance: number) =>
+      mortgageSplitForDate({
+        terms: { ...terms, accountId: "00000000-0000-4000-8000-000000000001" },
+        opening: { balance, date: "2000-01-01" },
+        valuations: [],
+        date: "2000-02-01",
+        fromAccountId: terms.paymentAccountId,
+        toAccountId: "00000000-0000-4000-8000-000000000001",
+      });
+    expect(split(-hundredThousand)?.interest).toBe(41_239);
+    expect(split(-50_000_00)?.interest).toBe(20_620);
+  });
+
+  test("a later opening date charges interest from that date", () => {
+    const early = mortgageSchedule(mortgageLoan(terms, { balance: -hundredThousand, date: "2000-01-01" }));
+    const late = mortgageSchedule(mortgageLoan(terms, { balance: -hundredThousand, date: "2000-01-16" }));
+    expect(late.payments[0].interest).toBeLessThan(early.payments[0].interest);
+  });
+
+  test("the first payment warning fires when the first payment is not one period after the opening date", () => {
+    expect(mortgageFirstPaymentOffPeriod("2026-03-01", "2026-04-01", "monthly")).toBe(false);
+    expect(mortgageFirstPaymentOffPeriod("2026-03-12", "2026-04-01", "monthly")).toBe(true);
+    expect(mortgageFirstPaymentOffPeriod("2026-03-01", "2026-03-15", "biweekly")).toBe(false);
+    expect(mortgageFirstPaymentOffPeriod("2026-03-01", "2026-03-22", "weekly")).toBe(true);
+    expect(mortgageFirstPaymentOffPeriod("2026-01-31", "2026-02-28", "monthly")).toBe(false);
   });
 });

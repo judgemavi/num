@@ -1,7 +1,6 @@
 import {
   accountSchema,
   bucketSchema,
-  mortgageTermsSchema,
   categoryGroupSchema,
   categorySchema,
   merchantSchema,
@@ -11,7 +10,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AccountForm } from "@/accounts/account-form";
 import { accountLabel } from "@/accounts/label";
-import { MortgageForm } from "@/accounts/mortgage-form";
+import { loadMortgageTerms } from "@/accounts/mortgage-terms-query";
 import { AccountImports } from "@/accounts/account-imports";
 import { BucketForm } from "@/buckets/bucket-form";
 import { LoadError, LoadingLine } from "@/editors/load-state";
@@ -65,17 +64,24 @@ export function TransactionRecord({ props, onClose, onSaved }: { props: EditorIn
 export function AccountRecord({ props, onClose, onSaved }: { props: EditorInput["account"] } & Finish) {
   const currency = useBookCurrency();
   const account = useRecord("account", props.id, `/api/accounts/${props.id ?? ""}`, accountSchema);
-  const save = useSaved([["accounts"], ["account"]], onSaved);
-  if (!currency.data || (props.id && account.isPending)) {
+  const isMortgage = account.data?.kind === "mortgage";
+  const terms = useQuery({
+    queryKey: ["mortgage-terms", props.id],
+    enabled: isMortgage,
+    queryFn: () => loadMortgageTerms(props.id ?? ""),
+  });
+  const save = useSaved([["accounts"], ["account"], ["mortgage-terms"], ["mortgage-view"]], onSaved);
+  if (!currency.data || (props.id && account.isPending) || (isMortgage && terms.isPending)) {
     return <LoadingLine label="Loading the account." />;
   }
-  if (currency.isError || account.isError) {
+  if (currency.isError || account.isError || terms.isError) {
     return <LoadError label="The account did not load." onRetry={() => void account.refetch()} />;
   }
   return (
     <AccountForm
       currency={currency.data}
       account={props.id ? (account.data ?? null) : null}
+      terms={terms.data ?? null}
       initialName={props.name}
       onClose={onClose}
       onSaved={save}
@@ -84,46 +90,6 @@ export function AccountRecord({ props, onClose, onSaved }: { props: EditorInput[
           <AccountImports accountId={props.id} accountName={accountLabel(account.data)} currency={currency.data} />
         ) : null
       }
-    />
-  );
-}
-
-export function MortgageRecord({ props, onClose, onSaved }: { props: EditorInput["mortgage"] } & Finish) {
-  const currency = useBookCurrency();
-  const accounts = useAccounts();
-  const categories = useCategories();
-  const terms = useQuery({
-    queryKey: ["mortgage-terms", props.id],
-    enabled: props.id !== null,
-    queryFn: async () => {
-      const result = await apiRequest(`/api/accounts/${props.id}/mortgage-terms`, mortgageTermsSchema);
-      if (!result.ok) {
-        if (result.code === "mortgage_terms_not_found") {
-          return null;
-        }
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-  const save = useSaved([["mortgage-terms"], ["mortgage-view"], ["account"], ["accounts"]], onSaved);
-  if (!props.id) {
-    return <LoadError label="Open mortgage terms from a mortgage account." onRetry={onClose} />;
-  }
-  if (!currency.data || accounts.isPending || categories.isPending || terms.isPending) {
-    return <LoadingLine label="Loading the mortgage terms." />;
-  }
-  if (currency.isError || accounts.isError || categories.isError || terms.isError || !accounts.data || !categories.data) {
-    return <LoadError label="The mortgage terms did not load." onRetry={() => void terms.refetch()} />;
-  }
-  return (
-    <MortgageForm
-      accountId={props.id}
-      currency={currency.data}
-      terms={terms.data ?? null}
-      accounts={accounts.data}
-      categories={categories.data}
-      onSaved={save}
     />
   );
 }

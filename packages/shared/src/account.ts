@@ -5,6 +5,7 @@ import { listQuerySchema, pagedResponseSchema } from "./list";
 import { interestRateMilliPctSchema } from "./rate";
 import { isUtcTimestamp } from "./time";
 import { centsSchema } from "./money";
+import { mortgageTermsWriteSchema } from "./mortgage";
 
 export const accountKinds = [
   "chequing",
@@ -89,6 +90,13 @@ const accountFields = {
   paymentPolicy: z.enum(paymentPolicies).nullable().optional(),
   fixedPayment: nonNegativeCentsSchema.nullable().optional(),
   interestRateMilliPct: interestRateMilliPctSchema.nullable().optional(),
+  mortgageTerms: mortgageTermsWriteSchema
+    .nullable()
+    .optional()
+    .meta({
+      description:
+        "Only for a mortgage. An object sets the terms. null removes them. Leave it out to keep the terms. The terms need an opening date.",
+    }),
 };
 
 function cardAndRateOk(
@@ -97,6 +105,8 @@ function cardAndRateOk(
     paymentPolicy?: PaymentPolicy | null;
     fixedPayment?: number | null;
     interestRateMilliPct?: number | null;
+    openingDate?: string | null;
+    mortgageTerms?: unknown;
   },
   context: z.RefinementCtx,
 ): void {
@@ -112,6 +122,13 @@ function cardAndRateOk(
     }
   } else if (policy !== null || fixed !== null) {
     context.addIssue({ code: "custom", path: ["paymentPolicy"] });
+  }
+  if ((value.mortgageTerms ?? null) !== null) {
+    if (value.kind !== "mortgage") {
+      context.addIssue({ code: "custom", path: ["mortgageTerms"] });
+    } else if (!value.openingDate) {
+      context.addIssue({ code: "custom", path: ["openingDate"] });
+    }
   }
   if ((value.interestRateMilliPct ?? null) !== null && !allowsInterestRate(value.kind)) {
     context.addIssue({ code: "custom", path: ["interestRateMilliPct"] });

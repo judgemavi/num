@@ -491,6 +491,8 @@ export {
 export {
   compounding,
   mortgageExtraEffect,
+  mortgageFirstPaymentOffPeriod,
+  mortgageLoan,
   mortgageNextPayments,
   mortgagePaymentDate,
   mortgagePaymentSchema,

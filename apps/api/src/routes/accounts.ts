@@ -48,7 +48,7 @@ const listRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_accounts",
-  description: "Create or run accounts. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run accounts. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive. For a mortgage, the same call saves the mortgage terms (mortgageTerms). null removes the terms. Terms need an opening date and make it fixed.",
   method: "post",
   path: "/api/accounts",
   request: {
@@ -76,7 +76,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_accounts_id",
-  description: "Change accounts. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Change accounts. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive. For a mortgage, the same call saves the mortgage terms (mortgageTerms). null removes the terms. Terms need an opening date and make it fixed.",
   method: "patch",
   path: "/api/accounts/{id}",
   request: {

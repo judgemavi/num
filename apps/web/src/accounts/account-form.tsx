@@ -15,10 +15,13 @@ import {
   toMinorUnits,
   type Account,
   type AccountKind,
+  type MortgageTerms,
   type PaymentPolicy,
 } from "@num/shared";
 import { useState, type ReactNode } from "react";
 import { accountError, policyLabel } from "@/accounts/format";
+import { draftFromTerms, draftIsBlank, termsFromDraft, type MortgageDraft } from "@/accounts/mortgage-draft";
+import { MortgageSection, openingDateHelp } from "@/accounts/mortgage-section";
 import { KindPicker } from "@/accounts/kind-picker";
 import { sameClassKinds } from "@/accounts/groups";
 import { apiRequest } from "@/request";
@@ -37,6 +40,8 @@ type AccountFormProps = {
   initialName?: string;
   currency: string;
   account: Account | null;
+  /** The saved terms of a mortgage account. Null when the account has none. */
+  terms?: MortgageTerms | null;
   inline?: boolean;
   below?: ReactNode;
   onClose: () => void;
@@ -80,7 +85,7 @@ function localToday(): string {
   return Temporal.Now.plainDateISO().toString();
 }
 
-export function AccountForm({ currency, account, initialName, inline = false, below, onClose, onSaved }: AccountFormProps) {
+export function AccountForm({ currency, account, terms = null, initialName, inline = false, below, onClose, onSaved }: AccountFormProps) {
   const [name, setName] = useState(account?.name ?? initialName ?? "");
   const [institution, setInstitution] = useState(account?.institution ?? "");
   const [kind, setKind] = useState<AccountKind>(account?.kind ?? "chequing");
@@ -98,9 +103,11 @@ export function AccountForm({ currency, account, initialName, inline = false, be
       ? ""
       : milliPctToPercent(account.interestRateMilliPct),
   );
+  const [mortgage, setMortgage] = useState<MortgageDraft>(() => draftFromTerms(currency, terms));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const liability = accountClass(kind) === "liability";
+  const termsOn = kind === "mortgage" && !draftIsBlank(mortgage);
   const allowed = account ? sameClassKinds(account.kind) : accountKinds;
 
   function changeOpeningDate(value: string) {
@@ -136,7 +143,7 @@ export function AccountForm({ currency, account, initialName, inline = false, be
         setError("Choose how you pay this card.");
         return;
       }
-      if (!automatic && openingDate.trim().length === 0) {
+      if ((!automatic || termsOn) && openingDate.trim().length === 0) {
         setError("Enter the date, or use the automatic date.");
         return;
       }
@@ -155,7 +162,7 @@ export function AccountForm({ currency, account, initialName, inline = false, be
         institution: institution.trim().length === 0 ? null : institution.trim(),
         kind,
         onBudget,
-        openingDate: automatic ? null : openingDate,
+        openingDate: automatic && !termsOn ? null : openingDate,
         ...(openingBalance.trim().length === 0
           ? {}
           : {
@@ -166,6 +173,7 @@ export function AccountForm({ currency, account, initialName, inline = false, be
             }),
         interestRateMilliPct: allowsInterestRate(kind) ? readInterest(interestRate) : null,
         ...card,
+        ...(kind === "mortgage" ? { mortgageTerms: termsFromDraft(currency, mortgage) } : {}),
       };
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Check the account fields.");
@@ -229,7 +237,9 @@ export function AccountForm({ currency, account, initialName, inline = false, be
           <Field>
             <FieldLabel htmlFor="opening-date">On this date</FieldLabel>
             <DateField id="opening-date" value={openingDate} onChange={changeOpeningDate} />
-            {automatic ? (
+            {termsOn ? (
+              <FieldDescription>{openingDateHelp}</FieldDescription>
+            ) : automatic ? (
               <FieldDescription className="flex flex-wrap items-center gap-2">
                 <Badge variant="neutral">Automatic</Badge>
                 {account?.automaticFollowsTransactions
@@ -246,6 +256,15 @@ export function AccountForm({ currency, account, initialName, inline = false, be
         <p className="text-sm text-muted-foreground" style={{ marginTop: 0 }}>
           Leave the balance blank to start at 0. Num counts forward from this date.
         </p>
+        {kind === "mortgage" ? (
+          <MortgageSection
+            accountId={account?.id ?? null}
+            openingDate={openingDate}
+            draft={mortgage}
+            onChange={setMortgage}
+            onClear={() => setMortgage(draftFromTerms(currency, null))}
+          />
+        ) : null}
         {kind === "credit_card" ? (
           <>
             <Field>

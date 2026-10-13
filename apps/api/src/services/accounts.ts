@@ -17,6 +17,7 @@ import { ServiceError } from "../service-error";
 import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
 import { assertCanArchive, assertSameClass, cardFields, interestRate, type CardFields } from "./account-rules";
 import { accountAuditSnapshot, readColumnMap } from "./account-snapshot";
+import { resolveTerms, saveTerms } from "./mortgage-terms";
 import { earliestTransactionDate, effectiveOpeningDate } from "./opening-date";
 import { write, type AuditSource, type WriteTx } from "./write";
 
@@ -158,6 +159,7 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
   const at = input.at ?? utcNow();
   const opening = resolveOpening(input, null);
   const id = crypto.randomUUID();
+  const terms = resolveTerms(db, id, input.kind, input.mortgageTerms);
   const row = {
     id,
     ...storedFields({
@@ -183,6 +185,7 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
       before: null,
       after: accountAuditSnapshot(row),
     });
+    saveTerms(tx, id, row.openingDate, terms);
   });
   return toAccount(db, row, row.openingBalance);
 }
@@ -199,13 +202,16 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
     assertSameClass(currentKind, input.kind);
     const card = cardFields(input.kind, input);
     const rate = interestRate(input.kind, input.interestRateMilliPct);
+    const terms = resolveTerms(tx, id, input.kind, input.mortgageTerms);
     const opening = resolveOpening(input, existing.openingDate);
+    // A mortgage with terms has a fixed opening date (decision 0027).
+    const openingDate = terms && opening.openingDate === null ? effectiveOpeningDate(tx, existing) : opening.openingDate;
     const next = storedFields({
       name: input.name.trim(),
       institution: blankToNull(input.institution),
       kind: input.kind,
       onBudget: input.onBudget,
-      openingDate: opening.openingDate,
+      openingDate,
       openingBalance: opening.openingBalance,
       archivedAt: existing.archivedAt,
       card,
@@ -219,6 +225,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
       before: accountAuditSnapshot(existing),
       after: accountAuditSnapshot({ ...existing, ...next }),
     });
+    saveTerms(tx, id, openingDate, terms);
     updated = toAccount(
       tx,
       { ...existing, ...next },

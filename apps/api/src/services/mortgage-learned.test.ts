@@ -8,7 +8,7 @@ import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { applyInboxGroup } from "./inbox-group";
-import { mortgageAccountView, saveMortgageTerms } from "./mortgage";
+import { mortgageAccountView } from "./mortgage";
 import { suggestForPayee } from "./suggestions";
 import { listNeedsReview } from "./needs-review";
 import { approveFiltered } from "./review-approve";
@@ -27,10 +27,7 @@ function book() {
   const account = createAccount(db, { name: "Everyday", institution: null, kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
   const interest = createCategory(db, { name: "Interest", kind: "expense", ...saved });
   const other = createCategory(db, { name: "Fees", kind: "expense", ...saved });
-  const mortgage = createAccount(db, { name: "Strive Mortgage", institution: null, kind: "mortgage", openingDate: "2026-01-01", openingBalance: -10_000_000, ...saved });
   const terms = {
-    principal: 10_000_000,
-    principalAsOf: "2026-03-01",
     rateMilliPct: 5000,
     compounding: "semiannual" as const,
     paymentAmount: 58160,
@@ -42,7 +39,15 @@ function book() {
     interestCategoryId: interest.id,
     propertyAccountId: null,
   };
-  saveMortgageTerms(db, mortgage.id, { ...terms, ...saved });
+  const mortgage = createAccount(db, {
+    name: "Strive Mortgage",
+    institution: null,
+    kind: "mortgage",
+    openingDate: "2026-02-01",
+    openingBalance: -10_000_000,
+    mortgageTerms: terms,
+    ...saved,
+  });
   return {
     db,
     account,
@@ -62,6 +67,7 @@ type Sample = ReturnType<typeof book>;
 function interestOn(sample: Sample, date: string): number {
   const split = mortgageSplitForDate({
     terms: sample.terms,
+    opening: { balance: sample.mortgage.openingBalance, date: sample.mortgage.openingDate },
     valuations: sample.db.select({ date: valuations.date, balance: valuations.balance }).from(valuations).all(),
     date,
     fromAccountId: sample.account.id,

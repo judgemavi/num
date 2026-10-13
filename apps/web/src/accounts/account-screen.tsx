@@ -87,11 +87,6 @@ export function AccountScreen() {
             <Button type="button" variant="outline" onClick={() => void openEditor("account", { id: accountId })}>
               Edit
             </Button>
-            {row.kind === "mortgage" ? (
-              <Button type="button" variant="outline" onClick={() => void openEditor("mortgage", { id: accountId })}>
-                Mortgage terms
-              </Button>
-            ) : null}
             <Button
               type="button"
               onClick={() => {
