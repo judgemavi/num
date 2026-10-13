@@ -9,20 +9,16 @@ const right = 16;
 const top = 16;
 const bottom = 36;
 
-export type ChartSeries = {
+type ChartSeries = {
   name: string;
   amounts: number[];
-  dashed?: boolean;
 };
 
 type ForecastChartProps = {
   currency: string;
   dates: string[];
-  label?: string;
-  known?: number[];
-  estimated?: number[];
-  lowest?: { date: string; amount: number };
-  series?: ChartSeries[];
+  label: string;
+  series: ChartSeries[];
 };
 
 function shortDate(iso: string): string {
@@ -44,12 +40,8 @@ function stepPath(points: { x: number; y: number }[]): string {
   return path;
 }
 
-export function ForecastChart({ currency, dates, known = [], estimated = [], lowest, series, label }: ForecastChartProps) {
+export function ForecastChart({ currency, dates, series: lines, label }: ForecastChartProps) {
   const [hover, setHover] = useState<number | null>(null);
-  const lines: ChartSeries[] = series ?? [
-    { name: "Known", amounts: known },
-    { name: "Estimated", amounts: estimated, dashed: true },
-  ];
   const values = lines.flatMap((line) => line.amounts);
   const peak = Math.max(...values, 0);
   const floor = Math.min(...values, 0);
@@ -63,10 +55,6 @@ export function ForecastChart({ currency, dates, known = [], estimated = [], low
   const linePoints = lines.map((line) => line.amounts.map((value, index) => ({ x: xAt(index), y: yAt(value) })));
   const linePaths = linePoints.map((points) => stepPath(points));
   const zero = yAt(0);
-  const lowIndex = lowest ? Math.max(0, dates.indexOf(lowest.date)) : 0;
-  const lowX = xAt(lowIndex);
-  const lowY = lowest ? yAt(lines[1]?.amounts[lowIndex] ?? lines[0]?.amounts[lowIndex] ?? lowest.amount) : 0;
-  const labelLeft = lowX > width * 0.72;
   const ticks = [yMin, Math.round((yMin + yMax) / 2), yMax];
   const dateIndexes = [0, Math.round((dates.length - 1) / 3), Math.round(((dates.length - 1) * 2) / 3), dates.length - 1];
   const hoverDate = hover === null ? null : dates[hover];
@@ -77,12 +65,7 @@ export function ForecastChart({ currency, dates, known = [], estimated = [], low
         viewBox={`0 0 ${width} ${height}`}
         className="h-auto w-full"
         role="img"
-        aria-label={
-          label ??
-          (lowest
-            ? `Forecast. Lowest estimated point ${formatMoney(currency, lowest.amount)} on ${shortDate(lowest.date)}.`
-            : "Chart")
-        }
+        aria-label={label}
       >
         {ticks.map((tick) => (
           <g key={tick}>
@@ -105,23 +88,9 @@ export function ForecastChart({ currency, dates, known = [], estimated = [], low
             fill="none"
             strokeWidth="2.5"
             strokeLinejoin="round"
-            strokeDasharray={line.dashed ? "7 5" : undefined}
-            className={line.dashed ? "stroke-est" : "stroke-primary"}
+            className="stroke-primary"
           />
         ))}
-        {lowest ? (
-          <>
-            <circle cx={lowX} cy={lowY} r="7" className="fill-card stroke-attn" strokeWidth="3" />
-            <text
-              x={labelLeft ? lowX - 10 : lowX + 12}
-              y={Math.min(lowY + 22, height - bottom)}
-              textAnchor={labelLeft ? "end" : "start"}
-              className="fill-attn text-[13px] font-semibold"
-            >
-              {`Lowest point: ${formatMoney(currency, lowest.amount)} on ${shortDate(lowest.date)}`}
-            </text>
-          </>
-        ) : null}
         {hover !== null ? (
           <line x1={xAt(hover)} x2={xAt(hover)} y1={top} y2={height - bottom} className="stroke-muted-foreground" strokeWidth="1" />
         ) : null}

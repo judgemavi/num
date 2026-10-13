@@ -2,9 +2,13 @@ import { accounts } from "@num/db";
 import { accountClass, accountKinds, type AccountKind } from "@num/shared";
 import type { Db } from "../db";
 import { balanceOf } from "./account-balance";
-import type { MonthPoint } from "./insights-spend";
 
-function asKind(value: string): AccountKind {
+export type MonthPoint = {
+  month: string;
+  date: string;
+};
+
+export function asKind(value: string): AccountKind {
   if (!(accountKinds as readonly string[]).includes(value)) {
     throw new Error("Unknown account kind");
   }

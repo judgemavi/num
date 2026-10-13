@@ -158,6 +158,14 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 
 **Full height:** the app shell fills the viewport height. The desktop sidebar is full height and stays in place when the page scrolls.
 
+**Charts (decision 0030):** use only the chart tokens `chart-1` to `chart-5`, `est` and `attn`.
+- Insights timeline: income bars `chart-3`, spending bars `chart-2`, balance line `chart-5`.
+  Forecast bars and the balance forecast line use the same colour at a lower opacity (lighter tone).
+  When the forecast ends inside a month, the forecast part of that bar also has a dashed outline in the same colour.
+  The known-only forecast line is `est`, dashed. The lowest forecast point is `attn`. The `asOf` marker is `muted`, dashed.
+- Spending donut: slices take `chart-1` to `chart-5` in order. After 5 slices, the colours repeat at a lower opacity.
+  "Uncategorized" is `est`. The list under the donut shows the same colour as a dot in each row.
+
 ## 6a. Transaction editor
 
 The transaction editor is one shared editor (§6b). Home, Transactions, import detail and Recurring open it.

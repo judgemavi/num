@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AccountKind, PaymentPolicy } from "./account";
 import { cardStatements } from "./card-statement";
 import { isoDateSchema } from "./date";
+import { isMonthKey } from "./month";
 import { billReserveDays } from "./funding";
 import { medianMinor } from "./recurring-calc";
 import { centsSchema } from "./money";
@@ -22,6 +23,12 @@ const seriesSchema = z.object({
 const pointSchema = z.object({
   date: isoDateSchema,
   amount: centsSchema,
+});
+
+const monthFlowSchema = z.object({
+  month: z.string().refine(isMonthKey),
+  income: centsSchema,
+  spending: centsSchema,
 });
 
 export const forecastSchema = z.object({
@@ -47,9 +54,11 @@ export const forecastSchema = z.object({
     }),
   ),
   total: seriesSchema,
+  months: z.array(monthFlowSchema),
 });
 
 export type Forecast = z.infer<typeof forecastSchema>;
+export type ForecastMonth = z.infer<typeof monthFlowSchema>;
 export type ForecastWarningCode = (typeof forecastWarningCodes)[number];
 export type ForecastRisk = (typeof forecastRisks)[number];
 
@@ -58,6 +67,13 @@ export type ForecastDelta = {
   accountId: string;
   amount: number;
   series: "known" | "estimated";
+};
+
+/** Income and spending of one forecast day. Spending is positive when money goes out. */
+export type ForecastFlow = {
+  date: string;
+  income: number;
+  spending: number;
 };
 
 export type ForecastCard = {
@@ -78,6 +94,7 @@ export type ForecastInput = {
   warnings: { code: ForecastWarningCode; accountId: string }[];
   accounts: { id: string; kind: AccountKind; balance: number }[];
   deltas: ForecastDelta[];
+  flows: ForecastFlow[];
   cards: ForecastCard[];
 };
 
@@ -135,6 +152,26 @@ export function spendDeltas(dates: readonly string[], items: readonly { accountI
     }
   }
   return deltas;
+}
+
+function forecastMonths(dates: readonly string[], flows: readonly ForecastFlow[]): ForecastMonth[] {
+  const days = new Set(dates);
+  const months = new Map<string, ForecastMonth>();
+  for (const date of dates) {
+    const month = date.slice(0, 7);
+    if (!months.has(month)) {
+      months.set(month, { month, income: 0, spending: 0 });
+    }
+  }
+  for (const flow of flows) {
+    const month = months.get(flow.date.slice(0, 7));
+    if (!month || !days.has(flow.date)) {
+      continue;
+    }
+    month.income += flow.income;
+    month.spending += flow.spending;
+  }
+  return [...months.values()];
 }
 
 function dailyShares(total: number, daysInMonth: number): number[] {
@@ -332,5 +369,6 @@ export function buildForecast(input: ForecastInput): Forecast {
       };
     }),
     total: { known: totalKnown, estimated: totalEstimated },
+    months: forecastMonths(dates, input.flows),
   };
 }

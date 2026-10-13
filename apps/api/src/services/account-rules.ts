@@ -11,14 +11,18 @@ type CardInput = {
   fixedPayment?: number | null;
 };
 
+/** A valuation sets the balance of these kinds (§5.10). */
+export function usesValuation(kind: AccountKind): boolean {
+  return kind === "investment" || kind === "property" || kind === "mortgage";
+}
+
 export function accountBalance(input: {
   kind: AccountKind;
   openingBalance: number;
   transactionTotal: number;
   valuation: { balance: number; transactionsAfter: number } | null;
 }): number {
-  const marked = input.kind === "investment" || input.kind === "property" || input.kind === "mortgage";
-  if (marked && input.valuation) {
+  if (usesValuation(input.kind) && input.valuation) {
     return input.valuation.balance + input.valuation.transactionsAfter;
   }
   return input.openingBalance + input.transactionTotal;

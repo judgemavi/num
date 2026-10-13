@@ -194,7 +194,7 @@ test("a read tool returns the same data as REST", async () => {
       ["list_plans", { accountId, kind: "bill" }, `/api/recurring?accountId=${accountId}&kind=bill`],
       ["list_occurrences", { id: planId, asOf }, `/api/recurring/${planId}/occurrences?asOf=${asOf}`],
       ["get_forecast", { asOf }, `/api/forecast?asOf=${asOf}`],
-      ["get_insights", { asOf, by: "category" }, `/api/insights?asOf=${asOf}&by=category`],
+      ["get_insights", { asOf, window: "3" }, `/api/insights?asOf=${asOf}&window=3`],
       ["get_hygiene", { asOf }, `/api/hygiene?asOf=${asOf}`],
       ["list_imports", { accountId, from: "2026-01-01" }, `/api/imports?accountId=${accountId}&from=2026-01-01`],
     ];

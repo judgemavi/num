@@ -159,14 +159,18 @@ export {
 } from "./month-plan";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
 export {
-  insightBreakdowns,
+  defaultInsightWindow,
   insightRowKinds,
+  insightWindows,
   insightsQuerySchema,
   insightsSchema,
   insightsSearchSchema,
-  type InsightBreakdown,
+  type InsightFlow,
   type InsightRow,
   type InsightRowKind,
+  type InsightTimeline,
+  type InsightTimelineMonth,
+  type InsightWindow,
   type Insights,
   type InsightsQuery,
   type InsightsSearch,
@@ -415,7 +419,9 @@ export {
   type Forecast,
   type ForecastCard,
   type ForecastDelta,
+  type ForecastFlow,
   type ForecastInput,
+  type ForecastMonth,
   type ForecastRisk,
   type ForecastWarningCode,
 } from "./forecast";

@@ -16,7 +16,7 @@ const insightsRoute = createRoute({
   request: { query: insightsQuerySchema },
   responses: {
     200: {
-      description: "Spending, the 12-month trend and net worth",
+      description: "Spending by group and category, merchant and tag lists, the timeline (actual and forecast) and net worth",
       content: { "application/json": { schema: insightsSchema } },
     },
     400: errorResponse,

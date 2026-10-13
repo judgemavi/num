@@ -4,43 +4,16 @@ import {
   isIncomeLine,
   isUncategorizedLine,
   uncategorizedFlows,
-  type InsightBreakdown,
   type InsightRow,
 } from "@num/shared";
-import type { Db } from "../db";
-import { loadLedgerLines, type LedgerLine } from "./ledger-lines";
+import type { LedgerLine } from "./ledger-lines";
+import type { Period } from "./insights-period";
 
-export type SpendFact = LedgerLine;
+/** The donut level: all groups, or the categories of one group ("none" = categories with no group). */
+export type DonutLevel = { group: string | null };
 
-export type MonthPoint = {
-  month: string;
-  date: string;
-};
-
-type Period = {
-  from: string;
-  to: string;
-};
-
-export function loadSpendFacts(db: Db): SpendFact[] {
-  return loadLedgerLines(db);
-}
-
-function inPeriod(fact: SpendFact, period: Period): boolean {
+function inPeriod(fact: LedgerLine, period: Period): boolean {
   return fact.date >= period.from && fact.date <= period.to;
-}
-
-function keysFor(fact: SpendFact, by: InsightBreakdown): string[] {
-  if (by === "category") {
-    return fact.categoryId ? [fact.categoryId] : [];
-  }
-  if (by === "group") {
-    return [fact.groupId ?? ""];
-  }
-  if (by === "merchant") {
-    return [fact.merchantId ?? ""];
-  }
-  return fact.tagIds.length > 0 ? fact.tagIds : [""];
 }
 
 function compareRows(left: InsightRow, right: InsightRow): number {
@@ -55,15 +28,21 @@ function compareRows(left: InsightRow, right: InsightRow): number {
   return leftId > rightId ? 1 : 0;
 }
 
-function row(id: string | null, kind: InsightRow["kind"], amount: number, inflow: number | null): InsightRow {
-  return { id, kind, amount, inflow };
+function itemRows(totals: Map<string, number>): InsightRow[] {
+  const rows: InsightRow[] = [];
+  for (const [key, amount] of totals) {
+    rows.push(key === "" ? { id: null, kind: "none", amount, inflow: null } : { id: key, kind: "item", amount, inflow: null });
+  }
+  return rows.sort(compareRows);
 }
 
-export function spendingReport(facts: readonly SpendFact[], period: Period, by: InsightBreakdown) {
+function addTo(totals: Map<string, number>, key: string, amount: number) {
+  totals.set(key, (totals.get(key) ?? 0) + amount);
+}
+
+export function spendTotals(facts: readonly LedgerLine[], period: Period) {
   let income = 0;
   let spending = 0;
-  const uncategorizedAmounts: number[] = [];
-  const totals = new Map<string, number>();
   for (const fact of facts) {
     if (!inPeriod(fact, period)) {
       continue;
@@ -72,63 +51,72 @@ export function spendingReport(facts: readonly SpendFact[], period: Period, by: 
       income += fact.amount;
     }
     if (isExpenseLine(fact)) {
-      const spent = expenseSpending(fact.amount);
-      spending += spent;
-      for (const key of keysFor(fact, by)) {
-        totals.set(key, (totals.get(key) ?? 0) + spent);
-      }
-    }
-    if (isUncategorizedLine(fact)) {
-      uncategorizedAmounts.push(fact.amount);
+      spending += expenseSpending(fact.amount);
     }
   }
-  const rows: InsightRow[] = [];
-  for (const [key, amount] of totals) {
-    if (amount === 0) {
+  return { income, spending, savings: income - spending };
+}
+
+/**
+ * Rows of one donut level. Refunds decrease spending. An item with lines stays in the list,
+ * also when its spending is zero or less. Uncategorized lines are one row at level 1.
+ */
+export function donutRows(facts: readonly LedgerLine[], period: Period, level: DonutLevel): InsightRow[] {
+  const totals = new Map<string, number>();
+  const uncategorized: number[] = [];
+  for (const fact of facts) {
+    if (!inPeriod(fact, period)) {
       continue;
     }
-    rows.push(key === "" ? row(null, "none", amount, null) : row(key, "item", amount, null));
-  }
-  rows.sort(compareRows);
-  if (uncategorizedAmounts.length > 0) {
-    const flows = uncategorizedFlows(uncategorizedAmounts);
-    rows.push(row(null, "uncategorized", flows.spent, flows.inflow));
-  }
-  return { income, spending, savings: income - spending, rows };
-}
-
-function inMonth(fact: SpendFact, point: MonthPoint): boolean {
-  return fact.month === point.month && fact.date <= point.date;
-}
-
-export function trendReport(facts: readonly SpendFact[], months: readonly MonthPoint[], categoryId: string | null) {
-  const trend = months.map((point) => {
-    let spending = 0;
-    let income = 0;
-    for (const fact of facts) {
-      if (!inMonth(fact, point)) {
-        continue;
-      }
-      if (isExpenseLine(fact)) {
-        spending += expenseSpending(fact.amount);
-      }
-      if (isIncomeLine(fact)) {
-        income += fact.amount;
+    if (isExpenseLine(fact)) {
+      const spent = expenseSpending(fact.amount);
+      if (level.group === null) {
+        addTo(totals, fact.groupId ?? "", spent);
+      } else if ((fact.groupId ?? "none") === level.group && fact.categoryId !== null) {
+        addTo(totals, fact.categoryId, spent);
       }
     }
-    return { month: point.month, spending, income };
-  });
-  const categoryTrend =
-    categoryId === null
-      ? null
-      : months.map((point) => {
-          let spending = 0;
-          for (const fact of facts) {
-            if (inMonth(fact, point) && isExpenseLine(fact) && fact.categoryId === categoryId) {
-              spending += expenseSpending(fact.amount);
-            }
-          }
-          return { month: point.month, spending };
-        });
-  return { trend, categoryTrend };
+    if (level.group === null && isUncategorizedLine(fact)) {
+      uncategorized.push(fact.amount);
+    }
+  }
+  const rows = itemRows(totals);
+  if (uncategorized.length > 0) {
+    const flows = uncategorizedFlows(uncategorized);
+    rows.push({ id: null, kind: "uncategorized", amount: flows.spent, inflow: flows.inflow });
+  }
+  return rows;
+}
+
+export function categoryRow(facts: readonly LedgerLine[], period: Period, categoryId: string): InsightRow {
+  let amount = 0;
+  for (const fact of facts) {
+    if (inPeriod(fact, period) && isExpenseLine(fact) && fact.categoryId === categoryId) {
+      amount += expenseSpending(fact.amount);
+    }
+  }
+  return { id: categoryId, kind: "item", amount, inflow: null };
+}
+
+/**
+ * Spending by merchant or by tag, largest first.
+ * With `noneRow`, a line with no key goes to the "none" row. Without it, the line is not in the list.
+ */
+export function spendRows(
+  facts: readonly LedgerLine[],
+  period: Period,
+  keysOf: (fact: LedgerLine) => string[],
+  noneRow: boolean,
+): InsightRow[] {
+  const totals = new Map<string, number>();
+  for (const fact of facts) {
+    if (!inPeriod(fact, period) || !isExpenseLine(fact)) {
+      continue;
+    }
+    const keys = keysOf(fact);
+    for (const key of keys.length > 0 || !noneRow ? keys : [""]) {
+      addTo(totals, key, expenseSpending(fact.amount));
+    }
+  }
+  return itemRows(totals);
 }

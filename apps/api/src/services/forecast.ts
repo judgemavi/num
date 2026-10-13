@@ -29,6 +29,7 @@ import {
   type BusinessDayShift,
   type Forecast,
   type ForecastDelta,
+  type ForecastFlow,
   type PaymentPolicy,
   type PlanFrequency,
   type PlanSchedule,
@@ -136,6 +137,16 @@ function planAmount(plan: PlanRow, links: { planId: string; dueDate: string; tra
   return variableAmounts(actuals, plan.expectedAmount).forecast;
 }
 
+function planFlows(kind: string, date: string, amount: number): ForecastFlow[] {
+  if (kind === "income") {
+    return [{ date, income: amount, spending: 0 }];
+  }
+  if (kind === "bill") {
+    return [{ date, income: 0, spending: -amount }];
+  }
+  return [];
+}
+
 export function readForecast(db: Db, asOf: string): Forecast {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
@@ -170,6 +181,7 @@ export function readForecast(db: Db, asOf: string): Forecast {
     }
   }
   const deltas: ForecastDelta[] = [];
+  const flows: ForecastFlow[] = [];
   const incomeDates: string[] = [];
   const incomeHorizon = Temporal.PlainDate.from(asOf).add({ years: 1 }).toString();
   for (const plan of plans) {
@@ -188,6 +200,7 @@ export function readForecast(db: Db, asOf: string): Forecast {
       }
       if (accountIds.has(plan.accountId)) {
         deltas.push({ date: date.dueDate, accountId: plan.accountId, amount, series: "known" });
+        flows.push(...planFlows(plan.kind, date.dueDate, amount));
       }
       if (plan.kind === "transfer" && plan.transferAccountId && accountIds.has(plan.transferAccountId)) {
         deltas.push({ date: date.dueDate, accountId: plan.transferAccountId, amount: -amount, series: "known" });
@@ -260,7 +273,9 @@ export function readForecast(db: Db, asOf: string): Forecast {
       monthly.push({ accountId, monthly: amount });
     }
   }
-  deltas.push(...spendDeltas(dates, monthly));
+  const variable = spendDeltas(dates, monthly);
+  deltas.push(...variable);
+  flows.push(...variable.map((delta) => ({ date: delta.date, income: 0, spending: -delta.amount })));
 
   const warnings: Forecast["warnings"] = [];
   const cards = [];
@@ -312,6 +327,7 @@ export function readForecast(db: Db, asOf: string): Forecast {
       balance: balanceAsOf(db, { id: row.id, kind: asKind(row.kind), openingBalance: row.openingBalance }, asOf),
     })),
     deltas,
+    flows,
     cards,
   });
   return forecast;

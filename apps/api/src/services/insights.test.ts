@@ -98,13 +98,14 @@ function rawClassified(db: Db) {
   return { raw, spending, income, uncategorized };
 }
 
-test("refunds reduce spending, transfers are excluded, and uncategorized is its own row", () => {
+test("group totals: refunds reduce spending, transfers are excluded, No group and Uncategorized are rows", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db, "Chequing", "chequing", "2026-01-01");
     const savings = account(book.db, "Savings", "savings", "2026-01-01");
     const home = createCategoryGroup(book.db, { name: "Home", ...saved });
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", groupId: home.id, ...saved });
+    const repairs = createCategory(book.db, { name: "Repairs", kind: "expense", groupId: home.id, ...saved });
     const fun = createCategory(book.db, { name: "Fun", kind: "expense", ...saved });
     const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
     const shop = createMerchant(book.db, { name: "Shop", ...saved });
@@ -112,6 +113,7 @@ test("refunds reduce spending, transfers are excluded, and uncategorized is its 
     const gift = createTag(book.db, { name: "Gift", ...saved });
     spend(book.db, { accountId: chequing.id, date: "2026-06-02", amount: -10_000, categoryId: groceries.id, merchantId: shop.id });
     spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: 2_500, categoryId: groceries.id, merchantId: shop.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: 1_000, categoryId: repairs.id });
     spend(book.db, { accountId: chequing.id, date: "2026-06-04", amount: 40_000, categoryId: pay.id });
     spend(book.db, { accountId: chequing.id, date: "2026-06-05", amount: -8_000, transferAccountId: savings.id });
     spend(book.db, { accountId: chequing.id, date: "2026-06-06", amount: -3_000 });
@@ -124,65 +126,62 @@ test("refunds reduce spending, transfers are excluded, and uncategorized is its 
     });
 
     const sums = rawClassified(book.db);
-    const query = { asOf: "2026-06-30", from: "2026-06-01", to: "2026-06-30" } as const;
-    const byCategory = readInsights(book.db, { ...query, by: "category" });
-    expect(byCategory.spending).toBe(sums.spending);
-    expect(byCategory.income).toBe(sums.income);
-    expect(byCategory.spending).toBe(9_500);
-    expect(byCategory.spending).not.toBe(sums.raw);
-    expect(byCategory.income).not.toBe(sums.raw);
-    expect(byCategory.rows.find((row) => row.id === pay.id)).toBeUndefined();
-    expect(byCategory.rows).toContainEqual({ id: groceries.id, kind: "item", amount: 7_500, inflow: null });
-    expect(byCategory.rows).toContainEqual({ id: fun.id, kind: "item", amount: 2_000, inflow: null });
-    expect(byCategory.rows).toContainEqual({ id: null, kind: "uncategorized", amount: 3_000, inflow: 0 });
+    const query = { asOf: "2026-06-30", window: "1" } as const;
+    const report = readInsights(book.db, query);
+    expect(report.range).toEqual({ from: "2026-06-01", to: "2026-06-30" });
+    expect(report.spending).toBe(sums.spending);
+    expect(report.income).toBe(sums.income);
+    expect(report.spending).toBe(8_500);
+    expect(report.donut).toEqual([
+      { id: home.id, kind: "item", amount: 6_500, inflow: null },
+      { id: null, kind: "none", amount: 2_000, inflow: null },
+      { id: null, kind: "uncategorized", amount: 3_000, inflow: 0 },
+    ]);
     expect(sums.uncategorized).toBe(-3_000);
 
-    const byGroup = readInsights(book.db, { ...query, by: "group" });
-    expect(byGroup.spending).toBe(sums.spending);
-    expect(byGroup.rows).toContainEqual({ id: home.id, kind: "item", amount: 7_500, inflow: null });
-    expect(byGroup.rows).toContainEqual({ id: null, kind: "none", amount: 2_000, inflow: null });
-    expect(byGroup.rows).toContainEqual({ id: null, kind: "uncategorized", amount: 3_000, inflow: 0 });
+    const homeLevel = readInsights(book.db, { ...query, group: home.id });
+    expect(homeLevel.donut).toEqual([
+      { id: groceries.id, kind: "item", amount: 7_500, inflow: null },
+      { id: repairs.id, kind: "item", amount: -1_000, inflow: null },
+    ]);
+    const noGroup = readInsights(book.db, { ...query, group: "none" });
+    expect(noGroup.donut).toEqual([{ id: fun.id, kind: "item", amount: 2_000, inflow: null }]);
+    const oneCategory = readInsights(book.db, { ...query, group: home.id, category: groceries.id });
+    expect(oneCategory.donut).toEqual(homeLevel.donut);
+    expect(oneCategory.rows).toEqual([{ id: groceries.id, kind: "item", amount: 7_500, inflow: null }]);
 
-    const byMerchant = readInsights(book.db, { ...query, by: "merchant" });
-    expect(byMerchant.rows).toContainEqual({ id: shop.id, kind: "item", amount: 7_500, inflow: null });
-    expect(byMerchant.rows).toContainEqual({ id: null, kind: "none", amount: 2_000, inflow: null });
-    expect(byMerchant.rows).toContainEqual({ id: null, kind: "uncategorized", amount: 3_000, inflow: 0 });
-
-    const byTag = readInsights(book.db, { ...query, by: "tag" });
-    expect(byTag.spending).toBe(9_500);
-    expect(byTag.rows).toContainEqual({ id: trip.id, kind: "item", amount: 2_000, inflow: null });
-    expect(byTag.rows).toContainEqual({ id: gift.id, kind: "item", amount: 2_000, inflow: null });
-    expect(byTag.rows).toContainEqual({ id: null, kind: "none", amount: 7_500, inflow: null });
-    const tagged = byTag.rows.filter((row) => row.kind !== "uncategorized").reduce((sum, row) => sum + row.amount, 0);
-    expect(tagged).not.toBe(byTag.spending);
+    expect(report.merchants).toEqual([
+      { id: shop.id, kind: "item", amount: 7_500, inflow: null },
+      { id: null, kind: "none", amount: 1_000, inflow: null },
+    ]);
+    expect(report.tags).toHaveLength(2);
+    expect(report.tags).toContainEqual({ id: trip.id, kind: "item", amount: 2_000, inflow: null });
+    expect(report.tags).toContainEqual({ id: gift.id, kind: "item", amount: 2_000, inflow: null });
   } finally {
     book.close();
   }
 });
 
-test("the trend is twelve months through asOf and leaves out later days", () => {
+test("the window sets the period up to asOf, and a month limits the breakdowns", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db, "Chequing", "chequing", "2025-01-01");
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
-    const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
     spend(book.db, { accountId: chequing.id, date: "2025-03-15", amount: -7_000, categoryId: groceries.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-01-20", amount: -4_000, categoryId: groceries.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-02-02", amount: 6_000, categoryId: pay.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-03-10", amount: -1_500, categoryId: groceries.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-02-10", amount: -4_000, categoryId: groceries.id });
     spend(book.db, { accountId: chequing.id, date: "2026-03-20", amount: -9_000, categoryId: groceries.id });
 
-    const report = readInsights(book.db, { asOf: "2026-03-16", categoryId: groceries.id });
-    expect(report.trend).toHaveLength(12);
-    expect(report.trend[0]?.month).toBe("2025-04");
-    expect(report.trend[11]?.month).toBe("2026-03");
-    expect(report.trend.find((point) => point.month === "2026-01")).toMatchObject({ spending: 4_000, income: 0 });
-    expect(report.trend.find((point) => point.month === "2026-02")).toMatchObject({ spending: 0, income: 6_000 });
-    expect(report.trend.find((point) => point.month === "2026-03")).toMatchObject({ spending: 1_500, income: 0 });
-    expect(report.trend.filter((point) => point.month < "2026-01").every((point) => point.spending === 0 && point.income === 0)).toBe(true);
-    expect(report.categoryTrend?.find((point) => point.month === "2026-01")?.spending).toBe(4_000);
-    expect(report.categoryTrend?.find((point) => point.month === "2026-03")?.spending).toBe(1_500);
-    expect(report.categoryTrend?.find((point) => point.month === "2026-02")?.spending).toBe(0);
+    const asOf = "2026-03-16";
+    expect(readInsights(book.db, { asOf })).toMatchObject({ window: "6", from: "2025-10-01", to: asOf, spending: 4_000 });
+    expect(readInsights(book.db, { asOf, window: "3" })).toMatchObject({ from: "2026-01-01", to: asOf });
+    expect(readInsights(book.db, { asOf, window: "all" })).toMatchObject({ from: "2025-03-15", spending: 11_000 });
+    const custom = readInsights(book.db, { asOf, window: "custom", from: "2025-03-01", to: "2026-12-31" });
+    expect(custom).toMatchObject({ from: "2025-03-01", to: asOf, spending: 11_000 });
+    const february = readInsights(book.db, { asOf, window: "all", month: "2026-02" });
+    expect(february.range).toEqual({ from: "2026-02-01", to: "2026-02-28" });
+    expect(february.spending).toBe(4_000);
+    expect(() => readInsights(book.db, { asOf, window: "1", month: "2026-02" })).toThrow("period_invalid");
+    expect(() => readInsights(book.db, { asOf, window: "custom", from: "2026-04-01", to: "2026-05-01" })).toThrow("period_invalid");
   } finally {
     book.close();
   }

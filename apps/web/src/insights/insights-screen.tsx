@@ -1,43 +1,29 @@
-import {
-  insightsSchema,
-  Temporal,
-  type ErrorCode,
-  type InsightBreakdown,
-  type InsightRow,
-  type InsightsSearch,
-} from "@num/shared";
+import { defaultInsightWindow, insightsSchema, Temporal, type ErrorCode, type InsightWindow, type InsightsSearch } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
-import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
+import { getRouteApi, Link } from "@tanstack/react-router";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
-import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { DateField } from "@/components/date-field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useBookCurrency, useCategories, useGroups, useMerchants, useTags } from "@/editors/lookups";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useBookCurrency, useCategories } from "@/editors/lookups";
 import { monthTitle } from "@/insights/format";
+import { InsightsBreakdown } from "@/insights/insights-breakdown";
+import { PeriodSelect } from "@/insights/period-select";
+import { TimelineChart } from "@/insights/timeline-chart";
 import { formatMoney } from "@/money";
 import { ForecastChart } from "@/plan/forecast-chart";
-import { ForecastPanel } from "@/insights/forecast-panel";
 import { apiRequest } from "@/request";
-import { OptionCombobox } from "@/transactions/option-combobox";
 
 const insightsRoute = getRouteApi("/insights");
 
-const breakdowns: { id: InsightBreakdown; label: string }[] = [
-  { id: "category", label: "Category" },
-  { id: "group", label: "Group" },
-  { id: "merchant", label: "Merchant" },
-  { id: "tag", label: "Tag" },
-];
+const searchKeys = ["window", "from", "to", "month", "group", "category"] as const;
 
 const errorText: Partial<Record<ErrorCode, string>> = {
-  period_invalid: "The start date is after the end date.",
+  period_invalid: "The start date is after the end date, or the month is not in the period.",
   category_not_found: "That category is not in the book.",
+  group_not_found: "That group is not in the book.",
   as_of_invalid: "The date is not valid.",
 };
 
@@ -47,51 +33,32 @@ function rangeText(from: string, to: string): string {
   return `${start} to ${end}`;
 }
 
-function rowLabel(row: InsightRow, by: InsightBreakdown, names: Map<string, string>): string {
-  if (row.kind === "uncategorized") {
-    return "Uncategorized";
-  }
-  if (row.kind === "none") {
-    if (by === "group") {
-      return "No group";
+function apiSearch(search: InsightsSearch): InsightsSearch {
+  const picked: InsightsSearch = {};
+  for (const key of searchKeys) {
+    if (search[key] !== undefined) {
+      Object.assign(picked, { [key]: search[key] });
     }
-    if (by === "merchant") {
-      return "No merchant";
-    }
-    return "No tag";
   }
-  return names.get(row.id ?? "") ?? "Unknown";
+  return picked;
 }
 
 function insightsPath(asOf: string, search: InsightsSearch): string {
   const params = new URLSearchParams({ asOf });
-  if (search.from) {
-    params.set("from", search.from);
-  }
-  if (search.to) {
-    params.set("to", search.to);
-  }
-  if (search.by) {
-    params.set("by", search.by);
-  }
-  if (search.categoryId) {
-    params.set("categoryId", search.categoryId);
+  for (const [key, value] of Object.entries(search)) {
+    params.set(key, String(value));
   }
   return `/api/insights?${params}`;
 }
 
 export function InsightsScreen() {
   const asOf = localAsOf();
-  const search = insightsRoute.useSearch();
+  const search = apiSearch(insightsRoute.useSearch());
   const navigateSearch = insightsRoute.useNavigate();
-  const navigate = useNavigate();
   const currency = useBookCurrency();
   const categories = useCategories();
-  const groups = useGroups();
-  const merchants = useMerchants();
-  const tags = useTags();
   const report = useQuery({
-    queryKey: ["insights", asOf, search.from, search.to, search.by, search.categoryId],
+    queryKey: ["insights", asOf, search],
     queryFn: async () => {
       const result = await apiRequest(insightsPath(asOf, search), insightsSchema);
       if (!result.ok) {
@@ -102,70 +69,33 @@ export function InsightsScreen() {
   });
 
   const bookCurrency = currency.data ?? "USD";
-  const by = report.data?.by ?? search.by ?? "category";
-  const nameSource =
-    by === "group" ? groups.data : by === "merchant" ? merchants.data : by === "tag" ? tags.data : categories.data;
-  const names = new Map((nameSource ?? []).map((item) => [item.id, item.name]));
-  const expenseCategories = (categories.data ?? []).filter((item) => item.kind === "expense" || item.id === search.categoryId);
-  const trendName = categories.data?.find((item) => item.id === search.categoryId)?.name;
   const data = report.data;
   const latest = data?.netWorth.at(-1);
   const firstWorth = data?.netWorth[0];
   const worthDelta = latest && firstWorth ? latest.net - firstWorth.net : 0;
+  const categoryName = categories.data?.find((item) => item.id === search.category)?.name ?? null;
 
   function patchSearch(patch: Partial<InsightsSearch>) {
     void navigateSearch({
       search: (prev) => {
-        const next = { ...prev, ...patch };
-        if (next.from === undefined) {
-          delete next.from;
+        const next: Record<string, unknown> = { ...prev, ...patch };
+        for (const key of searchKeys) {
+          if (next[key] === undefined) {
+            delete next[key];
+          }
         }
-        if (next.to === undefined) {
-          delete next.to;
-        }
-        if (next.by === undefined) {
-          delete next.by;
-        }
-        if (next.categoryId === undefined) {
-          delete next.categoryId;
-        }
-        return next;
+        return next as typeof prev;
       },
     });
   }
 
-  function openTransactions(row: InsightRow) {
-    if (!data) {
+  function chooseWindow(window: InsightWindow) {
+    if (window === "custom") {
+      patchSearch({ window, from: data?.from ?? `${asOf.slice(0, 7)}-01`, to: data?.to ?? asOf, month: undefined });
       return;
     }
-    void navigate({
-      to: "/transactions",
-      search: {
-        page: 1,
-        pageSize: 50,
-        uncategorized: row.kind === "uncategorized",
-        automatic: false,
-        needsReview: false,
-        from: data.from,
-        to: data.to,
-        categoryId: by === "category" && row.kind === "item" ? (row.id ?? undefined) : undefined,
-        groupId: by === "group" ? (row.kind === "none" ? "none" : (row.id ?? undefined)) : undefined,
-        merchantId: by === "merchant" ? (row.kind === "none" ? "none" : (row.id ?? undefined)) : undefined,
-        tagId: by === "tag" ? (row.kind === "none" ? "none" : (row.id ?? undefined)) : undefined,
-      },
-    });
+    patchSearch({ window: window === defaultInsightWindow ? undefined : window, from: undefined, to: undefined, month: undefined });
   }
-
-  const trendSeries = data?.categoryTrend
-    ? [{ name: trendName ?? "Category", amounts: data.categoryTrend.map((point) => point.spending) }]
-    : [
-        { name: "Spending", amounts: (data?.trend ?? []).map((point) => point.spending) },
-        { name: "Income", amounts: (data?.trend ?? []).map((point) => point.income), dashed: true },
-      ];
-  const latestTrend = data?.categoryTrend?.at(-1) ?? data?.trend.at(-1);
-  const trendLabel = data?.categoryTrend
-    ? `${trendName ?? "Category"} spending for 12 months. Latest ${formatMoney(bookCurrency, latestTrend && "spending" in latestTrend ? latestTrend.spending : 0)}.`
-    : `Spending and income for 12 months. Latest spending ${formatMoney(bookCurrency, data?.trend.at(-1)?.spending ?? 0)}. Latest income ${formatMoney(bookCurrency, data?.trend.at(-1)?.income ?? 0)}.`;
 
   return (
     <>
@@ -178,49 +108,7 @@ export function InsightsScreen() {
           </Button>
         }
       />
-      <div className="flex flex-wrap items-end gap-3">
-        <Field className="w-44">
-          <FieldLabel htmlFor="insights-from">From</FieldLabel>
-          <DateField
-            id="insights-from"
-            value={search.from ?? ""}
-            onChange={(value) => patchSearch({ from: value || undefined })}
-          />
-        </Field>
-        <Field className="w-44">
-          <FieldLabel htmlFor="insights-to">To</FieldLabel>
-          <DateField id="insights-to" value={search.to ?? ""} onChange={(value) => patchSearch({ to: value || undefined })} />
-        </Field>
-        <Field className="w-44">
-          <FieldLabel htmlFor="insights-by">Show</FieldLabel>
-          <Select
-            value={search.by ?? "category"}
-            onValueChange={(value) => patchSearch({ by: value === "category" ? undefined : (value as InsightBreakdown) })}
-          >
-            <SelectTrigger id="insights-by" aria-label="Show">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {breakdowns.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field className="w-64">
-          <FieldLabel htmlFor="insights-trend">12-month trend</FieldLabel>
-          <OptionCombobox
-            id="insights-trend"
-            value={search.categoryId ?? null}
-            placeholder="Total spending and income"
-            emptyLabel="Total spending and income"
-            options={expenseCategories.map((item) => ({ id: item.id, label: item.name }))}
-            onChange={(id) => patchSearch({ categoryId: id ?? undefined })}
-          />
-        </Field>
-      </div>
+      <PeriodSelect window={search.window} from={search.from} to={search.to} onWindow={chooseWindow} onRange={patchSearch} />
       {report.isPending ? <p className="text-muted-foreground">Loading insights.</p> : null}
       {report.isError ? (
         <div className="grid gap-3">
@@ -230,12 +118,12 @@ export function InsightsScreen() {
           </Button>
         </div>
       ) : null}
-      <ForecastPanel currency={bookCurrency} />
       {data ? (
         <SummaryStrip
+          tint="plan"
           label="Spending"
           amount={<Amount currency={bookCurrency} minor={data.spending} hero />}
-          hint={rangeText(data.from, data.to)}
+          hint={search.month ? `${monthTitle(search.month)}: ${rangeText(data.range.from, data.range.to)}` : rangeText(data.range.from, data.range.to)}
           facts={
             <>
               <Fact label="Income">
@@ -250,12 +138,28 @@ export function InsightsScreen() {
       ) : null}
       {data ? (
         <Card>
-          <CardContent className="grid gap-2 p-5 md:p-6">
-            <h2 className="text-base font-bold">{data.categoryTrend ? `${trendName ?? "Category"}, 12 months` : "Spending and income, 12 months"}</h2>
-            <ForecastChart currency={bookCurrency} label={trendLabel} dates={data.trend.map((point) => point.month)} series={trendSeries} />
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 px-5 pt-5 md:px-6">
+            <CardTitle className="text-base font-bold">{categoryName ? `${categoryName} spending` : "Income, spending and balance"}</CardTitle>
+            {search.category ? (
+              <Button type="button" variant="ghost" onClick={() => patchSearch({ category: undefined })}>
+                Show all spending
+              </Button>
+            ) : null}
+          </CardHeader>
+          <CardContent className="grid gap-3 px-5 pb-5 md:px-6">
+            <TimelineChart
+              currency={bookCurrency}
+              asOf={asOf}
+              current={data.to === asOf}
+              timeline={data.timeline}
+              categoryName={categoryName}
+              selectedMonth={search.month ?? null}
+              onSelectMonth={(month) => patchSearch({ month: search.month === month ? undefined : month })}
+            />
           </CardContent>
         </Card>
       ) : null}
+      {data ? <InsightsBreakdown currency={bookCurrency} data={data} search={search} patchSearch={patchSearch} /> : null}
       {data ? (
         <Card>
           <CardContent className="grid gap-2 p-5 md:p-6">
@@ -275,20 +179,6 @@ export function InsightsScreen() {
             />
           </CardContent>
         </Card>
-      ) : null}
-      {data ? (
-        <ListCard label="Spending" title={breakdowns.find((item) => item.id === by)?.label ?? "Category"}>
-          {data.rows.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">No spending in this period.</p> : null}
-          {data.rows.map((row) => (
-            <ListRow key={`${row.kind}-${row.id ?? "none"}`} onOpen={() => openTransactions(row)}>
-              <span className={listName}>{rowLabel(row, by, names)}</span>
-              <span className={listAmt}>
-                <Amount currency={bookCurrency} minor={row.amount} />
-                {row.kind === "uncategorized" ? <small>In {formatMoney(bookCurrency, row.inflow ?? 0)}</small> : null}
-              </span>
-            </ListRow>
-          ))}
-        </ListCard>
       ) : null}
     </>
   );
