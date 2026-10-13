@@ -703,8 +703,12 @@ After 90 days, show only the monthly net values (Home, this month). Do not show 
   - Changes to recurring payments.
   - Bucket results.
   - Plan compared with actual.
-- Spending by category, group, merchant and tag, for a period that the user selects.
-- A 12-month trend for each category.
+- **Period.** One selector: 1, 3, 6 or 12 months, All, or Custom (From and To). Decision 0030.
+- **Timeline.** One chart: monthly income and spending bars, and the daily on-budget balance line.
+  After `asOf`, it shows the forecast (§8). A click on a month bar limits the breakdowns to that month. Decision 0030.
+- **Spending donut.** Level 1: groups. Level 2: the categories of one group. A click on a category limits the
+  timeline to that category. A list under the donut shows the exact values. Decision 0030.
+- Spending by merchant and by tag: two lists for the period. A row opens Transactions with the filter.
 - **Net worth.** Assets − liabilities at the end of each month. Show a chart for 24 months.
 - **Mortgage.** Balance, rate, schedule and payoff date. Also, the effect of an extra payment amount.
 
@@ -799,7 +803,7 @@ There are 7 screens (decision 0021).
 | Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Transactions → Needs review); hygiene checks (§10); this month: income → bills → bucket funding → left to save, "Fund this paycheck", missed payments, overspent buckets, goal status; spending changes this month; net worth. Each card links to its screen. |
 | Transactions | Search and filter, Needs review view (§7.3), detail and edit, lines, tags, transfers |
 | Buckets | Balances, funding history, moves, goals (feasibility), settings |
-| Insights | Month story, categories, merchants, tags, trends, net worth, mortgage, forecast chart |
+| Insights | Month story, timeline (actual and forecast), spending donut (groups, categories), merchants, tags, net worth, mortgage. Decision 0030. |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
 | Recurring | Plans, occurrences, links, skips, Detected (new plan suggestions) |
 | Settings | Subpages: Groups, Categories, Tags, Merchants, Matching (`autoConfidence`), AI access, Backup. |
