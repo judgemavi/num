@@ -1,4 +1,4 @@
-export const autoReasons = ["recurring", "learned_amount", "learned_payee", "similar", "family", "merchant_default", "refund_match", "refund_reversal", "transfer_match"] as const;
+export const autoReasons = ["recurring", "learned_amount", "learned_payee", "similar", "family", "refund_match", "refund_reversal", "transfer_match"] as const;
 
 export type AutoReason = (typeof autoReasons)[number];
 
@@ -18,7 +18,6 @@ export const leadMinimum = 0.2;
 export const similarFactor = 0.9;
 export const familyFactor = 0.85;
 export const recurringConfidence = 0.99;
-export const merchantDefaultConfidence = 0.6;
 
 export type LearnedRow = {
   id: string;
@@ -74,7 +73,6 @@ export type ScoreInput = {
   payeeScores?: readonly LearnedScore[];
   similar: SimilarPayee | null;
   family?: FamilySignal | null;
-  merchant: { id: string; name: string; categoryId: string } | null;
   transferRows: readonly { id: string; date: string; transferAccountId: string }[];
 };
 
@@ -316,18 +314,6 @@ function collectSignals(input: ScoreInput): MatchSignal[] {
     });
   }
   pushTransfers(signals, input.transferRows, "learned_payee", 1, null);
-  if (input.merchant) {
-    signals.push({
-      reason: "merchant_default",
-      confidence: merchantDefaultConfidence,
-      categoryId: input.merchant.categoryId,
-      merchantId: input.merchant.id,
-      transferAccountId: null,
-      sourceId: input.merchant.id,
-      sourceName: input.merchant.name,
-      count: 0,
-    });
-  }
   return signals;
 }
 

@@ -38,7 +38,6 @@ export const merchants = sqliteTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    defaultCategoryId: text("default_category_id").references(() => categories.id),
     archivedAt: text("archived_at"),
   },
   (table) => [uniqueIndex("merchants_name_lower_unique").on(sql`lower(${table.name})`)],

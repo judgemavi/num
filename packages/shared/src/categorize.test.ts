@@ -96,7 +96,7 @@ test("the category kind follows the choice", () => {
   expect(refund.categoryId).toBe(coffee);
   const incomeOnOut = resolveEditorChoice({
     direction: "out",
-    suggestion: { merchantId: null, categoryId: coffee, transferAccountId: null, reason: "merchant_default", level: "maybe", sourceId: null, sourceName: null, confidence: 600 },
+    suggestion: { merchantId: null, categoryId: coffee, transferAccountId: null, reason: "learned_payee", level: "maybe", sourceId: null, sourceName: null, confidence: 600 },
     categoryKind: "income",
     transferAccountFromRule: null,
     oppositeAccountId: null,

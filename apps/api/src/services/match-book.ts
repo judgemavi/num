@@ -5,7 +5,6 @@ import {
   buildPayeeIndex,
   containedMatch,
   familyMatch,
-  normalizePayee,
   confidenceModes,
   learnedConfidence,
   linkWindowStart,
@@ -71,7 +70,6 @@ export type MatchBook = {
   contained: Map<string, string | null>;
   mortgageContained: Map<string, MortgageHit | null>;
   families: Map<string, FamilySignal | null>;
-  merchants: { id: string; name: string; categoryId: string; payee: string }[];
 };
 
 function asMode(value: string | undefined): ConfidenceMode {
@@ -156,11 +154,6 @@ export function loadMatchBook(db: Reader): MatchBook {
   const mortgageLearned = loadMortgageLearned(db);
   const index = buildPayeeIndex(labels.keys());
   const mortgageIndex = buildPayeeIndex(mortgageLearned.keys());
-  const merchants = db.all<{ id: string; name: string; categoryId: string }>(sql`
-    select id as id, name as name, default_category_id as categoryId
-    from merchants
-    where archived_at is null and default_category_id is not null
-  `);
   return {
     mode: confidenceMode(db),
     byPayee,
@@ -175,7 +168,6 @@ export function loadMatchBook(db: Reader): MatchBook {
     contained: new Map(),
     mortgageContained: new Map(),
     families: new Map(),
-    merchants: merchants.map((merchant) => ({ ...merchant, payee: normalizePayee(merchant.name) })),
   };
 }
 
@@ -242,8 +234,6 @@ export function scorePayee(
     amountScores = learnedConfidence(learnedOf(same.filter((row) => amountsWithinOnePercent(row.amount, input.amount))));
     book.amountLearned.set(amountKey, amountScores);
   }
-  const merchantHits = book.merchants.filter((merchant) => merchant.payee === input.payee);
-  const merchant = merchantHits.length === 1 ? merchantHits[0] : null;
   const scored: ScoreInput = {
     mode: book.mode,
     recurring: input.recurring,
@@ -259,7 +249,6 @@ export function scorePayee(
         }
       : null,
     family,
-    merchant: merchant ? { id: merchant.id, name: merchant.name, categoryId: merchant.categoryId } : null,
     transferRows: book.transfersByPayee.get(input.payee) ?? [],
   };
   return scoreMatch(scored);

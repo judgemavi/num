@@ -114,7 +114,7 @@ function seed(db: Db, dir: string) {
   if (!category) {
     throw new Error("Setup did not create a category");
   }
-  const merchant = createMerchant(db, { name: "North Market", defaultCategoryId: category.id, ...saved });
+  const merchant = createMerchant(db, { name: "North Market", ...saved });
   createTransaction(db, {
     accountId: account.id,
     date: "2026-03-02",

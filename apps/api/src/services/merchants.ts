@@ -1,4 +1,4 @@
-import { categories, merchants } from "@num/db";
+import { merchants } from "@num/db";
 import {
   utcNow,
   type Merchant,
@@ -33,10 +33,9 @@ function compareName(left: string, right: string): number {
   return folded === 0 ? compareText(left, right) : folded;
 }
 
-function snapshot(row: { name: string; defaultCategoryId: string | null; archivedAt: string | null }) {
+function snapshot(row: { name: string; archivedAt: string | null }) {
   return {
     name: row.name,
-    defaultCategoryId: row.defaultCategoryId,
     archivedAt: row.archivedAt,
   };
 }
@@ -45,7 +44,6 @@ export function toMerchant(row: MerchantRow): Merchant {
   return {
     id: row.id,
     name: row.name,
-    defaultCategoryId: row.defaultCategoryId,
     archivedAt: row.archivedAt,
   };
 }
@@ -58,19 +56,6 @@ function assertName(tx: WriteTx, name: string, exceptId?: string) {
     .get();
   if (row && row.id !== exceptId) {
     throw new ServiceError("merchant_name_taken", 409);
-  }
-}
-
-export function assertActiveCategory(tx: WriteTx, id: string | null) {
-  if (id === null) {
-    return;
-  }
-  const row = tx.select({ archivedAt: categories.archivedAt }).from(categories).where(eq(categories.id, id)).get();
-  if (!row) {
-    throw new ServiceError("category_not_found", 404);
-  }
-  if (row.archivedAt) {
-    throw new ServiceError("category_archived", 409);
   }
 }
 
@@ -105,12 +90,10 @@ export function createMerchant(db: Db, input: MerchantCreate & WriteInput): Merc
   const row = {
     id,
     name: input.name.trim(),
-    defaultCategoryId: input.defaultCategoryId ?? null,
     archivedAt: null,
   };
   write(db, { source: input.source, at: input.at }, (tx) => {
     assertName(tx, row.name);
-    assertActiveCategory(tx, row.defaultCategoryId);
     tx.insert(merchants).values(row).run();
     tx.audit({ entity: "merchants", entityId: id, action: "create", before: null, after: snapshot(row) });
   });
@@ -126,12 +109,10 @@ export function updateMerchant(db: Db, id: string, input: MerchantUpdate & Write
     }
     const next = {
       name: input.name.trim(),
-      defaultCategoryId: input.defaultCategoryId,
       archivedAt: existing.archivedAt,
     };
     assertName(tx, next.name, id);
-    assertActiveCategory(tx, next.defaultCategoryId);
-    tx.update(merchants).set({ name: next.name, defaultCategoryId: next.defaultCategoryId }).where(eq(merchants.id, id)).run();
+    tx.update(merchants).set({ name: next.name }).where(eq(merchants.id, id)).run();
     tx.audit({
       entity: "merchants",
       entityId: id,

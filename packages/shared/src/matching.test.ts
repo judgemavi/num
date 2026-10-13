@@ -20,7 +20,6 @@ function score(patch: Partial<ScoreInput> & Pick<ScoreInput, "amountRows" | "pay
     mode: "balanced",
     recurring: null,
     similar: null,
-    merchant: null,
     transferRows: [],
     ...patch,
   });

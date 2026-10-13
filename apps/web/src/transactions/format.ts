@@ -58,9 +58,6 @@ export function plainReason(input: {
   if (input.reason === "family") {
     return input.sourceName ? `Same as other ${input.sourceName} payees` : "Same as other payees of this brand";
   }
-  if (input.reason === "merchant_default") {
-    return "This merchant's usual category";
-  }
   return "";
 }
 

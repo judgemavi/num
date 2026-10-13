@@ -70,7 +70,7 @@ function category(db: Db, name: string) {
 
 function merchant(db: Db, name: string) {
   const id = crypto.randomUUID();
-  db.insert(merchants).values({ id, name, defaultCategoryId: null, archivedAt: null }).run();
+  db.insert(merchants).values({ id, name, archivedAt: null }).run();
   return id;
 }
 

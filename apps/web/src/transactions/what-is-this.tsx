@@ -75,8 +75,6 @@ function reasonText(suggestion: Suggestion): string {
       return suggestion.sourceName ? `Same as ${suggestion.sourceName}` : "Same as a similar payee";
     case "family":
       return suggestion.sourceName ? `Same as other ${suggestion.sourceName} payees` : "Same as other payees of this brand";
-    case "merchant_default":
-      return "This merchant's usual category";
     case "refund_match":
       return "Same payee and amount as a purchase";
     case "refund_reversal":
@@ -344,7 +342,7 @@ export function WhatIsThis({
               });
             }}
             onChange={onMerchantId}
-            renderForm={(name, finish) => <InlineMerchant name={name} depth={depth + 1} categories={categories} onDone={finish} />}
+            renderForm={(name, finish) => <InlineMerchant name={name} depth={depth + 1} onDone={finish} />}
           />
           {hint ? <FieldDescription role="status">{hint}</FieldDescription> : null}
         </Field>

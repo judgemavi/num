@@ -243,7 +243,6 @@ function rowsForIds(db: Db, ids: readonly string[]): ListRow[] {
       t.auto_confidence as autoConfidence,
       case
         when t.auto_reason = 'recurring' then (select p.name from recurring_plans p where p.id = t.auto_source_id)
-        when t.auto_reason = 'merchant_default' then (select m2.name from merchants m2 where m2.id = t.auto_source_id)
         else (select s.payee_normalized from transactions s where s.id = t.auto_source_id)
       end as autoSourceName,
       case when t.auto_reason is null then null else (
@@ -339,7 +338,6 @@ export function listTransactions(db: Db, query: TransactionListQuery & { asOf?: 
       t.auto_confidence as autoConfidence,
       case
         when t.auto_reason = 'recurring' then (select p.name from recurring_plans p where p.id = t.auto_source_id)
-        when t.auto_reason = 'merchant_default' then (select m2.name from merchants m2 where m2.id = t.auto_source_id)
         else (select s.payee_normalized from transactions s where s.id = t.auto_source_id)
       end as autoSourceName,
       case when t.auto_reason is null then null else (

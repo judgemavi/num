@@ -171,7 +171,7 @@ test("a group keeps an existing merchant and a transfer clears it on PATCH", () 
       ...saved,
     });
     const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
-    const shop = createMerchant(sample.db, { name: "Cafe", defaultCategoryId: null, ...saved });
+    const shop = createMerchant(sample.db, { name: "Cafe", ...saved });
     const row = pay(sample.db, cash.id, "2026-03-01", -500, "Cafe", shop.id);
     applyInboxGroup(sample.db, {
       accountId: cash.id,

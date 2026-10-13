@@ -1,9 +1,7 @@
-import { inboxDecisionListSchema, merchantSchema, type Category, type Merchant } from "@num/shared";
+import { inboxDecisionListSchema, merchantSchema, type Merchant } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
-import { ManagedPicker } from "@/editors/managed-picker";
-import { useRestoreNamed } from "@/editors/restore-named";
 import { undoDecision } from "@/review/actions";
 import { decisionText, inboxError } from "@/review/format";
 import { Button } from "@/components/ui/button";
@@ -11,28 +9,21 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/request";
 import { merchantError } from "@/settings/format";
-import { CategoryForm } from "@/settings/category-form";
-import { useGroups } from "@/editors/lookups";
 
 type MerchantFormProps = {
   merchant: Merchant | null;
   initialName?: string;
-  categories: Category[];
   inline?: boolean;
   depth?: number;
   onClose: () => void;
   onSaved: (id: string) => void;
 };
 
-export function MerchantForm({ merchant, initialName, categories, inline = false, depth = 0, onClose, onSaved }: MerchantFormProps) {
+export function MerchantForm({ merchant, initialName, inline = false, depth = 0, onClose, onSaved }: MerchantFormProps) {
   const [name, setName] = useState(merchant?.name ?? initialName ?? "");
-  const [categoryId, setCategoryId] = useState<string | null>(merchant?.defaultCategoryId ?? null);
   const [error, setError] = useState<string | null>(null);
   const [undoError, setUndoError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [extra, setExtra] = useState<Category[]>([]);
-  const restoreNamed = useRestoreNamed();
-  const groups = useGroups();
   const queryClient = useQueryClient();
   const decisions = useQuery({
     queryKey: ["inbox-decisions", merchant?.id],
@@ -45,11 +36,6 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
       return result.data.items.filter((row) => row.decision === "not_recurring" && merchant !== null && row.itemKey.includes(`:${merchant.id}:`));
     },
   });
-  const allCategories = [...categories, ...extra.filter((item) => !categories.some((category) => category.id === item.id))];
-  const categoryOptions = allCategories
-    .filter((category) => category.archivedAt === null || category.id === categoryId)
-    .map((category) => ({ id: category.id, label: category.name }));
-  const archivedCategories = allCategories.filter((category) => category.archivedAt).map((category) => ({ id: category.id, label: category.name }));
 
   async function submit() {
     if (name.trim().length === 0) {
@@ -60,7 +46,7 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
     const result = await apiRequest(merchant ? `/api/merchants/${merchant.id}` : "/api/merchants", merchantSchema, {
       method: merchant ? "PATCH" : "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), defaultCategoryId: categoryId }),
+      body: JSON.stringify({ name: name.trim() }),
     });
     setSaving(false);
     if (!result.ok) {
@@ -75,7 +61,7 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
       <FormHeading
         inline={inline}
         title={merchant ? "Edit merchant" : "New merchant"}
-        description="The default category is used when nothing else matches."
+        description="A merchant groups the transactions of one business."
       />
       <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
       {(decisions.data ?? []).map((row) => (
@@ -108,43 +94,6 @@ export function MerchantForm({ merchant, initialName, categories, inline = false
       <Field data-invalid={error !== null || undefined}>
         <FieldLabel htmlFor={inline ? `merchant-${depth}-name` : "merchant-name"}>Name</FieldLabel>
         <Input id={inline ? `merchant-${depth}-name` : "merchant-name"} value={name} onChange={(event) => setName(event.target.value)} />
-      </Field>
-      <Field>
-        <FieldLabel htmlFor={inline ? `merchant-${depth}-category` : "merchant-category"}>Default category</FieldLabel>
-        <ManagedPicker
-          id={inline ? `merchant-${depth}-category` : "merchant-category"}
-          value={categoryId}
-          options={categoryOptions}
-          placeholder="No default category"
-          emptyLabel="No default category"
-          noun="category"
-          depth={depth}
-          archived={archivedCategories}
-          onRestore={(id) => {
-            void restoreNamed(`/api/categories/${id}/restore`).then((restored) => {
-              if (restored) {
-                setCategoryId(restored);
-              }
-            });
-          }}
-          onChange={setCategoryId}
-          renderForm={(typed, finish) => (
-            <CategoryForm
-              inline
-              depth={depth + 1}
-              category={null}
-              groups={groups.data ?? []}
-              initialName={typed}
-              initialKind="expense"
-              onClose={() => finish(null)}
-              onSaved={(id) => {
-                setExtra((current) => [...current, { id, name: typed, kind: "expense", groupId: null, essential: false, archivedAt: null }]);
-                void queryClient.invalidateQueries({ queryKey: ["categories"] });
-                finish(id);
-              }}
-            />
-          )}
-        />
       </Field>
       {error ? <FieldError>{error}</FieldError> : null}
       </DialogBody>

@@ -42,7 +42,7 @@ test("merge moves transactions and plans, then archives the source", () => {
     });
     const category = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
     const source = createMerchant(db, { name: "Cafe North", source: "ui", at });
-    const target = createMerchant(db, { name: "Cafe South", defaultCategoryId: category.id, source: "ui", at });
+    const target = createMerchant(db, { name: "Cafe South", source: "ui", at });
     const plan = createPlan(db, {
       name: "Coffee",
       kind: "bill",

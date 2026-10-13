@@ -14,18 +14,15 @@ const archivedQuery = {
 export const merchantSchema = z.object({
   id: z.uuid(),
   name: z.string(),
-  defaultCategoryId: z.uuid().nullable(),
   archivedAt: z.string().refine(isUtcTimestamp).nullable(),
 });
 
 export const merchantCreateSchema = z.object({
   name: nameSchema,
-  defaultCategoryId: z.uuid().nullable().optional(),
 });
 
 export const merchantUpdateSchema = z.object({
   name: nameSchema,
-  defaultCategoryId: z.uuid().nullable(),
 });
 
 export const merchantMergeSchema = z.object({

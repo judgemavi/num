@@ -12,8 +12,8 @@ type WriteInput = {
   at?: string;
 };
 
-function merchantSnapshot(row: { name: string; defaultCategoryId: string | null; archivedAt: string | null }) {
-  return { name: row.name, defaultCategoryId: row.defaultCategoryId, archivedAt: row.archivedAt };
+function merchantSnapshot(row: { name: string; archivedAt: string | null }) {
+  return { name: row.name, archivedAt: row.archivedAt };
 }
 
 function moveTransactions(tx: WriteTx, sourceId: string, targetId: string, at: string) {

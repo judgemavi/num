@@ -1,4 +1,4 @@
-import { categoryListSchema, merchantListSchema, merchantSchema, type Merchant, type MerchantListQuery } from "@num/shared";
+import { merchantListSchema, merchantSchema, type Merchant, type MerchantListQuery } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
@@ -43,10 +43,6 @@ export function MerchantsPage() {
     queryKey: ["merchants", search],
     queryFn: () => loadAllPages("/api/merchants", merchantListSchema, { archived: search.archived, sort: search.sort, dir: search.dir }),
   });
-  const categories = useQuery({
-    queryKey: ["categories", "merchants"],
-    queryFn: () => loadAllPages("/api/categories", categoryListSchema, { archived: false }),
-  });
 
   function changeFilters(patch: Partial<MerchantListQuery>) {
     void navigate({ search: { ...search, ...patch, page: 1 } });
@@ -84,27 +80,22 @@ export function MerchantsPage() {
     });
   }
 
-  if (merchants.isPending || categories.isPending) {
+  if (merchants.isPending) {
     return <p className="text-muted-foreground">Loading merchants.</p>;
   }
-  if (merchants.isError || categories.isError) {
+  if (merchants.isError) {
     return (
       <div className="flex flex-col items-start gap-4">
         <p>Merchants did not load.</p>
         <Button
           type="button"
-          onClick={() => {
-            void merchants.refetch();
-            void categories.refetch();
-          }}
+          onClick={() => void merchants.refetch()}
         >
           Try again
         </Button>
       </div>
     );
   }
-
-  const categoryName = new Map(categories.data.items.map((category) => [category.id, category.name]));
 
   return (
     <>
@@ -154,10 +145,7 @@ export function MerchantsPage() {
         ) : (
           merchants.data.items.map((merchant) => (
             <ListRow key={merchant.id} simple onOpen={() => void openEditor("merchant", { id: merchant.id })}>
-              <div className={listName}>
-                {merchant.name}
-                {merchant.defaultCategoryId ? <small>{categoryName.get(merchant.defaultCategoryId) ?? "Category"}</small> : null}
-              </div>
+              <div className={listName}>{merchant.name}</div>
               <RowMenu label={`Actions for ${merchant.name}`}>
                 <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("mergeMerchant", { merchantId: merchant.id })}>
                   Merge

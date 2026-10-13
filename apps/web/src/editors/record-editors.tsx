@@ -188,20 +188,18 @@ export function TagRecord({ props, onClose, onSaved }: { props: EditorInput["tag
 }
 
 export function MerchantRecord({ props, onClose, onSaved }: { props: EditorInput["merchant"] } & Finish) {
-  const categories = useCategories();
   const merchant = useRecord("merchant", props.id, `/api/merchants/${props.id ?? ""}`, merchantSchema);
   const save = useSaved([["merchants"], ["merchant"]], onSaved);
-  if (categories.isPending || (props.id && merchant.isPending)) {
+  if (props.id && merchant.isPending) {
     return <LoadingLine label="Loading the merchant." />;
   }
-  if (categories.isError || merchant.isError || !categories.data) {
+  if (merchant.isError) {
     return <LoadError label="The merchant did not load." onRetry={() => void merchant.refetch()} />;
   }
   return (
     <MerchantForm
       merchant={props.id ? (merchant.data ?? null) : null}
       initialName={props.name}
-      categories={categories.data}
       onClose={onClose}
       onSaved={save}
     />

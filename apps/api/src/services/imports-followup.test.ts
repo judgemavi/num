@@ -2,26 +2,21 @@ import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  auditLog,
   documents,
   importBatches,
   importRows,
   migrateDatabase,
   openDatabase,
   settings,
-  transactionLines,
   transactions,
 } from "@num/db";
-import { columnMapSchema, normalizePayee, type ColumnMap } from "@num/shared";
+import { columnMapSchema, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
-import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
-import { createCategory } from "./categories";
 import { saveImportBatch } from "./import-save";
 import { undoImportBatch } from "./import-undo";
 import { importStatement, listImportBatches } from "./imports";
-import { createMerchant } from "./merchants";
 import { createTransaction, deleteTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
@@ -244,41 +239,6 @@ test("a failed import leaves no document, batch, row or file", () => {
     expect(book.db.select().from(importBatches).all()).toHaveLength(0);
     expect(book.db.select().from(importRows).all()).toHaveLength(0);
     expect(readdirSync(join(book.dir, "uploads"))).toEqual([]);
-  } finally {
-    book.close();
-  }
-});
-
-test("a created row stores the normalized payee and the suggestion", () => {
-  const book = tempBook();
-  try {
-    const category = createCategory(book.db, {
-      name: "Groceries",
-      kind: "expense",
-      source: "ui",
-      at,
-    });
-    createMerchant(book.db, {
-      name: "NORTH MARKET",
-      defaultCategoryId: category.id,
-      source: "ui",
-      at,
-    });
-    const result = importCsv(book.db, book.dir, book.account.id, "shop.csv", ["01/02/2026,NORTH MARKET,-12.50"]);
-    expect(result.kind).toBe("batch");
-    const txn = book.db.select().from(transactions).all()[0];
-    expect(txn?.payeeNormalized).toBe(normalizePayee("NORTH MARKET"));
-    expect(txn?.merchantId).toBeNull();
-    expect(txn?.autoReason).toBeNull();
-    expect(txn?.status).toBe("cleared");
-    const audits = book.db
-      .select()
-      .from(auditLog)
-      .where(eq(auditLog.entityId, txn?.id ?? ""))
-      .all();
-    expect(audits.map((item) => item.action)).toEqual(["create"]);
-    expect(audits[0]?.after).toContain("merchant_default");
-    expect(book.db.select().from(transactionLines).all()[0]?.categoryId).toBeNull();
   } finally {
     book.close();
   }

@@ -163,7 +163,7 @@ test("each no decision hides its review item until undo", () => {
     restoreSkip(sample.db, missedPlan.id, "2026-02-15", saved);
     expect(hasKey(sample.db, asOf, missedKey)).toBe(true);
 
-    const stream = createMerchant(sample.db, { name: "Stream Co", defaultCategoryId: null, ...saved });
+    const stream = createMerchant(sample.db, { name: "Stream Co", ...saved });
     for (const date of ["2026-01-15", "2026-02-15", "2026-03-15"]) {
       pay(sample.db, savings.id, date, -1500, "Stream", food.id, stream.id);
     }

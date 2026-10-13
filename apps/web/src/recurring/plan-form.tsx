@@ -308,7 +308,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
                 noun="merchant"
                 archived={merchants.filter((item) => item.archivedAt).map((item) => ({ id: item.id, label: item.name }))}
                 onChange={setMerchantId}
-                renderForm={(name, finish) => <InlineMerchant name={name} depth={1} categories={categories} onDone={finish} />}
+                renderForm={(name, finish) => <InlineMerchant name={name} depth={1} onDone={finish} />}
               />
             </Field>
             <Field>

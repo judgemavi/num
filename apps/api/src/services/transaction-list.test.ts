@@ -49,7 +49,7 @@ function book() {
   const trip = createTag(db, { name: "Trip", ...saved });
   const merchantId = crypto.randomUUID();
   db.insert(merchants)
-    .values({ id: merchantId, name: "Blue Harbor", defaultCategoryId: null, archivedAt: null })
+    .values({ id: merchantId, name: "Blue Harbor", archivedAt: null })
     .run();
   return { ...handle, db, chequing, savings, food, trip, merchantId };
 }

@@ -1,4 +1,4 @@
-import { merchants, recurringPlans, transactions } from "@num/db";
+import { recurringPlans, transactions } from "@num/db";
 import {
   autoReasons,
   refundOfIdAfterEdit,
@@ -66,8 +66,6 @@ function labelFacts(db: Reader, row: TxRow): { autoSourceName: string | null; au
   let autoSourceName: string | null = null;
   if (row.autoReason === "recurring" && row.autoSourceId) {
     autoSourceName = db.select({ name: recurringPlans.name }).from(recurringPlans).where(eq(recurringPlans.id, row.autoSourceId)).get()?.name ?? null;
-  } else if (row.autoReason === "merchant_default" && row.autoSourceId) {
-    autoSourceName = db.select({ name: merchants.name }).from(merchants).where(eq(merchants.id, row.autoSourceId)).get()?.name ?? null;
   } else if (row.autoSourceId) {
     autoSourceName = db.select({ payee: transactions.payeeNormalized }).from(transactions).where(eq(transactions.id, row.autoSourceId)).get()?.payee ?? null;
   }

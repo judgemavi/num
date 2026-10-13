@@ -1,4 +1,4 @@
-import { categoryGroupSchema, tagSchema, type Category, type CategoryKind } from "@num/shared";
+import { categoryGroupSchema, tagSchema, type CategoryKind } from "@num/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { AccountForm } from "@/accounts/account-form";
@@ -52,7 +52,7 @@ export function InlineAccount({ name, onDone }: { name: string; onDone: Done }) 
   );
 }
 
-export function InlineMerchant({ name, depth, categories, onDone }: { name: string; depth: number; categories: Category[]; onDone: Done }) {
+export function InlineMerchant({ name, depth, onDone }: { name: string; depth: number; onDone: Done }) {
   const queryClient = useQueryClient();
   return (
     <MerchantForm
@@ -60,7 +60,6 @@ export function InlineMerchant({ name, depth, categories, onDone }: { name: stri
       depth={depth}
       merchant={null}
       initialName={name}
-      categories={categories}
       onClose={() => onDone(null)}
       onSaved={(id) => {
         void queryClient.invalidateQueries({ queryKey: ["merchants"] });
