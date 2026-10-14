@@ -7,6 +7,7 @@ import {
   type MortgageTerms,
   type MortgageTermsWrite,
 } from "@num/shared";
+import { decimalsError } from "@/money";
 
 /** The mortgage terms as the form holds them: text for the fields the user types. */
 export function draftFromTerms(terms: MortgageTerms | null) {
@@ -56,7 +57,7 @@ function readPayment(currency: string, text: string) {
     if (error instanceof Error && error.message.startsWith("Enter ")) {
       throw error;
     }
-    throw new Error("Enter the payment as a number.");
+    throw new Error(decimalsError(currency, text) ?? "Enter the payment as a number.");
   }
 }
 

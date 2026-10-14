@@ -16,6 +16,7 @@ import { suggestionQuery, transferHintQuery } from "@/api/suggestions";
 import { localAsOf } from "@/as-of";
 import { useCategories } from "@/editors/lookups";
 import type { SplitLine } from "@/transactions/what-choice";
+import { decimalsError } from "@/money";
 
 /** A change that the form makes, not the person. It does not mark the field as changed and does not start the listeners. */
 export const quietChange = { dontUpdateMeta: true, dontRunListeners: true };
@@ -24,11 +25,8 @@ export function readPositive(currency: string, text: string): number {
   let milli: number;
   try {
     milli = parseAmount(currency, text.trim());
-  } catch (error) {
-    if (error instanceof Error && error.message === "Amount has too many decimal places") {
-      throw new Error("The amount has too many decimal places.");
-    }
-    throw new Error("Enter the amount as a number.");
+  } catch {
+    throw new Error(decimalsError(currency, text) ?? "Enter the amount as a number.");
   }
   if (milli < 0) {
     throw new Error("Enter a positive amount.");

@@ -122,7 +122,7 @@ export function AccountForm({ account, terms = null, initialName, inline = false
                     <div className="grid gap-4">
                       {allowsInterestRate(kind) ? (
                         <form.AppField name="interestRate">
-                          {(field) => <field.MoneyField id="interest-rate" label="Interest rate (%)" placeholder="6.875" />}
+                          {(field) => <field.TextField inputMode="decimal" id="interest-rate" label="Interest rate (%)" placeholder="6.875" />}
                         </form.AppField>
                       ) : null}
                       <form.Field name="onBudget">

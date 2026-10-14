@@ -7,7 +7,7 @@ import { useStore } from "@tanstack/react-form";
 import { useAccounts, useBookCurrency, useCategories } from "@/editors/lookups";
 import { withForm } from "@/forms/form-hook";
 import { fieldValue } from "@/forms/form-values";
-import { formatMoney } from "@/money";
+import { decimalsError, formatMoney } from "@/money";
 import { blankTransaction } from "@/transactions/transaction-draft";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { CategoryForm } from "@/settings/category-form";
@@ -177,7 +177,7 @@ function splitStatus(currency: string, totalMilli: number | null, left: number |
     return "Enter the amount.";
   }
   if (left === null) {
-    return "Enter a positive amount on each line.";
+    return lines.map((line) => decimalsError(currency, line.amount)).find((text) => text !== null) ?? "Enter a positive amount on each line.";
   }
   if (left === 0) {
     return splitBlank(lines) ? "Enter an amount on each line." : "All assigned";

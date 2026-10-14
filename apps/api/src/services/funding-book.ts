@@ -9,6 +9,7 @@ import {
   isIsoDate,
   nextIncomeDate,
   divideAmount,
+  floorToStep,
   occurrenceDates,
   positiveBalances,
   unassigned,
@@ -298,7 +299,7 @@ export function fundingProposalFor(db: Reader, incomeTransactionId: string, asOf
     payee: paycheck.payee,
     paycheckAmount: paycheck.amount,
     unassigned: position.unassigned,
-    limit: fundingLimit(paycheck.amount, position.unassigned),
+    limit: floorToStep(fundingLimit(paycheck.amount, position.unassigned), book.step),
     lines: lines.map((line) => ({
       bucketId: line.bucketId,
       name: names.get(line.bucketId) ?? "",

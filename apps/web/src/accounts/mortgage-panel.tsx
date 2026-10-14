@@ -12,7 +12,7 @@ import { Boundary } from "@/components/boundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppForm } from "@/forms/form-hook";
-import { formatMoney } from "@/money";
+import { decimalsError, formatMoney } from "@/money";
 
 function readAmount(currency: string, text: string) {
   if (text.trim().length === 0) {
@@ -30,7 +30,7 @@ function readExtra(currency: string, value: { extra: string; lump: string; lumpD
   const extra = readAmount(currency, value.extra);
   const lumpSum = readAmount(currency, value.lump);
   if (extra === null || lumpSum === null) {
-    return { error: "Enter the extra amount as a number." };
+    return { error: decimalsError(currency, value.extra) ?? decimalsError(currency, value.lump) ?? "Enter the extra amount as a number." };
   }
   if (extra < 0 || lumpSum < 0) {
     return { error: "Enter the extra amount as a positive number." };

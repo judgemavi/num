@@ -40,3 +40,15 @@ export function moneyParts(currency: string, milli: number): { currency: string;
   }
   return { currency: symbol, integer, fraction };
 }
+
+/** The rule for the decimal places of an amount in the currency. */
+export function decimalsRule(currency: string): string {
+  const digits = requireCurrencyDigits(currency);
+  return digits === 0 ? "Use whole amounts." : `Use no more than ${digits} decimal${digits === 1 ? "" : "s"}.`;
+}
+
+/** The text of the error when typed amount text has more decimal places than the currency has. Otherwise null. */
+export function decimalsError(currency: string, text: string): string | null {
+  const fraction = /^\s*[-+]?\d*\.(\d+)\s*$/.exec(text)?.[1];
+  return fraction !== undefined && fraction.length > requireCurrencyDigits(currency) ? decimalsRule(currency) : null;
+}

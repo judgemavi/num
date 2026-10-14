@@ -1,6 +1,6 @@
 import { Temporal, parseAmount, type Bucket, type BucketColor, type BucketIcon, type ErrorCode } from "@num/shared";
 import { errorCode } from "@/api/client";
-import { formatMoney } from "@/money";
+import { decimalsError, formatMoney } from "@/money";
 
 const colors: Record<BucketColor, string> = {
   sky: "Blue",
@@ -165,7 +165,7 @@ export function moveAmount(currency: string, text: string): { milli: number } | 
   try {
     milli = parseAmount(currency, text.trim());
   } catch {
-    return { error: "Enter the amount as a number." };
+    return { error: decimalsError(currency, text) ?? "Enter the amount as a number." };
   }
   return milli < 1 ? { error: "Enter an amount greater than zero." } : { milli };
 }

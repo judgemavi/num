@@ -1,5 +1,6 @@
 import { bucketWriteSchema, amountText, parseAmount, type Bucket, type BucketColor } from "@num/shared";
 import { localAsOf } from "@/as-of";
+import { decimalsError } from "@/money";
 
 function money(milli: number | null) {
   return milli === null ? "" : amountText(milli);
@@ -59,7 +60,8 @@ export function bucketBody(currency: string, value: BucketValues) {
       fixedAmount: value.kind === "goal" && value.goalMode === "paycheck" ? read(value.fixedAmount) : null,
     };
   } catch {
-    return { body: null, error: "Enter amounts as numbers." };
+    const typed = [value.refillTo, value.amount, value.target, value.fixedAmount];
+    return { body: null, error: typed.map((text) => decimalsError(currency, text)).find((text) => text !== null) ?? "Enter amounts as numbers." };
   }
   const parsed = bucketWriteSchema.safeParse(body);
   return parsed.success ? { body: parsed.data, error: null } : { body: null, error: "Check the bucket fields." };

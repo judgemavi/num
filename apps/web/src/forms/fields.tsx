@@ -2,11 +2,13 @@ import type { ComponentProps, ReactNode } from "react";
 import { ChoiceSelect } from "@/components/choice-select";
 import { DateField } from "@/components/date-field";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useBookCurrency } from "@/editors/lookups";
 import { useFieldContext } from "@/forms/form-context";
+import { decimalsError } from "@/money";
 import { OptionCombobox } from "@/transactions/option-combobox";
 
 /** The parts that each field component shows around its control: the label, the help text and the place in the layout. */
@@ -49,9 +51,33 @@ export function TextField({ id, label, description, className, labelClassName, .
   );
 }
 
-/** A field for an amount of money as the person types it. The form reads the text when it submits. */
-export function MoneyField(props: InputProps) {
-  return <TextField inputMode="decimal" autoComplete="off" {...props} />;
+/**
+ * A field for an amount of money as the person types it. The form reads the text when it submits. The field shows
+ * at once when the text has more decimal places than the book currency has.
+ */
+export function MoneyField({ id, label, description, className, labelClassName, ...input }: InputProps) {
+  const field = useFieldContext<string>();
+  const error = decimalsError(useBookCurrency(), field.state.value);
+  return (
+    <Field className={className} data-invalid={error !== null}>
+      <FieldLabel htmlFor={id} className={labelClassName}>
+        {label}
+      </FieldLabel>
+      <Input
+        inputMode="decimal"
+        autoComplete="off"
+        {...input}
+        id={id}
+        name={field.name}
+        value={field.state.value}
+        aria-invalid={error !== null}
+        onChange={(event) => field.handleChange(event.target.value)}
+        onBlur={field.handleBlur}
+      />
+      {description ? <FieldDescription>{description}</FieldDescription> : null}
+      {error ? <FieldError>{error}</FieldError> : null}
+    </Field>
+  );
 }
 
 export function TextareaField({ id, label, description, className }: FieldFrame) {

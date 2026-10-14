@@ -70,7 +70,7 @@ export const MortgageSection = withForm({
           <div className="grid gap-4">
             <p className="text-sm text-muted-foreground">{mortgageTermsHelp}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <form.AppField name="mortgage.rate">{(field) => <field.MoneyField id="mortgage-rate" label="Interest rate (%)" placeholder="5" />}</form.AppField>
+              <form.AppField name="mortgage.rate">{(field) => <field.TextField inputMode="decimal" id="mortgage-rate" label="Interest rate (%)" placeholder="5" />}</form.AppField>
               <form.AppField name="mortgage.compounding">
                 {(field) => <field.SelectField id="mortgage-compounding" label="Compounded" options={compoundingOptions} />}
               </form.AppField>

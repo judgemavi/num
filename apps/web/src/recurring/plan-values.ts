@@ -1,5 +1,6 @@
 import { amountText, planCreateSchema, parseAmount, type Plan, type PlanKind, type PlanProposal } from "@num/shared";
 import { amountForForm, amountFromForm } from "@/recurring/format";
+import { decimalsError } from "@/money";
 
 /** A recurring item that Num proposes. The person checks it in the form before it is saved. */
 export type PlanSeed = PlanProposal & { name: string; kind: PlanKind };
@@ -58,7 +59,7 @@ export function planBody(currency: string, value: PlanValues) {
     expectedAmount = amountFromForm(value.kind, parseAmount(currency, value.amount.trim()));
     tolerance = Math.abs(parseAmount(currency, value.tolerance.trim() || "0"));
   } catch {
-    return { body: null, error: "Enter the amount as a number." };
+    return { body: null, error: decimalsError(currency, value.amount) ?? decimalsError(currency, value.tolerance) ?? "Enter the amount as a number." };
   }
   const every = Number(value.interval);
   if (!Number.isInteger(every) || every < 1) {

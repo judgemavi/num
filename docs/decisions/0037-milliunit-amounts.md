@@ -56,7 +56,10 @@ Status: accepted (owner, 2026-10-14)
   `docs/design.md` (hero amount) change. This decision changes decision 0002 (amounts are minor units).
 - Tests and fixtures use milliunits.
 - After a change to a currency with fewer digits (example: CAD to JPY), a stored amount can have more precision than
-  the new currency. The browser shows it rounded. The API refuses a write that sends that amount again; the person must
-  correct the amount. New calculated amounts use the step of the new currency.
+  the new currency. The browser shows it rounded. The API refuses a write that sends that amount again.
+  An edit sends only the fields that changed (partial PATCH, branch c.10), thus an unchanged amount is not sent and
+  the edit is not refused. New calculated amounts use the step of the new currency.
+- An amount field in the web app shows the rule of the book currency at once ("Use no more than 2 decimals.",
+  "Use whole amounts.") when the typed text has too many decimal places (`decimalsError` in `apps/web/src/money.ts`).
 - A fixed amount in code (a tolerance, a threshold) must be in steps of the book currency. The app has no such
   amount now: the matching tolerances are percentages and the plan tolerance is a stored amount.

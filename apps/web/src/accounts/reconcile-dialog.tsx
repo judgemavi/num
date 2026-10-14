@@ -28,6 +28,7 @@ import { useBookCurrency } from "@/editors/lookups";
 import { DialogBody } from "@/editors/form-chrome";
 import { FieldError } from "@/components/ui/field";
 import { useAppForm } from "@/forms/form-hook";
+import { decimalsError } from "@/money";
 import { formatDate } from "@/transactions/format";
 
 /** The checkpoint of the form values. Null when the date or the balance is not valid. */
@@ -60,7 +61,7 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
       amount: hint.closingBalance === null ? "" : amountText(printedStatementBalance(kind, hint.closingBalance)),
     },
     validators: {
-      onSubmit: ({ value }) => (checkpointOf(currency, kind, value) ? undefined : "Enter a statement date and balance."),
+      onSubmit: ({ value }) => (checkpointOf(currency, kind, value) ? undefined : (decimalsError(currency, value.amount) ?? "Enter a statement date and balance.")),
     },
     onSubmit: async ({ value, formApi }) => {
       const body = checkpointOf(currency, kind, value);

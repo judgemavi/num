@@ -12,6 +12,7 @@ import {
 } from "@num/shared";
 import { draftFromTerms, draftIsBlank, firstPaymentNotAfterOpening, termsFromDraft } from "@/accounts/mortgage-draft";
 import { localAsOf } from "@/as-of";
+import { decimalsError } from "@/money";
 
 /** The start values of the Account form. A saved account gives its values and its mortgage terms. */
 export function accountValues(account: Account | null, terms: MortgageTerms | null, initialName: string) {
@@ -45,11 +46,8 @@ export function automaticOpeningDate(account: Account | null) {
 function readAmount(currency: string, text: string, label: string) {
   try {
     return parseAmount(currency, text.trim());
-  } catch (error) {
-    if (error instanceof Error && error.message === "Amount has too many decimal places") {
-      throw new Error(`${label} has too many decimal places.`);
-    }
-    throw new Error(`Enter ${label} as a number.`);
+  } catch {
+    throw new Error(decimalsError(currency, text) ?? `Enter ${label} as a number.`);
   }
 }
 

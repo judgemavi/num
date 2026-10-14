@@ -16,6 +16,7 @@ import { useAppForm } from "@/forms/form-hook";
 import { useBookCurrency } from "@/editors/lookups";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { decimalsError } from "@/money";
 
 export function FundPaycheck({ incomeTransactionId }: EditorInput["fundPaycheck"]) {
   const [chosen, setChosen] = useState<string | null>(null);
@@ -107,7 +108,7 @@ function fundingLines(currency: string, proposal: FundingProposal, amounts: Reco
     try {
       milli = parseAmount(currency, text);
     } catch {
-      return { error: "Enter each amount as a number." };
+      return { error: decimalsError(currency, text) ?? "Enter each amount as a number." };
     }
     if (milli < 0) {
       return { error: "Enter an amount of zero or more." };
