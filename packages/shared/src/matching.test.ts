@@ -21,7 +21,7 @@ function score(patch: Partial<ScoreInput>) {
     payeeScores: [],
     similar: null,
     transferRows: [],
-    outsideBands: false,
+    amountGuard: false,
     ...patch,
   });
 }

@@ -25,16 +25,18 @@ function book() {
   const account = createAccount(db, { name: "Everyday", institution: null, kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
   const rent = createCategory(db, { name: "Rent", kind: "expense", ...saved });
   const misc = createCategory(db, { name: "Miscellaneous", kind: "expense", ...saved });
+  const rental = createCategory(db, { name: "Rental Income", kind: "income", ...saved });
+  const other = createCategory(db, { name: "Other income", kind: "income", ...saved });
   const merchant = createMerchant(db, { name: "Landlord", ...saved });
-  const confirm = (date: string, amount: number, categoryId: string) =>
-    createTransaction(db, { accountId: account.id, date, amount, payeeRaw: payee, status: "open", lines: [{ amount, categoryId }], ...saved });
+  const confirm = (date: string, amount: number, categoryId: string, payeeRaw = payee) =>
+    createTransaction(db, { accountId: account.id, date, amount, payeeRaw, status: "open", lines: [{ amount, categoryId }], ...saved });
   /** A row that the app labelled before. */
-  const automatic = (date: string, amount: number, categoryId: string, autoReason: AutoReason) => {
+  const automatic = (date: string, amount: number, categoryId: string, autoReason: AutoReason, payeeRaw = payee) => {
     const row = createTransaction(db, {
       accountId: account.id,
       date,
       amount,
-      payeeRaw: payee,
+      payeeRaw,
       merchantId: merchant.id,
       status: "open",
       lines: [{ amount }],
@@ -60,6 +62,8 @@ function book() {
     db,
     rent,
     misc,
+    rental,
+    other,
     merchant,
     confirm,
     automatic,
@@ -72,9 +76,10 @@ function book() {
   };
 }
 
-test("after a confirmation, an automatic row outside all bands goes back to uncategorized with its merchant", () => {
+test("after a confirmation, an automatic row outside all bands of two categories goes back to uncategorized with its merchant", () => {
   const sample = book();
   try {
+    sample.confirm("2025-12-01", -40000, sample.misc.id);
     sample.confirm("2026-01-01", -2550000, sample.rent.id);
     sample.confirm("2026-02-01", -2550000, sample.rent.id);
     const ids = [-15000, -1500000, -2000000].map((amount) => sample.automatic("2026-02-10", amount, sample.rent.id, "learned_payee"));
@@ -170,6 +175,31 @@ test("a recurring, refund or transfer automatic row never changes", () => {
       });
       expect(sample.labelAudits(id)).toBe(0);
     });
+  } finally {
+    sample.close();
+  }
+});
+
+test("after a confirmation, an old automatic label switches to the label whose band contains the amount (decision 0044)", () => {
+  const sample = book();
+  const name = "E-TRANSFER";
+  try {
+    sample.confirm("2026-01-01", 18720, sample.other.id, name);
+    sample.confirm("2026-02-01", 500000, sample.other.id, name);
+    const small = sample.confirm("2026-03-01", 40000, sample.other.id, name);
+    for (const month of ["04", "05", "06", "07", "08", "09", "10"]) {
+      sample.confirm(`2026-${month}-01`, 2000000, sample.rental.id, name);
+    }
+    const id = sample.automatic("2026-10-15", 40000, sample.rental.id, "learned_payee", name);
+    sample.confirm("2026-11-01", 2000000, sample.rental.id, name);
+    expect(sample.read(id)).toEqual({
+      categoryId: sample.other.id,
+      merchantId: sample.merchant.id,
+      autoReason: "learned_amount",
+      autoSourceId: small.id,
+      autoConfidence: 899,
+    });
+    expect(sample.labelAudits(id)).toBe(1);
   } finally {
     sample.close();
   }

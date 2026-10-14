@@ -1,12 +1,12 @@
 import { accounts, occurrenceLinks, recurringPlans, settings, transactions, type TransactionRow } from "@num/db";
 import {
   Temporal,
+  bandSignals,
   buildPayeeIndex,
   containedMatch,
   familyMatch,
   fitLabels,
   learnedConfidence,
-  labelScores,
   learnedLabels,
   linkWindowStart,
   matchLinks,
@@ -62,8 +62,8 @@ function directionOf(amount: number): Direction {
 type Side = {
   bands: Map<string, LearnedLabel[]>;
   payeeLearned: Map<string, LearnedScore[]>;
-  /** Payee + amount scores, keyed by the payee and the labels whose band contains the amount. */
-  amountLearned: Map<string, LearnedScore[]>;
+  /** The learned signals of an amount, keyed by the payee and the labels whose band contains the amount. */
+  bandLearned: Map<string, ReturnType<typeof bandSignals>>;
   labels: Map<string, string>;
   tops: Map<string, FamilySignal>;
   index: PayeeIndex;
@@ -117,7 +117,7 @@ function buildSide(rows: readonly ConfirmRow[], transferTops: ReadonlyMap<string
   return {
     bands,
     payeeLearned,
-    amountLearned: new Map(),
+    bandLearned: new Map(),
     labels,
     tops,
     index: buildPayeeIndex(labels.keys()),
@@ -227,15 +227,14 @@ export function scorePayee(
   const bands = side.bands.get(input.payee) ?? [];
   const fit = fitLabels(bands, input.amount);
   const fitKey = `${input.payee}\0${fit.map((label) => label.key).join("\0")}`;
-  let amountScores = side.amountLearned.get(fitKey);
-  if (!amountScores) {
-    amountScores = labelScores(fit);
-    side.amountLearned.set(fitKey, amountScores);
+  let learned = side.bandLearned.get(fitKey);
+  if (!learned) {
+    learned = bandSignals(bands, fit, side.payeeLearned.get(input.payee) ?? []);
+    side.bandLearned.set(fitKey, learned);
   }
   return scoreMatch({
+    ...learned,
     recurring: input.recurring,
-    amountScores,
-    payeeScores: side.payeeLearned.get(input.payee) ?? [],
     similar: contained
       ? {
           scores: side.payeeLearned.get(contained) ?? [],
@@ -244,7 +243,6 @@ export function scorePayee(
       : null,
     family,
     transferRows: book.transfersByPayee.get(input.payee) ?? [],
-    outsideBands: bands.length > 0 && fit.length === 0,
   });
 }
 

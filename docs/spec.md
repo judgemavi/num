@@ -520,7 +520,7 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
 |---|---|
 | Recurring link (exactly one matching occurrence, §7.4) | 0.99 |
 | Learned payee + amount (decision 0036): the band of the learned label contains the amount | learned formula × width factor |
-| Learned payee | learned formula × 0.95 |
+| Learned payee (decision 0044: when one or more bands contain the amount, only for the labels of those bands) | learned formula × 0.95 |
 | Similar payee (decision 0026): a learned payee is contained, from the first word, in the new payee | that payee's learned confidence × 0.9, never automatic |
 | Brand family (decision 0026): 2 or more learned payees with the same first word all have the same label | lowest of their learned confidences × 0.85, never automatic |
 
@@ -545,8 +545,8 @@ It applies on every link: automatic link on import, and a manual link in the UI.
 
 Decision with the fixed threshold 0.85 (decision 0039):
 - confidence ≥ 0.85 and a clear lead: **automatic** (the label is applied; it still needs review).
-  Exception (decision 0043): when the key has learned labels and no band contains the amount, the result is not
-  automatic.
+  Exception (decisions 0043, 0044): when the learned labels of the key have two or more categories and no band
+  contains the amount, the result is not automatic.
 - confidence ≥ 0.60: **suggestion** (preselected, not applied).
 - less: no suggestion.
 The app compares confidence in thousandths (0–1000) with the thresholds (decision 0036).

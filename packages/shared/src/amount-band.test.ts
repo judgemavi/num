@@ -1,21 +1,26 @@
 import { expect, test } from "bun:test";
-import { bandContains, fitLabels, labelScores, learnedLabels, widthFactor, type BandRow } from "./amount-band";
+import { bandContains, bandSignals, fitLabels, learnedLabels, widthFactor, type BandRow } from "./amount-band";
 import { learnedConfidence, scoreMatch, type RecurringSignal } from "./matching";
 
-function row(id: string, date: string, categoryId: string, amount: number): BandRow {
-  return { id, date, categoryId, merchantId: null, amount };
+function row(id: string, date: string, categoryId: string, amount: number, merchantId: string | null = null): BandRow {
+  return { id, date, categoryId, merchantId, amount };
+}
+
+function signals(rows: readonly BandRow[], amount: number) {
+  const labels = learnedLabels(rows);
+  return bandSignals(labels, fitLabels(labels, amount), learnedConfidence(rows));
 }
 
 function score(rows: readonly BandRow[], amount: number, recurring: RecurringSignal | null = null) {
-  const labels = learnedLabels(rows);
-  const fit = fitLabels(labels, amount);
-  return scoreMatch({
-    recurring,
-    amountScores: labelScores(fit),
-    payeeScores: learnedConfidence(rows),
-    similar: null,
-    transferRows: [],
-    outsideBands: labels.length > 0 && fit.length === 0,
+  return scoreMatch({ ...signals(rows, amount), recurring, similar: null, transferRows: [] });
+}
+
+/** Rows of one label, one each month from the start month, oldest first. */
+function monthly(prefix: string, start: number, categoryId: string, amounts: readonly number[], merchantId: string | null = null) {
+  return amounts.map((amount, index) => {
+    const month = start + index;
+    const date = `${2025 + Math.floor((month - 1) / 12)}-${String(((month - 1) % 12) + 1).padStart(2, "0")}-01`;
+    return row(`${prefix}${index}`, date, categoryId, amount, merchantId);
   });
 }
 
@@ -60,25 +65,77 @@ test("the width factor is 1 at width 0, 0.975 at 0.25 and 0.95 from 0.5", () => 
   expect(widthFactor(0, 0)).toBe(1);
 });
 
-test("an amount outside all bands uses only the payee signal and is not automatic", () => {
+test("one category: an amount outside the band uses the payee signal and is automatic (decision 0044)", () => {
   const rows = [row("a", "2026-01-01", "pay", 5349850), row("b", "2026-01-31", "pay", 6445710)];
   expect(fitLabels(learnedLabels(rows), 7000000)).toEqual([]);
   const result = score(rows, 7000000);
   expect(result.reason).toBe("learned_payee");
   expect(result.confidence).toBeCloseTo(0.91 * 0.95, 10);
-  expect(result.level).toBe("suggestion");
-  expect(score(rows, 6000000).level).toBe("automatic");
+  expect(result.level).toBe("automatic");
 });
 
-test("an amount outside all bands of many confirmations is a suggestion, not automatic (decision 0043)", () => {
-  const rent = ["01", "02", "03", "04", "05", "06", "07"].map((month) => row(`r${month}`, `2026-${month}-01`, "rent", -2550000));
+test("one category with older lower pay: the older amount is outside the band and automatic", () => {
+  const pay = monthly("p", 1, "pay", [4750910, 5069080, 5121510, 5600000, 5900000, 6100000, 6300000, 6510170]);
+  const [label] = learnedLabels(pay);
+  expect(label?.low).toBe(5121510);
+  expect(fitLabels(learnedLabels(pay), 5069080)).toEqual([]);
+  const result = score(pay, 5069080);
+  expect(result.categoryId).toBe("pay");
+  expect(result.reason).toBe("learned_payee");
+  expect(result.confidenceMilli).toBeGreaterThanOrEqual(850);
+  expect(result.level).toBe("automatic");
+});
+
+test("two categories and an amount outside all bands is not automatic (decisions 0043, 0044)", () => {
+  const rows = [...monthly("m", 1, "misc", [-40000, -80000]), ...monthly("r", 3, "rent", Array<number>(7).fill(-2550000))];
+  expect(signals(rows, -1500000).amountGuard).toBe(true);
   for (const amount of [-15000, -1500000, -2000000]) {
-    const result = score(rent, amount);
+    const result = score(rows, amount);
     expect(result.categoryId).toBe("rent");
     expect(result.confidenceMilli).toBeGreaterThanOrEqual(850);
     expect(result.level).toBe("suggestion");
   }
-  expect(score(rent, -2550000).level).toBe("automatic");
+  expect(score(rows, -2550000).level).toBe("automatic");
+});
+
+test("money out: Miscellaneous 40–80 and Rent 2,550 ×7 make 80 automatic Miscellaneous", () => {
+  const rows = [...monthly("m", 1, "misc", [-40000, -80000]), ...monthly("r", 3, "rent", Array<number>(7).fill(-2550000))];
+  const result = score(rows, -80000);
+  expect(result.categoryId).toBe("misc");
+  expect(result.reason).toBe("learned_amount");
+  expect(result.confidenceMilli).toBe(864);
+  expect(result.level).toBe("automatic");
+});
+
+test("money in: 40 is in the Other income band only, so Rental Income gets no payee signal and 40 is automatic", () => {
+  const rows = [...monthly("o", 1, "other", [18720, 500000, 40000]), ...monthly("r", 4, "rental", Array<number>(8).fill(2000000))];
+  const learned = signals(rows, 40000);
+  expect(learned.payeeScores.map((score) => score.categoryId)).toEqual(["other"]);
+  expect(learned.amountGuard).toBe(false);
+  const result = score(rows, 40000);
+  expect(result.categoryId).toBe("other");
+  expect(result.signals.every((signal) => signal.categoryId === "other")).toBe(true);
+  expect(result.confidenceMilli).toBe(899);
+  expect(result.leadMilli).toBe(1000);
+  expect(result.level).toBe("automatic");
+  expect(score(rows, 2000000).categoryId).toBe("rental");
+});
+
+test("a band keeps the learned formula value of its label from all rows of the key", () => {
+  const rows = [...monthly("o", 1, "other", [18720, 500000, 40000]), ...monthly("r", 4, "rental", Array<number>(8).fill(2000000))];
+  const other = learnedConfidence(rows).find((score) => score.categoryId === "other");
+  expect(signals(rows, 40000).payeeScores).toEqual(other ? [other] : []);
+});
+
+test("two merchants of one category count as one category for the guard", () => {
+  const rows = [...monthly("b", 1, "rent", [-2000000], "b"), ...monthly("a", 2, "rent", Array<number>(4).fill(-2550000), "a")];
+  expect(signals(rows, -1500000).amountGuard).toBe(false);
+  const result = score(rows, -1500000);
+  expect(result.merchantId).toBe("a");
+  expect(result.level).toBe("automatic");
+  const mixed = [...monthly("b", 1, "misc", [-2000000], "b"), ...monthly("a", 2, "rent", Array<number>(4).fill(-2550000), "a")];
+  expect(signals(mixed, -1500000).amountGuard).toBe(true);
+  expect(score(mixed, -1500000).level).toBe("suggestion");
 });
 
 test("a key with no learned labels does not change", () => {
@@ -90,7 +147,7 @@ test("a key with no learned labels does not change", () => {
     payeeScores: [],
     similar: null,
     transferRows: [{ id: "t", date: "2026-01-01", transferAccountId: "savings" }],
-    outsideBands: false,
+    amountGuard: false,
   });
   expect(transfer.transferAccountId).toBe("savings");
   expect(transfer.level).toBe("suggestion");
