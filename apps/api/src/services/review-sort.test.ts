@@ -78,19 +78,20 @@ function sample(db: Db) {
 }
 
 /** All the rows of the review read, two pages of four rows. */
-function readAll(db: Db, dir: TransactionReviewListQuery["dir"]) {
+function readAll(db: Db, sort: Pick<TransactionReviewListQuery, "sort" | "dir">) {
   const read = (page: number) =>
-    listReviewTransactions(db, { page, pageSize: 4, uncategorized: false, automatic: false, sort: "confidence", dir, asOf });
+    listReviewTransactions(db, { page, pageSize: 4, uncategorized: false, automatic: false, ...sort, asOf });
   const first = read(1);
   expect(first.total).toBe(8);
   return [...first.items, ...read(2).items].map((row) => row.id);
 }
 
-test("the review read sorts by confidence: the level first, then the score, then the newest date", () => {
+test("the review read sorts by confidence: the level first, then the score, then the newest date; high to low by default", () => {
   withBook((db) => {
     const [noneNew, noneOld, into, out, maybe, likely, sureLow, sureHigh] = sample(db);
-    expect(readAll(db, "asc")).toEqual([noneNew, noneOld, into, out, maybe, likely, sureLow, sureHigh]);
-    expect(readAll(db, undefined)).toEqual([noneNew, noneOld, into, out, maybe, likely, sureLow, sureHigh]);
-    expect(readAll(db, "desc")).toEqual([sureHigh, sureLow, likely, maybe, into, out, noneNew, noneOld]);
+    expect(readAll(db, { sort: "confidence", dir: "asc" })).toEqual([noneNew, noneOld, into, out, maybe, likely, sureLow, sureHigh]);
+    expect(readAll(db, { sort: "confidence" })).toEqual([noneNew, noneOld, into, out, maybe, likely, sureLow, sureHigh]);
+    expect(readAll(db, { sort: "confidence", dir: "desc" })).toEqual([sureHigh, sureLow, likely, maybe, into, out, noneNew, noneOld]);
+    expect(readAll(db, {})).toEqual([sureHigh, sureLow, likely, maybe, into, out, noneNew, noneOld]);
   });
 });

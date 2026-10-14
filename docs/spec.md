@@ -612,7 +612,7 @@ It has the same sort orders, and also a sort by confidence (decision 0049). The 
   a question, and nothing for a row with no suggestion. The Category column shows the proposed label and merchant of a
   suggestion, and "Transfer to <account>" for a possible transfer. Other rows show the stored label.
   The Confidence column header sorts the page by confidence (decision 0049): from low to high, no suggestion,
-  Question, Maybe, Likely, Sure, and in a level, the lower score first.
+  Question, Maybe, Likely, Sure, and in a level, the lower score first. The default order is high to low.
 - **Answer in the editor:** a row has no buttons. A click on the row opens the transaction editor, and Save is the
   answer. A question is a field of the editor, filled with the proposed answer:
   - Possible transfer: "What is this?" is Transfer, with the other account and its matched transaction. Save as a

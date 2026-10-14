@@ -17,9 +17,9 @@ export function useAllSearch() {
   return useListSearch(allRoute.useSearch(), allRoute.useNavigate(), { sort: "date", dir: "desc" });
 }
 
-/** The filters, the sort order and the page of the Needs review page. It also sorts by confidence (decision 0049). */
+/** The filters, the sort order and the page of the Needs review page. The default is confidence, high to low (decision 0049). */
 export function useReviewSearch() {
-  return useListSearch(reviewRoute.useSearch(), reviewRoute.useNavigate(), { sort: "date", dir: "desc" });
+  return useListSearch(reviewRoute.useSearch(), reviewRoute.useNavigate(), { sort: "confidence", dir: "desc" });
 }
 
 /**

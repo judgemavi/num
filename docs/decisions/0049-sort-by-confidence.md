@@ -16,7 +16,8 @@ confidence: for example, all Sure rows together, or the rows that the app is not
    score comes first. `desc` is the opposite order. Equal rows sort by date (newest first), then by id.
    A Sure row uses the score of its automatic label. A suggestion uses its score. A question and a row with no
    suggestion have no score.
-4. The first click sorts `asc`, as for the other columns. The default sort of the page stays date, newest first.
+4. The default sort of the page is confidence, high to low (`desc`). A click on the Confidence header then sorts `asc`.
+   A click on another column sorts `asc` first. (Owner change, 2026-10-14: the default was date, newest first.)
 5. The sort runs in SQL with the rank of each row from the review read, so the pages and the filters do not change.
 
 ## Consequences

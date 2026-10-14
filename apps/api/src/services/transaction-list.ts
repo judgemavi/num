@@ -306,13 +306,18 @@ function confidenceOrder(hits: readonly NeedsReviewHit[], dir: TransactionReview
 
 /**
  * A page of the transactions that need review (decision 0047). The same filters and pages as the list.
- * The list also sorts by confidence (decision 0049).
+ * The list also sorts by confidence. With no sort, the order is confidence, high to low (decision 0049).
  */
 export function listReviewTransactions(db: Db, query: TransactionReviewListQuery & { asOf: string }) {
   const hits = filteredReviewHits(db, query, query.asOf);
   const reviews = reviewMap(hits);
   const where = hits.length === 0 ? sql`0` : idIn(hits.map((hit) => hit.id));
-  const sortOrder = query.sort === "confidence" ? confidenceOrder(hits, query.dir) : order({ ...query, sort: query.sort });
+  const sortOrder =
+    query.sort === undefined
+      ? confidenceOrder(hits, query.dir ?? "desc")
+      : query.sort === "confidence"
+        ? confidenceOrder(hits, query.dir)
+        : order({ ...query, sort: query.sort });
   return { ...readPage(db, query, where, sortOrder, () => reviews), reviewCounts: reviewCounts(hits) };
 }
 
