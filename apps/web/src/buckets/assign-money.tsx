@@ -49,7 +49,7 @@ export function AssignMoney({ bucket, kind }: AssignMoneyProps) {
         await save.mutateAsync({
           bucketId: bucket.id,
           asOf: localAsOf(),
-          body: { kind, amount: amount.minor, date: value.date, note: value.note.trim() === "" ? null : value.note.trim() },
+          body: { kind, amount: amount.milli, date: value.date, note: value.note.trim() === "" ? null : value.note.trim() },
         });
         close("ok");
       } catch (error) {

@@ -2,9 +2,10 @@ import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import { bucketColors, bucketKinds, type BucketColor, type BucketKind } from "./bucket";
 import { isoDateSchema } from "./date";
+import { divideAmount, floorToStep } from "./currency";
 import { roundUpShare } from "./funding";
 import { occurrenceDates, variableAmounts, type AmountMode, type PlanKind, type PlanSchedule } from "./recurring-calc";
-import { centsSchema as cents } from "./money";
+import { amountSchema as money } from "./money";
 
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
@@ -98,13 +99,13 @@ export const monthPlanSchema = z.object({
   income: z.object({ planned: nonNegative, actual: nonNegative }),
   bills: z.object({ planned: nonNegative, actual: nonNegative, items: z.array(billItemSchema) }),
   funding: z.object({ planned: nonNegative, actual: nonNegative, items: z.array(fundingItemSchema) }),
-  leftToSave: z.object({ planned: cents, actual: cents }),
+  leftToSave: z.object({ planned: money, actual: money }),
   feasibility: z
     .object({
       expectedPaycheck: nonNegative,
       billsEach: nonNegative,
       refillsEach: nonNegative,
-      surplus: cents,
+      surplus: money,
       need: nonNegative,
       shortfall: nonNegative,
       buckets: z.array(feasibilityBucketSchema),
@@ -125,14 +126,14 @@ function inMonth(date: string, month: string) {
   return date.slice(0, 7) === month;
 }
 
-function shareUp(total: number, count: number) {
+function shareUp(total: number, count: number, step: number) {
   if (count <= 0 || total <= 0) {
     return 0;
   }
-  return Math.ceil(total / count);
+  return divideAmount(total, count, step, "up");
 }
 
-function amountOf(plan: MonthPlanSource, links: readonly MonthPlanLink[], asOf: string, which: "forecast" | "safe") {
+function amountOf(plan: MonthPlanSource, links: readonly MonthPlanLink[], asOf: string, which: "forecast" | "safe", step: number) {
   if (plan.amountMode !== "variable") {
     return plan.expectedAmount;
   }
@@ -140,7 +141,7 @@ function amountOf(plan: MonthPlanSource, links: readonly MonthPlanLink[], asOf: 
     .filter((link) => link.planId === plan.id && link.actual !== null && link.dueDate <= asOf)
     .sort((left, right) => (left.dueDate < right.dueDate ? 1 : left.dueDate > right.dueDate ? -1 : 0))
     .flatMap((link) => (link.actual === null ? [] : [link.actual]));
-  const both = variableAmounts(actuals, plan.expectedAmount);
+  const both = variableAmounts(actuals, plan.expectedAmount, step);
   return which === "forecast" ? both.forecast : both.safe;
 }
 
@@ -162,6 +163,7 @@ function openingsFor(input: {
   plans: readonly MonthPlanSource[];
   links: readonly MonthPlanLink[];
   buckets: readonly MonthPlanBucketSource[];
+  step: number;
 }) {
   const origin = input.asOf.slice(0, 7);
   if (input.month <= origin) {
@@ -181,6 +183,7 @@ function openingsFor(input: {
 function surplusShares(
   surplus: number,
   buckets: readonly { bucketId: string; perPaycheck: number; dueDate: string | null }[],
+  step: number,
 ) {
   const blocked = buckets.filter((bucket) => bucket.dueDate !== null && surplus - (buckets.reduce((sum, item) => sum + item.perPaycheck, 0) - bucket.perPaycheck) <= 0);
   const shares = new Map<string, number>();
@@ -190,7 +193,7 @@ function surplusShares(
   const total = blocked.reduce((sum, bucket) => sum + bucket.perPaycheck, 0);
   let left = surplus;
   blocked.forEach((bucket, index) => {
-    const share = index === blocked.length - 1 ? left : Math.floor((surplus * bucket.perPaycheck) / total);
+    const share = index === blocked.length - 1 ? left : floorToStep((surplus * bucket.perPaycheck) / total, step);
     shares.set(bucket.bucketId, share);
     left -= share;
   });
@@ -203,6 +206,8 @@ export function buildMonthPlan(input: {
   plans: readonly MonthPlanSource[];
   links: readonly MonthPlanLink[];
   buckets: readonly MonthPlanBucketSource[];
+  /** The milliunits in one minor unit of the book currency. */
+  step: number;
 }): MonthPlan {
   return monthFigures({ ...input, buckets: openingsFor(input) });
 }
@@ -213,6 +218,7 @@ function monthFigures(input: {
   plans: readonly MonthPlanSource[];
   links: readonly MonthPlanLink[];
   buckets: readonly MonthPlanBucketSource[];
+  step: number;
 }) {
   const { start, end } = monthRange(input.month);
   const horizon = Temporal.PlainDate.from(start).add({ years: 20 }).toString();
@@ -233,8 +239,8 @@ function monthFigures(input: {
   const hits: Hit[] = [];
 
   for (const plan of plans) {
-    const forecast = Math.abs(amountOf(plan, input.links, input.asOf, "forecast"));
-    const safe = Math.abs(amountOf(plan, input.links, input.asOf, "safe"));
+    const forecast = Math.abs(amountOf(plan, input.links, input.asOf, "forecast", input.step));
+    const safe = Math.abs(amountOf(plan, input.links, input.asOf, "safe", input.step));
     for (const date of occurrenceDates(plan.schedule, plan.fundsBuckets ? horizon : end, start)) {
       if (skipped.has(skippedKey(plan.id, date.dueDate))) {
         continue;
@@ -309,7 +315,7 @@ function monthFigures(input: {
     const gap = Math.max(0, (bucket.kind === "sinking" ? (bucket.amount ?? 0) : (bucket.target ?? 0)) - bucket.balance);
     const fixed = bucket.kind === "goal" && bucket.targetDate === null;
     const remaining = fixed || goalDate === null ? 0 : fromAnchor.filter((hit) => hit.date < goalDate).length;
-    const perPaycheck = fixed ? Math.max(0, bucket.fixedAmount ?? 0) : roundUpShare(gap, remaining);
+    const perPaycheck = fixed ? Math.max(0, bucket.fixedAmount ?? 0) : roundUpShare(gap, remaining, input.step);
     const times = fixed ? paycheckCount : fromAnchor.filter((hit) => inMonth(hit.date, input.month) && goalDate !== null && hit.date < goalDate).length;
     const once = !fixed && remaining === 0 && gap > 0;
     const planned = once ? perPaycheck : perPaycheck * times;
@@ -345,11 +351,11 @@ function monthFigures(input: {
   let feasibility: MonthPlan["feasibility"] = null;
   if (paycheckCount > 0) {
     const expectedPaycheck = Math.min(...inMonthHits.map((hit) => hit.safe));
-    const billsEach = shareUp(safeBills, paycheckCount);
-    const refillsEach = shareUp(refillTotal, paycheckCount);
+    const billsEach = shareUp(safeBills, paycheckCount, input.step);
+    const refillsEach = shareUp(refillTotal, paycheckCount, input.step);
     const surplus = expectedPaycheck - billsEach - refillsEach;
     const shortfall = Math.max(0, need - surplus);
-    const shares = surplusShares(surplus, feasibilityBuckets);
+    const shares = surplusShares(surplus, feasibilityBuckets, input.step);
     const buckets = feasibilityBuckets.map((bucket) => {
       const alone = surplus - (need - bucket.perPaycheck);
       const room = alone > 0 ? alone : (shares.get(bucket.bucketId) ?? 0);

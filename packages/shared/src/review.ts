@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { autoReasons } from "./matching";
 import { reviewLevels } from "./review-level";
-import { centsSchema } from "./money";
+import { amountSchema } from "./money";
 import { suggestionSchema } from "./suggest";
 import { isUtcTimestamp } from "./time";
 
@@ -15,7 +15,7 @@ export type ReviewQuestion = (typeof reviewQuestions)[number];
 export const reviewTransferSchema = z.object({
   otherId: z.uuid(),
   otherPayee: z.string(),
-  otherAmount: centsSchema,
+  otherAmount: amountSchema,
   otherDate: isoDateSchema,
   itemKey: z.string(),
 });
@@ -23,8 +23,8 @@ export const reviewTransferSchema = z.object({
 export const reviewRecurringSchema = z.object({
   planId: z.uuid(),
   dueDate: isoDateSchema,
-  expectedAmount: centsSchema.nullable(),
-  actualAmount: centsSchema.nullable(),
+  expectedAmount: amountSchema.nullable(),
+  actualAmount: amountSchema.nullable(),
   itemKey: z.string(),
   transactionIds: z.array(z.uuid()),
 });
@@ -35,7 +35,7 @@ export const reviewRefundSchema = z.object({
     z.object({
       id: z.uuid(),
       date: isoDateSchema,
-      amount: centsSchema,
+      amount: amountSchema,
       payeeRaw: z.string(),
     }),
   ),

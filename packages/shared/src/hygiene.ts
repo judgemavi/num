@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { monthKeySchema } from "./month";
-import { centsSchema as cents } from "./money";
+import { amountSchema as money } from "./money";
 
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
@@ -11,7 +11,7 @@ const emergencyFundCheckSchema = z.object({
   code: z.literal("emergency_fund"),
   pass: z.boolean(),
   source: z.enum(["goals", "savings"]),
-  held: cents,
+  held: money,
   months: nonNegative,
   monthlyBills: nonNegative,
   monthlyRefills: nonNegative,
@@ -70,7 +70,7 @@ const sinkingCheckSchema = z.object({
 const savingsMonthSchema = z.object({
   month: monthKeySchema,
   savingsRateMilliPct: z.number().int().nullable(),
-  savings: cents,
+  savings: money,
 });
 
 const savingsRateCheckSchema = z.object({

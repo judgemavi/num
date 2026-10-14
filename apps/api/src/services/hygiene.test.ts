@@ -69,7 +69,7 @@ function bill(db: Db, accountId: string, categoryId: string | null, freq: "month
     kind: "bill",
     accountId,
     categoryId,
-    expectedAmount: freq === "yearly" ? -12_000 : -1_000,
+    expectedAmount: freq === "yearly" ? -120_000 : -10_000,
     tolerance: 0,
     amountMode: "fixed",
     startDate: freq === "yearly" ? "2026-06-15" : "2026-01-15",
@@ -120,12 +120,12 @@ test("the emergency fund passes when savings cover one month of bills and essent
   withBook((db) => {
     db.insert(settings).values({ key: "emergencyFundMonths", value: "1" }).run();
     const cash = account(db, "chequing", "Cash", 0);
-    account(db, "savings", "Reserve", 1_200);
+    account(db, "savings", "Reserve", 12_000);
     const food = expense(db, "Food");
-    spendBucket(db, food.id, true, 200);
+    spendBucket(db, food.id, true, 2_000);
     bill(db, cash.id, null, "monthly");
     const row = check(db, "2026-06-15", "emergency_fund");
-    expect(row).toMatchObject({ pass: true, source: "savings", held: 1_200, months: 1, monthlyBills: 1_000, monthlyRefills: 200, need: 1_200 });
+    expect(row).toMatchObject({ pass: true, source: "savings", held: 12_000, months: 1, monthlyBills: 10_000, monthlyRefills: 2_000, need: 12_000 });
   });
 });
 
@@ -133,9 +133,9 @@ test("the emergency fund fails when an essential goal is short, even if savings 
   withBook((db) => {
     db.insert(settings).values({ key: "emergencyFundMonths", value: "1" }).run();
     const cash = account(db, "chequing", "Cash", 0);
-    account(db, "savings", "Reserve", 50_000);
+    account(db, "savings", "Reserve", 500_000);
     const food = expense(db, "Food");
-    spendBucket(db, food.id, true, 200);
+    spendBucket(db, food.id, true, 2_000);
     bill(db, cash.id, null, "monthly");
     createBucket(db, {
       name: "Reserve goal",
@@ -149,44 +149,44 @@ test("the emergency fund fails when an essential goal is short, even if savings 
       amount: null,
       dueDate: null,
       repeat: null,
-      target: 10_000,
+      target: 100_000,
       targetDate: "2027-01-01",
       fixedAmount: null,
       asOf: "2000-01-01",
       ...saved,
     });
     const row = check(db, "2026-06-15", "emergency_fund");
-    expect(row).toMatchObject({ pass: false, source: "goals", held: 0, need: 1_200 });
+    expect(row).toMatchObject({ pass: false, source: "goals", held: 0, need: 12_000 });
   });
 });
 
 test("a full card passes when the last statement is paid by the derived due date", () => {
   withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 10_000);
-    const card = account(db, "credit_card", "Card", -4_000);
-    createCheckpoint(db, card.id, { date: "2026-01-15", statementBalance: -4_000, ...saved });
+    const cash = account(db, "chequing", "Cash", 100_000);
+    const card = account(db, "credit_card", "Card", -40_000);
+    createCheckpoint(db, card.id, { date: "2026-01-15", statementBalance: -40_000, ...saved });
     createTransaction(db, {
       accountId: cash.id,
       date: "2026-01-20",
-      amount: -4_000,
+      amount: -40_000,
       payeeRaw: "Card payment",
       status: "cleared",
-      lines: [{ amount: -4_000, transferAccountId: card.id }],
+      lines: [{ amount: -40_000, transferAccountId: card.id }],
       ...saved,
     });
     const row = check(db, "2026-02-10", "cards_paid");
     expect(row.pass).toBe(true);
-    expect(row.items[0]).toMatchObject({ accountId: card.id, statementDate: "2026-01-15", dueDate: "2026-02-05", owed: 4_000, paid: 4_000, pass: true });
+    expect(row.items[0]).toMatchObject({ accountId: card.id, statementDate: "2026-01-15", dueDate: "2026-02-05", owed: 40_000, paid: 40_000, pass: true });
   });
 });
 
 test("a full card fails when the statement is still unpaid after the derived due date", () => {
   withBook((db) => {
-    const card = account(db, "credit_card", "Card", -4_000);
-    createCheckpoint(db, card.id, { date: "2026-01-15", statementBalance: -4_000, ...saved });
+    const card = account(db, "credit_card", "Card", -40_000);
+    createCheckpoint(db, card.id, { date: "2026-01-15", statementBalance: -40_000, ...saved });
     const row = check(db, "2026-02-10", "cards_paid");
     expect(row.pass).toBe(false);
-    expect(row.items[0]).toMatchObject({ owed: 4_000, paid: 0, dueDate: "2026-02-05", pass: false });
+    expect(row.items[0]).toMatchObject({ owed: 40_000, paid: 0, dueDate: "2026-02-05", pass: false });
   });
 });
 
@@ -240,14 +240,14 @@ test("imports fail when an on-budget account has no recent import", () => {
 });
 test("the inbox passes when every item is within 7 days", () => {
   withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 100);
+    const cash = account(db, "chequing", "Cash", 1_000);
     createTransaction(db, {
       accountId: cash.id,
       date: "2026-01-28",
-      amount: -10,
+      amount: -100,
       payeeRaw: "Shop",
       status: "cleared",
-      lines: [{ amount: -10 }],
+      lines: [{ amount: -100 }],
       ...saved,
     });
     expect(check(db, "2026-02-01", "review")).toMatchObject({ pass: true, limitDays: 7, oldCount: 0, oldestDate: null });
@@ -256,14 +256,14 @@ test("the inbox passes when every item is within 7 days", () => {
 
 test("the inbox fails when an item is older than 7 days", () => {
   withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 100);
+    const cash = account(db, "chequing", "Cash", 1_000);
     createTransaction(db, {
       accountId: cash.id,
       date: "2026-01-01",
-      amount: -10,
+      amount: -100,
       payeeRaw: "Shop",
       status: "cleared",
-      lines: [{ amount: -10 }],
+      lines: [{ amount: -100 }],
       ...saved,
     });
     expect(check(db, "2026-02-01", "review")).toMatchObject({ pass: false, oldCount: 1, oldestDate: "2026-01-01" });
@@ -284,7 +284,7 @@ test("sinking funds pass when each yearly bill has a sinking bucket for its cate
       icon: "shield",
       categoryIds: [insurance.id],
       refillTo: null,
-      amount: 12_000,
+      amount: 120_000,
       dueDate: "2026-06-15",
       repeat: "yearly",
       target: null,
@@ -316,20 +316,20 @@ test("the savings rate uses the last 3 complete months: not older months, not th
     const pay = createCategory(db, { name: "Pay", kind: "income", ...saved });
     const food = expense(db, "Food");
     for (const month of ["2025-12", "2026-01", "2026-02", "2026-03"]) {
-      post(db, cash.id, `${month}-05`, 1_000, pay.id);
+      post(db, cash.id, `${month}-05`, 10_000, pay.id);
     }
-    post(db, cash.id, "2025-12-06", -4_000, food.id);
-    post(db, cash.id, "2026-04-05", -5_000, food.id);
+    post(db, cash.id, "2025-12-06", -40_000, food.id);
+    post(db, cash.id, "2026-04-05", -50_000, food.id);
     const row = check(db, "2026-04-30", "savings_rate");
     expect(row.pass).toBe(true);
     expect(row.months).toEqual([
-      { month: "2026-03", savingsRateMilliPct: 100_000, savings: 1_000 },
-      { month: "2026-02", savingsRateMilliPct: 100_000, savings: 1_000 },
-      { month: "2026-01", savingsRateMilliPct: 100_000, savings: 1_000 },
+      { month: "2026-03", savingsRateMilliPct: 100_000, savings: 10_000 },
+      { month: "2026-02", savingsRateMilliPct: 100_000, savings: 10_000 },
+      { month: "2026-01", savingsRateMilliPct: 100_000, savings: 10_000 },
     ]);
     const next = check(db, "2026-05-01", "savings_rate");
     expect(next.pass).toBe(false);
-    expect(next.months[0]).toEqual({ month: "2026-04", savingsRateMilliPct: null, savings: -5_000 });
+    expect(next.months[0]).toEqual({ month: "2026-04", savingsRateMilliPct: null, savings: -50_000 });
   });
 });
 
@@ -339,12 +339,12 @@ test("the savings rate fails when one of the last 3 complete months spent more t
     const pay = createCategory(db, { name: "Pay", kind: "income", ...saved });
     const food = expense(db, "Food");
     for (const month of ["2026-01", "2026-02"]) {
-      post(db, cash.id, `${month}-05`, 1_000, pay.id);
+      post(db, cash.id, `${month}-05`, 10_000, pay.id);
     }
-    post(db, cash.id, "2026-03-05", -2_000, food.id);
+    post(db, cash.id, "2026-03-05", -20_000, food.id);
     const row = check(db, "2026-04-15", "savings_rate");
     expect(row.pass).toBe(false);
-    expect(row.months[0]).toMatchObject({ month: "2026-03", savings: -2_000, savingsRateMilliPct: null });
+    expect(row.months[0]).toMatchObject({ month: "2026-03", savings: -20_000, savingsRateMilliPct: null });
   });
 });
 
@@ -353,11 +353,11 @@ test("the savings rate does not count months before the first transaction", () =
     const cash = account(db, "chequing", "Cash", 0);
     const pay = createCategory(db, { name: "Pay", kind: "income", ...saved });
     const food = expense(db, "Food");
-    post(db, cash.id, "2026-03-05", 1_000, pay.id);
-    post(db, cash.id, "2026-03-06", -250, food.id);
+    post(db, cash.id, "2026-03-05", 10_000, pay.id);
+    post(db, cash.id, "2026-03-06", -2_500, food.id);
     expect(check(db, "2026-03-20", "savings_rate")).toMatchObject({ pass: true, months: [] });
     expect(check(db, "2026-04-15", "savings_rate").months).toEqual([
-      { month: "2026-03", savingsRateMilliPct: 75_000, savings: 750 },
+      { month: "2026-03", savingsRateMilliPct: 75_000, savings: 7_500 },
     ]);
   });
 });
@@ -380,17 +380,17 @@ test("recurring fails when a payment was missed", () => {
 test("overspent passes when every bucket balance is zero or more", () => {
   withBook((db) => {
     const food = expense(db, "Food");
-    spendBucket(db, food.id, false, 1_000);
+    spendBucket(db, food.id, false, 10_000);
     expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: true, count: 0, balance: 0 });
   });
 });
 
 test("overspent fails when a bucket balance is below zero", () => {
   withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 500);
+    const cash = account(db, "chequing", "Cash", 5_000);
     const food = expense(db, "Food");
-    spendBucket(db, food.id, false, 1_000);
-    post(db, cash.id, "2026-03-02", -100, food.id);
-    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: false, count: 1, balance: -100 });
+    spendBucket(db, food.id, false, 10_000);
+    post(db, cash.id, "2026-03-02", -1_000, food.id);
+    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: false, count: 1, balance: -1_000 });
   });
 });

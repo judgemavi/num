@@ -59,7 +59,7 @@ function account(db: Db, name: string) {
     institution: null,
     kind: "chequing",
     openingDate: "2026-01-01",
-    openingBalance: 1_000_000,
+    openingBalance: 10_000_000,
     ...saved,
   });
 }
@@ -146,7 +146,7 @@ test("each review source appears and leaves after its action", () => {
     const dining = category(sample.db, "Dining");
     const stream = merchant(sample.db, "Stream Co");
 
-    const open = pay(sample.db, cash.id, "2026-03-02", -6400, "Corner market", null);
+    const open = pay(sample.db, cash.id, "2026-03-02", -64000, "Corner market", null);
     expect(questionIds(sample.db)).toEqual([open.id]);
     updateTransaction(sample.db, open.id, {
       accountId: open.accountId,
@@ -161,9 +161,9 @@ test("each review source appears and leaves after its action", () => {
     });
     expect(questionIds(sample.db)).toEqual([]);
 
-    const left = pay(sample.db, cash.id, "2026-03-05", -50000, "Move", food.id);
+    const left = pay(sample.db, cash.id, "2026-03-05", -500000, "Move", food.id);
     sample.db.update(transactions).set({ source: "import" }).where(eq(transactions.id, left.id)).run();
-    const right = pay(sample.db, savings.id, "2026-03-06", 50000, "Move", food.id);
+    const right = pay(sample.db, savings.id, "2026-03-06", 500000, "Move", food.id);
     const pairKey = left.id < right.id ? `transfer_pair:${left.id}:${right.id}` : `transfer_pair:${right.id}:${left.id}`;
     expect(pairKeys(sample.db)).toEqual([pairKey]);
     const beforePair = openCount(sample.db);
@@ -185,7 +185,7 @@ test("each review source appears and leaves after its action", () => {
       color: "pink",
       icon: "utensils",
       categoryIds: [dining.id],
-      refillTo: 1000,
+      refillTo: 10000,
       amount: null,
       dueDate: null,
       repeat: null,
@@ -203,7 +203,7 @@ test("each review source appears and leaves after its action", () => {
       color: "mint",
       icon: "wallet",
       categoryIds: [],
-      refillTo: 1000,
+      refillTo: 10000,
       amount: null,
       dueDate: null,
       repeat: null,
@@ -213,34 +213,34 @@ test("each review source appears and leaves after its action", () => {
       asOf: "2000-01-01",
       ...saved,
     });
-    pay(sample.db, cash.id, "2026-03-08", -4200, "Dining out", dining.id);
-    createBucketEvent(sample.db, spare.id, { kind: "fund", amount: 5000, date: "2026-03-01", asOf, ...saved });
+    pay(sample.db, cash.id, "2026-03-08", -42000, "Dining out", dining.id);
+    createBucketEvent(sample.db, spare.id, { kind: "fund", amount: 50000, date: "2026-03-01", asOf, ...saved });
     expect(overspentIds(sample.db)).toEqual([meals.id]);
     coverBucket(sample.db, meals.id, { fromBucketId: spare.id, date: asOf, ...saved });
     expect(overspentIds(sample.db)).toEqual([]);
 
-    const changedPlan = createPlan(sample.db, { ...planFields(cash.id, null, -1000, "2026-03-15"), ...saved });
-    const changedPay = pay(sample.db, cash.id, "2026-03-15", -1999, "Stream", food.id);
+    const changedPlan = createPlan(sample.db, { ...planFields(cash.id, null, -10000, "2026-03-15"), ...saved });
+    const changedPay = pay(sample.db, cash.id, "2026-03-15", -19990, "Stream", food.id);
     linkOccurrence(sample.db, changedPlan.id, "2026-03-15", changedPay.id, saved);
     expect(dueKeys(recurringSignals(sample.db, asOf).changed)).toEqual([`${changedPlan.id}:2026-03-15`]);
-    updatePlan(sample.db, changedPlan.id, { ...planFields(cash.id, null, -1999, "2026-03-15"), name: changedPlan.name, ...saved });
+    updatePlan(sample.db, changedPlan.id, { ...planFields(cash.id, null, -19990, "2026-03-15"), name: changedPlan.name, ...saved });
     expect(recurringSignals(sample.db, asOf).changed).toEqual([]);
 
-    const missedPlan = createPlan(sample.db, { ...planFields(cash.id, null, -1000, "2026-01-15"), endDate: null, name: "Gym", ...saved });
+    const missedPlan = createPlan(sample.db, { ...planFields(cash.id, null, -10000, "2026-01-15"), endDate: null, name: "Gym", ...saved });
     expect(dueKeys(recurringSignals(sample.db, asOf).missed)).toContain(`${missedPlan.id}:2026-02-15`);
     skipOccurrence(sample.db, missedPlan.id, "2026-02-15", "Closed", saved);
     expect(dueKeys(recurringSignals(sample.db, asOf).missed)).not.toContain(`${missedPlan.id}:2026-02-15`);
 
-    const ambiguousPlan = createPlan(sample.db, { ...planFields(savings.id, null, -1000, "2026-03-15"), name: "Phone", ...saved });
-    const first = pay(sample.db, savings.id, "2026-03-15", -1000, "Phone a", food.id);
-    const second = pay(sample.db, savings.id, "2026-03-16", -1000, "Phone b", food.id);
+    const ambiguousPlan = createPlan(sample.db, { ...planFields(savings.id, null, -10000, "2026-03-15"), name: "Phone", ...saved });
+    const first = pay(sample.db, savings.id, "2026-03-15", -10000, "Phone a", food.id);
+    const second = pay(sample.db, savings.id, "2026-03-16", -10000, "Phone b", food.id);
     expect(dueKeys(recurringSignals(sample.db, asOf).ambiguous)).toEqual([`${ambiguousPlan.id}:2026-03-15`]);
     linkOccurrence(sample.db, ambiguousPlan.id, "2026-03-15", first.id, saved);
     expect(recurringSignals(sample.db, asOf).ambiguous).toEqual([]);
     expect(second.id).not.toBe(first.id);
 
     for (const date of ["2026-01-15", "2026-02-15", "2026-03-15"]) {
-      pay(sample.db, savings.id, date, -1500, "Stream", food.id, stream);
+      pay(sample.db, savings.id, date, -15000, "Stream", food.id, stream);
     }
     const proposal = recurringSignals(sample.db, asOf).proposals[0];
     expect(proposal).toBeDefined();
@@ -268,8 +268,8 @@ test("each review source appears and leaves after its action", () => {
     }
     expect(recurringSignals(sample.db, asOf).proposals).toEqual([]);
 
-    const older = pay(sample.db, cash.id, "2026-01-09", -500, "Match one", food.id);
-    pay(sample.db, cash.id, "2026-01-11", -500, "Match two", food.id);
+    const older = pay(sample.db, cash.id, "2026-01-09", -5000, "Match one", food.id);
+    pay(sample.db, cash.id, "2026-01-11", -5000, "Match two", food.id);
     const imported = importStatement(sample.db, sample.dir, {
       source: "import",
       at,
@@ -294,8 +294,8 @@ test("each review source appears and leaves after its action", () => {
       expect(reviewRowIds(sample.db, imported.id)).toEqual([]);
     }
 
-    pay(sample.db, cash.id, "2026-02-09", -700, "Create one", food.id);
-    pay(sample.db, cash.id, "2026-02-11", -700, "Create two", food.id);
+    pay(sample.db, cash.id, "2026-02-09", -7000, "Create one", food.id);
+    pay(sample.db, cash.id, "2026-02-11", -7000, "Create two", food.id);
     const createBatch = importStatement(sample.db, sample.dir, {
       source: "import",
       at,
@@ -344,9 +344,9 @@ test("auto-link runs for the imported account after the import commits", () => {
   try {
     const cash = account(sample.db, "Cash");
     const other = account(sample.db, "Other");
-    const home = createPlan(sample.db, { ...planFields(cash.id, null, -1250, "2026-02-15"), name: "Hydro", ...saved });
-    const away = createPlan(sample.db, { ...planFields(other.id, null, -800, "2026-02-15"), name: "Other bill", ...saved });
-    pay(sample.db, other.id, "2026-02-15", -800, "Other bill", null);
+    const home = createPlan(sample.db, { ...planFields(cash.id, null, -12500, "2026-02-15"), name: "Hydro", ...saved });
+    const away = createPlan(sample.db, { ...planFields(other.id, null, -8000, "2026-02-15"), name: "Other bill", ...saved });
+    pay(sample.db, other.id, "2026-02-15", -8000, "Other bill", null);
     importStatement(sample.db, sample.dir, {
       source: "import",
       at,
@@ -370,7 +370,7 @@ test("undo of an import removes occurrence links for the removed transactions", 
   const sample = book();
   try {
     const cash = account(sample.db, "Cash");
-    const plan = createPlan(sample.db, { ...planFields(cash.id, null, -1250, "2026-02-15"), name: "Hydro", ...saved });
+    const plan = createPlan(sample.db, { ...planFields(cash.id, null, -12500, "2026-02-15"), name: "Hydro", ...saved });
     const imported = importStatement(sample.db, sample.dir, {
       source: "import",
       at,

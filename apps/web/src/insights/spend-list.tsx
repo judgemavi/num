@@ -33,7 +33,7 @@ export function SpendList({ title, rows, label, onOpen, colors, actions }: Spend
             ) : null}
             <span className={listName}>{label(row)}</span>
             <span className={listAmt}>
-              <Amount minor={row.amount} />
+              <Amount value={row.amount} />
               {row.kind === "uncategorized" ? <small>In {formatMoney(currency, row.inflow ?? 0)}</small> : null}
             </span>
           </ListRow>

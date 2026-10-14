@@ -63,7 +63,7 @@ function CheckpointRows({ accountId, onUnlock }: { accountId: string; onUnlock: 
       </div>
       {item.unlockedAt ? <Badge variant="neutral">Unlocked</Badge> : null}
       <div className="ml-auto text-right">
-        <Amount minor={item.statementBalance} owed={owed} />
+        <Amount value={item.statementBalance} owed={owed} />
       </div>
       {item.unlockedAt ? null : (
         <RowMenu label={`Actions for the checkpoint on ${formatDate(item.date)}`}>

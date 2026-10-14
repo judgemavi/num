@@ -72,7 +72,7 @@ function Activity() {
                   </small>
                 </div>
                 <div className={listAmt}>
-                  <Amount minor={event.amount} />
+                  <Amount value={event.amount} />
                 </div>
                 {event.fundingRunId ? null : (
                   <RowMenu label={`Actions for ${kindLabel[event.kind]}`}>

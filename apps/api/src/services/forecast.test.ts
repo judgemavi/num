@@ -20,8 +20,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-forecast-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });
@@ -76,26 +78,26 @@ function payCard(db: Db, fromId: string, cardId: string, date: string, amount: n
 test("a card purchase moves cash on the due date only", () => {
   const book = tempDatabase();
   try {
-    const cash = cashAccount(book.db, "Cash", 50_000);
+    const cash = cashAccount(book.db, "Cash", 500_000);
     const card = cardAccount(book.db, "full");
     const groceries = expense(book.db, "Groceries");
-    spend(book.db, card.id, groceries.id, "2026-08-01", -1_000);
-    createCheckpoint(book.db, card.id, { date: "2026-08-01", statementBalance: -1_000, ...saved });
-    payCard(book.db, cash.id, card.id, "2026-08-22", 1_000);
-    spend(book.db, card.id, groceries.id, "2026-09-01", -1_000);
-    createCheckpoint(book.db, card.id, { date: "2026-09-01", statementBalance: -1_000, ...saved });
-    payCard(book.db, cash.id, card.id, "2026-09-22", 1_000);
-    spend(book.db, card.id, groceries.id, "2026-10-01", -2_000);
-    createCheckpoint(book.db, card.id, { date: "2026-10-01", statementBalance: -2_000, ...saved });
+    spend(book.db, card.id, groceries.id, "2026-08-01", -10_000);
+    createCheckpoint(book.db, card.id, { date: "2026-08-01", statementBalance: -10_000, ...saved });
+    payCard(book.db, cash.id, card.id, "2026-08-22", 10_000);
+    spend(book.db, card.id, groceries.id, "2026-09-01", -10_000);
+    createCheckpoint(book.db, card.id, { date: "2026-09-01", statementBalance: -10_000, ...saved });
+    payCard(book.db, cash.id, card.id, "2026-09-22", 10_000);
+    spend(book.db, card.id, groceries.id, "2026-10-01", -20_000);
+    createCheckpoint(book.db, card.id, { date: "2026-10-01", statementBalance: -20_000, ...saved });
 
     const forecast = readForecast(book.db, "2026-10-08");
     const cashRow = forecast.accounts.find((row) => row.accountId === cash.id);
     const cardRow = forecast.accounts.find((row) => row.accountId === card.id);
     const before = forecast.dates.indexOf("2026-10-21");
     const due = forecast.dates.indexOf("2026-10-22");
-    expect(cashRow?.known[before]).toBe(48_000);
-    expect(cashRow?.known[due]).toBe(46_000);
-    expect(cardRow?.known[before]).toBe(-2_000);
+    expect(cashRow?.known[before]).toBe(480_000);
+    expect(cashRow?.known[due]).toBe(460_000);
+    expect(cardRow?.known[before]).toBe(-20_000);
     expect(cardRow?.known[due]).toBe(0);
     expect(forecast.total.known[before]).toBe(forecast.total.known[due]);
   } finally {
@@ -106,7 +108,7 @@ test("a card purchase moves cash on the due date only", () => {
 test("bucket spending is not counted two times", () => {
   const book = tempDatabase();
   try {
-    const cash = cashAccount(book.db, "Cash", 100_000);
+    const cash = cashAccount(book.db, "Cash", 1_000_000);
     const groceries = expense(book.db, "Groceries");
     createBucket(book.db, {
       name: "Food",
@@ -116,7 +118,7 @@ test("bucket spending is not counted two times", () => {
       color: "mint",
       icon: "shopping-cart",
       categoryIds: [groceries.id],
-      refillTo: 3_100,
+      refillTo: 31_000,
       amount: null,
       dueDate: null,
       repeat: null,
@@ -127,11 +129,11 @@ test("bucket spending is not counted two times", () => {
       ...saved,
     });
     for (const month of ["2026-07", "2026-08", "2026-09"]) {
-      spend(book.db, cash.id, groceries.id, `${month}-15`, -9_000);
+      spend(book.db, cash.id, groceries.id, `${month}-15`, -90_000);
     }
     const forecast = readForecast(book.db, "2026-10-01");
     const row = forecast.accounts.find((item) => item.accountId === cash.id);
-    expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 100);
+    expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 1_000);
   } finally {
     book.close();
   }
@@ -140,16 +142,16 @@ test("bucket spending is not counted two times", () => {
 test("outlier lines are not included in category spending", () => {
   const book = tempDatabase();
   try {
-    const cash = cashAccount(book.db, "Cash", 100_000);
+    const cash = cashAccount(book.db, "Cash", 1_000_000);
     const snacks = expense(book.db, "Snacks");
     for (const month of ["2026-01", "2026-02", "2026-03"]) {
-      spend(book.db, cash.id, snacks.id, `${month}-15`, -100);
+      spend(book.db, cash.id, snacks.id, `${month}-15`, -1_000);
     }
-    spend(book.db, cash.id, snacks.id, "2026-02-16", -10_000);
-    spend(book.db, cash.id, snacks.id, "2026-03-16", -10_000);
+    spend(book.db, cash.id, snacks.id, "2026-02-16", -100_000);
+    spend(book.db, cash.id, snacks.id, "2026-03-16", -100_000);
     const forecast = readForecast(book.db, "2026-04-01");
     const row = forecast.accounts.find((item) => item.accountId === cash.id);
-    expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 4);
+    expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 40);
   } finally {
     book.close();
   }
@@ -158,12 +160,12 @@ test("outlier lines are not included in category spending", () => {
 test("a forecast read does not write a snapshot", () => {
   const book = tempDatabase();
   try {
-    const cash = cashAccount(book.db, "Cash", 1_000);
+    const cash = cashAccount(book.db, "Cash", 10_000);
     createPlan(book.db, {
       name: "Rent",
       kind: "bill",
       accountId: cash.id,
-      expectedAmount: -400,
+      expectedAmount: -4_000,
       tolerance: 0,
       amountMode: "fixed",
       startDate: "2026-10-31",
@@ -178,7 +180,7 @@ test("a forecast read does not write a snapshot", () => {
     const before = book.db.select().from(auditLog).all().length;
     const first = readForecast(book.db, "2026-10-08");
     const end = first.dates.indexOf("2026-10-31");
-    expect(first.total.estimated[end]).toBe(600);
+    expect(first.total.estimated[end]).toBe(6_000);
     expect(book.db.select().from(auditLog).all()).toHaveLength(before);
     readForecast(book.db, "2026-10-20");
     expect(book.db.select().from(auditLog).all()).toHaveLength(before);
@@ -196,8 +198,8 @@ test("variable income uses the median of the last 6 actuals", () => {
       name: "Pay",
       kind: "income",
       accountId: cash.id,
-      expectedAmount: 9_999,
-      tolerance: 20_000,
+      expectedAmount: 99_990,
+      tolerance: 200_000,
       amountMode: "variable",
       categoryId: pay.id,
       startDate: "2026-01-01",
@@ -209,7 +211,7 @@ test("variable income uses the median of the last 6 actuals", () => {
       fundsBuckets: true,
       ...saved,
     });
-    const amounts = [100, 200, 300, 400, 500, 600];
+    const amounts = [1_000, 2_000, 3_000, 4_000, 5_000, 6_000];
     for (const [index, amount] of amounts.entries()) {
       const month = String(index + 1).padStart(2, "0");
       const date = `2026-${month}-01`;
@@ -226,7 +228,7 @@ test("variable income uses the median of the last 6 actuals", () => {
     }
     const forecast = readForecast(book.db, "2026-07-01");
     const row = forecast.accounts.find((item) => item.accountId === cash.id);
-    expect(row?.known[0]).toBe(2_100 + 350);
+    expect(row?.known[0]).toBe(21_000 + 3_500);
   } finally {
     book.close();
   }
@@ -235,13 +237,13 @@ test("variable income uses the median of the last 6 actuals", () => {
 function safeToSpend(income: boolean): number {
   const book = tempDatabase();
   try {
-    book.db.insert(settings).values({ key: "bufferAmount", value: "200" }).run();
-    const cash = cashAccount(book.db, "Cash", 100_000);
+    book.db.insert(settings).values({ key: "bufferAmount", value: "2000" }).run();
+    const cash = cashAccount(book.db, "Cash", 1_000_000);
     createPlan(book.db, {
       name: "Rent",
       kind: "bill",
       accountId: cash.id,
-      expectedAmount: -3_000,
+      expectedAmount: -30_000,
       tolerance: 0,
       amountMode: "fixed",
       startDate: "2026-10-20",
@@ -258,7 +260,7 @@ function safeToSpend(income: boolean): number {
         name: "Pay",
         kind: "income",
         accountId: cash.id,
-        expectedAmount: 5_000,
+        expectedAmount: 50_000,
         tolerance: 0,
         amountMode: "fixed",
         startDate: "2026-10-10",
@@ -278,7 +280,7 @@ function safeToSpend(income: boolean): number {
 }
 
 test("safe to spend uses the next paycheck, or 30 days when there is no income plan", () => {
-  expect(safeToSpend(true)).toBe(99_800);
-  expect(safeToSpend(false)).toBe(96_800);
+  expect(safeToSpend(true)).toBe(998_000);
+  expect(safeToSpend(false)).toBe(968_000);
 });
 

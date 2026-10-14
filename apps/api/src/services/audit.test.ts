@@ -96,15 +96,15 @@ test("one write can record several audit rows", () => {
         entity: "transactions",
         entityId: "source",
         action: "update",
-        before: { amount: -100 },
-        after: { amount: -120 },
+        before: { amount: -100000 },
+        after: { amount: -120000 },
       });
       tx.audit({
         entity: "transactions",
         entityId: "mirror",
         action: "update",
-        before: { amount: 100 },
-        after: { amount: 120 },
+        before: { amount: 100000 },
+        after: { amount: 120000 },
       });
     });
 

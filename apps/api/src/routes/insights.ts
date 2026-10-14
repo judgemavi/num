@@ -7,7 +7,7 @@ import { errorResponse } from "./common";
 
 const insightsRoute = createRoute({
   operationId: "get_insights",
-  description: "Read insights. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read insights. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/insights",
   request: { query: insightsQuerySchema },

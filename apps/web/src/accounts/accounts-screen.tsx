@@ -81,15 +81,15 @@ function AccountsPage() {
       <SummaryStrip
         tint="accounts"
         label={search.archived ? "Archived balances" : "Net worth"}
-        amount={<Amount minor={worth.net} owed hero />}
+        amount={<Amount value={worth.net} owed hero />}
         hint={search.archived ? "These accounts are not in the active list." : "What you have, minus what you owe."}
         facts={
           <>
             <Fact label="What you have">
-              <Amount minor={worth.have} className="text-lg" />
+              <Amount value={worth.have} className="text-lg" />
             </Fact>
             <Fact label="What you owe">
-              <Amount minor={worth.owe} className="text-lg" />
+              <Amount value={worth.owe} className="text-lg" />
             </Fact>
           </>
         }
@@ -97,8 +97,8 @@ function AccountsPage() {
           <SplitBar
             label={`You have ${formatMoney(bookCurrency, worth.have)} and owe ${formatMoney(bookCurrency, worth.owe)}`}
             segments={[
-              { key: "have", label: "What you have", color: "var(--primary)", value: Math.max(0, worth.have), amount: <Amount minor={worth.have} /> },
-              { key: "owe", label: "What you owe", color: hueColor.sky.glyph, value: worth.owe, amount: <Amount minor={worth.owe} /> },
+              { key: "have", label: "What you have", color: "var(--primary)", value: Math.max(0, worth.have), amount: <Amount value={worth.have} /> },
+              { key: "owe", label: "What you owe", color: hueColor.sky.glyph, value: worth.owe, amount: <Amount value={worth.owe} /> },
             ]}
           />
         }
@@ -118,7 +118,7 @@ function AccountsPage() {
               <div key={group.id}>
                 <ListGroup
                   label={groupLabel[group.id]}
-                  aside={<Amount minor={group.total} owed={group.id === "loans"} />}
+                  aside={<Amount value={group.total} owed={group.id === "loans"} />}
                 />
                 {group.items.map((account) => {
                   const detail = accountDetail(account);
@@ -142,7 +142,7 @@ function AccountsPage() {
                         {account.archivedAt ? <Badge variant="attention">Archived</Badge> : kindLabel(account.kind)}
                       </div>
                       <div className="ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-                        <Amount minor={account.balance} owed={accountClass(account.kind) === "liability"} />
+                        <Amount value={account.balance} owed={accountClass(account.kind) === "liability"} />
                         {detail ? <small>{detail}</small> : null}
                       </div>
                       <RowMenu label={`Actions for ${accountLabel(account)}`}>
@@ -197,7 +197,7 @@ function AccountsPage() {
                     <small>{account.paymentPolicy === "full" ? "Pays the full statement" : ""}</small>
                   </div>
                   <div className="ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-                    <Amount minor={account.balance} owed />
+                    <Amount value={account.balance} owed />
                   </div>
                 </ListRow>
               ))}

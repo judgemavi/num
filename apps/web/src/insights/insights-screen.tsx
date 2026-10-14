@@ -57,15 +57,15 @@ function SpendingSummary() {
     <SummaryStrip
       tint="plan"
       label="Spending"
-      amount={<Amount minor={data.spending} hero />}
+      amount={<Amount value={data.spending} hero />}
       hint={search.month ? `${monthTitle(search.month)}: ${rangeText(data.range.from, data.range.to)}` : rangeText(data.range.from, data.range.to)}
       facts={
         <>
           <Fact label="Income">
-            <Amount minor={data.income} />
+            <Amount value={data.income} />
           </Fact>
           <Fact label="Saved">
-            <Amount minor={data.savings} />
+            <Amount value={data.savings} />
           </Fact>
           {data.savingsRateMilliPct === null ? null : <Fact label="Savings rate">{rateText(data.savingsRateMilliPct)}</Fact>}
         </>
@@ -104,7 +104,7 @@ function NetWorthCard() {
     <Card>
       <CardContent className="grid gap-2 p-5 md:p-6">
         <h2 className="text-base font-bold">Net worth, 24 months</h2>
-        {latest ? <Amount minor={latest.net} /> : null}
+        {latest ? <Amount value={latest.net} /> : null}
         {firstWorth ? (
           <p className={`text-sm font-semibold ${worthDelta > 0 ? "text-pos" : worthDelta < 0 ? "text-attn" : ""}`}>
             {worthDelta > 0 ? "Up" : worthDelta < 0 ? "Down" : "No change"}{" "}

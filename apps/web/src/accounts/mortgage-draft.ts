@@ -1,19 +1,19 @@
 import {
-  fromMinorUnits,
+  amountText,
   milliPctToPercent,
   mortgageTermsWriteSchema,
   percentToMilliPct,
-  toMinorUnits,
+  parseAmount,
   type MortgageTerms,
   type MortgageTermsWrite,
 } from "@num/shared";
 
 /** The mortgage terms as the form holds them: text for the fields the user types. */
-export function draftFromTerms(currency: string, terms: MortgageTerms | null) {
+export function draftFromTerms(terms: MortgageTerms | null) {
   return {
     rate: terms ? milliPctToPercent(terms.rateMilliPct) : "",
     compounding: terms?.compounding ?? "semiannual",
-    payment: terms ? fromMinorUnits(currency, terms.paymentAmount) : "",
+    payment: terms ? amountText(terms.paymentAmount) : "",
     frequency: terms?.paymentFrequency ?? "monthly",
     firstPaymentDate: terms?.firstPaymentDate ?? "",
     termEnd: terms?.termEnd ?? "",
@@ -47,11 +47,11 @@ export function draftIsBlank(draft: MortgageDraft): boolean {
 
 function readPayment(currency: string, text: string) {
   try {
-    const minor = toMinorUnits(currency, text.trim());
-    if (minor < 1) {
+    const milli = parseAmount(currency, text.trim());
+    if (milli < 1) {
       throw new Error("Enter the payment as a positive amount.");
     }
-    return minor;
+    return milli;
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Enter ")) {
       throw error;

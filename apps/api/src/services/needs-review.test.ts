@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditLog, migrateDatabase, openDatabase, transactions } from "@num/db";
+import { auditLog, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
@@ -25,6 +25,7 @@ function withBook(run: (db: Db) => void) {
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   try {
     run(db);
   } finally {
@@ -34,7 +35,7 @@ function withBook(run: (db: Db) => void) {
 }
 
 function account(db: Db, name: string) {
-  return createAccount(db, { name, kind: "chequing", openingDate: "2026-01-01", openingBalance: 50_000, ...saved });
+  return createAccount(db, { name, kind: "chequing", openingDate: "2026-01-01", openingBalance: 500_000, ...saved });
 }
 
 function pay(db: Db, accountId: string, date: string, amount: number, payee: string, categoryId?: string) {
@@ -67,21 +68,21 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
     const cash = account(db, "Cash");
     const savings = account(db, "Savings");
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-    const confirmed = pay(db, cash.id, "2026-03-01", -1_000, "Market", food.id);
-    const likely = pay(db, cash.id, "2026-03-02", -1_000, "Market");
-    const none = pay(db, cash.id, "2026-03-03", -400, "Odd shop");
-    const sure = pay(db, cash.id, "2026-03-04", -800, "Cafe", food.id);
+    const confirmed = pay(db, cash.id, "2026-03-01", -10_000, "Market", food.id);
+    const likely = pay(db, cash.id, "2026-03-02", -10_000, "Market");
+    const none = pay(db, cash.id, "2026-03-03", -4000, "Odd shop");
+    const sure = pay(db, cash.id, "2026-03-04", -8000, "Cafe", food.id);
     stampAuto(db, sure.id, confirmed.id);
-    const quiet = pay(db, cash.id, "2026-03-05", -200, "Rent", food.id);
-    const left = pay(db, cash.id, "2026-03-06", -5_000, "Move", food.id);
+    const quiet = pay(db, cash.id, "2026-03-05", -2000, "Rent", food.id);
+    const left = pay(db, cash.id, "2026-03-06", -50_000, "Move", food.id);
     db.update(transactions).set({ source: "import" }).where(eq(transactions.id, left.id)).run();
-    const right = pay(db, savings.id, "2026-03-06", 5_000, "Savings deposit", food.id);
+    const right = pay(db, savings.id, "2026-03-06", 50_000, "Savings deposit", food.id);
     const pairKey = left.id < right.id ? `transfer_pair:${left.id}:${right.id}` : `transfer_pair:${right.id}:${left.id}`;
     const changedPlan = createPlan(db, {
       name: "Stream",
       kind: "bill",
       accountId: cash.id,
-      expectedAmount: -1_000,
+      expectedAmount: -10_000,
       tolerance: 0,
       amountMode: "fixed",
       categoryId: food.id,
@@ -97,13 +98,13 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
       fundsBuckets: false,
       ...saved,
     });
-    const changedPay = pay(db, cash.id, "2026-03-15", -1_999, "Stream", food.id);
+    const changedPay = pay(db, cash.id, "2026-03-15", -19_990, "Stream", food.id);
     linkOccurrence(db, changedPlan.id, "2026-03-15", changedPay.id, saved);
     createPlan(db, {
       name: "Phone",
       kind: "bill",
       accountId: savings.id,
-      expectedAmount: -1_000,
+      expectedAmount: -10_000,
       tolerance: 0,
       amountMode: "fixed",
       categoryId: null,
@@ -119,8 +120,8 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
       fundsBuckets: false,
       ...saved,
     });
-    const phoneA = pay(db, savings.id, "2026-03-20", -1_000, "Phone a", food.id);
-    const phoneB = pay(db, savings.id, "2026-03-21", -1_000, "Phone b", food.id);
+    const phoneA = pay(db, savings.id, "2026-03-20", -10_000, "Phone a", food.id);
+    const phoneB = pay(db, savings.id, "2026-03-21", -10_000, "Phone b", food.id);
 
     const questions = new Map(listNeedsReview(db, asOf).map((hit) => [hit.id, hit.review.question]));
     expect(questions.get(sure.id)).toBe("categorize");
@@ -151,14 +152,14 @@ test("approve all Sure confirms only the Sure rows in one write and counts as co
   withBook((db) => {
     const cash = account(db, "Cash");
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-    const known = pay(db, cash.id, "2026-03-01", -1_000, "Cafe", food.id);
-    const sureA = pay(db, cash.id, "2026-03-02", -1_000, "Cafe", food.id);
-    const sureB = pay(db, cash.id, "2026-03-03", -1_000, "Cafe", food.id);
+    const known = pay(db, cash.id, "2026-03-01", -10_000, "Cafe", food.id);
+    const sureA = pay(db, cash.id, "2026-03-02", -10_000, "Cafe", food.id);
+    const sureB = pay(db, cash.id, "2026-03-03", -10_000, "Cafe", food.id);
     stampAuto(db, sureA.id, known.id);
     stampAuto(db, sureB.id, known.id);
-    const openCafe = pay(db, cash.id, "2026-03-04", -1_000, "Cafe");
-    const marketKnown = pay(db, cash.id, "2026-03-05", -2_000, "Market", food.id);
-    const likely = pay(db, cash.id, "2026-03-06", -2_000, "Market");
+    const openCafe = pay(db, cash.id, "2026-03-04", -10_000, "Cafe");
+    const marketKnown = pay(db, cash.id, "2026-03-05", -20_000, "Market", food.id);
+    const likely = pay(db, cash.id, "2026-03-06", -20_000, "Market");
     const at = "2026-04-02T18:00:00Z";
     const result = approve(db, "sure", 2, noFilter, at);
     expect(result.ids.sort()).toEqual([sureA.id, sureB.id].sort());
@@ -178,9 +179,9 @@ test("approve all Likely applies the suggestion", () => {
   withBook((db) => {
     const cash = account(db, "Cash");
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-    pay(db, cash.id, "2026-03-01", -2_000, "Market", food.id);
-    const likely = pay(db, cash.id, "2026-03-02", -2_000, "Market");
-    const sure = pay(db, cash.id, "2026-03-03", -900, "Cafe", food.id);
+    pay(db, cash.id, "2026-03-01", -20_000, "Market", food.id);
+    const likely = pay(db, cash.id, "2026-03-02", -20_000, "Market");
+    const sure = pay(db, cash.id, "2026-03-03", -9000, "Cafe", food.id);
     stampAuto(db, sure.id, sure.id);
     const result = approve(db, "likely", 1, noFilter, "2026-04-02T18:05:00Z");
     expect(result.ids).toEqual([likely.id]);
@@ -195,9 +196,9 @@ test("approval uses the active filters and stops when the count changed", () => 
     const cash = account(db, "Cash");
     const other = account(db, "Other");
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-    const known = pay(db, cash.id, "2026-03-01", -1_000, "Cafe", food.id);
-    const here = pay(db, cash.id, "2026-03-02", -1_000, "Cafe", food.id);
-    const there = pay(db, other.id, "2026-03-03", -1_000, "Cafe", food.id);
+    const known = pay(db, cash.id, "2026-03-01", -10_000, "Cafe", food.id);
+    const here = pay(db, cash.id, "2026-03-02", -10_000, "Cafe", food.id);
+    const there = pay(db, other.id, "2026-03-03", -10_000, "Cafe", food.id);
     stampAuto(db, here.id, known.id);
     stampAuto(db, there.id, known.id);
     expect(filteredReviewHits(db, { ...noFilter, accountId: cash.id }, asOf).map((hit) => hit.id)).toEqual([here.id]);
@@ -215,22 +216,22 @@ test("a row has a bulk level only when the bulk action can apply it", () => {
     const savings = account(db, "Savings");
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
     const other = createCategory(db, { name: "Other", kind: "expense", ...saved });
-    pay(db, cash.id, "2026-03-01", -2_000, "Market", food.id);
-    const likely = pay(db, cash.id, "2026-03-02", -2_000, "Market");
+    pay(db, cash.id, "2026-03-01", -20_000, "Market", food.id);
+    const likely = pay(db, cash.id, "2026-03-02", -20_000, "Market");
     const split = createTransaction(db, {
       accountId: cash.id,
       date: "2026-03-03",
-      amount: -2_000,
+      amount: -20_000,
       payeeRaw: "Market",
       status: "cleared",
       lines: [
-        { amount: -1_000, categoryId: other.id },
-        { amount: -1_000 },
+        { amount: -10_000, categoryId: other.id },
+        { amount: -10_000 },
       ],
       ...saved,
     });
-    const out = pay(db, cash.id, "2026-03-05", -50_000, "Move");
-    pay(db, savings.id, "2026-03-06", 50_000, "Move");
+    const out = pay(db, cash.id, "2026-03-05", -500_000, "Move");
+    pay(db, savings.id, "2026-03-06", 500_000, "Move");
     db.update(transactions).set({ source: "import" }).where(eq(transactions.id, out.id)).run();
     const hits = new Map(listNeedsReview(db, asOf).map((hit) => [hit.id, hit]));
     expect(hits.get(likely.id)?.review.level).toBe("likely");
@@ -247,14 +248,14 @@ test("keeping a row uncategorized removes it from Needs review and Hygiene until
   withBook((db) => {
     const bank = account(db, "Bank");
     const category = createCategory(db, { name: "Food", kind: "expense", groupId: null, ...saved });
-    const row = pay(db, bank.id, "2026-01-05", -2_000, "KEEP ME");
+    const row = pay(db, bank.id, "2026-01-05", -20_000, "KEEP ME");
     const body = {
       accountId: bank.id,
       date: "2026-01-05",
-      amount: -2_000,
+      amount: -20_000,
       payeeRaw: "KEEP ME",
       status: "cleared" as const,
-      lines: [{ amount: -2_000 }],
+      lines: [{ amount: -20_000 }],
       ...saved,
     };
     const oldCount = () => {
@@ -277,7 +278,7 @@ test("keeping a row uncategorized removes it from Needs review and Hygiene until
     expect(listNeedsReview(db, asOf)).toEqual([]);
     expect(() => decideInboxItem(db, asOf, keyOf, "keep_uncategorized", saved)).toThrow();
 
-    updateTransaction(db, row.id, { ...body, lines: [{ amount: -2_000, categoryId: category.id }] });
+    updateTransaction(db, row.id, { ...body, lines: [{ amount: -20_000, categoryId: category.id }] });
     expect(decisionRows(db)).toEqual([]);
     expect(() => decideInboxItem(db, asOf, keyOf, "keep_uncategorized", saved)).toThrow();
   });

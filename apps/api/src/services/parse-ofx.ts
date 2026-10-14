@@ -1,5 +1,5 @@
 import { isIsoDate } from "@num/shared";
-import { readMinorAmount } from "./parse-amount";
+import { readAmount } from "./parse-amount";
 import type { ParsedStatement, StatementRow, UnreadableReason, UnreadableRow } from "./statement";
 
 type Block = {
@@ -62,13 +62,13 @@ function description(block: string) {
   return tagValue(block, "NAME") ?? tagValue(block, "MEMO") ?? "";
 }
 
-function amountProblem(raw: string | null, digits: number): { minor: number } | { reason: UnreadableReason } {
+function amountProblem(raw: string | null, digits: number): { amount: number } | { reason: UnreadableReason } {
   if (raw === null) {
     return { reason: "amount_unreadable" };
   }
-  const read = readMinorAmount(raw, digits, ".");
+  const read = readAmount(raw, digits, ".");
   if (read.kind === "value") {
-    return { minor: read.minor };
+    return { amount: read.amount };
   }
   if (read.kind === "error") {
     return { reason: read.reason };
@@ -76,7 +76,7 @@ function amountProblem(raw: string | null, digits: number): { minor: number } | 
   return { reason: "amount_unreadable" };
 }
 
-export function parseOfxStatement(text: string, minorDigits: number): ParsedStatement {
+export function parseOfxStatement(text: string, digits: number): ParsedStatement {
   const source = stripBom(text);
   if (!/<OFX|<STMTTRN/i.test(source)) {
     throw new Error("File is not OFX");
@@ -93,7 +93,7 @@ export function parseOfxStatement(text: string, minorDigits: number): ParsedStat
       unreadable.push({ line, raw, reason: "date_unreadable" });
       continue;
     }
-    const amount = amountProblem(tagValue(block.text, "TRNAMT"), minorDigits);
+    const amount = amountProblem(tagValue(block.text, "TRNAMT"), digits);
     if ("reason" in amount) {
       unreadable.push({ line, raw, reason: amount.reason });
       continue;
@@ -101,7 +101,7 @@ export function parseOfxStatement(text: string, minorDigits: number): ParsedStat
     rows.push({
       date,
       description: description(block.text),
-      amount: amount.minor,
+      amount: amount.amount,
       bankId: tagValue(block.text, "FITID"),
     });
   }
@@ -113,13 +113,13 @@ export function parseOfxStatement(text: string, minorDigits: number): ParsedStat
     const line = lineNumber(source, ledger.start);
     const raw = source.slice(ledger.start, ledger.end).trim();
     const balanceText = tagValue(ledger.text, "BALAMT");
-    const balance = amountProblem(balanceText, minorDigits);
+    const balance = amountProblem(balanceText, digits);
     const posted = tagValue(ledger.text, "DTASOF");
     const date = isoDate(posted);
     if ("reason" in balance && balanceText !== null) {
       unreadable.push({ line, raw, reason: balance.reason });
-    } else if ("minor" in balance) {
-      closingBalance = balance.minor;
+    } else if ("amount" in balance) {
+      closingBalance = balance.amount;
     }
     if (posted !== null && !date) {
       unreadable.push({ line, raw, reason: "date_unreadable" });

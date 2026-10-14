@@ -17,6 +17,7 @@ import {
 } from "@num/shared";
 import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
+import { bookStep } from "./book-step";
 import { decidedKeys } from "./decision-keys";
 import { ServiceError } from "../service-error";
 import { applyLinkedPlan } from "./match-apply";
@@ -172,7 +173,7 @@ export function listOccurrences(db: Db, planId: string, asOf: string) {
   );
   const actuals = amountsByDue(links, txns, asOf);
   const amounts =
-    row.amountMode === "variable" ? variableAmounts(actuals, row.expectedAmount) : { forecast: row.expectedAmount, safe: row.expectedAmount };
+    row.amountMode === "variable" ? variableAmounts(actuals, row.expectedAmount, bookStep(db)) : { forecast: row.expectedAmount, safe: row.expectedAmount };
   const items: Occurrence[] = occurrenceDates(row, horizon(asOf)).map((date) => {
     const link = byDue.get(date.dueDate);
     const txn = link?.transactionId ? txns.get(link.transactionId) : undefined;
@@ -261,7 +262,7 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
   const ambiguous = matchLinks(openOccurrences(plans, links, asOf, grace), candidates, grace).ambiguous;
   const covered = new Set(plans.filter((row) => row.merchantId).map((row) => `${row.accountId}|${row.merchantId}`));
   const declined = decidedKeys(db, "plan_proposal");
-  const proposals = detectPlans(detectionTransactions(db, asOf), asOf).filter((proposal) => {
+  const proposals = detectPlans(detectionTransactions(db, asOf), bookStep(db), asOf).filter((proposal) => {
     return !covered.has(`${proposal.accountId}|${proposal.merchantId}`) && !declined.has(planProposalKey(proposal));
   });
   return { changed, missed, ambiguous, proposals };

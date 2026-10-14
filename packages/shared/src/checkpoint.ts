@@ -4,13 +4,13 @@ import { isoDateSchema } from "./date";
 import { openingSuggestionSchema } from "./opening";
 import { transactionInputStatuses } from "./transaction";
 import { isUtcTimestamp } from "./time";
-import { centsSchema } from "./money";
+import { amountSchema } from "./money";
 import { queryFlag, queryNumber } from "./list";
 
 
 export const checkpointCreateSchema = z.object({
   date: isoDateSchema,
-  statementBalance: centsSchema,
+  statementBalance: amountSchema,
 });
 
 /** The query of the compare read: the same two values as a checkpoint, in the URL. */
@@ -23,7 +23,7 @@ export const checkpointSchema = z.object({
   id: z.uuid(),
   accountId: z.uuid(),
   date: isoDateSchema,
-  statementBalance: centsSchema,
+  statementBalance: amountSchema,
   createdAt: z.string().refine(isUtcTimestamp),
   unlockedAt: z.string().refine(isUtcTimestamp).nullable(),
 });
@@ -32,7 +32,7 @@ export const checkpointHelpRowSchema = z.object({
   id: z.uuid(),
   date: isoDateSchema,
   payee: z.string(),
-  amount: centsSchema,
+  amount: amountSchema,
 });
 
 export const checkpointHelpSchema = z.discriminatedUnion("code", [
@@ -51,19 +51,19 @@ export const checkpointHelpSchema = z.discriminatedUnion("code", [
   }),
 ]);
 
-export function storedStatementBalance(kind: AccountKind, printedMinor: number): number {
-  return accountClass(kind) === "liability" ? -printedMinor : printedMinor;
+export function storedStatementBalance(kind: AccountKind, printed: number): number {
+  return accountClass(kind) === "liability" ? -printed : printed;
 }
 
-export function printedStatementBalance(kind: AccountKind, storedMinor: number): number {
-  return accountClass(kind) === "liability" ? -storedMinor : storedMinor;
+export function printedStatementBalance(kind: AccountKind, stored: number): number {
+  return accountClass(kind) === "liability" ? -stored : stored;
 }
 
 export const checkpointCompareSchema = z.object({
   balanced: z.boolean(),
-  calculatedBalance: centsSchema,
-  statementBalance: centsSchema,
-  difference: centsSchema,
+  calculatedBalance: amountSchema,
+  statementBalance: amountSchema,
+  difference: amountSchema,
   help: z.array(checkpointHelpSchema),
   openingSuggestion: openingSuggestionSchema.nullable(),
 });
@@ -74,7 +74,7 @@ export const checkpointListSchema = z.object({
 
 export const closingHintSchema = z.object({
   closingDate: isoDateSchema.nullable(),
-  closingBalance: centsSchema.nullable(),
+  closingBalance: amountSchema.nullable(),
 });
 
 export const clearanceSchema = z.object({

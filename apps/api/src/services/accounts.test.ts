@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, openDatabase, transactions, valuations } from "@num/db";
+import { migrateDatabase, openDatabase, settings, transactions, valuations } from "@num/db";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -12,8 +12,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-accounts-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });
@@ -90,11 +92,11 @@ function balanceOf(db: Db, id: string): number {
 test("a transaction account balance is the opening balance plus transactions", () => {
   const book = tempDatabase();
   try {
-    const account = createAccount(book.db, base("chequing", 1_000));
-    addTransaction(book.db, account.id, "2026-02-01", -250);
-    addTransaction(book.db, account.id, "2026-02-02", 25);
-    addValuation(book.db, account.id, "2026-02-01", 5_000);
-    expect(balanceOf(book.db, account.id)).toBe(775);
+    const account = createAccount(book.db, base("chequing", 10000));
+    addTransaction(book.db, account.id, "2026-02-01", -2500);
+    addTransaction(book.db, account.id, "2026-02-02", 250);
+    addValuation(book.db, account.id, "2026-02-01", 50000);
+    expect(balanceOf(book.db, account.id)).toBe(7750);
   } finally {
     book.close();
   }
@@ -104,23 +106,23 @@ test("an investment or property balance uses the latest valuation and later tran
   const book = tempDatabase();
   try {
     for (const kind of ["investment", "property"] as const) {
-      const account = createAccount(book.db, { ...base(kind, 999), name: kind });
-      addValuation(book.db, account.id, "2026-03-01", 500);
-      addValuation(book.db, account.id, "2026-06-01", 1_000);
-      addTransaction(book.db, account.id, "2026-05-01", -100);
-      addTransaction(book.db, account.id, "2026-06-01", 200);
-      addTransaction(book.db, account.id, "2026-06-02", 300);
-      expect(balanceOf(book.db, account.id)).toBe(1_300);
+      const account = createAccount(book.db, { ...base(kind, 9990), name: kind });
+      addValuation(book.db, account.id, "2026-03-01", 5000);
+      addValuation(book.db, account.id, "2026-06-01", 10000);
+      addTransaction(book.db, account.id, "2026-05-01", -1000);
+      addTransaction(book.db, account.id, "2026-06-01", 2000);
+      addTransaction(book.db, account.id, "2026-06-02", 3000);
+      expect(balanceOf(book.db, account.id)).toBe(13000);
     }
 
-    const empty = createAccount(book.db, { ...base("investment", 1_000), name: "No valuation" });
-    addTransaction(book.db, empty.id, "2026-02-01", 50);
-    expect(balanceOf(book.db, empty.id)).toBe(1_050);
+    const empty = createAccount(book.db, { ...base("investment", 10000), name: "No valuation" });
+    addTransaction(book.db, empty.id, "2026-02-01", 500);
+    expect(balanceOf(book.db, empty.id)).toBe(10500);
 
-    const mortgage = createAccount(book.db, base("mortgage", -20_000));
-    addValuation(book.db, mortgage.id, "2026-06-01", -15_000);
-    addTransaction(book.db, mortgage.id, "2026-07-01", 500);
-    expect(balanceOf(book.db, mortgage.id)).toBe(-14_500);
+    const mortgage = createAccount(book.db, base("mortgage", -200000));
+    addValuation(book.db, mortgage.id, "2026-06-01", -150000);
+    addTransaction(book.db, mortgage.id, "2026-07-01", 5000);
+    expect(balanceOf(book.db, mortgage.id)).toBe(-145000);
   } finally {
     book.close();
   }
@@ -163,23 +165,23 @@ test("a kind change across classes is rejected", () => {
 test("archive of a non-zero balance needs confirmation", () => {
   const book = tempDatabase();
   try {
-    const open = createAccount(book.db, base("chequing", 100));
+    const open = createAccount(book.db, base("chequing", 1000));
     expectCode(
       () => archiveAccount(book.db, open.id, { confirm: false, source: "ui", at }),
       "archive_confirmation_required",
     );
     const archived = archiveAccount(book.db, open.id, { confirm: true, source: "ui", at });
     expect(archived.archivedAt).toBe(at);
-    expect(archived.balance).toBe(100);
+    expect(archived.balance).toBe(1000);
 
-    const settled = createAccount(book.db, { ...base("savings", 40), name: "Settled" });
-    addTransaction(book.db, settled.id, "2026-04-01", -40);
+    const settled = createAccount(book.db, { ...base("savings", 400), name: "Settled" });
+    addTransaction(book.db, settled.id, "2026-04-01", -400);
     const zero = archiveAccount(book.db, settled.id, { confirm: false, source: "ui", at });
     expect(zero.balance).toBe(0);
     expect(zero.archivedAt).toBe(at);
 
     const valued = createAccount(book.db, { ...base("property", 0), name: "House" });
-    addValuation(book.db, valued.id, "2026-06-01", 250_000);
+    addValuation(book.db, valued.id, "2026-06-01", 2500000);
     expectCode(
       () => archiveAccount(book.db, valued.id, { confirm: false, source: "ui", at }),
       "archive_confirmation_required",
@@ -199,17 +201,17 @@ test("card fields belong only to a credit card", () => {
       "card_fields_invalid",
     );
     expectCode(
-      () => createAccount(book.db, { ...card(), fixedPayment: 500 }),
+      () => createAccount(book.db, { ...card(), fixedPayment: 5000 }),
       "card_fields_invalid",
     );
 
     const created = createAccount(book.db, {
       ...card(),
       paymentPolicy: "fixed",
-      fixedPayment: 2_500,
+      fixedPayment: 25000,
     });
     expect(created.paymentPolicy).toBe("fixed");
-    expect(created.fixedPayment).toBe(2_500);
+    expect(created.fixedPayment).toBe(25000);
     expect(created.onBudget).toBe(true);
 
     const mortgage = createAccount(book.db, base("mortgage"));

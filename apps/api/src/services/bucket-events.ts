@@ -6,6 +6,7 @@ import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
 import { fundingPosition } from "./funding-book";
 import { withoutId, write, type WriteTx, type WriteInput } from "./write";
+import { requireWholeAmounts } from "./book-step";
 
 type EventWriteInput = WriteInput & {
   asOf?: string;
@@ -31,6 +32,7 @@ export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCr
   if (!isIsoDate(input.date) || !Number.isSafeInteger(input.amount) || input.amount < 1) {
     throw new ServiceError("bucket_fields_invalid", 400);
   }
+  requireWholeAmounts(db, [input.amount]);
   const otherBucketId = input.kind === "move" ? (input.otherBucketId ?? null) : null;
   if (input.kind === "move" && otherBucketId === null) {
     throw new ServiceError("bucket_fields_invalid", 400);

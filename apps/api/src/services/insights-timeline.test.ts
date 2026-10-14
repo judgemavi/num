@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, openDatabase } from "@num/db";
+import { migrateDatabase, openDatabase, settings } from "@num/db";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { archiveAccount, createAccount } from "./accounts";
@@ -16,8 +16,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-timeline-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });
@@ -59,33 +61,33 @@ function monthly(db: Db, accountId: string, kind: "income" | "bill", expectedAmo
 test("the month of asOf has an actual part to asOf and a forecast part after it", () => {
   const book = tempDatabase();
   try {
-    const cash = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-08-01", openingBalance: 10_000, ...saved });
+    const cash = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-08-01", openingBalance: 100_000, ...saved });
     const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
-    record(book.db, cash.id, "2026-09-12", -700, groceries.id);
-    record(book.db, cash.id, "2026-10-01", 2_000, pay.id);
-    record(book.db, cash.id, "2026-10-05", -500, groceries.id);
-    record(book.db, cash.id, "2026-10-14", 100, groceries.id);
-    record(book.db, cash.id, "2026-10-18", -900, groceries.id);
-    monthly(book.db, cash.id, "bill", -1_000, 25);
-    monthly(book.db, cash.id, "income", 3_000, 28);
+    record(book.db, cash.id, "2026-09-12", -7000, groceries.id);
+    record(book.db, cash.id, "2026-10-01", 20_000, pay.id);
+    record(book.db, cash.id, "2026-10-05", -5000, groceries.id);
+    record(book.db, cash.id, "2026-10-14", 1000, groceries.id);
+    record(book.db, cash.id, "2026-10-18", -9000, groceries.id);
+    monthly(book.db, cash.id, "bill", -10_000, 25);
+    monthly(book.db, cash.id, "income", 30_000, 28);
 
-    // September is the one complete month. Its 700 is the monthly estimate: 23 on days 1 to 18, then 22.
+    // September is the one complete month. Its 7000 is the monthly estimate: 230 on days 1 to 18, then 220.
     const asOf = "2026-10-15";
     const report = readInsights(book.db, { asOf, window: "3" });
     const months = report.timeline.months;
     expect(months.map((item) => item.month)).toEqual(["2026-08", "2026-09", "2026-10", "2026-11", "2026-12", "2027-01"]);
-    expect(months[1]).toEqual({ month: "2026-09", actual: { income: 0, spending: 700 }, forecast: null });
+    expect(months[1]).toEqual({ month: "2026-09", actual: { income: 0, spending: 7000 }, forecast: null });
     expect(months[2]).toEqual({
       month: "2026-10",
-      actual: { income: 2_000, spending: 400 },
-      forecast: { income: 3_000, spending: 1_000 + 4 * 23 + 13 * 22 },
+      actual: { income: 20_000, spending: 4000 },
+      forecast: { income: 30_000, spending: 10_000 + 4 * 230 + 13 * 220 },
     });
-    expect(months[3]).toEqual({ month: "2026-11", actual: null, forecast: { income: 3_000, spending: 1_000 + 700 } });
+    expect(months[3]).toEqual({ month: "2026-11", actual: null, forecast: { income: 30_000, spending: 10_000 + 7000 } });
 
     const balances = report.timeline.balances;
-    expect(balances[0]).toEqual({ date: "2026-08-01", amount: 10_000 });
-    expect(balances.at(-1)).toEqual({ date: asOf, amount: 10_000 - 700 + 2_000 - 500 + 100 });
+    expect(balances[0]).toEqual({ date: "2026-08-01", amount: 100_000 });
+    expect(balances.at(-1)).toEqual({ date: asOf, amount: 100_000 - 7000 + 20_000 - 5000 + 1000 });
     expect(report.timeline.forecast?.dates[0]).toBe(asOf);
     expect(report.timeline.forecast?.dates).toHaveLength(90);
 
@@ -94,8 +96,8 @@ test("the month of asOf has an actual part to asOf and a forecast part after it"
     expect(category.timeline.balances).toEqual([]);
     expect(category.timeline.months).toEqual([
       { month: "2026-08", actual: { income: 0, spending: 0 }, forecast: null },
-      { month: "2026-09", actual: { income: 0, spending: 700 }, forecast: null },
-      { month: "2026-10", actual: { income: 0, spending: 400 }, forecast: null },
+      { month: "2026-09", actual: { income: 0, spending: 7000 }, forecast: null },
+      { month: "2026-10", actual: { income: 0, spending: 4000 }, forecast: null },
     ]);
   } finally {
     book.close();
@@ -105,19 +107,19 @@ test("the month of asOf has an actual part to asOf and a forecast part after it"
 test("a period that ends before asOf has only its own months and no forecast", () => {
   const book = tempDatabase();
   try {
-    const cash = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-08-01", openingBalance: 10_000, ...saved });
+    const cash = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-08-01", openingBalance: 100_000, ...saved });
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
-    record(book.db, cash.id, "2026-08-12", -700, groceries.id);
-    record(book.db, cash.id, "2026-09-25", -300, groceries.id);
-    monthly(book.db, cash.id, "bill", -1_000, 25);
+    record(book.db, cash.id, "2026-08-12", -7000, groceries.id);
+    record(book.db, cash.id, "2026-09-25", -3000, groceries.id);
+    monthly(book.db, cash.id, "bill", -10_000, 25);
 
     const report = readInsights(book.db, { asOf: "2026-10-15", window: "custom", from: "2026-08-01", to: "2026-09-20" });
     expect(report.timeline.forecast).toBeNull();
     expect(report.timeline.months).toEqual([
-      { month: "2026-08", actual: { income: 0, spending: 700 }, forecast: null },
+      { month: "2026-08", actual: { income: 0, spending: 7000 }, forecast: null },
       { month: "2026-09", actual: { income: 0, spending: 0 }, forecast: null },
     ]);
-    expect(report.timeline.balances.at(-1)).toEqual({ date: "2026-09-20", amount: 9_300 });
+    expect(report.timeline.balances.at(-1)).toEqual({ date: "2026-09-20", amount: 93_000 });
   } finally {
     book.close();
   }
@@ -126,13 +128,13 @@ test("a period that ends before asOf has only its own months and no forecast", (
 test("an archived account counts in the balance line up to and including its archive date", () => {
   const book = tempDatabase();
   try {
-    createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-08-01", openingBalance: 10_000, ...saved });
-    const old = createAccount(book.db, { name: "Old", kind: "savings", openingDate: "2026-08-01", openingBalance: 2_500, ...saved });
+    createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-08-01", openingBalance: 100_000, ...saved });
+    const old = createAccount(book.db, { name: "Old", kind: "savings", openingDate: "2026-08-01", openingBalance: 25_000, ...saved });
     archiveAccount(book.db, old.id, { confirm: true, source: "ui", at: "2026-09-10T23:30:00Z" });
 
     const balances = readInsights(book.db, { asOf: "2026-10-15", window: "3" }).timeline.balances;
-    expect(balances.find((point) => point.date === "2026-09-10")?.amount).toBe(12_500);
-    expect(balances.find((point) => point.date === "2026-09-11")?.amount).toBe(10_000);
+    expect(balances.find((point) => point.date === "2026-09-10")?.amount).toBe(125_000);
+    expect(balances.find((point) => point.date === "2026-09-11")?.amount).toBe(100_000);
   } finally {
     book.close();
   }

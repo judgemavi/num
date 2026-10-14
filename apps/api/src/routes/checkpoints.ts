@@ -34,7 +34,7 @@ const checkpointParams = z.object({
 
 const listRoute = createRoute({
   operationId: "get_accounts_id_checkpoints",
-  description: "Read accounts. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read accounts. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts/{id}/checkpoints",
   request: { params: accountParams },
@@ -49,7 +49,7 @@ const listRoute = createRoute({
 
 const compareRoute = createRoute({
   operationId: "get_accounts_id_checkpoints_compare",
-  description: "Read accounts. This does not create, change or delete a record. Compare a statement balance with the book. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read accounts. This does not create, change or delete a record. Compare a statement balance with the book. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts/{id}/checkpoints/compare",
   request: {
@@ -68,7 +68,7 @@ const compareRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_accounts_id_checkpoints",
-  description: "Create or run accounts. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run accounts. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/accounts/{id}/checkpoints",
   request: {
@@ -91,7 +91,7 @@ const createRouteDef = createRoute({
 
 const unlockRoute = createRoute({
   operationId: "post_accounts_id_checkpoints_checkpointid_unlock",
-  description: "Create or run accounts. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run accounts. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/accounts/{id}/checkpoints/{checkpointId}/unlock",
   request: { params: checkpointParams },
@@ -107,7 +107,7 @@ const unlockRoute = createRoute({
 
 const closingRoute = createRoute({
   operationId: "get_accounts_id_closing",
-  description: "Read accounts. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read accounts. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts/{id}/closing",
   request: { params: accountParams },
@@ -122,7 +122,7 @@ const closingRoute = createRoute({
 
 const clearanceRoute = createRoute({
   operationId: "post_accounts_id_clearance",
-  description: "Create or run accounts (clearance). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run accounts (clearance). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/accounts/{id}/clearance",
   request: {
@@ -145,7 +145,7 @@ const clearanceRoute = createRoute({
 
 const statementsRoute = createRoute({
   operationId: "get_accounts_id_statements",
-  description: "Read accounts (statements). This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read accounts (statements). This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts/{id}/statements",
   request: { params: accountParams },

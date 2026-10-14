@@ -84,9 +84,9 @@ export function MonthFlow({ plan }: { plan: MonthPlan }) {
             <SplitBar
               label={`Of income: bills ${formatMoney(currency, plan.bills.planned)}, bucket funding ${formatMoney(currency, plan.funding.planned)}, left to save ${formatMoney(currency, left)}`}
               segments={[
-                { key: "bills", label: countLabel(bills, "bill", "bills"), color: billColor, value: plan.bills.planned, amount: <Amount minor={plan.bills.planned} /> },
-                { key: "buckets", label: countLabel(buckets, "bucket", "buckets"), color: bucketColor, value: plan.funding.planned, amount: <Amount minor={plan.funding.planned} /> },
-                { key: "save", label: "Left to save", color: saveColor, value: Math.max(0, left), amount: <Amount minor={left} /> },
+                { key: "bills", label: countLabel(bills, "bill", "bills"), color: billColor, value: plan.bills.planned, amount: <Amount value={plan.bills.planned} /> },
+                { key: "buckets", label: countLabel(buckets, "bucket", "buckets"), color: bucketColor, value: plan.funding.planned, amount: <Amount value={plan.funding.planned} /> },
+                { key: "save", label: "Left to save", color: saveColor, value: Math.max(0, left), amount: <Amount value={left} /> },
               ]}
             />
           </div>
@@ -111,11 +111,11 @@ export function GoalFeasibility() {
       </CardHeader>
       <CardContent className="grid gap-3 px-0 pb-5">
         <p className="px-5">
-          Each paycheck is <Amount minor={item.expectedPaycheck} />. Bills take <Amount minor={item.billsEach} />. Spending refills take <Amount minor={item.refillsEach} />. <Amount minor={item.surplus} /> is left for goals and sinking funds.
+          Each paycheck is <Amount value={item.expectedPaycheck} />. Bills take <Amount value={item.billsEach} />. Spending refills take <Amount value={item.refillsEach} />. <Amount value={item.surplus} /> is left for goals and sinking funds.
         </p>
         {item.shortfall > 0 ? (
           <p className="px-5 font-semibold text-attn">
-            Goals and sinking funds need <Amount minor={item.need} className="text-attn" /> each paycheck. That is <Amount minor={item.shortfall} className="text-attn" /> short. Cut <Amount minor={item.shortfall} className="text-attn" /> from other buckets each paycheck.
+            Goals and sinking funds need <Amount value={item.need} className="text-attn" /> each paycheck. That is <Amount value={item.shortfall} className="text-attn" /> short. Cut <Amount value={item.shortfall} className="text-attn" /> from other buckets each paycheck.
           </p>
         ) : (
           <p className="px-5">These amounts fit in the paycheck.</p>
@@ -127,7 +127,7 @@ export function GoalFeasibility() {
               {bucket.laterDate ? <small>A date of {longDate(bucket.laterDate)} fits.</small> : null}
             </span>
             <span className={listAmt}>
-              <Amount minor={bucket.perPaycheck} />
+              <Amount value={bucket.perPaycheck} />
               <small>each paycheck</small>
             </span>
           </ListRow>
@@ -153,7 +153,7 @@ export function MonthDetails({ plan }: { plan: MonthPlan }) {
                 {plan.compareActual && item.actual !== null ? <Badge variant="positive">Paid</Badge> : null}
               </span>
               <span className={listAmt}>
-                <Amount minor={item.planned} />
+                <Amount value={item.planned} />
                 {plan.compareActual && item.actual !== null && item.actual !== item.planned ? (
                   <small>Actual {formatMoney(currency, item.actual)}</small>
                 ) : null}
@@ -179,7 +179,7 @@ export function MonthDetails({ plan }: { plan: MonthPlan }) {
                 )}
               </span>
               <span className={listAmt}>
-                <Amount minor={item.planned} />
+                <Amount value={item.planned} />
                 {plan.compareActual ? <small>Actual {formatMoney(currency, item.actual)}</small> : null}
               </span>
             </ListRow>

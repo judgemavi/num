@@ -1,5 +1,5 @@
-import { categories, categoryGroups, settings, transactions } from "@num/db";
-import { foldName, minorUnitDigits, type CategorySet, type ConfidenceMode, type CurrencyCode } from "@num/shared";
+import { categories, categoryGroups, settings } from "@num/db";
+import { foldName, currencyDigits, type CategorySet, type ConfidenceMode, type CurrencyCode } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -29,7 +29,7 @@ type CurrencyInput = {
 };
 
 function assertCurrency(code: string): asserts code is CurrencyCode {
-  if (minorUnitDigits(code) === undefined) {
+  if (currencyDigits(code) === undefined) {
     throw new ServiceError("invalid_body", 400, { field: "currency" });
   }
 }
@@ -125,6 +125,7 @@ export function runSetup(db: Db, input: SetupInput): { currency: CurrencyCode; c
   return { currency, categorySet: input.categorySet };
 }
 
+/** A change of the book currency is a relabel. Stored amounts do not change (decision 0037). */
 export function changeCurrency(db: Db, input: CurrencyInput): { currency: CurrencyCode } {
   assertCurrency(input.currency);
   const currency = input.currency;
@@ -140,10 +141,6 @@ export function changeCurrency(db: Db, input: CurrencyInput): { currency: Curren
     const row = currencyRow(tx);
     if (!row) {
       throw new ServiceError("setup_required", 409);
-    }
-    const transaction = tx.select({ id: transactions.id }).from(transactions).limit(1).get();
-    if (transaction) {
-      throw new ServiceError("currency_locked", 409);
     }
     tx.update(settings).set({ value: currency }).where(eq(settings.key, "currency")).run();
     tx.audit({

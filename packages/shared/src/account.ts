@@ -4,7 +4,7 @@ import { columnMapSchema } from "./statement";
 import { archivedQuery, listQuerySchema, pagedResponseSchema } from "./list";
 import { interestRateMilliPctSchema } from "./rate";
 import { isUtcTimestamp } from "./time";
-import { centsSchema } from "./money";
+import { amountSchema, nonNegativeAmountSchema } from "./money";
 import { mortgageTermsWriteSchema } from "./mortgage";
 
 export const accountKinds = [
@@ -76,19 +76,16 @@ export function allowsInterestRate(kind: AccountKind): boolean {
   return interestKinds.has(kind);
 }
 
-
-const nonNegativeCentsSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
-
 const accountFields = {
   name: z.string().trim().min(1),
   institution: z.string().trim().min(1).nullable().optional(),
   kind: z.enum(accountKinds),
   openingDate: isoDateSchema.nullable().optional(),
-  openingBalance: centsSchema
+  openingBalance: amountSchema
     .optional()
     .meta({ money: true, description: "Signed. A liability that is owed has a negative opening balance." }),
   paymentPolicy: z.enum(paymentPolicies).nullable().optional(),
-  fixedPayment: nonNegativeCentsSchema.nullable().optional(),
+  fixedPayment: nonNegativeAmountSchema.nullable().optional(),
   interestRateMilliPct: interestRateMilliPctSchema.nullable().optional(),
   mortgageTerms: mortgageTermsWriteSchema
     .nullable()
@@ -171,14 +168,14 @@ export const accountSchema = z.object({
   openingAutomatic: z.boolean(),
   automaticOpeningDate: isoDateSchema,
   automaticFollowsTransactions: z.boolean(),
-  openingBalance: centsSchema,
+  openingBalance: amountSchema,
   archivedAt: z.string().refine(isUtcTimestamp).nullable(),
   paymentPolicy: z.enum(paymentPolicies).nullable(),
-  fixedPayment: nonNegativeCentsSchema.nullable(),
+  fixedPayment: nonNegativeAmountSchema.nullable(),
   interestRateMilliPct: interestRateMilliPctSchema.nullable(),
   importPreset: z.string().nullable(),
   columnMap: columnMapSchema.nullable(),
-  balance: centsSchema,
+  balance: amountSchema,
 });
 
 export const accountListQuerySchema = listQuerySchema(["name", "kind"]).extend({

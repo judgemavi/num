@@ -1,11 +1,11 @@
 import {
   choiceForCategory,
-  fromMinorUnits,
+  amountText,
   merchantForChoice,
   moneyDirection,
   resolveEditorChoice,
   signedAmount,
-  toMinorUnits,
+  parseAmount,
   type Category,
   type MoneyDirection,
   type Transaction,
@@ -21,19 +21,19 @@ import type { SplitLine } from "@/transactions/what-choice";
 export const quietChange = { dontUpdateMeta: true, dontRunListeners: true };
 
 export function readPositive(currency: string, text: string): number {
-  let minor: number;
+  let milli: number;
   try {
-    minor = toMinorUnits(currency, text.trim());
+    milli = parseAmount(currency, text.trim());
   } catch (error) {
     if (error instanceof Error && error.message === "Amount has too many decimal places") {
       throw new Error("The amount has too many decimal places.");
     }
     throw new Error("Enter the amount as a number.");
   }
-  if (minor < 0) {
+  if (milli < 0) {
     throw new Error("Enter a positive amount.");
   }
-  return minor;
+  return milli;
 }
 
 function choiceOf(transaction: Transaction | null, categories: Category[]) {
@@ -59,11 +59,11 @@ export function alreadyChosen(transaction: Transaction | null): boolean {
   return transaction.lines.length > 1 || transaction.lines.some((line) => line.categoryId !== null || line.transferAccountId !== null);
 }
 
-function linesOf(currency: string, transaction: Transaction): SplitLine[] {
+function linesOf(transaction: Transaction): SplitLine[] {
   const direction = moneyDirection(transaction.amount);
   return transaction.lines.map((line) => ({
     key: line.id,
-    amount: fromMinorUnits(currency, Math.abs(line.amount)),
+    amount: amountText(Math.abs(line.amount)),
     opposite: moneyDirection(line.amount) !== direction,
     edited: true,
     categoryId: line.categoryId,
@@ -75,12 +75,12 @@ function linesOf(currency: string, transaction: Transaction): SplitLine[] {
  * The start values of the Transaction form. A saved transaction gives its values. A new transaction starts on
  * `accountId` with today's date.
  */
-export function transactionValues(currency: string, categories: Category[], transaction: Transaction | null, accountId: string) {
+export function transactionValues(categories: Category[], transaction: Transaction | null, accountId: string) {
   return {
     accountId: transaction?.accountId ?? accountId,
     date: transaction?.date ?? localAsOf(),
     direction: transaction ? moneyDirection(transaction.amount) : "out",
-    amount: transaction ? fromMinorUnits(currency, Math.abs(transaction.amount)) : "",
+    amount: transaction ? amountText(Math.abs(transaction.amount)) : "",
     payee: transaction?.payeeRaw ?? "",
     notes: transaction?.notes ?? "",
     cleared: transaction?.status === "cleared",
@@ -89,7 +89,7 @@ export function transactionValues(currency: string, categories: Category[], tran
     choice: choiceOf(transaction, categories),
     categoryId: transaction?.lines[0]?.categoryId ?? null,
     transferAccountId: transaction?.lines[0]?.transferAccountId ?? null,
-    lines: transaction && transaction.lines.length > 1 ? linesOf(currency, transaction) : [],
+    lines: transaction && transaction.lines.length > 1 ? linesOf(transaction) : [],
     tagIds: [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])],
     /** True after the form put the lines of a mortgage payment from the schedule. The form does it one time. */
     mortgageFilled: false,
@@ -99,7 +99,7 @@ export function transactionValues(currency: string, categories: Category[], tran
 export type TransactionValues = ReturnType<typeof transactionValues>;
 
 /** The values of a new transaction. A form part made with `withForm` gets the type of the form values from them. */
-export const blankTransaction = transactionValues("", [], null, "");
+export const blankTransaction = transactionValues([], null, "");
 
 /** The signed amount of the form. An imported transaction keeps its amount. Null when the amount is not valid. */
 export function signedTotal(currency: string, importedAmount: number | null, amount: string, direction: MoneyDirection): number | null {

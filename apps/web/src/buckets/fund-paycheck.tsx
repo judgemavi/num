@@ -1,4 +1,4 @@
-import { fromMinorUnits, toMinorUnits, type FundingProposal } from "@num/shared";
+import { amountText, parseAmount, type FundingProposal } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useDeferredValue, useState, type ReactNode } from "react";
 import { errorCode } from "@/api/client";
@@ -103,18 +103,18 @@ function fundingLines(currency: string, proposal: FundingProposal, amounts: Reco
     if (text === "") {
       continue;
     }
-    let minor = 0;
+    let milli = 0;
     try {
-      minor = toMinorUnits(currency, text);
+      milli = parseAmount(currency, text);
     } catch {
       return { error: "Enter each amount as a number." };
     }
-    if (minor < 0) {
+    if (milli < 0) {
       return { error: "Enter an amount of zero or more." };
     }
-    if (minor > 0) {
-      lines.push({ bucketId: line.bucketId, amount: minor });
-      sum += minor;
+    if (milli > 0) {
+      lines.push({ bucketId: line.bucketId, amount: milli });
+      sum += milli;
     }
   }
   if (lines.length === 0) {
@@ -128,7 +128,7 @@ function ProposalForm({ leading, proposal }: { leading: ReactNode; proposal: Fun
   const currency = useBookCurrency();
   const fund = useFundPaycheck();
   const form = useAppForm({
-    defaultValues: { amounts: Object.fromEntries(proposal.lines.map((line) => [line.bucketId, fromMinorUnits(currency, line.amount)])) },
+    defaultValues: { amounts: Object.fromEntries(proposal.lines.map((line) => [line.bucketId, amountText(line.amount)])) },
     validators: {
       onSubmit: ({ value }) => fundingLines(currency, proposal, value.amounts).error,
     },
@@ -152,7 +152,7 @@ function ProposalForm({ leading, proposal }: { leading: ReactNode; proposal: Fun
         <DialogBody>
           {leading}
           <p className="text-sm text-muted-foreground">
-            {proposal.payee} · {formatDate(proposal.date)}. Assign up to <Amount minor={proposal.limit} />. That is the smaller of the paycheck and Unassigned.
+            {proposal.payee} · {formatDate(proposal.date)}. Assign up to <Amount value={proposal.limit} />. That is the smaller of the paycheck and Unassigned.
           </p>
           {proposal.lines.length === 0 ? <p>Nothing to assign. The buckets are full, or Unassigned is zero.</p> : null}
           {proposal.lines.map((line) => (

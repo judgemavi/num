@@ -134,7 +134,7 @@ function addLine(db: ReturnType<typeof tempDatabase>["db"], categoryId: string) 
       id: transactionId,
       accountId,
       date: "2026-03-01",
-      amount: -100,
+      amount: -1000,
       ...storedPayee("Example shop"),
       status: "cleared",
       source: "manual",
@@ -144,7 +144,7 @@ function addLine(db: ReturnType<typeof tempDatabase>["db"], categoryId: string) 
     .values({
       id: crypto.randomUUID(),
       transactionId,
-      amount: -100,
+      amount: -1000,
       categoryId,
     })
     .run();
@@ -163,7 +163,7 @@ function addBucket(db: ReturnType<typeof tempDatabase>["db"], categoryId: string
       color: "sky",
       icon: "shopping-cart",
       startDate: "2000-01-01",
-      refillTo: 100,
+      refillTo: 1000,
     })
     .run();
   db.insert(bucketCategories).values({ categoryId, bucketId }).run();

@@ -50,7 +50,7 @@ export function AccountImports({ accountId }: { accountId: string }) {
                   {formatStatementDate(row.date)} · {row.payeeRaw || "No description"}
                 </p>
                 <p>
-                  <Amount minor={row.amount} /> · {undoBlockLabel(row.reason)}
+                  <Amount value={row.amount} /> · {undoBlockLabel(row.reason)}
                 </p>
               </li>
             ))}

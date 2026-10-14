@@ -82,7 +82,7 @@ test("a book can start with no categories", () => {
   }
 });
 
-test("currency cannot change after the first transaction", () => {
+test("a currency change after the first transaction is a relabel and keeps the stored amounts", () => {
   const db = tempDatabase();
   try {
     runSetup(db.db, { currency: "JPY", categorySet: "none", source: "ui", at });
@@ -108,25 +108,18 @@ test("currency cannot change after the first transaction", () => {
         id: crypto.randomUUID(),
         accountId,
         date: "2026-01-02",
-        amount: -100,
+        amount: -1000,
         ...storedPayee("Shop"),
         status: "open",
         source: "manual",
       })
       .run();
 
-    try {
-      changeCurrency(db.db, { currency: "KWD", source: "ui", at });
-      throw new Error("currency change should fail");
-    } catch (error) {
-      expect(error).toBeInstanceOf(ServiceError);
-      if (error instanceof ServiceError) {
-        expect(error.code).toBe("currency_locked");
-      }
-    }
+    expect(changeCurrency(db.db, { currency: "KWD", source: "ui", at })).toEqual({ currency: "KWD" });
     expect(db.sqlite.query("select value from settings where key = 'currency'").get()).toEqual({
-      value: "CAD",
+      value: "KWD",
     });
+    expect(db.sqlite.query("select amount from transactions").all()).toEqual([{ amount: -1000 }]);
   } finally {
     db.close();
   }

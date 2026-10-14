@@ -19,6 +19,7 @@ import { hasTerms, resolveTerms, saveTerms } from "./mortgage-terms";
 import { automaticOpening, automaticOpenings, effectiveOpeningDate, type AutomaticOpening } from "./opening-date";
 import { keepOmitted, write, type WriteInput } from "./write";
 import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
+import { requireWholeAmounts } from "./book-step";
 
 function blankToNull(value: string | null | undefined) {
   if (value === undefined || value === null) {
@@ -65,6 +66,7 @@ export function listAccounts(db: Db, query: AccountListQuery) {
 }
 
 export function createAccount(db: Db, input: AccountCreate & WriteInput): Account {
+  requireWholeAmounts(db, [input.openingBalance, input.fixedPayment, input.mortgageTerms?.paymentAmount]);
   const card = cardFields(input.kind, input);
   const rate = interestRate(input.kind, input.interestRateMilliPct);
   const at = input.at ?? utcNow();
@@ -102,6 +104,7 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
 
 /** A field that the update leaves out keeps its stored value. An explicit null clears a field that can be empty. */
 export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteInput): Account {
+  requireWholeAmounts(db, [input.openingBalance, input.fixedPayment, input.mortgageTerms?.paymentAmount]);
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
     const existing = tx.select().from(accounts).where(eq(accounts.id, id)).get();

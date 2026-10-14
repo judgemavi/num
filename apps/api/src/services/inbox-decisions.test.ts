@@ -56,7 +56,7 @@ function account(db: Db, name: string) {
     institution: null,
     kind: "chequing",
     openingDate: "2026-01-01",
-    openingBalance: 1_000_000,
+    openingBalance: 10_000_000,
     ...saved,
   });
 }
@@ -105,9 +105,9 @@ test("each no decision hides its review item until undo", () => {
     const cash = account(sample.db, "Cash");
     const savings = account(sample.db, "Savings");
     const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
-    const left = pay(sample.db, cash.id, "2026-03-05", -50_000, "Move", food.id);
+    const left = pay(sample.db, cash.id, "2026-03-05", -500_000, "Move", food.id);
     sample.db.update(transactions).set({ source: "import" }).where(eq(transactions.id, left.id)).run();
-    const right = pay(sample.db, savings.id, "2026-03-06", 50_000, "Move", food.id);
+    const right = pay(sample.db, savings.id, "2026-03-06", 500_000, "Move", food.id);
     const pairKey = left.id < right.id ? `transfer_pair:${left.id}:${right.id}` : `transfer_pair:${right.id}:${left.id}`;
     roundTrip(sample.db, asOf, pairKey, "not_transfer");
 
@@ -115,7 +115,7 @@ test("each no decision hides its review item until undo", () => {
       name: "Stream",
       kind: "bill",
       accountId: cash.id,
-      expectedAmount: -1000,
+      expectedAmount: -10000,
       tolerance: 0,
       amountMode: "fixed",
       categoryId: null,
@@ -131,7 +131,7 @@ test("each no decision hides its review item until undo", () => {
       fundsBuckets: false,
       ...saved,
     });
-    const changedPay = pay(sample.db, cash.id, "2026-03-15", -1999, "Stream", food.id);
+    const changedPay = pay(sample.db, cash.id, "2026-03-15", -19990, "Stream", food.id);
     linkOccurrence(sample.db, changedPlan.id, "2026-03-15", changedPay.id, saved);
     roundTrip(sample.db, asOf, `recurring_changed:${changedPlan.id}:2026-03-15`, "keep_plan_amount");
 
@@ -139,7 +139,7 @@ test("each no decision hides its review item until undo", () => {
       name: "Gym",
       kind: "bill",
       accountId: cash.id,
-      expectedAmount: -1000,
+      expectedAmount: -10000,
       tolerance: 0,
       amountMode: "fixed",
       categoryId: null,
@@ -164,7 +164,7 @@ test("each no decision hides its review item until undo", () => {
 
     const stream = createMerchant(sample.db, { name: "Stream Co", ...saved });
     for (const date of ["2026-01-15", "2026-02-15", "2026-03-15"]) {
-      pay(sample.db, savings.id, date, -1500, "Stream", food.id, stream.id);
+      pay(sample.db, savings.id, date, -15000, "Stream", food.id, stream.id);
     }
     const proposal = recurringSignals(sample.db, asOf).proposals[0];
     expect(proposal).toBeDefined();
@@ -177,7 +177,7 @@ test("each no decision hides its review item until undo", () => {
       name: "Pay",
       kind: "income",
       accountId: cash.id,
-      expectedAmount: 50_000,
+      expectedAmount: 500_000,
       tolerance: 0,
       amountMode: "fixed",
       categoryId: payCategory.id,
@@ -193,7 +193,7 @@ test("each no decision hides its review item until undo", () => {
       fundsBuckets: true,
       ...saved,
     });
-    const deposit = pay(sample.db, cash.id, "2026-03-01", 50_000, "Payroll", payCategory.id);
+    const deposit = pay(sample.db, cash.id, "2026-03-01", 500_000, "Payroll", payCategory.id);
     linkOccurrence(sample.db, paycheckPlan.id, "2026-03-01", deposit.id, saved);
     roundTrip(sample.db, asOf, `paycheck_funding:${deposit.id}`, "keep_unassigned");
 
@@ -216,10 +216,10 @@ test("each no decision hides its review item until undo", () => {
     const body = {
       accountId: cash.id,
       date: "2026-03-02",
-      amount: 100,
+      amount: 1000,
       payeeRaw: "By hand",
       status: "open" as const,
-      lines: [{ amount: 100, categoryId: null, memo: null, transferAccountId: null, tagIds: [] }],
+      lines: [{ amount: 1000, categoryId: null, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     };
     const count = () => sample.db.select().from(transactions).all().length;

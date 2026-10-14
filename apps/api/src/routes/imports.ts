@@ -26,7 +26,7 @@ const maxUploadBytes = 20 * 1024 * 1024;
 
 const presetsRoute = createRoute({
   operationId: "get_import_presets",
-  description: "Read bank presets. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read bank presets. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/import-presets",
   responses: {
@@ -39,7 +39,7 @@ const presetsRoute = createRoute({
 
 const listRoute = createRoute({
   operationId: "get_accounts_id_imports",
-  description: "Read accounts. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read accounts. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts/{id}/imports",
   request: { params: idParams },
@@ -54,7 +54,7 @@ const listRoute = createRoute({
 
 const importRoute = createRoute({
   operationId: "post_imports",
-  description: "Import a statement file. This can create transactions, match existing transactions, skip duplicates and store the file. It does not change buckets, plans or the book currency. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Import a statement file. This can create transactions, match existing transactions, skip duplicates and store the file. It does not change buckets, plans or the book currency. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/imports",
   request: {
@@ -86,7 +86,7 @@ const importRoute = createRoute({
 
 const reviewRoute = createRoute({
   operationId: "post_imports_rows_id_resolve",
-  description: "Create or run imports (resolve). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run imports (resolve). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/imports/rows/{id}/resolve",
   request: {
@@ -106,7 +106,7 @@ const reviewRoute = createRoute({
 
 const viewRoute = createRoute({
   operationId: "list_imports",
-  description: "Read imports. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read imports. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/imports",
   request: { query: importViewQuerySchema },
@@ -121,7 +121,7 @@ const viewRoute = createRoute({
 
 const detailRoute = createRoute({
   operationId: "get_imports_id",
-  description: "Read imports. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read imports. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/imports/{id}",
   request: { params: idParams },
@@ -136,7 +136,7 @@ const detailRoute = createRoute({
 
 const undoRoute = createRoute({
   operationId: "post_imports_id_undo",
-  description: "Undo imports (undo). This reverses that change. It does not remove the audit log. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Undo imports (undo). This reverses that change. It does not remove the audit log. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/imports/{id}/undo",
   request: { params: idParams },

@@ -7,12 +7,12 @@ export function moneyDirection(amount: number): MoneyDirection {
 }
 
 /** The Money out / Money in toggle sets the sign. The typed amount stays positive. */
-export function signedAmount(direction: MoneyDirection, positiveMinor: number): number {
-  if (!Number.isInteger(positiveMinor) || positiveMinor < 0) {
-    throw new Error("Amount must be a positive number of minor units.");
+export function signedAmount(direction: MoneyDirection, positive: number): number {
+  if (!Number.isInteger(positive) || positive < 0) {
+    throw new Error("Amount must be a positive number of milliunits.");
   }
-  if (positiveMinor === 0) {
+  if (positive === 0) {
     return 0;
   }
-  return direction === "out" ? -positiveMinor : positiveMinor;
+  return direction === "out" ? -positive : positive;
 }

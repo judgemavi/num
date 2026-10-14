@@ -4,7 +4,7 @@ import {
   isInboxMissed,
   isLinkCandidate,
   matchLinks,
-  medianMinor,
+  medianOf,
   occurrenceAt,
   occurrenceDates,
   variableAmounts,
@@ -65,10 +65,13 @@ test("a weekend shifts to the next or previous weekday", () => {
 });
 
 test("a variable plan uses the median and the lowest of the last 6, then the fallback", () => {
-  expect(variableAmounts([400, 200], 1000)).toEqual({ forecast: 1000, safe: 1000 });
-  expect(variableAmounts([500, 400, 300, 200, 100, 50, 9999], 1000)).toEqual({ forecast: 250, safe: 50 });
-  expect(medianMinor([10, 20, 30, 40])).toBe(25);
-  expect(medianMinor([-3, -2])).toBe(-3);
+  expect(variableAmounts([4000, 2000], 10000, 10)).toEqual({ forecast: 10000, safe: 10000 });
+  expect(variableAmounts([5000, 4000, 3000, 2000, 1000, 500, 99990], 10000, 10)).toEqual({ forecast: 2500, safe: 500 });
+  expect(variableAmounts([12_350, 12_340, 12_340, 12_350], 0, 10)).toEqual({ forecast: 12_350, safe: 12_340 });
+  expect(variableAmounts([1_000_000, 2_000_000, 3_000_000, 4_000_000], 0, 1000).forecast).toBe(2_500_000);
+  expect(variableAmounts([1_000, 2_000, 4_000, 5_000], 0, 1000).forecast).toBe(3_000);
+  expect(medianOf([10, 20, 30, 40])).toBe(25);
+  expect(medianOf([-3, -2])).toBe(-3);
 });
 
 function txn(id: string, date: string, amount: number, merchantId = "merchant-1"): DetectionTransaction {
@@ -76,85 +79,85 @@ function txn(id: string, date: string, amount: number, merchantId = "merchant-1"
 }
 
 test("detection needs 3 transactions, regular gaps within 3 days, and amounts within 10 percent", () => {
-  expect(detectPlans([txn("a", "2026-01-05", 1000), txn("b", "2026-01-12", 1000)])).toEqual([]);
+  expect(detectPlans([txn("a", "2026-01-05", 10000), txn("b", "2026-01-12", 10000)], 10)).toEqual([]);
 
   const weekly = detectPlans([
-    txn("a", "2026-01-05", 1000),
-    txn("b", "2026-01-12", 1000),
-    txn("c", "2026-01-19", 1100),
-  ]);
+    txn("a", "2026-01-05", 10000),
+    txn("b", "2026-01-12", 10000),
+    txn("c", "2026-01-19", 11000),
+  ], 10);
   expect(weekly).toHaveLength(1);
-  expect(weekly[0]).toMatchObject({ freq: "weekly", interval: 1, amountMode: "variable", expectedAmount: 1000 });
+  expect(weekly[0]).toMatchObject({ freq: "weekly", interval: 1, amountMode: "variable", expectedAmount: 10000 });
 
   expect(
     detectPlans([
-      txn("a", "2026-01-05", 1000),
-      txn("b", "2026-01-16", 1000),
-      txn("c", "2026-01-19", 1000),
-    ]),
+      txn("a", "2026-01-05", 10000),
+      txn("b", "2026-01-16", 10000),
+      txn("c", "2026-01-19", 10000),
+    ], 10),
   ).toEqual([]);
 
   expect(
     detectPlans([
-      txn("a", "2026-01-05", 1000),
-      txn("b", "2026-01-12", 1000),
-      txn("c", "2026-01-19", 1110),
-    ]),
+      txn("a", "2026-01-05", 10000),
+      txn("b", "2026-01-12", 10000),
+      txn("c", "2026-01-19", 11100),
+    ], 10),
   ).toEqual([]);
 
   const biweekly = detectPlans([
-    txn("a", "2026-01-02", 2000),
-    txn("b", "2026-01-16", 2000),
-    txn("c", "2026-01-30", 2000),
-  ]);
+    txn("a", "2026-01-02", 20000),
+    txn("b", "2026-01-16", 20000),
+    txn("c", "2026-01-30", 20000),
+  ], 10);
   expect(biweekly[0]).toMatchObject({ freq: "weekly", interval: 2, amountMode: "fixed" });
 
   const month = detectPlans([
-    txn("a", "2026-01-31", -1699),
-    txn("b", "2026-02-28", -1699),
-    txn("c", "2026-03-31", -1699),
-  ]);
+    txn("a", "2026-01-31", -16990),
+    txn("b", "2026-02-28", -16990),
+    txn("c", "2026-03-31", -16990),
+  ], 10);
   expect(month[0]).toMatchObject({ freq: "monthly", interval: 1, monthDay: 31 });
 
   const year = detectPlans([
-    txn("a", "2024-03-01", -5000),
-    txn("b", "2025-03-01", -5000),
-    txn("c", "2026-03-01", -5000),
-  ]);
+    txn("a", "2024-03-01", -50000),
+    txn("b", "2025-03-01", -50000),
+    txn("c", "2026-03-01", -50000),
+  ], 10);
   expect(year[0]).toMatchObject({ freq: "yearly", interval: 1 });
 });
 
 test("an old regular run that stopped is not proposed", () => {
   expect(
     detectPlans([
-      txn("a", "2024-01-15", 1000),
-      txn("b", "2024-02-15", 1000),
-      txn("c", "2024-03-15", 1000),
-      txn("d", "2024-06-02", 1000),
-    ]),
+      txn("a", "2024-01-15", 10000),
+      txn("b", "2024-02-15", 10000),
+      txn("c", "2024-03-15", 10000),
+      txn("d", "2024-06-02", 10000),
+    ], 10),
   ).toEqual([]);
 });
 
 test("detection uses the latest run and ignores history older than 18 months", () => {
   const found = detectPlans([
-    txn("a", "2024-01-15", 5000),
-    txn("b", "2024-02-15", 5000),
-    txn("c", "2024-03-15", 5000),
-    txn("d", "2024-04-15", 5000),
-    txn("e", "2026-01-05", 1000),
-    txn("f", "2026-01-12", 1000),
-    txn("g", "2026-01-19", 1000),
-  ]);
+    txn("a", "2024-01-15", 50000),
+    txn("b", "2024-02-15", 50000),
+    txn("c", "2024-03-15", 50000),
+    txn("d", "2024-04-15", 50000),
+    txn("e", "2026-01-05", 10000),
+    txn("f", "2026-01-12", 10000),
+    txn("g", "2026-01-19", 10000),
+  ], 10);
   expect(found).toHaveLength(1);
   expect(found[0]).toMatchObject({ freq: "weekly", interval: 1, transactionIds: ["e", "f", "g"] });
 
   expect(
     detectPlans(
       [
-        txn("a", "2024-01-15", 1000),
-        txn("b", "2024-02-15", 1000),
-        txn("c", "2024-03-15", 1000),
-      ],
+        txn("a", "2024-01-15", 10000),
+        txn("b", "2024-02-15", 10000),
+        txn("c", "2024-03-15", 10000),
+      ], 10,
       "2026-10-07",
     ),
   ).toEqual([]);
@@ -166,12 +169,12 @@ function occurrence(planId: string, dueDate: string, merchantId: string | null =
     dueDate,
     accountId: "account-1",
     merchantId,
-    expectedAmount: -1699,
-    tolerance: 100,
+    expectedAmount: -16990,
+    tolerance: 1000,
   };
 }
 
-function payment(id: string, date: string, amount = -1699, merchantId: string | null = "merchant-1"): LinkTransaction {
+function payment(id: string, date: string, amount = -16990, merchantId: string | null = "merchant-1"): LinkTransaction {
   return { id, accountId: "account-1", date, amount, merchantId };
 }
 
@@ -186,10 +189,10 @@ test("auto-link matches one candidate and leaves every other case open", () => {
   const plan = occurrence("plan-1", "2026-03-02", "merchant-1");
   expect(isLinkCandidate(plan, payment("txn-1", "2026-03-05"), 3)).toBe(true);
   expect(isLinkCandidate(plan, payment("txn-1", "2026-03-06"), 3)).toBe(false);
-  expect(isLinkCandidate(plan, payment("txn-1", "2026-03-02", -1699, "other"), 3)).toBe(false);
-  expect(isLinkCandidate(plan, payment("txn-1", "2026-03-02", -1900), 3)).toBe(false);
+  expect(isLinkCandidate(plan, payment("txn-1", "2026-03-02", -16990, "other"), 3)).toBe(false);
+  expect(isLinkCandidate(plan, payment("txn-1", "2026-03-02", -19000), 3)).toBe(false);
   expect(isLinkCandidate(plan, { ...payment("txn-1", "2026-03-02"), accountId: "account-2" }, 3)).toBe(false);
-  expect(isLinkCandidate({ ...plan, merchantId: null }, payment("txn-1", "2026-03-02", -1699, null), 3)).toBe(true);
+  expect(isLinkCandidate({ ...plan, merchantId: null }, payment("txn-1", "2026-03-02", -16990, null), 3)).toBe(true);
 
   const one = matchLinks([plan], [payment("txn-1", "2026-03-02")], 3);
   expect(one.unique).toEqual([{ planId: "plan-1", dueDate: "2026-03-02", transactionId: "txn-1" }]);

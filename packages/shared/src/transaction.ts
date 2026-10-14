@@ -4,7 +4,7 @@ import { isoDateSchema } from "./date";
 import { approveLevels } from "./review";
 import { listQuerySchema, pagedResponseSchema, queryDate, queryFlag, queryId, queryIdOrNone, queryText } from "./list";
 import { autoReasons } from "./matching";
-import { centsSchema } from "./money";
+import { amountSchema } from "./money";
 import { reviewCountSchema, transactionReviewSchema } from "./review";
 
 export const transactionStatuses = ["open", "cleared"] as const;
@@ -24,7 +24,7 @@ const optionalText = z.string().trim().min(1).nullable().optional();
 
 export const transactionLineInputSchema = z
   .object({
-    amount: centsSchema,
+    amount: amountSchema,
     memo: optionalText,
     categoryId: z.uuid().nullable().optional(),
     transferAccountId: z.uuid().nullable().optional(),
@@ -34,7 +34,7 @@ export const transactionLineInputSchema = z
 
 export const transactionLineSchema = z.object({
   id: z.uuid(),
-  amount: centsSchema,
+  amount: amountSchema,
   memo: z.string().nullable(),
   categoryId: z.uuid().nullable(),
   transferAccountId: z.uuid().nullable(),
@@ -44,7 +44,7 @@ export const transactionLineSchema = z.object({
 const transactionFields = {
   accountId: z.uuid(),
   date: isoDateSchema,
-  amount: centsSchema,
+  amount: amountSchema,
   merchantId: z.uuid().nullable().optional(),
   notes: optionalText,
   payeeRaw: z.string().trim().min(1),
@@ -69,7 +69,7 @@ export const transactionSchema = z.object({
   id: z.uuid(),
   accountId: z.uuid(),
   date: isoDateSchema,
-  amount: centsSchema,
+  amount: amountSchema,
   merchantId: z.uuid().nullable(),
   notes: z.string().nullable(),
   payeeRaw: z.string(),
@@ -88,11 +88,11 @@ export const transactionSchema = z.object({
     .object({
       id: z.uuid(),
       date: isoDateSchema,
-      amount: centsSchema,
+      amount: amountSchema,
       payeeRaw: z.string(),
     })
     .nullable(),
-  refundedAmount: centsSchema.nullable(),
+  refundedAmount: amountSchema.nullable(),
   lines: z.array(transactionLineSchema),
 });
 
@@ -130,23 +130,23 @@ export const transactionListItemSchema = z.object({
   accountName: z.string(),
   accountKind: z.enum(accountKinds),
   date: isoDateSchema,
-  amount: centsSchema,
+  amount: amountSchema,
   payeeRaw: z.string(),
   merchantId: z.uuid().nullable(),
   merchantName: z.string().nullable(),
   status: z.enum(transactionStatuses),
   reconciled: z.boolean(),
-  runningBalance: centsSchema.nullable(),
+  runningBalance: amountSchema.nullable(),
   autoReason: z.enum(autoReasons).nullable(),
   autoConfidence: z.number().int().min(0).max(1000).nullable(),
   refundOf: z
     .object({
       id: z.uuid(),
       date: isoDateSchema,
-      amount: centsSchema,
+      amount: amountSchema,
     })
     .nullable(),
-  refundedAmount: centsSchema.nullable(),
+  refundedAmount: amountSchema.nullable(),
   lines: z.array(z.object({ categoryId: z.uuid().nullable(), transferAccountId: z.uuid().nullable() })),
   review: transactionReviewSchema.nullable(),
 });

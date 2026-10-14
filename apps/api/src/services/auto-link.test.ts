@@ -75,10 +75,10 @@ function learnTransfer(db: Db, ids: Ids, payee: string) {
   createTransaction(db, {
     accountId: ids.cheque,
     date: "2026-01-05",
-    amount: -1_000,
+    amount: -10_000,
     payeeRaw: payee,
     status: "cleared",
-    lines: [{ amount: -1_000, transferAccountId: ids.savings }],
+    lines: [{ amount: -10_000, transferAccountId: ids.savings }],
     ...saved,
   });
 }
@@ -101,15 +101,15 @@ test("a pair with a learned transfer payee links by itself and both rows are Sur
   withBook((db, ids) => {
     learnTransfer(db, ids, "MOVE TO SAVINGS");
     pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
-    const [out] = rowsOf(db, -5_000);
-    const [incoming] = rowsOf(db, 5_000);
+    const [out] = rowsOf(db, -50_000);
+    const [incoming] = rowsOf(db, 50_000);
     expect(out?.transferPeerId).toBe(incoming?.id ?? "missing");
     expect(incoming?.transferPeerId).toBe(out?.id ?? "missing");
     expect(out?.autoReason).toBe("transfer_match");
     expect(incoming?.autoReason).toBe("transfer_match");
     expect(incoming?.autoSourceId).toBe(out?.id ?? "missing");
     expect(out?.editedAt).toBeNull();
-    expect(db.select().from(transactions).all().filter((row) => row.mirror && row.amount === 5_000)).toHaveLength(0);
+    expect(db.select().from(transactions).all().filter((row) => row.mirror && row.amount === 50_000)).toHaveLength(0);
     expect(review(db, out?.id ?? "")?.level).toBe("sure");
     expect(review(db, incoming?.id ?? "")?.level).toBe("sure");
   });
@@ -118,7 +118,7 @@ test("a pair with a learned transfer payee links by itself and both rows are Sur
 test("a pair without a learned transfer payee asks", () => {
   withBook((db, ids) => {
     pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
-    const [out] = rowsOf(db, -5_000);
+    const [out] = rowsOf(db, -50_000);
     expect(out?.transferPeerId).toBeNull();
     expect(review(db, out?.id ?? "")?.question).toBe("transfer_pair");
   });
@@ -129,7 +129,7 @@ test("two candidates ask and do not link", () => {
     learnTransfer(db, ids, "MOVE TO SAVINGS");
     statement(db, ids, ids.cheque, "out", ["03/10/2026,MOVE TO SAVINGS,-50.00"]);
     statement(db, ids, ids.savings, "in", ["03/11/2026,FROM EVERYDAY,50.00", "03/12/2026,DEPOSIT,50.00"]);
-    for (const row of [...rowsOf(db, -5_000), ...rowsOf(db, 5_000)]) {
+    for (const row of [...rowsOf(db, -50_000), ...rowsOf(db, 50_000)]) {
       expect(row.transferPeerId).toBeNull();
       expect(row.autoReason).toBeNull();
     }
@@ -140,15 +140,15 @@ test("Not a transfer unlinks the pair, records the no and stays answered", () =>
   withBook((db, ids) => {
     learnTransfer(db, ids, "MOVE TO SAVINGS");
     pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
-    const [out] = rowsOf(db, -5_000);
-    const [incoming] = rowsOf(db, 5_000);
+    const [out] = rowsOf(db, -50_000);
+    const [incoming] = rowsOf(db, 50_000);
     updateTransaction(db, out?.id ?? "", {
       accountId: ids.cheque,
       date: "2026-03-10",
-      amount: -5_000,
+      amount: -50_000,
       payeeRaw: "MOVE TO SAVINGS",
       status: "cleared",
-      lines: [{ amount: -5_000, categoryId: ids.other }],
+      lines: [{ amount: -50_000, categoryId: ids.other }],
       ...saved,
     });
     const key = [out?.id ?? "", incoming?.id ?? ""].sort().join(":");
@@ -165,10 +165,10 @@ test("an automatic pair does not teach until the person confirms it", () => {
     learnTransfer(db, ids, "MOVE TO SAVINGS");
     pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
     expect(loadMatchBook(db).transfersByPayee.has("FROM EVERYDAY")).toBe(false);
-    const [incoming] = rowsOf(db, 5_000);
+    const [incoming] = rowsOf(db, 50_000);
     acceptLooksRight(db, incoming?.id ?? "", saved);
     expect(loadMatchBook(db).transfersByPayee.has("FROM EVERYDAY")).toBe(true);
-    const [out] = rowsOf(db, -5_000);
+    const [out] = rowsOf(db, -50_000);
     expect(out?.autoReason).toBeNull();
   });
 });
@@ -179,8 +179,8 @@ test("undoing the import removes an automatic pair row and frees the other", () 
     const batch = pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
     const result = undoImportBatch(db, batch.id, saved);
     expect(result.blocked).toEqual([]);
-    expect(rowsOf(db, 5_000)).toHaveLength(0);
-    const [out] = rowsOf(db, -5_000);
+    expect(rowsOf(db, 50_000)).toHaveLength(0);
+    const [out] = rowsOf(db, -50_000);
     expect(out?.transferPeerId).toBeNull();
     expect(out?.autoReason).toBeNull();
   });
@@ -211,10 +211,10 @@ function fee(db: Db, ids: Ids) {
   return createTransaction(db, {
     accountId: ids.cheque,
     date: "2026-03-01",
-    amount: -1_795,
+    amount: -17_950,
     payeeRaw: "MONTHLY ACCOUNT FEE",
     status: "cleared",
-    lines: [{ amount: -1_795, categoryId: ids.fees }],
+    lines: [{ amount: -17_950, categoryId: ids.fees }],
     ...saved,
   });
 }
@@ -222,7 +222,7 @@ function fee(db: Db, ids: Ids) {
 test("a fee and a same-day rebate with other payees link", () => {
   withBook((db, ids) => {
     const charge = fee(db, ids);
-    const rebate = refundOf(db, ids, "2026-03-01", 1_795, ids.fees, "ACCT BAL REBATE");
+    const rebate = refundOf(db, ids, "2026-03-01", 17_950, ids.fees, "ACCT BAL REBATE");
     const stored = getTransaction(db, rebate.id);
     expect(stored?.refundOfId).toBe(charge.id);
     expect(stored?.autoReason).toBe("refund_reversal");
@@ -233,12 +233,12 @@ test("a fee and a same-day rebate with other payees link", () => {
 test("a rebate 3 days later links and 4 days later does not", () => {
   withBook((db, ids) => {
     const charge = fee(db, ids);
-    const near = refundOf(db, ids, "2026-03-04", 1_795, ids.fees, "ACCT BAL REBATE");
+    const near = refundOf(db, ids, "2026-03-04", 17_950, ids.fees, "ACCT BAL REBATE");
     expect(getTransaction(db, near.id)?.refundOfId).toBe(charge.id);
   });
   withBook((db, ids) => {
     fee(db, ids);
-    const late = refundOf(db, ids, "2026-03-05", 1_795, ids.fees, "ACCT BAL REBATE");
+    const late = refundOf(db, ids, "2026-03-05", 17_950, ids.fees, "ACCT BAL REBATE");
     expect(getTransaction(db, late.id)?.refundOfId).toBeNull();
     expect(review(db, late.id)?.question).not.toBe("refund_purchase");
   });
@@ -247,7 +247,7 @@ test("a rebate 3 days later links and 4 days later does not", () => {
 test("a rebate in another category does not link", () => {
   withBook((db, ids) => {
     fee(db, ids);
-    const rebate = refundOf(db, ids, "2026-03-01", 1_795, ids.other, "ACCT BAL REBATE");
+    const rebate = refundOf(db, ids, "2026-03-01", 17_950, ids.other, "ACCT BAL REBATE");
     expect(getTransaction(db, rebate.id)?.refundOfId).toBeNull();
     expect(review(db, rebate.id)?.question).not.toBe("refund_purchase");
   });
@@ -257,7 +257,7 @@ test("two same-day fees of the same amount ask which one", () => {
   withBook((db, ids) => {
     fee(db, ids);
     fee(db, ids);
-    const rebate = refundOf(db, ids, "2026-03-01", 1_795, ids.fees, "ACCT BAL REBATE");
+    const rebate = refundOf(db, ids, "2026-03-01", 17_950, ids.fees, "ACCT BAL REBATE");
     expect(getTransaction(db, rebate.id)?.refundOfId).toBeNull();
     expect(review(db, rebate.id)?.question).toBe("refund_purchase");
   });
@@ -268,8 +268,8 @@ test("confirming one pair links the other open pairs of the same payee, except a
     const dates = ["02/03", "02/17", "03/03", "03/10"];
     statement(db, ids, ids.cheque, "out", dates.map((day) => `${day}/2026,CIBC PAYMENT,-50.00`));
     statement(db, ids, ids.savings, "in", dates.map((day) => `${day}/2026,PAYMENT RECEIVED,50.00`));
-    const outs = rowsOf(db, -5_000).sort((a, b) => a.date.localeCompare(b.date));
-    const ins = rowsOf(db, 5_000).sort((a, b) => a.date.localeCompare(b.date));
+    const outs = rowsOf(db, -50_000).sort((a, b) => a.date.localeCompare(b.date));
+    const ins = rowsOf(db, 50_000).sort((a, b) => a.date.localeCompare(b.date));
     expect(outs.every((row) => row.transferPeerId === null)).toBe(true);
     const skipped = [outs[1]?.id ?? "", ins[1]?.id ?? ""].sort();
     decideInboxItem(db, asOf, `transfer_pair:${skipped.join(":")}`, "not_transfer", saved);
@@ -289,10 +289,10 @@ test("undoing the second import and then the first both work", () => {
     learnTransfer(db, ids, "MOVE TO SAVINGS");
     const batch = pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
     expect(undoImportBatch(db, batch.id, saved).blocked).toEqual([]);
-    const [out] = rowsOf(db, -5_000);
+    const [out] = rowsOf(db, -50_000);
     expect(out?.editedAt).toBeNull();
     expect(undoImportBatch(db, batch.outId, saved).blocked).toEqual([]);
-    expect(rowsOf(db, -5_000)).toHaveLength(0);
+    expect(rowsOf(db, -50_000)).toHaveLength(0);
   });
 });
 
@@ -303,8 +303,8 @@ test("undo is blocked when the linked peer is reconciled", () => {
     db.insert(checkpoints).values({ id: crypto.randomUUID(), accountId: ids.savings, date: "2026-03-15", statementBalance: 0, createdAt: at }).run();
     const result = undoImportBatch(db, batch.outId, saved);
     expect(result.blocked.map((item) => item.reason)).toEqual(["reconciled"]);
-    expect(rowsOf(db, -5_000)).toHaveLength(1);
-    expect(rowsOf(db, -5_000)[0]?.transferPeerId).not.toBeNull();
+    expect(rowsOf(db, -50_000)).toHaveLength(1);
+    expect(rowsOf(db, -50_000)[0]?.transferPeerId).not.toBeNull();
   });
 });
 
@@ -313,7 +313,7 @@ test("a group answer does not auto-link rows of its own batch", () => {
     const dates = ["01/05", "01/12", "01/19", "01/26", "02/02"];
     statement(db, ids, ids.cheque, "out", dates.map((day) => `${day}/2026,CIBC PAYMENT,-50.00`));
     statement(db, ids, ids.savings, "in", dates.map((day) => `${day}/2026,PAYMENT RECEIVED,50.00`));
-    const outs = rowsOf(db, -5_000).sort((a, b) => a.date.localeCompare(b.date));
+    const outs = rowsOf(db, -50_000).sort((a, b) => a.date.localeCompare(b.date));
     const result = applyInboxGroup(db, {
       accountId: ids.cheque,
       transactionIds: outs.map((row) => row.id),
@@ -337,7 +337,7 @@ test("Approve all Sure confirms an automatic pair as one transfer", () => {
     pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
     const result = approveFiltered(db, asOf, { uncategorized: false, automatic: false }, "sure", 2, saved);
     expect(result.count).toBe(2);
-    expect(rowsOf(db, -5_000)[0]?.autoReason).toBeNull();
-    expect(rowsOf(db, 5_000)[0]?.autoReason).toBeNull();
+    expect(rowsOf(db, -50_000)[0]?.autoReason).toBeNull();
+    expect(rowsOf(db, 50_000)[0]?.autoReason).toBeNull();
   });
 });

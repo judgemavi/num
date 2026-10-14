@@ -11,6 +11,7 @@ import {
 } from "@num/shared";
 import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
+import { bookStep } from "./book-step";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
 import { literal } from "./transaction-sql";
@@ -94,7 +95,7 @@ export function readMonthPlan(db: Db, asOf: string, month: string | undefined): 
       source.balance = balances.get(row.id) ?? 0;
       return source;
     });
-  return buildMonthPlan({ month: selected, asOf, plans, links, buckets: sources });
+  return buildMonthPlan({ month: selected, asOf, plans, links, buckets: sources, step: bookStep(db) });
 }
 
 function loadLinks(db: Db, asOf: string, windowStart: string, windowEnd: string) {

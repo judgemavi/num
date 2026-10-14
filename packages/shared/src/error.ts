@@ -10,7 +10,7 @@ export const errorCodes = [
   "invalid_params",
   "setup_already_complete",
   "setup_required",
-  "currency_locked",
+  "amount_too_precise",
   "account_not_found",
   "account_archived",
   "account_not_archived",

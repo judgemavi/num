@@ -107,7 +107,7 @@ function seed(db: Db, dir: string) {
     name: "Everyday",
     kind: "chequing",
     openingDate: "2026-01-01",
-    openingBalance: 10_000,
+    openingBalance: 100_000,
     ...saved,
   });
   const category = listCategories(db, { page: 1, pageSize: 50, archived: false }).items[0];
@@ -118,11 +118,11 @@ function seed(db: Db, dir: string) {
   createTransaction(db, {
     accountId: account.id,
     date: "2026-03-02",
-    amount: -400,
+    amount: -4_000,
     payeeRaw: "North Market",
     merchantId: merchant.id,
     status: "cleared",
-    lines: [{ amount: -400, categoryId: category.id }],
+    lines: [{ amount: -4_000, categoryId: category.id }],
     ...saved,
   });
   createBucket(db, {
@@ -133,7 +133,7 @@ function seed(db: Db, dir: string) {
     color: "mint",
     icon: "shopping-cart",
     categoryIds: [category.id],
-    refillTo: 5_000,
+    refillTo: 50_000,
     amount: null,
     dueDate: null,
     repeat: null,
@@ -147,7 +147,7 @@ function seed(db: Db, dir: string) {
     name: "Rent",
     kind: "bill",
     accountId: account.id,
-    expectedAmount: -90_000,
+    expectedAmount: -900_000,
     tolerance: 0,
     amountMode: "fixed",
     categoryId: category.id,
@@ -245,12 +245,12 @@ test("the money sentence is only on tools that carry amounts", async () => {
   try {
     const listed = await post(book.app, "tools/list", {});
     const tools = (listed.body.result?.tools ?? []) as { name: string; description?: string }[];
-    const sentence = "Amounts are integer minor units. Money that enters the account is positive.";
+    const sentence = "Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.";
     function text(name: string): string {
       return tools.find((tool) => tool.name === name)?.description ?? "";
     }
-    expect(text("get_health")).not.toContain("minor units");
-    expect(text("get_tags")).not.toContain("minor units");
+    expect(text("get_health")).not.toContain("milliunits");
+    expect(text("get_tags")).not.toContain("milliunits");
     expect(text("get_forecast")).toContain(sentence);
     expect(text("list_accounts")).toContain(sentence);
     expect(text("search_transactions")).toContain(sentence);

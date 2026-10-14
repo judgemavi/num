@@ -172,8 +172,8 @@ function SplitLineRow({
   );
 }
 
-function splitStatus(currency: string, totalMinor: number | null, left: number | null, lines: SplitLine[]) {
-  if (totalMinor === null) {
+function splitStatus(currency: string, totalMilli: number | null, left: number | null, lines: SplitLine[]) {
+  if (totalMilli === null) {
     return "Enter the amount.";
   }
   if (left === null) {
@@ -191,8 +191,8 @@ function splitStatus(currency: string, totalMinor: number | null, left: number |
  */
 export const SplitLines = withForm({
   defaultValues: blankTransaction,
-  props: { totalMinor: fieldValue<number | null>(null), categoryLocked: false, transferLocked: false, amountsLocked: false },
-  render: function SplitLinesRender({ form, totalMinor, categoryLocked, transferLocked, amountsLocked }) {
+  props: { totalMilli: fieldValue<number | null>(null), categoryLocked: false, transferLocked: false, amountsLocked: false },
+  render: function SplitLinesRender({ form, totalMilli, categoryLocked, transferLocked, amountsLocked }) {
     const currency = useBookCurrency();
     const direction = useStore(form.store, (state) => state.values.direction);
     const accountId = useStore(form.store, (state) => state.values.accountId);
@@ -201,8 +201,8 @@ export const SplitLines = withForm({
         {(field) => {
           const lines = field.state.value;
           const change = field.handleChange;
-          const left = totalMinor === null ? null : splitRemainder(currency, totalMinor, direction, lines);
-          const lastLineRest = totalMinor === null ? null : restOnLastLine(currency, totalMinor, direction, lines);
+          const left = totalMilli === null ? null : splitRemainder(currency, totalMilli, direction, lines);
+          const lastLineRest = totalMilli === null ? null : restOnLastLine(currency, totalMilli, direction, lines);
           return (
             <div className="grid gap-3">
               {lines.map((line, index) => (
@@ -216,17 +216,17 @@ export const SplitLines = withForm({
                   transferLocked={transferLocked}
                   amountsLocked={amountsLocked}
                   onChange={(patch) => change(lines.map((item) => (item.key === line.key ? { ...item, ...patch } : item)))}
-                  onAmount={(text) => change(editLineAmount(currency, totalMinor, direction, lines, line.key, text))}
+                  onAmount={(text) => change(editLineAmount(currency, totalMilli, direction, lines, line.key, text))}
                   onRemove={lines.length > 1 && !amountsLocked ? () => change(lines.filter((item) => item.key !== line.key)) : null}
                 />
               ))}
               {!amountsLocked ? (
-                <Button type="button" variant="ghost" className="justify-start" onClick={() => change([...lines, addedLine(currency, totalMinor, direction, lines)])}>
+                <Button type="button" variant="ghost" className="justify-start" onClick={() => change([...lines, addedLine(currency, totalMilli, direction, lines)])}>
                   + Add a line
                 </Button>
               ) : null}
               <div className="flex flex-wrap items-center justify-between gap-2" role="status">
-                <p className="text-sm font-semibold">{splitStatus(currency, totalMinor, left, lines)}</p>
+                <p className="text-sm font-semibold">{splitStatus(currency, totalMilli, left, lines)}</p>
                 {!amountsLocked && left !== null && left !== 0 && lastLineRest !== null ? (
                   <Button type="button" variant="outline" size="sm" onClick={() => change(lastLineRest)}>
                     Put it on the last line

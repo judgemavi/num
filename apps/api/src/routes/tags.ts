@@ -7,7 +7,7 @@ import { errorResponse, idParams } from "./common";
 
 const listRoute = createRoute({
   operationId: "get_tags",
-  description: "Read tags. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read tags. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/tags",
   request: { query: tagListQuerySchema },
@@ -22,7 +22,7 @@ const listRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_tags",
-  description: "Create or run tags. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run tags. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/tags",
   request: {
@@ -43,7 +43,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_tags_id",
-  description: "Change tags. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Change tags. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/tags/{id}",
   request: {
@@ -66,7 +66,7 @@ const updateRoute = createRoute({
 
 const restoreRoute = createRoute({
   operationId: "post_tags_id_restore",
-  description: "Restore tags (restore). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Restore tags (restore). This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/tags/{id}/restore",
   request: { params: idParams },
@@ -82,7 +82,7 @@ const restoreRoute = createRoute({
 
 const archiveRoute = createRoute({
   operationId: "post_tags_id_archive",
-  description: "Remove or archive tags (archive). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Remove or archive tags (archive). This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/tags/{id}/archive",
   request: { params: idParams },
@@ -98,7 +98,7 @@ const archiveRoute = createRoute({
 
 const readRoute = createRoute({
   operationId: "get_tags_id",
-  description: "Read tags. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read tags. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/tags/{id}",
   request: { params: idParams },

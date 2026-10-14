@@ -198,7 +198,7 @@ test("a failed import leaves no document, batch, row or file", () => {
   try {
     const row = {
       date: "2026-01-02",
-      amount: -1250,
+      amount: -12500,
       payeeRaw: "NORTH MARKET",
       bankId: "SAME",
       rowIndex: 0,
@@ -271,10 +271,10 @@ test("an imported row is cleared, a match sets cleared, and undo restores the ea
     createTransaction(book.db, {
       accountId: book.account.id,
       date: "2026-04-01",
-      amount: -1000,
+      amount: -10000,
       payeeRaw: "RENT",
       status: "open",
-      lines: [{ amount: -1000 }],
+      lines: [{ amount: -10000 }],
       source: "ui",
       at,
     });

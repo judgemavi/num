@@ -1,5 +1,5 @@
 import type { MoneyDirection } from "@num/shared";
-import { fromMinorUnits, signedAmount, toMinorUnits } from "@num/shared";
+import { amountText, signedAmount, parseAmount } from "@num/shared";
 
 /** `opposite` is true when the line goes the other way than the transaction. `edited` is true once the user typed the amount. */
 export type SplitLine = {
@@ -25,8 +25,8 @@ function lineSigned(currency: string, direction: MoneyDirection, line: SplitLine
     return 0;
   }
   try {
-    const minor = toMinorUnits(currency, text);
-    return minor < 0 ? null : signedAmount(lineDirection(direction, line), minor);
+    const milli = parseAmount(currency, text);
+    return milli < 0 ? null : signedAmount(lineDirection(direction, line), milli);
   } catch {
     return null;
   }
@@ -37,7 +37,7 @@ export function splitBlank(lines: SplitLine[]): boolean {
 }
 
 /** What is left to assign. Null when a line has an amount that is not valid. */
-export function splitRemainder(currency: string, totalMinor: number, direction: MoneyDirection, lines: SplitLine[]): number | null {
+export function splitRemainder(currency: string, totalMilli: number, direction: MoneyDirection, lines: SplitLine[]): number | null {
   let assigned = 0;
   for (const line of lines) {
     const signed = lineSigned(currency, direction, line);
@@ -46,20 +46,20 @@ export function splitRemainder(currency: string, totalMinor: number, direction: 
     }
     assigned += signed;
   }
-  return totalMinor - assigned;
+  return totalMilli - assigned;
 }
 
 /** The amount text that makes `signed` on this line, or "" when the line cannot hold it. */
-function textFor(currency: string, direction: MoneyDirection, line: SplitLine, signed: number) {
+function textFor(direction: MoneyDirection, line: SplitLine, signed: number) {
   const magnitude = signed * signedAmount(lineDirection(direction, line), 1);
-  return magnitude > 0 ? fromMinorUnits(currency, magnitude) : "";
+  return magnitude > 0 ? amountText(magnitude) : "";
 }
 
 /** The user typed an amount. With two lines, the other line takes the rest until the user edits it. */
-export function editLineAmount(currency: string, totalMinor: number | null, direction: MoneyDirection, lines: SplitLine[], key: string, text: string): SplitLine[] {
+export function editLineAmount(currency: string, totalMilli: number | null, direction: MoneyDirection, lines: SplitLine[], key: string, text: string): SplitLine[] {
   const changed = lines.map((line) => (line.key === key ? { ...line, amount: text, edited: true } : line));
   const [first, second] = changed;
-  if (changed.length !== 2 || !first || !second || totalMinor === null) {
+  if (changed.length !== 2 || !first || !second || totalMilli === null) {
     return changed;
   }
   const edited = first.key === key ? first : second;
@@ -68,25 +68,25 @@ export function editLineAmount(currency: string, totalMinor: number | null, dire
   if (other.edited || signed === null) {
     return changed;
   }
-  const amount = textFor(currency, direction, other, totalMinor - signed);
+  const amount = textFor(direction, other, totalMilli - signed);
   return changed.map((line) => (line.key === other.key ? { ...line, amount } : line));
 }
 
 /** A new line starts with what is left. */
-export function addedLine(currency: string, totalMinor: number | null, direction: MoneyDirection, lines: SplitLine[]): SplitLine {
-  const left = totalMinor === null ? null : splitRemainder(currency, totalMinor, direction, lines);
+export function addedLine(currency: string, totalMilli: number | null, direction: MoneyDirection, lines: SplitLine[]): SplitLine {
+  const left = totalMilli === null ? null : splitRemainder(currency, totalMilli, direction, lines);
   const line: SplitLine = { key: crypto.randomUUID(), amount: "", opposite: false, edited: false, categoryId: null, transferAccountId: null };
-  return left === null ? line : { ...line, amount: textFor(currency, direction, line, left) };
+  return left === null ? line : { ...line, amount: textFor(direction, line, left) };
 }
 
 /** The last line takes what is left. Null when the last line cannot hold it. */
-export function restOnLastLine(currency: string, totalMinor: number, direction: MoneyDirection, lines: SplitLine[]): SplitLine[] | null {
+export function restOnLastLine(currency: string, totalMilli: number, direction: MoneyDirection, lines: SplitLine[]): SplitLine[] | null {
   const last = lines.at(-1);
-  const left = splitRemainder(currency, totalMinor, direction, lines);
+  const left = splitRemainder(currency, totalMilli, direction, lines);
   const current = last ? lineSigned(currency, direction, last) : null;
   if (!last || left === null || current === null || left === 0) {
     return null;
   }
-  const amount = textFor(currency, direction, last, current + left);
+  const amount = textFor(direction, last, current + left);
   return amount.length === 0 ? null : lines.map((line) => (line.key === last.key ? { ...line, amount, edited: true } : line));
 }

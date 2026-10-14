@@ -62,8 +62,8 @@ test("only the rows of the group change, and a failure writes nothing", () => {
       ...saved,
     });
     const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
-    const kept = pay(sample.db, cash.id, "2026-03-01", -400, "Blue Bottle");
-    const other = pay(sample.db, cash.id, "2026-03-02", -420, "SQ *BLUE BOTTLE");
+    const kept = pay(sample.db, cash.id, "2026-03-01", -4000, "Blue Bottle");
+    const other = pay(sample.db, cash.id, "2026-03-02", -4200, "SQ *BLUE BOTTLE");
     const applyAt = "2026-10-08T17:00:00Z";
     expect(() =>
       applyInboxGroup(sample.db, {
@@ -117,14 +117,14 @@ test("a categorized row, a split and a reconciled transfer are skipped", () => {
       ...saved,
     });
     const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
-    const done = pay(sample.db, cash.id, "2026-03-02", -100, "Cafe", null, [{ amount: -100, categoryId: food.id }]);
-    const open = pay(sample.db, cash.id, "2026-03-01", -400, "Cafe");
-    const split = pay(sample.db, cash.id, "2026-03-03", -300, "Cafe", null, [
-      { amount: -200, categoryId: null },
-      { amount: -100, categoryId: null },
+    const done = pay(sample.db, cash.id, "2026-03-02", -1000, "Cafe", null, [{ amount: -1000, categoryId: food.id }]);
+    const open = pay(sample.db, cash.id, "2026-03-01", -4000, "Cafe");
+    const split = pay(sample.db, cash.id, "2026-03-03", -3000, "Cafe", null, [
+      { amount: -2000, categoryId: null },
+      { amount: -1000, categoryId: null },
     ]);
-    const locked = pay(sample.db, cash.id, "2026-02-01", -50, "Cafe");
-    createCheckpoint(sample.db, cash.id, { date: "2026-02-01", statementBalance: -50, ...saved });
+    const locked = pay(sample.db, cash.id, "2026-02-01", -500, "Cafe");
+    createCheckpoint(sample.db, cash.id, { date: "2026-02-01", statementBalance: -500, ...saved });
     const result = applyInboxGroup(sample.db, {
       accountId: cash.id,
       transactionIds: [open.id, done.id, split.id, locked.id],
@@ -150,12 +150,12 @@ test("a group in which each row is skipped returns the skips and writes nothing"
   try {
     const cash = createAccount(sample.db, { name: "Cash", institution: null, kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
-    const done = pay(sample.db, cash.id, "2026-03-01", -400, "Blue Bottle", null, [{ amount: -400, categoryId: food.id }]);
-    const split = pay(sample.db, cash.id, "2026-03-02", -500, "Blue Bottle", null, [
-      { amount: -200, categoryId: null },
-      { amount: -300, categoryId: null },
+    const done = pay(sample.db, cash.id, "2026-03-01", -4000, "Blue Bottle", null, [{ amount: -4000, categoryId: food.id }]);
+    const split = pay(sample.db, cash.id, "2026-03-02", -5000, "Blue Bottle", null, [
+      { amount: -2000, categoryId: null },
+      { amount: -3000, categoryId: null },
     ]);
-    const open = pay(sample.db, cash.id, "2026-03-03", -600, "Blue Bottle");
+    const open = pay(sample.db, cash.id, "2026-03-03", -6000, "Blue Bottle");
     const applyAt = "2026-10-08T19:00:00Z";
     const group = { accountId: cash.id, categoryId: food.id, transferAccountId: null, merchantId: null, source: "ui" as const, at: applyAt };
 
@@ -198,7 +198,7 @@ test("a group keeps an existing merchant and a transfer clears it on PATCH", () 
     });
     const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
     const shop = createMerchant(sample.db, { name: "Cafe", ...saved });
-    const row = pay(sample.db, cash.id, "2026-03-01", -500, "Cafe", shop.id);
+    const row = pay(sample.db, cash.id, "2026-03-01", -5000, "Cafe", shop.id);
     applyInboxGroup(sample.db, {
       accountId: cash.id,
       transactionIds: [row.id],
@@ -244,11 +244,11 @@ test("saving one transaction does not fill a split", () => {
       ...saved,
     });
     const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
-    const current = pay(sample.db, cash.id, "2026-03-01", -400, "Blue Bottle");
-    const other = pay(sample.db, cash.id, "2026-03-02", -420, "SQ *BLUE BOTTLE");
-    const split = pay(sample.db, cash.id, "2026-03-03", -300, "blue bottle", null, [
-      { amount: -200, categoryId: null },
-      { amount: -100, categoryId: null },
+    const current = pay(sample.db, cash.id, "2026-03-01", -4000, "Blue Bottle");
+    const other = pay(sample.db, cash.id, "2026-03-02", -4200, "SQ *BLUE BOTTLE");
+    const split = pay(sample.db, cash.id, "2026-03-03", -3000, "blue bottle", null, [
+      { amount: -2000, categoryId: null },
+      { amount: -1000, categoryId: null },
     ]);
     const ruleAt = "2026-10-08T21:00:00Z";
     expect(() =>

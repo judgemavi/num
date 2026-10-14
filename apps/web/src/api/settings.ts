@@ -1,4 +1,4 @@
-import type { ConfidenceMode } from "@num/shared";
+import type { ConfidenceMode, CurrencyCode } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 
@@ -6,6 +6,13 @@ export function bookCurrencyQuery() {
   return queryOptions({
     queryKey: ["book-currency"],
     queryFn: async () => (await unwrap(api.settings.currency.$get())).currency,
+  });
+}
+
+/** A change of the book currency is a relabel. Amounts do not change (decision 0037). */
+export function useSaveBookCurrency() {
+  return useMutation({
+    mutationFn: (currency: CurrencyCode) => unwrap(api.settings.currency.$patch({ json: { currency } })),
   });
 }
 

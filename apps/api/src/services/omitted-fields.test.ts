@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, openDatabase } from "@num/db";
+import { migrateDatabase, openDatabase, settings } from "@num/db";
 import { expect, test } from "bun:test";
 import { planCreateSchema, planUpdateSchema } from "@num/shared";
 import { createDb, type Db } from "../db";
@@ -17,8 +17,10 @@ function withBook(run: (db: Db) => void) {
   const dir = mkdtempSync(join(tmpdir(), "num-omitted-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   try {
-    run(createDb(sqlite));
+    run(db);
   } finally {
     sqlite.close();
     rmSync(dir, { recursive: true, force: true });
@@ -32,7 +34,7 @@ test("an account update keeps the fields that it leaves out and clears the field
       institution: "Example Bank",
       kind: "savings",
       openingDate: "2026-01-01",
-      openingBalance: 5_000,
+      openingBalance: 50_000,
       interestRateMilliPct: 2_500,
       ...saved,
     });
@@ -41,17 +43,17 @@ test("an account update keeps the fields that it leaves out and clears the field
     const kept = updateAccount(db, account.id, body);
     expect(kept.name).toBe("Rainy day 2");
     expect(kept.institution).toBe("Example Bank");
-    expect(kept.openingBalance).toBe(5_000);
+    expect(kept.openingBalance).toBe(50_000);
     expect(kept.openingDate).toBe("2026-01-01");
     expect(kept.openingAutomatic).toBe(false);
     expect(kept.interestRateMilliPct).toBe(2_500);
-    expect(kept.balance).toBe(5_000);
+    expect(kept.balance).toBe(50_000);
 
     const cleared = updateAccount(db, account.id, { ...body, institution: null, openingDate: null, interestRateMilliPct: null });
     expect(cleared.institution).toBeNull();
     expect(cleared.openingAutomatic).toBe(true);
     expect(cleared.interestRateMilliPct).toBeNull();
-    expect(cleared.openingBalance).toBe(5_000);
+    expect(cleared.openingBalance).toBe(50_000);
 
     expect(updateAccount(db, account.id, { ...body, openingBalance: 0 }).openingBalance).toBe(0);
   });
@@ -70,16 +72,16 @@ test("a card keeps the two card fields only when the update leaves out the two",
     const card = createAccount(db, {
       name: "Card",
       kind: "credit_card",
-      openingBalance: -2_000,
+      openingBalance: -20_000,
       paymentPolicy: "fixed",
-      fixedPayment: 500,
+      fixedPayment: 5000,
       ...saved,
     });
     const body = { name: "Card", kind: "credit_card" as const, onBudget: true, ...saved };
 
     const kept = updateAccount(db, card.id, body);
     expect(kept.paymentPolicy).toBe("fixed");
-    expect(kept.fixedPayment).toBe(500);
+    expect(kept.fixedPayment).toBe(5000);
 
     const full = updateAccount(db, card.id, { ...body, paymentPolicy: "full" });
     expect(full.paymentPolicy).toBe("full");
@@ -94,13 +96,13 @@ test("an opening suggestion changes only the opening date and the opening balanc
       institution: "Example Bank",
       kind: "credit_card",
       openingDate: "2026-01-01",
-      openingBalance: -2_000,
+      openingBalance: -20_000,
       paymentPolicy: "fixed",
-      fixedPayment: 500,
+      fixedPayment: 5000,
       ...saved,
     });
-    const after = applyOpeningSuggestion(db, card.id, { date: "2025-12-01", amount: -3_000, ...saved });
-    expect(after).toEqual({ ...card, openingDate: "2025-12-01", openingBalance: -3_000, balance: -3_000 });
+    const after = applyOpeningSuggestion(db, card.id, { date: "2025-12-01", amount: -30_000, ...saved });
+    expect(after).toEqual({ ...card, openingDate: "2025-12-01", openingBalance: -30_000, balance: -30_000 });
   });
 });
 
@@ -113,7 +115,7 @@ test("a plan update keeps the fields that it leaves out and clears the fields th
       name: "Stream",
       kind: "bill" as const,
       accountId: account.id,
-      expectedAmount: -1_000,
+      expectedAmount: -10_000,
       tolerance: 0,
       amountMode: "fixed" as const,
       startDate: "2026-01-15",
@@ -141,7 +143,7 @@ test("a plan update keeps `active` and `fundsBuckets` when it leaves them out", 
       name: "Pay",
       kind: "income" as const,
       accountId: account.id,
-      expectedAmount: 300_000,
+      expectedAmount: 3_000_000,
       tolerance: 0,
       amountMode: "fixed" as const,
       startDate: "2026-01-15",
@@ -168,7 +170,7 @@ test("a plan update keeps `active` and `fundsBuckets` when it leaves them out", 
     expect(paused.active).toBe(false);
     expect(paused.fundsBuckets).toBe(true);
     // A plan that is not income cannot fund buckets, also when the update leaves the field out.
-    expect(updatePlan(db, plan.id, { ...omitted, kind: "bill", expectedAmount: -1_000, ...saved }).fundsBuckets).toBe(false);
+    expect(updatePlan(db, plan.id, { ...omitted, kind: "bill", expectedAmount: -10_000, ...saved }).fundsBuckets).toBe(false);
   });
 });
 
@@ -179,7 +181,7 @@ test("a plan that changes to weekly does not keep the stored month day", () => {
       name: "Stream",
       kind: "bill" as const,
       accountId: account.id,
-      expectedAmount: -1_000,
+      expectedAmount: -10_000,
       tolerance: 0,
       amountMode: "fixed" as const,
       startDate: "2026-01-15",
@@ -201,10 +203,10 @@ test("a transaction update keeps the merchant and the note that it leaves out an
     const body = {
       accountId: account.id,
       date: "2026-03-01",
-      amount: -500,
+      amount: -5000,
       payeeRaw: "Example shop",
       status: "open" as const,
-      lines: [{ amount: -500 }],
+      lines: [{ amount: -5000 }],
       ...saved,
     };
     const created = createTransaction(db, { ...body, merchantId: merchant.id, notes: "weekly" });

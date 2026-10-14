@@ -13,7 +13,7 @@ import { lineDirection } from "@/transactions/what-choice";
 type SubmitInput = TransactionValues & {
   currency: string;
   transaction: Transaction | null;
-  totalMinor: number;
+  totalMilli: number;
   unreadableItemKey?: string;
 };
 
@@ -64,7 +64,7 @@ export function buildTransactionSave(input: SubmitInput): BuildResult {
     built =
       input.choice === "split"
         ? input.lines.map((line, index) => ({
-            amount: signedAmount(lineDirection(moneyDirection(input.totalMinor), line), readPositive(input.currency, line.amount)),
+            amount: signedAmount(lineDirection(moneyDirection(input.totalMilli), line), readPositive(input.currency, line.amount)),
             memo: memoAt(index),
             categoryId: line.categoryId,
             transferAccountId: line.transferAccountId,
@@ -72,7 +72,7 @@ export function buildTransactionSave(input: SubmitInput): BuildResult {
           }))
         : [
             {
-              amount: input.totalMinor,
+              amount: input.totalMilli,
               memo: memoAt(0),
               categoryId: input.choice === "transfer" ? null : input.categoryId,
               transferAccountId: input.choice === "transfer" ? input.transferAccountId : null,
@@ -85,7 +85,7 @@ export function buildTransactionSave(input: SubmitInput): BuildResult {
   const body = {
     accountId: input.accountId,
     date: input.date,
-    amount: input.totalMinor,
+    amount: input.totalMilli,
     merchantId: merchantForChoice(input.choice, input.merchantId),
     notes: input.notes.trim().length === 0 ? null : input.notes.trim(),
     payeeRaw: input.payee.trim(),

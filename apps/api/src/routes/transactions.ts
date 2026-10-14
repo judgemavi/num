@@ -41,7 +41,7 @@ const transactionSaveResponse = {
 
 const refundPurchasesRoute = createRoute({
   operationId: "get_transactions_refund_purchases",
-  description: "Read transactions. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read transactions. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/transactions/refund-purchases",
   request: { query: refundPurchaseQuerySchema },
@@ -75,7 +75,7 @@ const approveRoute = createRoute({
 
 const listRoute = createRoute({
   operationId: "search_transactions",
-  description: "Read transactions. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive. The needsReview filter needs asOf (an ISO date).",
+  description: "Read transactions. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive. The needsReview filter needs asOf (an ISO date).",
   method: "get",
   path: "/api/transactions",
   request: {
@@ -96,7 +96,7 @@ const listRoute = createRoute({
 
 const looksRightRoute = createRoute({
   operationId: "post_transactions_id_looks_right",
-  description: "Create or run transactions. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run transactions. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/transactions/{id}/looks-right",
   request: { params: idParams },
@@ -110,7 +110,7 @@ const looksRightRoute = createRoute({
 
 const refundOfRoute = createRoute({
   operationId: "post_transactions_id_refund_of",
-  description: "Link a refund to the purchase it returns. This changes only the refund and its automatic label. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Link a refund to the purchase it returns. This changes only the refund and its automatic label. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/transactions/{id}/refund-of",
   request: {
@@ -130,7 +130,7 @@ const refundOfRoute = createRoute({
 
 const readRoute = createRoute({
   operationId: "get_transactions_id",
-  description: "Read transactions. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read transactions. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/transactions/{id}",
   request: { params: idParams },
@@ -142,7 +142,7 @@ const readRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_transactions",
-  description: "Create or run transactions. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run transactions. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/transactions",
   request: {
@@ -165,7 +165,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_transactions_id",
-  description: "Change transactions. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Change transactions. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/transactions/{id}",
   request: {
@@ -189,7 +189,7 @@ const updateRoute = createRoute({
 
 const deleteRoute = createRoute({
   operationId: "delete_transactions_id",
-  description: "Remove or archive transactions. This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Remove or archive transactions. This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "delete",
   path: "/api/transactions/{id}",
   request: { params: idParams },

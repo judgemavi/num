@@ -114,7 +114,7 @@ function ImportDetailPage() {
                   {formatStatementDate(row.date)} · {row.payeeRaw || "No description"}
                 </p>
                 <p>
-                  <Amount minor={row.amount} /> · {undoBlockLabel(row.reason)}
+                  <Amount value={row.amount} /> · {undoBlockLabel(row.reason)}
                 </p>
               </li>
             ))}
@@ -258,7 +258,7 @@ function DetailRow({ row, onMatch, onAddNew }: { row: ImportDetailRow; onMatch: 
           </Button>
         </span>
       ) : null}
-      <Amount minor={row.amount} />
+      <Amount value={row.amount} />
     </ListRow>
   );
 }

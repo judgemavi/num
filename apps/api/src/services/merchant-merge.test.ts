@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { merchants, migrateDatabase, openDatabase, recurringPlans, transactions } from "@num/db";
+import { merchants, migrateDatabase, openDatabase, recurringPlans, settings, transactions } from "@num/db";
 import { storedPayee } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
@@ -19,8 +19,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-merge-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });
@@ -47,7 +49,7 @@ test("merge moves transactions and plans, then archives the source", () => {
       name: "Coffee",
       kind: "bill",
       accountId: account.id,
-      expectedAmount: -500,
+      expectedAmount: -5000,
       tolerance: 0,
       amountMode: "fixed",
       merchantId: source.id,
@@ -68,7 +70,7 @@ test("merge moves transactions and plans, then archives the source", () => {
         id: txnId,
         accountId: account.id,
         date: "2026-02-01",
-        amount: -500,
+        amount: -5000,
         merchantId: source.id,
         ...storedPayee("CAFE NORTH"),
         status: "open",

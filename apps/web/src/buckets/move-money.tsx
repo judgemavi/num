@@ -36,7 +36,7 @@ export function MoveMoney({ fromId }: EditorInput["moveMoney"]) {
         await save.mutateAsync({
           bucketId: value.from,
           asOf: localAsOf(),
-          body: { kind: "move", amount: amount.minor, date: value.date, otherBucketId: value.to, note: value.note.trim() === "" ? null : value.note.trim() },
+          body: { kind: "move", amount: amount.milli, date: value.date, otherBucketId: value.to, note: value.note.trim() === "" ? null : value.note.trim() },
         });
         close("ok");
       } catch (error) {

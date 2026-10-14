@@ -1,4 +1,4 @@
-import { fromMinorUnits, Temporal, type Plan, type PlanFrequency, type PlanKind, type ErrorCode } from "@num/shared";
+import { amountText, Temporal, type Plan, type PlanFrequency, type PlanKind, type ErrorCode } from "@num/shared";
 
 const kindLabels: Record<PlanKind, string> = {
   income: "Income",
@@ -44,23 +44,25 @@ export function formatDate(iso: string): string {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { dateStyle: "medium" });
 }
 
-export function amountForForm(currency: string, kind: PlanKind, minor: number): string {
-  const shown = kind === "transfer" ? minor : Math.abs(minor);
-  return fromMinorUnits(currency, shown);
+export function amountForForm(kind: PlanKind, milli: number): string {
+  const shown = kind === "transfer" ? milli : Math.abs(milli);
+  return amountText(shown);
 }
 
-export function amountFromForm(kind: PlanKind, minor: number): number {
+export function amountFromForm(kind: PlanKind, milli: number): number {
   if (kind === "income") {
-    return Math.abs(minor);
+    return Math.abs(milli);
   }
   if (kind === "bill") {
-    return -Math.abs(minor);
+    return -Math.abs(milli);
   }
-  return minor;
+  return milli;
 }
 
 export function planError(code: ErrorCode | undefined): string {
   switch (code) {
+    case "amount_too_precise":
+      return "An amount has more decimal places than the currency has.";
     case "plan_not_found":
       return "That recurring item is not in the book.";
     case "plan_archived":

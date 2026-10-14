@@ -1,5 +1,6 @@
 // Active ISO 4217 codes and the number of minor-unit digits.
-// Withdrawn codes, and codes with no minor unit, are omitted.
+// Withdrawn codes, codes with no minor unit and codes with more than 3 minor-unit digits (CLF, UYW) are omitted.
+// Stored amounts are milliunits, thus a currency can have a maximum of 3 digits (decision 0037).
 
 export const currencyMinorUnits = {
   AED: 2,
@@ -31,7 +32,6 @@ export const currencyMinorUnits = {
   CHE: 2,
   CHF: 2,
   CHW: 2,
-  CLF: 4,
   CLP: 0,
   CNY: 2,
   COP: 2,
@@ -150,7 +150,6 @@ export const currencyMinorUnits = {
   USN: 2,
   UYI: 0,
   UYU: 2,
-  UYW: 4,
   UZS: 2,
   VED: 2,
   VES: 2,

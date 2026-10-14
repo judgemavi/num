@@ -41,7 +41,7 @@ function CoverRow({ item, errorText }: { item: OverspentBucket; errorText: (code
       <p className="font-semibold">
         {item.name}
         <span className="mt-0.5 block text-sm font-normal text-attn">
-          Over by <Amount minor={need} />
+          Over by <Amount value={need} />
         </span>
       </p>
       {options.length === 0 ? (

@@ -23,13 +23,13 @@ test("the 3 largest changes use the median of the previous 3 months", () => {
   const months = ["2026-01", "2026-02", "2026-03"];
   const history: FlowLine[] = [];
   const series = [
-    { id: groceries, prior: [100, 200, 300], current: 800 },
-    { id: dining, prior: [50, 50, 50], current: 200 },
-    { id: fuel, prior: [40, 40, 40], current: 160 },
-    { id: rent, prior: [10, 10, 10], current: 80 },
-    { id: travel, prior: [400, 400, 400], current: 100 },
-    { id: gifts, prior: [300, 300, 300], current: 50 },
-    { id: hobbies, prior: [200, 200, 200], current: 20 },
+    { id: groceries, prior: [1000, 2000, 3000], current: 8000 },
+    { id: dining, prior: [500, 500, 500], current: 2000 },
+    { id: fuel, prior: [400, 400, 400], current: 1600 },
+    { id: rent, prior: [100, 100, 100], current: 800 },
+    { id: travel, prior: [4000, 4000, 4000], current: 1000 },
+    { id: gifts, prior: [3000, 3000, 3000], current: 500 },
+    { id: hobbies, prior: [2000, 2000, 2000], current: 200 },
   ];
   for (const row of series) {
     months.forEach((month, index) => {
@@ -39,11 +39,11 @@ test("the 3 largest changes use the median of the previous 3 months", () => {
   }
   const result = changes({ lines: history });
   expect(result.increases.map((row) => row.categoryId)).toEqual([groceries, dining, fuel]);
-  expect(result.increases[0]).toMatchObject({ amount: 800, median: 200, delta: 600 });
+  expect(result.increases[0]).toMatchObject({ amount: 8000, median: 2000, delta: 6000 });
   expect(result.decreases.map((row) => [row.categoryId, row.delta])).toEqual([
-    [travel, -300],
-    [gifts, -250],
-    [hobbies, -180],
+    [travel, -3000],
+    [gifts, -2500],
+    [hobbies, -1800],
   ]);
   expect(result.increases.some((row) => row.categoryId === rent)).toBe(false);
 });
@@ -51,13 +51,13 @@ test("the 3 largest changes use the median of the previous 3 months", () => {
 test("income, transfer and uncategorized lines are not category changes", () => {
   const result = changes({
     lines: [
-      line("2026-04", 5_000, income, "income"),
-      line("2026-04", -900, groceries, "expense", true),
-      line("2026-04", -700, null, null),
-      line("2026-04", -300, dining, "expense"),
+      line("2026-04", 50_000, income, "income"),
+      line("2026-04", -9000, groceries, "expense", true),
+      line("2026-04", -7000, null, null),
+      line("2026-04", -3000, dining, "expense"),
     ],
   });
-  expect(result.increases).toEqual([{ categoryId: dining, amount: 300, median: 0, delta: 300 }]);
+  expect(result.increases).toEqual([{ categoryId: dining, amount: 3000, median: 0, delta: 3000 }]);
   expect(result.decreases).toEqual([]);
 });
 
@@ -75,8 +75,8 @@ test("a new merchant has its first transaction in the change month", () => {
 });
 
 test("the savings rate is thousandths of a percent, and it is null when income is zero", () => {
-  expect(savingsRateMilliPct(10_000, 2_500)).toBe(75_000);
-  expect(savingsRateMilliPct(3, 1)).toBe(66_667);
-  expect(savingsRateMilliPct(1_000, 1_500)).toBe(-50_000);
+  expect(savingsRateMilliPct(100_000, 25_000)).toBe(75_000);
+  expect(savingsRateMilliPct(30, 10)).toBe(66_667);
+  expect(savingsRateMilliPct(10_000, 15_000)).toBe(-50_000);
   expect(savingsRateMilliPct(0, 100)).toBeNull();
 });

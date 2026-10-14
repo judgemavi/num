@@ -71,6 +71,8 @@ export function accountDetail(account: Account): string | null {
 
 export function accountError(code: ErrorCode | undefined): string {
   switch (code) {
+    case "amount_too_precise":
+      return "An amount has more decimal places than the currency has.";
     case "kind_class_mismatch":
       return "Choose a kind in the same group.";
     case "archive_confirmation_required":

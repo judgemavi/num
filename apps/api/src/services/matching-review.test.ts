@@ -77,11 +77,11 @@ test("undo removes the mortgage mirror created for an imported payment", () => {
       institution: null,
       kind: "mortgage",
       openingDate: "2026-02-01",
-      openingBalance: -10_000_000,
+      openingBalance: -100_000_000,
       mortgageTerms: {
         rateMilliPct: 5000,
         compounding: "semiannual",
-        paymentAmount: 58160,
+        paymentAmount: 581600,
         paymentFrequency: "monthly",
         firstPaymentDate: "2026-03-01",
         termEnd: "2031-03-01",
@@ -96,7 +96,7 @@ test("undo removes the mortgage mirror created for an imported payment", () => {
       name: "Mortgage",
       kind: "transfer",
       accountId: sample.account.id,
-      expectedAmount: -58160,
+      expectedAmount: -581600,
       tolerance: 0,
       amountMode: "fixed",
       categoryId: null,
@@ -136,7 +136,7 @@ test("a mortgage import links an existing opposite row", () => {
     const terms = {
       rateMilliPct: 5000,
       compounding: "semiannual" as const,
-      paymentAmount: 58160,
+      paymentAmount: 581600,
       paymentFrequency: "monthly" as const,
       firstPaymentDate: "2026-03-01",
       termEnd: "2031-03-01",
@@ -150,7 +150,7 @@ test("a mortgage import links an existing opposite row", () => {
       institution: null,
       kind: "mortgage",
       openingDate: "2026-02-01",
-      openingBalance: -10_000_000,
+      openingBalance: -100_000_000,
       mortgageTerms: terms,
       ...saved,
     });
@@ -160,7 +160,7 @@ test("a mortgage import links an existing opposite row", () => {
       valuations: [],
       date: "2026-03-01",
       fromAccountId: sample.account.id,
-      toAccountId: mortgage.id,
+      toAccountId: mortgage.id, step: 10,
     });
     if (!split) {
       throw new Error("Schedule row is missing");
@@ -178,7 +178,7 @@ test("a mortgage import links an existing opposite row", () => {
       name: "Mortgage",
       kind: "transfer",
       accountId: sample.account.id,
-      expectedAmount: -58160,
+      expectedAmount: -581600,
       tolerance: 0,
       amountMode: "fixed",
       categoryId: null,
@@ -213,10 +213,10 @@ test("a recurring link labels even when payee history disagrees", () => {
       createTransaction(sample.db, {
         accountId: sample.account.id,
         date,
-        amount: -400,
+        amount: -4000,
         payeeRaw: "NORTH CAFE",
         status: "open",
-        lines: [{ amount: -400, categoryId: food.id }],
+        lines: [{ amount: -4000, categoryId: food.id }],
         ...saved,
       });
     }
@@ -224,7 +224,7 @@ test("a recurring link labels even when payee history disagrees", () => {
       name: "Rent",
       kind: "bill",
       accountId: sample.account.id,
-      expectedAmount: -400,
+      expectedAmount: -4000,
       tolerance: 0,
       amountMode: "fixed",
       categoryId: rent.id,
@@ -261,10 +261,10 @@ test("a spread label does not block import undo", () => {
     createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-01",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400, categoryId: food.id }],
+      lines: [{ amount: -4000, categoryId: food.id }],
       ...saved,
     });
     const labeled = active(sample.db).find((row) => row.date === "2026-03-02");
@@ -290,22 +290,22 @@ test("a learned transfer preselects Transfer and is not automatic", () => {
     createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-01",
-      amount: -800,
+      amount: -8000,
       payeeRaw: "VISA PAYMENT",
       status: "open",
-      lines: [{ amount: -800, transferAccountId: visa.id }],
+      lines: [{ amount: -8000, transferAccountId: visa.id }],
       ...saved,
     });
     const open = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-02",
-      amount: -800,
+      amount: -8000,
       payeeRaw: "VISA PAYMENT",
       status: "open",
-      lines: [{ amount: -800 }],
+      lines: [{ amount: -8000 }],
       ...saved,
     });
-    const result = scorePayee(loadMatchBook(sample.db), { payee: "VISA PAYMENT", amount: -800, recurring: null });
+    const result = scorePayee(loadMatchBook(sample.db), { payee: "VISA PAYMENT", amount: -8000, recurring: null });
     expect(result.level).toBe("suggestion");
     expect(result.transferAccountId).toBe(visa.id);
     expect(result.categoryId).toBeNull();
@@ -320,10 +320,10 @@ function learn(sample: ReturnType<typeof book>, payeeRaw: string, categoryId: st
   createTransaction(sample.db, {
     accountId: sample.account.id,
     date: "2026-01-12",
-    amount: -400,
+    amount: -4000,
     payeeRaw,
     status: "open",
-    lines: [{ amount: -400, categoryId }],
+    lines: [{ amount: -4000, categoryId }],
     ...saved,
   });
 }
@@ -337,18 +337,18 @@ test("a brand family suggests when 2 learned payees agree, and stops when they d
     learn(sample, "PRESTO SHEPPARD STN", transit.id);
     learn(sample, "COSTCO WHOLESALE", food.id);
     learn(sample, "COSTCO GAS", fuel.id);
-    const one = scorePayee(loadMatchBook(sample.db), { payee: "COSTCO BUSINESS CENTRE", amount: -400, recurring: null });
+    const one = scorePayee(loadMatchBook(sample.db), { payee: "COSTCO BUSINESS CENTRE", amount: -4000, recurring: null });
     expect(one.level).toBe("none");
-    expect(scorePayee(loadMatchBook(sample.db), { payee: "PRESTO DUNDAS STN", amount: -400, recurring: null }).level).toBe("none");
+    expect(scorePayee(loadMatchBook(sample.db), { payee: "PRESTO DUNDAS STN", amount: -4000, recurring: null }).level).toBe("none");
     learn(sample, "PRESTO KING STN", transit.id);
     const loaded = loadMatchBook(sample.db);
-    const family = scorePayee(loaded, { payee: "PRESTO DUNDAS STN", amount: -400, recurring: null });
+    const family = scorePayee(loaded, { payee: "PRESTO DUNDAS STN", amount: -4000, recurring: null });
     expect(family.categoryId).toBe(transit.id);
     expect(family.reason).toBe("family");
     expect(family.level).toBe("suggestion");
-    expect(scorePayee(loaded, { payee: "COSTCO BUSINESS CENTRE", amount: -400, recurring: null }).level).toBe("none");
+    expect(scorePayee(loaded, { payee: "COSTCO BUSINESS CENTRE", amount: -4000, recurring: null }).level).toBe("none");
     learn(sample, "PRESTO LOAD", fuel.id);
-    expect(scorePayee(loadMatchBook(sample.db), { payee: "PRESTO DUNDAS STN", amount: -400, recurring: null }).level).toBe("none");
+    expect(scorePayee(loadMatchBook(sample.db), { payee: "PRESTO DUNDAS STN", amount: -4000, recurring: null }).level).toBe("none");
   } finally {
     sample.close();
   }
@@ -362,7 +362,7 @@ test("containment wins over the brand family", () => {
     learn(sample, "PRESTO SHEPPARD STN", transit.id);
     learn(sample, "PRESTO KING STN", transit.id);
     learn(sample, "PRESTO LOAD", fuel.id);
-    const result = scorePayee(loadMatchBook(sample.db), { payee: "PRESTO LOAD TORONTO", amount: -400, recurring: null });
+    const result = scorePayee(loadMatchBook(sample.db), { payee: "PRESTO LOAD TORONTO", amount: -4000, recurring: null });
     expect(result.reason).toBe("similar");
     expect(result.categoryId).toBe(fuel.id);
   } finally {
@@ -378,19 +378,19 @@ test("a payee that contains a learned payee is a similar suggestion and never au
       createTransaction(sample.db, {
         accountId: sample.account.id,
         date,
-        amount: -400,
+        amount: -4000,
         payeeRaw: "COSTCO WHOLESALE",
         status: "open",
-        lines: [{ amount: -400, categoryId: food.id }],
+        lines: [{ amount: -4000, categoryId: food.id }],
         ...saved,
       });
     }
     const loaded = loadMatchBook(sample.db);
-    const similar = scorePayee(loaded, { payee: "COSTCO WHOLESALE W535 TORONTO", amount: -400, recurring: null });
+    const similar = scorePayee(loaded, { payee: "COSTCO WHOLESALE W535 TORONTO", amount: -4000, recurring: null });
     expect(similar.categoryId).toBe(food.id);
     expect(similar.reason).toBe("similar");
     expect(similar.level).toBe("suggestion");
-    expect(scorePayee(loaded, { payee: "COSTCO", amount: -400, recurring: null }).level).toBe("none");
+    expect(scorePayee(loaded, { payee: "COSTCO", amount: -4000, recurring: null }).level).toBe("none");
   } finally {
     sample.close();
   }

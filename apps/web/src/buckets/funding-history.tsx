@@ -55,7 +55,7 @@ function FundingRuns() {
                 </small>
               </div>
               <div className={listAmt}>
-                <Amount minor={run.total} />
+                <Amount value={run.total} />
               </div>
               {run.undoneAt ? null : (
                 <RowMenu label={`Actions for ${run.payee || "paycheck"} funding`}>

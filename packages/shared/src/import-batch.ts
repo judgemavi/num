@@ -4,7 +4,7 @@ import { listQuerySchema, optionalQuery, pagedResponseSchema, queryDate, queryId
 import { isUtcTimestamp } from "./time";
 import { openingSuggestionSchema } from "./opening";
 import { presetSchema, unreadableRowSchema } from "./statement";
-import { centsSchema } from "./money";
+import { amountSchema } from "./money";
 
 
 export const importCountsSchema = z.object({
@@ -35,7 +35,7 @@ export const importBatchSchema = z.object({
   parser: z.string(),
   periodStart: isoDateSchema,
   periodEnd: isoDateSchema,
-  closingBalance: centsSchema.nullable(),
+  closingBalance: amountSchema.nullable(),
   closingDate: isoDateSchema.nullable(),
   createdAt: timestampSchema,
   undoneAt: timestampSchema.nullable(),
@@ -85,7 +85,7 @@ export const importUndoSchema = z.object({
     z.object({
       rowIndex: z.number().int().nonnegative(),
       date: isoDateSchema,
-      amount: centsSchema,
+      amount: amountSchema,
       payeeRaw: z.string(),
       reason: z.enum(undoBlockReasons),
     }),
@@ -127,7 +127,7 @@ export const importDetailRowSchema = z.object({
   id: z.uuid(),
   rowIndex: z.number().int().nonnegative(),
   date: isoDateSchema,
-  amount: centsSchema,
+  amount: amountSchema,
   payeeRaw: z.string(),
   outcome: z.enum(importRowOutcomes),
   transactionId: z.uuid().nullable(),
@@ -137,7 +137,7 @@ export const importDetailRowSchema = z.object({
     z.object({
       id: z.uuid(),
       date: isoDateSchema,
-      amount: centsSchema,
+      amount: amountSchema,
       payeeRaw: z.string(),
     }),
   ),

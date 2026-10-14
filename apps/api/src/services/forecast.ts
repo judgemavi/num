@@ -20,6 +20,7 @@ import type { Db } from "../db";
 import { balancesOf } from "./account-balance";
 import { lastCompleteMonths } from "./complete-months";
 import { ServiceError } from "../service-error";
+import { bookStep } from "./book-step";
 import { literal } from "./transaction-sql";
 
 const peer = alias(transactions, "peer");
@@ -52,7 +53,13 @@ function bufferOf(db: Db) {
   return Number.isSafeInteger(value) ? value : 0;
 }
 
-function planAmount(plan: RecurringPlanRow, links: { planId: string; dueDate: string; transactionId: string | null }[], amounts: Map<string, number>, asOf: string) {
+function planAmount(
+  plan: RecurringPlanRow,
+  links: { planId: string; dueDate: string; transactionId: string | null }[],
+  amounts: Map<string, number>,
+  asOf: string,
+  step: number,
+) {
   if (plan.amountMode !== "variable") {
     return plan.expectedAmount;
   }
@@ -63,7 +70,7 @@ function planAmount(plan: RecurringPlanRow, links: { planId: string; dueDate: st
       const amount = link.transactionId ? amounts.get(link.transactionId) : undefined;
       return amount === undefined ? [] : [amount];
     });
-  return variableAmounts(actuals, plan.expectedAmount).forecast;
+  return variableAmounts(actuals, plan.expectedAmount, step).forecast;
 }
 
 function planFlows(kind: string, date: string, amount: number): ForecastFlow[] {
@@ -77,6 +84,7 @@ function planFlows(kind: string, date: string, amount: number): ForecastFlow[] {
 }
 
 export function readForecast(db: Db, asOf: string): Forecast {
+  const step = bookStep(db);
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
@@ -111,7 +119,7 @@ export function readForecast(db: Db, asOf: string): Forecast {
   const incomeDates: string[] = [];
   const incomeHorizon = Temporal.PlainDate.from(asOf).add({ years: 1 }).toString();
   for (const plan of plans) {
-    const amount = planAmount(plan, links, amounts, asOf);
+    const amount = planAmount(plan, links, amounts, asOf, step);
     if (plan.kind === "income" && plan.fundsBuckets) {
       for (const date of occurrenceDates(plan, incomeHorizon, asOf)) {
         if (!skipped.has(`${plan.id}|${date.dueDate}`)) {
@@ -192,13 +200,14 @@ export function readForecast(db: Db, asOf: string): Forecast {
     const amount = unbucketedMonthly(
       months,
       rows.flatMap((line) => (line.categoryId ? [{ month: line.date.slice(0, 7), amount: line.amount }] : [])),
+      step,
     );
     const accountId = usualAccount(rows.filter((line) => accountIds.has(line.accountId)));
     if (accountId && amount > 0) {
       monthly.push({ accountId, monthly: amount });
     }
   }
-  const variable = spendDeltas(dates, monthly);
+  const variable = spendDeltas(dates, monthly, step);
   deltas.push(...variable);
   flows.push(...variable.map((delta) => ({ date: delta.date, income: 0, spending: -delta.amount })));
 

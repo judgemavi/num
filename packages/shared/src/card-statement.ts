@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Temporal } from "temporal-polyfill";
 import { isoDateSchema } from "./date";
-import { medianMinor } from "./recurring-calc";
+import { medianOf } from "./recurring-calc";
 
 export const defaultCardDueDays = 21;
 
@@ -35,7 +35,7 @@ function dueGap(statements: readonly { date: string }[], paymentDates: readonly 
   if (gaps.length < 2) {
     return defaultCardDueDays;
   }
-  return medianMinor(gaps);
+  return medianOf(gaps);
 }
 
 function dueDate(statementDate: string, gapDays: number) {

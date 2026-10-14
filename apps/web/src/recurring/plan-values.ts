@@ -1,4 +1,4 @@
-import { fromMinorUnits, planCreateSchema, toMinorUnits, type Plan, type PlanKind, type PlanProposal } from "@num/shared";
+import { amountText, planCreateSchema, parseAmount, type Plan, type PlanKind, type PlanProposal } from "@num/shared";
 import { amountForForm, amountFromForm } from "@/recurring/format";
 
 /** A recurring item that Num proposes. The person checks it in the form before it is saved. */
@@ -19,7 +19,7 @@ function monthValue(day: number | null | undefined) {
 }
 
 /** The start values of the Recurring form: a saved item, a proposal, or a new item of `initialKind`. */
-export function planValues(currency: string, draft: Plan | PlanSeed | "new", initialKind: PlanKind) {
+export function planValues(draft: Plan | PlanSeed | "new", initialKind: PlanKind) {
   const current = isPlan(draft) ? draft : null;
   const seed = draft === "new" ? null : draft;
   const kind = seed?.kind ?? initialKind;
@@ -30,8 +30,8 @@ export function planValues(currency: string, draft: Plan | PlanSeed | "new", ini
     transferAccountId: current?.transferAccountId ?? null,
     categoryId: current?.categoryId ?? null,
     merchantId: seed?.merchantId ?? null,
-    amount: seed ? amountForForm(currency, kind, seed.expectedAmount) : "",
-    tolerance: seed ? fromMinorUnits(currency, seed.tolerance) : "0",
+    amount: seed ? amountForForm(kind, seed.expectedAmount) : "",
+    tolerance: seed ? amountText(seed.tolerance) : "0",
     amountMode: seed?.amountMode ?? "fixed",
     startDate: seed?.startDate ?? "",
     freq: seed?.freq ?? "monthly",
@@ -55,8 +55,8 @@ export function planBody(currency: string, value: PlanValues) {
   let expectedAmount = 0;
   let tolerance = 0;
   try {
-    expectedAmount = amountFromForm(value.kind, toMinorUnits(currency, value.amount.trim()));
-    tolerance = Math.abs(toMinorUnits(currency, value.tolerance.trim() || "0"));
+    expectedAmount = amountFromForm(value.kind, parseAmount(currency, value.amount.trim()));
+    tolerance = Math.abs(parseAmount(currency, value.tolerance.trim() || "0"));
   } catch {
     return { body: null, error: "Enter the amount as a number." };
   }

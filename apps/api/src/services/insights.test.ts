@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { categories, migrateDatabase, openDatabase, transactionLines, transactions, valuations } from "@num/db";
+import { categories, migrateDatabase, openDatabase, settings, transactionLines, transactions, valuations } from "@num/db";
 import type { TransactionCreate } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
@@ -18,8 +18,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-insights-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });
@@ -111,16 +113,16 @@ test("group totals: refunds reduce spending, transfers are excluded, No group an
     const shop = createMerchant(book.db, { name: "Shop", ...saved });
     const trip = createTag(book.db, { name: "Trip", ...saved });
     const gift = createTag(book.db, { name: "Gift", ...saved });
-    spend(book.db, { accountId: chequing.id, date: "2026-06-02", amount: -10_000, categoryId: groceries.id, merchantId: shop.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: 2_500, categoryId: groceries.id, merchantId: shop.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: 1_000, categoryId: repairs.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-06-04", amount: 40_000, categoryId: pay.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-06-05", amount: -8_000, transferAccountId: savings.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-06-06", amount: -3_000 });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-02", amount: -100_000, categoryId: groceries.id, merchantId: shop.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: 25_000, categoryId: groceries.id, merchantId: shop.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: 10_000, categoryId: repairs.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-04", amount: 400_000, categoryId: pay.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-05", amount: -80_000, transferAccountId: savings.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-06", amount: -30_000 });
     spend(book.db, {
       accountId: chequing.id,
       date: "2026-06-07",
-      amount: -2_000,
+      amount: -20_000,
       categoryId: fun.id,
       tagIds: [trip.id, gift.id],
     });
@@ -131,32 +133,32 @@ test("group totals: refunds reduce spending, transfers are excluded, No group an
     expect(report.range).toEqual({ from: "2026-06-01", to: "2026-06-30" });
     expect(report.spending).toBe(sums.spending);
     expect(report.income).toBe(sums.income);
-    expect(report.spending).toBe(8_500);
+    expect(report.spending).toBe(85_000);
     expect(report.donut).toEqual([
-      { id: home.id, kind: "item", amount: 6_500, inflow: null },
-      { id: null, kind: "none", amount: 2_000, inflow: null },
-      { id: null, kind: "uncategorized", amount: 3_000, inflow: 0 },
+      { id: home.id, kind: "item", amount: 65_000, inflow: null },
+      { id: null, kind: "none", amount: 20_000, inflow: null },
+      { id: null, kind: "uncategorized", amount: 30_000, inflow: 0 },
     ]);
-    expect(sums.uncategorized).toBe(-3_000);
+    expect(sums.uncategorized).toBe(-30_000);
 
     const homeLevel = readInsights(book.db, { ...query, group: home.id });
     expect(homeLevel.donut).toEqual([
-      { id: groceries.id, kind: "item", amount: 7_500, inflow: null },
-      { id: repairs.id, kind: "item", amount: -1_000, inflow: null },
+      { id: groceries.id, kind: "item", amount: 75_000, inflow: null },
+      { id: repairs.id, kind: "item", amount: -10_000, inflow: null },
     ]);
     const noGroup = readInsights(book.db, { ...query, group: "none" });
-    expect(noGroup.donut).toEqual([{ id: fun.id, kind: "item", amount: 2_000, inflow: null }]);
+    expect(noGroup.donut).toEqual([{ id: fun.id, kind: "item", amount: 20_000, inflow: null }]);
     const oneCategory = readInsights(book.db, { ...query, group: home.id, category: groceries.id });
     expect(oneCategory.donut).toEqual(homeLevel.donut);
-    expect(oneCategory.rows).toEqual([{ id: groceries.id, kind: "item", amount: 7_500, inflow: null }]);
+    expect(oneCategory.rows).toEqual([{ id: groceries.id, kind: "item", amount: 75_000, inflow: null }]);
 
     expect(report.merchants).toEqual([
-      { id: shop.id, kind: "item", amount: 7_500, inflow: null },
-      { id: null, kind: "none", amount: 1_000, inflow: null },
+      { id: shop.id, kind: "item", amount: 75_000, inflow: null },
+      { id: null, kind: "none", amount: 10_000, inflow: null },
     ]);
     expect(report.tags).toHaveLength(2);
-    expect(report.tags).toContainEqual({ id: trip.id, kind: "item", amount: 2_000, inflow: null });
-    expect(report.tags).toContainEqual({ id: gift.id, kind: "item", amount: 2_000, inflow: null });
+    expect(report.tags).toContainEqual({ id: trip.id, kind: "item", amount: 20_000, inflow: null });
+    expect(report.tags).toContainEqual({ id: gift.id, kind: "item", amount: 20_000, inflow: null });
   } finally {
     book.close();
   }
@@ -167,19 +169,19 @@ test("the window sets the period up to asOf, and a month limits the breakdowns",
   try {
     const chequing = account(book.db, "Chequing", "chequing", "2025-01-01");
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
-    spend(book.db, { accountId: chequing.id, date: "2025-03-15", amount: -7_000, categoryId: groceries.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-02-10", amount: -4_000, categoryId: groceries.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-03-20", amount: -9_000, categoryId: groceries.id });
+    spend(book.db, { accountId: chequing.id, date: "2025-03-15", amount: -70_000, categoryId: groceries.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-02-10", amount: -40_000, categoryId: groceries.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-03-20", amount: -90_000, categoryId: groceries.id });
 
     const asOf = "2026-03-16";
-    expect(readInsights(book.db, { asOf })).toMatchObject({ window: "6", from: "2025-10-01", to: asOf, spending: 4_000 });
+    expect(readInsights(book.db, { asOf })).toMatchObject({ window: "6", from: "2025-10-01", to: asOf, spending: 40_000 });
     expect(readInsights(book.db, { asOf, window: "3" })).toMatchObject({ from: "2026-01-01", to: asOf });
-    expect(readInsights(book.db, { asOf, window: "all" })).toMatchObject({ from: "2025-03-15", spending: 11_000 });
+    expect(readInsights(book.db, { asOf, window: "all" })).toMatchObject({ from: "2025-03-15", spending: 110_000 });
     const custom = readInsights(book.db, { asOf, window: "custom", from: "2025-03-01", to: "2026-12-31" });
-    expect(custom).toMatchObject({ from: "2025-03-01", to: asOf, spending: 11_000 });
+    expect(custom).toMatchObject({ from: "2025-03-01", to: asOf, spending: 110_000 });
     const february = readInsights(book.db, { asOf, window: "all", month: "2026-02" });
     expect(february.range).toEqual({ from: "2026-02-01", to: "2026-02-28" });
-    expect(february.spending).toBe(4_000);
+    expect(february.spending).toBe(40_000);
     expect(() => readInsights(book.db, { asOf, window: "1", month: "2026-02" })).toThrow("period_invalid");
     expect(() => readInsights(book.db, { asOf, window: "custom", from: "2026-04-01", to: "2026-05-01" })).toThrow("period_invalid");
   } finally {
@@ -196,24 +198,24 @@ test("changes use the selected month, or the month of the period end", () => {
     const old = createMerchant(book.db, { name: "Old shop", ...saved });
     const fresh = createMerchant(book.db, { name: "New shop", ...saved });
     const later = createMerchant(book.db, { name: "Later shop", ...saved });
-    for (const [date, amount] of [["2025-11-10", -1_000], ["2025-12-10", -2_000], ["2026-01-10", -3_000]] as const) {
+    for (const [date, amount] of [["2025-11-10", -10_000], ["2025-12-10", -20_000], ["2026-01-10", -30_000]] as const) {
       spend(book.db, { accountId: chequing.id, date, amount, categoryId: groceries.id, merchantId: old.id });
     }
-    spend(book.db, { accountId: chequing.id, date: "2026-02-10", amount: -6_000, categoryId: groceries.id, merchantId: fresh.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-01-12", amount: -500, categoryId: fun.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-03-05", amount: -700, categoryId: fun.id, merchantId: old.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-03-20", amount: -9_000, categoryId: fun.id, merchantId: later.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-02-10", amount: -60_000, categoryId: groceries.id, merchantId: fresh.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-01-12", amount: -5000, categoryId: fun.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-03-05", amount: -7000, categoryId: fun.id, merchantId: old.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-03-20", amount: -90_000, categoryId: fun.id, merchantId: later.id });
 
     const asOf = "2026-03-16";
     expect(readInsights(book.db, { asOf }).changes).toEqual({
       month: "2026-03",
-      increases: [{ categoryId: fun.id, amount: 700, median: 0, delta: 700 }],
-      decreases: [{ categoryId: groceries.id, amount: 0, median: 3_000, delta: -3_000 }],
+      increases: [{ categoryId: fun.id, amount: 7000, median: 0, delta: 7000 }],
+      decreases: [{ categoryId: groceries.id, amount: 0, median: 30_000, delta: -30_000 }],
       newMerchants: [],
     });
     expect(readInsights(book.db, { asOf, month: "2026-02" }).changes).toEqual({
       month: "2026-02",
-      increases: [{ categoryId: groceries.id, amount: 6_000, median: 2_000, delta: 4_000 }],
+      increases: [{ categoryId: groceries.id, amount: 60_000, median: 20_000, delta: 40_000 }],
       decreases: [],
       newMerchants: [{ merchantId: fresh.id }],
     });
@@ -232,12 +234,12 @@ test("the savings rate is for the breakdown range, and it is null when income is
     const chequing = account(book.db, "Chequing", "chequing", "2026-01-01");
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
     const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
-    spend(book.db, { accountId: chequing.id, date: "2026-02-05", amount: 10_000, categoryId: pay.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-02-10", amount: -2_500, categoryId: groceries.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-03-10", amount: -1_500, categoryId: groceries.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-02-05", amount: 100_000, categoryId: pay.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-02-10", amount: -25_000, categoryId: groceries.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-03-10", amount: -15_000, categoryId: groceries.id });
 
     const asOf = "2026-03-16";
-    expect(readInsights(book.db, { asOf })).toMatchObject({ income: 10_000, spending: 4_000, savingsRateMilliPct: 60_000 });
+    expect(readInsights(book.db, { asOf })).toMatchObject({ income: 100_000, spending: 40_000, savingsRateMilliPct: 60_000 });
     expect(readInsights(book.db, { asOf, month: "2026-02" }).savingsRateMilliPct).toBe(75_000);
     expect(readInsights(book.db, { asOf, month: "2026-03" })).toMatchObject({ income: 0, savingsRateMilliPct: null });
   } finally {
@@ -248,18 +250,18 @@ test("the savings rate is for the breakdown range, and it is null when income is
 test("net worth at the current month end equals the Accounts balance", () => {
   const book = tempDatabase();
   try {
-    const chequing = account(book.db, "Chequing", "chequing", "2026-06-01", 100_000);
+    const chequing = account(book.db, "Chequing", "chequing", "2026-06-01", 1_000_000);
     const property = account(book.db, "House", "property", "2026-01-01");
     const interest = createCategory(book.db, { name: "Interest", kind: "expense", ...saved });
     const mortgage = createAccount(book.db, {
       name: "Home loan",
       kind: "mortgage",
       openingDate: "2026-01-01",
-      openingBalance: -1_000_000,
+      openingBalance: -10_000_000,
       mortgageTerms: {
       rateMilliPct: 0,
       compounding: "monthly",
-      paymentAmount: 100_000,
+      paymentAmount: 1_000_000,
       paymentFrequency: "monthly",
       firstPaymentDate: "2026-02-01",
       termEnd: "2027-01-01",
@@ -270,10 +272,10 @@ test("net worth at the current month end equals the Accounts balance", () => {
       },
       ...saved,
     });
-    spend(book.db, { accountId: chequing.id, date: "2026-05-15", amount: -2_000 });
-    book.db.insert(valuations).values({ id: crypto.randomUUID(), accountId: property.id, date: "2026-06-15", balance: 2_000_000 }).run();
-    book.db.insert(valuations).values({ id: crypto.randomUUID(), accountId: mortgage.id, date: "2026-06-30", balance: -500_000 }).run();
-    spend(book.db, { accountId: property.id, date: "2026-06-20", amount: 50_000 });
+    spend(book.db, { accountId: chequing.id, date: "2026-05-15", amount: -20_000 });
+    book.db.insert(valuations).values({ id: crypto.randomUUID(), accountId: property.id, date: "2026-06-15", balance: 20_000_000 }).run();
+    book.db.insert(valuations).values({ id: crypto.randomUUID(), accountId: mortgage.id, date: "2026-06-30", balance: -5_000_000 }).run();
+    spend(book.db, { accountId: property.id, date: "2026-06-20", amount: 500_000 });
 
     const asOf = "2026-06-30";
     const report = readInsights(book.db, { asOf });
@@ -283,11 +285,11 @@ test("net worth at the current month end equals the Accounts balance", () => {
     const may = report.netWorth.find((point) => point.month === "2026-05");
     expect(june?.date).toBe(asOf);
     expect(june?.net).toBe(accountsTotal);
-    expect(listed.items.find((item) => item.id === chequing.id)?.balance).toBe(98_000);
-    expect(listed.items.find((item) => item.id === mortgage.id)?.balance).toBe(-500_000);
-    expect(mortgageAccountView(book.db, mortgage.id, asOf, {}).balance).toBe(-500_000);
-    expect(june).toMatchObject({ assets: 98_000 + 2_050_000, liabilities: 500_000, net: 1_648_000 });
-    expect(may).toMatchObject({ date: "2026-05-31", net: 98_000 - 1_000_000 });
+    expect(listed.items.find((item) => item.id === chequing.id)?.balance).toBe(980_000);
+    expect(listed.items.find((item) => item.id === mortgage.id)?.balance).toBe(-5_000_000);
+    expect(mortgageAccountView(book.db, mortgage.id, asOf, {}).balance).toBe(-5_000_000);
+    expect(june).toMatchObject({ assets: 980_000 + 20_500_000, liabilities: 5_000_000, net: 16_480_000 });
+    expect(may).toMatchObject({ date: "2026-05-31", net: 980_000 - 10_000_000 });
   } finally {
     book.close();
   }

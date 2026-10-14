@@ -1,44 +1,31 @@
-import { minorUnitDigits } from "@num/shared";
+import { amountText, currencyStep, requireCurrencyDigits, roundToStep } from "@num/shared";
 
-function minorToNumber(minor: number, digits: number) {
-  const sign = minor < 0 ? -1 : 1;
-  const text = Math.abs(minor).toString().padStart(digits + 1, "0");
-  if (digits === 0) {
-    return sign * Number(text);
-  }
-  const whole = text.slice(0, -digits);
-  const fraction = text.slice(-digits);
-  return sign * Number(`${whole}.${fraction}`);
-}
-
-function digitsFor(currency: string) {
-  const digits = minorUnitDigits(currency);
-  if (digits === undefined) {
-    throw new Error("Unknown currency");
-  }
-  return digits;
-}
-
-export function formatMoney(currency: string, minor: number): string {
-  const digits = digitsFor(currency);
+function numberFormat(currency: string, digits: number) {
   return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency,
     currencyDisplay: "narrowSymbol",
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
-  }).format(minorToNumber(minor, digits));
+  });
 }
 
-export function moneyParts(currency: string, minor: number): { currency: string; integer: string; fraction: string } {
-  const digits = digitsFor(currency);
-  const parts = new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-    currencyDisplay: "narrowSymbol",
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }).formatToParts(minorToNumber(Math.abs(minor), digits));
+/**
+ * The amount in major units, rounded to the minor unit of the currency with integer math first.
+ * A number with no more than 3 decimal places goes back to the same decimal text in Intl.
+ */
+function shown(currency: string, milli: number) {
+  return { value: Number(amountText(roundToStep(milli, currencyStep(currency)))), digits: requireCurrencyDigits(currency) };
+}
+
+export function formatMoney(currency: string, milli: number): string {
+  const { value, digits } = shown(currency, milli);
+  return numberFormat(currency, digits).format(value);
+}
+
+export function moneyParts(currency: string, milli: number): { currency: string; integer: string; fraction: string } {
+  const { value, digits } = shown(currency, Math.abs(milli));
+  const parts = numberFormat(currency, digits).formatToParts(value);
   let symbol = "";
   let integer = "";
   let fraction = "";

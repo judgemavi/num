@@ -55,7 +55,7 @@ export function PlanForm({ draft, initialKind = "bill" }: { draft: Plan | PlanSe
   const save = useSavePlan();
   const [more, setMore] = useState(Boolean(current?.merchantId || current?.categoryId || current?.endDate));
   const form = useAppForm({
-    defaultValues: planValues(currency, draft, initialKind),
+    defaultValues: planValues(draft, initialKind),
     validators: {
       onSubmit: ({ value }) => planBody(currency, value).error ?? undefined,
     },

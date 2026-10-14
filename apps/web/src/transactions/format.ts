@@ -34,6 +34,8 @@ export function refundedText(currency: string, amount: number): string {
 
 export function transactionError(code: ErrorCode | undefined): string {
   switch (code) {
+    case "amount_too_precise":
+      return "An amount has more decimal places than the currency has.";
     case "lines_sum_mismatch":
       return "The lines must add up to the amount.";
     case "lines_required":

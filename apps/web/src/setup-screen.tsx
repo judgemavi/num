@@ -53,7 +53,7 @@ export function SetupScreen({ onAlreadyComplete }: SetupScreenProps) {
         Num
       </p>
       <h1 className="font-display text-4xl leading-none font-extrabold uppercase [font-stretch:72%]">Set up your book</h1>
-      <p className="text-muted-foreground">Choose the currency for this book. You cannot change it after you add a transaction.</p>
+      <p className="text-muted-foreground">Choose the currency for this book. You can change it later in Settings.</p>
       <form.AppForm>
         <form.FormShell className="grid gap-4">
           <form.Field name="currency">

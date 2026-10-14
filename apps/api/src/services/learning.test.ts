@@ -134,31 +134,31 @@ test("a transfer and a split are never labeled automatically", () => {
     const plain = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-01",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400 }],
+      lines: [{ amount: -4000 }],
       ...saved,
     });
     const split = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-02",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
       lines: [
-        { amount: -250, memo: null, tagIds: [] },
-        { amount: -150, categoryId: food.id, memo: null, tagIds: [] },
+        { amount: -2500, memo: null, tagIds: [] },
+        { amount: -1500, categoryId: food.id, memo: null, tagIds: [] },
       ],
       ...saved,
     });
     const transfer = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-03",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400, transferAccountId: visa.id, memo: null, tagIds: [] }],
+      lines: [{ amount: -4000, transferAccountId: visa.id, memo: null, tagIds: [] }],
       ...saved,
     });
     updateTransaction(sample.db, plain.id, {
@@ -178,7 +178,7 @@ test("a transfer and a split are never labeled automatically", () => {
     const transferSaved = getTransaction(sample.db, transfer.id);
     expect(transferSaved?.autoReason).toBeNull();
     expect(transferSaved?.lines[0]?.transferAccountId).toBe(visa.id);
-    expect(transferSaved?.amount).toBe(-400);
+    expect(transferSaved?.amount).toBe(-4000);
     const imported = importCsv(sample.db, sample.dir, sample.account.id, "visa.csv", ["03/04/2026,VISA PAYMENT,-8.00"]);
     expect(imported.kind).toBe("batch");
     const visaRow = rows(sample.db).find((row) => row.payeeRaw === "VISA PAYMENT");
@@ -200,29 +200,29 @@ test("a disagreeing confirmation stops automatic labels", () => {
       createTransaction(sample.db, {
         accountId: sample.account.id,
         date: `2026-03-0${day}`,
-        amount: -400,
+        amount: -4000,
         payeeRaw: "NORTH CAFE",
         status: "open",
-        lines: [{ amount: -400, categoryId: coffee.id, memo: null, tagIds: [] }],
+        lines: [{ amount: -4000, categoryId: coffee.id, memo: null, tagIds: [] }],
         ...saved,
       });
     }
     const open = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-10",
-      amount: -500,
+      amount: -5000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -500 }],
+      lines: [{ amount: -5000 }],
       ...saved,
     });
     const other = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-11",
-      amount: -600,
+      amount: -6000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -600, categoryId: groceries.id, memo: null, tagIds: [] }],
+      lines: [{ amount: -6000, categoryId: groceries.id, memo: null, tagIds: [] }],
       ...saved,
     });
     expect(getTransaction(sample.db, open.id)?.autoReason).toBeNull();
@@ -244,19 +244,19 @@ test("a correction clears the automatic reason and counts as a confirmation", ()
     const first = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-01",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400 }],
+      lines: [{ amount: -4000 }],
       ...saved,
     });
     const second = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-02",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400 }],
+      lines: [{ amount: -4000 }],
       ...saved,
     });
     updateTransaction(sample.db, first.id, {

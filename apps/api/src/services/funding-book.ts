@@ -8,7 +8,7 @@ import {
   fundingProposal,
   isIsoDate,
   nextIncomeDate,
-  divideHalfAway,
+  divideAmount,
   occurrenceDates,
   positiveBalances,
   unassigned,
@@ -22,6 +22,7 @@ import {
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import { balancesOf } from "./account-balance";
+import { bookStep } from "./book-step";
 import { bucketBalances } from "./bucket-balance";
 import type { Reader } from "./write";
 
@@ -34,6 +35,8 @@ type Book = {
   balances: Map<string, number>;
   amounts: Map<string, number>;
   payees: Map<string, { date: string; payee: string; amount: number }>;
+  /** The milliunits in one minor unit of the book currency. */
+  step: number;
 };
 
 function loadBook(db: Reader): Book {
@@ -79,6 +82,7 @@ function loadBook(db: Reader): Book {
     balances: bucketBalances(db),
     amounts,
     payees,
+    step: bookStep(db),
   };
 }
 
@@ -109,7 +113,7 @@ function billAmount(plan: RecurringPlanRow, book: Book, asOf: string) {
       const amount = link.transactionId ? book.amounts.get(link.transactionId) : undefined;
       return amount === undefined ? [] : [amount];
     });
-  return variableAmounts(actuals, plan.expectedAmount).safe;
+  return variableAmounts(actuals, plan.expectedAmount, book.step).safe;
 }
 
 function incomePlans(rows: RecurringPlanRow[]): RecurringPlanRow[] {
@@ -189,7 +193,7 @@ export function monthlyBills(db: Reader, asOf: string): number {
     const count = occurrenceDates(plan, end, asOf).length;
     total += Math.abs(billAmount(plan, book, asOf)) * count;
   }
-  return divideHalfAway(total, 12);
+  return divideAmount(total, 12, book.step);
 }
 
 export function requirePaycheck(db: Reader, incomeTransactionId: string): FundingPaycheck & { planId: string } {
@@ -270,6 +274,7 @@ export function fundingProposalFor(db: Reader, incomeTransactionId: string, asOf
     paycheckDate: paycheck.dueDate,
     paycheckAmount: paycheck.amount,
     unassigned: position.unassigned,
+    step: book.step,
     incomes: proposalIncomes(book, paycheck.dueDate),
     buckets: book.buckets.map((row) => ({
       id: row.id,

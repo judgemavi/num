@@ -4,7 +4,7 @@ import {
   chosenPresetId,
   detectStatementFormat,
   isOfxFile,
-  minorUnitDigits,
+  currencyDigits,
   sampleCsvRows,
   Temporal,
   utcNow,
@@ -45,9 +45,9 @@ type ReadyParse = {
   columnMap: ColumnMap | null;
 };
 
-function minorDigits(db: Db) {
+function currencyDigitsOf(db: Db) {
   const row = db.select().from(settings).where(eq(settings.key, "currency")).get();
-  const digits = row ? minorUnitDigits(row.value) : undefined;
+  const digits = row ? currencyDigits(row.value) : undefined;
   if (digits === undefined) {
     throw new ServiceError("setup_required", 400);
   }
@@ -195,7 +195,7 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
   }
 
   const text = textOf(input.bytes);
-  const resolved = resolveParse(input.filename, text, minorDigits(db), account, {
+  const resolved = resolveParse(input.filename, text, currencyDigitsOf(db), account, {
     presetId: input.presetId ?? null,
     columnMap: input.columnMap ?? null,
   });

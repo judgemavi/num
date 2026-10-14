@@ -75,7 +75,7 @@ Other screens use the surface colour.
   - Hero amount: 60px (44px in a side panel, 48px on a phone).
   - Plan flow amounts: 34px.
 - All amounts: `font-variant-numeric: tabular-nums lining-nums`, weight 600.
-- Hero amount: the currency symbol at 0.5em, the minor units as superscript at 0.42em. Only in hero amounts.
+- Hero amount: the currency symbol at 0.5em, the fraction digits as superscript at 0.42em. Only in hero amounts.
 - Liabilities: a small uppercase "OWED" label (12px, weight 600, muted) before the amount.
 
 ## 4. Navigation

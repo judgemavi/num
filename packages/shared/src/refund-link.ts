@@ -1,7 +1,7 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import { isoDateSchema } from "./date";
-import { centsSchema } from "./money";
+import { amountSchema } from "./money";
 
 export const refundWindowDays = 90;
 
@@ -24,7 +24,7 @@ export const refundPurchaseQuerySchema = z.object({
 export const refundPurchaseItemSchema = z.object({
   id: z.uuid(),
   date: isoDateSchema,
-  amount: centsSchema,
+  amount: amountSchema,
   payeeRaw: z.string(),
   categoryId: z.uuid(),
   merchantId: z.uuid().nullable(),

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, openDatabase } from "@num/db";
+import { migrateDatabase, openDatabase, settings } from "@num/db";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
 import { createAccount, listAccounts } from "./accounts";
@@ -19,8 +19,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-name-lists-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });
@@ -77,7 +79,7 @@ test("buckets and plans sort by the folded name, and the plan search ignores acc
         color: "mint",
         icon: "shopping-cart",
         categoryIds: [],
-        refillTo: 100,
+        refillTo: 1000,
         amount: null,
         dueDate: null,
         repeat: null,
@@ -91,8 +93,8 @@ test("buckets and plans sort by the folded name, and the plan search ignores acc
         name,
         kind: "bill",
         accountId: account.id,
-        expectedAmount: -1000,
-        tolerance: 100,
+        expectedAmount: -10_000,
+        tolerance: 1000,
         amountMode: "fixed",
         startDate: "2026-01-15",
         freq: "monthly",

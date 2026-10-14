@@ -4,7 +4,7 @@ import { archivedQuery, listQuerySchema, optionalQuery, pagedResponseSchema, que
 import { amountModes, businessDayShifts, planFrequencies, planKinds } from "./recurring-calc";
 import { type PlanProposal } from "./recurring-detect";
 import { isUtcTimestamp } from "./time";
-import { centsSchema } from "./money";
+import { amountSchema } from "./money";
 
 const toleranceSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const monthDaySchema = z
@@ -16,7 +16,7 @@ const planFields = {
   name: z.string().trim().min(1),
   kind: z.enum(planKinds),
   accountId: z.uuid(),
-  expectedAmount: centsSchema,
+  expectedAmount: amountSchema,
   tolerance: toleranceSchema,
   amountMode: z.enum(amountModes),
   categoryId: z.uuid().nullable().optional(),
@@ -73,7 +73,7 @@ export const planSchema = z.object({
   name: z.string(),
   kind: z.enum(planKinds),
   accountId: z.uuid(),
-  expectedAmount: centsSchema,
+  expectedAmount: amountSchema,
   tolerance: toleranceSchema,
   amountMode: z.enum(amountModes),
   categoryId: z.uuid().nullable(),
@@ -108,13 +108,13 @@ export const occurrenceSchema = z.object({
   nominalDate: isoDateSchema,
   status: z.enum(occurrenceStatuses),
   transactionId: z.uuid().nullable(),
-  actualAmount: centsSchema.nullable(),
+  actualAmount: amountSchema.nullable(),
   reason: z.string().nullable(),
 });
 
 export const occurrenceListSchema = z.object({
-  forecastAmount: centsSchema,
-  safeAmount: centsSchema,
+  forecastAmount: amountSchema,
+  safeAmount: amountSchema,
   items: z.array(occurrenceSchema),
 });
 
@@ -139,8 +139,8 @@ export const changedOccurrenceSchema = z.object({
   planId: z.uuid(),
   dueDate: isoDateSchema,
   transactionId: z.uuid(),
-  expectedAmount: centsSchema,
-  actualAmount: centsSchema,
+  expectedAmount: amountSchema,
+  actualAmount: amountSchema,
 });
 
 export const missedOccurrenceSchema = z.object({
@@ -161,7 +161,7 @@ export const planProposalSchema = z.object({
   interval: z.number().int(),
   startDate: isoDateSchema,
   monthDay: monthDaySchema.nullable(),
-  expectedAmount: centsSchema,
+  expectedAmount: amountSchema,
   tolerance: toleranceSchema,
   amountMode: z.enum(amountModes),
   transactionIds: z.array(z.uuid()),

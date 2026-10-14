@@ -74,7 +74,7 @@ function AccountPage() {
         {detail ? <span className="text-muted-foreground"> · {detail}</span> : null}
       </p>
       <p className="text-sm text-muted-foreground">
-        Balance <Amount minor={row.balance} owed={accountClass(row.kind) === "liability"} />
+        Balance <Amount value={row.balance} owed={accountClass(row.kind) === "liability"} />
       </p>
       <div className="grid items-start gap-5">
         {row.kind === "mortgage" ? <MortgagePanel accountId={row.id} /> : null}

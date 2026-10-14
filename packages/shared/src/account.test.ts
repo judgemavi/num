@@ -18,29 +18,29 @@ test("onBudget defaults to true for cash accounts and credit cards", () => {
 });
 
 test("an amount owed on a liability is stored negative and round-trips", () => {
-  expect(balanceFromEntry("mortgage", 50648866)).toBe(-50648866);
-  expect(entryFromBalance("mortgage", -50648866)).toBe(50648866);
+  expect(balanceFromEntry("mortgage", 506_488_660)).toBe(-506_488_660);
+  expect(entryFromBalance("mortgage", -506_488_660)).toBe(506_488_660);
   expect(balanceFromEntry("credit_card", 0)).toBe(0);
-  expect(balanceFromEntry("chequing", 1200)).toBe(1200);
-  expect(entryFromBalance("chequing", -300)).toBe(-300);
+  expect(balanceFromEntry("chequing", 12_000)).toBe(12_000);
+  expect(entryFromBalance("chequing", -3000)).toBe(-3000);
 });
 
 test("net worth counts a negative card and a negative mortgage as owed", () => {
   const result = netWorthOf([
-    { kind: "chequing", balance: 100000 },
-    { kind: "credit_card", balance: -107368 },
-    { kind: "credit_card", balance: -5000 },
-    { kind: "mortgage", balance: -50648866 },
+    { kind: "chequing", balance: 1_000_000 },
+    { kind: "credit_card", balance: -1_073_680 },
+    { kind: "credit_card", balance: -50_000 },
+    { kind: "mortgage", balance: -506_488_660 },
   ]);
-  expect(result).toEqual({ have: 100000, owe: 50761234, net: -50661234 });
+  expect(result).toEqual({ have: 1_000_000, owe: 507_612_340, net: -506_612_340 });
 });
 
 test("a card in credit counts as money you have", () => {
-  expect(netWorthOf([{ kind: "credit_card", balance: 2500 }])).toEqual({ have: 2500, owe: 0, net: 2500 });
+  expect(netWorthOf([{ kind: "credit_card", balance: 25_000 }])).toEqual({ have: 25_000, owe: 0, net: 25_000 });
 });
 
 test("a principal payment lowers the amount owed on a mortgage", () => {
-  const before = netWorthOf([{ kind: "mortgage", balance: -50000000 }]);
-  const after = netWorthOf([{ kind: "mortgage", balance: -50000000 + 120000 }]);
-  expect(after.owe).toBe(before.owe - 120000);
+  const before = netWorthOf([{ kind: "mortgage", balance: -500_000_000 }]);
+  const after = netWorthOf([{ kind: "mortgage", balance: -500_000_000 + 1_200_000 }]);
+  expect(after.owe).toBe(before.owe - 1_200_000);
 });

@@ -55,7 +55,7 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
   const create = useCreateBucket();
   const update = useUpdateBucket();
   const form = useAppForm({
-    defaultValues: bucketValues(currency, current, board.nextColor, board.items.reduce((max, item) => Math.max(max, item.priority), 0)),
+    defaultValues: bucketValues(current, board.nextColor, board.items.reduce((max, item) => Math.max(max, item.priority), 0)),
     validators: {
       onSubmit: ({ value }) => bucketBody(currency, value).error ?? undefined,
     },

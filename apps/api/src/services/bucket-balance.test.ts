@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, openDatabase } from "@num/db";
+import { migrateDatabase, openDatabase, settings } from "@num/db";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
@@ -14,8 +14,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-bucket-balance-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });
@@ -32,7 +34,7 @@ const spendingFields = {
   essential: false,
   color: "mint" as const,
   icon: "shopping-cart" as const,
-  refillTo: 10_000,
+  refillTo: 100_000,
   amount: null,
   dueDate: null,
   repeat: null,
@@ -60,20 +62,20 @@ test("bucket balance counts lines from the start date and events on all dates", 
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
-      openingBalance: 100_000,
+      openingBalance: 1_000_000,
       ...saved,
     });
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
-    purchase(book.db, account.id, groceries.id, -1_000, "2026-03-09");
-    purchase(book.db, account.id, groceries.id, -300, "2026-03-10");
-    purchase(book.db, account.id, groceries.id, -200, "2026-03-11");
+    purchase(book.db, account.id, groceries.id, -10_000, "2026-03-09");
+    purchase(book.db, account.id, groceries.id, -3_000, "2026-03-10");
+    purchase(book.db, account.id, groceries.id, -2_000, "2026-03-11");
 
     const food = createBucket(book.db, { ...spendingFields, categoryIds: [groceries.id], asOf: "2026-03-10", ...saved });
     expect(food.startDate).toBe("2026-03-10");
-    expect(food.balance).toBe(-500);
+    expect(food.balance).toBe(-5_000);
 
-    createBucketEvent(book.db, food.id, { kind: "fund", amount: 5_000, date: "2026-03-01", asOf: "2026-03-11", ...saved });
-    expect(readBucket(book.db, food.id).balance).toBe(4_500);
+    createBucketEvent(book.db, food.id, { kind: "fund", amount: 50_000, date: "2026-03-01", asOf: "2026-03-11", ...saved });
+    expect(readBucket(book.db, food.id).balance).toBe(45_000);
 
     const earlier = updateBucket(book.db, food.id, {
       ...spendingFields,
@@ -82,7 +84,7 @@ test("bucket balance counts lines from the start date and events on all dates", 
       ...saved,
     });
     expect(earlier.startDate).toBe("2026-03-09");
-    expect(earlier.balance).toBe(3_500);
+    expect(earlier.balance).toBe(35_000);
   } finally {
     book.close();
   }

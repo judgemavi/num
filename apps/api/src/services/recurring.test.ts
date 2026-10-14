@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { merchants, migrateDatabase, openDatabase, transactions } from "@num/db";
+import { merchants, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
 import { foldName, storedPayee } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
@@ -17,8 +17,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-recurring-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });
@@ -72,8 +74,8 @@ function bill(db: ReturnType<typeof tempDatabase>["db"], accountId: string, mode
     name: mode === "variable" ? "Pay" : "Stream",
     kind: "bill",
     accountId,
-    expectedAmount: -1000,
-    tolerance: 100,
+    expectedAmount: -10000,
+    tolerance: 1000,
     amountMode: mode,
     startDate: "2026-01-15",
     freq: "monthly",
@@ -96,8 +98,8 @@ test("one transaction can link to one occurrence only", () => {
       name: "Other stream",
       kind: "bill",
       accountId: chequing.id,
-      expectedAmount: -1000,
-      tolerance: 100,
+      expectedAmount: -10000,
+      tolerance: 1000,
       amountMode: "fixed",
       startDate: "2026-01-15",
       freq: "monthly",
@@ -109,7 +111,7 @@ test("one transaction can link to one occurrence only", () => {
       source: "ui",
       at,
     });
-    const txn = payment(db, chequing.id, "2026-01-15", -1000);
+    const txn = payment(db, chequing.id, "2026-01-15", -10000);
     linkOccurrence(db, first.id, "2026-01-15", txn, { source: "ui", at });
     expect(() => linkOccurrence(db, second.id, "2026-01-15", txn, { source: "ui", at })).toThrow(ServiceError);
     try {
@@ -117,13 +119,13 @@ test("one transaction can link to one occurrence only", () => {
     } catch (error) {
       expect((error as ServiceError).code).toBe("transaction_already_linked");
     }
-    const shared = payment(db, chequing.id, "2026-02-15", -1000);
+    const shared = payment(db, chequing.id, "2026-02-15", -10000);
     const twin = createPlan(db, {
       name: "Twin stream",
       kind: "bill",
       accountId: chequing.id,
-      expectedAmount: -1000,
-      tolerance: 100,
+      expectedAmount: -10000,
+      tolerance: 1000,
       amountMode: "fixed",
       startDate: "2026-02-15",
       freq: "monthly",
@@ -157,8 +159,8 @@ test("auto-link saves the one candidate and leaves two candidates open", () => {
       kind: "bill",
       accountId: chequing.id,
       merchantId: shop,
-      expectedAmount: -1699,
-      tolerance: 50,
+      expectedAmount: -16990,
+      tolerance: 500,
       amountMode: "fixed",
       startDate: "2026-03-02",
       freq: "monthly",
@@ -170,14 +172,14 @@ test("auto-link saves the one candidate and leaves two candidates open", () => {
       source: "ui",
       at,
     });
-    payment(db, chequing.id, "2026-03-06", -1699, shop);
+    payment(db, chequing.id, "2026-03-06", -16990, shop);
     expect(autoLink(db, "2026-03-10", { source: "ui", at }).linked).toBe(0);
-    const inside = payment(db, chequing.id, "2026-03-04", -1699, shop);
+    const inside = payment(db, chequing.id, "2026-03-04", -16990, shop);
     expect(autoLink(db, "2026-03-10", { source: "ui", at }).linked).toBe(1);
     const linked = listOccurrences(db, plan.id, "2026-03-10").items.find((item) => item.dueDate === "2026-03-02");
     expect(linked?.transactionId).toBe(inside);
-    payment(db, chequing.id, "2026-04-02", -1699, shop);
-    payment(db, chequing.id, "2026-04-03", -1700, shop);
+    payment(db, chequing.id, "2026-04-02", -16990, shop);
+    payment(db, chequing.id, "2026-04-03", -17000, shop);
     expect(autoLink(db, "2026-04-10", { source: "ui", at }).linked).toBe(0);
     expect(recurringSignals(db, "2026-04-10").ambiguous.some((item) => item.dueDate === "2026-04-02")).toBe(true);
   } finally {
@@ -191,14 +193,14 @@ test("a variable plan uses the last 6 actuals and does not report a changed amou
     const chequing = account(db);
     const plan = bill(db, chequing.id, "variable");
     const dates = ["2026-01-15", "2026-02-15", "2026-03-15", "2026-04-15", "2026-05-15", "2026-06-15", "2026-07-15"];
-    const amounts = [-9999, -50, -100, -200, -300, -400, -500];
+    const amounts = [-99_990, -500, -1000, -2000, -3000, -4000, -5000];
     for (let index = 0; index < 2; index += 1) {
       linkOccurrence(db, plan.id, dates[index] ?? "", payment(db, chequing.id, dates[index] ?? "", amounts[index] ?? 0), {
         source: "ui",
         at,
       });
     }
-    expect(listOccurrences(db, plan.id, "2026-08-01")).toMatchObject({ forecastAmount: -1000, safeAmount: -1000 });
+    expect(listOccurrences(db, plan.id, "2026-08-01")).toMatchObject({ forecastAmount: -10000, safeAmount: -10000 });
     expect(recurringSignals(db, "2026-08-01").changed).toEqual([]);
     for (let index = 2; index < dates.length; index += 1) {
       linkOccurrence(db, plan.id, dates[index] ?? "", payment(db, chequing.id, dates[index] ?? "", amounts[index] ?? 0), {
@@ -206,19 +208,19 @@ test("a variable plan uses the last 6 actuals and does not report a changed amou
         at,
       });
     }
-    expect(listOccurrences(db, plan.id, "2026-08-01")).toMatchObject({ forecastAmount: -250, safeAmount: -500 });
+    expect(listOccurrences(db, plan.id, "2026-08-01")).toMatchObject({ forecastAmount: -2500, safeAmount: -5000 });
     expect(recurringSignals(db, "2026-08-01").changed).toEqual([]);
 
     const fixed = bill(db, chequing.id, "fixed");
-    const odd = payment(db, chequing.id, "2026-01-15", -5000);
+    const odd = payment(db, chequing.id, "2026-01-15", -50000);
     linkOccurrence(db, fixed.id, "2026-01-15", odd, { source: "ui", at });
     expect(recurringSignals(db, "2026-08-01").changed).toEqual([
       {
         planId: fixed.id,
         dueDate: "2026-01-15",
         transactionId: odd,
-        expectedAmount: -1000,
-        actualAmount: -5000,
+        expectedAmount: -10000,
+        actualAmount: -50000,
       },
     ]);
   } finally {
@@ -234,7 +236,7 @@ test("an old unlinked occurrence is not missed", () => {
       name: "Old bill",
       kind: "bill",
       accountId: chequing.id,
-      expectedAmount: -1000,
+      expectedAmount: -10000,
       tolerance: 0,
       amountMode: "fixed",
       startDate: "2024-01-15",

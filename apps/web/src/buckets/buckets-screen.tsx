@@ -97,15 +97,15 @@ function BucketsSummary() {
     <SummaryStrip
       tint="buckets"
       label="Left to spend"
-      amount={<Amount minor={spendingLeft} hero />}
+      amount={<Amount value={spendingLeft} hero />}
       hint={`of ${formatMoney(currency, spendingTarget)} across ${spending.length} spending ${spending.length === 1 ? "bucket" : "buckets"}`}
       facts={
         <>
           <Fact label="Unassigned">
-            <Amount minor={position.unassigned} className="text-lg" />
+            <Amount value={position.unassigned} className="text-lg" />
           </Fact>
           <Fact label="In all buckets">
-            <Amount minor={allBalances} className="text-lg" />
+            <Amount value={allBalances} className="text-lg" />
           </Fact>
           <Fact label="Overspent">
             <span className="text-lg font-semibold tabular-nums">{overspent.length}</span>
@@ -139,16 +139,16 @@ function BucketList() {
                   group.kind === "spending" ? (
                     total < 0 ? (
                       <>
-                        Over by <Amount minor={-total} />
+                        Over by <Amount value={-total} />
                       </>
                     ) : (
                       <>
-                        <Amount minor={total} /> left
+                        <Amount value={total} /> left
                       </>
                     )
                   ) : (
                     <>
-                      <Amount minor={total} /> saved
+                      <Amount value={total} /> saved
                     </>
                   )
                 }

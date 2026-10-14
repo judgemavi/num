@@ -54,8 +54,8 @@ export const WhatIsThis = withForm({
     const categories = useCategories();
     const values = useStore(form.store, (state) => state.values);
     const { direction, choice, refundOfId, accountId } = values;
-    const totalMinor = signedTotal(currency, importedAmount, values.amount, direction);
-    const { suggestion } = useSuggestion({ accountId, payee: values.payee, date: values.date, direction, amount: totalMinor });
+    const totalMilli = signedTotal(currency, importedAmount, values.amount, direction);
+    const { suggestion } = useSuggestion({ accountId, payee: values.payee, date: values.date, direction, amount: totalMilli });
     const choices = choicesForDirection(direction);
     const categoryKind = categoryKindForChoice(choice);
 
@@ -128,7 +128,7 @@ export const WhatIsThis = withForm({
           </form.Field>
         ) : null}
         {choice === "split" ? (
-          <SplitLines form={form} totalMinor={totalMinor} categoryLocked={categoryLocked} transferLocked={transferLocked} amountsLocked={amountsLocked} />
+          <SplitLines form={form} totalMilli={totalMilli} categoryLocked={categoryLocked} transferLocked={transferLocked} amountsLocked={amountsLocked} />
         ) : null}
         {choice === "transfer" || (choice === "refund" && refundOfId !== null) ? null : (
           <form.Field name="merchantId">

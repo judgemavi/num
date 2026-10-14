@@ -58,73 +58,78 @@ const biweekly = schedule("2026-01-02", "weekly", 2);
 test("monthly totals count weekly, biweekly and monthly occurrences, including a 3-paycheck month", () => {
   const january = buildMonthPlan({
     month: "2026-01",
+    step: 10,
     asOf: "2026-01-15",
     links: [],
-    buckets: [goal("save", 1_000, null, 10)],
+    buckets: [goal("save", 10_000, null, 100)],
     plans: [
-      income("week", 100, schedule("2026-01-02", "weekly", 1)),
-      income("two-weeks", 100, biweekly),
-      income("month", 100, schedule("2026-01-15", "monthly", 1, 15)),
-      income("other", 50, schedule("2026-01-20", "monthly", 1, 20), false),
+      income("week", 1_000, schedule("2026-01-02", "weekly", 1)),
+      income("two-weeks", 1_000, biweekly),
+      income("month", 1_000, schedule("2026-01-15", "monthly", 1, 15)),
+      income("other", 500, schedule("2026-01-20", "monthly", 1, 20), false),
     ],
   });
   expect(january.paycheckCount).toBe(5 + 3 + 1);
-  expect(january.income.planned).toBe(100 * 5 + 100 * 3 + 100 + 50);
-  expect(january.funding.items.find((item) => item.bucketId === "save")).toMatchObject({ perPaycheck: 10, paychecks: 9, planned: 90 });
+  expect(january.income.planned).toBe(1_000 * 5 + 1_000 * 3 + 1_000 + 500);
+  expect(january.funding.items.find((item) => item.bucketId === "save")).toMatchObject({ perPaycheck: 100, paychecks: 9, planned: 900 });
 
   const february = buildMonthPlan({
     month: "2026-02",
+    step: 10,
     asOf: "2026-02-01",
     links: [],
     buckets: [],
-    plans: [income("two-weeks", 100, biweekly)],
+    plans: [income("two-weeks", 1_000, biweekly)],
   });
   expect(february.paycheckCount).toBe(2);
-  expect(february.income.planned).toBe(200);
+  expect(february.income.planned).toBe(2_000);
 });
 
 test("variable income uses the median of the last 6, and the plan amount when fewer than 3 exist", () => {
   const links: MonthPlanLink[] = [
-    { planId: "pay", dueDate: "2025-12-19", skipped: false, actual: 50 },
-    { planId: "pay", dueDate: "2025-12-05", skipped: false, actual: 100 },
-    { planId: "pay", dueDate: "2025-11-21", skipped: false, actual: 200 },
-    { planId: "pay", dueDate: "2025-11-07", skipped: false, actual: 300 },
-    { planId: "pay", dueDate: "2025-10-24", skipped: false, actual: 400 },
-    { planId: "pay", dueDate: "2025-10-10", skipped: false, actual: 500 },
-    { planId: "pay", dueDate: "2025-09-26", skipped: false, actual: 9_999 },
+    { planId: "pay", dueDate: "2025-12-19", skipped: false, actual: 500 },
+    { planId: "pay", dueDate: "2025-12-05", skipped: false, actual: 1_000 },
+    { planId: "pay", dueDate: "2025-11-21", skipped: false, actual: 2_000 },
+    { planId: "pay", dueDate: "2025-11-07", skipped: false, actual: 3_000 },
+    { planId: "pay", dueDate: "2025-10-24", skipped: false, actual: 4_000 },
+    { planId: "pay", dueDate: "2025-10-10", skipped: false, actual: 5_000 },
+    { planId: "pay", dueDate: "2025-09-26", skipped: false, actual: 99_990 },
   ];
   const month = buildMonthPlan({
     month: "2026-01",
+    step: 10,
     asOf: "2026-01-15",
     links,
     buckets: [],
-    plans: [income("pay", 1_000, biweekly, true, "variable")],
+    plans: [income("pay", 10_000, biweekly, true, "variable")],
   });
-  expect(month.income.planned).toBe(250 * 3);
-  expect(month.feasibility?.expectedPaycheck).toBe(50);
+  expect(month.income.planned).toBe(2_500 * 3);
+  expect(month.feasibility?.expectedPaycheck).toBe(500);
 
   const few = buildMonthPlan({
     month: "2026-01",
+    step: 10,
     asOf: "2026-01-15",
     links: links.slice(0, 2),
     buckets: [],
-    plans: [income("pay", 1_000, biweekly, true, "variable")],
+    plans: [income("pay", 10_000, biweekly, true, "variable")],
   });
-  expect(few.income.planned).toBe(1_000 * 3);
+  expect(few.income.planned).toBe(10_000 * 3);
 
   const power = buildMonthPlan({
     month: "2026-02",
+    step: 10,
     asOf: "2026-02-01",
     links: [
-      { planId: "power", dueDate: "2025-11-15", skipped: false, actual: -100 },
-      { planId: "power", dueDate: "2025-12-15", skipped: false, actual: -300 },
-      { planId: "power", dueDate: "2026-01-15", skipped: false, actual: -500 },
+      { planId: "power", dueDate: "2025-11-15", skipped: false, actual: -1_000 },
+      { planId: "power", dueDate: "2025-12-15", skipped: false, actual: -3_000 },
+      { planId: "power", dueDate: "2026-01-15", skipped: false, actual: -5_000 },
     ],
     buckets: [],
-    plans: [income("pay", 10_000, biweekly), bill("power", 1_000, schedule("2026-02-15", "monthly", 1, 15), "variable")],
+    plans: [income("pay", 100_000, biweekly), bill("power", 10_000, schedule("2026-02-15", "monthly", 1, 15), "variable")],
   });
-  expect(power.bills.planned).toBe(300);
-  expect(power.feasibility?.billsEach).toBe(250);
+  expect(power.bills.planned).toBe(3_000);
+  expect(power.feasibility?.billsEach).toBe(2_500);
 });
 
 test("a shortfall shows a later date that fits and the amount to cut elsewhere", () => {
@@ -137,7 +142,7 @@ test("a shortfall shows a later date that fits and the amount to cut elsewhere",
     archived: false,
     balance: 0,
     refillTo: null,
-    amount: 80_000,
+    amount: 800_000,
     dueDate: "2026-02-28",
     target: null,
     targetDate: null,
@@ -146,15 +151,16 @@ test("a shortfall shows a later date that fits and the amount to cut elsewhere",
   };
   const month = buildMonthPlan({
     month: "2026-02",
+    step: 10,
     asOf: "2026-02-01",
     links: [],
     plans: [
-      income("pay", 100_000, biweekly),
-      bill("rent", 60_000, schedule("2026-02-15", "monthly", 1, 15)),
+      income("pay", 1_000_000, biweekly),
+      bill("rent", 600_000, schedule("2026-02-15", "monthly", 1, 15)),
     ],
     buckets: [
       sinking,
-      goal("steady", 50_000, null, 20_000),
+      goal("steady", 500_000, null, 200_000),
       {
         id: "food",
         name: "Food",
@@ -163,7 +169,7 @@ test("a shortfall shows a later date that fits and the amount to cut elsewhere",
         color: "mint",
         archived: false,
         balance: 0,
-        refillTo: 40_000,
+        refillTo: 400_000,
         amount: null,
         dueDate: null,
         target: null,
@@ -175,96 +181,115 @@ test("a shortfall shows a later date that fits and the amount to cut elsewhere",
   });
   expect(month.paycheckCount).toBe(2);
   expect(month.feasibility).toMatchObject({
-    expectedPaycheck: 100_000,
-    billsEach: 30_000,
-    refillsEach: 20_000,
-    surplus: 50_000,
-    need: 60_000,
-    shortfall: 10_000,
+    expectedPaycheck: 1_000_000,
+    billsEach: 300_000,
+    refillsEach: 200_000,
+    surplus: 500_000,
+    need: 600_000,
+    shortfall: 100_000,
   });
   const tax = month.feasibility?.buckets.find((bucket) => bucket.bucketId === "tax");
-  expect(tax).toMatchObject({ perPaycheck: 40_000, laterDate: "2026-03-14" });
-  expect(month.funding.items.find((item) => item.bucketId === "tax")).toMatchObject({ planned: 80_000, paychecks: 2 });
-  expect(month.funding.items.find((item) => item.bucketId === "steady")).toMatchObject({ perPaycheck: 20_000, planned: 40_000 });
+  expect(tax).toMatchObject({ perPaycheck: 400_000, laterDate: "2026-03-14" });
+  expect(month.funding.items.find((item) => item.bucketId === "tax")).toMatchObject({ planned: 800_000, paychecks: 2 });
+  expect(month.funding.items.find((item) => item.bucketId === "steady")).toMatchObject({ perPaycheck: 200_000, planned: 400_000 });
 });
 
 test("the current month compares planned amounts with linked actuals", () => {
   const links: MonthPlanLink[] = [
-    { planId: "pay", dueDate: "2026-01-02", skipped: false, actual: 120_000 },
-    { planId: "rent", dueDate: "2026-01-10", skipped: false, actual: -35_000 },
+    { planId: "pay", dueDate: "2026-01-02", skipped: false, actual: 1_200_000 },
+    { planId: "rent", dueDate: "2026-01-10", skipped: false, actual: -350_000 },
     { planId: "rent", dueDate: "2026-01-24", skipped: true, actual: null },
   ];
   const month = buildMonthPlan({
     month: "2026-01",
+    step: 10,
     asOf: "2026-01-15",
     links,
     plans: [
-      income("pay", 100_000, biweekly),
-      bill("rent", 40_000, schedule("2026-01-10", "weekly", 2)),
+      income("pay", 1_000_000, biweekly),
+      bill("rent", 400_000, schedule("2026-01-10", "weekly", 2)),
     ],
     buckets: [
       {
-        ...goal("trip", 90_000, "2026-04-01", null),
-        actualFunded: 10_000,
+        ...goal("trip", 900_000, "2026-04-01", null),
+        actualFunded: 100_000,
       },
     ],
   });
   expect(month.compareActual).toBe(true);
-  expect(month.income).toEqual({ planned: 300_000, actual: 120_000 });
-  expect(month.bills.planned).toBe(40_000);
-  expect(month.bills.actual).toBe(35_000);
+  expect(month.income).toEqual({ planned: 3_000_000, actual: 1_200_000 });
+  expect(month.bills.planned).toBe(400_000);
+  expect(month.bills.actual).toBe(350_000);
   expect(month.bills.items.map((item) => item.dueDate)).toEqual(["2026-01-10"]);
-  expect(month.funding.actual).toBe(10_000);
+  expect(month.funding.actual).toBe(100_000);
   expect(month.leftToSave).toEqual({
     planned: month.income.planned - month.bills.planned - month.funding.planned,
-    actual: 120_000 - 35_000 - 10_000,
+    actual: 1_200_000 - 350_000 - 100_000,
   });
 
   const future = buildMonthPlan({
     month: "2026-03",
+    step: 10,
     asOf: "2026-01-15",
     links: [],
-    plans: [income("pay", 100_000, biweekly)],
+    plans: [income("pay", 1_000_000, biweekly)],
     buckets: [],
   });
   expect(future.compareActual).toBe(false);
 });
 
 test("a future month uses planned funding from earlier months, not today's balance", () => {
-  const trip = goal("trip", 300, "2026-04-01", null, 0);
+  const trip = goal("trip", 3_000, "2026-04-01", null, 0);
   const january = buildMonthPlan({
     month: "2026-01",
+    step: 10,
     asOf: "2026-01-15",
     links: [],
     buckets: [trip],
-    plans: [income("pay", 100_000, schedule("2026-01-01", "monthly", 1, 1))],
+    plans: [income("pay", 1_000_000, schedule("2026-01-01", "monthly", 1, 1))],
   });
   const march = buildMonthPlan({
     month: "2026-03",
+    step: 10,
     asOf: "2026-01-15",
     links: [],
     buckets: [trip],
-    plans: [income("pay", 100_000, schedule("2026-01-01", "monthly", 1, 1))],
+    plans: [income("pay", 1_000_000, schedule("2026-01-01", "monthly", 1, 1))],
   });
-  expect(january.funding.items.find((item) => item.bucketId === "trip")?.perPaycheck).toBe(100);
-  expect(march.funding.items.find((item) => item.bucketId === "trip")?.perPaycheck).toBe(100);
-  expect(march.feasibility?.need).toBe(100);
+  expect(january.funding.items.find((item) => item.bucketId === "trip")?.perPaycheck).toBe(1_000);
+  expect(march.funding.items.find((item) => item.bucketId === "trip")?.perPaycheck).toBe(1_000);
+  expect(march.feasibility?.need).toBe(1_000);
 });
 
 test("goals that are short together each get a later date from a share of the surplus", () => {
   const month = buildMonthPlan({
     month: "2026-02",
+    step: 10,
     asOf: "2026-02-01",
     links: [],
-    plans: [income("pay", 10_000, biweekly)],
+    plans: [income("pay", 100_000, biweekly)],
     buckets: [
-      { ...goal("north", 80_000, "2026-02-28", null), priority: 1, name: "North" },
-      { ...goal("south", 80_000, "2026-02-28", null), priority: 2, name: "South" },
+      { ...goal("north", 800_000, "2026-02-28", null), priority: 1, name: "North" },
+      { ...goal("south", 800_000, "2026-02-28", null), priority: 2, name: "South" },
     ],
   });
-  expect(month.feasibility?.surplus).toBe(10_000);
-  expect(month.feasibility?.shortfall).toBe(70_000);
+  expect(month.feasibility?.surplus).toBe(100_000);
+  expect(month.feasibility?.shortfall).toBe(700_000);
   const dates = month.feasibility?.buckets.map((bucket) => bucket.laterDate) ?? [];
   expect(dates.every((date) => date !== null)).toBe(true);
   expect(new Set(dates).size).toBe(1);
+});
+
+test("the share of each paycheck is a whole number of the currency's minor unit", () => {
+  const plan = (step: number) =>
+    buildMonthPlan({
+      month: "2026-01",
+      step,
+      asOf: "2026-01-01",
+      links: [],
+      buckets: [],
+      plans: [income("pay", 3_000_000, biweekly), bill("rent", 1_000_000, schedule("2026-01-10", "monthly", 1, 10))],
+    });
+  expect(plan(10).feasibility?.billsEach).toBe(333_340);
+  expect(plan(1000).feasibility?.billsEach).toBe(334_000);
 });

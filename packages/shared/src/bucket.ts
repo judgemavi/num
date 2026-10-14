@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { archivedQuery, listQuerySchema, pagedResponseSchema } from "./list";
 import { isUtcTimestamp } from "./time";
-import { nonNegativeCentsSchema as cents } from "./money";
+import { nonNegativeAmountSchema as money, positiveAmountSchema } from "./money";
 
 export const bucketKinds = ["spending", "sinking", "goal"] as const;
 
@@ -46,8 +46,6 @@ export const bucketIcons = [
 export type BucketIcon = (typeof bucketIcons)[number];
 
 const nameSchema = z.string().trim().min(1);
-const positiveCents = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
-
 const bucketFields = {
   name: nameSchema,
   kind: z.enum(bucketKinds),
@@ -57,13 +55,13 @@ const bucketFields = {
   icon: z.enum(bucketIcons),
   categoryIds: z.array(z.uuid()),
   startDate: isoDateSchema,
-  refillTo: cents.nullable(),
-  amount: cents.nullable(),
+  refillTo: money.nullable(),
+  amount: money.nullable(),
   dueDate: isoDateSchema.nullable(),
   repeat: z.enum(sinkingRepeats).nullable(),
-  target: cents.nullable(),
+  target: money.nullable(),
   targetDate: isoDateSchema.nullable(),
-  fixedAmount: cents.nullable(),
+  fixedAmount: money.nullable(),
 };
 
 export function kindFieldsValid(value: {
@@ -150,7 +148,7 @@ export const bucketEventSchema = z.object({
   kind: z.enum(bucketEventKinds),
   bucketId: z.uuid(),
   otherBucketId: z.uuid().nullable(),
-  amount: positiveCents,
+  amount: positiveAmountSchema,
   date: isoDateSchema,
   note: z.string().nullable(),
   fundingRunId: z.uuid().nullable(),
@@ -164,7 +162,7 @@ export const bucketEventListSchema = z.object({
 export const bucketEventCreateSchema = z
   .object({
     kind: z.enum(bucketEventKinds),
-    amount: positiveCents,
+    amount: positiveAmountSchema,
     date: isoDateSchema,
     note: noteSchema,
     otherBucketId: z.uuid().nullable().optional(),

@@ -88,19 +88,19 @@ test("accepting a transfer pair clears the automatic reason", () => {
     const left = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-01",
-      amount: -2_000,
+      amount: -20_000,
       payeeRaw: "MOVE",
       status: "open",
-      lines: [{ amount: -2_000 }],
+      lines: [{ amount: -20_000 }],
       ...saved,
     });
     const right = createTransaction(sample.db, {
       accountId: other.id,
       date: "2026-03-02",
-      amount: 2_000,
+      amount: 20_000,
       payeeRaw: "MOVE",
       status: "open",
-      lines: [{ amount: 2_000 }],
+      lines: [{ amount: 20_000 }],
       ...saved,
     });
     sample.db
@@ -132,20 +132,20 @@ test("an automatic label keeps a merchant the user set", () => {
     const chosen = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-02",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       merchantId: shop.id,
       status: "open",
-      lines: [{ amount: -400 }],
+      lines: [{ amount: -4000 }],
       ...saved,
     });
     const first = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-01",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400 }],
+      lines: [{ amount: -4000 }],
       ...saved,
     });
     updateTransaction(sample.db, first.id, {
@@ -175,19 +175,19 @@ test("a notes edit is not a confirmation and Looks right is", () => {
     const first = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-01",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400 }],
+      lines: [{ amount: -4000 }],
       ...saved,
     });
     const second = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-02",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400 }],
+      lines: [{ amount: -4000 }],
       ...saved,
     });
     updateTransaction(sample.db, first.id, {
@@ -204,10 +204,10 @@ test("a notes edit is not a confirmation and Looks right is", () => {
     const third = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-03",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400 }],
+      lines: [{ amount: -4000 }],
       ...saved,
     });
     updateTransaction(sample.db, second.id, {
@@ -241,19 +241,19 @@ test("an import labels only its own rows and undo removes those labels", () => {
     const older = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-02-01",
-      amount: -300,
+      amount: -3000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -300 }],
+      lines: [{ amount: -3000 }],
       ...saved,
     });
     createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-01-01",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400, categoryId: food.id, memo: null, tagIds: [] }],
+      lines: [{ amount: -4000, categoryId: food.id, memo: null, tagIds: [] }],
       ...saved,
     });
     const imported = importCsv(sample.db, sample.dir, sample.account.id, "learn.csv", ["03/12/2026,NORTH CAFE,-4.00"]);
@@ -282,28 +282,28 @@ test("a conflict suggests the most recent confirmation and does not label", () =
     createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-01",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400, categoryId: coffee.id }],
+      lines: [{ amount: -4000, categoryId: coffee.id }],
       ...saved,
     });
     createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-10",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -400, categoryId: groceries.id }],
+      lines: [{ amount: -4000, categoryId: groceries.id }],
       ...saved,
     });
     const open = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-11",
-      amount: -500,
+      amount: -5000,
       payeeRaw: "NORTH CAFE",
       status: "open",
-      lines: [{ amount: -500 }],
+      lines: [{ amount: -5000 }],
       ...saved,
     });
     expect(getTransaction(sample.db, open.id)?.autoReason).toBeNull();

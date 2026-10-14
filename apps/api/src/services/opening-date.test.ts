@@ -95,7 +95,7 @@ test("an import of older rows moves the effective opening date and checkpoint he
     const help = compareCheckpoint(book.db, account.id, { date: "2026-01-15", statementBalance: 0 });
     expect(help.help).toContainEqual({
       code: "uncleared",
-      transaction: { id: row.id, date: "2026-01-15", payee: "Shop", amount: -1250 },
+      transaction: { id: row.id, date: "2026-01-15", payee: "Shop", amount: -12500 },
     });
 
     importCsv(book.db, book.dir, account.id, "december.csv", ["12/01/2025,Older shop,-4.00"]);

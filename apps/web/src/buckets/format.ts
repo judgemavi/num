@@ -1,4 +1,4 @@
-import { Temporal, toMinorUnits, type Bucket, type BucketColor, type BucketIcon, type ErrorCode } from "@num/shared";
+import { Temporal, parseAmount, type Bucket, type BucketColor, type BucketIcon, type ErrorCode } from "@num/shared";
 import { errorCode } from "@/api/client";
 import { formatMoney } from "@/money";
 
@@ -84,6 +84,9 @@ export function bucketTarget(bucket: Bucket): number {
 }
 
 export function bucketError(code: ErrorCode | undefined): string {
+  if (code === "amount_too_precise") {
+    return "An amount has more decimal places than the currency has.";
+  }
   if (code === "category_in_bucket") {
     return "That category is already in a bucket. Remove it there first.";
   }
@@ -156,13 +159,13 @@ export function requestError(error: unknown, noAnswer: string): string {
   return code ? bucketError(code) : noAnswer;
 }
 
-/** The amount of money to move, in minor units. The text of the error when the text is not an amount greater than zero. */
-export function moveAmount(currency: string, text: string): { minor: number } | { error: string } {
-  let minor = 0;
+/** The amount of money to move, in milliunits. The text of the error when the text is not an amount greater than zero. */
+export function moveAmount(currency: string, text: string): { milli: number } | { error: string } {
+  let milli = 0;
   try {
-    minor = toMinorUnits(currency, text.trim());
+    milli = parseAmount(currency, text.trim());
   } catch {
     return { error: "Enter the amount as a number." };
   }
-  return minor < 1 ? { error: "Enter an amount greater than zero." } : { minor };
+  return milli < 1 ? { error: "Enter an amount greater than zero." } : { milli };
 }

@@ -12,6 +12,7 @@ import {
 } from "@num/shared";
 import { and, asc, eq, lt, sql } from "drizzle-orm";
 import type { Db } from "../db";
+import { bookStep } from "./book-step";
 import { balanceOf } from "./account-balance";
 import { ServiceError } from "../service-error";
 import { hasTransferLine, literal } from "./transaction-sql";
@@ -71,7 +72,7 @@ export function mortgageAccountView(
 ): MortgageView {
   const account = requireMortgage(db, accountId);
   const terms = getMortgageTerms(db, accountId);
-  const loan = mortgageLoan(terms, { balance: account.openingBalance, date: storedOpeningDate(account) });
+  const loan = mortgageLoan(terms, { balance: account.openingBalance, date: storedOpeningDate(account) }, bookStep(db));
   const checkpoints = activeValuations(db, accountId);
   const schedule = mortgageSchedule(loan, checkpoints);
   const perPayment = options.extra ?? 0;
@@ -129,6 +130,7 @@ export function mortgagePrefill(db: Db, fromAccountId: string, toAccountId: stri
     date,
     fromAccountId,
     toAccountId: targetId,
+    step: bookStep(db),
   });
   if (!split || split.payment < 1) {
     return null;

@@ -17,6 +17,7 @@ import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
 import { withoutId, write, type WriteTx, type WriteInput, type Reader } from "./write";
 import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
+import { requireWholeAmounts } from "./book-step";
 
 /** The route schema uses the same rule. This check is for callers that are not routes. */
 function assertKindFields(input: BucketCreate) {
@@ -173,6 +174,7 @@ export function listOverspent(db: Db): { items: OverspentBucket[] } {
 
 export function createBucket(db: Db, input: BucketCreate & WriteInput & { asOf: string }): Bucket {
   assertKindFields(input);
+  requireWholeAmounts(db, [input.refillTo, input.amount, input.target, input.fixedAmount]);
   if (!isIsoDate(input.asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
   }
@@ -194,6 +196,7 @@ export function createBucket(db: Db, input: BucketCreate & WriteInput & { asOf: 
 
 export function updateBucket(db: Db, id: string, input: BucketWrite & WriteInput): Bucket {
   assertKindFields(input);
+  requireWholeAmounts(db, [input.refillTo, input.amount, input.target, input.fixedAmount]);
   return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = withoutSortKey(tx.select().from(buckets).where(eq(buckets.id, id)).get());
     if (!existing) {

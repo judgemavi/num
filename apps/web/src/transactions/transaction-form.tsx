@@ -48,7 +48,7 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
   const importedAmount = imported && transaction ? transaction.amount : null;
 
   const form = useAppForm({
-    defaultValues: transactionValues(currency, categories, transaction, initialAccountId ?? accounts.find((item) => !item.archivedAt)?.id ?? ""),
+    defaultValues: transactionValues(categories, transaction, initialAccountId ?? accounts.find((item) => !item.archivedAt)?.id ?? ""),
     validators: {
       onSubmit: ({ value }) => {
         const total = signedTotal(currency, importedAmount, value.amount, value.direction);
@@ -67,13 +67,13 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
         if (value.choice === "split" && (splitRemainder(currency, total, value.direction, value.lines) !== 0 || splitBlank(value.lines))) {
           return "Assign the whole amount.";
         }
-        const built = buildTransactionSave({ ...value, currency, transaction, totalMinor: total, unreadableItemKey });
+        const built = buildTransactionSave({ ...value, currency, transaction, totalMilli: total, unreadableItemKey });
         return built.ok ? undefined : built.error;
       },
     },
     onSubmit: async ({ value, formApi }) => {
       const total = signedTotal(currency, importedAmount, value.amount, value.direction);
-      const built = total === null ? null : buildTransactionSave({ ...value, currency, transaction, totalMinor: total, unreadableItemKey });
+      const built = total === null ? null : buildTransactionSave({ ...value, currency, transaction, totalMilli: total, unreadableItemKey });
       if (!built?.ok) {
         return;
       }
@@ -89,8 +89,8 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
   const values = useStore(form.store, (state) => state.values);
   const touched = useStore(form.store, (state) => alreadyChosen(transaction) || choiceFields.some((name) => state.fieldMeta[name]?.isTouched));
   const linesEdited = useStore(form.store, (state) => alreadyChosen(transaction) || state.fieldMeta.lines?.isTouched === true);
-  const totalMinor = signedTotal(currency, importedAmount, values.amount, values.direction);
-  const suggested = useSuggestion({ accountId: values.accountId, payee: values.payee, date: values.date, direction: values.direction, amount: totalMinor });
+  const totalMilli = signedTotal(currency, importedAmount, values.amount, values.direction);
+  const suggested = useSuggestion({ accountId: values.accountId, payee: values.payee, date: values.date, direction: values.direction, amount: totalMilli });
 
   // The suggestion arrives from the API, outside the form. The form takes its choice until the person makes a choice.
   const suggestedChoice = touched ? null : suggested.choice;
@@ -127,13 +127,13 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
     }
   }, [mortgageSplit, currency, form, transaction]);
 
-  const left = values.choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, values.direction, values.lines) : null;
+  const left = values.choice === "split" && totalMilli !== null ? splitRemainder(currency, totalMilli, values.direction, values.lines) : null;
   const saveDisabled =
     values.accountId.length === 0 ||
-    totalMinor === null ||
+    totalMilli === null ||
     (values.choice === "transfer" && !values.transferAccountId) ||
     (values.choice === "split" && (left !== 0 || splitBlank(values.lines)));
-  const summary = `${formatDate(values.date)} · ${accountLabels.get(values.accountId) ?? "Account"} · ${values.direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(totalMinor ?? 0))} · ${values.payee}`;
+  const summary = `${formatDate(values.date)} · ${accountLabels.get(values.accountId) ?? "Account"} · ${values.direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(totalMilli ?? 0))} · ${values.payee}`;
 
   return (
     <form.AppForm>

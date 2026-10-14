@@ -13,7 +13,7 @@ import { errorResponse, idParams } from "./common";
 
 const readRoute = createRoute({
   operationId: "get_accounts_id_mortgage_terms",
-  description: "Read accounts. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read accounts. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts/{id}/mortgage-terms",
   request: { params: idParams },
@@ -29,7 +29,7 @@ const readRoute = createRoute({
 
 const viewRoute = createRoute({
   operationId: "get_accounts_id_mortgage",
-  description: "Read accounts. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read accounts. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts/{id}/mortgage",
   request: {
@@ -48,7 +48,7 @@ const viewRoute = createRoute({
 
 const prefillRoute = createRoute({
   operationId: "get_mortgage_prefill",
-  description: "Read mortgage prefill. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read mortgage prefill. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/mortgage-prefill",
   request: { query: mortgagePrefillQuerySchema },

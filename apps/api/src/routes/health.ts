@@ -7,7 +7,7 @@ const healthSchema = z.object({
 
 const healthRoute = createRoute({
   operationId: "get_health",
-  description: "Check that the API is running. This does not read or change the books. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Check that the API is running. This does not read or change the books. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/health",
   responses: {

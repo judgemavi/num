@@ -83,7 +83,7 @@ function PlanOccurrences({ plan: chosen }: PlanDetailProps) {
             {note ? <small>{note}</small> : null}
           </div>
           <div className="text-right">
-            <Amount minor={item.actualAmount ?? occurrences.forecastAmount} />
+            <Amount value={item.actualAmount ?? occurrences.forecastAmount} />
           </div>
           <RowMenu label={`Actions for ${formatDate(item.dueDate)}`}>
             {item.transactionId ? (
@@ -152,10 +152,10 @@ function PlanOccurrences({ plan: chosen }: PlanDetailProps) {
       >
         <div className="grid gap-1 text-sm">
           <span className="text-muted-foreground">Forecast</span>
-          <Amount minor={occurrences.forecastAmount} />
+          <Amount value={occurrences.forecastAmount} />
           {plan.amountMode === "variable" ? (
             <span className="text-muted-foreground">
-              Safe amount <Amount minor={occurrences.safeAmount} />
+              Safe amount <Amount value={occurrences.safeAmount} />
             </span>
           ) : null}
         </div>

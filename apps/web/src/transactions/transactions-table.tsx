@@ -119,13 +119,13 @@ export function TransactionsTable(props: Props) {
             ) : row.status === "open" ? (
               <span className="text-sm text-muted-foreground">Pending</span>
             ) : null}
-            <Amount minor={row.amount} />
+            <Amount value={row.amount} />
           </div>
         </TableCell>
         {showBalance ? (
           <TableCell className="text-right">
             {row.runningBalance === null ? null : (
-              <Amount minor={row.runningBalance} owed={accountClass(row.accountKind) === "liability"} />
+              <Amount value={row.runningBalance} owed={accountClass(row.accountKind) === "liability"} />
             )}
           </TableCell>
         ) : null}

@@ -1,5 +1,5 @@
 import { splitCsvLine, statementDate, type ColumnMap, type DecimalSeparator, type SignConvention } from "@num/shared";
-import { readMinorAmount, type AmountProblem } from "./parse-amount";
+import { readAmount, type AmountProblem } from "./parse-amount";
 import type { ParsedStatement, StatementRow, UnreadableReason, UnreadableRow } from "./statement";
 
 type BalanceRow = {
@@ -52,15 +52,15 @@ function money(
   raw: string,
   digits: number,
   decimal: DecimalSeparator,
-): { ok: true; minor: number | null } | { ok: false; reason: AmountProblem } {
-  const read = readMinorAmount(raw, digits, decimal);
+): { ok: true; amount: number | null } | { ok: false; reason: AmountProblem } {
+  const read = readAmount(raw, digits, decimal);
   if (read.kind === "empty") {
-    return { ok: true, minor: null };
+    return { ok: true, amount: null };
   }
   if (read.kind === "error") {
     return { ok: false, reason: read.reason };
   }
-  return { ok: true, minor: read.minor };
+  return { ok: true, amount: read.amount };
 }
 
 function rowAmount(
@@ -70,19 +70,19 @@ function rowAmount(
   decimal: DecimalSeparator,
 ): { ok: true; amount: number } | { ok: false; reason: AmountProblem } {
   if (map.debit != null || map.credit != null) {
-    const debit = map.debit == null ? { ok: true as const, minor: null } : money(cell(cells, map.debit), digits, decimal);
+    const debit = map.debit == null ? { ok: true as const, amount: null } : money(cell(cells, map.debit), digits, decimal);
     if (!debit.ok) {
       return debit;
     }
-    const credit = map.credit == null ? { ok: true as const, minor: null } : money(cell(cells, map.credit), digits, decimal);
+    const credit = map.credit == null ? { ok: true as const, amount: null } : money(cell(cells, map.credit), digits, decimal);
     if (!credit.ok) {
       return credit;
     }
-    if (debit.minor === null && credit.minor === null) {
+    if (debit.amount === null && credit.amount === null) {
       return { ok: false, reason: "amount_unreadable" };
     }
-    const out = debit.minor === null ? 0 : Math.abs(debit.minor);
-    const inn = credit.minor === null ? 0 : Math.abs(credit.minor);
+    const out = debit.amount === null ? 0 : Math.abs(debit.amount);
+    const inn = credit.amount === null ? 0 : Math.abs(credit.amount);
     return { ok: true, amount: inn - out };
   }
 
@@ -90,10 +90,10 @@ function rowAmount(
   if (!read.ok) {
     return read;
   }
-  if (read.minor === null) {
+  if (read.amount === null) {
     return { ok: false, reason: "amount_unreadable" };
   }
-  return { ok: true, amount: applySign(read.minor, map.signConvention) };
+  return { ok: true, amount: applySign(read.amount, map.signConvention) };
 }
 
 function readRow(cells: string[], map: ColumnMap, digits: number): ReadRow {
@@ -114,8 +114,8 @@ function readRow(cells: string[], map: ColumnMap, digits: number): ReadRow {
     if (!read.ok) {
       return read;
     }
-    if (read.minor !== null) {
-      balance = applySign(read.minor, map.balanceSign ?? map.signConvention);
+    if (read.amount !== null) {
+      balance = applySign(read.amount, map.balanceSign ?? map.signConvention);
     }
   }
 
@@ -145,7 +145,7 @@ function closing(rows: BalanceRow[], newestFirst: boolean) {
   return ordered[0] ?? null;
 }
 
-export function parseCsvStatement(text: string, map: ColumnMap, minorDigits: number): ParsedStatement {
+export function parseCsvStatement(text: string, map: ColumnMap, digits: number): ParsedStatement {
   const lines = stripBom(text).split(/\r?\n/);
   const rows: StatementRow[] = [];
   const rowBalances: (number | null)[] = [];
@@ -159,7 +159,7 @@ export function parseCsvStatement(text: string, map: ColumnMap, minorDigits: num
       continue;
     }
 
-    const parsed = readRow(splitCsvLine(raw), map, minorDigits);
+    const parsed = readRow(splitCsvLine(raw), map, digits);
     if (!parsed.ok) {
       unreadable.push({ line: index + 1, raw, reason: parsed.reason });
       continue;

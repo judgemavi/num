@@ -1,4 +1,5 @@
 import { Temporal } from "temporal-polyfill";
+import { divideAmount } from "./currency";
 
 export const planKinds = ["income", "bill", "transfer"] as const;
 export const amountModes = ["fixed", "variable"] as const;
@@ -136,7 +137,7 @@ export function withinTolerance(actual: number, expected: number, tolerance: num
   return Math.abs(actual - expected) <= tolerance;
 }
 
-export function divideHalfAway(sum: number, divisor: number): number {
+function divideHalfAway(sum: number, divisor: number): number {
   const negative = sum < 0;
   const magnitude = Math.abs(sum);
   const quotient = Math.floor(magnitude / divisor);
@@ -145,7 +146,7 @@ export function divideHalfAway(sum: number, divisor: number): number {
   return negative ? -rounded : rounded;
 }
 
-export function medianMinor(values: readonly number[]): number {
+export function medianOf(values: readonly number[]): number {
   const sorted = [...values].sort((left, right) => left - right);
   const mid = Math.floor(sorted.length / 2);
   if (sorted.length % 2 === 1) {
@@ -154,15 +155,26 @@ export function medianMinor(values: readonly number[]): number {
   return divideHalfAway((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0), 2);
 }
 
+/** The median of amounts. The middle of two amounts is rounded to a whole number of minor units (`step`). */
+export function medianAmount(values: readonly number[], step: number): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) {
+    return sorted[mid] ?? 0;
+  }
+  return divideAmount((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0), 2, step);
+}
+
 export function variableAmounts(
   actualsNewestFirst: readonly number[],
   fallback: number,
+  step: number,
 ): { forecast: number; safe: number } {
   if (actualsNewestFirst.length < 3) {
     return { forecast: fallback, safe: fallback };
   }
   const last = actualsNewestFirst.slice(0, 6);
-  return { forecast: medianMinor(last), safe: Math.min(...last) };
+  return { forecast: medianAmount(last, step), safe: Math.min(...last) };
 }
 
 export type OpenOccurrence = {

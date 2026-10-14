@@ -3,10 +3,10 @@ import {
   allowsInterestRate,
   balanceFromEntry,
   entryFromBalance,
-  fromMinorUnits,
+  amountText,
   milliPctToPercent,
   percentToMilliPct,
-  toMinorUnits,
+  parseAmount,
   type Account,
   type MortgageTerms,
 } from "@num/shared";
@@ -14,7 +14,7 @@ import { draftFromTerms, draftIsBlank, firstPaymentNotAfterOpening, termsFromDra
 import { localAsOf } from "@/as-of";
 
 /** The start values of the Account form. A saved account gives its values and its mortgage terms. */
-export function accountValues(currency: string, account: Account | null, terms: MortgageTerms | null, initialName: string) {
+export function accountValues(account: Account | null, terms: MortgageTerms | null, initialName: string) {
   return {
     name: account?.name ?? initialName,
     institution: account?.institution ?? "",
@@ -23,19 +23,19 @@ export function accountValues(currency: string, account: Account | null, terms: 
     /** True while the opening date follows the first transaction, or today. */
     automatic: account ? account.openingAutomatic : true,
     openingDate: account?.openingDate ?? automaticOpeningDate(account),
-    openingBalance: account ? fromMinorUnits(currency, entryFromBalance(account.kind, account.openingBalance)) : "",
+    openingBalance: account ? amountText(entryFromBalance(account.kind, account.openingBalance)) : "",
     paymentPolicy: account?.paymentPolicy ?? null,
-    fixedPayment: account?.fixedPayment === null || account?.fixedPayment === undefined ? "" : fromMinorUnits(currency, account.fixedPayment),
+    fixedPayment: account?.fixedPayment === null || account?.fixedPayment === undefined ? "" : amountText(account.fixedPayment),
     interestRate:
       account?.interestRateMilliPct === null || account?.interestRateMilliPct === undefined ? "" : milliPctToPercent(account.interestRateMilliPct),
-    mortgage: draftFromTerms(currency, terms),
+    mortgage: draftFromTerms(terms),
   };
 }
 
 type AccountValues = ReturnType<typeof accountValues>;
 
 /** The values of a new account. A form part made with `withForm` gets the type of the form values from them. */
-export const blankAccount = accountValues("", null, null, "");
+export const blankAccount = accountValues(null, null, "");
 
 /** The date that the account uses when the person does not choose one. */
 export function automaticOpeningDate(account: Account | null) {
@@ -44,7 +44,7 @@ export function automaticOpeningDate(account: Account | null) {
 
 function readAmount(currency: string, text: string, label: string) {
   try {
-    return toMinorUnits(currency, text.trim());
+    return parseAmount(currency, text.trim());
   } catch (error) {
     if (error instanceof Error && error.message === "Amount has too many decimal places") {
       throw new Error(`${label} has too many decimal places.`);

@@ -1,10 +1,11 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import type { BucketKind } from "./bucket";
+import { divideAmount, floorToStep } from "./currency";
 import { isoDateSchema, asOfQuerySchema } from "./date";
 import { amountModes } from "./recurring-calc";
 import { isUtcTimestamp } from "./time";
-import { centsSchema as cents } from "./money";
+import { amountSchema as money, positiveAmountSchema } from "./money";
 
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const positive = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
@@ -66,14 +67,15 @@ export function fundingLimit(paycheckAmount: number, free: number): number {
   return Math.min(paycheck, available);
 }
 
-export function roundUpShare(shortfall: number, paychecks: number): number {
+/** The share of a shortfall for one paycheck, rounded up to a whole number of minor units (`step`). */
+export function roundUpShare(shortfall: number, paychecks: number, step: number): number {
   if (shortfall <= 0) {
     return 0;
   }
   if (paychecks <= 0) {
     return shortfall;
   }
-  return Math.ceil(shortfall / paychecks);
+  return divideAmount(shortfall, paychecks, step, "up");
 }
 
 export type FundingBucketInput = {
@@ -127,7 +129,7 @@ function remainingPaychecks(paycheckDate: string, due: string, incomes: readonly
   return count;
 }
 
-function idealAmount(bucket: FundingBucketInput, paycheckDate: string, incomes: readonly FundingIncome[]) {
+function idealAmount(bucket: FundingBucketInput, paycheckDate: string, incomes: readonly FundingIncome[], step: number) {
   if (bucket.archived) {
     return 0;
   }
@@ -141,10 +143,10 @@ function idealAmount(bucket: FundingBucketInput, paycheckDate: string, incomes: 
     if (bucket.dueDate === null || bucket.amount === null) {
       return 0;
     }
-    return roundUpShare(bucket.amount - bucket.balance, remainingPaychecks(paycheckDate, bucket.dueDate, incomes));
+    return roundUpShare(bucket.amount - bucket.balance, remainingPaychecks(paycheckDate, bucket.dueDate, incomes), step);
   }
   if (bucket.targetDate !== null) {
-    return roundUpShare((bucket.target ?? 0) - bucket.balance, remainingPaychecks(paycheckDate, bucket.targetDate, incomes));
+    return roundUpShare((bucket.target ?? 0) - bucket.balance, remainingPaychecks(paycheckDate, bucket.targetDate, incomes), step);
   }
   return Math.max(0, bucket.fixedAmount ?? 0);
 }
@@ -156,6 +158,7 @@ export function fundingProposal(input: {
   unassigned: number;
   buckets: readonly FundingBucketInput[];
   incomes: readonly FundingIncome[];
+  step: number;
 }): { bucketId: string; amount: number }[] {
   const incomes = withCurrent(input.incomes, input.paycheckPlanId, input.paycheckDate);
   const ordered = [...input.buckets].sort((left, right) => {
@@ -170,13 +173,13 @@ export function fundingProposal(input: {
     }
     return 0;
   });
-  let room = fundingLimit(input.paycheckAmount, input.unassigned);
+  let room = floorToStep(fundingLimit(input.paycheckAmount, input.unassigned), input.step);
   const lines: { bucketId: string; amount: number }[] = [];
   for (const bucket of ordered) {
     if (room <= 0) {
       break;
     }
-    const amount = Math.min(idealAmount(bucket, input.paycheckDate, incomes), room);
+    const amount = Math.min(idealAmount(bucket, input.paycheckDate, incomes, input.step), room);
     if (amount <= 0) {
       continue;
     }
@@ -188,9 +191,9 @@ export function fundingProposal(input: {
 
 export const fundingPositionSchema = z.object({
   asOf: isoDateSchema,
-  onBudgetTotal: cents,
+  onBudgetTotal: money,
   billsReserved: nonNegative,
-  unassigned: cents,
+  unassigned: money,
   nextIncomeDate: isoDateSchema.nullable(),
 });
 
@@ -223,7 +226,7 @@ export const fundingProposalSchema = z.object({
   dueDate: isoDateSchema,
   payee: z.string(),
   paycheckAmount: positive,
-  unassigned: cents,
+  unassigned: money,
   limit: nonNegative,
   lines: z.array(fundingProposalLineSchema),
 });
@@ -234,7 +237,7 @@ export const fundingRunCreateSchema = z.object({
     .array(
       z.object({
         bucketId: z.uuid(),
-        amount: positive,
+        amount: positiveAmountSchema,
       }),
     )
     .min(1),

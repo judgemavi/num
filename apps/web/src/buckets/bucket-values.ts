@@ -1,15 +1,15 @@
-import { bucketWriteSchema, fromMinorUnits, toMinorUnits, type Bucket, type BucketColor } from "@num/shared";
+import { bucketWriteSchema, amountText, parseAmount, type Bucket, type BucketColor } from "@num/shared";
 import { localAsOf } from "@/as-of";
 
-function money(currency: string, minor: number | null) {
-  return minor === null ? "" : fromMinorUnits(currency, minor);
+function money(milli: number | null) {
+  return milli === null ? "" : amountText(milli);
 }
 
 /**
  * The start values of the Bucket form. A new bucket gets the next colour of the rotation and the priority after the
  * last active bucket.
  */
-export function bucketValues(currency: string, bucket: Bucket | null, nextColor: BucketColor, lastPriority: number) {
+export function bucketValues(bucket: Bucket | null, nextColor: BucketColor, lastPriority: number) {
   return {
     name: bucket?.name ?? "",
     kind: bucket?.kind ?? "spending",
@@ -17,13 +17,13 @@ export function bucketValues(currency: string, bucket: Bucket | null, nextColor:
     icon: bucket?.icon ?? "shopping-cart",
     categoryIds: bucket?.categoryIds ?? [],
     startDate: bucket?.startDate ?? localAsOf(),
-    refillTo: money(currency, bucket?.refillTo ?? null),
-    amount: money(currency, bucket?.amount ?? null),
+    refillTo: money(bucket?.refillTo ?? null),
+    amount: money(bucket?.amount ?? null),
     dueDate: bucket?.dueDate ?? "",
     repeat: bucket?.repeat ?? "none",
-    target: money(currency, bucket?.target ?? null),
+    target: money(bucket?.target ?? null),
     targetDate: bucket?.targetDate ?? "",
-    fixedAmount: money(currency, bucket?.fixedAmount ?? null),
+    fixedAmount: money(bucket?.fixedAmount ?? null),
     /** A goal saves by a date, or a set amount from each paycheck. */
     goalMode: bucket?.fixedAmount !== null && bucket?.fixedAmount !== undefined ? "paycheck" : "date",
     priority: String(bucket?.priority ?? lastPriority + 1),
@@ -34,11 +34,11 @@ export function bucketValues(currency: string, bucket: Bucket | null, nextColor:
 type BucketValues = ReturnType<typeof bucketValues>;
 
 /** The values of a new bucket. A form part made with `withForm` gets the type of the form values from them. */
-export const blankBucket = bucketValues("", null, "sky", 0);
+export const blankBucket = bucketValues(null, "sky", 0);
 
 /** The request body of the Bucket form, or the text of the first error. */
 export function bucketBody(currency: string, value: BucketValues) {
-  const read = (text: string) => toMinorUnits(currency, text.trim());
+  const read = (text: string) => parseAmount(currency, text.trim());
   let body;
   try {
     body = {

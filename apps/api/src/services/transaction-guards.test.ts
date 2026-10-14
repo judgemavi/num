@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, openDatabase } from "@num/db";
+import { migrateDatabase, openDatabase, settings } from "@num/db";
 import type { AccountKind, ErrorCode, TransactionLineInput } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
@@ -14,8 +14,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-transaction-guards-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });
@@ -67,9 +69,9 @@ test("a mirror amount change is rejected when the source has more than one line"
     const interest = createCategory(book.db, { name: "Interest", kind: "expense", ...saved });
     const created = createTransaction(
       book.db,
-      lines(chequing.id, -150_000, [
-        { amount: -120_000, transferAccountId: mortgage.id },
-        { amount: -30_000, categoryId: interest.id, memo: "Interest" },
+      lines(chequing.id, -1_500_000, [
+        { amount: -1_200_000, transferAccountId: mortgage.id },
+        { amount: -300_000, categoryId: interest.id, memo: "Interest" },
       ]),
     );
     const mirror = getTransaction(book.db, created.transferPeerId ?? "");
@@ -81,28 +83,28 @@ test("a mirror amount change is rejected when the source has more than one line"
         updateTransaction(
           book.db,
           mirror.id,
-          lines(mortgage.id, 100_000, [{ amount: 100_000, transferAccountId: chequing.id }]),
+          lines(mortgage.id, 1_000_000, [{ amount: 1_000_000, transferAccountId: chequing.id }]),
         ),
       "mirror_amount_locked",
     );
-    expect(getTransaction(book.db, created.id)?.amount).toBe(-150_000);
-    expect(getTransaction(book.db, mirror.id)?.amount).toBe(120_000);
+    expect(getTransaction(book.db, created.id)?.amount).toBe(-1_500_000);
+    expect(getTransaction(book.db, mirror.id)?.amount).toBe(1_200_000);
 
     const edited = updateTransaction(book.db, mirror.id, {
-      ...lines(mortgage.id, 120_000, [{ amount: 120_000, transferAccountId: chequing.id }], "open"),
+      ...lines(mortgage.id, 1_200_000, [{ amount: 1_200_000, transferAccountId: chequing.id }], "open"),
       date: "2026-04-02",
       notes: "Principal",
     });
-    expect(edited.amount).toBe(120_000);
+    expect(edited.amount).toBe(1_200_000);
     expect(edited.date).toBe("2026-04-02");
     expect(edited.notes).toBe("Principal");
     expect(edited.transferPeerId).toBeNull();
     const source = getTransaction(book.db, created.id);
-    expect(source?.amount).toBe(-150_000);
+    expect(source?.amount).toBe(-1_500_000);
     expect(source?.date).toBe("2026-04-01");
     expect(source?.notes).toBeNull();
     expect(source?.transferPeerId).toBeNull();
-    expect(source?.lines.map((line) => line.amount)).toEqual([-120_000, -30_000]);
+    expect(source?.lines.map((line) => line.amount)).toEqual([-1_200_000, -300_000]);
     expect(source?.lines[0]?.transferAccountId).toBeNull();
 
     const corrected = updateTransaction(
@@ -110,20 +112,20 @@ test("a mirror amount change is rejected when the source has more than one line"
       created.id,
       lines(
         chequing.id,
-        -130_000,
+        -1_300_000,
         [
-          { amount: -100_000, transferAccountId: mortgage.id },
-          { amount: -30_000, categoryId: interest.id, memo: "Interest" },
+          { amount: -1_000_000, transferAccountId: mortgage.id },
+          { amount: -300_000, categoryId: interest.id, memo: "Interest" },
         ],
         "cleared",
       ),
     );
-    expect(corrected.amount).toBe(-130_000);
+    expect(corrected.amount).toBe(-1_300_000);
     expect(corrected.status).toBe("cleared");
     const nextMirror = getTransaction(book.db, corrected.transferPeerId ?? "");
     expect(nextMirror?.id).not.toBe(mirror.id);
     expect(nextMirror?.mirror).toBe(true);
-    expect(nextMirror?.amount).toBe(100_000);
+    expect(nextMirror?.amount).toBe(1_000_000);
     expect(nextMirror?.status).toBe("open");
     expect(nextMirror?.lines).toHaveLength(1);
   } finally {
@@ -138,7 +140,7 @@ test("a new mirror starts open", () => {
     const savings = account(book.db, "Savings", "savings");
     const created = createTransaction(
       book.db,
-      lines(chequing.id, -5_000, [{ amount: -5_000, transferAccountId: savings.id }], "cleared"),
+      lines(chequing.id, -50_000, [{ amount: -50_000, transferAccountId: savings.id }], "cleared"),
     );
     const mirror = getTransaction(book.db, created.transferPeerId ?? "");
     if (!mirror) {
@@ -150,7 +152,7 @@ test("a new mirror starts open", () => {
     const clearedMirror = updateTransaction(
       book.db,
       mirror.id,
-      lines(savings.id, 5_000, [{ amount: 5_000, transferAccountId: chequing.id }], "cleared"),
+      lines(savings.id, 50_000, [{ amount: 50_000, transferAccountId: chequing.id }], "cleared"),
     );
     expect(clearedMirror.status).toBe("cleared");
     expect(getTransaction(book.db, created.id)?.status).toBe("cleared");
@@ -158,7 +160,7 @@ test("a new mirror starts open", () => {
     const edited = updateTransaction(
       book.db,
       created.id,
-      lines(chequing.id, -5_000, [{ amount: -5_000, transferAccountId: savings.id }], "open"),
+      lines(chequing.id, -50_000, [{ amount: -50_000, transferAccountId: savings.id }], "open"),
     );
     expect(edited.status).toBe("open");
     expect(getTransaction(book.db, mirror.id)?.status).toBe("cleared");
@@ -171,7 +173,7 @@ test("status reconciled is rejected on input", () => {
   const book = tempDatabase();
   try {
     const cash = account(book.db, "Cash", "cash");
-    const body = lines(cash.id, -10, [{ amount: -10 }]);
+    const body = lines(cash.id, -100, [{ amount: -100 }]);
     expectCode(() => createTransaction(book.db, { ...body, status: "reconciled" }), "transaction_status_invalid");
     const created = createTransaction(book.db, body);
     expectCode(
@@ -193,12 +195,12 @@ test("an archived account is rejected", () => {
     archiveAccount(book.db, closed.id, { confirm: false, ...saved });
 
     expectCode(
-      () => createTransaction(book.db, lines(closed.id, -10, [{ amount: -10 }])),
+      () => createTransaction(book.db, lines(closed.id, -100, [{ amount: -100 }])),
       "account_archived",
     );
-    const created = createTransaction(book.db, lines(chequing.id, -10, [{ amount: -10 }]));
+    const created = createTransaction(book.db, lines(chequing.id, -100, [{ amount: -100 }]));
     expectCode(
-      () => updateTransaction(book.db, created.id, lines(closed.id, -10, [{ amount: -10 }])),
+      () => updateTransaction(book.db, created.id, lines(closed.id, -100, [{ amount: -100 }])),
       "account_archived",
     );
     expect(getTransaction(book.db, created.id)?.accountId).toBe(chequing.id);
@@ -207,25 +209,25 @@ test("an archived account is rejected", () => {
       () =>
         createTransaction(
           book.db,
-          lines(chequing.id, -20, [{ amount: -20, transferAccountId: closed.id }]),
+          lines(chequing.id, -200, [{ amount: -200, transferAccountId: closed.id }]),
         ),
       "account_archived",
     );
     const transfer = createTransaction(
       book.db,
-      lines(chequing.id, -20, [{ amount: -20, transferAccountId: savings.id }]),
+      lines(chequing.id, -200, [{ amount: -200, transferAccountId: savings.id }]),
     );
     expectCode(
       () =>
         updateTransaction(
           book.db,
           transfer.id,
-          lines(chequing.id, -20, [{ amount: -20, transferAccountId: closed.id }]),
+          lines(chequing.id, -200, [{ amount: -200, transferAccountId: closed.id }]),
         ),
       "account_archived",
     );
     expect(getTransaction(book.db, transfer.transferPeerId ?? "")?.accountId).toBe(savings.id);
-    expect(getTransaction(book.db, transfer.id)?.amount).toBe(-20);
+    expect(getTransaction(book.db, transfer.id)?.amount).toBe(-200);
   } finally {
     book.close();
   }

@@ -1,10 +1,10 @@
 import {
   accountClass,
   checkpointCreateSchema,
-  fromMinorUnits,
+  amountText,
   printedStatementBalance,
   storedStatementBalance,
-  toMinorUnits,
+  parseAmount,
   type Account,
   type CheckpointCreate,
 } from "@num/shared";
@@ -34,7 +34,7 @@ import { formatDate } from "@/transactions/format";
 function checkpointOf(currency: string, kind: Account["kind"], value: { date: string; amount: string }) {
   let statementBalance;
   try {
-    statementBalance = storedStatementBalance(kind, toMinorUnits(currency, value.amount.trim()));
+    statementBalance = storedStatementBalance(kind, parseAmount(currency, value.amount.trim()));
   } catch {
     return null;
   }
@@ -57,7 +57,7 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
     // The form starts with the closing date and the closing balance of the last imported statement.
     defaultValues: {
       date: hint.closingDate ?? "",
-      amount: hint.closingBalance === null ? "" : fromMinorUnits(currency, printedStatementBalance(kind, hint.closingBalance)),
+      amount: hint.closingBalance === null ? "" : amountText(printedStatementBalance(kind, hint.closingBalance)),
     },
     validators: {
       onSubmit: ({ value }) => (checkpointOf(currency, kind, value) ? undefined : "Enter a statement date and balance."),
@@ -121,8 +121,8 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
         {compare && !compare.balanced ? (
           <div role="status" className="grid gap-3">
             <p className="text-sm">
-              The book is off by <Amount minor={compare.difference} />. The book balance is{" "}
-              <Amount minor={compare.calculatedBalance} owed={owed} />.
+              The book is off by <Amount value={compare.difference} />. The book balance is{" "}
+              <Amount value={compare.calculatedBalance} owed={owed} />.
             </p>
             {uncleared.length > 0 ? (
               <div>
@@ -130,7 +130,7 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
                 <ul className="mt-1 grid gap-1 text-sm text-muted-foreground">
                   {uncleared.map((item) => (
                     <li key={item.id}>
-                      {item.payee} · {formatDate(item.date)} · <Amount minor={item.amount} />
+                      {item.payee} · {formatDate(item.date)} · <Amount value={item.amount} />
                     </li>
                   ))}
                 </ul>

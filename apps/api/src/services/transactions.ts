@@ -28,6 +28,7 @@ import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-
 import { isUncategorized, recordKeep } from "./decision-keep";
 import { clearUnreadableLine } from "./unreadable-line";
 import { keepOmitted, write, type AuditSource, type WriteTx, type WriteInput, type Reader } from "./write";
+import { requireWholeAmounts } from "./book-step";
 
 const clearedAuto: AutoStamp = { autoReason: null, autoSourceId: null, autoConfidence: null };
 
@@ -123,6 +124,7 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
 }
 
 export function createTransaction(db: Db, input: TransactionBody & WriteInput): Transaction {
+  requireWholeAmounts(db, [input.amount, ...input.lines.map((line) => line.amount)]);
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
     const created = insertTransaction(tx, input, input.source);
@@ -247,6 +249,7 @@ export function updateTransaction(
   id: string,
   input: TransactionBody & WriteInput & { keepUncategorized?: boolean },
 ): Transaction {
+  requireWholeAmounts(db, [input.amount, ...input.lines.map((line) => line.amount)]);
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
     const before = readTransaction(tx, id);

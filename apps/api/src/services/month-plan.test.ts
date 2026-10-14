@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, openDatabase } from "@num/db";
+import { migrateDatabase, openDatabase, settings } from "@num/db";
 import type { ErrorCode } from "@num/shared";
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
@@ -24,8 +24,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-month-plan-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });
@@ -51,7 +53,7 @@ test("funding and spending inside the month do not change the plan", () => {
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
-      openingBalance: 1_000_000,
+      openingBalance: 10_000_000,
       paymentPolicy: null,
       ...saved,
     });
@@ -60,7 +62,7 @@ test("funding and spending inside the month do not change the plan", () => {
       name: "Pay",
       kind: "income",
       accountId: cash.id,
-      expectedAmount: 100_000,
+      expectedAmount: 1_000_000,
       tolerance: 0,
       amountMode: "fixed",
       startDate: "2026-03-01",
@@ -80,7 +82,7 @@ test("funding and spending inside the month do not change the plan", () => {
       color: "mint",
       icon: "shopping-cart",
       categoryIds: [groceries.id],
-      refillTo: 40_000,
+      refillTo: 400_000,
       amount: null,
       dueDate: null,
       repeat: null,
@@ -91,21 +93,21 @@ test("funding and spending inside the month do not change the plan", () => {
       ...saved,
     });
     const before = readMonthPlan(book.db, "2026-03-20", "2026-03");
-    createBucketEvent(book.db, food.id, { kind: "fund", amount: 15_000, date: "2026-03-05", asOf: "2026-03-20", ...saved });
+    createBucketEvent(book.db, food.id, { kind: "fund", amount: 150_000, date: "2026-03-05", asOf: "2026-03-20", ...saved });
     createTransaction(book.db, {
       accountId: cash.id,
       date: "2026-03-12",
-      amount: -8_000,
+      amount: -80_000,
       payeeRaw: "Market",
       status: "open",
-      lines: [{ amount: -8_000, categoryId: groceries.id }],
+      lines: [{ amount: -80_000, categoryId: groceries.id }],
       ...saved,
     });
     const after = readMonthPlan(book.db, "2026-03-20", "2026-03");
     expect(after.funding.planned).toBe(before.funding.planned);
-    expect(after.funding.items.find((item) => item.bucketId === food.id)?.planned).toBe(40_000);
+    expect(after.funding.items.find((item) => item.bucketId === food.id)?.planned).toBe(400_000);
     expect(after.feasibility?.refillsEach).toBe(before.feasibility?.refillsEach);
-    expect(after.funding.actual).toBe(15_000);
+    expect(after.funding.actual).toBe(150_000);
   } finally {
     book.close();
   }
@@ -126,7 +128,7 @@ test("a future month includes planned funding from earlier months", () => {
       name: "Pay",
       kind: "income",
       accountId: cash.id,
-      expectedAmount: 100_000,
+      expectedAmount: 1_000_000,
       tolerance: 0,
       amountMode: "fixed",
       startDate: "2026-01-01",
@@ -150,15 +152,15 @@ test("a future month includes planned funding from earlier months", () => {
       amount: null,
       dueDate: null,
       repeat: null,
-      target: 300,
+      target: 3_000,
       targetDate: "2026-04-01",
       fixedAmount: null,
       asOf: "2000-01-01",
       ...saved,
     });
     const march = readMonthPlan(book.db, "2026-01-15", "2026-03");
-    expect(march.funding.items.find((item) => item.bucketId === trip.id)).toMatchObject({ perPaycheck: 100, planned: 100 });
-    expect(march.feasibility).toMatchObject({ need: 100, refillsEach: 0, shortfall: 0 });
+    expect(march.funding.items.find((item) => item.bucketId === trip.id)).toMatchObject({ perPaycheck: 1_000, planned: 1_000 });
+    expect(march.feasibility).toMatchObject({ need: 1_000, refillsEach: 0, shortfall: 0 });
   } finally {
     book.close();
   }
@@ -171,7 +173,7 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
-      openingBalance: 1_000_000,
+      openingBalance: 10_000_000,
       paymentPolicy: null,
       ...saved,
     });
@@ -180,7 +182,7 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       name: "Pay",
       kind: "income",
       accountId: cash.id,
-      expectedAmount: 50_000,
+      expectedAmount: 500_000,
       tolerance: 0,
       amountMode: "variable",
       startDate: "2025-10-01",
@@ -192,7 +194,7 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       fundsBuckets: true,
       ...saved,
     });
-    const amounts = [100, 200, 300, 9_999];
+    const amounts = [1_000, 2_000, 3_000, 99_990];
     const dates = ["2025-10-01", "2025-11-01", "2025-12-01", "2026-02-01"];
     for (const [index, date] of dates.entries()) {
       const deposit = createTransaction(book.db, {
@@ -221,25 +223,25 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       amount: null,
       dueDate: null,
       repeat: null,
-      target: 10_000,
+      target: 100_000,
       targetDate: null,
-      fixedAmount: 1_000,
+      fixedAmount: 10_000,
       asOf: "2000-01-01",
       ...saved,
     });
     const marchPay = createTransaction(book.db, {
       accountId: cash.id,
       date: "2026-03-01",
-      amount: 50_000,
+      amount: 500_000,
       payeeRaw: "Payroll",
       status: "open",
-      lines: [{ amount: 50_000, categoryId: pay.id }],
+      lines: [{ amount: 500_000, categoryId: pay.id }],
       ...saved,
     });
     linkOccurrence(book.db, plan.id, "2026-03-01", marchPay.id, saved);
     const run = createFundingRun(book.db, {
       incomeTransactionId: marchPay.id,
-      lines: [{ bucketId: trip.id, amount: 1_000 }],
+      lines: [{ bucketId: trip.id, amount: 10_000 }],
       asOf: "2026-03-20",
       ...saved,
     });
@@ -252,7 +254,7 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       color: "sky",
       icon: "wallet",
       categoryIds: [],
-      refillTo: 2_000,
+      refillTo: 20_000,
       amount: null,
       dueDate: null,
       repeat: null,
@@ -262,13 +264,13 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       asOf: "2000-01-01",
       ...saved,
     });
-    createBucketEvent(book.db, old.id, { kind: "fund", amount: 2_000, date: "2026-03-04", asOf: "2026-03-20", ...saved });
-    createBucketEvent(book.db, old.id, { kind: "release", amount: 2_000, date: "2026-03-04", asOf: "2026-03-20", ...saved });
+    createBucketEvent(book.db, old.id, { kind: "fund", amount: 20_000, date: "2026-03-04", asOf: "2026-03-20", ...saved });
+    createBucketEvent(book.db, old.id, { kind: "release", amount: 20_000, date: "2026-03-04", asOf: "2026-03-20", ...saved });
     archiveBucket(book.db, old.id, saved);
 
     const month = readMonthPlan(book.db, "2026-03-20", "2026-03");
-    expect(month.income.planned).toBe(250);
-    expect(month.income.actual).toBe(50_000);
+    expect(month.income.planned).toBe(2_500);
+    expect(month.income.actual).toBe(500_000);
     expect(month.funding.actual).toBe(0);
     expect(month.funding.items.some((item) => item.bucketId === old.id)).toBe(false);
     expect(month.funding.items.find((item) => item.bucketId === trip.id)?.actual).toBe(0);

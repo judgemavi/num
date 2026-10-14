@@ -1,10 +1,10 @@
-import { currencyCodes, type DecimalSeparator } from "@num/shared";
+import { currencyCodes, milliunitDigits, type DecimalSeparator } from "@num/shared";
 
 export type AmountProblem = "amount_unreadable" | "too_many_decimals" | "amount_too_large" | "sign_marker";
 
 export type AmountRead =
   | { kind: "empty" }
-  | { kind: "value"; minor: number }
+  | { kind: "value"; amount: number }
   | { kind: "error"; reason: AmountProblem };
 
 const numberPattern = /^(\d+)(?:\.(\d+))?$/;
@@ -28,8 +28,9 @@ function invalid(reason: AmountProblem): AmountRead {
   return { kind: "error", reason };
 }
 
-export function readMinorAmount(raw: string, digits: number, decimal: DecimalSeparator): AmountRead {
-  if (!Number.isInteger(digits) || digits < 0 || digits > 8) {
+/** Reads a statement amount as milliunits. `digits` is the number of minor-unit digits of the book currency. */
+export function readAmount(raw: string, digits: number, decimal: DecimalSeparator): AmountRead {
+  if (!Number.isInteger(digits) || digits < 0 || digits > milliunitDigits) {
     throw new Error("Minor unit digits are not valid");
   }
 
@@ -89,11 +90,11 @@ export function readMinorAmount(raw: string, digits: number, decimal: DecimalSep
     return invalid("too_many_decimals");
   }
 
-  const scaled = BigInt(`${match[1]}${fraction.padEnd(digits, "0")}`);
+  const scaled = BigInt(`${match[1]}${fraction.padEnd(milliunitDigits, "0")}`);
   if (scaled > BigInt(Number.MAX_SAFE_INTEGER)) {
     return invalid("amount_too_large");
   }
 
-  const minor = Number(scaled);
-  return { kind: "value", minor: negative ? -minor : minor };
+  const amount = Number(scaled);
+  return { kind: "value", amount: negative ? -amount : amount };
 }

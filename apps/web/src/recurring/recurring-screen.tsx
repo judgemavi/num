@@ -125,7 +125,7 @@ function RecurringPage() {
                       </div>
                       {!plan.active ? <Badge variant="neutral">Paused</Badge> : null}
                       {plan.archivedAt ? <Badge variant="neutral">Archived</Badge> : null}
-                      <Amount minor={plan.expectedAmount} />
+                      <Amount value={plan.expectedAmount} />
                       <RowMenu label={`Actions for ${plan.name}`}>
                         <ArchiveMenuItem
                           archived={plan.archivedAt !== null}

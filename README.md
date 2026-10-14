@@ -59,7 +59,7 @@ After an uncertain response, read the current state before a retry.
 A 409 is a conflict to resolve.
 It is not permission to force the write.
 
-Amounts are integer minor units.
+Amounts are integer milliunits: 1000 is one unit of the book currency.
 Money that enters an account is positive.
 A file tool takes the file name and the file text, or the file name and base64 bytes.
 

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditLog, migrateDatabase, openDatabase, valuations } from "@num/db";
+import { auditLog, migrateDatabase, openDatabase, settings, valuations } from "@num/db";
 import { storedStatementBalance, type ErrorCode, type TransactionCreate, type TransactionLineInput } from "@num/shared";
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
@@ -17,8 +17,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-checkpoints-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     sqlite,
     close() {
       sqlite.close();
@@ -87,19 +89,19 @@ function entry(
 test("a checkpoint is created only when the balances are equal, and only rows on or before the date are reconciled", () => {
   const book = tempDatabase();
   try {
-    const chequing = account(book.db, 1_000);
-    const before = createTransaction(book.db, entry(chequing.id, -200, "2026-02-01", "cleared"));
-    const onDate = createTransaction(book.db, entry(chequing.id, -300, "2026-02-15"));
-    const after = createTransaction(book.db, entry(chequing.id, -400, "2026-02-20"));
-    const removed = createTransaction(book.db, entry(chequing.id, -50, "2026-02-10"));
+    const chequing = account(book.db, 10000);
+    const before = createTransaction(book.db, entry(chequing.id, -2000, "2026-02-01", "cleared"));
+    const onDate = createTransaction(book.db, entry(chequing.id, -3000, "2026-02-15"));
+    const after = createTransaction(book.db, entry(chequing.id, -4000, "2026-02-20"));
+    const removed = createTransaction(book.db, entry(chequing.id, -500, "2026-02-10"));
     deleteTransaction(book.db, removed.id, saved);
 
-    const mismatch = compareCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 400 });
+    const mismatch = compareCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 4000 });
     expect(mismatch.balanced).toBe(false);
-    expect(mismatch.difference).toBe(100);
+    expect(mismatch.difference).toBe(1000);
     expect(countWrites(book.sqlite, () => {
       expectCode(
-        () => createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 400, ...saved }),
+        () => createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 4000, ...saved }),
         "checkpoint_unbalanced",
       );
     })).toBe(0);
@@ -107,9 +109,9 @@ test("a checkpoint is created only when the balances are equal, and only rows on
 
     let createdId = "";
     expect(countWrites(book.sqlite, () => {
-      const created = createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 500, ...saved });
+      const created = createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 5000, ...saved });
       createdId = created.id;
-      expect(created.statementBalance).toBe(500);
+      expect(created.statementBalance).toBe(5000);
       expect(created.unlockedAt).toBeNull();
     })).toBe(1);
 
@@ -123,7 +125,7 @@ test("a checkpoint is created only when the balances are equal, and only rows on
     expectCode(
       () =>
         updateTransaction(book.db, onDate.id, {
-          ...entry(chequing.id, -301, "2026-02-15"),
+          ...entry(chequing.id, -3010, "2026-02-15"),
         }),
       "transaction_reconciled",
     );
@@ -131,7 +133,7 @@ test("a checkpoint is created only when the balances are equal, and only rows on
       () => setClearance(book.db, chequing.id, { transactionIds: [onDate.id], status: "open", ...saved }),
       "transaction_reconciled",
     );
-    expect(getTransaction(book.db, onDate.id)?.amount).toBe(-300);
+    expect(getTransaction(book.db, onDate.id)?.amount).toBe(-3000);
 
     const unlocked = unlockCheckpoint(book.db, chequing.id, createdId, { ...saved, at: "2026-10-08T16:00:00Z" });
     expect(unlocked.unlockedAt).toBe("2026-10-08T16:00:00Z");
@@ -149,8 +151,8 @@ test("a checkpoint is created only when the balances are equal, and only rows on
 
     expectCode(() => unlockCheckpoint(book.db, chequing.id, createdId, saved), "checkpoint_unlocked");
 
-    const edited = updateTransaction(book.db, onDate.id, entry(chequing.id, -301, "2026-02-15"));
-    expect(edited.amount).toBe(-301);
+    const edited = updateTransaction(book.db, onDate.id, entry(chequing.id, -3010, "2026-02-15"));
+    expect(edited.amount).toBe(-3010);
     const cleared = setClearance(book.db, chequing.id, { transactionIds: [before.id], status: "open", ...saved });
     expect(cleared.updated).toBe(1);
     expect(getTransaction(book.db, before.id)?.status).toBe("open");
@@ -163,24 +165,24 @@ test("difference help finds a duplicate and a gap", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db);
-    const first = createTransaction(book.db, entry(chequing.id, -100, "2026-01-02"));
-    const copy = createTransaction(book.db, entry(chequing.id, -100, "2026-01-04"));
-    const later = createTransaction(book.db, entry(chequing.id, -50, "2026-01-25"));
+    const first = createTransaction(book.db, entry(chequing.id, -1000, "2026-01-02"));
+    const copy = createTransaction(book.db, entry(chequing.id, -1000, "2026-01-04"));
+    const later = createTransaction(book.db, entry(chequing.id, -500, "2026-01-25"));
     const result = compareCheckpoint(book.db, chequing.id, { date: "2026-01-25", statementBalance: 0 });
     expect(result.balanced).toBe(false);
-    expect(result.calculatedBalance).toBe(-250);
-    expect(result.difference).toBe(-250);
+    expect(result.calculatedBalance).toBe(-2500);
+    expect(result.difference).toBe(-2500);
     expect(result.help).toContainEqual({
       code: "duplicate",
       transactions: [
-        { id: first.id, date: "2026-01-02", payee: "Example shop", amount: -100 },
-        { id: copy.id, date: "2026-01-04", payee: "Example shop", amount: -100 },
+        { id: first.id, date: "2026-01-02", payee: "Example shop", amount: -1000 },
+        { id: copy.id, date: "2026-01-04", payee: "Example shop", amount: -1000 },
       ],
     });
     expect(result.help).toContainEqual({ code: "gap", from: "2026-01-05", to: "2026-01-24" });
     expect(result.help).toContainEqual({
       code: "uncleared",
-      transaction: { id: later.id, date: "2026-01-25", payee: "Example shop", amount: -50 },
+      transaction: { id: later.id, date: "2026-01-25", payee: "Example shop", amount: -500 },
     });
     expect(result.help.some((item) => item.code === "uncleared" && item.transaction.id === first.id)).toBe(false);
   } finally {
@@ -192,11 +194,11 @@ test("help ignores rows after the statement date", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db);
-    const onDate = createTransaction(book.db, entry(chequing.id, -40, "2026-01-25"));
-    const after = createTransaction(book.db, entry(chequing.id, -40, "2026-01-27"));
-    const laterCopy = createTransaction(book.db, entry(chequing.id, -40, "2026-01-28"));
+    const onDate = createTransaction(book.db, entry(chequing.id, -400, "2026-01-25"));
+    const after = createTransaction(book.db, entry(chequing.id, -400, "2026-01-27"));
+    const laterCopy = createTransaction(book.db, entry(chequing.id, -400, "2026-01-28"));
     const result = compareCheckpoint(book.db, chequing.id, { date: "2026-01-25", statementBalance: 0 });
-    expect(result.calculatedBalance).toBe(-40);
+    expect(result.calculatedBalance).toBe(-400);
     const flagged = result.help.flatMap((item) => {
       if (item.code === "uncleared") {
         return [item.transaction.id];
@@ -225,12 +227,12 @@ test("a liability checkpoint stores the negated printed amount", () => {
       paymentPolicy: "full",
       ...saved,
     });
-    const charge = createTransaction(book.db, entry(card.id, -180_636, "2026-02-15"));
-    const printed = 180_636;
+    const charge = createTransaction(book.db, entry(card.id, -1806360, "2026-02-15"));
+    const printed = 1_806_360;
     const stored = storedStatementBalance(card.kind, printed);
-    expect(stored).toBe(-180_636);
+    expect(stored).toBe(-1806360);
     const created = createCheckpoint(book.db, card.id, { date: "2026-02-15", statementBalance: stored, ...saved });
-    expect(created.statementBalance).toBe(-180_636);
+    expect(created.statementBalance).toBe(-1806360);
     expect(getTransaction(book.db, charge.id)?.reconciled).toBe(true);
   } finally {
     book.close();
@@ -244,17 +246,17 @@ test("an investment checkpoint uses the valuation and later transactions", () =>
       name: "Fund",
       kind: "investment",
       openingDate: "2026-01-01",
-      openingBalance: 100,
+      openingBalance: 1000,
       ...saved,
     });
-    book.db.insert(valuations).values({ id: crypto.randomUUID(), accountId: fund.id, date: "2026-02-01", balance: 50_000 }).run();
-    const before = createTransaction(book.db, entry(fund.id, 9_999, "2026-01-15"));
-    const afterValuation = createTransaction(book.db, entry(fund.id, -1_000, "2026-02-10"));
-    const afterStatement = createTransaction(book.db, entry(fund.id, -5_000, "2026-03-01"));
-    const compared = compareCheckpoint(book.db, fund.id, { date: "2026-02-15", statementBalance: 49_000 });
+    book.db.insert(valuations).values({ id: crypto.randomUUID(), accountId: fund.id, date: "2026-02-01", balance: 500000 }).run();
+    const before = createTransaction(book.db, entry(fund.id, 99990, "2026-01-15"));
+    const afterValuation = createTransaction(book.db, entry(fund.id, -10000, "2026-02-10"));
+    const afterStatement = createTransaction(book.db, entry(fund.id, -50000, "2026-03-01"));
+    const compared = compareCheckpoint(book.db, fund.id, { date: "2026-02-15", statementBalance: 490000 });
     expect(compared.balanced).toBe(true);
-    expect(compared.calculatedBalance).toBe(49_000);
-    createCheckpoint(book.db, fund.id, { date: "2026-02-15", statementBalance: 49_000, ...saved });
+    expect(compared.calculatedBalance).toBe(490000);
+    createCheckpoint(book.db, fund.id, { date: "2026-02-15", statementBalance: 490000, ...saved });
     expect(getTransaction(book.db, before.id)?.reconciled).toBe(true);
     expect(getTransaction(book.db, afterValuation.id)?.reconciled).toBe(true);
     expect(getTransaction(book.db, afterStatement.id)?.status).toBe("open");
@@ -275,14 +277,14 @@ test("a checkpoint does not reconcile the mirror in the other account", () => {
       ...saved,
     });
     const transfer = createTransaction(book.db, {
-      ...entry(chequing.id, -200, "2026-02-15"),
-      lines: [{ amount: -200, transferAccountId: savings.id }],
+      ...entry(chequing.id, -2000, "2026-02-15"),
+      lines: [{ amount: -2000, transferAccountId: savings.id }],
     });
     const mirrorId = transfer.transferPeerId;
     if (!mirrorId) {
       throw new Error("Transfer has no mirror");
     }
-    createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: -200, ...saved });
+    createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: -2000, ...saved });
     expect(getTransaction(book.db, transfer.id)?.reconciled).toBe(true);
     expect(getTransaction(book.db, mirrorId)?.status).toBe("open");
   } finally {
@@ -293,11 +295,11 @@ test("a checkpoint does not reconcile the mirror in the other account", () => {
 test("unlock leaves transactions reconciled when a later checkpoint still covers them", () => {
   const book = tempDatabase();
   try {
-    const chequing = account(book.db, 1_000);
-    const early = createTransaction(book.db, entry(chequing.id, -200, "2026-02-01"));
-    const late = createTransaction(book.db, entry(chequing.id, -400, "2026-02-20"));
-    const first = createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 800, ...saved });
-    createCheckpoint(book.db, chequing.id, { date: "2026-02-20", statementBalance: 400, ...saved });
+    const chequing = account(book.db, 10000);
+    const early = createTransaction(book.db, entry(chequing.id, -2000, "2026-02-01"));
+    const late = createTransaction(book.db, entry(chequing.id, -4000, "2026-02-20"));
+    const first = createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 8000, ...saved });
+    createCheckpoint(book.db, chequing.id, { date: "2026-02-20", statementBalance: 4000, ...saved });
     unlockCheckpoint(book.db, chequing.id, first.id, saved);
     expect(getTransaction(book.db, early.id)?.reconciled).toBe(true);
     expect(getTransaction(book.db, late.id)?.reconciled).toBe(true);
@@ -309,15 +311,15 @@ test("unlock leaves transactions reconciled when a later checkpoint still covers
 test("reconcile suggests an opening balance only when the account has no checkpoint", () => {
   const book = tempDatabase();
   try {
-    const chequing = account(book.db, 1_000);
-    createTransaction(book.db, entry(chequing.id, -200, "2026-02-01"));
-    const open = compareCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 400 });
+    const chequing = account(book.db, 10000);
+    createTransaction(book.db, entry(chequing.id, -2000, "2026-02-01"));
+    const open = compareCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 4000 });
     expect(open.difference).not.toBe(0);
-    expect(open.openingSuggestion).toEqual({ amount: 600, date: "2026-01-31" });
-    expect(600 + (open.calculatedBalance - 1_000)).toBe(open.statementBalance);
+    expect(open.openingSuggestion).toEqual({ amount: 6000, date: "2026-01-31" });
+    expect(6000 + (open.calculatedBalance - 10000)).toBe(open.statementBalance);
 
-    createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 800, ...saved });
-    const locked = compareCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 400 });
+    createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 8000, ...saved });
+    const locked = compareCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: 4000 });
     expect(locked.balanced).toBe(false);
     expect(locked.openingSuggestion).toBeNull();
   } finally {

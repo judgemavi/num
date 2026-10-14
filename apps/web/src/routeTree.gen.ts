@@ -22,6 +22,7 @@ import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsAiRouteImport } from './routes/settings/ai'
 import { Route as SettingsBackupRouteImport } from './routes/settings/backup'
 import { Route as SettingsCategoriesRouteImport } from './routes/settings/categories'
+import { Route as SettingsCurrencyRouteImport } from './routes/settings/currency'
 import { Route as SettingsGroupsRouteImport } from './routes/settings/groups'
 import { Route as SettingsMatchingRouteImport } from './routes/settings/matching'
 import { Route as SettingsMerchantsRouteImport } from './routes/settings/merchants'
@@ -93,6 +94,11 @@ const SettingsCategoriesRoute = SettingsCategoriesRouteImport.update({
   path: '/categories',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsCurrencyRoute = SettingsCurrencyRouteImport.update({
+  id: '/currency',
+  path: '/currency',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsGroupsRoute = SettingsGroupsRouteImport.update({
   id: '/groups',
   path: '/groups',
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/settings/ai': typeof SettingsAiRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
+  '/settings/currency': typeof SettingsCurrencyRoute
   '/settings/groups': typeof SettingsGroupsRoute
   '/settings/matching': typeof SettingsMatchingRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByTo {
   '/settings/ai': typeof SettingsAiRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
+  '/settings/currency': typeof SettingsCurrencyRoute
   '/settings/groups': typeof SettingsGroupsRoute
   '/settings/matching': typeof SettingsMatchingRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
@@ -172,6 +180,7 @@ export interface FileRoutesById {
   '/settings/ai': typeof SettingsAiRoute
   '/settings/backup': typeof SettingsBackupRoute
   '/settings/categories': typeof SettingsCategoriesRoute
+  '/settings/currency': typeof SettingsCurrencyRoute
   '/settings/groups': typeof SettingsGroupsRoute
   '/settings/matching': typeof SettingsMatchingRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
@@ -194,6 +203,7 @@ export interface FileRouteTypes {
     | '/settings/ai'
     | '/settings/backup'
     | '/settings/categories'
+    | '/settings/currency'
     | '/settings/groups'
     | '/settings/matching'
     | '/settings/merchants'
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
     | '/settings/ai'
     | '/settings/backup'
     | '/settings/categories'
+    | '/settings/currency'
     | '/settings/groups'
     | '/settings/matching'
     | '/settings/merchants'
@@ -233,6 +244,7 @@ export interface FileRouteTypes {
     | '/settings/ai'
     | '/settings/backup'
     | '/settings/categories'
+    | '/settings/currency'
     | '/settings/groups'
     | '/settings/matching'
     | '/settings/merchants'
@@ -347,6 +359,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsCategoriesRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/currency': {
+      id: '/settings/currency'
+      path: '/currency'
+      fullPath: '/settings/currency'
+      preLoaderRoute: typeof SettingsCurrencyRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/groups': {
       id: '/settings/groups'
       path: '/groups'
@@ -389,6 +408,7 @@ interface SettingsRouteChildren {
   SettingsAiRoute: typeof SettingsAiRoute
   SettingsBackupRoute: typeof SettingsBackupRoute
   SettingsCategoriesRoute: typeof SettingsCategoriesRoute
+  SettingsCurrencyRoute: typeof SettingsCurrencyRoute
   SettingsGroupsRoute: typeof SettingsGroupsRoute
   SettingsMatchingRoute: typeof SettingsMatchingRoute
   SettingsMerchantsRoute: typeof SettingsMerchantsRoute
@@ -400,6 +420,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsAiRoute: SettingsAiRoute,
   SettingsBackupRoute: SettingsBackupRoute,
   SettingsCategoriesRoute: SettingsCategoriesRoute,
+  SettingsCurrencyRoute: SettingsCurrencyRoute,
   SettingsGroupsRoute: SettingsGroupsRoute,
   SettingsMatchingRoute: SettingsMatchingRoute,
   SettingsMerchantsRoute: SettingsMerchantsRoute,

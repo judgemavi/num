@@ -39,17 +39,17 @@ export function BucketRow({ bucket }: { bucket: Bucket }) {
         <div className={`${listAmt} ${over ? "text-attn" : ""}`}>
           {over ? (
             <>
-              Over by <Amount minor={-bucket.balance} />
+              Over by <Amount value={-bucket.balance} />
             </>
           ) : bucket.kind === "spending" ? (
             <>
-              <Amount minor={bucket.balance} /> left
-              <small>of <Amount minor={target} /></small>
+              <Amount value={bucket.balance} /> left
+              <small>of <Amount value={target} /></small>
             </>
           ) : (
             <>
-              <Amount minor={bucket.balance} />
-              <small>of <Amount minor={target} /></small>
+              <Amount value={bucket.balance} />
+              <small>of <Amount value={target} /></small>
             </>
           )}
         </div>

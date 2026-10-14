@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { centsSchema as cents } from "./money";
+import { amountSchema as money } from "./money";
 import { expenseSpending, isExpenseLine, monthKeySchema, priorMonths, type FlowLine } from "./month";
-import { medianMinor } from "./recurring-calc";
+import { medianOf } from "./recurring-calc";
 
 const categoryChangeSchema = z.object({
   categoryId: z.uuid(),
-  amount: cents,
-  median: cents,
-  delta: cents,
+  amount: money,
+  median: money,
+  delta: money,
 });
 
 export const insightChangesSchema = z.object({
@@ -83,7 +83,7 @@ function categoryChanges(byMonth: Map<string, Map<string, number>>, month: strin
   }
   const changes = [...ids].map((categoryId) => {
     const amount = byMonth.get(month)?.get(categoryId) ?? 0;
-    const median = medianMinor(earlier.map((key) => byMonth.get(key)?.get(categoryId) ?? 0));
+    const median = medianOf(earlier.map((key) => byMonth.get(key)?.get(categoryId) ?? 0));
     return { categoryId, amount, median, delta: amount - median };
   });
   const increases = changes

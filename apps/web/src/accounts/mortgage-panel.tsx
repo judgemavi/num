@@ -1,4 +1,4 @@
-import { milliPctToPercent, Temporal, toMinorUnits } from "@num/shared";
+import { milliPctToPercent, Temporal, parseAmount } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useDeferredValue, useState } from "react";
 import { mortgageViewQuery } from "@/api/mortgage";
@@ -19,7 +19,7 @@ function readAmount(currency: string, text: string) {
     return 0;
   }
   try {
-    return toMinorUnits(currency, text.trim());
+    return parseAmount(currency, text.trim());
   } catch {
     return null;
   }
@@ -106,7 +106,7 @@ function MortgageView({ accountId }: { accountId: string }) {
       </CardHeader>
       <CardContent className="grid gap-4 px-5 pt-4 pb-5">
         <p className="text-sm">
-          Balance <Amount minor={row.balance} owed />
+          Balance <Amount value={row.balance} owed />
           <span className="text-muted-foreground"> · {rate} · {frequencyLabels[row.paymentFrequency]}</span>
         </p>
         {row.payoffDate ? (

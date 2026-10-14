@@ -5,8 +5,9 @@ import { cardStatements } from "./card-statement";
 import { isoDateSchema } from "./date";
 import { isMonthKey } from "./month";
 import { billReserveDays } from "./funding";
-import { medianMinor } from "./recurring-calc";
-import { centsSchema } from "./money";
+import { roundToStep } from "./currency";
+import { medianAmount, medianOf } from "./recurring-calc";
+import { amountSchema } from "./money";
 
 export const forecastDayCount = 90;
 
@@ -16,19 +17,19 @@ export const forecastWarningCodes = ["manual_card", "no_payment_account"] as con
 export const forecastRisks = ["below_zero", "below_buffer"] as const;
 
 const seriesSchema = z.object({
-  known: z.array(centsSchema).length(forecastDayCount),
-  estimated: z.array(centsSchema).length(forecastDayCount),
+  known: z.array(amountSchema).length(forecastDayCount),
+  estimated: z.array(amountSchema).length(forecastDayCount),
 });
 
 const pointSchema = z.object({
   date: isoDateSchema,
-  amount: centsSchema,
+  amount: amountSchema,
 });
 
 const monthFlowSchema = z.object({
   month: z.string().refine(isMonthKey),
-  income: centsSchema,
-  spending: centsSchema,
+  income: amountSchema,
+  spending: amountSchema,
 });
 
 export const forecastSchema = z.object({
@@ -36,7 +37,7 @@ export const forecastSchema = z.object({
   dates: z.array(isoDateSchema).length(forecastDayCount),
   nextIncomeDate: isoDateSchema.nullable(),
   bufferAmount: z.number().int().min(0),
-  safeToSpend: centsSchema,
+  safeToSpend: amountSchema,
   lowest: pointSchema,
   warnings: z.array(
     z.object({
@@ -47,8 +48,8 @@ export const forecastSchema = z.object({
   accounts: z.array(
     z.object({
       accountId: z.uuid(),
-      known: z.array(centsSchema).length(forecastDayCount),
-      estimated: z.array(centsSchema).length(forecastDayCount),
+      known: z.array(amountSchema).length(forecastDayCount),
+      estimated: z.array(amountSchema).length(forecastDayCount),
       lowest: pointSchema,
       risk: z.enum(forecastRisks).nullable(),
     }),
@@ -108,11 +109,12 @@ export function monthEnd(asOf: string): string {
   return date.with({ day: date.daysInMonth }).toString();
 }
 
-export function unbucketedMonthly(months: readonly string[], lines: readonly { month: string; amount: number }[]): number {
+/** `step` is the milliunits in one minor unit of the book currency. The result is a whole number of minor units. */
+export function unbucketedMonthly(months: readonly string[], lines: readonly { month: string; amount: number }[], step: number): number {
   if (months.length === 0 || lines.length === 0) {
     return 0;
   }
-  const medianLine = medianMinor(lines.map((line) => line.amount));
+  const medianLine = medianOf(lines.map((line) => line.amount));
   const limit = Math.abs(medianLine) * 3;
   const totals = new Map<string, number>(months.map((month) => [month, 0]));
   for (const line of lines) {
@@ -125,11 +127,11 @@ export function unbucketedMonthly(months: readonly string[], lines: readonly { m
     }
     totals.set(line.month, current + line.amount);
   }
-  const median = medianMinor(months.map((month) => totals.get(month) ?? 0));
+  const median = medianAmount(months.map((month) => totals.get(month) ?? 0), step);
   return median < 0 ? -median : 0;
 }
 
-export function spendDeltas(dates: readonly string[], items: readonly { accountId: string; monthly: number }[]): ForecastDelta[] {
+export function spendDeltas(dates: readonly string[], items: readonly { accountId: string; monthly: number }[], step: number): ForecastDelta[] {
   const shares = new Map<string, number[]>();
   const deltas: ForecastDelta[] = [];
   for (const item of items) {
@@ -141,7 +143,7 @@ export function spendDeltas(dates: readonly string[], items: readonly { accountI
       const key = `${item.monthly}|${day.year}-${day.month}`;
       let monthShares = shares.get(key);
       if (!monthShares) {
-        monthShares = dailyShares(item.monthly, day.daysInMonth);
+        monthShares = dailyShares(item.monthly, day.daysInMonth, step);
         shares.set(key, monthShares);
       }
       const share = monthShares[day.day - 1] ?? 0;
@@ -174,10 +176,12 @@ function forecastMonths(dates: readonly string[], flows: readonly ForecastFlow[]
   return [...months.values()];
 }
 
-function dailyShares(total: number, daysInMonth: number) {
-  const base = Math.floor(total / daysInMonth);
-  const extra = total % daysInMonth;
-  return Array.from({ length: daysInMonth }, (_, index) => (index < extra ? base + 1 : base));
+/** Spreads a monthly amount over the days of the month in whole minor units. The first days get the remainder. */
+function dailyShares(total: number, daysInMonth: number, step: number) {
+  const units = roundToStep(total, step) / step;
+  const base = Math.floor(units / daysInMonth);
+  const extra = units % daysInMonth;
+  return Array.from({ length: daysInMonth }, (_, index) => (index < extra ? base + 1 : base) * step);
 }
 
 export function cardForecastSchedule(input: {

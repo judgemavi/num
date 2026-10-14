@@ -170,10 +170,10 @@ test("one match candidate links the row and several candidates need review", () 
     createTransaction(book.db, {
       accountId: book.account.id,
       date: "2026-04-01",
-      amount: -1000,
+      amount: -10000,
       payeeRaw: "RENT",
       status: "open",
-      lines: [{ amount: -1000 }],
+      lines: [{ amount: -10000 }],
       source: "ui",
       at,
     });
@@ -191,20 +191,20 @@ test("one match candidate links the row and several candidates need review", () 
     createTransaction(book.db, {
       accountId: book.account.id,
       date: "2026-05-01",
-      amount: -2500,
+      amount: -25000,
       payeeRaw: "POWER",
       status: "open",
-      lines: [{ amount: -2500 }],
+      lines: [{ amount: -25000 }],
       source: "ui",
       at,
     });
     createTransaction(book.db, {
       accountId: book.account.id,
       date: "2026-05-03",
-      amount: -2500,
+      amount: -25000,
       payeeRaw: "POWER EAST",
       status: "open",
-      lines: [{ amount: -2500 }],
+      lines: [{ amount: -25000 }],
       source: "ui",
       at,
     });
@@ -234,10 +234,10 @@ test("undo removes only unedited, unreconciled rows", () => {
     createTransaction(book.db, {
       accountId: book.account.id,
       date: "2026-01-13",
-      amount: -400,
+      amount: -4000,
       payeeRaw: "MANUAL",
       status: "open",
-      lines: [{ amount: -400 }],
+      lines: [{ amount: -4000 }],
       source: "ui",
       at,
     });
@@ -316,7 +316,7 @@ test("a column map is saved after the first import", () => {
     if (first.kind !== "batch") {
       return;
     }
-    expect(first.closingBalance).toBe(10000);
+    expect(first.closingBalance).toBe(100000);
     expect(first.closingDate).toBe("2026-01-02");
     const saved = book.db.select().from(accounts).where(eq(accounts.id, book.account.id)).get();
     expect(saved?.columnMap).toEqual(withBalance);
@@ -358,10 +358,10 @@ test("a later import matches a mirror and clears the mirror flag", () => {
     const payment = createTransaction(book.db, {
       accountId: book.account.id,
       date: "2026-01-02",
-      amount: -500,
+      amount: -5000,
       payeeRaw: "Visa payment",
       status: "open",
-      lines: [{ amount: -500, transferAccountId: savings.id }],
+      lines: [{ amount: -5000, transferAccountId: savings.id }],
       source: "ui",
       at,
     });
@@ -455,7 +455,7 @@ test("the first import with a running balance suggests the opening balance", () 
     if (first.kind !== "batch") {
       return;
     }
-    expect(first.openingSuggestion).toEqual({ amount: 150_000, date: "2026-01-01" });
+    expect(first.openingSuggestion).toEqual({ amount: 1_500_000, date: "2026-01-01" });
 
     const card = createAccount(book.db, {
       name: "Card",
@@ -479,7 +479,7 @@ test("the first import with a running balance suggests the opening balance", () 
     });
     expect(cardImport.kind).toBe("batch");
     if (cardImport.kind === "batch") {
-      expect(cardImport.openingSuggestion).toEqual({ amount: -5_600, date: "2026-01-04" });
+      expect(cardImport.openingSuggestion).toEqual({ amount: -56_000, date: "2026-01-04" });
     }
 
     const second = importStatement(book.db, book.dir, {

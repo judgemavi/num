@@ -1,9 +1,10 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
+import { roundToStep } from "./currency";
 import { isoDateSchema } from "./date";
 import { queryNumber } from "./list";
 import { interestRateMilliPctSchema } from "./rate";
-import { centsSchema, nonNegativeCentsSchema as cents } from "./money";
+import { amountSchema, nonNegativeAmountSchema as money, positiveAmountSchema } from "./money";
 
 export const compounding = ["monthly", "semiannual"] as const;
 export const paymentFrequencies = ["weekly", "biweekly", "semimonthly", "monthly"] as const;
@@ -11,12 +12,10 @@ export const paymentFrequencies = ["weekly", "biweekly", "semimonthly", "monthly
 export type Compounding = (typeof compounding)[number];
 export type PaymentFrequency = (typeof paymentFrequencies)[number];
 
-const positiveCents = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
-
 export const mortgageTermsWriteSchema = z.object({
   rateMilliPct: interestRateMilliPctSchema,
   compounding: z.enum(compounding),
-  paymentAmount: positiveCents,
+  paymentAmount: positiveAmountSchema,
   paymentFrequency: z.enum(paymentFrequencies),
   firstPaymentDate: isoDateSchema,
   termEnd: isoDateSchema,
@@ -59,9 +58,11 @@ export type MortgageLoan = {
   firstPaymentDate: string;
   extraPerPayment?: number;
   lumpSum?: MortgageLumpSum | null;
+  /** The milliunits in one minor unit of the book currency. Interest is rounded to it. */
+  step: number;
 };
 
-export function mortgageLoan(terms: MortgageTermsWrite, opening: MortgageOpening): MortgageLoan {
+export function mortgageLoan(terms: MortgageTermsWrite, opening: MortgageOpening, step: number): MortgageLoan {
   return {
     principal: Math.abs(opening.balance),
     principalAsOf: opening.date,
@@ -70,6 +71,7 @@ export function mortgageLoan(terms: MortgageTermsWrite, opening: MortgageOpening
     paymentAmount: terms.paymentAmount,
     paymentFrequency: terms.paymentFrequency,
     firstPaymentDate: terms.firstPaymentDate,
+    step,
   };
 }
 
@@ -222,10 +224,10 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
       }
     }
     const rate = chargeRate(regular, periods, previous, date, frequency);
-    const interest = Math.round(balance * rate);
+    const interest = roundToStep(balance * rate, loan.step);
     const sameDayLump = lump && !lumpUsed && lump.date === date ? lump.amount : 0;
     const payable = due + sameDayLump;
-    if (Math.round(balance * regular) >= payable) {
+    if (roundToStep(balance * regular, loan.step) >= payable) {
       nonAmortizing = true;
       break;
     }
@@ -303,11 +305,12 @@ export function mortgageSplitForDate(input: {
   date: string;
   fromAccountId: string;
   toAccountId: string;
+  step: number;
 }): MortgageSplit | null {
   if (input.fromAccountId !== input.terms.paymentAccountId || input.toAccountId !== input.terms.accountId) {
     return null;
   }
-  const schedule = mortgageSchedule(mortgageLoan(input.terms, input.opening), input.valuations);
+  const schedule = mortgageSchedule(mortgageLoan(input.terms, input.opening, input.step), input.valuations);
   const row = schedule.payments.filter((payment) => payment.date <= input.date).at(-1);
   if (!row) {
     return null;
@@ -322,20 +325,20 @@ export function mortgageSplitForDate(input: {
 
 export const mortgagePaymentSchema = z.object({
   date: isoDateSchema,
-  payment: cents,
-  principal: cents,
-  interest: cents,
-  balance: cents,
+  payment: money,
+  principal: money,
+  interest: money,
+  balance: money,
 });
 
 export const mortgageViewSchema = z.object({
-  balance: centsSchema,
+  balance: amountSchema,
   rateMilliPct: interestRateMilliPctSchema,
   payoffDate: isoDateSchema.nullable(),
   nonAmortizing: z.boolean(),
-  totalInterest: cents,
+  totalInterest: money,
   termEnd: isoDateSchema,
-  paymentAmount: positiveCents,
+  paymentAmount: positiveAmountSchema,
   paymentFrequency: z.enum(paymentFrequencies),
   nextPayments: z.array(mortgagePaymentSchema),
   payments: z.array(mortgagePaymentSchema),
@@ -343,13 +346,13 @@ export const mortgageViewSchema = z.object({
     z.object({
       id: z.uuid(),
       date: isoDateSchema,
-      amount: cents,
+      amount: money,
     }),
   ),
   extra: z
     .object({
-      amount: cents,
-      lumpSum: cents.nullable(),
+      amount: money,
+      lumpSum: money.nullable(),
       lumpDate: isoDateSchema.nullable(),
       payoffDate: isoDateSchema.nullable(),
       interestSaved: z.number().int().nullable(),
@@ -358,11 +361,11 @@ export const mortgageViewSchema = z.object({
 });
 
 export const mortgagePrefillSchema = z.object({
-  principal: cents,
-  interest: cents,
+  principal: money,
+  interest: money,
   interestCategoryId: z.uuid(),
   mortgageAccountId: z.uuid(),
-  payment: positiveCents,
+  payment: positiveAmountSchema,
 });
 
 export const mortgageViewQuerySchema = z

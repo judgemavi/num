@@ -44,7 +44,7 @@ export function AccountForm({ account, terms = null, initialName, inline = false
   const allowed = account ? sameClassKinds(account.kind) : accountKinds;
 
   const form = useAppForm({
-    defaultValues: accountValues(currency, account, terms, initialName ?? ""),
+    defaultValues: accountValues(account, terms, initialName ?? ""),
     validators: {
       onSubmit: ({ value }) => {
         const result = accountBody(currency, value, value.kind === "mortgage" && !inline);

@@ -77,7 +77,7 @@ function paycheck(db: Db) {
     name: "Cash",
     kind: "chequing",
     openingDate: "2026-01-01",
-    openingBalance: 50_000,
+    openingBalance: 500_000,
     ...saved,
   });
   const pay = createCategory(db, { name: "Pay", kind: "income", ...saved });
@@ -85,7 +85,7 @@ function paycheck(db: Db) {
     name: "Pay",
     kind: "income",
     accountId: cash.id,
-    expectedAmount: 50_000,
+    expectedAmount: 500_000,
     tolerance: 0,
     amountMode: "fixed",
     startDate: "2026-10-01",
@@ -100,10 +100,10 @@ function paycheck(db: Db) {
   const deposit = createTransaction(db, {
     accountId: cash.id,
     date: "2026-10-01",
-    amount: 50_000,
+    amount: 500_000,
     payeeRaw: "Payroll",
     status: "open",
-    lines: [{ amount: 50_000, categoryId: pay.id }],
+    lines: [{ amount: 500_000, categoryId: pay.id }],
     ...saved,
   });
   linkOccurrence(db, plan.id, "2026-10-01", deposit.id, saved);
@@ -115,7 +115,7 @@ function paycheck(db: Db) {
     color: "mint",
     icon: "shopping-cart",
     categoryIds: [],
-    refillTo: 10_000,
+    refillTo: 100_000,
     amount: null,
     dueDate: null,
     repeat: null,
@@ -134,13 +134,13 @@ test("delete of a funded paycheck is refused", () => {
     const { deposit, food } = paycheck(sample.db);
     createFundingRun(sample.db, {
       incomeTransactionId: deposit.id,
-      lines: [{ bucketId: food.id, amount: 1_000 }],
+      lines: [{ bucketId: food.id, amount: 10_000 }],
       asOf: "2026-10-01",
       ...saved,
     });
     expectCode(() => deleteTransaction(sample.db, deposit.id, saved), "paycheck_funded");
-    expect(getTransaction(sample.db, deposit.id)?.amount).toBe(50_000);
-    expect(readBucket(sample.db, food.id).balance).toBe(1_000);
+    expect(getTransaction(sample.db, deposit.id)?.amount).toBe(500_000);
+    expect(readBucket(sample.db, food.id).balance).toBe(10_000);
     assertLedger(sample.sqlite);
   } finally {
     sample.close();
@@ -153,7 +153,7 @@ test("delete of a paycheck with an undone run leaves bucket balances unchanged",
     const { deposit, food } = paycheck(sample.db);
     const run = createFundingRun(sample.db, {
       incomeTransactionId: deposit.id,
-      lines: [{ bucketId: food.id, amount: 1_000 }],
+      lines: [{ bucketId: food.id, amount: 10_000 }],
       asOf: "2026-10-01",
       ...saved,
     });
@@ -204,10 +204,10 @@ test("import undo skips a row the user linked as a transfer", () => {
     const other = createTransaction(sample.db, {
       accountId: savings.id,
       date: "2026-01-02",
-      amount: 800,
+      amount: 8000,
       payeeRaw: "From cash",
       status: "open",
-      lines: [{ amount: 800 }],
+      lines: [{ amount: 8000 }],
       ...saved,
     });
     acceptTransferPair(sample.db, "2026-01-02", payment.id, other.id, saved);
@@ -255,10 +255,10 @@ test("undo of a row with a refund pointing at it clears the link", () => {
     const refund = createTransaction(sample.db, {
       accountId: cash.id,
       date: "2026-01-05",
-      amount: 400,
+      amount: 4000,
       payeeRaw: "NORTH MARKET",
       status: "open",
-      lines: [{ amount: 400, categoryId: groceries.id }],
+      lines: [{ amount: 4000, categoryId: groceries.id }],
       refundOfId: purchase.id,
       ...saved,
     });
@@ -299,10 +299,10 @@ test("delete of a transfer removes the mirror and leaves no orphan transfer line
     const payment = createTransaction(sample.db, {
       accountId: cash.id,
       date: "2026-04-01",
-      amount: -500,
+      amount: -5000,
       payeeRaw: "Move",
       status: "open",
-      lines: [{ amount: -500, transferAccountId: savings.id }],
+      lines: [{ amount: -5000, transferAccountId: savings.id }],
       ...saved,
     });
     const mirrorId = payment.transferPeerId;

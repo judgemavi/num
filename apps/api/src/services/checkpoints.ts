@@ -13,6 +13,7 @@ import { checkpointHelp } from "./checkpoint-help";
 import { effectiveOpeningDate } from "./opening-date";
 import { checkpointOpeningSuggestion } from "./opening-suggestion";
 import { withoutId, write, type WriteInput, type Reader } from "./write";
+import { requireWholeAmounts } from "./book-step";
 
 function requireAccount(db: Reader, id: string) {
   const row = db
@@ -85,6 +86,7 @@ export function createCheckpoint(
   accountId: string,
   input: { date: string; statementBalance: number } & WriteInput,
 ): Checkpoint {
+  requireWholeAmounts(db, [input.statementBalance]);
   const preview = compareCheckpoint(db, accountId, input);
   if (!preview.balanced) {
     throw new ServiceError("checkpoint_unbalanced", 409, { difference: String(preview.difference) });

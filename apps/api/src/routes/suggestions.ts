@@ -16,7 +16,7 @@ import { errorResponse } from "./common";
 
 const suggestRoute = createRoute({
   operationId: "get_suggestions",
-  description: "Read category suggestions. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read category suggestions. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/suggestions",
   request: { query: suggestionQuerySchema },
@@ -29,7 +29,7 @@ const suggestRoute = createRoute({
 
 const transfersRoute = createRoute({
   operationId: "get_transfer_pairs",
-  description: "Read transfer pairs. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read transfer pairs. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/transfer-pairs",
   request: { query: asOfQuerySchema },
@@ -41,7 +41,7 @@ const transfersRoute = createRoute({
 
 const pairRoute = createRoute({
   operationId: "post_transfer_pairs",
-  description: "Create or run transfer pairs. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run transfer pairs. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/transfer-pairs",
   request: {
@@ -58,7 +58,7 @@ const pairRoute = createRoute({
 
 const hintRoute = createRoute({
   operationId: "get_transfer_hint",
-  description: "Read the transfer hint. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read the transfer hint. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/transfer-hint",
   request: { query: transferHintQuerySchema },

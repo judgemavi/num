@@ -1,5 +1,5 @@
 import { Temporal } from "temporal-polyfill";
-import { medianMinor, type AmountMode, type PlanFrequency } from "./recurring-calc";
+import { medianAmount, medianOf, type AmountMode, type PlanFrequency } from "./recurring-calc";
 
 export type DetectionTransaction = {
   id: string;
@@ -44,7 +44,7 @@ function expectedGap(previous: Temporal.PlainDate, freq: PlanFrequency, interval
 }
 
 function withinTenPercent(amounts: readonly number[]) {
-  const mid = medianMinor(amounts);
+  const mid = medianOf(amounts);
   if (mid === 0) {
     return amounts.every((amount) => amount === 0);
   }
@@ -54,9 +54,10 @@ function withinTenPercent(amounts: readonly number[]) {
 function proposalFrom(
   rows: readonly DetectionTransaction[],
   pattern: { freq: PlanFrequency; interval: number },
+  step: number,
 ): PlanProposal {
   const amounts = rows.map((row) => row.amount);
-  const expectedAmount = medianMinor(amounts);
+  const expectedAmount = medianAmount(amounts, step);
   const first = rows[0];
   const start = Temporal.PlainDate.from(first?.date ?? "1970-01-01");
   const varied = amounts.some((amount) => amount !== amounts[0]);
@@ -81,7 +82,7 @@ function patternForGap(previous: Temporal.PlainDate, next: Temporal.PlainDate) {
   );
 }
 
-function latestRun(sorted: readonly DetectionTransaction[]): PlanProposal | null {
+function latestRun(sorted: readonly DetectionTransaction[], step: number): PlanProposal | null {
   if (sorted.length < 3) {
     return null;
   }
@@ -112,10 +113,11 @@ function latestRun(sorted: readonly DetectionTransaction[]): PlanProposal | null
   if (window.length < 3 || !withinTenPercent(window.map((row) => row.amount))) {
     return null;
   }
-  return proposalFrom(window, pattern);
+  return proposalFrom(window, pattern, step);
 }
 
-export function detectPlans(transactions: readonly DetectionTransaction[], asOf?: string): PlanProposal[] {
+/** `step` is the milliunits in one minor unit of the book currency. */
+export function detectPlans(transactions: readonly DetectionTransaction[], step: number, asOf?: string): PlanProposal[] {
   const since = asOf ? Temporal.PlainDate.from(asOf).subtract({ months: 18 }).toString() : null;
   const groups = new Map<string, DetectionTransaction[]>();
   for (const transaction of transactions) {
@@ -135,7 +137,7 @@ export function detectPlans(transactions: readonly DetectionTransaction[], asOf?
       }
       return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
     });
-    const proposal = latestRun(sorted);
+    const proposal = latestRun(sorted, step);
     if (proposal) {
       proposals.push(proposal);
     }

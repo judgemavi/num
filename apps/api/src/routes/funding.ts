@@ -18,7 +18,7 @@ import { errorResponse, idParams } from "./common";
 
 const positionRoute = createRoute({
   operationId: "get_funding_position",
-  description: "Read funding. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read funding. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/funding/position",
   request: { query: asOfQuerySchema },
@@ -33,7 +33,7 @@ const positionRoute = createRoute({
 
 const paychecksRoute = createRoute({
   operationId: "get_funding_paychecks",
-  description: "Read funding. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read funding. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/funding/paychecks",
   responses: {
@@ -46,7 +46,7 @@ const paychecksRoute = createRoute({
 
 const proposalRoute = createRoute({
   operationId: "get_funding_proposal",
-  description: "Read funding. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read funding. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/funding/proposal",
   request: { query: fundingProposalQuerySchema },
@@ -63,7 +63,7 @@ const proposalRoute = createRoute({
 
 const listRoute = createRoute({
   operationId: "get_funding_runs",
-  description: "Read funding. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read funding. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/funding/runs",
   responses: {
@@ -76,7 +76,7 @@ const listRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_funding_runs",
-  description: "Create or run funding. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run funding. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/funding/runs",
   request: {
@@ -96,7 +96,7 @@ const createRouteDef = createRoute({
 
 const undoRoute = createRoute({
   operationId: "post_funding_runs_id_undo",
-  description: "Undo funding (undo). This reverses that change. It does not remove the audit log. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Undo funding (undo). This reverses that change. It does not remove the audit log. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/funding/runs/{id}/undo",
   request: { params: idParams },

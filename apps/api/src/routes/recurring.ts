@@ -25,7 +25,7 @@ const asOfQuery = z.object({ asOf: isoDateSchema });
 
 const listRoute = createRoute({
   operationId: "list_plans",
-  description: "Read recurring plans. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read recurring plans. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/recurring",
   request: { query: planListQuerySchema },
@@ -37,7 +37,7 @@ const listRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_recurring",
-  description: "Create or run recurring plans. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run recurring plans. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/recurring",
   request: { body: { required: true, content: { "application/json": { schema: planCreateSchema } } } },
@@ -51,7 +51,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_recurring_id",
-  description: "Change recurring plans. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Change recurring plans. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/recurring/{id}",
   request: {
@@ -68,7 +68,7 @@ const updateRoute = createRoute({
 
 const archiveRoute = createRoute({
   operationId: "post_recurring_id_archive",
-  description: "Remove or archive recurring plans (archive). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Remove or archive recurring plans (archive). This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/recurring/{id}/archive",
   request: { params: idParams },
@@ -81,7 +81,7 @@ const archiveRoute = createRoute({
 
 const restoreRoute = createRoute({
   operationId: "post_recurring_id_restore",
-  description: "Restore recurring plans (restore). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Restore recurring plans (restore). This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/recurring/{id}/restore",
   request: { params: idParams },
@@ -94,7 +94,7 @@ const restoreRoute = createRoute({
 
 const occurrencesRoute = createRoute({
   operationId: "list_occurrences",
-  description: "Read recurring plans (occurrences). This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read recurring plans (occurrences). This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/recurring/{id}/occurrences",
   request: { params: idParams, query: asOfQuery },
@@ -107,7 +107,7 @@ const occurrencesRoute = createRoute({
 
 const linkRoute = createRoute({
   operationId: "post_recurring_id_occurrences_duedate_link",
-  description: "Create or run recurring plans (link). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run recurring plans (link). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/recurring/{id}/occurrences/{dueDate}/link",
   request: {
@@ -124,7 +124,7 @@ const linkRoute = createRoute({
 
 const unlinkRoute = createRoute({
   operationId: "post_recurring_id_occurrences_duedate_unlink",
-  description: "Create or run recurring plans (unlink). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run recurring plans (unlink). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/recurring/{id}/occurrences/{dueDate}/unlink",
   request: { params: occurrenceParams },
@@ -137,7 +137,7 @@ const unlinkRoute = createRoute({
 
 const skipRoute = createRoute({
   operationId: "post_recurring_id_occurrences_duedate_skip",
-  description: "Create or run recurring plans (skip). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run recurring plans (skip). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/recurring/{id}/occurrences/{dueDate}/skip",
   request: {
@@ -154,7 +154,7 @@ const skipRoute = createRoute({
 
 const restoreSkipRoute = createRoute({
   operationId: "post_recurring_id_occurrences_duedate_restore",
-  description: "Restore recurring plans (restore). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Restore recurring plans (restore). This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/recurring/{id}/occurrences/{dueDate}/restore",
   request: { params: occurrenceParams },
@@ -167,7 +167,7 @@ const restoreSkipRoute = createRoute({
 
 const autoLinkRoute = createRoute({
   operationId: "post_recurring_auto_link",
-  description: "Create or run recurring plans. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run recurring plans. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/recurring/auto-link",
   request: { query: asOfQuery },
@@ -179,7 +179,7 @@ const autoLinkRoute = createRoute({
 
 const signalsRoute = createRoute({
   operationId: "get_recurring_signals",
-  description: "Read recurring plans (signals). This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read recurring plans (signals). This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/recurring/signals",
   request: { query: asOfQuery },
@@ -191,7 +191,7 @@ const signalsRoute = createRoute({
 
 const readRoute = createRoute({
   operationId: "get_recurring_id",
-  description: "Read recurring plans. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read recurring plans. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/recurring/{id}",
   request: { params: idParams },

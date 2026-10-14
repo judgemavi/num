@@ -15,7 +15,7 @@ import { errorResponse, idParams } from "./common";
 
 const listRoute = createRoute({
   operationId: "list_accounts",
-  description: "Read accounts. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read accounts. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts",
   request: {
@@ -36,7 +36,7 @@ const listRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_accounts",
-  description: "Create or run accounts. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive. For a mortgage, the same call saves the mortgage terms (mortgageTerms). null removes the terms. Terms need an opening date and make it fixed.",
+  description: "Create or run accounts. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive. For a mortgage, the same call saves the mortgage terms (mortgageTerms). null removes the terms. Terms need an opening date and make it fixed.",
   method: "post",
   path: "/api/accounts",
   request: {
@@ -64,7 +64,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_accounts_id",
-  description: "Change accounts. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive. For a mortgage, the same call saves the mortgage terms (mortgageTerms). null removes the terms. Terms need an opening date and make it fixed.",
+  description: "Change accounts. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive. For a mortgage, the same call saves the mortgage terms (mortgageTerms). null removes the terms. Terms need an opening date and make it fixed.",
   method: "patch",
   path: "/api/accounts/{id}",
   request: {
@@ -94,7 +94,7 @@ const updateRoute = createRoute({
 
 const restoreRoute = createRoute({
   operationId: "post_accounts_id_restore",
-  description: "Restore accounts (restore). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Restore accounts (restore). This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/accounts/{id}/restore",
   request: { params: idParams },
@@ -114,7 +114,7 @@ const restoreRoute = createRoute({
 
 const readRoute = createRoute({
   operationId: "get_accounts_id",
-  description: "Read accounts. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read accounts. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts/{id}",
   request: { params: idParams },
@@ -133,7 +133,7 @@ const readRoute = createRoute({
 
 const archiveRoute = createRoute({
   operationId: "post_accounts_id_archive",
-  description: "Remove or archive accounts (archive). This does not change records of another kind. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Remove or archive accounts (archive). This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/accounts/{id}/archive",
   request: {
@@ -164,7 +164,7 @@ const archiveRoute = createRoute({
 
 const openingRoute = createRoute({
   operationId: "post_accounts_id_opening",
-  description: "Create or run accounts (opening). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run accounts (opening). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/accounts/{id}/opening",
   request: {

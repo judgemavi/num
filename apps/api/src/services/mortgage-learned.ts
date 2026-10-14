@@ -12,6 +12,7 @@ import { and, eq, isNull, lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { lineCount, literal } from "./transaction-sql";
 import type { Reader } from "./write";
+import { bookStep } from "./book-step";
 
 const principalLine = alias(transactionLines, "principal_line");
 const interestLine = alias(transactionLines, "interest_line");
@@ -96,6 +97,7 @@ export function mortgageLinesFor(db: Reader, mortgageAccountId: string, fromAcco
     date,
     fromAccountId,
     toAccountId: mortgageAccountId,
+    step: bookStep(db),
   });
   if (!split) {
     return null;

@@ -14,6 +14,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { keepOmitted, withoutId, write, type WriteTx, type WriteInput } from "./write";
 import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
+import { requireWholeAmounts } from "./book-step";
 
 function fieldsOf(input: PlanCreate) {
   const transfer = input.kind === "transfer";
@@ -142,6 +143,7 @@ export function listPlans(db: Db, query: PlanListQuery) {
 }
 
 export function createPlan(db: Db, input: PlanCreate & WriteInput): Plan {
+  requireWholeAmounts(db, [input.expectedAmount, input.tolerance]);
   const id = crypto.randomUUID();
   const value = fieldsOf(input);
   const row = { id, ...value, archivedAt: null };
@@ -161,6 +163,7 @@ export function createPlan(db: Db, input: PlanCreate & WriteInput): Plan {
 
 /** A field that the update leaves out keeps its stored value. An explicit null clears a field that can be empty. */
 export function updatePlan(db: Db, id: string, input: PlanUpdate & WriteInput): Plan {
+  requireWholeAmounts(db, [input.expectedAmount, input.tolerance]);
   return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = requirePlan(tx, id);
     const value = fieldsOf({

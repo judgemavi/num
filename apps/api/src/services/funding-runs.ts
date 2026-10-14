@@ -5,6 +5,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { activeFundingRun, fundingPosition, requirePaycheck } from "./funding-book";
 import { withoutId, write, type WriteTx, type WriteInput } from "./write";
+import { requireWholeAmounts } from "./book-step";
 
 /** The audit log keeps the run row without its id, and the lines of the run. */
 function snapshot(row: FundingRunRow, lines: { bucketId: string; amount: number }[]) {
@@ -59,6 +60,7 @@ export function createFundingRun(db: Db, input: FundingRunCreate & WriteInput & 
   if (!isIsoDate(input.asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
   }
+  requireWholeAmounts(db, input.lines.map((line) => line.amount));
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
     const paycheck = requirePaycheck(tx, input.incomeTransactionId);

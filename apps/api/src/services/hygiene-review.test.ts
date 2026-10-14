@@ -50,14 +50,14 @@ function check<T extends HygieneCheck["code"]>(db: Db, asOf: string, code: T): E
 }
 
 function changedPlan(db: Db) {
-  const cash = account(db, "chequing", "Cash", 5_000);
+  const cash = account(db, "chequing", "Cash", 50_000);
   const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
   const plan = createPlan(db, {
     name: "Stream",
     kind: "bill",
     accountId: cash.id,
     categoryId: food.id,
-    expectedAmount: -1_000,
+    expectedAmount: -10_000,
     tolerance: 0,
     amountMode: "fixed",
     startDate: "2026-01-15",
@@ -72,10 +72,10 @@ function changedPlan(db: Db) {
   const paid = createTransaction(db, {
     accountId: cash.id,
     date: "2026-01-15",
-    amount: -1_999,
+    amount: -19_990,
     payeeRaw: "Stream",
     status: "cleared",
-    lines: [{ amount: -1_999, categoryId: food.id }],
+    lines: [{ amount: -19_990, categoryId: food.id }],
     ...saved,
   });
   linkOccurrence(db, plan.id, "2026-01-15", paid.id, saved);
@@ -94,29 +94,29 @@ test("a changed amount fails the recurring check until keep_plan_amount", () => 
 
 test("an older unpaid statement fails after a newer statement exists", () => {
   withBook((db) => {
-    const card = account(db, "credit_card", "Card", -4_000);
+    const card = account(db, "credit_card", "Card", -40_000);
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-    createCheckpoint(db, card.id, { date: "2026-01-15", statementBalance: -4_000, ...saved });
+    createCheckpoint(db, card.id, { date: "2026-01-15", statementBalance: -40_000, ...saved });
     createTransaction(db, {
       accountId: card.id,
       date: "2026-02-10",
-      amount: -1_000,
+      amount: -10_000,
       payeeRaw: "Shop",
       status: "cleared",
-      lines: [{ amount: -1_000, categoryId: food.id }],
+      lines: [{ amount: -10_000, categoryId: food.id }],
       ...saved,
     });
-    createCheckpoint(db, card.id, { date: "2026-02-15", statementBalance: -5_000, ...saved });
+    createCheckpoint(db, card.id, { date: "2026-02-15", statementBalance: -50_000, ...saved });
     const row = check(db, "2026-02-20", "cards_paid");
     expect(row.pass).toBe(false);
-    expect(row.items[0]).toMatchObject({ statementDate: "2026-01-15", dueDate: "2026-02-05", owed: 4_000, paid: 0, pass: false });
+    expect(row.items[0]).toMatchObject({ statementDate: "2026-01-15", dueDate: "2026-02-05", owed: 40_000, paid: 0, pass: false });
   });
 });
 
 test("a statement dated after asOf is ignored", () => {
   withBook((db) => {
-    const card = account(db, "credit_card", "Card", -1_000);
-    createCheckpoint(db, card.id, { date: "2026-03-01", statementBalance: -1_000, ...saved });
+    const card = account(db, "credit_card", "Card", -10_000);
+    createCheckpoint(db, card.id, { date: "2026-03-01", statementBalance: -10_000, ...saved });
     const row = check(db, "2026-02-10", "cards_paid");
     expect(row.pass).toBe(true);
     expect(row.items[0]).toMatchObject({ statementDate: null, dueDate: null, owed: 0, paid: 0, pass: true });
@@ -125,7 +125,7 @@ test("a statement dated after asOf is ignored", () => {
 
 test("a cash account that was never imported does not fail", () => {
   withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 500);
+    const cash = account(db, "chequing", "Cash", 5_000);
     const row = check(db, "2026-10-08", "imports_current");
     expect(row.pass).toBe(true);
     expect(row.items).toEqual([{ accountId: cash.id, lastImportDate: null, ageDays: null, pass: true }]);

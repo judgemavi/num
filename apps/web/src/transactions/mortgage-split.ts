@@ -1,4 +1,4 @@
-import { fromMinorUnits, isIsoDate, mortgagePrefillLines, toMinorUnits, type MoneyDirection, type WhatChoice } from "@num/shared";
+import { amountText, isIsoDate, mortgagePrefillLines, parseAmount, type MoneyDirection, type WhatChoice } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { mortgagePrefillQuery } from "@/api/mortgage";
 import type { SplitLine } from "@/transactions/what-choice";
@@ -30,22 +30,22 @@ export function useMortgageSplit({ open, choice, direction, fromAccountId, toAcc
  * With an amount in the form, the interest stays and the principal is the remainder. With no amount, `total` is the
  * payment of the schedule, for the amount field.
  */
-export function mortgageSplitFill(currency: string, split: NonNullable<ReturnType<typeof useMortgageSplit>>, amountText: string): { total: string | null; lines: SplitLine[] } {
-  let totalMinor: number | null = null;
-  if (amountText.trim().length > 0) {
+export function mortgageSplitFill(currency: string, split: NonNullable<ReturnType<typeof useMortgageSplit>>, typed: string): { total: string | null; lines: SplitLine[] } {
+  let totalMilli: number | null = null;
+  if (typed.trim().length > 0) {
     try {
-      totalMinor = toMinorUnits(currency, amountText.trim());
+      totalMilli = parseAmount(currency, typed.trim());
     } catch {
-      totalMinor = null;
+      totalMilli = null;
     }
   }
-  const amounts = mortgagePrefillLines(split.interest, split.principal, totalMinor);
+  const amounts = mortgagePrefillLines(split.interest, split.principal, totalMilli);
   return {
-    total: totalMinor === null ? fromMinorUnits(currency, split.payment) : null,
+    total: totalMilli === null ? amountText(split.payment) : null,
     lines: [
       {
         key: crypto.randomUUID(),
-        amount: fromMinorUnits(currency, amounts.principal),
+        amount: amountText(amounts.principal),
         opposite: false,
         edited: false,
         categoryId: null,
@@ -53,7 +53,7 @@ export function mortgageSplitFill(currency: string, split: NonNullable<ReturnTyp
       },
       {
         key: crypto.randomUUID(),
-        amount: fromMinorUnits(currency, amounts.interest),
+        amount: amountText(amounts.interest),
         opposite: false,
         edited: false,
         categoryId: split.interestCategoryId,

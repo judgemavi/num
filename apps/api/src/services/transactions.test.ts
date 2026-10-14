@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, openDatabase } from "@num/db";
+import { migrateDatabase, openDatabase, settings } from "@num/db";
 import type { AccountKind, ErrorCode, Transaction, TransactionCreate, TransactionLineInput } from "@num/shared";
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
@@ -18,8 +18,10 @@ function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-transactions-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
+  const db = createDb(sqlite);
+  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
-    db: createDb(sqlite),
+    db,
     sqlite,
     close() {
       sqlite.close();
@@ -102,26 +104,37 @@ test("lines must sum to the transaction amount", () => {
     const chequing = account(book.db, "Chequing", "chequing");
     const created = createTransaction(
       book.db,
-      entry(chequing.id, -100, [
-        { amount: -60, memo: "Food" },
-        { amount: -40, memo: "Taxi" },
+      entry(chequing.id, -1000, [
+        { amount: -600, memo: "Food" },
+        { amount: -400, memo: "Taxi" },
       ]),
     );
-    expect(created.amount).toBe(-100);
-    expect(created.lines.map((line) => line.amount)).toEqual([-60, -40]);
+    expect(created.amount).toBe(-1000);
+    expect(created.lines.map((line) => line.amount)).toEqual([-600, -400]);
 
     expectCode(
-      () => createTransaction(book.db, entry(chequing.id, -100, [{ amount: -60 }])),
+      () => createTransaction(book.db, entry(chequing.id, -1000, [{ amount: -600 }])),
       "lines_sum_mismatch",
     );
 
     expectCode(
       () =>
-        updateTransaction(book.db, created.id, entry(chequing.id, -100, [{ amount: -90 }, { amount: -5 }])),
+        updateTransaction(book.db, created.id, entry(chequing.id, -1000, [{ amount: -900 }, { amount: -50 }])),
       "lines_sum_mismatch",
     );
-    expect(getTransaction(book.db, created.id)?.amount).toBe(-100);
-    expect(getTransaction(book.db, created.id)?.lines.map((line) => line.amount)).toEqual([-60, -40]);
+    expect(getTransaction(book.db, created.id)?.amount).toBe(-1000);
+    expect(getTransaction(book.db, created.id)?.lines.map((line) => line.amount)).toEqual([-600, -400]);
+  } finally {
+    book.close();
+  }
+});
+
+test("an amount must be a whole number of minor units of the book currency", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db, "Chequing", "chequing");
+    expectCode(() => createTransaction(book.db, entry(chequing.id, -12_345, [{ amount: -12_345 }])), "amount_too_precise");
+    expect(createTransaction(book.db, entry(chequing.id, -12_340, [{ amount: -12_340 }])).amount).toBe(-12_340);
   } finally {
     book.close();
   }
@@ -138,8 +151,8 @@ test("edit and delete of a transfer update both sides in one database transactio
       countWrites(book.sqlite, () => {
         created = createTransaction(
           book.db,
-          entry(chequing.id, -5_000, [
-            { amount: -5_000, transferAccountId: savings.id, tagIds: [tag.id] },
+          entry(chequing.id, -50_000, [
+            { amount: -50_000, transferAccountId: savings.id, tagIds: [tag.id] },
           ]),
         );
       }),
@@ -150,12 +163,12 @@ test("edit and delete of a transfer update both sides in one database transactio
     const payment: Transaction = created;
     const mirror = requirePeer(book.db, payment);
     expect(mirror.accountId).toBe(savings.id);
-    expect(mirror.amount).toBe(5_000);
+    expect(mirror.amount).toBe(50_000);
     expect(mirror.date).toBe(payment.date);
     expect(mirror.transferPeerId).toBe(payment.id);
     expect(mirror.lines).toHaveLength(1);
     expect(mirror.lines[0]?.transferAccountId).toBe(chequing.id);
-    expect(mirror.lines[0]?.amount).toBe(5_000);
+    expect(mirror.lines[0]?.amount).toBe(50_000);
     expect(mirror.lines[0]?.tagIds).toEqual([tag.id]);
     expect(payment.lines[0]?.tagIds).toEqual([tag.id]);
 
@@ -167,8 +180,8 @@ test("edit and delete of a transfer update both sides in one database transactio
           payment.id,
           entry(
             chequing.id,
-            -7_000,
-            [{ amount: -7_000, transferAccountId: savings.id, tagIds: [tag.id] }],
+            -70_000,
+            [{ amount: -70_000, transferAccountId: savings.id, tagIds: [tag.id] }],
             "2026-03-05",
           ),
         );
@@ -179,20 +192,20 @@ test("edit and delete of a transfer update both sides in one database transactio
     }
     const next: Transaction = edited;
     const nextMirror = requirePeer(book.db, next);
-    expect(next.amount).toBe(-7_000);
+    expect(next.amount).toBe(-70_000);
     expect(next.date).toBe("2026-03-05");
-    expect(nextMirror.amount).toBe(7_000);
+    expect(nextMirror.amount).toBe(70_000);
     expect(nextMirror.date).toBe("2026-03-05");
     expect(nextMirror.lines).toHaveLength(1);
-    expect(nextMirror.lines[0]?.amount).toBe(7_000);
+    expect(nextMirror.lines[0]?.amount).toBe(70_000);
     expect(nextMirror.lines[0]?.transferAccountId).toBe(chequing.id);
 
     expectCode(
-      () => updateTransaction(book.db, payment.id, entry(chequing.id, -7_000, [{ amount: -1 }])),
+      () => updateTransaction(book.db, payment.id, entry(chequing.id, -70_000, [{ amount: -10 }])),
       "lines_sum_mismatch",
     );
-    expect(getTransaction(book.db, payment.id)?.amount).toBe(-7_000);
-    expect(getTransaction(book.db, nextMirror.id)?.amount).toBe(7_000);
+    expect(getTransaction(book.db, payment.id)?.amount).toBe(-70_000);
+    expect(getTransaction(book.db, nextMirror.id)?.amount).toBe(70_000);
 
     expect(
       countWrites(book.sqlite, () => {
@@ -211,7 +224,7 @@ test("a transfer to the same account is rejected", () => {
   try {
     const cash = account(book.db, "Cash", "cash");
     expectCode(
-      () => createTransaction(book.db, entry(cash.id, -20, [{ amount: -20, transferAccountId: cash.id }])),
+      () => createTransaction(book.db, entry(cash.id, -200, [{ amount: -200, transferAccountId: cash.id }])),
       "transfer_same_account",
     );
     expect(book.sqlite.query("select count(*) as count from transactions").get()).toEqual({ count: 0 });
@@ -230,9 +243,9 @@ test("a second transfer line is rejected", () => {
       () =>
         createTransaction(
           book.db,
-          entry(chequing.id, -100, [
-            { amount: -40, transferAccountId: savings.id },
-            { amount: -60, transferAccountId: cash.id },
+          entry(chequing.id, -1000, [
+            { amount: -400, transferAccountId: savings.id },
+            { amount: -600, transferAccountId: cash.id },
           ]),
         ),
       "transfer_line_limit",
@@ -240,16 +253,16 @@ test("a second transfer line is rejected", () => {
 
     const created = createTransaction(
       book.db,
-      entry(chequing.id, -25, [{ amount: -25, memo: "Shop" }]),
+      entry(chequing.id, -250, [{ amount: -250, memo: "Shop" }]),
     );
     expectCode(
       () =>
         updateTransaction(
           book.db,
           created.id,
-          entry(chequing.id, -25, [
-            { amount: -10, transferAccountId: savings.id },
-            { amount: -15, transferAccountId: cash.id },
+          entry(chequing.id, -250, [
+            { amount: -100, transferAccountId: savings.id },
+            { amount: -150, transferAccountId: cash.id },
           ]),
         ),
       "transfer_line_limit",
@@ -267,40 +280,40 @@ test("a reconciled transaction accepts a category change and rejects an amount c
     const chequing = account(book.db, "Chequing", "chequing");
     const savings = account(book.db, "Savings", "savings");
     const food = createCategory(book.db, { name: "Food", kind: "expense", ...saved });
-    const created = createTransaction(book.db, entry(chequing.id, -15, [{ amount: -15 }]));
-    createCheckpoint(book.db, chequing.id, { date: created.date, statementBalance: -15, ...saved });
+    const created = createTransaction(book.db, entry(chequing.id, -150, [{ amount: -150 }]));
+    createCheckpoint(book.db, chequing.id, { date: created.date, statementBalance: -150, ...saved });
     expect(getTransaction(book.db, created.id)?.reconciled).toBe(true);
     expect(getTransaction(book.db, created.id)?.status).toBe("open");
     expectCode(
-      () => updateTransaction(book.db, created.id, entry(chequing.id, -16, [{ amount: -16 }])),
+      () => updateTransaction(book.db, created.id, entry(chequing.id, -160, [{ amount: -160 }])),
       "transaction_reconciled",
     );
-    const changed = updateTransaction(book.db, created.id, entry(chequing.id, -15, [{ amount: -15, categoryId: food.id }]));
+    const changed = updateTransaction(book.db, created.id, entry(chequing.id, -150, [{ amount: -150, categoryId: food.id }]));
     expect(changed.reconciled).toBe(true);
     expect(changed.status).toBe("open");
-    expect(changed.amount).toBe(-15);
+    expect(changed.amount).toBe(-150);
     expect(changed.lines[0]?.categoryId).toBe(food.id);
     expectCode(() => deleteTransaction(book.db, created.id, saved), "transaction_reconciled");
     expect(getTransaction(book.db, created.id)?.reconciled).toBe(true);
 
     const transfer = createTransaction(
       book.db,
-      entry(chequing.id, -30, [{ amount: -30, transferAccountId: savings.id }]),
+      entry(chequing.id, -300, [{ amount: -300, transferAccountId: savings.id }]),
     );
     const mirror = requirePeer(book.db, transfer);
-    createCheckpoint(book.db, savings.id, { date: mirror.date, statementBalance: 30, ...saved });
+    createCheckpoint(book.db, savings.id, { date: mirror.date, statementBalance: 300, ...saved });
     expectCode(
       () =>
         updateTransaction(
           book.db,
           transfer.id,
-          entry(chequing.id, -31, [{ amount: -31, transferAccountId: savings.id }]),
+          entry(chequing.id, -310, [{ amount: -310, transferAccountId: savings.id }]),
         ),
       "transaction_reconciled",
     );
     expectCode(() => deleteTransaction(book.db, transfer.id, saved), "transaction_reconciled");
-    expect(getTransaction(book.db, transfer.id)?.amount).toBe(-30);
-    expect(getTransaction(book.db, mirror.id)?.amount).toBe(30);
+    expect(getTransaction(book.db, transfer.id)?.amount).toBe(-300);
+    expect(getTransaction(book.db, mirror.id)?.amount).toBe(300);
     expect(getTransaction(book.db, mirror.id)?.reconciled).toBe(true);
   } finally {
     book.close();
@@ -316,23 +329,23 @@ test("a mortgage payment splits principal and interest", () => {
     const created = createTransaction(book.db, {
       accountId: chequing.id,
       date: "2026-04-01",
-      amount: -150_000,
+      amount: -1_500_000,
       payeeRaw: "Example lender",
       status: "cleared",
       lines: [
-        { amount: -120_000, transferAccountId: mortgage.id },
-        { amount: -30_000, categoryId: interest.id, memo: "Interest" },
+        { amount: -1_200_000, transferAccountId: mortgage.id },
+        { amount: -300_000, categoryId: interest.id, memo: "Interest" },
       ],
       ...saved,
     });
-    expect(created.lines.map((line) => line.amount)).toEqual([-120_000, -30_000]);
+    expect(created.lines.map((line) => line.amount)).toEqual([-1_200_000, -300_000]);
     expect(created.lines[1]?.categoryId).toBe(interest.id);
     const mirror = requirePeer(book.db, created);
     expect(mirror.accountId).toBe(mortgage.id);
-    expect(mirror.amount).toBe(120_000);
+    expect(mirror.amount).toBe(1_200_000);
     expect(mirror.date).toBe("2026-04-01");
     expect(mirror.lines).toHaveLength(1);
-    expect(mirror.lines[0]?.amount).toBe(120_000);
+    expect(mirror.lines[0]?.amount).toBe(1_200_000);
     expect(mirror.lines[0]?.transferAccountId).toBe(chequing.id);
     expect(mirror.lines[0]?.categoryId).toBeNull();
     expect(mirror.status).toBe("open");
@@ -347,33 +360,33 @@ test("a transfer links an opposite row within 3 days and mirrors when none match
   try {
     const chequing = account(book.db, "Chequing", "chequing");
     const visa = account(book.db, "Visa", "savings");
-    const incoming = createTransaction(book.db, entry(visa.id, 5_000, [{ amount: 5_000 }], "2026-04-02"));
+    const incoming = createTransaction(book.db, entry(visa.id, 50_000, [{ amount: 50_000 }], "2026-04-02"));
     const outgoing = createTransaction(
       book.db,
-      entry(chequing.id, -5_000, [{ amount: -5_000, transferAccountId: visa.id }], "2026-04-01"),
+      entry(chequing.id, -50_000, [{ amount: -50_000, transferAccountId: visa.id }], "2026-04-01"),
     );
     expect(outgoing.transferPeerId).toBe(incoming.id);
     const linked = getTransaction(book.db, incoming.id);
     expect(linked?.transferPeerId).toBe(outgoing.id);
-    expect(linked?.amount).toBe(5_000);
+    expect(linked?.amount).toBe(50_000);
     expect(linked?.lines[0]?.transferAccountId).toBe(chequing.id);
 
-    const far = createTransaction(book.db, entry(visa.id, 800, [{ amount: 800 }], "2026-05-01"));
+    const far = createTransaction(book.db, entry(visa.id, 8000, [{ amount: 8000 }], "2026-05-01"));
     const tooFar = createTransaction(
       book.db,
-      entry(chequing.id, -800, [{ amount: -800, transferAccountId: visa.id }], "2026-05-05"),
+      entry(chequing.id, -8000, [{ amount: -8000, transferAccountId: visa.id }], "2026-05-05"),
     );
     expect(tooFar.transferPeerId).not.toBe(far.id);
     expect(getTransaction(book.db, far.id)?.transferPeerId).toBeNull();
     const mirror = requirePeer(book.db, tooFar);
     expect(mirror.accountId).toBe(visa.id);
-    expect(mirror.amount).toBe(800);
+    expect(mirror.amount).toBe(8000);
 
-    const held = createTransaction(book.db, entry(visa.id, 100, [{ amount: 100 }], "2026-06-01"));
-    createCheckpoint(book.db, visa.id, { date: "2026-06-01", statementBalance: 6_700, ...saved });
+    const held = createTransaction(book.db, entry(visa.id, 1000, [{ amount: 1000 }], "2026-06-01"));
+    createCheckpoint(book.db, visa.id, { date: "2026-06-01", statementBalance: 67_000, ...saved });
     const aroundHeld = createTransaction(
       book.db,
-      entry(chequing.id, -100, [{ amount: -100, transferAccountId: visa.id }], "2026-06-01"),
+      entry(chequing.id, -1000, [{ amount: -1000, transferAccountId: visa.id }], "2026-06-01"),
     );
     expect(aroundHeld.transferPeerId).not.toBe(held.id);
     expect(getTransaction(book.db, held.id)?.transferPeerId).toBeNull();
@@ -388,10 +401,10 @@ test("changing a linked transfer to a category keeps the other row", () => {
     const chequing = account(book.db, "Chequing", "chequing");
     const visa = account(book.db, "Visa", "savings");
     const food = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
-    const card = createTransaction(book.db, entry(visa.id, 5_000, [{ amount: 5_000 }], "2026-04-02"));
+    const card = createTransaction(book.db, entry(visa.id, 50_000, [{ amount: 50_000 }], "2026-04-02"));
     const payment = createTransaction(
       book.db,
-      entry(chequing.id, -5_000, [{ amount: -5_000, transferAccountId: visa.id }], "2026-04-01"),
+      entry(chequing.id, -50_000, [{ amount: -50_000, transferAccountId: visa.id }], "2026-04-01"),
     );
     expect(payment.transferPeerId).toBe(card.id);
     expect(payment.mirror).toBe(false);
@@ -399,13 +412,13 @@ test("changing a linked transfer to a category keeps the other row", () => {
     const edited = updateTransaction(
       book.db,
       payment.id,
-      entry(chequing.id, -5_000, [{ amount: -5_000, categoryId: food.id }], "2026-04-01"),
+      entry(chequing.id, -50_000, [{ amount: -50_000, categoryId: food.id }], "2026-04-01"),
     );
     expect(edited.transferPeerId).toBeNull();
     const peer = getTransaction(book.db, card.id);
     expect(peer).not.toBeNull();
     expect(peer?.transferPeerId).toBeNull();
-    expect(peer?.amount).toBe(5_000);
+    expect(peer?.amount).toBe(50_000);
     expect(peer?.autoReason).toBeNull();
     expect(peer?.lines[0]?.categoryId).toBeNull();
     expect(peer?.lines[0]?.transferAccountId).toBeNull();
@@ -419,15 +432,15 @@ test("deleting one side of a linked pair keeps the other", () => {
   try {
     const chequing = account(book.db, "Chequing", "chequing");
     const visa = account(book.db, "Visa", "savings");
-    const card = createTransaction(book.db, entry(visa.id, 5_000, [{ amount: 5_000 }], "2026-04-02"));
+    const card = createTransaction(book.db, entry(visa.id, 50_000, [{ amount: 50_000 }], "2026-04-02"));
     const payment = createTransaction(
       book.db,
-      entry(chequing.id, -5_000, [{ amount: -5_000, transferAccountId: visa.id }], "2026-04-01"),
+      entry(chequing.id, -50_000, [{ amount: -50_000, transferAccountId: visa.id }], "2026-04-01"),
     );
     deleteTransaction(book.db, payment.id, saved);
     const peer = getTransaction(book.db, card.id);
     expect(peer).not.toBeNull();
-    expect(peer?.amount).toBe(5_000);
+    expect(peer?.amount).toBe(50_000);
     expect(peer?.transferPeerId).toBeNull();
     expect(getTransaction(book.db, payment.id)).toBeNull();
   } finally {
@@ -443,14 +456,14 @@ test("removing a transfer deletes the mirror and keeps a linked row", () => {
     const food = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
     const created = createTransaction(
       book.db,
-      entry(chequing.id, -3_000, [{ amount: -3_000, transferAccountId: savings.id }]),
+      entry(chequing.id, -30_000, [{ amount: -30_000, transferAccountId: savings.id }]),
     );
     const mirrorId = created.transferPeerId;
     if (!mirrorId) {
       throw new Error("Mirror is missing");
     }
     expect(getTransaction(book.db, mirrorId)?.mirror).toBe(true);
-    updateTransaction(book.db, created.id, entry(chequing.id, -3_000, [{ amount: -3_000, categoryId: food.id }]));
+    updateTransaction(book.db, created.id, entry(chequing.id, -30_000, [{ amount: -30_000, categoryId: food.id }]));
     expect(getTransaction(book.db, mirrorId)).toBeNull();
   } finally {
     book.close();
@@ -462,12 +475,12 @@ test("updateTransaction links an existing opposite row", () => {
   try {
     const chequing = account(book.db, "Chequing", "chequing");
     const visa = account(book.db, "Visa", "savings");
-    const card = createTransaction(book.db, entry(visa.id, 5_000, [{ amount: 5_000 }], "2026-04-02"));
-    const payment = createTransaction(book.db, entry(chequing.id, -5_000, [{ amount: -5_000 }], "2026-04-01"));
+    const card = createTransaction(book.db, entry(visa.id, 50_000, [{ amount: 50_000 }], "2026-04-02"));
+    const payment = createTransaction(book.db, entry(chequing.id, -50_000, [{ amount: -50_000 }], "2026-04-01"));
     const edited = updateTransaction(
       book.db,
       payment.id,
-      entry(chequing.id, -5_000, [{ amount: -5_000, transferAccountId: visa.id }], "2026-04-01"),
+      entry(chequing.id, -50_000, [{ amount: -50_000, transferAccountId: visa.id }], "2026-04-01"),
     );
     expect(edited.transferPeerId).toBe(card.id);
     expect(edited.mirror).toBe(false);
@@ -490,27 +503,27 @@ test("a linked refund takes the category and merchant of the purchase and ignore
     const store = createMerchant(db, { name: "Store", ...saved });
     const other = createMerchant(db, { name: "Other", ...saved });
     const purchase = createTransaction(db, {
-      ...entry(checking.id, -8_000, [{ amount: -8_000, categoryId: groceries.id }]),
+      ...entry(checking.id, -80_000, [{ amount: -80_000, categoryId: groceries.id }]),
       merchantId: store.id,
     });
     const refund = createTransaction(db, {
-      ...entry(checking.id, 3_000, [{ amount: 3_000, categoryId: fun.id }], "2026-03-10"),
+      ...entry(checking.id, 30_000, [{ amount: 30_000, categoryId: fun.id }], "2026-03-10"),
       merchantId: other.id,
       refundOfId: purchase.id,
     });
     expect(refund.merchantId).toBe(store.id);
     expect(refund.lines[0]?.categoryId).toBe(groceries.id);
     const edited = updateTransaction(db, refund.id, {
-      ...entry(checking.id, 3_000, [{ amount: 3_000, categoryId: fun.id }], "2026-03-10"),
+      ...entry(checking.id, 30_000, [{ amount: 30_000, categoryId: fun.id }], "2026-03-10"),
       merchantId: other.id,
     });
     expect(edited.merchantId).toBe(store.id);
     expect(edited.lines[0]?.categoryId).toBe(groceries.id);
     const plain = createTransaction(db, {
-      ...entry(checking.id, -500, [{ amount: -500, categoryId: groceries.id }]),
+      ...entry(checking.id, -5000, [{ amount: -5000, categoryId: groceries.id }]),
     });
     const noMerchant = createTransaction(db, {
-      ...entry(checking.id, 100, [{ amount: 100, categoryId: fun.id }], "2026-03-10"),
+      ...entry(checking.id, 1000, [{ amount: 1000, categoryId: fun.id }], "2026-03-10"),
       merchantId: other.id,
       refundOfId: plain.id,
     });

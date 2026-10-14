@@ -2,17 +2,17 @@ import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney, moneyParts } from "@/money";
 
 type AmountProps = {
-  minor: number;
+  value: number;
   owed?: boolean;
   hero?: boolean;
   className?: string;
 };
 
 /** An amount of money in the book currency. It reads the currency itself. */
-export function Amount({ minor, owed = false, hero = false, className }: AmountProps) {
+export function Amount({ value, owed = false, hero = false, className }: AmountProps) {
   const currency = useBookCurrency();
-  const showOwed = owed && minor < 0;
-  const signed = showOwed ? -minor : minor;
+  const showOwed = owed && value < 0;
+  const signed = showOwed ? -value : value;
   if (!hero) {
     return (
       <span className={`text-base font-semibold tabular-nums ${className ?? ""}`}>

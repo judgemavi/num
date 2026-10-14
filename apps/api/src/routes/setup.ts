@@ -15,7 +15,7 @@ import { errorResponse } from "./common";
 
 const setupStatusRoute = createRoute({
   operationId: "get_setup",
-  description: "Read setup. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read setup. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/setup",
   responses: {
@@ -32,7 +32,7 @@ const setupStatusRoute = createRoute({
 
 const setupRoute = createRoute({
   operationId: "post_setup",
-  description: "Create or run setup. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run setup. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/setup",
   request: {
@@ -61,7 +61,7 @@ const setupRoute = createRoute({
 
 const currencyReadRoute = createRoute({
   operationId: "get_settings_currency",
-  description: "Read the book currency. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read the book currency. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/settings/currency",
   responses: {
@@ -79,7 +79,7 @@ const currencyReadRoute = createRoute({
 
 const currencyRoute = createRoute({
   operationId: "patch_settings_currency",
-  description: "Change the book currency. This does not change transactions. It is refused after the first transaction. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Change the book currency. This is only a new label: amounts are not converted and do not change. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/settings/currency",
   request: {
@@ -111,7 +111,7 @@ const matchingReadRoute = createRoute({
   path: "/api/settings/matching",
   operationId: "get_settings_matching",
   description:
-    "Read when labels become automatic. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+    "Read when labels become automatic. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   responses: {
     200: {
       description: "When labels become automatic",
@@ -126,7 +126,7 @@ const aiReadRoute = createRoute({
   path: "/api/settings/ai",
   operationId: "get_ai_access",
   description:
-    "Read whether an AI may change the books. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+    "Read whether an AI may change the books. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   responses: {
     200: {
       description: "Whether an AI may change the books",
@@ -140,7 +140,7 @@ const aiRoute = createRoute({
   path: "/api/settings/ai",
   operationId: "patch_ai_access",
   description:
-    "Allow or block AI changes to the books. This changes only that setting. Amounts are integer minor units. Money that enters the account is positive.",
+    "Allow or block AI changes to the books. This changes only that setting. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   request: {
     body: { required: true, content: { "application/json": { schema: aiAccessSettingSchema } } },
   },
@@ -156,7 +156,7 @@ const aiRoute = createRoute({
 
 const matchingRoute = createRoute({
   operationId: "patch_settings_matching",
-  description: "Change when labels become automatic. This does not change transactions or categories. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Change when labels become automatic. This does not change transactions or categories. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/settings/matching",
   request: {

@@ -10,7 +10,7 @@ import { draftFromTerms, draftIsBlank, firstPaymentNotAfterOpening } from "@/acc
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { useAccounts, useBookCurrency, useCategories } from "@/editors/lookups";
+import { useAccounts, useCategories } from "@/editors/lookups";
 import { withForm } from "@/forms/form-hook";
 import { fieldValue } from "@/forms/form-values";
 import { useStore } from "@tanstack/react-form";
@@ -38,7 +38,6 @@ export const MortgageSection = withForm({
   defaultValues: blankAccount,
   props: { accountId: fieldValue<string | null>(null) },
   render: function MortgageSectionRender({ form, accountId }) {
-    const currency = useBookCurrency();
     const archiveAccount = useArchiveAccount();
     const archiveCategory = useArchiveCategory();
     const accounts = useAccounts();
@@ -151,7 +150,7 @@ export const MortgageSection = withForm({
               )}
             </form.Field>
             {draftIsBlank(draft) ? null : (
-              <Button type="button" variant="outline" className="justify-self-start" onClick={() => form.setFieldValue("mortgage", draftFromTerms(currency, null))}>
+              <Button type="button" variant="outline" className="justify-self-start" onClick={() => form.setFieldValue("mortgage", draftFromTerms(null))}>
                 Remove the mortgage terms
               </Button>
             )}

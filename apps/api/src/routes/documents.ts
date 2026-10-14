@@ -10,7 +10,7 @@ const maxUploadBytes = 20 * 1024 * 1024;
 
 const uploadRoute = createRoute({
   operationId: "post_documents",
-  description: "Store a document file. This does not create transactions. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Store a document file. This does not create transactions. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/documents",
   request: {
@@ -37,7 +37,7 @@ const uploadRoute = createRoute({
 
 const downloadRoute = createRoute({
   operationId: "get_documents_id",
-  description: "Read documents. This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read documents. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/documents/{id}",
   request: { params: idParams },
@@ -56,7 +56,7 @@ const downloadRoute = createRoute({
 
 const deleteRoute = createRoute({
   operationId: "post_documents_id_delete",
-  description: "Create or run documents (delete). This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Create or run documents (delete). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/documents/{id}/delete",
   request: { params: idParams },

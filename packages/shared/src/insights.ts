@@ -3,7 +3,7 @@ import { isoDateSchema } from "./date";
 import { insightChangesSchema } from "./insights-changes";
 import { optionalQuery, queryDate, queryId, queryIdOrNone } from "./list";
 import { isMonthKey } from "./month";
-import { centsSchema as cents } from "./money";
+import { amountSchema as money } from "./money";
 
 export const insightWindows = ["1", "3", "6", "12", "all", "custom"] as const;
 
@@ -44,13 +44,13 @@ export type InsightsQuery = z.output<typeof insightsQuerySchema>;
 const rowSchema = z.object({
   id: z.uuid().nullable(),
   kind: z.enum(insightRowKinds),
-  amount: cents,
-  inflow: cents.nullable(),
+  amount: money,
+  inflow: money.nullable(),
 });
 
 const flowSchema = z.object({
-  income: cents,
-  spending: cents,
+  income: money,
+  spending: money,
 });
 
 const timelineMonthSchema = z.object({
@@ -61,7 +61,7 @@ const timelineMonthSchema = z.object({
 
 const pointSchema = z.object({
   date: isoDateSchema,
-  amount: cents,
+  amount: money,
 });
 
 const timelineSchema = z.object({
@@ -71,8 +71,8 @@ const timelineSchema = z.object({
   forecast: z
     .object({
       dates: z.array(isoDateSchema),
-      known: z.array(cents),
-      estimated: z.array(cents),
+      known: z.array(money),
+      estimated: z.array(money),
       lowest: pointSchema,
     })
     .nullable(),
@@ -84,9 +84,9 @@ export const insightsSchema = z.object({
   from: isoDateSchema,
   to: isoDateSchema,
   range: z.object({ from: isoDateSchema, to: isoDateSchema }),
-  income: cents,
-  spending: cents,
-  savings: cents,
+  income: money,
+  spending: money,
+  savings: money,
   savingsRateMilliPct: z.number().int().nullable(),
   changes: insightChangesSchema,
   donut: z.array(rowSchema),
@@ -99,9 +99,9 @@ export const insightsSchema = z.object({
       z.object({
         month: z.string().refine(isMonthKey),
         date: isoDateSchema,
-        assets: cents,
-        liabilities: cents,
-        net: cents,
+        assets: money,
+        liabilities: money,
+        net: money,
       }),
     )
     .length(24),

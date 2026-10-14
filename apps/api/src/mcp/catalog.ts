@@ -7,7 +7,7 @@ import { callMcpTool } from "./execute";
 import { fieldKeys, isFileSchema, shapeOf } from "./inputs";
 import { publishedSchema } from "./result";
 
-const moneyText = "Amounts are integer minor units. Money that enters the account is positive.";
+const moneyText = "Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.";
 
 const fileInputSchema = z
   .union([

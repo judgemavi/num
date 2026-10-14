@@ -34,13 +34,13 @@ export function ForecastStrip() {
     <SummaryStrip
       tint="home"
       label="Safe to spend until payday"
-      amount={<Amount minor={forecast.safeToSpend} hero />}
+      amount={<Amount value={forecast.safeToSpend} hero />}
       hint={paydayHint(currency, asOf, forecast.nextIncomeDate, forecast.safeToSpend)}
       facts={
         <>
           <Fact label="Payday">{forecast.nextIncomeDate ? formatDate(forecast.nextIncomeDate) : "No paycheck"}</Fact>
           <Fact label="Buffer">
-            <Amount minor={forecast.bufferAmount} />
+            <Amount value={forecast.bufferAmount} />
           </Fact>
         </>
       }
@@ -129,7 +129,7 @@ export function PaychecksCard() {
               <small>Fund buckets, or keep it unassigned</small>
             </span>
             <span className={listAmt}>
-              <Amount minor={item.amount} />
+              <Amount value={item.amount} />
             </span>
             <Button
               type="button"
@@ -243,7 +243,7 @@ export function NetWorthCard() {
         </Button>
       </CardHeader>
       <CardContent className="grid gap-3 px-5 pb-5">
-        {latestWorth ? <Amount minor={latestWorth.net} /> : <p className="text-muted-foreground">No net worth yet.</p>}
+        {latestWorth ? <Amount value={latestWorth.net} /> : <p className="text-muted-foreground">No net worth yet.</p>}
         {worth.length > 1 ? (
           <ForecastChart label="Net worth, 12 months" dates={worth.map((point) => point.month)} series={[{ name: "Net worth", amounts: worth.map((point) => point.net) }]} />
         ) : null}
