@@ -1,6 +1,6 @@
 // Active ISO 4217 codes and the number of minor-unit digits.
 // Withdrawn codes, codes with no minor unit and codes with more than 3 minor-unit digits (CLF, UYW) are omitted.
-// Stored amounts are milliunits, thus a currency can have a maximum of 3 digits (decision 0037).
+// Stored amounts are milliunits, thus a currency can have a maximum of 3 digits (decision 0038).
 
 export const currencyMinorUnits = {
   AED: 2,

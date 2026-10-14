@@ -35,14 +35,14 @@ test("money in does not learn from money out", () => {
   try {
     const shopping = createCategory(sample.db, { name: "Shopping", kind: "expense", ...saved });
     for (const date of ["2026-01-05", "2026-02-05", "2026-03-05"]) {
-      sample.confirm("ACME STORE", date, -5000, { categoryId: shopping.id });
+      sample.confirm("ACME STORE", date, -50000, { categoryId: shopping.id });
     }
     const loaded = loadMatchBook(sample.db);
-    expect(scorePayee(loaded, { payee: "ACME STORE", amount: -5000, recurring: null }).categoryId).toBe(shopping.id);
-    const incoming = scorePayee(loaded, { payee: "ACME STORE", amount: 5000, recurring: null });
+    expect(scorePayee(loaded, { payee: "ACME STORE", amount: -50000, recurring: null }).categoryId).toBe(shopping.id);
+    const incoming = scorePayee(loaded, { payee: "ACME STORE", amount: 50000, recurring: null });
     expect(incoming.level).toBe("none");
     expect(incoming.categoryId).toBeNull();
-    expect(scorePayee(loaded, { payee: "ACME STORE ONLINE", amount: 5000, recurring: null }).level).toBe("none");
+    expect(scorePayee(loaded, { payee: "ACME STORE ONLINE", amount: 50000, recurring: null }).level).toBe("none");
     expect(scorePayee(loaded, { payee: "ACME", amount: 0, recurring: null }).level).toBe("none");
   } finally {
     sample.close();
@@ -53,10 +53,10 @@ test("a learned transfer ignores the direction", () => {
   const sample = book();
   try {
     const savings = createAccount(sample.db, { name: "Savings", institution: null, kind: "savings", openingDate: "2026-01-01", openingBalance: 0, ...saved });
-    sample.confirm("ONLINE TRANSFER", "2026-03-01", -80000, { transferAccountId: savings.id });
+    sample.confirm("ONLINE TRANSFER", "2026-03-01", -800000, { transferAccountId: savings.id });
     const loaded = loadMatchBook(sample.db);
-    expect(scorePayee(loaded, { payee: "ONLINE TRANSFER", amount: -80000, recurring: null }).transferAccountId).toBe(savings.id);
-    expect(scorePayee(loaded, { payee: "ONLINE TRANSFER", amount: 25000, recurring: null }).transferAccountId).toBe(savings.id);
+    expect(scorePayee(loaded, { payee: "ONLINE TRANSFER", amount: -800000, recurring: null }).transferAccountId).toBe(savings.id);
+    expect(scorePayee(loaded, { payee: "ONLINE TRANSFER", amount: 250000, recurring: null }).transferAccountId).toBe(savings.id);
   } finally {
     sample.close();
   }

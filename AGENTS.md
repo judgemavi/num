@@ -29,7 +29,7 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 - The `v1` branch is private and read-only. Read it only with `git show v1:<path>`.
   Do not check it out, merge it, rebase it or push it.
 - Tests must use temporary databases.
-- Money is integer milliunits: thousandths of the major unit, for every currency (decision 0037).
+- Money is integer milliunits: thousandths of the major unit, for every currency (decision 0038).
   Do not use floating-point numbers for money. Round a calculated amount to the minor unit of the book currency with
   the helpers in `packages/shared/src/currency.ts` (`divideAmount`, `roundToStep`, `floorToStep`).
   Do not write a fixed amount (a tolerance, a threshold) in code; express it in steps of the book currency.

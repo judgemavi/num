@@ -5,7 +5,7 @@ export const bandSize = 6;
 
 export type BandRow = LearnedRow & { amount: number };
 
-/** One learned label (category + merchant) of one key, with the band of its amounts in absolute cents. */
+/** One learned label (category + merchant) of one key, with the band of its amounts in absolute milliunits. */
 export type LearnedLabel = { key: string; rows: BandRow[]; low: number; high: number; factor: number };
 
 /** width = (high − low) / high. factor = 1 − 0.05 × min(1, width / 0.5). */
@@ -13,7 +13,7 @@ export function widthFactor(low: number, high: number): number {
   return high === 0 ? 1 : 1 - 0.05 * Math.min(1, (2 * (high - low)) / high);
 }
 
-/** The amount is from the lowest − 1% to the highest + 1%. Integer cents only. */
+/** The amount is from the lowest − 1% to the highest + 1%. Integer milliunits only. */
 export function bandContains(band: Pick<LearnedLabel, "low" | "high">, amount: number): boolean {
   const size = Math.abs(amount) * 100;
   return size >= band.low * 99 && size <= band.high * 101;

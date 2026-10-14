@@ -7,7 +7,7 @@ const currencyCodeList = Object.keys(currencyMinorUnits) as [CurrencyCode, ...Cu
 
 export const currencyCodes: readonly CurrencyCode[] = currencyCodeList;
 
-/** A stored amount is an integer number of milliunits: thousandths of the major unit (decision 0037). */
+/** A stored amount is an integer number of milliunits: thousandths of the major unit (decision 0038). */
 export const milliunitDigits = 3;
 
 /** The number of minor-unit digits of the currency (ISO 4217). */

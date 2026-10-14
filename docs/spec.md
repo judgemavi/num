@@ -66,7 +66,7 @@ The owner finds information about unknown merchants with Claude through MCP.
 
 - **Currency:** Each book has one currency (ISO 4217 code). The user selects it at setup (§7.0).
   The user can change it at any time in Settings → Currency. The change is only a new label: the app does not convert
-  amounts (decision 0037).
+  amounts (decision 0038).
 - **Amounts:** Amounts are signed integers in milliunits: thousandths of the major unit of the currency, for every
   currency. Examples: $12.34 = `12340`, ¥1,234 = `1234000`, 1.234 KWD = `1234`. Tables do not have currency columns.
   - The minor unit of the currency (ISO 4217, a maximum of 3 digits) sets the step of a real amount:
@@ -808,6 +808,6 @@ There are 7 screens (decision 0021).
 | Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups, categories), merchants, tags, net worth, mortgage. Decision 0030. |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
 | Recurring | Plans, occurrences, links, skips, Detected (new plan suggestions) |
-| Settings | Subpages: Groups, Categories, Tags, Merchants, Currency (decision 0037), Matching (`autoConfidence`), AI access, Backup. |
+| Settings | Subpages: Groups, Categories, Tags, Merchants, Currency (decision 0038), Matching (`autoConfidence`), AI access, Backup. |
 
 The first-run setup screen (§7.0) is not one of the 7 screens. It shows only one time.
