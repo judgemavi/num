@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, openDatabase, settings, transactions } from "@num/db";
+import { accounts, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
 import type { AccountKind, ErrorCode, TransactionLineInput } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -9,6 +9,7 @@ import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
 import { archiveAccount, createAccount } from "./accounts";
 import { createCategory } from "./categories";
+import { getsImports } from "./transaction-test-book";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 function tempDatabase() {
@@ -121,32 +122,47 @@ test("a mirror amount change is rejected when the source has more than one line"
     expect(nextMirror?.id).not.toBe(mirror.id);
     expect(nextMirror?.mirror).toBe(true);
     expect(nextMirror?.amount).toBe(1_000_000);
-    expect(nextMirror?.status).toBe("open");
+    // A mortgage gets no imports: its mirror is cleared (decision 0052).
+    expect(nextMirror?.status).toBe("cleared");
     expect(nextMirror?.lines).toHaveLength(1);
   } finally {
     book.close();
   }
 });
 
-test("a new transaction and its new mirror start open, and an edit keeps the status that the app set", () => {
+test("a new transaction and its new mirror are open only in an account that gets imports (decision 0052)", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db, "Chequing", "chequing");
+    const card = account(book.db, "Second chequing", "chequing");
     const savings = account(book.db, "Savings", "savings");
+    const cash = account(book.db, "Cash", "cash");
+    getsImports(book.db, chequing.id);
+    book.db.update(accounts).set({ importPreset: "td-bank-account" }).where(eq(accounts.id, card.id)).run();
+
+    expect(createTransaction(book.db, lines(chequing.id, -1_000, [{ amount: -1_000 }])).status).toBe("open");
+    expect(createTransaction(book.db, lines(card.id, -1_000, [{ amount: -1_000 }])).status).toBe("open");
+    expect(createTransaction(book.db, lines(savings.id, -1_000, [{ amount: -1_000 }])).status).toBe("cleared");
+
     const created = createTransaction(book.db, lines(chequing.id, -50_000, [{ amount: -50_000, transferAccountId: savings.id }]));
     const mirror = getTransaction(book.db, created.transferPeerId ?? "");
-    if (!mirror) {
-      throw new Error("Transfer peer is missing");
-    }
     expect(created.status).toBe("open");
-    expect(mirror.status).toBe("open");
+    expect(mirror?.status).toBe("cleared");
+    const fromCash = createTransaction(book.db, lines(cash.id, -7_000, [{ amount: -7_000, transferAccountId: card.id }]));
+    expect(fromCash.status).toBe("cleared");
+    expect(getTransaction(book.db, fromCash.transferPeerId ?? "")?.status).toBe("open");
+
+    // A mirror that moves to another account takes the status of a new mirror there.
+    const moved = updateTransaction(book.db, created.id, { lines: [{ amount: -50_000, transferAccountId: card.id }], ...saved });
+    expect(moved.transferPeerId).toBe(mirror?.id ?? "");
+    expect(getTransaction(book.db, moved.transferPeerId ?? "")?.status).toBe("open");
 
     // An import sets "cleared" (decision 0050). An edit by the person does not change the status.
     book.db.update(transactions).set({ status: "cleared" }).where(eq(transactions.id, created.id)).run();
     const edited = updateTransaction(book.db, created.id, { date: "2026-04-02", ...saved });
     expect(edited.date).toBe("2026-04-02");
     expect(edited.status).toBe("cleared");
-    expect(getTransaction(book.db, mirror.id)?.status).toBe("open");
+    expect(getTransaction(book.db, moved.transferPeerId ?? "")?.status).toBe("open");
   } finally {
     book.close();
   }

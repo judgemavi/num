@@ -187,14 +187,15 @@ Order, top to bottom:
 3. **Description** (text field). For an imported transaction it is disabled, with the hint "From the bank import. It
    does not change." Never say "bank text" in the UI.
 4. **What is this?** (ToggleGroup). The choices follow the direction (spec §7.3):
-   - Money out: Spending · Transfer · Split. Money in: Income · Refund · Transfer · Split.
+   - Money out: Spending · Transfer · Loan payment. Money in: Income · Refund · Transfer.
    - Spending / Refund: expense categories only. Income: income categories only.
    - Transfer: "To account" / "From account" Combobox (link an existing match or create the mirror). No merchant.
-   - Split (decision 0025): line rows ("Category or account" picker, amount, remove). Lines take the transaction's
-     direction; a line menu has "Money in on this line". A new line starts with what is left; with two lines, one amount
-     sets the other. Under the lines: "+ Add a line" and "All assigned" or "$X left" with "Put it on the last line".
-     Save is disabled until nothing is left.
-5. **Merchant** Combobox, with the suggestion and its level. Hidden for Transfer.
+   - Loan payment (decision 0053): "Loan account" Combobox (mortgage and loan accounts that are not archived),
+     "Interest" (money field), "Principal" (read-only: the amount minus the interest) and "Interest category"
+     (Combobox of expense categories). For a mortgage with terms, Interest starts with the interest of the schedule,
+     with the hint "From the payment schedule." Interest category starts with the category of the terms, else the
+     category of the last loan payment to that account. No merchant.
+5. **Merchant** Combobox, with the suggestion and its level. Hidden for Transfer and Loan payment.
 6. **Tags**. All fields show; the editor has no collapsed section. There is no "Cleared" control and no "status" word
    in the UI: only the app sets the status (decision 0050).
 7. Footer: Save (primary). Delete goes in a More menu (shared confirm).
@@ -210,12 +211,14 @@ two tabs (links) in the page header: "All" and "Needs review · N". A tab link d
 Columns: a checkbox, Date, Account, Payee, Category, Amount, Status (and Balance when one account is shown).
 The checkbox column (decision 0051) shows only on these two pages, not on the page of an account. A click on the
 checkbox selects the row; a click on another part of the row opens the editor. Shift and click selects a range. The
-header checkbox selects all rows of the page. The checkbox of a split is disabled, with the Tooltip "Split
-transactions are edited one at a time." With a selection, the ActionBar (§6) shows "N selected", "Approve · N"
+header checkbox selects all rows of the page. The checkbox of a loan payment is disabled, with the Tooltip "Loan
+payments are changed one at a time." (decision 0053) With a selection, the ActionBar (§6) shows "N selected", "Approve · N"
 (outline), "Edit…" (primary) and "Clear". Approve has no confirm.
-The Category column shows the category, "Transfer to <account>", or "Uncategorized", and the merchant below it.
+The Category column shows the category, "Transfer to <account>", "Loan payment", or "Uncategorized", and the merchant
+below it.
 The Amount cell shows only the exceptions: a lock icon for a reconciled row (Tooltip: "Checked against your balance on <date>")
-and "Pending" for an open row (entered by hand, not yet on a statement). A cleared row shows nothing.
+and "Pending" for an open row (entered by hand in an account that gets imports, not yet on a statement; decision 0052).
+A cleared row shows nothing.
 The Status column (right-most) shows a Badge only when the row needs review: the level (Sure, Likely, Maybe, never a
 percentage) for a row with a suggestion or an automatic label, and "Needs review" for a row with a question or no
 suggestion. On `/transactions/review` the column is "Confidence" (decision 0048): the level, "Question" for a question,
@@ -254,8 +257,8 @@ with the typed text. Save creates, selects and collapses; Cancel collapses. Inli
 form → "+ Create new group"). An archived match shows "Restore 'X'".
 
 **Account editor, mortgage (decision 0027):** when the kind is mortgage, the Account form has a "Mortgage terms" section
-under the amount owed. It is open by default, with the help line "Add the terms to see the payment schedule and to split
-each payment into interest and principal." The opening date has the help line from decision 0027, and the form shows the
+under the amount owed. It is open by default, with the help line "Add the terms to see the payment schedule and the
+interest and principal of each payment." The opening date has the help line from decision 0027, and the form shows the
 first payment warning from decision 0027. There is no separate mortgage terms editor.
 
 **Mortgage schedule:** one ListCard for each year. Each row shows the date, the payment, the interest, the principal and

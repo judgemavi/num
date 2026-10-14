@@ -69,27 +69,33 @@ export function assertLineShape(accountId: string, amount: number, lines: Normal
   if (!Number.isSafeInteger(amount)) {
     throw new ServiceError("lines_sum_mismatch", 400);
   }
-  let transfers = 0;
   for (const line of lines) {
-    const hasCategory = line.categoryId !== null;
-    const hasTransfer = line.transferAccountId !== null;
-    if (hasCategory && hasTransfer) {
+    if (line.categoryId !== null && line.transferAccountId !== null) {
       throw new ServiceError("line_target_conflict", 400);
     }
-    if (!hasTransfer) {
-      continue;
-    }
-    transfers += 1;
     if (line.transferAccountId === accountId) {
       throw new ServiceError("transfer_same_account", 400);
     }
   }
-  if (transfers > 1) {
-    throw new ServiceError("transfer_line_limit", 400);
-  }
   if (lineTotal(lines) !== amount) {
     throw new ServiceError("lines_sum_mismatch", 400);
   }
+  if (lines.length > 1 && !loanPaymentLines(lines)) {
+    throw new ServiceError("lines_not_loan_payment", 400);
+  }
+}
+
+/**
+ * The lines of a loan payment (decision 0053): two lines, both money out, one category line (the interest) and one
+ * transfer line (the principal). The kinds of the category and of the account are checked with the stored records.
+ */
+export function loanPaymentLines(lines: NormalizedLine[]) {
+  if (lines.length !== 2 || lines.some((line) => line.amount >= 0)) {
+    return null;
+  }
+  const categoryId = lines.find((line) => line.transferAccountId === null)?.categoryId ?? null;
+  const loanAccountId = lines.find((line) => line.categoryId === null)?.transferAccountId ?? null;
+  return categoryId !== null && loanAccountId !== null ? { categoryId, loanAccountId } : null;
 }
 
 export function isMirrorSide(

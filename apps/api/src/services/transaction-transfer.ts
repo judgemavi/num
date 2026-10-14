@@ -5,7 +5,7 @@ import { ServiceError } from "../service-error";
 import { dateIsReconciled, latestCheckpointDate } from "./reconciled";
 import { eraseTransaction } from "./transaction-erase";
 import { loadLines, replaceLines, type StoredLine } from "./transaction-lines";
-import { auditTransaction, automaticPair, headerForWrite, readTransaction, toTransaction, type AutoStamp, type Header } from "./transaction-record";
+import { auditTransaction, automaticPair, headerForWrite, newTransactionStatus, readTransaction, toTransaction, type AutoStamp, type Header } from "./transaction-record";
 import { transferLine, type NormalizedLine } from "./transaction-rules";
 import { lineCount } from "./transaction-sql";
 import type { WriteTx } from "./write";
@@ -40,7 +40,7 @@ export function insertMirror(
       merchantId: header.merchantId,
       payeeRaw: header.payeeRaw,
       payeeNormalized: header.payeeNormalized,
-      status: "open",
+      status: newTransactionStatus(tx, targetAccountId),
       source,
       importRowId: null,
       transferPeerId: sourceId,
@@ -183,7 +183,16 @@ function rewriteMirror(
     throw new Error("Transfer line is missing");
   }
   tx.update(transactions)
-    .set({ accountId: target, date: header.date, amount, autoReason: null, autoSourceId: null, autoConfidence: null })
+    .set({
+      accountId: target,
+      date: header.date,
+      amount,
+      autoReason: null,
+      autoSourceId: null,
+      autoConfidence: null,
+      // A mirror that moves to another account gets the status of a new mirror there (decision 0052).
+      ...(peer.accountId === target ? {} : { status: newTransactionStatus(tx, target) }),
+    })
     .where(eq(transactions.id, peer.id))
     .run();
   replaceLines(tx, peer.id, [

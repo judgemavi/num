@@ -101,7 +101,7 @@ export function JarsIllustration() {
 
 export function PaycheckSplitIllustration() {
   return (
-    <Art label="A paycheck split between a home, a jar, and a bill" viewBox="0 0 260 160">
+    <Art label="A paycheck shared between a home, a jar, and a bill" viewBox="0 0 260 160">
       <rect {...stroke(gold)} x="95" y="6" width="70" height="40" rx="6" />
       <circle {...stroke("none")} cx="130" cy="26" r="9" />
       <path {...stroke("none")} strokeDasharray="0 8" d="M118 48Q60 60 40 96M130 48v50M142 48q58 12 79 56" />

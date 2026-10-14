@@ -1,6 +1,6 @@
 import { fieldValue } from "@/forms/form-values";
 
-/** The choices of "What is this?" in the bulk editor. Split is not a choice: a split is edited one at a time. */
+/** The choices of "What is this?" in the bulk editor. Loan payment is not a choice: a loan payment is changed one at a time. */
 export const bulkChoices = ["none", "spending", "income", "refund", "transfer"] as const;
 
 export const merchantModes = ["none", "change"] as const;

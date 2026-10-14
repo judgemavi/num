@@ -78,7 +78,7 @@ export function loadMortgageLearned(db: Reader): Map<string, MortgageLearned> {
 /** A mortgage payee that the payee teaches. `similarTo` is the learned payee when the payee only contains it. */
 export type MortgageHit = MortgageLearned & { similarTo: string | null };
 
-/** The interest line and the principal line of a payment, from the terms and the schedule. Null when there is no split. */
+/** The interest line and the principal line of a loan payment, from the terms and the schedule. Null when the schedule gives none. */
 export function mortgageLinesFor(db: Reader, mortgageAccountId: string, fromAccountId: string, date: string, amount: number) {
   const terms = db.select().from(mortgageTerms).where(eq(mortgageTerms.accountId, mortgageAccountId)).get();
   const account = db.select().from(accounts).where(eq(accounts.id, mortgageAccountId)).get();
@@ -103,7 +103,8 @@ export function mortgageLinesFor(db: Reader, mortgageAccountId: string, fromAcco
     return null;
   }
   const fitted = mortgagePrefillLines(split.interest, split.principal, Math.abs(amount));
-  if (fitted.principal < 0) {
+  // A loan payment has two lines of money out (decision 0053).
+  if (fitted.principal <= 0 || fitted.interest <= 0) {
     return null;
   }
   const sign = amount < 0 ? -1 : 1;

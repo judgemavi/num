@@ -198,7 +198,7 @@ const readRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_transactions",
-  description: "Create or run transactions. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Create or run transactions. This does not change records outside this action. A transaction with more than one line is a loan payment: two lines of money out, one with an expense category (the interest) and one transfer line to a mortgage or loan account (the principal). Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/transactions",
   request: {
@@ -221,7 +221,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_transactions_id",
-  description: "Change transactions. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. lines replaces all the lines: when you change the amount, send the lines too. The API checks the fields together on the stored transaction with your changes. answer gives the answer to the Needs review question of the transaction (from get_transactions_id_review): for transfer_pair, one transfer line to the account of otherId links the two transactions, and other lines record not_transfer; for refund_purchase, no refundOfId records not_linked; recurring_ambiguous links the transaction to the occurrence. Other records do not change. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Change transactions. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. lines replaces all the lines: when you change the amount, send the lines too. The API checks the fields together on the stored transaction with your changes. answer gives the answer to the Needs review question of the transaction (from get_transactions_id_review): for transfer_pair, one transfer line to the account of otherId links the two transactions, and other lines record not_transfer; for refund_purchase, no refundOfId records not_linked; recurring_ambiguous links the transaction to the occurrence. Other records do not change. A transaction with more than one line is a loan payment: two lines of money out, one with an expense category (the interest) and one transfer line to a mortgage or loan account (the principal). Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/transactions/{id}",
   request: {

@@ -1,6 +1,8 @@
 # 0051 — Bulk edit and approve from a row selection
 
 Status: approved (owner, 2026-10-14)
+Changed by decision 0053 (2026-10-14): a loan payment cannot be selected. The tooltip is "Loan payments are changed one
+at a time." The skip reason `split` is `loan_payment`.
 
 ## Context
 

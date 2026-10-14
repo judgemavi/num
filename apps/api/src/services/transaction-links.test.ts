@@ -5,7 +5,7 @@ import { createMerchant } from "./merchants";
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
 import { tempDatabase, saved, account, entry, requirePeer } from "./transaction-test-book";
 
-test("a mortgage payment splits principal and interest", () => {
+test("a mortgage payment puts the principal and the interest on two lines", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db, "Chequing", "chequing");
@@ -32,8 +32,9 @@ test("a mortgage payment splits principal and interest", () => {
     expect(mirror.lines[0]?.amount).toBe(1_200_000);
     expect(mirror.lines[0]?.transferAccountId).toBe(chequing.id);
     expect(mirror.lines[0]?.categoryId).toBeNull();
-    expect(mirror.status).toBe("open");
-    expect(created.status).toBe("open");
+    // Chequing and the mortgage get no imports (decision 0052).
+    expect(mirror.status).toBe("cleared");
+    expect(created.status).toBe("cleared");
   } finally {
     book.close();
   }

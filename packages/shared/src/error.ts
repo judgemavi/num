@@ -49,7 +49,7 @@ export const errorCodes = [
   "lines_sum_mismatch",
   "line_target_conflict",
   "transfer_same_account",
-  "transfer_line_limit",
+  "lines_not_loan_payment",
   "mirror_one_line",
   "mirror_amount_locked",
   "payee_raw_locked",

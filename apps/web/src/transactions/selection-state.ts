@@ -1,7 +1,7 @@
 import type { TransactionListItem } from "@num/shared";
 import { createContext, useContext } from "react";
 
-/** A row with more than one line (a split) is edited one at a time. It cannot be selected (decision 0051). */
+/** A loan payment (a row with two lines) is changed one at a time. It cannot be selected (decisions 0051, 0053). */
 export function selectable(row: Pick<TransactionListItem, "lines">) {
   return row.lines.length === 1;
 }

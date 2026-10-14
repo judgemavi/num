@@ -117,10 +117,11 @@ test("the first confirmation labels the payee's other rows and the next import",
   }
 });
 
-test("a transfer and a split are never labeled automatically", () => {
+test("a transfer and a loan payment are never labeled automatically", () => {
   const sample = book();
   try {
     const food = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
+    const loan = createAccount(sample.db, { name: "Loan", institution: null, kind: "loan", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const visa = createAccount(sample.db, {
       name: "Visa",
       institution: null,
@@ -137,13 +138,13 @@ test("a transfer and a split are never labeled automatically", () => {
       lines: [{ amount: -4000 }],
       ...saved,
     });
-    const split = createTransaction(sample.db, {
+    const loanPayment = createTransaction(sample.db, {
       accountId: sample.account.id,
       date: "2026-03-02",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
       lines: [
-        { amount: -2500, memo: null, tagIds: [] },
+        { amount: -2500, transferAccountId: loan.id, memo: null, tagIds: [] },
         { amount: -1500, categoryId: food.id, memo: null, tagIds: [] },
       ],
       ...saved,
@@ -165,9 +166,9 @@ test("a transfer and a split are never labeled automatically", () => {
       lines: [{ amount: plain.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });
-    const splitSaved = getTransaction(sample.db, split.id);
-    expect(splitSaved?.autoReason).toBeNull();
-    expect(splitSaved?.lines.map((line) => line.categoryId)).toEqual([null, food.id]);
+    const loanSaved = getTransaction(sample.db, loanPayment.id);
+    expect(loanSaved?.autoReason).toBeNull();
+    expect(loanSaved?.lines.map((line) => line.categoryId)).toEqual([null, food.id]);
     const transferSaved = getTransaction(sample.db, transfer.id);
     expect(transferSaved?.autoReason).toBeNull();
     expect(transferSaved?.lines[0]?.transferAccountId).toBe(visa.id);

@@ -49,8 +49,8 @@ export function transactionError(code: ErrorCode | undefined): string {
       return "A line can have a category or a transfer, not both.";
     case "transfer_same_account":
       return "A transfer must go to a different account.";
-    case "transfer_line_limit":
-      return "A transaction can have one transfer line.";
+    case "lines_not_loan_payment":
+      return "A transaction with two lines must be a loan payment: interest and principal.";
     case "mirror_amount_locked":
       return "Change this amount on the other side of the transfer.";
     case "mirror_one_line":

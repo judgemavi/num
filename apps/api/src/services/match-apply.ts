@@ -57,7 +57,8 @@ export function applyLinkedPlan(
   }
   tx.update(transactions)
     .set({
-      merchantId: plan.merchantId ?? txn.merchantId,
+      // A loan payment has no merchant (decision 0053).
+      merchantId: lines ? null : (plan.merchantId ?? txn.merchantId),
       autoReason: "recurring",
       autoSourceId: plan.id,
       autoConfidence: 990,

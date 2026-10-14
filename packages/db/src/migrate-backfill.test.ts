@@ -1,33 +1,14 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { foldName } from "@num/shared";
-import { drizzle } from "drizzle-orm/bun-sqlite";
-import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { migrateDatabase } from "./index";
+import { databaseBefore } from "./migrate-before";
 import { fillSortKeys } from "./sort-keys";
 
-const migrations = join(import.meta.dir, "..", "migrations");
 const backfill = "0008_sort_keys_and_account_created_at";
-
-/** A database that has all migrations before the backfill migration. */
-function databaseBeforeBackfill(dir: string) {
-  const old = join(dir, "old");
-  mkdirSync(join(old, "meta"), { recursive: true });
-  const journal = JSON.parse(readFileSync(join(migrations, "meta", "_journal.json"), "utf8")) as { entries: { tag: string }[] };
-  const index = journal.entries.findIndex((entry) => entry.tag === backfill);
-  expect(index).toBeGreaterThan(0);
-  const kept = journal.entries.slice(0, index);
-  writeFileSync(join(old, "meta", "_journal.json"), JSON.stringify({ ...journal, entries: kept }));
-  for (const entry of kept) {
-    cpSync(join(migrations, `${entry.tag}.sql`), join(old, `${entry.tag}.sql`));
-  }
-  const sqlite = new Database(join(dir, "num.sqlite"));
-  migrate(drizzle(sqlite), { migrationsFolder: old });
-  return sqlite;
-}
 
 function addAccount(sqlite: Database, id: string, openingDate: string | null) {
   sqlite
@@ -37,7 +18,7 @@ function addAccount(sqlite: Database, id: string, openingDate: string | null) {
 
 test("the backfill migration fills the creation time of each account and the sort keys", () => {
   const dir = mkdtempSync(join(tmpdir(), "num-db-backfill-"));
-  const sqlite = databaseBeforeBackfill(dir);
+  const sqlite = databaseBefore(dir, backfill);
   try {
     addAccount(sqlite, "audited", "2026-01-01");
     addAccount(sqlite, "from-transaction", null);

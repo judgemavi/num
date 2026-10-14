@@ -1,6 +1,8 @@
 # 0050 — Transaction editor fields: no notes, no manual status, Description
 
 Status: approved (owner, 2026-10-14)
+Changed by decision 0052 (2026-10-14): a new manual, MCP or mirror transaction is `open` only when its account gets
+imports. Else it is `cleared`.
 
 ## Context
 

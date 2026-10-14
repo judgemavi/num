@@ -4,8 +4,6 @@ import {
   mortgageLoan,
   mortgageNextPayments,
   mortgageSchedule,
-  mortgageSplitForDate,
-  type MortgagePrefill,
   type MortgageTerms,
   type MortgageValuation,
   type MortgageView,
@@ -30,14 +28,14 @@ function requireMortgage(db: Reader, accountId: string) {
 }
 
 /** A mortgage with terms always has a stored opening date (decision 0027). */
-function storedOpeningDate(account: { openingDate: string | null }) {
+export function storedOpeningDate(account: { openingDate: string | null }) {
   if (account.openingDate === null) {
     throw new Error("A mortgage with terms has no opening date");
   }
   return account.openingDate;
 }
 
-function activeValuations(db: Reader, accountId: string): MortgageValuation[] {
+export function activeValuations(db: Reader, accountId: string): MortgageValuation[] {
   return db
     .select({ date: valuations.date, balance: valuations.balance })
     .from(valuations)
@@ -100,40 +98,4 @@ export function mortgageAccountView(
         }
       : null,
   };
-}
-
-function mortgagePaidFrom(db: Db, fromAccountId: string) {
-  const rows = db.select().from(mortgageTerms).where(eq(mortgageTerms.paymentAccountId, fromAccountId)).all();
-  if (rows.length !== 1) {
-    return null;
-  }
-  return rows[0]?.accountId ?? null;
-}
-
-export function mortgagePrefill(db: Db, fromAccountId: string, toAccountId: string | undefined, date: string): MortgagePrefill | null {
-  const targetId = toAccountId ?? mortgagePaidFrom(db, fromAccountId);
-  if (!targetId) {
-    return null;
-  }
-  const account = db.select().from(accounts).where(eq(accounts.id, targetId)).get();
-  if (!account || account.kind !== "mortgage") {
-    return null;
-  }
-  const row = db.select().from(mortgageTerms).where(eq(mortgageTerms.accountId, targetId)).get();
-  if (!row) {
-    return null;
-  }
-  const split = mortgageSplitForDate({
-    terms: row,
-    opening: { balance: account.openingBalance, date: storedOpeningDate(account) },
-    valuations: activeValuations(db, targetId),
-    date,
-    fromAccountId,
-    toAccountId: targetId,
-    step: bookStep(db),
-  });
-  if (!split || split.payment < 1) {
-    return null;
-  }
-  return { ...split, mortgageAccountId: targetId };
 }

@@ -1,4 +1,4 @@
-import { queryOptions, skipToken } from "@tanstack/react-query";
+import { queryOptions } from "@tanstack/react-query";
 import { api, errorCode, unwrap } from "@/api/client";
 
 /** Give null when the account has no mortgage terms. Throw each other error again. */
@@ -40,15 +40,13 @@ export function mortgageViewQuery(accountId: string, asOf: string, { extra, lump
   });
 }
 
-type PrefillSearch = { fromAccountId: string; toAccountId: string | null; date: string };
-
 /**
- * The principal and the interest of a mortgage payment on a date, or null when the accounts have no mortgage payment.
- * The read does not start until `wanted` is true.
+ * The start values of a loan payment to a mortgage or loan account on a date (decision 0053): the interest from the
+ * payment schedule and the interest category. Each one is null when there is none.
  */
-export function mortgagePrefillQuery({ fromAccountId, toAccountId, date }: PrefillSearch, wanted: boolean) {
+export function loanPaymentDefaultsQuery(accountId: string, date: string) {
   return queryOptions({
-    queryKey: ["mortgage-prefill", fromAccountId, toAccountId, date],
-    queryFn: wanted ? () => unwrap(api["mortgage-prefill"].$get({ query: { fromAccountId, toAccountId: toAccountId ?? undefined, date } })) : skipToken,
+    queryKey: ["loan-payment-defaults", accountId, date],
+    queryFn: () => unwrap(api["loan-payment-defaults"].$get({ query: { accountId, date } })),
   });
 }

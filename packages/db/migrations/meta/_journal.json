@@ -78,6 +78,13 @@
       "when": 1792010292350,
       "tag": "0010_remove_transaction_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1792017184056,
+      "tag": "0011_clear_open_in_accounts_without_imports",
+      "breakpoints": true
     }
   ]
 }

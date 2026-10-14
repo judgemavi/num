@@ -2,12 +2,12 @@ import type { MoneyDirection } from "./amount-sign";
 import type { CategoryKind } from "./category";
 import type { Suggestion } from "./suggest";
 
-export const whatChoices = ["spending", "income", "refund", "transfer", "split"] as const;
+export const whatChoices = ["spending", "income", "refund", "transfer", "loan_payment"] as const;
 
 export type WhatChoice = (typeof whatChoices)[number];
 
 export function choicesForDirection(direction: MoneyDirection): WhatChoice[] {
-  return direction === "out" ? ["spending", "transfer", "split"] : ["income", "refund", "transfer", "split"];
+  return direction === "out" ? ["spending", "transfer", "loan_payment"] : ["income", "refund", "transfer"];
 }
 
 export function defaultChoice(direction: MoneyDirection): WhatChoice {
@@ -29,8 +29,9 @@ export function preselectTransfer(input: { transferRule: boolean; oppositeMatch:
   return input.transferRule || input.oppositeMatch;
 }
 
+/** A transfer and a loan payment have no merchant (decision 0053). */
 export function merchantForChoice(choice: WhatChoice, merchantId: string | null): string | null {
-  return choice === "transfer" ? null : merchantId;
+  return choice === "transfer" || choice === "loan_payment" ? null : merchantId;
 }
 
 export function choiceForCategory(direction: MoneyDirection, kind: CategoryKind | null): WhatChoice {
@@ -51,6 +52,10 @@ export function resolveEditorChoice(input: {
   oppositeAccountId: string | null;
 }): { choice: WhatChoice; categoryId: string | null; transferAccountId: string | null; merchantId: string | null } {
   const transferFromRule = input.transferAccountFromRule;
+  // The learned mortgage payment (decision 0025) is a loan payment to the mortgage (decision 0053).
+  if (input.suggestion?.mortgage && input.suggestion.transferAccountId && input.direction === "out") {
+    return { choice: "loan_payment", categoryId: null, transferAccountId: input.suggestion.transferAccountId, merchantId: null };
+  }
   if (preselectTransfer({ transferRule: transferFromRule !== null, oppositeMatch: input.oppositeAccountId !== null })) {
     return {
       choice: "transfer",

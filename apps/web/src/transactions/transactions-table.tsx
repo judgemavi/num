@@ -55,7 +55,7 @@ function ConfidenceHead() {
   return <SortHead column="confidence" label="Confidence" sort={sort} onSort={sortBy} />;
 }
 
-const splitHint = "Split transactions are edited one at a time.";
+const loanPaymentHint = "Loan payments are changed one at a time.";
 
 /** The checkbox of a row. A click selects the row; Shift and click selects a range (decision 0051). */
 function SelectCell({ rows, row }: { rows: TransactionListItem[]; row: TransactionListItem }) {
@@ -81,11 +81,11 @@ function SelectCell({ rows, row }: { rows: TransactionListItem[]; row: Transacti
       ) : (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-flex" tabIndex={0} aria-label={splitHint}>
+            <span className="inline-flex" tabIndex={0} aria-label={loanPaymentHint}>
               {box}
             </span>
           </TooltipTrigger>
-          <TooltipContent>{splitHint}</TooltipContent>
+          <TooltipContent>{loanPaymentHint}</TooltipContent>
         </Tooltip>
       )}
     </TableCell>

@@ -73,7 +73,7 @@ export function answerNoCategory(tx: WriteTx, transactionId: string, at: string)
   auditTransaction(tx, transactionId, "update", before, readTransaction(tx, transactionId));
 }
 
-/** Removes the keep decisions of transactions that have a category, a transfer or a split in every line. */
+/** Removes the keep decisions of transactions that have a category or a transfer in every line. */
 export function dropSettledKeeps(tx: WriteTx): void {
   const settled = tx
     .select()

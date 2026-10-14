@@ -1,8 +1,6 @@
 import {
   amountText,
   merchantForChoice,
-  moneyDirection,
-  signedAmount,
   transactionWriteSchema,
   type ReviewAnswer,
   type Transaction,
@@ -11,8 +9,7 @@ import {
 } from "@num/shared";
 import type { TransactionSave } from "@/api/transactions";
 import { editPatch, keptAmount } from "@/forms/form-values";
-import { readPositive, type TransactionValues } from "@/transactions/transaction-draft";
-import { lineDirection } from "@/transactions/what-choice";
+import { interestLine, readPositive, type TransactionValues } from "@/transactions/transaction-draft";
 
 type SubmitInput = TransactionValues & {
   currency: string;
@@ -70,30 +67,55 @@ function hasOpenLine(lines: readonly { categoryId?: string | null; transferAccou
 }
 
 /**
+ * The interest of a loan payment as a negative amount (decision 0053). An interest text that the person did not change
+ * keeps its stored amount (decision 0040). It is more than zero and less than the amount.
+ */
+export function loanInterest(input: Pick<SubmitInput, "currency" | "transaction" | "totalMilli" | "interest">): number {
+  const stored = interestLine(input.transaction);
+  const start = stored ? { text: amountText(Math.abs(stored.amount)), amount: stored.amount } : null;
+  if (input.interest.trim().length === 0) {
+    throw new Error("Enter the interest.");
+  }
+  const interest = keptAmount(input.interest, start, (text) => -readPositive(input.currency, text));
+  if (interest === 0) {
+    throw new Error("Enter the interest.");
+  }
+  if (interest <= input.totalMilli) {
+    throw new Error("The interest must be less than the amount.");
+  }
+  return interest;
+}
+
+/** The lines of a loan payment: the interest on its category and the principal on the transfer to the loan account. */
+function loanLines(input: SubmitInput) {
+  if (!input.transferAccountId) {
+    throw new Error("Choose the loan account.");
+  }
+  const interest = loanInterest(input);
+  if (!input.interestCategoryId) {
+    throw new Error("Choose the interest category.");
+  }
+  const lines = [
+    { amount: interest, categoryId: input.interestCategoryId, transferAccountId: null },
+    { amount: input.totalMilli - interest, categoryId: null, transferAccountId: input.transferAccountId },
+  ];
+  // The lines keep their stored order: an unchanged loan payment is not a change.
+  const stored = input.transaction?.lines ?? [];
+  const ordered = stored.length === 2 && stored[0]?.transferAccountId !== null ? [...lines].reverse() : lines;
+  return ordered.map((line, index) => ({ ...line, memo: stored[index]?.memo ?? null, tagIds: input.tagIds }));
+}
+
+/**
  * Make the save for the Transaction editor from the form fields.
  * On a transaction with an automatic label, Save is the answer: the label is confirmed.
  */
 export function buildTransactionSave(input: SubmitInput): BuildResult {
   const memoAt = (index: number) => input.transaction?.lines[index]?.memo ?? null;
-  // A line amount that the person did not change keeps its stored amount (decision 0040).
-  const lineAmount = (index: number, line: SubmitInput["lines"][number]) => {
-    const direction = lineDirection(moneyDirection(input.totalMilli), line);
-    const stored = input.transaction?.lines[index]?.amount;
-    const start =
-      stored !== undefined && moneyDirection(stored) === direction ? { text: amountText(Math.abs(stored)), amount: stored } : null;
-    return keptAmount(line.amount, start, (text) => signedAmount(direction, readPositive(input.currency, text)));
-  };
   let built;
   try {
     built =
-      input.choice === "split"
-        ? input.lines.map((line, index) => ({
-            amount: lineAmount(index, line),
-            memo: memoAt(index),
-            categoryId: line.categoryId,
-            transferAccountId: line.transferAccountId,
-            tagIds: input.tagIds,
-          }))
+      input.choice === "loan_payment"
+        ? loanLines(input)
         : [
             {
               amount: input.totalMilli,

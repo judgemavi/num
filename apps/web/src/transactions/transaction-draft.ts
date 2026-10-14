@@ -17,7 +17,6 @@ import { suggestionQuery, transferHintQuery } from "@/api/suggestions";
 import { localAsOf } from "@/as-of";
 import { useCategories } from "@/editors/lookups";
 import { fieldValue } from "@/forms/form-values";
-import type { SplitLine } from "@/transactions/what-choice";
 import { decimalsError } from "@/money";
 
 /** A change that the form makes, not the person. It does not mark the field as changed and does not start the listeners. */
@@ -41,7 +40,7 @@ function choiceOf(transaction: Transaction | null, categories: Category[]) {
     return "spending";
   }
   if (transaction.lines.length > 1) {
-    return "split";
+    return "loan_payment";
   }
   const line = transaction.lines[0];
   if (line?.transferAccountId) {
@@ -51,7 +50,7 @@ function choiceOf(transaction: Transaction | null, categories: Category[]) {
   return choiceForCategory(moneyDirection(transaction.amount), kind);
 }
 
-/** True when the saved transaction has a category, a transfer or lines. Then the form does not apply a suggestion. */
+/** True when the saved transaction has a category, a transfer or two lines. Then the form does not apply a suggestion. */
 export function alreadyChosen(transaction: Transaction | null): boolean {
   if (!transaction) {
     return false;
@@ -59,16 +58,9 @@ export function alreadyChosen(transaction: Transaction | null): boolean {
   return transaction.lines.length > 1 || transaction.lines.some((line) => line.categoryId !== null || line.transferAccountId !== null);
 }
 
-function linesOf(transaction: Transaction): SplitLine[] {
-  const direction = moneyDirection(transaction.amount);
-  return transaction.lines.map((line) => ({
-    key: line.id,
-    amount: amountText(Math.abs(line.amount)),
-    opposite: moneyDirection(line.amount) !== direction,
-    edited: true,
-    categoryId: line.categoryId,
-    transferAccountId: line.transferAccountId,
-  }));
+/** The interest line of a saved loan payment (decision 0053): the category line of a transaction with two lines. */
+export function interestLine(transaction: Transaction | null) {
+  return transaction && transaction.lines.length > 1 ? (transaction.lines.find((line) => line.transferAccountId === null) ?? null) : null;
 }
 
 /**
@@ -80,6 +72,7 @@ function linesOf(transaction: Transaction): SplitLine[] {
 export function transactionValues(categories: Category[], transaction: Transaction | null, accountId: string, review: TransactionReview | null = null) {
   const pair = review?.question === "transfer_pair" ? review.transfer : null;
   const purchase = review?.question === "refund_purchase" ? (review.refund?.purchases[0] ?? null) : null;
+  const interest = pair ? null : interestLine(transaction);
   return {
     accountId: transaction?.accountId ?? accountId,
     date: transaction?.date ?? localAsOf(),
@@ -89,12 +82,13 @@ export function transactionValues(categories: Category[], transaction: Transacti
     merchantId: transaction && !pair ? transaction.merchantId : null,
     refundOfId: purchase ? purchase.id : transaction ? transaction.refundOfId : null,
     choice: pair ? "transfer" : purchase ? "refund" : choiceOf(transaction, categories),
-    categoryId: pair ? null : (transaction?.lines[0]?.categoryId ?? null),
-    transferAccountId: pair ? pair.otherAccountId : (transaction?.lines[0]?.transferAccountId ?? null),
-    lines: transaction && !pair && transaction.lines.length > 1 ? linesOf(transaction) : [],
+    categoryId: pair || interest ? null : (transaction?.lines[0]?.categoryId ?? null),
+    /** The other account of a transfer, or the loan account of a loan payment. */
+    transferAccountId: pair ? pair.otherAccountId : (transaction?.lines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null),
+    /** The interest of a loan payment, as the person types it (decision 0053). */
+    interest: interest ? amountText(Math.abs(interest.amount)) : "",
+    interestCategoryId: interest?.categoryId ?? null,
     tagIds: [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])],
-    /** True after the form put the lines of a mortgage payment from the schedule. The form does it one time. */
-    mortgageFilled: false,
     /** The occurrence that the transaction pays: "planId:dueDate". Only for the question "Which payment is this?". */
     paymentFor: fieldValue<string | null>(null),
   };

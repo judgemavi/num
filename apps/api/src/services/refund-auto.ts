@@ -22,7 +22,7 @@ const incoming = alias(transactions, "incoming");
 const incomingLine = alias(transactionLines, "incoming_line");
 const purchaseLine = alias(transactionLines, "purchase_line");
 
-/** Rows with one expense-category line. A transfer or a split is never a refund or a purchase. */
+/** Rows with one expense-category line. A transfer or a loan payment is never a refund or a purchase. */
 function hasOneExpenseLine(transactionId: AnySQLiteColumn) {
   return and(
     eq(lineCount(transactionId), literal(1)),

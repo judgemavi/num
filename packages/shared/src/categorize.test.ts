@@ -18,8 +18,8 @@ const savings = "33333333-3333-4333-8333-333333333333";
 test("direction sets the default choice", () => {
   expect(defaultChoice("out")).toBe("spending");
   expect(defaultChoice("in")).toBe("income");
-  expect(choicesForDirection("out")).toEqual(["spending", "transfer", "split"]);
-  expect(choicesForDirection("in")).toEqual(["income", "refund", "transfer", "split"]);
+  expect(choicesForDirection("out")).toEqual(["spending", "transfer", "loan_payment"]);
+  expect(choicesForDirection("in")).toEqual(["income", "refund", "transfer"]);
   expect(resolveEditorChoice({
     direction: "out",
     suggestion: none,
@@ -71,8 +71,15 @@ test("transfer is preselected only on evidence", () => {
   expect(fromMatch.transferAccountId).toBe(savings);
 });
 
-test("a transfer clears the merchant", () => {
+test("a learned mortgage payment gives Loan payment to the mortgage (decision 0053)", () => {
+  const mortgage: Suggestion = { ...none, transferAccountId: savings, reason: "learned_payee", level: "likely", confidence: 800, mortgage: true };
+  const resolved = resolveEditorChoice({ direction: "out", suggestion: mortgage, categoryKind: null, transferAccountFromRule: savings, oppositeAccountId: null });
+  expect(resolved).toEqual({ choice: "loan_payment", categoryId: null, transferAccountId: savings, merchantId: null });
+});
+
+test("a transfer and a loan payment clear the merchant", () => {
   expect(merchantForChoice("transfer", merchant)).toBeNull();
+  expect(merchantForChoice("loan_payment", merchant)).toBeNull();
   expect(merchantForChoice("spending", merchant)).toBe(merchant);
   expect(merchantForChoice("income", merchant)).toBe(merchant);
   expect(merchantForChoice("refund", null)).toBeNull();
@@ -83,7 +90,7 @@ test("the category kind follows the choice", () => {
   expect(categoryKindForChoice("refund")).toBe("expense");
   expect(categoryKindForChoice("income")).toBe("income");
   expect(categoryKindForChoice("transfer")).toBeNull();
-  expect(categoryKindForChoice("split")).toBeNull();
+  expect(categoryKindForChoice("loan_payment")).toBeNull();
   const refund = resolveEditorChoice({
     direction: "in",
     suggestion: { merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "learned_payee", level: "maybe", sourceId: null, confidence: 700 },

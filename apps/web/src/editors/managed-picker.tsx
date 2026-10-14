@@ -2,13 +2,12 @@ import { canOfferInlineCreate, finishInlineCreate } from "@num/shared";
 import { useState, type ReactNode } from "react";
 import { Boundary } from "@/components/boundary";
 import { EditorFrameContext } from "@/editors/editor-api";
-import { OptionCombobox, type Option, type OptionGroup } from "@/transactions/option-combobox";
+import { OptionCombobox, type Option } from "@/transactions/option-combobox";
 
 type ManagedPickerProps = {
   id: string;
   value: string | null;
   options: Option[];
-  groups?: OptionGroup[];
   placeholder: string;
   emptyLabel?: string;
   disabled?: boolean;
@@ -29,7 +28,6 @@ export function ManagedPicker({
   id,
   value,
   options,
-  groups,
   placeholder,
   emptyLabel,
   disabled,
@@ -45,9 +43,8 @@ export function ManagedPicker({
 }: ManagedPickerProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const [added, setAdded] = useState<Option[]>([]);
-  const extras = added.filter((item) => !options.some((option) => option.id === item.id) && !groups?.some((group) => group.options.some((option) => option.id === item.id)));
+  const extras = added.filter((item) => !options.some((option) => option.id === item.id));
   const merged = [...options, ...extras];
-  const mergedGroups = groups?.map((group, index) => (index === 0 ? { ...group, options: [...group.options, ...extras] } : group));
   const offer = Boolean(renderForm) && canOfferInlineCreate(depth);
 
   /** The inline form closed. A saved record becomes the selected option. */
@@ -67,7 +64,6 @@ export function ManagedPicker({
         id={id}
         value={value}
         options={merged}
-        groups={mergedGroups}
         placeholder={placeholder}
         emptyLabel={emptyLabel}
         disabled={disabled}

@@ -4,7 +4,7 @@ import { useTargetText } from "@/transactions/names";
 
 function labelText(row: TransactionListItem, targetText: ReturnType<typeof useTargetText>) {
   if (row.lines.length > 1) {
-    return "Split";
+    return "Loan payment";
   }
   const line = row.lines[0] ?? { categoryId: null, transferAccountId: null };
   // An automatic label with no category and no transfer is the answer "no category" (decision 0046).

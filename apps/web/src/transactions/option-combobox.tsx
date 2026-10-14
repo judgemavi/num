@@ -10,11 +10,6 @@ export type Option = {
   label: string;
 };
 
-export type OptionGroup = {
-  label: string;
-  options: Option[];
-};
-
 type CreateAction = {
   noun: string;
   suggestedName?: string;
@@ -30,7 +25,6 @@ type OptionComboboxProps = {
   id: string;
   value: string | null;
   options: Option[];
-  groups?: OptionGroup[];
   placeholder: string;
   emptyLabel?: string;
   disabled?: boolean;
@@ -65,7 +59,6 @@ export function OptionCombobox({
   id,
   value,
   options,
-  groups,
   placeholder,
   emptyLabel,
   disabled = false,
@@ -77,13 +70,12 @@ export function OptionCombobox({
 }: OptionComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const selected = options.find((option) => option.id === value) ?? groups?.flatMap((group) => group.options).find((option) => option.id === value);
+  const selected = options.find((option) => option.id === value);
   const query = search.trim();
   const prefill = query.length > 0 ? query : (create?.suggestedName?.trim() ?? "");
-  const pool = groups ? groups.flatMap((group) => group.options) : options;
   const archivedHit = archivedNameMatch(
     query,
-    pool.map((option) => option.label),
+    options.map((option) => option.label),
     (archived ?? []).map((item) => ({ id: item.id, name: item.label })),
   );
 
@@ -92,8 +84,6 @@ export function OptionCombobox({
     setOpen(false);
     setSearch("");
   }
-
-  const filteredGroups = groups?.map((group) => ({ label: group.label, options: visibleOptions(group.options, query, preserveOrder) })).filter((group) => group.options.length > 0);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -143,25 +133,13 @@ export function OptionCombobox({
                 </CommandItem>
               </CommandGroup>
             ) : null}
-            {filteredGroups ? (
-              filteredGroups.map((group) => (
-                <CommandGroup key={group.label} heading={group.label}>
-                  {group.options.map((option) => (
-                    <CommandItem key={option.id} value={option.label} onSelect={() => pick(option.id)}>
-                      {option.label}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              ))
-            ) : (
-              <CommandGroup>
-                {visibleOptions(options, query, preserveOrder).map((option) => (
-                  <CommandItem key={option.id} value={option.label} onSelect={() => pick(option.id)}>
-                    {option.label}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
+            <CommandGroup>
+              {visibleOptions(options, query, preserveOrder).map((option) => (
+                <CommandItem key={option.id} value={option.label} onSelect={() => pick(option.id)}>
+                  {option.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
           </CommandList>
         </Command>
       </PopoverContent>

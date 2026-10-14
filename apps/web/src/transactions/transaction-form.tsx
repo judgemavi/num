@@ -13,12 +13,10 @@ import { useAccountLabels, useAccounts, useBookCurrency, useCategories } from "@
 import { useAppForm } from "@/forms/form-hook";
 import { formatMoney } from "@/money";
 import { formatDate, levelLabel, refundedText, transactionError } from "@/transactions/format";
-import { mortgageSplitFill, useMortgageSplit } from "@/transactions/mortgage-split";
 import { DecisionNotes, DeleteMenu, MoneySection, TagsField } from "@/transactions/transaction-parts";
 import { PaymentForField } from "@/transactions/payment-for-field";
-import { alreadyChosen, answerFilled, quietChange, signedTotal, transactionValues, useSuggestion } from "@/transactions/transaction-draft";
+import { alreadyChosen, answerFilled, interestLine, quietChange, signedTotal, transactionValues, useSuggestion } from "@/transactions/transaction-draft";
 import { buildTransactionSave, reviewAnswer } from "@/transactions/transaction-submit";
-import { splitBlank, splitRemainder } from "@/transactions/what-choice";
 import { WhatIsThis } from "@/transactions/what-is-this";
 
 type TransactionFormProps = {
@@ -35,8 +33,6 @@ type TransactionFormProps = {
 
 /** The fields that the person sets to answer "What is this?". A change to one of them stops the suggestion. */
 const choiceFields = ["choice", "categoryId", "transferAccountId", "merchantId", "refundOfId"] as const;
-
-const mortgageNotice = "Num put the principal and interest from the schedule in the lines. You can change the amounts.";
 
 export function TransactionForm({
   transaction,
@@ -80,9 +76,6 @@ export function TransactionForm({
         if (value.choice === "transfer" && !value.transferAccountId) {
           return "Choose the other account.";
         }
-        if (value.choice === "split" && (splitRemainder(currency, total, value.direction, value.lines) !== 0 || splitBlank(value.lines))) {
-          return "Assign the whole amount.";
-        }
         const built = buildTransactionSave({ ...value, currency, transaction, totalMilli: total, unreadableItemKey, answer: answerOf(value.paymentFor) });
         return built.ok ? undefined : built.error;
       },
@@ -114,7 +107,6 @@ export function TransactionForm({
     form.store,
     (state) => alreadyChosen(transaction) || answerFilled(review) || choiceFields.some((name) => state.fieldMeta[name]?.isTouched),
   );
-  const linesEdited = useStore(form.store, (state) => alreadyChosen(transaction) || state.fieldMeta.lines?.isTouched === true);
   const totalMilli = signedTotal(currency, storedTotal(values), values.amount, values.direction);
   const suggested = useSuggestion({ accountId: values.accountId, payee: values.payee, date: values.date, direction: values.direction, amount: totalMilli });
 
@@ -130,35 +122,11 @@ export function TransactionForm({
     form.setFieldValue("merchantId", suggestedChoice.merchantId, quietChange);
   }, [suggestedChoice, form]);
 
-  // A mortgage payment from the payment account gets its two lines from the schedule, one time, when the read of the
-  // schedule completes. After that, the person owns the lines.
-  const mortgageSplit = useMortgageSplit({
-    open: !reconciled && !linesEdited && !values.mortgageFilled,
-    choice: values.choice,
-    direction: values.direction,
-    fromAccountId: values.accountId,
-    toAccountId: values.transferAccountId,
-    date: values.date,
-  });
-  useEffect(() => {
-    if (!mortgageSplit || form.getFieldValue("mortgageFilled")) {
-      return;
-    }
-    const fill = mortgageSplitFill(currency, mortgageSplit, form.getFieldValue("amount"));
-    form.setFieldValue("mortgageFilled", true, quietChange);
-    form.setFieldValue("choice", "split", quietChange);
-    form.setFieldValue("lines", fill.lines, quietChange);
-    if (!transaction && fill.total !== null) {
-      form.setFieldValue("amount", fill.total, quietChange);
-    }
-  }, [mortgageSplit, currency, form, transaction]);
-
-  const left = values.choice === "split" && totalMilli !== null ? splitRemainder(currency, totalMilli, values.direction, values.lines) : null;
   const saveDisabled =
     values.accountId.length === 0 ||
     totalMilli === null ||
-    (values.choice === "transfer" && !values.transferAccountId) ||
-    (values.choice === "split" && (left !== 0 || splitBlank(values.lines)));
+    ((values.choice === "transfer" || values.choice === "loan_payment") && !values.transferAccountId) ||
+    (values.choice === "loan_payment" && (values.interest.trim().length === 0 || !values.interestCategoryId));
   const summary = `${formatDate(values.date)} · ${accountLabels.get(values.accountId) ?? "Account"} · ${values.direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(totalMilli ?? 0))}`;
 
   return (
@@ -207,6 +175,7 @@ export function TransactionForm({
             categoryLocked={amountLocked}
             transferLocked={reconciled || amountLocked}
             amountsLocked={reconciled || amountLocked}
+            loanFill={interestLine(transaction) === null}
             storedAmount={storedTotal(values)}
             linkedRefund={values.refundOfId !== null && transaction?.refundOf?.id === values.refundOfId ? transaction.refundOf : null}
             pair={review?.question === "transfer_pair" ? review.transfer : null}
@@ -215,7 +184,6 @@ export function TransactionForm({
           {review?.question === "recurring_ambiguous" && review.recurring ? <PaymentForField form={form} occurrence={review.recurring} /> : null}
           {transaction?.refundedAmount ? <p className="text-sm text-muted-foreground">{refundedText(currency, transaction.refundedAmount)}</p> : null}
           <form.Field name="tagIds">{(field) => <TagsField tagIds={field.state.value} onTags={field.handleChange} />}</form.Field>
-          {values.mortgageFilled ? <p role="status">{mortgageNotice}</p> : null}
           <form.FormError />
         </DialogBody>
         <DialogFooter>

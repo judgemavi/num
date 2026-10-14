@@ -29,7 +29,7 @@ If a screen or feature does not support one of these loops, do not add it.
 1. **Correct money.** Use integer milliunits for all amounts (§4). Account balances must agree with bank statements.
 2. **Deterministic.** Use schedules, history, text similarity and arithmetic (confidence scores, §7.3). Do not use ML. The app does not call an LLM.
 3. **Money never changes by itself.** The app does not create, change or delete money (amounts, dates, accounts,
-   transfers, splits) without a user action. Labels (category and merchant) can be automatic when the app is sure
+   transfers, loan payments) without a user action. Labels (category and merchant) can be automatic when the app is sure
    (§7.3). An automatic label always shows its level (Sure) and is easy to correct (decision 0037).
 4. **Reversible.** The user can undo imports and funding.
    The user can restore archived accounts, categories, tags, merchants, recurring items and buckets.
@@ -198,7 +198,9 @@ Line fields:
 
 Rules:
 - The sum of the lines must be equal to the transaction amount.
-- A transaction has one or more lines.
+- A transaction has one or more lines. A transaction with more than one line is a **loan payment** (decision 0053):
+  exactly two lines, both money out, one line with an expense category (the interest) and one transfer line to a
+  `mortgage` or `loan` account (the principal). Else the API answers 400 with `lines_not_loan_payment`.
 - A line without a category and without a transfer is **uncategorized**. It needs review (§7.3), unless the user
   kept it uncategorized (decision 0024). Saving a transaction with no category after its automatic label was removed
   also keeps it uncategorized (decision 0045).
@@ -220,15 +222,18 @@ Rules:
   - A change to the date, amount or target of a transfer updates the peer only when the peer is a mirror.
     If the peer is not a mirror, the app unlinks the pair instead. The app never rewrites imported bank data.
   - Deleting one side of a pair: a mirror peer is deleted with it; a non-mirror peer is unlinked.
-  - The mirror has its own `status`. A new mirror starts as `open`.
+  - The mirror has its own `status`. A new mirror starts as `open` when its account gets imports, else as `cleared`
+    (decision 0052).
   - If the source transaction has more than one line, the user cannot change the mirror amount.
     The user changes the amount on the source transaction.
-- Only the app sets `status`. The user and the API do not set it. A new manual or MCP transaction is `open`.
-  Reconciled is calculated (§5.13).
+- Only the app sets `status`. The user and the API do not set it. Reconciled is calculated (§5.13).
+- An account **gets imports** when it has `importPreset` or `columnMap` (decision 0052). A new manual or MCP transaction
+  is `open` when its account gets imports, else `cleared`. When an account gets its first import, the status of its
+  existing transactions does not change.
 - An imported transaction is `cleared` (the bank shows it). An import row that is `matched` to a transaction sets that
   transaction to `cleared`. Import undo sets a matched transaction back to its status before the import.
 - The user cannot add a transaction to an archived account, or move a transaction to an archived account.
-- A mortgage payment is one chequing transaction with two lines:
+- A mortgage payment is a loan payment: one chequing transaction with two lines:
   - A transfer line for the principal. The target is the mortgage account.
   - An expense line for the interest. The category is the interest category.
 - A `reconciled` transaction locks its money fields: date, account, amount, line amounts, transfer targets, and delete.
@@ -392,7 +397,7 @@ app records, so the same question does not come back:
 
 | Item | Answer that resolves it | Recorded "no" decision |
 |---|---|---|
-| Uncategorized | category, transfer or split | `keep_uncategorized` (Save with no category; decision 0024) |
+| Uncategorized | category, transfer or loan payment | `keep_uncategorized` (Save with no category; decision 0024) |
 | Possible transfer | link | `not_transfer` |
 | Recurring amount changed | update the plan | `keep_plan_amount` |
 | Missed payment | link a transaction | `skipped` (+ reason, as a plan skip) |
@@ -577,15 +582,16 @@ The app compares confidence in thousandths (0–1000) with the thresholds (decis
   The UI shows the level (see Levels). The reason code stays for the logic; the UI does not show it.
 - A confirmation clears `autoReason`. Other edits (tags, memos) are not confirmations. A save in the editor and a
   bulk edit are the user's answer: they confirm the label of each changed row (decisions 0047, 0051).
-- When a transaction becomes a transfer or a split, the automatic fields are cleared.
-- Transfers are never automatic (evidence only preselects Transfer). Splits are never automatic, except the mortgage split
-  of a recurring mortgage item (§5.2, the user created the item).
+- When a transaction becomes a transfer or a loan payment, the automatic fields are cleared.
+- Transfers are never automatic (evidence only preselects Transfer). Loan payments are never automatic, except the
+  mortgage payment of a recurring mortgage item (§5.2, the user created the item).
 - A confirmed mortgage payment teaches its payee. The other transactions of that payee get the suggestion
-  "Mortgage payment" (Likely); Yes and Approve apply the split from the terms (decisions 0025, 0051).
+  "Mortgage payment" (Likely); the editor shows it as Loan payment, and Approve applies the interest and the principal
+  from the terms (decisions 0025, 0051, 0053).
 
 **What is this?** The choices follow the direction of the money (decision 0014):
-- Money out: **Spending** (default) · Transfer · Split.
-- Money in: **Income** (default) · Refund · Transfer · Split.
+- Money out: **Spending** (default) · Transfer · Loan payment.
+- Money in: **Income** (default) · Refund · Transfer.
 
 1. **Spending** and **Refund:** an expense category. The list shows only expense categories.
    **Refund** first asks "Refund of which purchase?" (optional; recent spending, same payee first, decision 0018).
@@ -600,8 +606,12 @@ The app compares confidence in thousandths (0–1000) with the thresholds (decis
    account within ±3 days, or a learned transfer for that payee. A transfer has no merchant. If that account has an unlinked transaction with the opposite amount within ±3 days,
    the app links the two (no new mirror). If not, the app creates the mirror transaction. A later import of the other
    account matches the mirror (§7.2 step 4).
-3. **Split:** several lines, for example a mortgage payment. Each line has its own direction, and its category list shows
-   both groups with labels (this also covers returned income).
+3. **Loan payment** (decision 0053): a payment to a mortgage or a loan. The fields are the loan account (mortgage and
+   loan accounts that are not archived), the interest, the principal (read-only: the amount minus the interest) and the
+   interest category (expense categories). For a mortgage with terms, the interest starts with the interest of the
+   schedule for the date (§5.2). The interest category starts with the category of the terms, else the category of the
+   last loan payment to that account. The interest is more than zero and less than the amount. A loan payment has no
+   merchant. The save makes the two lines of §5.4.
 The best candidate (§7.3) preselects the choice: a category, or a learned transfer.
 
 **Needs review (decisions 0021, 0047).** A transaction needs review when it has an automatic label, a suggestion,
@@ -627,8 +637,8 @@ It has the same sort orders, and also a sort by confidence (decision 0049). The 
     payment links the transaction to it.
 - **Selection (decision 0051):** the table on `/transactions` and `/transactions/review` has a checkbox column. A click
   on the checkbox selects the row; a click on another part of the row opens the editor. Shift and click selects a
-  range. The header checkbox selects all rows of the page; a selection does not go across pages. A split cannot be
-  selected. The selection clears when the page, the filters or the sort order change.
+  range. The header checkbox selects all rows of the page; a selection does not go across pages. A loan payment cannot be
+  selected (decision 0053). The selection clears when the page, the filters or the sort order change.
 - **Action bar:** with one or more selected rows, a bar shows "N selected", "Approve · N", "Edit…" and "Clear".
   - **Approve** applies the automatic label or the suggestion of each selected row as a confirmation (no confirm;
     audited; one write). A row with a question or with no suggestion is skipped. The count on the button is the number
@@ -639,7 +649,7 @@ It has the same sort orders, and also a sort by confidence (decision 0049). The 
     choices follow the direction; money out and money in together allow only Transfer), the merchant, "Add tags" and
     "Remove tags". The bulk editor does not change the date, the amount, the description, the account or the line
     memos. Save writes all rows in one write (no confirm), with one audit entry for each changed row. A row that cannot
-    take the change is skipped with a reason (split, reconciled for a transfer, another account, the transfer
+    take the change is skipped with a reason (loan payment, reconciled for a transfer, another account, the transfer
     target). The result shows the counts: "10 changed · 2 skipped".
 - An approval and a bulk edit are confirmations (they count for learning).
 - Home shows the count and links to Needs review.

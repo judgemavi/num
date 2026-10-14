@@ -11,22 +11,21 @@ import { useStore } from "@tanstack/react-form";
 import { choiceIn } from "@/components/choice";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useAccountLabels, useBookCurrency, useCategories, useCategoryNames, useMerchantNames } from "@/editors/lookups";
+import { useAccountLabels, useAccounts, useBookCurrency, useCategories, useCategoryNames, useMerchantNames } from "@/editors/lookups";
 import { withForm } from "@/forms/form-hook";
 import { fieldValue } from "@/forms/form-values";
 import { AccountPicker, CategoryPicker, MerchantPicker } from "@/transactions/pickers";
-import { SplitLines } from "@/transactions/split-line-row";
+import { LoanPaymentFields } from "@/transactions/loan-payment-fields";
 import { RefundOfField } from "@/transactions/refund-of-field";
 import { levelLabel, refundPurchaseLabel } from "@/transactions/format";
 import { blankTransaction, quietChange, signedTotal, useSuggestion } from "@/transactions/transaction-draft";
-import type { SplitLine } from "@/transactions/what-choice";
 
 const choiceLabel: Record<WhatChoice, string> = {
   spending: "Spending",
   income: "Income",
   refund: "Refund",
   transfer: "Transfer",
-  split: "Split",
+  loan_payment: "Loan payment",
 };
 
 /** The line under the merchant that tells what Num suggests and its level. It shows only when a suggestion has a name to show. */
@@ -49,7 +48,7 @@ function SuggestionHint({ suggestion }: { suggestion: Suggestion }) {
   return <FieldDescription role="status">{suggestion.level === "none" ? text : `${levelLabel(suggestion.level)}. ${text}`}</FieldDescription>;
 }
 
-/** The choice of the transaction and its fields: the category, the transfer account, the lines and the merchant. */
+/** The choice of the transaction and its fields: the category, the transfer account, the loan payment and the merchant. */
 export const WhatIsThis = withForm({
   defaultValues: blankTransaction,
   props: {
@@ -57,6 +56,8 @@ export const WhatIsThis = withForm({
     categoryLocked: false,
     transferLocked: false,
     amountsLocked: false,
+    /** False for a saved loan payment: its fields keep the saved values (decision 0053). */
+    loanFill: true,
     /** The stored amount while the amount is unchanged, or the amount of an imported transaction. */
     storedAmount: fieldValue<number | null>(null),
     /** The purchase that the saved refund links to. */
@@ -72,6 +73,7 @@ export const WhatIsThis = withForm({
     categoryLocked,
     transferLocked,
     amountsLocked,
+    loanFill,
     storedAmount,
     linkedRefund,
     pair,
@@ -79,6 +81,7 @@ export const WhatIsThis = withForm({
   }) {
     const currency = useBookCurrency();
     const categories = useCategories();
+    const accounts = useAccounts();
     const values = useStore(form.store, (state) => state.values);
     const { direction, choice, refundOfId, accountId } = values;
     const totalMilli = signedTotal(currency, storedAmount, values.amount, direction);
@@ -91,7 +94,7 @@ export const WhatIsThis = withForm({
         <form.Field
           name="choice"
           listeners={{
-            // A new choice keeps only the fields that fit it. Split starts with two lines.
+            // A new choice keeps only the fields that fit it. A loan payment goes only to a mortgage or a loan.
             onChange: ({ value: next, fieldApi }) => {
               const draft = fieldApi.form;
               draft.setFieldValue("merchantId", (current) => merchantForChoice(next, current), quietChange);
@@ -99,11 +102,12 @@ export const WhatIsThis = withForm({
                 draft.setFieldValue("refundOfId", null, quietChange);
               }
               const kind = categories.find((category) => category.id === draft.getFieldValue("categoryId"))?.kind ?? null;
-              if (next !== "transfer" && next !== "split" && kind && kind !== categoryKindForChoice(next)) {
+              if (next !== "transfer" && kind && kind !== categoryKindForChoice(next)) {
                 draft.setFieldValue("categoryId", null, quietChange);
               }
-              if (next === "split" && draft.getFieldValue("lines").length < 2) {
-                draft.setFieldValue("lines", firstLines(draft.getFieldValue("amount"), draft.getFieldValue("categoryId")), quietChange);
+              const target = accounts.find((account) => account.id === draft.getFieldValue("transferAccountId"))?.kind;
+              if (next === "loan_payment" && target !== "mortgage" && target !== "loan") {
+                draft.setFieldValue("transferAccountId", null, quietChange);
               }
             },
           }}
@@ -157,10 +161,9 @@ export const WhatIsThis = withForm({
             )}
           </form.Field>
         ) : null}
-        {choice === "split" ? (
-          <SplitLines form={form} totalMilli={totalMilli} categoryLocked={categoryLocked} transferLocked={transferLocked} amountsLocked={amountsLocked} />
-        ) : null}
-        {choice === "transfer" || (choice === "refund" && refundOfId !== null) ? null : (
+        {choice === "loan_payment" ? <LoanPaymentFields form={form} moneyLocked={transferLocked || amountsLocked} fill={loanFill} totalMilli={totalMilli} /> : null}
+        {choice === "loan_payment" && suggestion?.mortgage ? <SuggestionHint suggestion={suggestion} /> : null}
+        {choice === "transfer" || choice === "loan_payment" || (choice === "refund" && refundOfId !== null) ? null : (
           <form.Field name="merchantId">
             {(field) => (
               <Field>
@@ -175,11 +178,3 @@ export const WhatIsThis = withForm({
     );
   },
 });
-
-/** The two lines of a new split: the first line has the amount and the category, the second line is empty. */
-function firstLines(amount: string, categoryId: string | null): SplitLine[] {
-  return [
-    { key: crypto.randomUUID(), amount, opposite: false, edited: false, categoryId, transferAccountId: null },
-    { key: crypto.randomUUID(), amount: "", opposite: false, edited: false, categoryId: null, transferAccountId: null },
-  ];
-}

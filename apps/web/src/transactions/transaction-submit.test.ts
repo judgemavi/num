@@ -88,3 +88,48 @@ describe("the answer to a Needs review question (decision 0047)", () => {
     expect(reviewAnswer(review, `${planId}:2026-03-01`, "2026-03-02")).toEqual({ question: "recurring_ambiguous", planId, dueDate: "2026-03-01" });
   });
 });
+
+describe("a loan payment (decision 0053)", () => {
+  const loan = "00000000-0000-4000-8000-000000000008";
+  const interestCategory = "00000000-0000-4000-8000-000000000009";
+  const values = { ...transactionValues([], null, "00000000-0000-4000-8000-000000000003"), choice: "loan_payment" as const, transferAccountId: loan, interestCategoryId: interestCategory };
+
+  function build(interest: string, transaction: Transaction | null = null, totalMilli = -1_500_000) {
+    return buildTransactionSave({ ...values, payee: "Lender", date: "2026-03-01", interest, currency: "USD", transaction, totalMilli });
+  }
+
+  test("the interest goes on its category and the principal goes to the loan account", () => {
+    const built = build("400");
+    expect(built.ok && built.save?.kind === "create" && built.save.body.lines).toEqual([
+      { amount: -400_000, memo: null, categoryId: interestCategory, transferAccountId: null, tagIds: [] },
+      { amount: -1_100_000, memo: null, categoryId: null, transferAccountId: loan, tagIds: [] },
+    ]);
+    expect(built.ok && built.save?.kind === "create" && built.save.body.merchantId).toBeNull();
+  });
+
+  test("the interest must be more than zero and less than the amount", () => {
+    expect(build("")).toEqual({ ok: false, error: "Enter the interest." });
+    expect(build("0")).toEqual({ ok: false, error: "Enter the interest." });
+    expect(build("1500")).toEqual({ ok: false, error: "The interest must be less than the amount." });
+    expect(build("1600")).toEqual({ ok: false, error: "The interest must be less than the amount." });
+    expect(build("1499.99").ok).toBe(true);
+  });
+
+  test("a saved loan payment opens as Loan payment, and a save with no change has no write", () => {
+    const saved: Transaction = {
+      ...stored(null, null),
+      amount: -1_500_000,
+      source: "manual",
+      lines: [
+        { id: "00000000-0000-4000-8000-000000000010", amount: -1_100_000, memo: null, categoryId: null, transferAccountId: loan, tagIds: [] },
+        { id: "00000000-0000-4000-8000-000000000011", amount: -400_000, memo: null, categoryId: interestCategory, transferAccountId: null, tagIds: [] },
+      ],
+    };
+    const start = transactionValues([], saved, "");
+    expect(start.choice).toBe("loan_payment");
+    expect(start.transferAccountId).toBe(loan);
+    expect(start.interest).toBe("400");
+    expect(start.interestCategoryId).toBe(interestCategory);
+    expect(buildTransactionSave({ ...start, currency: "USD", transaction: saved, totalMilli: saved.amount })).toEqual({ ok: true, save: null });
+  });
+});

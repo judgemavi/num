@@ -22,7 +22,7 @@ import { applyTransactionUpdate, confirmLinkedPeer, spreadAfterConfirmations } f
 import { linkTransferPair, recordPairNo } from "./transfer-auto";
 import { write, type Reader, type WriteInput, type WriteTx } from "./write";
 
-/** "What is this?" of a bulk edit. Approve also applies a mortgage suggestion: a split from the schedule (decision 0025). */
+/** "What is this?" of a bulk edit. Approve also applies a mortgage suggestion: a loan payment from the schedule (decisions 0025, 0053). */
 type BulkWhat = NonNullable<BulkEdit["what"]> | { kind: "mortgage"; accountId: string; transferAccountId: string };
 
 /** The change to each row. A field that is undefined does not change. */
@@ -52,7 +52,7 @@ function transferAfter(what: BulkWhat | undefined, current: string | null) {
 function skipReason(db: Reader, transaction: Transaction, patch: BulkPatch): BulkSkipReason | null {
   const line = transaction.lines[0];
   if (!line || transaction.lines.length !== 1) {
-    return "split";
+    return "loan_payment";
   }
   const what = patch.what;
   if (what && what.kind !== "category") {
@@ -65,7 +65,7 @@ function skipReason(db: Reader, transaction: Transaction, patch: BulkPatch): Bul
   }
   const peer = transaction.transferPeerId ? readTransaction(db, transaction.transferPeerId) : null;
   if (peer && peer.lines.length !== 1) {
-    return "split";
+    return "loan_payment";
   }
   if (transferAfter(what, line.transferAccountId) !== line.transferAccountId && (transaction.reconciled || peer?.reconciled)) {
     return "reconciled";
@@ -127,7 +127,7 @@ function plan(db: Reader, id: string, patch: BulkPatch, review: TransactionRevie
   const reason = skipReason(db, transaction, patch);
   const line = transaction.lines[0];
   if (reason || !line) {
-    return { skip: { id, reason: reason ?? "split" } };
+    return { skip: { id, reason: reason ?? "loan_payment" } };
   }
   const what = patch.what;
   if (what?.kind === "mortgage") {

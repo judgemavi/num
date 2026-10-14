@@ -38,7 +38,7 @@ function withBook(run: (db: Db, ids: { cash: string; savings: string; food: stri
   }
 }
 
-type Line = { amount: number; categoryId?: string | null; tagIds?: string[] };
+type Line = { amount: number; categoryId?: string | null; transferAccountId?: string | null; tagIds?: string[] };
 
 function pay(db: Db, accountId: string, date: string, amount: number, payee: string, options: { merchantId?: string; lines?: Line[] } = {}) {
   return createTransaction(db, {
@@ -50,6 +50,19 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
     lines: options.lines ?? [{ amount }],
     ...saved,
   });
+}
+
+/** A loan payment: the interest on a category line and the principal on a transfer line to a loan (decision 0053). */
+function loanPayment(db: Db, accountId: string, date: string, payee: string) {
+  const loan = createAccount(db, { name: `Loan ${date}`, kind: "loan", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+  const interest = createCategory(db, { name: `Interest ${date}`, kind: "expense", ...saved });
+  const payment = pay(db, accountId, date, -3000, payee, {
+    lines: [
+      { amount: -1000, categoryId: interest.id },
+      { amount: -2000, transferAccountId: loan.id },
+    ],
+  });
+  return { payment, interest };
 }
 
 function auditsAt(db: Db, time: string) {
@@ -82,23 +95,23 @@ test("a failure writes nothing, and only the selected rows change", () => {
   });
 });
 
-test("a transfer skips a split, a reconciled row, the transfer target and a row of another account", () => {
+test("a transfer skips a loan payment, a reconciled row, the transfer target and a row of another account", () => {
   withBook((db, ids) => {
     const open = pay(db, ids.cash, "2026-03-01", -4000, "Cafe");
-    const split = pay(db, ids.cash, "2026-03-03", -3000, "Cafe", { lines: [{ amount: -2000 }, { amount: -1000 }] });
+    const loan = loanPayment(db, ids.cash, "2026-03-03", "Cafe").payment;
     const locked = pay(db, ids.cash, "2026-02-01", -500, "Cafe");
     createCheckpoint(db, ids.cash, { date: "2026-02-01", statementBalance: -500, ...saved });
     const target = pay(db, ids.savings, "2026-03-04", -700, "Cafe");
     const visa = createAccount(db, { name: "Other", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const elsewhere = pay(db, visa.id, "2026-03-05", -900, "Cafe");
     const result = bulkEdit(db, asOf, {
-      transactionIds: [open.id, split.id, locked.id, target.id, elsewhere.id],
+      transactionIds: [open.id, loan.id, locked.id, target.id, elsewhere.id],
       what: { kind: "transfer", accountId: ids.cash, transferAccountId: ids.savings },
       ...saved,
     });
     expect(result.changed).toBe(1);
     expect(result.skipped).toEqual([
-      { id: split.id, reason: "split" },
+      { id: loan.id, reason: "loan_payment" },
       { id: locked.id, reason: "reconciled" },
       { id: target.id, reason: "transfer_target" },
       { id: elsewhere.id, reason: "other_account" },
@@ -134,10 +147,10 @@ test("a category skips the wrong direction and a row with no change, and changes
 
 test("a selection in which each row is skipped writes nothing", () => {
   withBook((db, ids) => {
-    const split = pay(db, ids.cash, "2026-03-02", -5000, "Blue Bottle", { lines: [{ amount: -2000 }, { amount: -3000 }] });
+    const loan = loanPayment(db, ids.cash, "2026-03-02", "Blue Bottle").payment;
     const skipAt = "2026-10-08T19:00:00Z";
-    const result = bulkEdit(db, asOf, { transactionIds: [split.id], what: { kind: "category", categoryId: ids.food }, source: "ui", at: skipAt });
-    expect(result).toEqual({ changed: 0, skipped: [{ id: split.id, reason: "split" }] });
+    const result = bulkEdit(db, asOf, { transactionIds: [loan.id], what: { kind: "category", categoryId: ids.food }, source: "ui", at: skipAt });
+    expect(result).toEqual({ changed: 0, skipped: [{ id: loan.id, reason: "loan_payment" }] });
     expect(auditsAt(db, skipAt)).toHaveLength(0);
   });
 });
@@ -242,11 +255,11 @@ test("a transfer to the account of a proposed pair links the pair", () => {
   });
 });
 
-test("saving one transaction does not fill a split", () => {
+test("saving one transaction does not fill a loan payment", () => {
   withBook((db, ids) => {
     const current = pay(db, ids.cash, "2026-03-01", -4000, "Blue Bottle");
     const other = pay(db, ids.cash, "2026-03-02", -4200, "SQ *BLUE BOTTLE");
-    const split = pay(db, ids.cash, "2026-03-03", -3000, "blue bottle", { lines: [{ amount: -2000 }, { amount: -1000 }] });
+    const loan = loanPayment(db, ids.cash, "2026-03-03", "blue bottle");
     const ruleAt = "2026-10-08T21:00:00Z";
     expect(() =>
       updateTransaction(db, current.id, {
@@ -264,6 +277,6 @@ test("saving one transaction does not fill a split", () => {
     });
     expect(savedRow.lines[0]?.categoryId).toBe(ids.food);
     expect(getTransaction(db, other.id)?.lines[0]?.categoryId).toBeNull();
-    expect(getTransaction(db, split.id)?.lines.every((line) => line.categoryId === null)).toBe(true);
+    expect(getTransaction(db, loan.payment.id)?.lines.map((line) => line.categoryId)).toEqual([loan.interest.id, null]);
   });
 });

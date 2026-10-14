@@ -4,17 +4,19 @@ import { createCheckpoint } from "./checkpoints";
 import { createCategory } from "./categories";
 import { createTag } from "./tags";
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
-import { tempDatabase, saved, expectCode, account, entry, countWrites, requirePeer } from "./transaction-test-book";
+import { tempDatabase, saved, expectCode, account, entry, countWrites, requirePeer, getsImports } from "./transaction-test-book";
 
 test("lines must sum to the transaction amount", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db, "Chequing", "chequing");
+    const mortgage = account(book.db, "Mortgage", "mortgage");
+    const interest = createCategory(book.db, { name: "Interest", kind: "expense", ...saved });
     const created = createTransaction(
       book.db,
       entry(chequing.id, -1000, [
-        { amount: -600, memo: "Food" },
-        { amount: -400, memo: "Taxi" },
+        { amount: -600, categoryId: interest.id },
+        { amount: -400, transferAccountId: mortgage.id },
       ]),
     );
     expect(created.amount).toBe(-1000);
@@ -27,7 +29,14 @@ test("lines must sum to the transaction amount", () => {
 
     expectCode(
       () =>
-        updateTransaction(book.db, created.id, entry(chequing.id, -1000, [{ amount: -900 }, { amount: -50 }])),
+        updateTransaction(
+          book.db,
+          created.id,
+          entry(chequing.id, -1000, [
+            { amount: -900, categoryId: interest.id },
+            { amount: -50, transferAccountId: mortgage.id },
+          ]),
+        ),
       "lines_sum_mismatch",
     );
     expect(getTransaction(book.db, created.id)?.amount).toBe(-1000);
@@ -141,42 +150,79 @@ test("a transfer to the same account is rejected", () => {
   }
 });
 
-test("a second transfer line is rejected", () => {
+test("a transaction with more than one line must be a loan payment (decision 0053)", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db, "Chequing", "chequing");
     const savings = account(book.db, "Savings", "savings");
-    const cash = account(book.db, "Cash", "cash");
-    expectCode(
-      () =>
-        createTransaction(
-          book.db,
-          entry(chequing.id, -1000, [
-            { amount: -400, transferAccountId: savings.id },
-            { amount: -600, transferAccountId: cash.id },
-          ]),
-        ),
-      "transfer_line_limit",
-    );
+    const mortgage = account(book.db, "Mortgage", "mortgage");
+    const loan = account(book.db, "Car loan", "loan");
+    const interest = createCategory(book.db, { name: "Interest", kind: "expense", ...saved });
+    const fees = createCategory(book.db, { name: "Fees", kind: "expense", ...saved });
+    const salary = createCategory(book.db, { name: "Salary", kind: "income", ...saved });
+    const refused = [
+      [
+        { amount: -400, categoryId: interest.id },
+        { amount: -600, categoryId: fees.id },
+      ],
+      [
+        { amount: -400, transferAccountId: mortgage.id },
+        { amount: -600, transferAccountId: loan.id },
+      ],
+      [
+        { amount: -1_200, categoryId: interest.id },
+        { amount: 200, transferAccountId: mortgage.id },
+      ],
+      [
+        { amount: -400, categoryId: interest.id },
+        { amount: -600, transferAccountId: savings.id },
+      ],
+      [
+        { amount: -400, categoryId: salary.id },
+        { amount: -600, transferAccountId: mortgage.id },
+      ],
+      [
+        { amount: -400, categoryId: interest.id },
+        { amount: -600 },
+      ],
+      [
+        { amount: -300, categoryId: interest.id },
+        { amount: -300, categoryId: fees.id },
+        { amount: -400, transferAccountId: mortgage.id },
+      ],
+    ];
+    for (const lines of refused) {
+      expectCode(() => createTransaction(book.db, entry(chequing.id, -1_000, lines)), "lines_not_loan_payment");
+    }
+    const plain = createTransaction(book.db, entry(chequing.id, -1_000, [{ amount: -1_000 }]));
+    for (const lines of refused) {
+      expectCode(() => updateTransaction(book.db, plain.id, entry(chequing.id, -1_000, lines)), "lines_not_loan_payment");
+    }
+    expect(getTransaction(book.db, plain.id)?.lines).toHaveLength(1);
+    expect(book.sqlite.query("select count(*) as count from transactions").get()).toEqual({ count: 1 });
 
-    const created = createTransaction(
+    const payment = createTransaction(
       book.db,
-      entry(chequing.id, -250, [{ amount: -250, memo: "Shop" }]),
+      entry(chequing.id, -1_000, [
+        { amount: -400, categoryId: interest.id },
+        { amount: -600, transferAccountId: loan.id },
+      ]),
     );
-    expectCode(
-      () =>
-        updateTransaction(
-          book.db,
-          created.id,
-          entry(chequing.id, -250, [
-            { amount: -100, transferAccountId: savings.id },
-            { amount: -150, transferAccountId: cash.id },
-          ]),
-        ),
-      "transfer_line_limit",
+    const principal = requirePeer(book.db, payment);
+    expect(principal.accountId).toBe(loan.id);
+    expect(principal.amount).toBe(600);
+    expect(principal.mirror).toBe(true);
+    // A loan account gets no imports (decision 0052).
+    expect(principal.status).toBe("cleared");
+    const updated = updateTransaction(
+      book.db,
+      plain.id,
+      entry(chequing.id, -1_000, [
+        { amount: -600, transferAccountId: mortgage.id },
+        { amount: -400, categoryId: interest.id },
+      ]),
     );
-    expect(getTransaction(book.db, created.id)?.lines).toHaveLength(1);
-    expect(getTransaction(book.db, created.id)?.transferPeerId).toBeNull();
+    expect(requirePeer(book.db, updated).accountId).toBe(mortgage.id);
   } finally {
     book.close();
   }
@@ -188,6 +234,7 @@ test("a reconciled transaction accepts a category change and rejects an amount c
     const chequing = account(book.db, "Chequing", "chequing");
     const savings = account(book.db, "Savings", "savings");
     const food = createCategory(book.db, { name: "Food", kind: "expense", ...saved });
+    getsImports(book.db, chequing.id);
     const created = createTransaction(book.db, entry(chequing.id, -150, [{ amount: -150 }]));
     createCheckpoint(book.db, chequing.id, { date: created.date, statementBalance: -150, ...saved });
     expect(getTransaction(book.db, created.id)?.reconciled).toBe(true);

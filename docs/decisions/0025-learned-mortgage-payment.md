@@ -2,6 +2,7 @@
 
 Status: approved (owner, 2026-10-12)
 Changed by decision 0037 (2026-10-14): the UI shows the level only, not the reason text.
+Changed by decision 0053 (2026-10-14): there is no split editor. A mortgage payment is a Loan payment in "What is this?".
 
 ## Context
 

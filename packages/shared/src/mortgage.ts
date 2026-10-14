@@ -360,12 +360,10 @@ export const mortgageViewSchema = z.object({
     .nullable(),
 });
 
-export const mortgagePrefillSchema = z.object({
-  principal: money,
-  interest: money,
-  interestCategoryId: z.uuid(),
-  mortgageAccountId: z.uuid(),
-  payment: positiveAmountSchema,
+/** The start values of the Loan payment fields (decision 0053). Null when there is no start value. */
+export const loanPaymentDefaultsSchema = z.object({
+  interest: positiveAmountSchema.nullable(),
+  interestCategoryId: z.uuid().nullable(),
 });
 
 export const mortgageViewQuerySchema = z
@@ -383,11 +381,9 @@ export const mortgageViewQuerySchema = z
     }
   });
 
-export const mortgagePrefillQuerySchema = z.object({
-  fromAccountId: z.uuid(),
-  toAccountId: z.uuid().optional(),
+export const loanPaymentDefaultsQuerySchema = z.object({
+  accountId: z.uuid(),
   date: isoDateSchema,
 });
 
 export type MortgageView = z.infer<typeof mortgageViewSchema>;
-export type MortgagePrefill = z.infer<typeof mortgagePrefillSchema>;

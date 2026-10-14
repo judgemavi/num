@@ -17,6 +17,7 @@ import { createAccount } from "./accounts";
 import { saveImportBatch } from "./import-save";
 import { undoImportBatch } from "./import-undo";
 import { importStatement, listImportBatches } from "./imports";
+import { getsImports } from "./transaction-test-book";
 import { createTransaction, deleteTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
@@ -268,6 +269,7 @@ test("unreadable rows are stored on the batch and listed", () => {
 test("an imported row is cleared, a match sets cleared, and undo restores the earlier status", () => {
   const book = tempBook();
   try {
+    getsImports(book.db, book.account.id);
     createTransaction(book.db, {
       accountId: book.account.id,
       date: "2026-04-01",

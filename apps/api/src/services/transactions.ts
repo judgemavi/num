@@ -8,6 +8,7 @@ import {
   auditTransaction,
   headerForWrite,
   headerFrom,
+  newTransactionStatus,
   readTransaction,
   recordSource,
   toTransaction,
@@ -22,7 +23,7 @@ import { acceptedPeer, pairIsOpen, recordSaveAnswer } from "./transaction-answer
 import { assertRefundLink, withRefundPurchase } from "./refund-link";
 import { spreadSureLabels } from "./match-apply";
 import { transactionReconciled } from "./reconciled";
-import { assertPayee, assertReconciledMoney, assertReferences } from "./transaction-checks";
+import { assertLoanPaymentTargets, assertPayee, assertReconciledMoney, assertReferences } from "./transaction-checks";
 import { removeTransaction } from "./transaction-erase";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
 import { isUncategorized, recordKeep, teachesLabel } from "./decision-keep";
@@ -46,7 +47,7 @@ function labelChanged(existing: TransactionRow, existingLines: StoredLine[], hea
   return before.length !== after.length || before.some((value, index) => value !== after[index]);
 }
 
-function isTransferOrSplit(lines: NormalizedLine[]) {
+function isTransferOrLoanPayment(lines: NormalizedLine[]) {
   return lines.length !== 1 || lines.some((line) => line.transferAccountId !== null);
 }
 
@@ -89,11 +90,12 @@ export function insertTransaction(tx: WriteTx, input: TransactionCreate, source:
   assertRefundLink(tx, typedHeader, null);
   const { header, lines } = withRefundPurchase(tx, typedHeader, typed);
   assertReferences(tx, header, lines, { accountId: null, transferAccountId: null });
+  assertLoanPaymentTargets(tx, lines);
   tx.insert(transactions)
     .values({
       id,
       ...header,
-      status: "open",
+      status: newTransactionStatus(tx, header.accountId),
       refundOfId: header.refundOfId ?? null,
       source: recordSourceName,
       importRowId: null,
@@ -153,11 +155,12 @@ export function applyTransactionUpdate(
   assertLineShape(header.accountId, header.amount, lines);
   const previousTarget = existingLines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null;
   assertReferences(tx, header, lines, { accountId: existing.accountId, transferAccountId: previousTarget });
+  assertLoanPaymentTargets(tx, lines);
   const savedHeader = headerForWrite(existing.refundOfId, header);
   assertRefundLink(tx, savedHeader, id);
   const linked = withRefundPurchase(tx, savedHeader, lines);
   const changed = labelChanged(existing, existingLines, linked.header, linked.lines);
-  const auto: AutoStamp = confirm || changed || isTransferOrSplit(lines) ? clearedAuto : keptAuto(existing);
+  const auto: AutoStamp = confirm || changed || isTransferOrLoanPayment(lines) ? clearedAuto : keptAuto(existing);
   if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {
     applyMirrorEdit(tx, existing, existingLines, peer, peerLines, linked.header, linked.lines, at, auto);
   } else {

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import type { StoredLine } from "./transaction-lines";
 import type { Header } from "./transaction-record";
-import type { NormalizedLine } from "./transaction-rules";
+import { loanPaymentLines, type NormalizedLine } from "./transaction-rules";
 import { transactionReconciled } from "./reconciled";
 import type { WriteTx, Reader } from "./write";
 
@@ -106,5 +106,18 @@ export function assertReferences(
     for (const tagId of line.tagIds) {
       assertTag(tx, tagId);
     }
+  }
+}
+
+/** A transaction with more than one line is a loan payment: an expense category and a transfer to a mortgage or a loan (decision 0053). */
+export function assertLoanPaymentTargets(db: Reader, lines: NormalizedLine[]): void {
+  const loan = lines.length > 1 ? loanPaymentLines(lines) : null;
+  if (!loan) {
+    return;
+  }
+  const kind = db.select({ kind: categories.kind }).from(categories).where(eq(categories.id, loan.categoryId)).get()?.kind;
+  const target = db.select({ kind: accounts.kind }).from(accounts).where(eq(accounts.id, loan.loanAccountId)).get()?.kind;
+  if (kind !== "expense" || (target !== "mortgage" && target !== "loan")) {
+    throw new ServiceError("lines_not_loan_payment", 400);
   }
 }

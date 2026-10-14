@@ -10,6 +10,7 @@ import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { compareCheckpoint, createCheckpoint, unlockCheckpoint } from "./checkpoints";
+import { getsImports } from "./transaction-test-book";
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
 
 function tempDatabase() {
@@ -57,14 +58,17 @@ function countWrites(sqlite: Database, run: () => void): number {
   return count;
 }
 
+/** A chequing account that gets imports: its new manual transactions are `open` (decision 0052). */
 function account(db: Db, openingBalance = 0) {
-  return createAccount(db, {
+  const created = createAccount(db, {
     name: "Chequing",
     kind: "chequing",
     openingDate: "2026-01-01",
     openingBalance,
     ...saved,
   });
+  getsImports(db, created.id);
+  return created;
 }
 
 function entry(
@@ -249,7 +253,7 @@ test("an investment checkpoint uses the valuation and later transactions", () =>
     createCheckpoint(book.db, fund.id, { date: "2026-02-15", statementBalance: 490000, ...saved });
     expect(getTransaction(book.db, before.id)?.reconciled).toBe(true);
     expect(getTransaction(book.db, afterValuation.id)?.reconciled).toBe(true);
-    expect(getTransaction(book.db, afterStatement.id)?.status).toBe("open");
+    expect(getTransaction(book.db, afterStatement.id)?.reconciled).toBe(false);
   } finally {
     book.close();
   }
@@ -276,7 +280,7 @@ test("a checkpoint does not reconcile the mirror in the other account", () => {
     }
     createCheckpoint(book.db, chequing.id, { date: "2026-02-15", statementBalance: -2000, ...saved });
     expect(getTransaction(book.db, transfer.id)?.reconciled).toBe(true);
-    expect(getTransaction(book.db, mirrorId)?.status).toBe("open");
+    expect(getTransaction(book.db, mirrorId)?.reconciled).toBe(false);
   } finally {
     book.close();
   }

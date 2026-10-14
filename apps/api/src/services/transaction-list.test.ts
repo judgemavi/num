@@ -118,14 +118,15 @@ test("filters match account, category, merchant, tag, date, text and uncategoriz
       payeeRaw: "Move",
       transferAccountId: fixture.savings.id,
     });
+    const loan = createAccount(fixture.db, { name: "Loan", kind: "loan", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const mixed = createTransaction(fixture.db, {
       accountId: fixture.chequing.id,
       date: "2026-04-02",
       amount: -500,
-      payeeRaw: "Split shop",
+      payeeRaw: "Loan shop",
       lines: [
         { amount: -300, categoryId: fixture.food.id },
-        { amount: -200 },
+        { amount: -200, transferAccountId: loan.id },
       ],
       ...saved,
     });
@@ -137,7 +138,7 @@ test("filters match account, category, merchant, tag, date, text and uncategoriz
       food.id,
     ]);
     expect(listTransactions(fixture.db, { ...page, categoryId: fixture.food.id }).items.map((item) => item.payeeRaw)).toEqual([
-      "Split shop",
+      "Loan shop",
       "North Market",
     ]);
     expect(listTransactions(fixture.db, { ...page, merchantId: fixture.merchantId }).items.map((item) => item.id)).toEqual([
@@ -154,7 +155,8 @@ test("filters match account, category, merchant, tag, date, text and uncategoriz
     expect(listTransactions(fixture.db, { ...page, q: "missing" }).total).toBe(0);
 
     const uncategorized = listTransactions(fixture.db, { ...page, uncategorized: true });
-    expect(uncategorized.items.map((item) => item.id).sort()).toEqual([plain.id, interest.id, mixed.id].sort());
+    expect(uncategorized.items.map((item) => item.id).sort()).toEqual([plain.id, interest.id].sort());
+    expect(uncategorized.items.find((item) => item.id === mixed.id)).toBeUndefined();
     expect(uncategorized.items.find((item) => item.id === food.id)).toBeUndefined();
     expect(uncategorized.items.find((item) => item.id === transfer.id)).toBeUndefined();
   } finally {

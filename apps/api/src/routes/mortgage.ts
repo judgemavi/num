@@ -1,13 +1,14 @@
 import {
-  mortgagePrefillQuerySchema,
-  mortgagePrefillSchema,
+  loanPaymentDefaultsQuerySchema,
+  loanPaymentDefaultsSchema,
   mortgageTermsSchema,
   mortgageViewQuerySchema,
   mortgageViewSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { getMortgageTerms, mortgageAccountView, mortgagePrefill } from "../services/mortgage";
+import { loanPaymentDefaults } from "../services/loan-payment";
+import { getMortgageTerms, mortgageAccountView } from "../services/mortgage";
 import { validationHook } from "../validation";
 import { errorResponse, idParams } from "./common";
 
@@ -46,18 +47,19 @@ const viewRoute = createRoute({
   },
 });
 
-const prefillRoute = createRoute({
-  operationId: "get_mortgage_prefill",
-  description: "Read mortgage prefill. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+const loanDefaultsRoute = createRoute({
+  operationId: "get_loan_payment_defaults",
+  description: "Read the start values of a loan payment to a mortgage or loan account on a date: the interest from the payment schedule and the interest category. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
-  path: "/api/mortgage-prefill",
-  request: { query: mortgagePrefillQuerySchema },
+  path: "/api/loan-payment-defaults",
+  request: { query: loanPaymentDefaultsQuerySchema },
   responses: {
     200: {
-      description: "Principal and interest for a mortgage payment date, or null",
-      content: { "application/json": { schema: mortgagePrefillSchema.nullable() } },
+      description: "Interest and interest category, each null when there is no start value",
+      content: { "application/json": { schema: loanPaymentDefaultsSchema } },
     },
     400: errorResponse,
+    404: errorResponse,
   },
 });
 
@@ -72,9 +74,9 @@ export function mortgageRoutes(db: Db) {
         200,
       );
     })
-    .openapi(prefillRoute, (c) => {
+    .openapi(loanDefaultsRoute, (c) => {
       const query = c.req.valid("query");
-      return c.json(mortgagePrefill(db, query.fromAccountId, query.toAccountId, query.date), 200);
+      return c.json(loanPaymentDefaults(db, query.accountId, query.date), 200);
     });
 }
 

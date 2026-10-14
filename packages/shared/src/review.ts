@@ -114,7 +114,7 @@ export const transferPairAcceptSchema = z.object({
 
 /**
  * Why approve or bulk edit leaves a selected row as it is (decision 0051).
- * - `split`: the row (or the other side of its transfer) has more than one line.
+ * - `loan_payment`: the row (or the other side of its transfer) is a loan payment, with two lines (decision 0053).
  * - `reconciled`: the change moves money of a reconciled row (a transfer).
  * - `other_account`: a transfer applies only to the rows of its account.
  * - `transfer_target`: the row is in the account that the transfer goes to.
@@ -122,10 +122,10 @@ export const transferPairAcceptSchema = z.object({
  * - `refund_linked`: a linked refund takes its category and merchant from the purchase.
  * - `unchanged`: the row already has the values.
  * - `question`, `no_suggestion`: approve has nothing to apply.
- * - `no_split`: the mortgage schedule gives no split for the row.
+ * - `no_split`: the mortgage schedule gives no loan payment lines for the row.
  */
 const bulkSkipReasons = [
-  "split",
+  "loan_payment",
   "reconciled",
   "other_account",
   "transfer_target",
