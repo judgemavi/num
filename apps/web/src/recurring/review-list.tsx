@@ -3,7 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { recurringSignalsQuery, useAddDetectedPlan } from "@/api/recurring";
 import { useDecideItem } from "@/api/review";
 import { localAsOf } from "@/as-of";
-import { useCategoryNames, useMerchantNames } from "@/editors/lookups";
+import { useAccountLabels, useCategoryNames, useMerchantNames } from "@/editors/lookups";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
 import { repeatLabel } from "@/review/format";
@@ -11,16 +11,26 @@ import { formatDate } from "@/transactions/format";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
 
+/** A proposal with a transfer target is a transfer (decision 0056). Else money out is a bill and money in is income. */
+function proposalKind(item: PlanProposal) {
+  if (item.transferAccountId) {
+    return "transfer" as const;
+  }
+  return item.expectedAmount < 0 ? ("bill" as const) : ("income" as const);
+}
+
+const addLabels = { transfer: "Add a recurring transfer", bill: "Add a recurring payment", income: "Add recurring income" } as const;
+
 function proposedPlan(item: PlanProposal, name: string): PlanCreate {
   return {
     name,
-    kind: item.expectedAmount < 0 ? "bill" : "income",
+    kind: proposalKind(item),
     accountId: item.accountId,
     expectedAmount: item.expectedAmount,
     tolerance: item.tolerance,
     amountMode: item.amountMode,
     categoryId: item.categoryId,
-    transferAccountId: null,
+    transferAccountId: item.transferAccountId,
     merchantId: item.merchantId,
     startDate: item.startDate,
     freq: item.freq,
@@ -39,6 +49,7 @@ export function ReviewList() {
   const { data: signals } = useSuspenseQuery(recurringSignalsQuery(asOf));
   const merchantName = useMerchantNames();
   const categoryName = useCategoryNames();
+  const accountLabel = useAccountLabels();
   const { openEditor } = useEditors();
   const create = useAddDetectedPlan();
   const decide = useDecideItem();
@@ -51,9 +62,15 @@ export function ReviewList() {
     <ListCard label="Detected" title="Detected">
       {signals.proposals.map((item) => {
         // A proposal for one amount has no name: the person names it in the form (decision 0054).
-        const name = item.merchantId ? merchantName.get(item.merchantId) : item.categoryId ? categoryName.get(item.categoryId) : undefined;
+        const name = item.merchantId
+          ? merchantName.get(item.merchantId)
+          : item.transferAccountId
+            ? accountLabel.get(item.transferAccountId)
+            : item.categoryId
+              ? categoryName.get(item.categoryId)
+              : undefined;
         const itemKey = planProposalKey(item);
-        const kind = item.expectedAmount < 0 ? "bill" : "income";
+        const kind = proposalKind(item);
         return (
           <ListRow key={itemKey}>
             <div className={listName}>
@@ -74,7 +91,7 @@ export function ReviewList() {
                 }
               }}
             >
-              {item.expectedAmount >= 0 ? "Add recurring income" : "Add a recurring payment"}
+              {addLabels[kind]}
             </Button>
             <Button
               type="button"

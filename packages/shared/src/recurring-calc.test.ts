@@ -75,7 +75,7 @@ test("a variable plan uses the median and the lowest of the last 6, then the fal
 });
 
 function txn(id: string, date: string, amount: number, merchantId: string | null = "merchant-1"): DetectionTransaction {
-  return { id, accountId: "account-1", merchantId, plain: true, categoryId: null, date, amount };
+  return { id, accountId: "account-1", merchantId, plain: true, categoryId: null, transferAccountId: null, date, amount };
 }
 
 test("detection needs 3 transactions, regular gaps within 3 days, and amounts within 10 percent", () => {
@@ -249,7 +249,16 @@ test("with no merchant, detection groups by category, else by one exact amount",
   expect(byAmount[0]).toMatchObject({ merchantId: null, categoryId: null, transactionIds: ["a", "c", "e"] });
 });
 
-test("a split or a transfer with no merchant is not detected", () => {
+test("a split with no transfer and no merchant is not detected", () => {
   const split = (id: string, date: string) => ({ ...txn(id, date, -400_000, null), plain: false });
   expect(detectPlans([split("a", "2026-09-02"), split("b", "2026-09-09"), split("c", "2026-09-16")], 10)).toEqual([]);
+});
+
+test("money out to one transfer target is detected as a transfer, and money in is not", () => {
+  const payment = (id: string, date: string, amount: number) => ({ ...txn(id, date, amount, null), plain: false, transferAccountId: "loan" });
+  const found = detectPlans([payment("a", "2026-09-02", -400_000), payment("b", "2026-09-09", -400_000), payment("c", "2026-09-16", -400_000)], 10);
+  expect(found).toHaveLength(1);
+  expect(found[0]).toMatchObject({ freq: "weekly", interval: 1, merchantId: null, categoryId: null, transferAccountId: "loan" });
+
+  expect(detectPlans([payment("a", "2026-09-02", 400_000), payment("b", "2026-09-09", 400_000), payment("c", "2026-09-16", 400_000)], 10)).toEqual([]);
 });

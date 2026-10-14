@@ -3,6 +3,7 @@ import { medianAmount, medianOf, type AmountMode, type PlanFrequency } from "./r
 
 /**
  * `plain` is true for a transaction with one line that is not a transfer. `categoryId` is the category of that line.
+ * `transferAccountId` is the target of the one transfer line of a transfer or a loan payment (decision 0056).
  */
 export type DetectionTransaction = {
   id: string;
@@ -10,15 +11,20 @@ export type DetectionTransaction = {
   merchantId: string | null;
   plain: boolean;
   categoryId: string | null;
+  transferAccountId: string | null;
   date: string;
   amount: number;
 };
 
-/** A proposal has a merchant, or else a category (decision 0054). With neither, it groups one exact amount. */
+/**
+ * A proposal has a merchant, or else a category (decision 0054), or else a transfer target (decision 0056).
+ * With none, it groups one exact amount.
+ */
 export type PlanProposal = {
   accountId: string;
   merchantId: string | null;
   categoryId: string | null;
+  transferAccountId: string | null;
   freq: PlanFrequency;
   interval: number;
   startDate: string;
@@ -73,6 +79,7 @@ function proposalFrom(
     accountId: first?.accountId ?? "",
     merchantId,
     categoryId: merchantId ? null : (first?.categoryId ?? null),
+    transferAccountId: merchantId ? null : (first?.transferAccountId ?? null),
     freq: pattern.freq,
     interval: pattern.interval,
     startDate: start.toString(),
@@ -131,11 +138,15 @@ function latestRun(sorted: readonly DetectionTransaction[], step: number): PlanP
 
 /**
  * The group of a transaction: its merchant; else its category; else its exact amount (decision 0054).
- * A transaction with no merchant and a split or a transfer is in no group.
+ * With no merchant, money out with one transfer line (a transfer or a loan payment) goes in the group of the
+ * transfer target (decision 0056). Other splits and transfers are in no group.
  */
 function groupKey(transaction: DetectionTransaction) {
   if (transaction.merchantId) {
     return `merchant\0${transaction.merchantId}`;
+  }
+  if (transaction.transferAccountId) {
+    return transaction.amount < 0 ? `transfer\0${transaction.transferAccountId}` : null;
   }
   if (!transaction.plain) {
     return null;
@@ -143,10 +154,13 @@ function groupKey(transaction: DetectionTransaction) {
   return transaction.categoryId ? `category\0${transaction.categoryId}` : `amount\0${transaction.amount}`;
 }
 
-/** What a proposal is about: its merchant, its category or its one amount (decision 0054). */
-export function proposalSubject(item: Pick<PlanProposal, "merchantId" | "categoryId" | "expectedAmount">): string {
+/** What a proposal is about: its merchant, its transfer target, its category or its one amount (decisions 0054, 0056). */
+export function proposalSubject(item: Pick<PlanProposal, "merchantId" | "categoryId" | "transferAccountId" | "expectedAmount">): string {
   if (item.merchantId) {
     return item.merchantId;
+  }
+  if (item.transferAccountId) {
+    return `transfer-${item.transferAccountId}`;
   }
   return item.categoryId ? `category-${item.categoryId}` : `amount-${item.expectedAmount}`;
 }

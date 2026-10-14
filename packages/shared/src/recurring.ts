@@ -164,6 +164,7 @@ export const planProposalSchema = z.object({
   accountId: z.uuid(),
   merchantId: z.uuid().nullable(),
   categoryId: z.uuid().nullable(),
+  transferAccountId: z.uuid().nullable(),
   freq: z.enum(planFrequencies),
   interval: z.number().int(),
   startDate: isoDateSchema,
@@ -175,7 +176,7 @@ export const planProposalSchema = z.object({
 });
 
 export function planProposalKey(
-  item: Pick<PlanProposal, "accountId" | "merchantId" | "categoryId" | "expectedAmount" | "startDate" | "freq" | "interval">,
+  item: Pick<PlanProposal, "accountId" | "merchantId" | "categoryId" | "transferAccountId" | "expectedAmount" | "startDate" | "freq" | "interval">,
 ): string {
   return `plan_proposal:${item.accountId}:${proposalSubject(item)}:${item.startDate}:${item.freq}:${item.interval}`;
 }

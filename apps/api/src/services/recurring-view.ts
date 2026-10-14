@@ -107,7 +107,10 @@ function transactionsForAccounts(db: Db, accountIds: readonly string[], from: st
   return rows;
 }
 
-/** Each transaction of the detection window, with its one category when it is a plain transaction (decision 0054). */
+/**
+ * Each transaction of the detection window with the facts of its lines: the category of a plain transaction
+ * (decision 0054) and the target of its one transfer line (decision 0056).
+ */
 function detectionTransactions(db: Db, asOf: string): DetectionTransaction[] {
   const since = Temporal.PlainDate.from(asOf).subtract({ months: 18 }).toString();
   const rows = db
@@ -115,7 +118,6 @@ function detectionTransactions(db: Db, asOf: string): DetectionTransaction[] {
       id: transactions.id,
       accountId: transactions.accountId,
       merchantId: transactions.merchantId,
-      transferPeerId: transactions.transferPeerId,
       date: transactions.date,
       amount: transactions.amount,
       categoryId: transactionLines.categoryId,
@@ -125,30 +127,36 @@ function detectionTransactions(db: Db, asOf: string): DetectionTransaction[] {
     .innerJoin(transactionLines, eq(transactionLines.transactionId, transactions.id))
     .where(and(gte(transactions.date, since), lte(transactions.date, asOf)))
     .all();
-  const byId = new Map<string, DetectionTransaction>();
+  const lines = new Map<string, typeof rows>();
   for (const row of rows) {
-    const seen = byId.get(row.id);
-    if (seen) {
-      byId.set(row.id, { ...seen, plain: false, categoryId: null });
-      continue;
-    }
-    const plain = row.transferPeerId === null && row.transferAccountId === null;
-    byId.set(row.id, {
-      id: row.id,
-      accountId: row.accountId,
-      merchantId: row.merchantId,
-      plain,
-      categoryId: plain ? row.categoryId : null,
-      date: row.date,
-      amount: row.amount,
-    });
+    lines.set(row.id, [...(lines.get(row.id) ?? []), row]);
   }
-  return [...byId.values()];
+  return [...lines.values()].flatMap((group) => {
+    const first = group[0];
+    if (!first) {
+      return [];
+    }
+    const transfers = group.filter((line) => line.transferAccountId !== null);
+    const plain = group.length === 1 && transfers.length === 0;
+    return [
+      {
+        id: first.id,
+        accountId: first.accountId,
+        merchantId: first.merchantId,
+        plain,
+        categoryId: plain ? first.categoryId : null,
+        transferAccountId: transfers.length === 1 ? (transfers[0]?.transferAccountId ?? null) : null,
+        date: first.date,
+        amount: first.amount,
+      },
+    ];
+  });
 }
 
 /**
  * A plan of the account covers a proposal for its merchant. A plan with no merchant covers a proposal for its
  * category, or a proposal for one amount when it has no category and the amount is in its tolerance (decision 0054).
+ * A plan with no merchant covers a proposal for its transfer target (decision 0056).
  */
 function covers(plan: RecurringPlanRow, proposal: PlanProposal) {
   if (plan.accountId !== proposal.accountId) {
@@ -156,6 +164,9 @@ function covers(plan: RecurringPlanRow, proposal: PlanProposal) {
   }
   if (proposal.merchantId || plan.merchantId) {
     return plan.merchantId === proposal.merchantId;
+  }
+  if (proposal.transferAccountId || plan.transferAccountId) {
+    return plan.transferAccountId === proposal.transferAccountId;
   }
   if (proposal.categoryId || plan.categoryId) {
     return plan.categoryId === proposal.categoryId;

@@ -355,3 +355,48 @@ test("upcoming has the occurrences of all active plans in the next 30 days, by d
     close();
   }
 });
+
+test("a regular transfer out with no merchant is proposed as a transfer until a plan to that account covers it", () => {
+  const { db, close } = tempDatabase();
+  try {
+    const chequing = account(db);
+    const savings = account(db, "Savings");
+    for (const date of ["2026-08-03", "2026-09-01", "2026-10-01"]) {
+      createTransaction(db, {
+        accountId: chequing.id,
+        date,
+        amount: -300_000,
+        payeeRaw: `Transfer out ${date}`,
+        merchantId: null,
+        lines: [{ amount: -300_000, categoryId: null, memo: null, transferAccountId: savings.id, tagIds: [] }],
+        source: "ui",
+        at,
+      });
+    }
+    const proposals = recurringSignals(db, "2026-10-14").proposals;
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]).toMatchObject({ accountId: chequing.id, transferAccountId: savings.id, freq: "monthly" });
+
+    createPlan(db, {
+      name: "Savings",
+      kind: "transfer",
+      accountId: chequing.id,
+      transferAccountId: savings.id,
+      expectedAmount: -300_000,
+      tolerance: 0,
+      amountMode: "fixed",
+      startDate: "2026-08-01",
+      freq: "monthly",
+      interval: 1,
+      monthDay: 1,
+      businessDayShift: "none",
+      active: true,
+      fundsBuckets: false,
+      source: "ui",
+      at,
+    });
+    expect(recurringSignals(db, "2026-10-14").proposals).toEqual([]);
+  } finally {
+    close();
+  }
+});

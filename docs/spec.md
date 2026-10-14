@@ -686,6 +686,8 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
     are not part of the plan (decision 0054).
   - The group is the merchant. A transaction with no merchant and one line that is not a transfer goes in the group
     of its category. With no category, it goes in the group of its exact amount (decision 0054).
+  - With no merchant, money out with one transfer line (a transfer or a loan payment) goes in the group of the
+    transfer target. The proposal is a transfer plan to that account (decision 0056).
 - **Time windows** (they keep the work small and Home calm):
   - Link candidates: occurrences from the later of `startDate` and `asOf` − 13 months.
   - Missed: only occurrences in the last 35 days. Home does not show older unlinked occurrences. The app has no
