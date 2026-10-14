@@ -57,15 +57,21 @@ export function PlanForm({ draft, initialKind = "bill" }: { draft: Plan | PlanSe
   const form = useAppForm({
     defaultValues: planValues(draft, initialKind),
     validators: {
-      onSubmit: ({ value }) => planBody(currency, value).error ?? undefined,
+      onSubmit: ({ value }) => planBody(currency, value, current).error ?? undefined,
     },
     onSubmit: async ({ value, formApi }) => {
-      const { body } = planBody(currency, value);
+      const { body, patch } = planBody(currency, value, current);
       if (!body) {
         return;
       }
+      const request = current ? (patch ? { id: current.id, body: patch } : null) : { id: null, body };
+      // An edit with no change closes without a write.
+      if (!request) {
+        close();
+        return;
+      }
       try {
-        close((await save.mutateAsync({ id: current?.id ?? null, body })).id);
+        close((await save.mutateAsync(request)).id);
       } catch (error) {
         const code = errorCode(error);
         formApi.setErrorMap({ onSubmit: { form: code ? planError(code) : "This did not save. Try again.", fields: {} } });

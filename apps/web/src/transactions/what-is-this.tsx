@@ -45,16 +45,17 @@ export const WhatIsThis = withForm({
     transferLocked: false,
     amountsLocked: false,
     /** The amount of an imported transaction. Null when the person enters the amount. */
-    importedAmount: fieldValue<number | null>(null),
+    /** The stored amount while the amount is unchanged, or the amount of an imported transaction. */
+    storedAmount: fieldValue<number | null>(null),
     /** The purchase that the saved refund links to. */
     linkedRefund: fieldValue<Transaction["refundOf"]>(null),
   },
-  render: function WhatIsThisRender({ form, choiceLocked, categoryLocked, transferLocked, amountsLocked, importedAmount, linkedRefund }) {
+  render: function WhatIsThisRender({ form, choiceLocked, categoryLocked, transferLocked, amountsLocked, storedAmount, linkedRefund }) {
     const currency = useBookCurrency();
     const categories = useCategories();
     const values = useStore(form.store, (state) => state.values);
     const { direction, choice, refundOfId, accountId } = values;
-    const totalMilli = signedTotal(currency, importedAmount, values.amount, direction);
+    const totalMilli = signedTotal(currency, storedAmount, values.amount, direction);
     const { suggestion } = useSuggestion({ accountId, payee: values.payee, date: values.date, direction, amount: totalMilli });
     const choices = choicesForDirection(direction);
     const categoryKind = categoryKindForChoice(choice);

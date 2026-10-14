@@ -57,15 +57,21 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
   const form = useAppForm({
     defaultValues: bucketValues(current, board.nextColor, board.items.reduce((max, item) => Math.max(max, item.priority), 0)),
     validators: {
-      onSubmit: ({ value }) => bucketBody(currency, value).error ?? undefined,
+      onSubmit: ({ value }) => bucketBody(currency, value, current).error ?? undefined,
     },
     onSubmit: async ({ value, formApi }) => {
-      const { body } = bucketBody(currency, value);
+      const { body, patch } = bucketBody(currency, value, current);
       if (!body) {
         return;
       }
+      // An edit with no change closes without a write.
+      if (current && !patch) {
+        close();
+        return;
+      }
       try {
-        const saved = current ? await update.mutateAsync({ id: current.id, body }) : await create.mutateAsync({ asOf: localAsOf(), body });
+        const saved =
+          current && patch ? await update.mutateAsync({ id: current.id, body: patch }) : await create.mutateAsync({ asOf: localAsOf(), body });
         close(saved.id);
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: requestError(error, "The bucket did not save. Try again."), fields: {} } });

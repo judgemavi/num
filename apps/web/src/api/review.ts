@@ -1,4 +1,4 @@
-import type { approveLevels, InboxDecisionCode, InboxGroupApply, Plan, Suggestion, TransactionFilter } from "@num/shared";
+import type { approveLevels, InboxDecisionCode, InboxGroupApply, Suggestion, TransactionFilter } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, errorCode, unwrap } from "@/api/client";
 import { linkOccurrence, savePlan } from "@/api/recurring";
@@ -61,7 +61,7 @@ export type ReviewAnswer =
   | { kind: "acceptPair"; asOf: string; leftId: string; rightId: string }
   | { kind: "decide"; asOf: string; itemKey: string; decision: InboxDecisionCode }
   | { kind: "linkRefund"; refundId: string; purchaseId: string }
-  | { kind: "planAmount"; plan: Plan; expectedAmount: number }
+  | { kind: "planAmount"; planId: string; expectedAmount: number }
   | { kind: "linkOccurrence"; planId: string; dueDate: string; transactionId: string }
   | { kind: "applySuggestion"; accountId: string; transactionId: string; suggestion: Suggestion };
 
@@ -75,31 +75,8 @@ function answerReview(answer: ReviewAnswer) {
       return decideItem(answer);
     case "linkRefund":
       return linkRefund(answer);
-    case "planAmount": {
-      const { plan, expectedAmount } = answer;
-      return savePlan({
-        id: plan.id,
-        body: {
-          name: plan.name,
-          kind: plan.kind,
-          accountId: plan.accountId,
-          expectedAmount,
-          tolerance: plan.tolerance,
-          amountMode: plan.amountMode,
-          categoryId: plan.categoryId,
-          transferAccountId: plan.transferAccountId,
-          merchantId: plan.merchantId,
-          startDate: plan.startDate,
-          freq: plan.freq,
-          interval: plan.interval,
-          monthDay: plan.monthDay,
-          businessDayShift: plan.businessDayShift,
-          endDate: plan.endDate,
-          active: plan.active,
-          fundsBuckets: plan.fundsBuckets,
-        },
-      });
-    }
+    case "planAmount":
+      return savePlan({ id: answer.planId, body: { expectedAmount: answer.expectedAmount } });
     case "linkOccurrence":
       return linkOccurrence(answer);
     case "applySuggestion": {

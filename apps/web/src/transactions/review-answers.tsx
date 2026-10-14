@@ -92,7 +92,7 @@ export function ReviewAnswers({ row }: { row: TransactionListItem }) {
             disabled={busy || !plan || actualAmount === null}
             onClick={() => {
               if (plan && actualAmount !== null) {
-                answer.mutate({ kind: "planAmount", plan, expectedAmount: actualAmount });
+                answer.mutate({ kind: "planAmount", planId: plan.id, expectedAmount: actualAmount });
               }
             }}
           >

@@ -1,4 +1,5 @@
 import { amountText, planCreateSchema, parseAmount, type Plan, type PlanKind, type PlanProposal } from "@num/shared";
+import { editPatch, keptAmount } from "@/forms/form-values";
 import { amountForForm, amountFromForm } from "@/recurring/format";
 import { decimalsError } from "@/money";
 
@@ -48,22 +49,23 @@ export function planValues(draft: Plan | PlanSeed | "new", initialKind: PlanKind
 
 type PlanValues = ReturnType<typeof planValues>;
 
-/** The request body of the Recurring form, or the text of the first error. */
-export function planBody(currency: string, value: PlanValues) {
+function planFields(currency: string, value: PlanValues, stored: Plan | null) {
   if (!value.accountId) {
-    return { body: null, error: "Choose an account." };
+    throw new Error("Choose an account.");
   }
   let expectedAmount = 0;
   let tolerance = 0;
   try {
-    expectedAmount = amountFromForm(value.kind, parseAmount(currency, value.amount.trim()));
-    tolerance = Math.abs(parseAmount(currency, value.tolerance.trim() || "0"));
+    const amountStart = stored ? { text: amountForForm(stored.kind, stored.expectedAmount), amount: stored.expectedAmount } : null;
+    expectedAmount = amountFromForm(value.kind, keptAmount(value.amount, amountStart, (text) => parseAmount(currency, text.trim())));
+    const toleranceStart = stored ? { text: amountText(stored.tolerance), amount: stored.tolerance } : null;
+    tolerance = Math.abs(keptAmount(value.tolerance, toleranceStart, (text) => parseAmount(currency, text.trim() || "0")));
   } catch {
-    return { body: null, error: decimalsError(currency, value.amount) ?? decimalsError(currency, value.tolerance) ?? "Enter the amount as a number." };
+    throw new Error(decimalsError(currency, value.amount) ?? decimalsError(currency, value.tolerance) ?? "Enter the amount as a number.");
   }
   const every = Number(value.interval);
   if (!Number.isInteger(every) || every < 1) {
-    return { body: null, error: "Enter how often this repeats as a whole number." };
+    throw new Error("Enter how often this repeats as a whole number.");
   }
   const parsed = planCreateSchema.safeParse({
     name: value.name.trim(),
@@ -84,5 +86,32 @@ export function planBody(currency: string, value: PlanValues) {
     active: value.active,
     fundsBuckets: value.kind === "income" ? value.fundsBuckets : false,
   });
-  return parsed.success ? { body: parsed.data, error: null } : { body: null, error: "Check the details and try again." };
+  if (!parsed.success) {
+    throw new Error("Check the details and try again.");
+  }
+  return parsed.data;
+}
+
+/**
+ * The request body of the Recurring form, or the text of the first error. For a saved plan, `patch` has only the
+ * fields that changed (decision 0040). It is null when nothing changed.
+ */
+export function planBody(currency: string, value: PlanValues, stored: Plan | null) {
+  let body;
+  try {
+    body = planFields(currency, value, stored);
+  } catch (caught) {
+    return { body: null, patch: null, error: caught instanceof Error ? caught.message : "Check the details and try again." };
+  }
+  if (!stored) {
+    return { body, patch: null, error: null };
+  }
+  let start;
+  try {
+    start = planFields(currency, planValues(stored, stored.kind), stored);
+  } catch {
+    // A saved plan that the form cannot read: each field is a change.
+    return { body, patch: body, error: null };
+  }
+  return { body, patch: editPatch(body, start), error: null };
 }

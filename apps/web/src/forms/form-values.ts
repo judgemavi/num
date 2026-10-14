@@ -5,3 +5,27 @@
 export function fieldValue<T>(value: T): T {
   return value;
 }
+
+/**
+ * The amount of a money field. While the text is the start text, the stored amount comes back and the text is not
+ * read again. Thus an unchanged amount stays as it is stored, also when it has more digits than the currency has now.
+ */
+export function keptAmount(text: string, start: { text: string; amount: number } | null, read: (text: string) => number): number {
+  return start !== null && text === start.text ? start.amount : read(text);
+}
+
+/**
+ * The patch of an edit form (decision 0040): the fields of the request body that differ from the body of the start
+ * values. Null when no field changed: the form then closes without a write.
+ */
+export function editPatch<B extends object>(body: B, start: B): Partial<B> | null {
+  const patch: Partial<B> = {};
+  let changed = false;
+  for (const key in body) {
+    if (JSON.stringify(body[key]) !== JSON.stringify(start[key])) {
+      patch[key] = body[key];
+      changed = true;
+    }
+  }
+  return changed ? patch : null;
+}

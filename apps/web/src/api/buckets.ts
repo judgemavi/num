@@ -1,4 +1,4 @@
-import type { BucketCover, BucketCreate, BucketEventCreate, BucketListQuery, BucketWrite } from "@num/shared";
+import type { BucketCover, BucketCreate, BucketEventCreate, BucketListQuery, BucketUpdate } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { activeAndArchived, allPages, fullPage, type ListFilters } from "@/api/pages";
@@ -55,7 +55,7 @@ export function useCreateBucket() {
 
 export function useUpdateBucket() {
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: BucketWrite }) => unwrap(api.buckets[":id"].$patch({ param: { id }, json: body })),
+    mutationFn: ({ id, body }: { id: string; body: BucketUpdate }) => unwrap(api.buckets[":id"].$patch({ param: { id }, json: body })),
   });
 }
 

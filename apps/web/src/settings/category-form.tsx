@@ -1,4 +1,4 @@
-import { bucketWriteSchema, categoryCreateSchema, type Category, type CategoryKind } from "@num/shared";
+import { categoryCreateSchema, type Category, type CategoryKind } from "@num/shared";
 import { useUpdateBucket } from "@/api/buckets";
 import { useSaveCategory } from "@/api/categories";
 import { errorCode } from "@/api/client";
@@ -7,7 +7,7 @@ import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody, FormActions, FormCancel, FormHeading } from "@/editors/form-chrome";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { useAppForm } from "@/forms/form-hook";
-import { fieldValue } from "@/forms/form-values";
+import { editPatch, fieldValue } from "@/forms/form-values";
 import { categoryError } from "@/settings/format";
 import { GroupForm } from "@/settings/group-form";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -47,21 +47,26 @@ export function CategoryForm({ category, initialName, initialKind, inline = fals
       onSubmit: ({ value }) => (categoryCreateSchema.safeParse(value).success ? undefined : "Check the fields."),
     },
     onSubmit: async ({ value, formApi }) => {
+      const body = { name: value.name.trim(), kind: value.kind, groupId: value.groupId, essential: value.essential };
+      const start = category ? { name: category.name, kind: category.kind, groupId: category.groupId, essential: category.essential } : null;
+      const patch = start ? editPatch(body, start) : null;
+      const request = category ? (patch ? { id: category.id, body: patch } : null) : { id: null, body };
+      // An edit with no change closes without a write.
+      if (!request) {
+        close();
+        return;
+      }
       let saved;
       try {
-        saved = await save.mutateAsync({
-          id: category?.id ?? null,
-          body: { name: value.name.trim(), kind: value.kind, groupId: value.groupId, essential: value.essential },
-        });
+        saved = await save.mutateAsync(request);
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: categoryError(errorCode(error)), fields: {} } });
         return;
       }
       const bucket = category || value.kind !== "expense" ? undefined : buckets.items.find((item) => item.id === value.bucketId);
-      const body = bucket ? bucketWriteSchema.safeParse({ ...bucket, categoryIds: [...bucket.categoryIds, saved.id] }) : undefined;
-      if (bucket && body?.success) {
+      if (bucket) {
         try {
-          await addToBucket.mutateAsync({ id: bucket.id, body: body.data });
+          await addToBucket.mutateAsync({ id: bucket.id, body: { categoryIds: [...bucket.categoryIds, saved.id] } });
         } catch {
           // The category is in the book. The person can add it to the bucket on the Buckets screen.
         }

@@ -1,5 +1,6 @@
 import { bucketWriteSchema, amountText, parseAmount, type Bucket, type BucketColor } from "@num/shared";
 import { localAsOf } from "@/as-of";
+import { editPatch, keptAmount } from "@/forms/form-values";
 import { decimalsError } from "@/money";
 
 function money(milli: number | null) {
@@ -37,32 +38,49 @@ type BucketValues = ReturnType<typeof bucketValues>;
 /** The values of a new bucket. A form part made with `withForm` gets the type of the form values from them. */
 export const blankBucket = bucketValues(null, "sky", 0);
 
-/** The request body of the Bucket form, or the text of the first error. */
-export function bucketBody(currency: string, value: BucketValues) {
-  const read = (text: string) => parseAmount(currency, text.trim());
+type BucketAmount = "refillTo" | "amount" | "target" | "fixedAmount";
+
+function bucketFields(currency: string, value: BucketValues, stored: Bucket | null) {
+  const read = (field: BucketAmount) => {
+    const minor = stored?.[field] ?? null;
+    const start = minor === null ? null : { text: money(minor), amount: minor };
+    return keptAmount(value[field], start, (text) => parseAmount(currency, text.trim()));
+  };
+  return {
+    name: value.name.trim(),
+    kind: value.kind,
+    priority: Number(value.priority),
+    essential: value.essential,
+    color: value.color,
+    icon: value.icon,
+    categoryIds: value.categoryIds,
+    startDate: value.startDate,
+    refillTo: value.kind === "spending" ? read("refillTo") : null,
+    amount: value.kind === "sinking" ? read("amount") : null,
+    dueDate: value.kind === "sinking" ? value.dueDate : null,
+    repeat: value.kind === "sinking" ? value.repeat : null,
+    target: value.kind === "goal" ? read("target") : null,
+    targetDate: value.kind === "goal" && value.goalMode === "date" ? value.targetDate : null,
+    fixedAmount: value.kind === "goal" && value.goalMode === "paycheck" ? read("fixedAmount") : null,
+  };
+}
+
+/**
+ * The request body of the Bucket form, or the text of the first error. For a saved bucket, `patch` has only the fields
+ * that changed (decision 0040). It is null when nothing changed.
+ */
+export function bucketBody(currency: string, value: BucketValues, stored: Bucket | null) {
   let body;
   try {
-    body = {
-      name: value.name.trim(),
-      kind: value.kind,
-      priority: Number(value.priority),
-      essential: value.essential,
-      color: value.color,
-      icon: value.icon,
-      categoryIds: value.categoryIds,
-      startDate: value.startDate,
-      refillTo: value.kind === "spending" ? read(value.refillTo) : null,
-      amount: value.kind === "sinking" ? read(value.amount) : null,
-      dueDate: value.kind === "sinking" ? value.dueDate : null,
-      repeat: value.kind === "sinking" ? value.repeat : null,
-      target: value.kind === "goal" ? read(value.target) : null,
-      targetDate: value.kind === "goal" && value.goalMode === "date" ? value.targetDate : null,
-      fixedAmount: value.kind === "goal" && value.goalMode === "paycheck" ? read(value.fixedAmount) : null,
-    };
+    body = bucketFields(currency, value, stored);
   } catch {
     const typed = [value.refillTo, value.amount, value.target, value.fixedAmount];
-    return { body: null, error: typed.map((text) => decimalsError(currency, text)).find((text) => text !== null) ?? "Enter amounts as numbers." };
+    return { body: null, patch: null, error: typed.map((text) => decimalsError(currency, text)).find((text) => text !== null) ?? "Enter amounts as numbers." };
   }
   const parsed = bucketWriteSchema.safeParse(body);
-  return parsed.success ? { body: parsed.data, error: null } : { body: null, error: "Check the bucket fields." };
+  if (!parsed.success) {
+    return { body: null, patch: null, error: "Check the bucket fields." };
+  }
+  const start = stored ? bucketFields(currency, bucketValues(stored, stored.color, 0), stored) : null;
+  return { body: parsed.data, patch: start ? editPatch(body, start) : null, error: null };
 }

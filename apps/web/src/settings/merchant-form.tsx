@@ -52,6 +52,11 @@ export function MerchantForm({ merchant, initialName, inline = false, depth = 0 
       onSubmit: merchantCreateSchema,
     },
     onSubmit: async ({ value, formApi }) => {
+      // An edit with no change closes without a write.
+      if (merchant && formApi.state.isDefaultValue) {
+        close();
+        return;
+      }
       try {
         close((await save.mutateAsync({ id: merchant?.id ?? null, name: value.name.trim() })).id);
       } catch (error) {

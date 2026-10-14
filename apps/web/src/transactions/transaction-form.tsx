@@ -1,4 +1,4 @@
-import type { Transaction } from "@num/shared";
+import { amountText, moneyDirection, type MoneyDirection, type Transaction } from "@num/shared";
 import { useStore } from "@tanstack/react-form";
 import { useEffect } from "react";
 import { errorCode } from "@/api/client";
@@ -45,13 +45,16 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
   const remove = useDeleteTransaction();
   const reconciled = transaction?.reconciled === true;
   const imported = transaction?.source === "import";
-  const importedAmount = imported && transaction ? transaction.amount : null;
+  // An imported transaction keeps its amount. An amount that the person did not change keeps its stored value (decision 0040).
+  const startAmount = transaction ? amountText(Math.abs(transaction.amount)) : null;
+  const storedTotal = (value: { amount: string; direction: MoneyDirection }) =>
+    transaction && (imported || (value.amount === startAmount && value.direction === moneyDirection(transaction.amount))) ? transaction.amount : null;
 
   const form = useAppForm({
     defaultValues: transactionValues(categories, transaction, initialAccountId ?? accounts.find((item) => !item.archivedAt)?.id ?? ""),
     validators: {
       onSubmit: ({ value }) => {
-        const total = signedTotal(currency, importedAmount, value.amount, value.direction);
+        const total = signedTotal(currency, storedTotal(value), value.amount, value.direction);
         if (value.payee.trim().length === 0) {
           return "Enter the bank text.";
         }
@@ -72,12 +75,17 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
       },
     },
     onSubmit: async ({ value, formApi }) => {
-      const total = signedTotal(currency, importedAmount, value.amount, value.direction);
+      const total = signedTotal(currency, storedTotal(value), value.amount, value.direction);
       const built = total === null ? null : buildTransactionSave({ ...value, currency, transaction, totalMilli: total, unreadableItemKey });
       if (!built?.ok) {
         return;
       }
       remove.reset();
+      // An edit with no change closes without a write.
+      if (!built.save) {
+        close();
+        return;
+      }
       try {
         close((await save.mutateAsync(built.save)).id);
       } catch (error) {
@@ -89,7 +97,7 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
   const values = useStore(form.store, (state) => state.values);
   const touched = useStore(form.store, (state) => alreadyChosen(transaction) || choiceFields.some((name) => state.fieldMeta[name]?.isTouched));
   const linesEdited = useStore(form.store, (state) => alreadyChosen(transaction) || state.fieldMeta.lines?.isTouched === true);
-  const totalMilli = signedTotal(currency, importedAmount, values.amount, values.direction);
+  const totalMilli = signedTotal(currency, storedTotal(values), values.amount, values.direction);
   const suggested = useSuggestion({ accountId: values.accountId, payee: values.payee, date: values.date, direction: values.direction, amount: totalMilli });
 
   // The suggestion arrives from the API, outside the form. The form takes its choice until the person makes a choice.
@@ -171,7 +179,7 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
             categoryLocked={amountLocked}
             transferLocked={reconciled || amountLocked}
             amountsLocked={reconciled || amountLocked}
-            importedAmount={importedAmount}
+            storedAmount={storedTotal(values)}
             linkedRefund={values.refundOfId !== null && transaction?.refundOf?.id === values.refundOfId ? transaction.refundOf : null}
           />
           {transaction?.refundedAmount ? <p className="text-sm text-muted-foreground">{refundedText(currency, transaction.refundedAmount)}</p> : null}

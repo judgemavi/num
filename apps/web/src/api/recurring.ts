@@ -1,4 +1,4 @@
-import type { PlanCreate, PlanListQuery } from "@num/shared";
+import type { PlanCreate, PlanListQuery, PlanUpdate } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { allPages, fullPage } from "@/api/pages";
@@ -51,9 +51,9 @@ export function occurrencesQuery(planId: string, asOf: string) {
   });
 }
 
-/** Create a plan (`id` is null) or change a plan. */
-export function savePlan({ id, body }: { id: string | null; body: PlanCreate }) {
-  return unwrap(id ? api.recurring[":id"].$patch({ param: { id }, json: body }) : api.recurring.$post({ json: body }));
+/** Create a plan (`id` is null) or change the fields of a plan that are in the patch. */
+export function savePlan(input: { id: null; body: PlanCreate } | { id: string; body: PlanUpdate }) {
+  return unwrap(input.id === null ? api.recurring.$post({ json: input.body }) : api.recurring[":id"].$patch({ param: { id: input.id }, json: input.body }));
 }
 
 export function useSavePlan() {

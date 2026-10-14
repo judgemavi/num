@@ -42,23 +42,26 @@ export function AccountForm({ account, terms = null, initialName, inline = false
   const currency = useBookCurrency();
   const save = useSaveAccount();
   const allowed = account ? sameClassKinds(account.kind) : accountKinds;
+  const stored = account ? { account, terms } : null;
 
   const form = useAppForm({
     defaultValues: accountValues(account, terms, initialName ?? ""),
     validators: {
-      onSubmit: ({ value }) => {
-        const result = accountBody(currency, value, value.kind === "mortgage" && !inline);
-        return result.error ?? undefined;
-      },
+      onSubmit: ({ value }) => accountBody(currency, value, value.kind === "mortgage" && !inline, stored).error ?? undefined,
     },
     onSubmit: async ({ value, formApi }) => {
-      const result = accountBody(currency, value, value.kind === "mortgage" && !inline);
-      const body = result.body;
+      const { body, patch } = accountBody(currency, value, value.kind === "mortgage" && !inline, stored);
       if (!body) {
         return;
       }
+      const request = account ? (patch ? { id: account.id, body: patch } : null) : { id: null, body };
+      // An edit with no change closes without a write.
+      if (!request) {
+        close();
+        return;
+      }
       try {
-        const saved = await save.mutateAsync(account ? { id: account.id, body } : { id: null, body });
+        const saved = await save.mutateAsync(request);
         close(saved.id);
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: accountError(errorCode(error)), fields: {} } });

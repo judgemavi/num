@@ -33,9 +33,16 @@ Status: accepted (owner, 2026-10-14)
    `PATCH /api/accounts/{id}` with `openingBalance` and `openingDate`. The guard of the old route moves into the
    update: on a mortgage with terms, a patch that changes the opening date or the opening balance must include the
    terms (`opening_date_fixed` otherwise).
-4. The web forms send the full form. A full body is a valid patch, and the forms already check the full values. The
-   opening-balance buttons send only the two fields. The Account form sends `mortgageTerms: null` when the kind is
-   not a mortgage.
+4. An edit form sends only the fields that it changed. The form builds the request body from its values and from
+   its start values, and sends the fields that differ (`editPatch`). A money field that the person did not change
+   keeps the stored amount, and the form does not read its text again (`keptAmount`). Thus an unchanged amount is
+   never sent again, also when it has more digits than the currency has now (decision 0038). The amount field shows
+   the decimal rule of the currency (`decimalsError`) only after the person changes the amount. An edit with no change closes the form
+   without a write (Save stays active). On a transaction with an automatic label, Save with no change confirms the
+   label, as before. The name forms (group, tag, merchant) use the `isDefaultValue` state of the form. The
+   opening-balance buttons send only `openingBalance` and `openingDate`. "Update the plan amount" on Needs review
+   sends only `expectedAmount`. The Account form sends `mortgageTerms: null` when the kind changes from a mortgage to
+   another kind.
 
 ## Consequences
 

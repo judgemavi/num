@@ -15,6 +15,11 @@ export function TagForm({ id, initialName, inline = false, idPrefix = "record-na
       onSubmit: tagCreateSchema,
     },
     onSubmit: async ({ value, formApi }) => {
+      // An edit with no change closes without a write.
+      if (id && formApi.state.isDefaultValue) {
+        close();
+        return;
+      }
       try {
         close((await save.mutateAsync({ id, name: value.name.trim() })).id);
       } catch (error) {

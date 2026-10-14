@@ -1,4 +1,5 @@
 import {
+  amountText,
   merchantForChoice,
   moneyDirection,
   signedAmount,
@@ -7,6 +8,7 @@ import {
   type TransactionWrite,
 } from "@num/shared";
 import type { TransactionSave } from "@/api/transactions";
+import { editPatch, keptAmount } from "@/forms/form-values";
 import { readPositive, type TransactionValues } from "@/transactions/transaction-draft";
 import { lineDirection } from "@/transactions/what-choice";
 
@@ -17,36 +19,28 @@ type SubmitInput = TransactionValues & {
   unreadableItemKey?: string;
 };
 
-type BuildResult = { ok: true; save: TransactionSave } | { ok: false; error: string };
+/** `save` is null when the person changed nothing: the form closes without a write. */
+type BuildResult = { ok: true; save: TransactionSave | null } | { ok: false; error: string };
 
-function sameTags(a: string[], b: string[]) {
-  return a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
-}
-
-function unchanged(existing: Transaction, body: TransactionWrite) {
-  if (
-    existing.accountId !== body.accountId ||
-    existing.date !== body.date ||
-    existing.amount !== body.amount ||
-    existing.merchantId !== body.merchantId ||
-    (existing.notes ?? null) !== body.notes ||
-    existing.payeeRaw !== body.payeeRaw ||
-    (existing.status === "cleared") !== (body.status === "cleared") ||
-    (existing.refundOfId ?? null) !== (body.refundOfId ?? null) ||
-    existing.lines.length !== body.lines.length
-  ) {
-    return false;
-  }
-  return existing.lines.every((line, index) => {
-    const next = body.lines[index];
-    return (
-      next !== undefined &&
-      line.amount === next.amount &&
-      (line.categoryId ?? null) === (next.categoryId ?? null) &&
-      (line.transferAccountId ?? null) === (next.transferAccountId ?? null) &&
-      sameTags(line.tagIds, next.tagIds ?? [])
-    );
-  });
+/** The stored transaction as a write body, in the order of the built body. A patch has the fields that differ. */
+function storedBody(existing: Transaction): TransactionWrite {
+  return {
+    accountId: existing.accountId,
+    date: existing.date,
+    amount: existing.amount,
+    merchantId: existing.merchantId,
+    notes: existing.notes,
+    payeeRaw: existing.payeeRaw,
+    status: existing.status,
+    lines: existing.lines.map((line) => ({
+      amount: line.amount,
+      memo: line.memo,
+      categoryId: line.categoryId,
+      transferAccountId: line.transferAccountId,
+      tagIds: line.tagIds,
+    })),
+    refundOfId: existing.refundOfId,
+  };
 }
 
 function hasOpenLine(lines: readonly { categoryId?: string | null; transferAccountId?: string | null }[]) {
@@ -59,12 +53,20 @@ function hasOpenLine(lines: readonly { categoryId?: string | null; transferAccou
  */
 export function buildTransactionSave(input: SubmitInput): BuildResult {
   const memoAt = (index: number) => input.transaction?.lines[index]?.memo ?? null;
+  // A line amount that the person did not change keeps its stored amount (decision 0040).
+  const lineAmount = (index: number, line: SubmitInput["lines"][number]) => {
+    const direction = lineDirection(moneyDirection(input.totalMilli), line);
+    const stored = input.transaction?.lines[index]?.amount;
+    const start =
+      stored !== undefined && moneyDirection(stored) === direction ? { text: amountText(Math.abs(stored)), amount: stored } : null;
+    return keptAmount(line.amount, start, (text) => signedAmount(direction, readPositive(input.currency, text)));
+  };
   let built;
   try {
     built =
       input.choice === "split"
         ? input.lines.map((line, index) => ({
-            amount: signedAmount(lineDirection(moneyDirection(input.totalMilli), line), readPositive(input.currency, line.amount)),
+            amount: lineAmount(index, line),
             memo: memoAt(index),
             categoryId: line.categoryId,
             transferAccountId: line.transferAccountId,
@@ -103,8 +105,9 @@ export function buildTransactionSave(input: SubmitInput): BuildResult {
   }
   const keep = hasOpenLine(existing.lines) && hasOpenLine(parsed.data.lines);
   const labelled = existing.autoReason !== null;
-  if (labelled && !keep && unchanged(existing, parsed.data)) {
-    return { ok: true, save: { kind: "confirm", id: existing.id } };
+  const patch = editPatch(parsed.data, storedBody(existing));
+  if (!patch && !keep) {
+    return { ok: true, save: labelled ? { kind: "confirm", id: existing.id } : null };
   }
-  return { ok: true, save: { kind: "update", id: existing.id, body: { ...parsed.data, keepUncategorized: keep }, confirmLabel: labelled } };
+  return { ok: true, save: { kind: "update", id: existing.id, body: { ...patch, keepUncategorized: keep }, confirmLabel: labelled } };
 }

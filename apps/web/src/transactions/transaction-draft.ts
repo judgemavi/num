@@ -99,10 +99,13 @@ export type TransactionValues = ReturnType<typeof transactionValues>;
 /** The values of a new transaction. A form part made with `withForm` gets the type of the form values from them. */
 export const blankTransaction = transactionValues([], null, "");
 
-/** The signed amount of the form. An imported transaction keeps its amount. Null when the amount is not valid. */
-export function signedTotal(currency: string, importedAmount: number | null, amount: string, direction: MoneyDirection): number | null {
-  if (importedAmount !== null) {
-    return importedAmount;
+/**
+ * The signed amount of the form. `storedAmount` is the stored amount of an imported transaction or of an amount that
+ * the person did not change: it comes back as it is. Null when the amount is not valid.
+ */
+export function signedTotal(currency: string, storedAmount: number | null, amount: string, direction: MoneyDirection): number | null {
+  if (storedAmount !== null) {
+    return storedAmount;
   }
   if (amount.trim().length === 0) {
     return null;
