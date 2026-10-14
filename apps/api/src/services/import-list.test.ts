@@ -104,7 +104,7 @@ test("the import list filters by account, status and date", () => {
       .set({ outcome: "needs_review" })
       .where(eq(importRows.batchId, undone))
       .run();
-    const unreadable = JSON.stringify([{ line: 2, raw: "bad", reason: "date_unreadable" }]);
+    const unreadable = [{ line: 2, raw: "bad", reason: "date_unreadable" as const }];
     book.db.update(importBatches).set({ unreadableJson: unreadable }).where(eq(importBatches.id, dismissed)).run();
     book.db.update(importBatches).set({ unreadableJson: unreadable }).where(eq(importBatches.id, openUnreadable)).run();
     book.db

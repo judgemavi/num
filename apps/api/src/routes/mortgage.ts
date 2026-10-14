@@ -1,28 +1,15 @@
 import {
-  errorSchema,
   mortgagePrefillQuerySchema,
   mortgagePrefillSchema,
   mortgageTermsSchema,
   mortgageViewQuerySchema,
   mortgageViewSchema,
 } from "@num/shared";
-import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { getMortgageTerms, mortgageAccountView, mortgagePrefill } from "../services/mortgage";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: {
-    "application/json": {
-      schema: errorSchema,
-    },
-  },
-} as const;
-
-const idParams = z.object({
-  id: z.uuid(),
-});
+import { errorResponse, idParams } from "./common";
 
 const readRoute = createRoute({
   operationId: "get_accounts_id_mortgage_terms",

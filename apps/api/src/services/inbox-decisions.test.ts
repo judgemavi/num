@@ -9,7 +9,6 @@ import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
-import { readUnreadable } from "./import-read";
 import { importStatement } from "./imports";
 import { openUnreadableKeys } from "./book-settings";
 import { openFundingPaychecks } from "./funding-paychecks";
@@ -231,7 +230,7 @@ test("each no decision hides its review item until undo", () => {
     expect(count()).toBe(total + 1);
     expect(hasKey(sample.db, asOf, unreadableKey)).toBe(false);
     const batch = sample.db.select().from(importBatches).where(eq(importBatches.id, batchId)).get();
-    expect(readUnreadable(batch?.unreadableJson ?? "[]").some((row) => String(row.line) === line)).toBe(false);
+    expect((batch?.unreadableJson ?? []).some((row) => String(row.line) === line)).toBe(false);
 
     expect(() => decideInboxItem(sample.db, asOf, `transfer_pair:${crypto.randomUUID()}:${crypto.randomUUID()}`, "not_transfer", saved)).toThrow(
       ServiceError,

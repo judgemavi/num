@@ -1,14 +1,11 @@
 import { checkpoints, importBatches } from "@num/db";
 import { openingFromFirstRow, reconcileOpening, type OpeningSuggestion } from "@num/shared";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
-import type { Db } from "../db";
 import { hasTerms } from "./mortgage-terms";
 import { earliestTransactionDate, effectiveOpeningDate } from "./opening-date";
-import type { WriteTx } from "./write";
+import type { Reader } from "./write";
 
-type Reader = Db | WriteTx;
-
-function hasActiveCheckpoint(db: Reader, accountId: string): boolean {
+function hasActiveCheckpoint(db: Reader, accountId: string) {
   return (
     db
       .select({ id: checkpoints.id })
@@ -18,7 +15,7 @@ function hasActiveCheckpoint(db: Reader, accountId: string): boolean {
   );
 }
 
-function hadRunningBalanceImport(db: Reader, accountId: string): boolean {
+function hadRunningBalanceImport(db: Reader, accountId: string) {
   return (
     db
       .select({ id: importBatches.id })

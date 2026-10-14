@@ -21,7 +21,7 @@ export function shapeOf(schema: z.ZodType | undefined): Record<string, z.ZodType
   return (schema as { shape: Record<string, z.ZodType> }).shape;
 }
 
-function unionOptions(schema: z.ZodType | undefined): z.ZodType[] {
+function unionOptions(schema: z.ZodType | undefined) {
   if (!schema || !("options" in schema)) {
     return [];
   }
@@ -62,7 +62,7 @@ export function isFileSchema(schema: z.ZodType): boolean {
   return type === "instanceof" || type === "file" || type === "custom";
 }
 
-function fileFrom(value: unknown): File {
+function fileFrom(value: unknown) {
   const file = fileInputSchema.parse(value);
   if ("text" in file) {
     return new File([file.text], file.filename, { type: file.mimeType || "text/csv" });
@@ -72,7 +72,7 @@ function fileFrom(value: unknown): File {
   });
 }
 
-function picked(schema: z.ZodType | undefined, args: Record<string, unknown>): Record<string, unknown> {
+function picked(schema: z.ZodType | undefined, args: Record<string, unknown>) {
   const out: Record<string, unknown> = {};
   for (const key of fieldKeys(schema)) {
     if (args[key] !== undefined) {
@@ -82,14 +82,14 @@ function picked(schema: z.ZodType | undefined, args: Record<string, unknown>): R
   return out;
 }
 
-function queryString(value: unknown): string {
+function queryString(value: unknown) {
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
   return JSON.stringify(value) ?? "";
 }
 
-function formValue(schema: z.ZodType, value: unknown): string | File {
+function formValue(schema: z.ZodType, value: unknown) {
   if (isFileSchema(schema)) {
     return fileFrom(value);
   }

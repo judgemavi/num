@@ -1,13 +1,9 @@
-import { errorSchema, insightsQuerySchema, insightsSchema } from "@num/shared";
+import { insightsQuerySchema, insightsSchema } from "@num/shared";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { readInsights } from "../services/insights";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: { "application/json": { schema: errorSchema } },
-} as const;
+import { errorResponse } from "./common";
 
 const insightsRoute = createRoute({
   operationId: "get_insights",

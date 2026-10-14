@@ -1,7 +1,13 @@
 export { accounts, mortgageTerms } from "./accounts";
+export type { AccountRow, MortgageTermRow } from "./accounts";
 export { bucketCategories, bucketEvents, buckets, fundingRuns } from "./buckets";
+export type { BucketEventRow, BucketRow, FundingRunRow } from "./buckets";
 export { categories, categoryGroups, merchants, tags } from "./categories";
+export type { CategoryGroupRow, CategoryRow, MerchantRow, TagRow } from "./categories";
 export { checkpoints, documents, importBatches, importRows, valuations } from "./imports";
+export type { DocumentRow, ImportBatchRow } from "./imports";
 export { lineTags, transactionLines, transactions } from "./ledger";
+export type { TransactionRow } from "./ledger";
 export { occurrenceLinks, recurringPlans } from "./plans";
+export type { OccurrenceLinkRow, RecurringPlanRow } from "./plans";
 export { auditLog, inboxDecisions, settings } from "./records";

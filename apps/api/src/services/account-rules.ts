@@ -1,10 +1,5 @@
-import { accountClass, allowsInterestRate, type AccountKind, type PaymentPolicy } from "@num/shared";
+import { accountClass, allowsInterestRate, cardFieldIssue, type AccountKind, type PaymentPolicy } from "@num/shared";
 import { ServiceError } from "../service-error";
-
-export type CardFields = {
-  paymentPolicy: PaymentPolicy | null;
-  fixedPayment: number | null;
-};
 
 type CardInput = {
   paymentPolicy?: PaymentPolicy | null;
@@ -40,26 +35,15 @@ export function assertCanArchive(balance: number, confirm: boolean): void {
   }
 }
 
-export function cardFields(kind: AccountKind, input: CardInput): CardFields {
-  const fields: CardFields = {
+/** The route schema uses the same rule. This check is for the stored values that an update keeps and for callers that are not routes. */
+export function cardFields(kind: AccountKind, input: CardInput) {
+  const fields = {
     paymentPolicy: input.paymentPolicy ?? null,
     fixedPayment: input.fixedPayment ?? null,
   };
-  const hasCardValue = Object.values(fields).some((value) => value !== null);
-  if (kind !== "credit_card") {
-    if (hasCardValue) {
-      throw new ServiceError("card_fields_invalid", 400);
-    }
-    return fields;
-  }
-  if (fields.paymentPolicy === null) {
-    throw new ServiceError("card_fields_invalid", 400, { field: "paymentPolicy" });
-  }
-  if (fields.paymentPolicy === "fixed" && fields.fixedPayment === null) {
-    throw new ServiceError("card_fields_invalid", 400, { field: "fixedPayment" });
-  }
-  if (fields.paymentPolicy !== "fixed" && fields.fixedPayment !== null) {
-    throw new ServiceError("card_fields_invalid", 400, { field: "fixedPayment" });
+  const field = cardFieldIssue({ kind, ...fields });
+  if (field) {
+    throw new ServiceError("card_fields_invalid", 400, kind === "credit_card" ? { field } : {});
   }
   return fields;
 }

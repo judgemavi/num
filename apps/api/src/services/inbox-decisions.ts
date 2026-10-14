@@ -11,12 +11,7 @@ import { openFundingPaychecks } from "./funding-paychecks";
 import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
 import { listTransferPairs } from "./suggestions";
-import { write, type AuditSource } from "./write";
-
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
+import { write, type WriteInput } from "./write";
 
 const codeForKind: Record<string, InboxDecisionCode | undefined> = {
   transfer_pair: "not_transfer",
@@ -32,21 +27,15 @@ export function decisionRows(db: Db): InboxDecision[] {
   return db
     .select()
     .from(inboxDecisions)
-    .all()
-    .map((row) => ({
-      itemKey: row.itemKey,
-      decision: row.decision as InboxDecisionCode,
-      reason: row.reason,
-      decidedAt: row.decidedAt,
-    }));
+    .all();
 }
 
-function itemKind(itemKey: string): string {
+function itemKind(itemKey: string) {
   const split = itemKey.indexOf(":");
   return split === -1 ? itemKey : itemKey.slice(0, split);
 }
 
-function isOpen(db: Db, asOf: string, itemKey: string): boolean {
+function isOpen(db: Db, asOf: string, itemKey: string) {
   if (decidedKeys(db).has(itemKey)) {
     return false;
   }

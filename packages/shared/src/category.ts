@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { listQuerySchema, pagedResponseSchema } from "./list";
+import { archivedQuery, listQuerySchema, pagedResponseSchema, queryIdOrNone } from "./list";
 import { isUtcTimestamp } from "./time";
 
 export const categoryKinds = ["income", "expense"] as const;
@@ -7,13 +7,6 @@ export const categoryKinds = ["income", "expense"] as const;
 export type CategoryKind = (typeof categoryKinds)[number];
 
 const nameSchema = z.string().trim().min(1);
-
-const archivedQuery = {
-  archived: z
-    .union([z.boolean(), z.enum(["true", "false"])])
-    .optional()
-    .transform((value) => value === true || value === "true"),
-};
 
 export const categoryGroupSchema = z.object({
   id: z.uuid(),
@@ -63,16 +56,9 @@ export const categoryUpdateSchema = z
   })
   .refine((value) => value.kind === "expense" || value.essential !== true, { path: ["essential"] });
 
-function blankQuery(value: unknown): unknown {
-  if (typeof value === "string" && value.trim() === "") {
-    return undefined;
-  }
-  return value;
-}
-
 export const categoryListQuerySchema = listQuerySchema(["name", "kind"]).extend({
   ...archivedQuery,
-  groupId: z.preprocess(blankQuery, z.union([z.uuid(), z.literal("none")]).optional()),
+  groupId: queryIdOrNone,
 });
 
 export const categoryListSchema = pagedResponseSchema(categorySchema);

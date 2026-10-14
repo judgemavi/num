@@ -1,29 +1,17 @@
-import { bucketEvents, buckets, fundingRuns, transactions } from "@num/db";
+import { bucketEvents, buckets, fundingRuns, transactions, type FundingRunRow } from "@num/db";
 import { fundingLimit, isIsoDate, utcNow, type FundingRun, type FundingRunCreate } from "@num/shared";
 import { eq, isNotNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { activeFundingRun, fundingPosition, requirePaycheck } from "./funding-book";
-import { write, type AuditSource, type WriteTx } from "./write";
+import { withoutId, write, type WriteTx, type WriteInput } from "./write";
 
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-type RunRow = typeof fundingRuns.$inferSelect;
-
-function snapshot(row: RunRow, lines: { bucketId: string; amount: number }[]) {
-  return {
-    incomeTransactionId: row.incomeTransactionId,
-    date: row.date,
-    createdAt: row.createdAt,
-    undoneAt: row.undoneAt,
-    lines,
-  };
+/** The audit log keeps the run row without its id, and the lines of the run. */
+function snapshot(row: FundingRunRow, lines: { bucketId: string; amount: number }[]) {
+  return { ...withoutId(row), lines };
 }
 
-function linesOf(db: WriteTx | Db, runId: string): { bucketId: string; amount: number }[] {
+function linesOf(db: WriteTx | Db, runId: string) {
   return db
     .select({ bucketId: bucketEvents.bucketId, amount: bucketEvents.amount })
     .from(bucketEvents)
@@ -31,7 +19,7 @@ function linesOf(db: WriteTx | Db, runId: string): { bucketId: string; amount: n
     .all();
 }
 
-function toRun(db: WriteTx | Db, row: RunRow): FundingRun {
+function toRun(db: WriteTx | Db, row: FundingRunRow) {
   const txn = db.select({ payeeRaw: transactions.payeeRaw }).from(transactions).where(eq(transactions.id, row.incomeTransactionId)).get();
   const total = linesOf(db, row.id).reduce((sum, line) => sum + line.amount, 0);
   return {
@@ -72,8 +60,7 @@ export function createFundingRun(db: Db, input: FundingRunCreate & WriteInput & 
     throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
   }
   const at = input.at ?? utcNow();
-  let created: FundingRun | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const paycheck = requirePaycheck(tx, input.incomeTransactionId);
     if (activeFundingRun(tx, paycheck.incomeTransactionId)) {
       throw new ServiceError("funding_run_exists", 409);
@@ -81,7 +68,7 @@ export function createFundingRun(db: Db, input: FundingRunCreate & WriteInput & 
     const position = fundingPosition(tx, input.asOf);
     assertLines(tx, input.lines, fundingLimit(paycheck.amount, position.unassigned));
     const id = crypto.randomUUID();
-    const row: RunRow = {
+    const row: FundingRunRow = {
       id,
       incomeTransactionId: paycheck.incomeTransactionId,
       date: paycheck.date,
@@ -119,18 +106,13 @@ export function createFundingRun(db: Db, input: FundingRunCreate & WriteInput & 
         after: event,
       });
     }
-    created = toRun(tx, row);
+    return toRun(tx, row);
   });
-  if (!created) {
-    throw new Error("Create did not return a funding run");
-  }
-  return created;
 }
 
 export function undoFundingRun(db: Db, id: string, input: WriteInput): FundingRun {
   const at = input.at ?? utcNow();
-  let undone: FundingRun | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const existing = tx.select().from(fundingRuns).where(eq(fundingRuns.id, id)).get();
     if (!existing) {
       throw new ServiceError("funding_run_not_found", 404);
@@ -148,15 +130,11 @@ export function undoFundingRun(db: Db, id: string, input: WriteInput): FundingRu
       before: snapshot(existing, lines),
       after: snapshot(next, lines),
     });
-    undone = toRun(tx, next);
+    return toRun(tx, next);
   });
-  if (!undone) {
-    throw new Error("Undo did not return a funding run");
-  }
-  return undone;
 }
 
-function runTotals(db: Db): Map<string, number> {
+function runTotals(db: Db) {
   const totals = new Map<string, number>();
   const rows = db
     .select({

@@ -161,14 +161,11 @@ export function AccountForm({ account, terms = null, initialName, inline = false
         kind,
         onBudget,
         openingDate: automatic && !termsOn ? null : openingDate,
-        ...(openingBalance.trim().length === 0
-          ? {}
-          : {
-              openingBalance: balanceFromEntry(
-                kind,
-                readAmount(currency, openingBalance, liability ? "the amount owed" : "the balance"),
-              ),
-            }),
+        // An empty field is a zero balance. An update that leaves out the balance keeps the stored balance.
+        openingBalance:
+          openingBalance.trim().length === 0
+            ? 0
+            : balanceFromEntry(kind, readAmount(currency, openingBalance, liability ? "the amount owed" : "the balance")),
         interestRateMilliPct: allowsInterestRate(kind) ? readInterest(interestRate) : null,
         ...card,
         ...(hasSection ? { mortgageTerms: termsFromDraft(currency, mortgage) } : {}),

@@ -9,16 +9,14 @@ import { requireAsOf, type NeedsReviewHit } from "./needs-review";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { filteredReviewHits } from "./transaction-list";
 import { confirmLinkedPeer, spreadAfterConfirmations } from "./transactions";
-import { write, type AuditSource, type WriteTx } from "./write";
-
-type WriteInput = { source: AuditSource; at?: string };
+import { write, type WriteTx, type WriteInput, type Reader } from "./write";
 
 type ApproveLevel = "sure" | "likely";
 
 const clearedAuto = { autoReason: null, autoSourceId: null, autoConfidence: null };
 
 /** `peers` holds the rows that an earlier row of this batch confirmed with its pair. */
-function confirmSure(tx: WriteTx, id: string, at: string, peers: Set<string>): boolean {
+function confirmSure(tx: WriteTx, id: string, at: string, peers: Set<string>) {
   const existing = tx.select().from(transactions).where(eq(transactions.id, id)).get();
   if (!existing?.autoReason) {
     return peers.has(id);
@@ -34,7 +32,7 @@ function confirmSure(tx: WriteTx, id: string, at: string, peers: Set<string>): b
   return true;
 }
 
-function applyLikely(tx: WriteTx, hit: NeedsReviewHit, at: string): boolean {
+function applyLikely(tx: WriteTx, hit: NeedsReviewHit, at: string) {
   const suggestion = hit.review.suggestion;
   if (!suggestion) {
     return false;
@@ -54,11 +52,11 @@ function applyLikely(tx: WriteTx, hit: NeedsReviewHit, at: string): boolean {
   return skip === null;
 }
 
-function targetsOf(db: Db | WriteTx, asOf: string, filter: TransactionFilter, level: ApproveLevel): NeedsReviewHit[] {
+function targetsOf(db: Reader, asOf: string, filter: TransactionFilter, level: ApproveLevel) {
   return filteredReviewHits(db, filter, asOf).filter((hit) => hit.review.question === "categorize" && hit.review.level === level);
 }
 
-function changed(count: number): ServiceError {
+function changed(count: number) {
   return new ServiceError("review_changed", 409, { count: String(count) });
 }
 

@@ -1,17 +1,9 @@
-import { asOfQuerySchema, errorSchema, forecastSchema } from "@num/shared";
+import { asOfQuerySchema, forecastSchema } from "@num/shared";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { readForecast } from "../services/forecast";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: {
-    "application/json": {
-      schema: errorSchema,
-    },
-  },
-} as const;
+import { errorResponse } from "./common";
 
 const forecastRoute = createRoute({
   operationId: "get_forecast",

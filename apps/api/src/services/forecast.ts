@@ -1,83 +1,30 @@
+import { accounts, bucketCategories, buckets, categories, checkpoints, occurrenceLinks, recurringPlans, settings, transactionLines, transactions, type RecurringPlanRow } from "@num/db";
 import {
-  accounts,
-  bucketCategories,
-  buckets,
-  categories,
-  checkpoints,
-  occurrenceLinks,
-  recurringPlans,
-  settings,
-  transactionLines,
-  transactions,
-} from "@num/db";
-import {
-  accountKinds,
   buildForecast,
   cardForecastSchedule,
   forecastDates,
   isIsoDate,
   nextIncomeDate,
   occurrenceDates,
-  planFrequencies,
-  businessDayShifts,
   spendDeltas,
   unbucketedMonthly,
   Temporal,
   variableAmounts,
-  type AccountKind,
-  type BusinessDayShift,
   type Forecast,
   type ForecastDelta,
   type ForecastFlow,
-  type PaymentPolicy,
-  type PlanFrequency,
-  type PlanSchedule,
 } from "@num/shared";
-import { and, eq, gt, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gt, isNotNull, isNull, lte } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import type { Db } from "../db";
-import { balanceOf } from "./account-balance";
+import { balancesOf } from "./account-balance";
 import { lastCompleteMonths } from "./complete-months";
 import { ServiceError } from "../service-error";
+import { literal } from "./transaction-sql";
 
-type PlanRow = typeof recurringPlans.$inferSelect;
+const peer = alias(transactions, "peer");
 
-const paymentPolicies = ["full", "fixed", "manual"] as const;
-
-function asKind(value: string): AccountKind {
-  if (!(accountKinds as readonly string[]).includes(value)) {
-    throw new Error("Unknown account kind");
-  }
-  return value as AccountKind;
-}
-
-function asPolicy(value: string | null): PaymentPolicy | null {
-  if (value === null) {
-    return null;
-  }
-  if (!(paymentPolicies as readonly string[]).includes(value)) {
-    throw new Error("Unknown payment policy");
-  }
-  return value as PaymentPolicy;
-}
-
-function scheduleOf(row: PlanRow): PlanSchedule {
-  if (!(planFrequencies as readonly string[]).includes(row.freq)) {
-    throw new Error("Unknown frequency");
-  }
-  if (!(businessDayShifts as readonly string[]).includes(row.businessDayShift)) {
-    throw new Error("Unknown shift");
-  }
-  return {
-    startDate: row.startDate,
-    endDate: row.endDate,
-    freq: row.freq as PlanFrequency,
-    interval: row.interval,
-    monthDay: row.monthDay,
-    businessDayShift: row.businessDayShift as BusinessDayShift,
-  };
-}
-
-function usualAccount(rows: readonly { accountId: string; date: string }[]): string | null {
+function usualAccount(rows: readonly { accountId: string; date: string }[]) {
   const counts = new Map<string, { count: number; latest: string }>();
   for (const row of rows) {
     const current = counts.get(row.accountId) ?? { count: 0, latest: "" };
@@ -96,7 +43,7 @@ function usualAccount(rows: readonly { accountId: string; date: string }[]): str
   return best?.id ?? null;
 }
 
-function bufferOf(db: Db): number {
+function bufferOf(db: Db) {
   const row = db.select().from(settings).where(eq(settings.key, "bufferAmount")).get();
   if (!row || !/^\d+$/.test(row.value)) {
     return 0;
@@ -105,15 +52,7 @@ function bufferOf(db: Db): number {
   return Number.isSafeInteger(value) ? value : 0;
 }
 
-export function balanceAsOf(
-  db: Db,
-  account: { id: string; kind: AccountKind; openingBalance: number },
-  asOf?: string,
-): number {
-  return balanceOf(db, account, undefined, undefined, asOf);
-}
-
-function planAmount(plan: PlanRow, links: { planId: string; dueDate: string; transactionId: string | null }[], amounts: Map<string, number>, asOf: string): number {
+function planAmount(plan: RecurringPlanRow, links: { planId: string; dueDate: string; transactionId: string | null }[], amounts: Map<string, number>, asOf: string) {
   if (plan.amountMode !== "variable") {
     return plan.expectedAmount;
   }
@@ -159,32 +98,28 @@ export function readForecast(db: Db, asOf: string): Forecast {
   const skipped = new Set(links.filter((link) => link.skipped).map((link) => `${link.planId}|${link.dueDate}`));
   const posted = new Set(links.filter((link) => link.transactionId !== null).map((link) => `${link.planId}|${link.dueDate}`));
   const linkedTransactions = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
-  const amounts = new Map<string, number>();
-  if (linkedTransactions.size > 0) {
-    for (const row of db
+  const amounts = new Map(
+    db
       .select({ id: transactions.id, amount: transactions.amount })
-      .from(transactions)
-      .all()) {
-      if (linkedTransactions.has(row.id)) {
-        amounts.set(row.id, row.amount);
-      }
-    }
-  }
+      .from(occurrenceLinks)
+      .innerJoin(transactions, eq(transactions.id, occurrenceLinks.transactionId))
+      .all()
+      .map((row) => [row.id, row.amount]),
+  );
   const deltas: ForecastDelta[] = [];
   const flows: ForecastFlow[] = [];
   const incomeDates: string[] = [];
   const incomeHorizon = Temporal.PlainDate.from(asOf).add({ years: 1 }).toString();
   for (const plan of plans) {
     const amount = planAmount(plan, links, amounts, asOf);
-    const schedule = scheduleOf(plan);
     if (plan.kind === "income" && plan.fundsBuckets) {
-      for (const date of occurrenceDates(schedule, incomeHorizon, asOf)) {
+      for (const date of occurrenceDates(plan, incomeHorizon, asOf)) {
         if (!skipped.has(`${plan.id}|${date.dueDate}`)) {
           incomeDates.push(date.dueDate);
         }
       }
     }
-    for (const date of occurrenceDates(schedule, horizonEnd, asOf)) {
+    for (const date of occurrenceDates(plan, horizonEnd, asOf)) {
       if (skipped.has(`${plan.id}|${date.dueDate}`) || posted.has(`${plan.id}|${date.dueDate}`)) {
         continue;
       }
@@ -270,8 +205,8 @@ export function readForecast(db: Db, asOf: string): Forecast {
   const warnings: Forecast["warnings"] = [];
   const cards = [];
   for (const account of openAccounts) {
-    const policy = asPolicy(account.paymentPolicy);
-    if (asKind(account.kind) !== "credit_card" || policy === null) {
+    const policy = account.paymentPolicy;
+    if (account.kind !== "credit_card" || policy === null) {
       continue;
     }
     if (policy === "manual") {
@@ -282,13 +217,12 @@ export function readForecast(db: Db, asOf: string): Forecast {
       .from(checkpoints)
       .where(and(eq(checkpoints.accountId, account.id), isNull(checkpoints.unlockedAt)))
       .all();
-    const payments = db.all<{ date: string; amount: number; accountId: string }>(sql`
-      select t.date as date, t.amount as amount, peer.account_id as accountId
-      from transactions t
-      inner join transactions peer on peer.id = t.transfer_peer_id
-      where t.account_id = ${account.id}
-        and t.amount > 0
-    `);
+    const payments = db
+      .select({ date: transactions.date, amount: transactions.amount, accountId: peer.accountId })
+      .from(transactions)
+      .innerJoin(peer, eq(peer.id, transactions.transferPeerId))
+      .where(and(eq(transactions.accountId, account.id), gt(transactions.amount, literal(0))))
+      .all();
     const fromHistory = usualAccount(payments);
     const chequing = openAccounts.filter((row) => row.kind === "chequing");
     const paymentAccountId = fromHistory ?? (chequing.length === 1 ? chequing[0]?.id ?? null : null);
@@ -311,10 +245,10 @@ export function readForecast(db: Db, asOf: string): Forecast {
     bufferAmount: bufferOf(db),
     nextIncomeDate: nextIncomeDate(asOf, incomeDates),
     warnings,
-    accounts: openAccounts.map((row) => ({
-      id: row.id,
-      kind: asKind(row.kind),
-      balance: balanceAsOf(db, { id: row.id, kind: asKind(row.kind), openingBalance: row.openingBalance }, asOf),
+    accounts: balancesOf(db, openAccounts, asOf).map(({ account, balance }) => ({
+      id: account.id,
+      kind: account.kind,
+      balance,
     })),
     deltas,
     flows,

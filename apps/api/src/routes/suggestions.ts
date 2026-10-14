@@ -1,6 +1,5 @@
 import {
   asOfQuerySchema,
-  errorSchema,
   suggestionQuerySchema,
   suggestionSchema,
   transferHintQuerySchema,
@@ -13,11 +12,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { acceptTransferPair, listTransferPairs, suggestForPayee, transferHint } from "../services/suggestions";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: { "application/json": { schema: errorSchema } },
-} as const;
+import { errorResponse } from "./common";
 
 const suggestRoute = createRoute({
   operationId: "get_suggestions",

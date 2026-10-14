@@ -61,7 +61,7 @@ type ZodDef = {
   out?: z.ZodType;
 };
 
-function schemaHasAmount(schema: z.ZodType, seen: WeakSet<object>): boolean {
+function schemaHasAmount(schema: z.ZodType, seen: WeakSet<object>) {
   if (seen.has(schema)) {
     return false;
   }
@@ -101,7 +101,7 @@ function schemaHasAmount(schema: z.ZodType, seen: WeakSet<object>): boolean {
   return false;
 }
 
-function routeSchemas(route: RouteConfig, body: z.ZodType | undefined): z.ZodType[] {
+function routeSchemas(route: RouteConfig, body: z.ZodType | undefined) {
   const schemas: z.ZodType[] = [];
   if (route.request?.params) {
     schemas.push(route.request.params);
@@ -123,7 +123,7 @@ function routeSchemas(route: RouteConfig, body: z.ZodType | undefined): z.ZodTyp
   return schemas;
 }
 
-function routeHasAmount(schemas: z.ZodType[]): boolean {
+function routeHasAmount(schemas: z.ZodType[]) {
   const seen = new WeakSet<object>();
   return schemas.some((schema) => schemaHasAmount(schema, seen));
 }
@@ -226,7 +226,7 @@ function unionSchema(route: McpRoute, extra: Record<string, z.ZodType>): z.ZodTy
   return z.union(branches as unknown as [z.ZodType, z.ZodType, ...z.ZodType[]]);
 }
 
-function inputSchema(route: McpRoute): z.ZodType {
+function inputSchema(route: McpRoute) {
   const fields: Record<string, z.ZodType> = {};
   addFields(fields, route.params, route);
   addFields(fields, route.query, route);
@@ -238,7 +238,7 @@ function inputSchema(route: McpRoute): z.ZodType {
   return publishedSchema(z.object(fields));
 }
 
-function toolDescription(route: McpRoute): string {
+function toolDescription(route: McpRoute) {
   const base = route.description.replaceAll(` ${moneyText}`, "").replaceAll(moneyText, "").trim();
   if (!routeHasAmount(route.schemas)) {
     return base;

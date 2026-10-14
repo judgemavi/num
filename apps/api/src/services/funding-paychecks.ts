@@ -2,7 +2,6 @@ import { fundingRuns, occurrenceLinks, recurringPlans, transactions } from "@num
 import { and, eq, gt, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { decidedKeys } from "./decision-keys";
-import { amountMode } from "./funding-book";
 
 export function listFundingPaychecks(db: Db) {
   const hidden = decidedKeys(db, "paycheck_funding");
@@ -36,7 +35,7 @@ export function listFundingPaychecks(db: Db) {
     dueDate: row.dueDate,
     amount: row.amount,
     payee: row.payee,
-    amountMode: amountMode(row.amountMode),
+    amountMode: row.amountMode,
     kept: hidden.has(`paycheck_funding:${row.incomeTransactionId}`),
   }));
   items.sort((left, right) => {

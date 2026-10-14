@@ -2,11 +2,10 @@ import type { ColumnMap, ImportCounts, OpeningSuggestion, StatementFormat, Unrea
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState, type RefObject } from "react";
-import { accountQuery, useSetOpeningBalance } from "@/api/accounts";
+import { useSetOpeningBalance } from "@/api/accounts";
 import { importPresetsQuery } from "@/api/imports";
 import { ImportAccountPicker } from "@/accounts/import-account-picker";
 import { formatImportDate, importCountText, unreadableLabel } from "@/accounts/import-format";
-import { Boundary } from "@/components/boundary";
 import { useEditorFrame } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
@@ -159,23 +158,20 @@ export function ImportFileList({ rows, disabled, editorAccountId, onFormat, onAc
 }
 
 function OpeningBalanceButton({ row, onApplied }: { row: ImportFileRow; onApplied: () => void }) {
-  if (!row.openingSuggestion || row.accountId.length === 0) {
+  const currency = useBookCurrency();
+  const opening = useSetOpeningBalance();
+  const suggestion = row.openingSuggestion;
+  if (!suggestion || row.accountId.length === 0) {
     return null;
   }
   return (
-    <Boundary look="panel" loading="Loading the account." failed="The account did not load.">
-      <OpeningBalance accountId={row.accountId} suggestion={row.openingSuggestion} onApplied={onApplied} />
-    </Boundary>
-  );
-}
-
-function OpeningBalance({ accountId, suggestion, onApplied }: { accountId: string; suggestion: OpeningSuggestion; onApplied: () => void }) {
-  const currency = useBookCurrency();
-  const { data: account } = useSuspenseQuery(accountQuery(accountId));
-  const opening = useSetOpeningBalance();
-  return (
     <div className="grid gap-1">
-      <Button type="button" variant="outline" disabled={opening.isPending} onClick={() => opening.mutate({ account, suggestion }, { onSuccess: onApplied })}>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={opening.isPending}
+        onClick={() => opening.mutate({ accountId: row.accountId, suggestion }, { onSuccess: onApplied })}
+      >
         Set the opening balance from this statement
         {` · ${formatMoney(currency, suggestion.amount)}`}
       </Button>

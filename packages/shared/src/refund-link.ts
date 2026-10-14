@@ -44,7 +44,7 @@ export function refundWindowStart(asOf: string): string {
   return Temporal.PlainDate.from(asOf).subtract({ days: refundWindowDays }).toString();
 }
 
-function daySpan(earlier: string, later: string): number {
+function daySpan(earlier: string, later: string) {
   return Temporal.PlainDate.from(earlier).until(Temporal.PlainDate.from(later), { largestUnit: "day" }).days;
 }
 
@@ -69,7 +69,7 @@ export function refundLinkAllowed(input: {
   return daySpan(input.purchaseDate, input.refundDate) <= refundWindowDays;
 }
 
-function preferred(row: RefundPurchase, payeeNormalized: string): boolean {
+function preferred(row: RefundPurchase, payeeNormalized: string) {
   return payeeNormalized.length > 0 && row.payeeNormalized === payeeNormalized;
 }
 

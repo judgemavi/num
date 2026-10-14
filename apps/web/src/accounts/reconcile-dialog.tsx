@@ -95,7 +95,7 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
     if (!suggestion) {
       return;
     }
-    opening.mutate({ account, suggestion }, { onSuccess: checkBalance });
+    opening.mutate({ accountId, suggestion }, { onSuccess: checkBalance });
   }
 
   function errorText() {

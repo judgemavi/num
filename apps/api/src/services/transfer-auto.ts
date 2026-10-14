@@ -1,26 +1,20 @@
-import { inboxDecisions, transactions } from "@num/db";
+import { accounts, inboxDecisions, transactionLines, transactions } from "@num/db";
 import { Temporal } from "@num/shared";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, ne, type SQL } from "drizzle-orm";
 import { pairKey } from "./decision-keys";
 import { transactionReconciled } from "./reconciled";
 import { ServiceError } from "../service-error";
 import { loadLines, replaceLines } from "./transaction-lines";
 import { auditTransaction, readTransaction, toTransaction } from "./transaction-record";
+import { hasOpenLine, hasTransferLine, isImported, lineCount, literal } from "./transaction-sql";
 import type { WriteTx } from "./write";
 
-type Row = {
-  id: string;
-  accountId: string;
-  date: string;
-  amount: number;
-  payee: string;
-  imported: number;
-};
+type Row = ReturnType<typeof openRows>[number];
 
 /** The fields of one side of a linked pair. An automatic link is not an edit, so the import can still be undone. */
 function linkFields(peerId: string, editedAt: string | null) {
   if (editedAt === null) {
-    return { transferPeerId: peerId, autoReason: "transfer_match", autoSourceId: peerId, autoConfidence: 990 };
+    return { transferPeerId: peerId, autoReason: "transfer_match" as const, autoSourceId: peerId, autoConfidence: 990 };
   }
   return { transferPeerId: peerId, autoReason: null, autoSourceId: null, autoConfidence: null, editedAt };
 }
@@ -67,37 +61,44 @@ export function linkTransferPair(tx: WriteTx, leftId: string, rightId: string, e
 }
 
 
-/** An unlinked row with one open line (no category, no transfer) in an on-budget account. */
-const openRow = sql`
-  t.transfer_peer_id is null and t.mirror = 0 and a.on_budget = 1 and t.amount != 0
-  and (select count(*) from transaction_lines l where l.transaction_id = t.id) = 1
-  and exists (
-    select 1 from transaction_lines l
-    where l.transaction_id = t.id and l.category_id is null and l.transfer_account_id is null
-  )
-`;
-
-const columns = sql`
-  t.id as id, t.account_id as accountId, t.date as date, t.amount as amount, t.payee_normalized as payee,
-  (t.source = 'import' or t.import_row_id is not null) as imported
-`;
-
-function readRow(tx: WriteTx, id: string): Row | undefined {
-  return tx.all<Row>(sql`
-    select ${columns} from transactions t inner join accounts a on a.id = t.account_id
-    where t.id = ${id} and ${openRow}
-  `)[0];
+/** Unlinked rows with one open line (no category, no transfer) in an on-budget account. Add the conditions on the row. */
+function openRows(tx: WriteTx, ...conditions: SQL[]) {
+  return tx
+    .select({
+      id: transactions.id,
+      accountId: transactions.accountId,
+      date: transactions.date,
+      amount: transactions.amount,
+      payee: transactions.payeeNormalized,
+      imported: isImported,
+    })
+    .from(transactions)
+    .innerJoin(accounts, eq(accounts.id, transactions.accountId))
+    .where(
+      and(
+        ...conditions,
+        isNull(transactions.transferPeerId),
+        eq(transactions.mirror, literal(0)),
+        eq(accounts.onBudget, literal(1)),
+        ne(transactions.amount, literal(0)),
+        eq(lineCount(transactions.id), literal(1)),
+        hasOpenLine(transactions.id),
+      ),
+    )
+    .all();
 }
 
 /** Opposite rows in other accounts within 3 days that no recorded "no" excludes. Indexed by account, date and amount. */
-function candidates(tx: WriteTx, row: Row): Row[] {
+function candidates(tx: WriteTx, row: Row) {
   const from = Temporal.PlainDate.from(row.date).subtract({ days: 3 }).toString();
   const to = Temporal.PlainDate.from(row.date).add({ days: 3 }).toString();
-  const found = tx.all<Row>(sql`
-    select ${columns} from transactions t inner join accounts a on a.id = t.account_id
-    where t.account_id <> ${row.accountId} and t.amount = ${-row.amount}
-      and t.date >= ${from} and t.date <= ${to} and ${openRow}
-  `);
+  const found = openRows(
+    tx,
+    ne(transactions.accountId, row.accountId),
+    eq(transactions.amount, -row.amount),
+    gte(transactions.date, from),
+    lte(transactions.date, to),
+  );
   if (found.length === 0) {
     return found;
   }
@@ -114,20 +115,27 @@ function candidates(tx: WriteTx, row: Row): Row[] {
 }
 
 /** The payee is a confirmed transfer from this account to the other account. An automatic link has an auto reason, so it does not count. */
-function learnedTransfer(tx: WriteTx, payee: string, fromAccountId: string, toAccountId: string): boolean {
+function learnedTransfer(tx: WriteTx, payee: string, fromAccountId: string, toAccountId: string) {
   if (payee.length === 0) {
     return false;
   }
-  return (
-    tx.all<{ found: number }>(sql`
-      select 1 as found from transactions t
-      inner join transaction_lines l on l.transaction_id = t.id
-      where t.payee_normalized = ${payee} and t.mirror = 0 and t.auto_reason is null
-        and t.account_id = ${fromAccountId} and l.transfer_account_id = ${toAccountId}
-        and (select count(*) from transaction_lines x where x.transaction_id = t.id) = 1
-      limit 1
-    `).length > 0
-  );
+  const learned = tx
+    .select({ id: transactions.id })
+    .from(transactions)
+    .innerJoin(transactionLines, eq(transactionLines.transactionId, transactions.id))
+    .where(
+      and(
+        eq(transactions.payeeNormalized, payee),
+        eq(transactions.mirror, literal(0)),
+        isNull(transactions.autoReason),
+        eq(transactions.accountId, fromAccountId),
+        eq(transactionLines.transferAccountId, toAccountId),
+        eq(lineCount(transactions.id), literal(1)),
+      ),
+    )
+    .limit(1)
+    .get();
+  return learned !== undefined;
 }
 
 /**
@@ -136,7 +144,7 @@ function learnedTransfer(tx: WriteTx, payee: string, fromAccountId: string, toAc
  * A read never calls this. The 90-day limit of the pair list does not apply: a write has no `asOf`.
  */
 export function linkTransferIfSure(tx: WriteTx, transactionId: string): void {
-  const row = readRow(tx, transactionId);
+  const row = openRows(tx, eq(transactions.id, transactionId))[0];
   if (!row) {
     return;
   }
@@ -167,7 +175,7 @@ export function recordPairNo(tx: WriteTx, leftId: string, rightId: string, at: s
   if (tx.select().from(inboxDecisions).where(eq(inboxDecisions.itemKey, itemKey)).get()) {
     return;
   }
-  const row = { itemKey, decision: "not_transfer", reason: null, decidedAt: at };
+  const row = { itemKey, decision: "not_transfer" as const, reason: null, decidedAt: at };
   tx.insert(inboxDecisions).values(row).run();
   tx.audit({ entity: "inbox_decisions", entityId: itemKey, action: "create", before: null, after: row });
 }
@@ -179,22 +187,37 @@ export function recordPairNo(tx: WriteTx, leftId: string, rightId: string, at: s
  */
 export function linkLearnedTransfers(tx: WriteTx, confirmedIds: readonly string[], except: ReadonlySet<string>): void {
   for (const id of confirmedIds) {
-    const row = tx.all<{ payee: string; date: string }>(sql`
-      select t.payee_normalized as payee, t.date as date from transactions t
-      where t.id = ${id} and t.mirror = 0 and t.auto_reason is null
-        and (select count(*) from transaction_lines l where l.transaction_id = t.id) = 1
-        and exists (select 1 from transaction_lines l where l.transaction_id = t.id and l.transfer_account_id is not null)
-    `)[0];
+    const row = tx
+      .select({ payee: transactions.payeeNormalized, date: transactions.date })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.id, id),
+          eq(transactions.mirror, literal(0)),
+          isNull(transactions.autoReason),
+          eq(lineCount(transactions.id), literal(1)),
+          hasTransferLine(transactions.id),
+        ),
+      )
+      .get();
     if (!row || row.payee.length === 0) {
       continue;
     }
     const from = Temporal.PlainDate.from(row.date).subtract({ days: 90 }).toString();
     const to = Temporal.PlainDate.from(row.date).add({ days: 90 }).toString();
-    const others = tx.all<{ id: string }>(sql`
-      select t.id as id from transactions t
-      where t.payee_normalized = ${row.payee} and t.id <> ${id} and t.transfer_peer_id is null
-        and t.date >= ${from} and t.date <= ${to}
-    `);
+    const others = tx
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.payeeNormalized, row.payee),
+          ne(transactions.id, id),
+          isNull(transactions.transferPeerId),
+          gte(transactions.date, from),
+          lte(transactions.date, to),
+        ),
+      )
+      .all();
     for (const other of others.filter((item) => !except.has(item.id))) {
       linkTransferIfSure(tx, other.id);
     }

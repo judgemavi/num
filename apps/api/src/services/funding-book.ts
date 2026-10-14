@@ -1,45 +1,33 @@
-import { accounts, buckets, fundingRuns, occurrenceLinks, recurringPlans, transactions } from "@num/db";
+import { accounts, buckets, fundingRuns, occurrenceLinks, recurringPlans, transactions, type BucketRow, type OccurrenceLinkRow, type RecurringPlanRow } from "@num/db";
 import {
-  accountKinds,
   addDays,
   billReserveDays,
   Temporal,
   billsReserved,
-  bucketKinds,
-  businessDayShifts,
   fundingLimit,
   fundingProposal,
   isIsoDate,
   nextIncomeDate,
   divideHalfAway,
   occurrenceDates,
-  planFrequencies,
   positiveBalances,
   unassigned,
   variableAmounts,
-  type AccountKind,
-  type BucketKind,
-  type BusinessDayShift,
   type FundingIncome,
   type FundingPaycheck,
   type ReservedBill,
   type FundingPosition,
   type FundingProposal,
-  type PlanFrequency,
-  type PlanSchedule,
 } from "@num/shared";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { ServiceError } from "../service-error";
-import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
-import { bucketBalances, type Reader } from "./bucket-balance";
-
-type PlanRow = typeof recurringPlans.$inferSelect;
-type BucketRow = typeof buckets.$inferSelect;
-type LinkRow = typeof occurrenceLinks.$inferSelect;
+import { balancesOf } from "./account-balance";
+import { bucketBalances } from "./bucket-balance";
+import type { Reader } from "./write";
 
 type Book = {
-  plans: PlanRow[];
-  links: LinkRow[];
+  plans: RecurringPlanRow[];
+  links: OccurrenceLinkRow[];
   skipped: Set<string>;
   linked: Set<string>;
   buckets: BucketRow[];
@@ -47,44 +35,6 @@ type Book = {
   amounts: Map<string, number>;
   payees: Map<string, { date: string; payee: string; amount: number }>;
 };
-
-function accountKind(value: string): AccountKind {
-  if (!(accountKinds as readonly string[]).includes(value)) {
-    throw new Error("Unknown account kind");
-  }
-  return value as AccountKind;
-}
-
-function bucketKind(value: string): BucketKind {
-  if (!(bucketKinds as readonly string[]).includes(value)) {
-    throw new Error("Unknown bucket kind");
-  }
-  return value as BucketKind;
-}
-
-export function amountMode(value: string): FundingPaycheck["amountMode"] {
-  if (value !== "fixed" && value !== "variable") {
-    throw new Error("Unknown amount mode");
-  }
-  return value;
-}
-
-function scheduleOf(row: PlanRow): PlanSchedule {
-  if (!(planFrequencies as readonly string[]).includes(row.freq)) {
-    throw new Error("Unknown frequency");
-  }
-  if (!(businessDayShifts as readonly string[]).includes(row.businessDayShift)) {
-    throw new Error("Unknown shift");
-  }
-  return {
-    startDate: row.startDate,
-    endDate: row.endDate,
-    freq: row.freq as PlanFrequency,
-    interval: row.interval,
-    monthDay: row.monthDay,
-    businessDayShift: row.businessDayShift as BusinessDayShift,
-  };
-}
 
 function loadBook(db: Reader): Book {
   const plans = db.select().from(recurringPlans).all();
@@ -132,12 +82,12 @@ function loadBook(db: Reader): Book {
   };
 }
 
-function firstIncomeAfter(plans: PlanRow[], skipped: Set<string>, asOf: string): string | null {
+function firstIncomeAfter(plans: RecurringPlanRow[], skipped: Set<string>, asOf: string) {
   const start = addDays(asOf, 1);
   const horizon = Temporal.PlainDate.from(asOf).add({ years: 1 }).toString();
   const dates: string[] = [];
   for (const plan of plans) {
-    for (const date of occurrenceDates(scheduleOf(plan), horizon, start)) {
+    for (const date of occurrenceDates(plan, horizon, start)) {
       if (skipped.has(`${plan.id}|${date.dueDate}`)) {
         continue;
       }
@@ -148,7 +98,7 @@ function firstIncomeAfter(plans: PlanRow[], skipped: Set<string>, asOf: string):
   return nextIncomeDate(asOf, dates);
 }
 
-function billAmount(plan: PlanRow, book: Book, asOf: string): number {
+function billAmount(plan: RecurringPlanRow, book: Book, asOf: string) {
   if (plan.amountMode !== "variable") {
     return plan.expectedAmount;
   }
@@ -162,17 +112,17 @@ function billAmount(plan: PlanRow, book: Book, asOf: string): number {
   return variableAmounts(actuals, plan.expectedAmount).safe;
 }
 
-function incomePlans(rows: PlanRow[]): PlanRow[] {
+function incomePlans(rows: RecurringPlanRow[]): RecurringPlanRow[] {
   return rows.filter((row) => row.kind === "income" && row.fundsBuckets && row.active && row.archivedAt === null);
 }
 
-function hits(plans: PlanRow[], from: string, to: string, skipped: Set<string>): FundingIncome[] {
+function hits(plans: RecurringPlanRow[], from: string, to: string, skipped: Set<string>) {
   if (to < from) {
     return [];
   }
   const items: FundingIncome[] = [];
   for (const plan of plans) {
-    for (const date of occurrenceDates(scheduleOf(plan), to, from)) {
+    for (const date of occurrenceDates(plan, to, from)) {
       if (skipped.has(`${plan.id}|${date.dueDate}`)) {
         continue;
       }
@@ -182,20 +132,12 @@ function hits(plans: PlanRow[], from: string, to: string, skipped: Set<string>):
   return items;
 }
 
-function onBudgetTotal(db: Reader): number {
-  const totals = transactionTotals(db);
-  const latest = latestValuations(db);
-  let total = 0;
-  for (const row of db.select().from(accounts).all()) {
-    if (!row.onBudget) {
-      continue;
-    }
-    total += balanceOf(db, { id: row.id, kind: accountKind(row.kind), openingBalance: row.openingBalance }, totals, latest);
-  }
-  return total;
+function onBudgetTotal(db: Reader) {
+  const rows = db.select().from(accounts).where(eq(accounts.onBudget, true)).all();
+  return balancesOf(db, rows).reduce((total, item) => total + item.balance, 0);
 }
 
-function positionFrom(db: Reader, asOf: string, book: Book): FundingPosition {
+function positionFrom(db: Reader, asOf: string, book: Book) {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
@@ -209,7 +151,7 @@ function positionFrom(db: Reader, asOf: string, book: Book): FundingPosition {
         continue;
       }
       const amount = billAmount(plan, book, asOf);
-      for (const date of occurrenceDates(scheduleOf(plan), last, asOf)) {
+      for (const date of occurrenceDates(plan, last, asOf)) {
         bills.push({
           dueDate: date.dueDate,
           amount,
@@ -244,7 +186,7 @@ export function monthlyBills(db: Reader, asOf: string): number {
     if (plan.kind !== "bill" || !plan.active || plan.archivedAt !== null) {
       continue;
     }
-    const count = occurrenceDates(scheduleOf(plan), end, asOf).length;
+    const count = occurrenceDates(plan, end, asOf).length;
     total += Math.abs(billAmount(plan, book, asOf)) * count;
   }
   return divideHalfAway(total, 12);
@@ -269,7 +211,7 @@ export function requirePaycheck(db: Reader, incomeTransactionId: string): Fundin
     dueDate: link.dueDate,
     amount: txn.amount,
     payee: txn.payeeRaw,
-    amountMode: amountMode(plan.amountMode),
+    amountMode: plan.amountMode,
     planId: plan.id,
   };
 }
@@ -282,7 +224,7 @@ export function activeFundingRun(db: Reader, incomeTransactionId: string) {
     .get();
 }
 
-function proposalIncomes(book: Book, dueDate: string): FundingIncome[] {
+function proposalIncomes(book: Book, dueDate: string) {
   const month = Temporal.PlainDate.from(dueDate).with({ day: 1 });
   const start = month.toString();
   let end = month.add({ months: 1 }).subtract({ days: 1 }).toString();
@@ -311,7 +253,7 @@ function paycheckFromBook(book: Book, incomeTransactionId: string): FundingPaych
     dueDate: link.dueDate,
     amount: txn.amount,
     payee: txn.payee,
-    amountMode: amountMode(plan.amountMode),
+    amountMode: plan.amountMode,
     planId: plan.id,
   };
 }
@@ -331,7 +273,7 @@ export function fundingProposalFor(db: Reader, incomeTransactionId: string, asOf
     incomes: proposalIncomes(book, paycheck.dueDate),
     buckets: book.buckets.map((row) => ({
       id: row.id,
-      kind: bucketKind(row.kind),
+      kind: row.kind,
       priority: row.priority,
       balance: book.balances.get(row.id) ?? 0,
       archived: row.archivedAt !== null,

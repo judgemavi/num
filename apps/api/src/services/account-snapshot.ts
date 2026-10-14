@@ -1,43 +1,7 @@
-import { columnMapSchema, type ColumnMap } from "@num/shared";
+import type { AccountRow } from "@num/db";
+import { withoutId } from "./write";
 
-export function readColumnMap(value: string | null): ColumnMap | null {
-  if (!value) {
-    return null;
-  }
-  try {
-    const parsed = columnMapSchema.safeParse(JSON.parse(value));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
-}
-
-export function accountAuditSnapshot(row: {
-  name: string;
-  institution: string | null;
-  kind: string;
-  onBudget: boolean;
-  openingDate: string | null;
-  openingBalance: number;
-  archivedAt: string | null;
-  paymentPolicy: string | null;
-  fixedPayment: number | null;
-  interestRateMilliPct: number | null;
-  importPreset: string | null;
-  columnMap: string | null;
-}) {
-  return {
-    name: row.name,
-    institution: row.institution,
-    kind: row.kind,
-    onBudget: row.onBudget,
-    openingDate: row.openingDate,
-    openingBalance: row.openingBalance,
-    archivedAt: row.archivedAt,
-    paymentPolicy: row.paymentPolicy,
-    fixedPayment: row.fixedPayment,
-    interestRateMilliPct: row.interestRateMilliPct,
-    importPreset: row.importPreset,
-    columnMap: row.columnMap,
-  };
+/** The audit log keeps the column map as JSON text, the same text that the column stores. */
+export function accountAuditSnapshot(row: AccountRow) {
+  return { ...withoutId(row), columnMap: row.columnMap && JSON.stringify(row.columnMap) };
 }

@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
+import { queryNumber } from "./list";
 import { dayDistance } from "./recurring-calc";
 
 export const transferHintQuerySchema = z.object({
   accountId: z.uuid(),
   date: isoDateSchema,
-  amount: z.coerce.number().int(),
+  amount: queryNumber(),
 });
 
 export const transferHintSchema = z.object({

@@ -1,6 +1,5 @@
 import {
   asOfQuerySchema,
-  errorSchema,
   inboxDecisionCreateSchema,
   inboxDecisionListSchema,
   inboxDecisionSchema,
@@ -15,11 +14,7 @@ import type { Db } from "../db";
 import { decideInboxItem, decisionRows, undoInboxDecision } from "../services/inbox-decisions";
 import { applyInboxGroup, countOtherUncategorized } from "../services/inbox-group";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: { "application/json": { schema: errorSchema } },
-} as const;
+import { errorResponse } from "./common";
 
 const decisionsRoute = createRoute({
   operationId: "get_review_decisions",
@@ -88,7 +83,7 @@ const payeeCountRoute = createRoute({
   },
 });
 
-function exceptIds(except: string | undefined): string[] {
+function exceptIds(except: string | undefined) {
   if (!except) {
     return [];
   }

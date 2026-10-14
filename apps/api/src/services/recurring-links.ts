@@ -1,60 +1,20 @@
-import { occurrenceLinks, recurringPlans, transactions } from "@num/db";
-import { occurrenceDates, utcNow, type OccurrenceLink, type PlanSchedule } from "@num/shared";
+import { occurrenceLinks, recurringPlans, transactions, type OccurrenceLinkRow, type RecurringPlanRow } from "@num/db";
+import { occurrenceDates, utcNow, type OccurrenceLink } from "@num/shared";
 import { and, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { applyLinkedPlan } from "./match-apply";
-import { write, type AuditSource, type WriteTx } from "./write";
+import { withoutId, write, type WriteTx, type WriteInput } from "./write";
 
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-type PlanRow = typeof recurringPlans.$inferSelect;
-type LinkRow = typeof occurrenceLinks.$inferSelect;
-
-function scheduleOf(row: PlanRow): PlanSchedule {
-  return {
-    startDate: row.startDate,
-    endDate: row.endDate,
-    freq: row.freq as PlanSchedule["freq"],
-    interval: row.interval,
-    monthDay: row.monthDay,
-    businessDayShift: row.businessDayShift as PlanSchedule["businessDayShift"],
-  };
-}
-
-function requireDueDate(row: PlanRow, dueDate: string) {
-  const found = occurrenceDates(scheduleOf(row), dueDate).find((item) => item.dueDate === dueDate);
+function requireDueDate(row: RecurringPlanRow, dueDate: string) {
+  const found = occurrenceDates(row, dueDate).find((item) => item.dueDate === dueDate);
   if (!found) {
     throw new ServiceError("occurrence_not_found", 404);
   }
   return found;
 }
 
-function toLink(row: LinkRow): OccurrenceLink {
-  return {
-    id: row.id,
-    planId: row.planId,
-    dueDate: row.dueDate,
-    transactionId: row.transactionId,
-    skipped: row.skipped,
-    reason: row.reason,
-  };
-}
-
-function linkSnapshot(row: LinkRow) {
-  return {
-    planId: row.planId,
-    dueDate: row.dueDate,
-    transactionId: row.transactionId,
-    skipped: row.skipped,
-    reason: row.reason,
-  };
-}
-
-function requireWritablePlan(tx: WriteTx, id: string): PlanRow {
+function requireWritablePlan(tx: WriteTx, id: string): RecurringPlanRow {
   const row = tx.select().from(recurringPlans).where(eq(recurringPlans.id, id)).get();
   if (!row) {
     throw new ServiceError("plan_not_found", 404);
@@ -65,7 +25,7 @@ function requireWritablePlan(tx: WriteTx, id: string): PlanRow {
   return row;
 }
 
-function existingLink(tx: WriteTx, planId: string, dueDate: string): LinkRow | undefined {
+function existingLink(tx: WriteTx, planId: string, dueDate: string): OccurrenceLinkRow | undefined {
   return tx
     .select()
     .from(occurrenceLinks)
@@ -80,8 +40,7 @@ export function linkOccurrence(
   transactionId: string,
   input: WriteInput,
 ): OccurrenceLink {
-  let linked: OccurrenceLink | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const plan = requireWritablePlan(tx, planId);
     requireDueDate(plan, dueDate);
     if (existingLink(tx, planId, dueDate)) {
@@ -98,7 +57,7 @@ export function linkOccurrence(
     if (used) {
       throw new ServiceError("transaction_already_linked", 409);
     }
-    const row: LinkRow = {
+    const row: OccurrenceLinkRow = {
       id: crypto.randomUUID(),
       planId,
       dueDate,
@@ -112,21 +71,16 @@ export function linkOccurrence(
       entityId: row.id,
       action: "link",
       before: null,
-      after: linkSnapshot(row),
+      after: withoutId(row),
     });
     applyLinkedPlan(tx, plan, transactionId, true);
     tx.update(transactions).set({ editedAt: input.at ?? utcNow() }).where(eq(transactions.id, transactionId)).run();
-    linked = toLink(row);
+    return row;
   });
-  if (!linked) {
-    throw new Error("Link did not return an occurrence");
-  }
-  return linked;
 }
 
 export function unlinkOccurrence(db: Db, planId: string, dueDate: string, input: WriteInput): OccurrenceLink {
-  let removed: OccurrenceLink | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     requireWritablePlan(tx, planId);
     const link = existingLink(tx, planId, dueDate);
     if (!link?.transactionId) {
@@ -137,15 +91,11 @@ export function unlinkOccurrence(db: Db, planId: string, dueDate: string, input:
       entity: "occurrence_links",
       entityId: link.id,
       action: "unlink",
-      before: linkSnapshot(link),
+      before: withoutId(link),
       after: null,
     });
-    removed = toLink(link);
+    return link;
   });
-  if (!removed) {
-    throw new Error("Unlink did not return an occurrence");
-  }
-  return removed;
 }
 
 export function skipOccurrence(
@@ -159,14 +109,13 @@ export function skipOccurrence(
   if (trimmed.length === 0) {
     throw new ServiceError("plan_fields_invalid", 400, { field: "reason" });
   }
-  let skipped: OccurrenceLink | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const plan = requireWritablePlan(tx, planId);
     requireDueDate(plan, dueDate);
     if (existingLink(tx, planId, dueDate)) {
       throw new ServiceError("occurrence_taken", 409);
     }
-    const row: LinkRow = {
+    const row: OccurrenceLinkRow = {
       id: crypto.randomUUID(),
       planId,
       dueDate,
@@ -180,19 +129,14 @@ export function skipOccurrence(
       entityId: row.id,
       action: "skip",
       before: null,
-      after: linkSnapshot(row),
+      after: withoutId(row),
     });
-    skipped = toLink(row);
+    return row;
   });
-  if (!skipped) {
-    throw new Error("Skip did not return an occurrence");
-  }
-  return skipped;
 }
 
 export function restoreSkip(db: Db, planId: string, dueDate: string, input: WriteInput): OccurrenceLink {
-  let restored: OccurrenceLink | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     requireWritablePlan(tx, planId);
     const link = existingLink(tx, planId, dueDate);
     if (!link?.skipped) {
@@ -203,13 +147,9 @@ export function restoreSkip(db: Db, planId: string, dueDate: string, input: Writ
       entity: "occurrence_links",
       entityId: link.id,
       action: "restore",
-      before: linkSnapshot(link),
+      before: withoutId(link),
       after: null,
     });
-    restored = toLink(link);
+    return link;
   });
-  if (!restored) {
-    throw new Error("Restore did not return an occurrence");
-  }
-  return restored;
 }

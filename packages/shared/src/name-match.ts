@@ -3,7 +3,7 @@ export type NamedId = {
   name: string;
 };
 
-function sameName(left: string, right: string): boolean {
+function sameName(left: string, right: string) {
   return left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
 }
 

@@ -1,9 +1,6 @@
 import { bucketCategories, bucketEvents, buckets, fundingRuns, transactionLines, transactions } from "@num/db";
 import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
-import type { Db } from "../db";
-import type { WriteTx } from "./write";
-
-export type Reader = Db | WriteTx;
+import type { Reader } from "./write";
 
 function add(balances: Map<string, number>, id: string, amount: number) {
   balances.set(id, (balances.get(id) ?? 0) + amount);

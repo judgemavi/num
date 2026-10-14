@@ -30,7 +30,7 @@ export type InsightChangesInput = {
   merchants: readonly MerchantFirstMonth[];
 };
 
-function divRoundHalfAway(numerator: bigint, denominator: bigint): number {
+function divRoundHalfAway(numerator: bigint, denominator: bigint) {
   const negative = numerator < 0n !== denominator < 0n;
   const left = numerator < 0n ? -numerator : numerator;
   const right = denominator < 0n ? -denominator : denominator;
@@ -50,7 +50,7 @@ export function savingsRateMilliPct(income: number, spending: number): number | 
   return divRoundHalfAway(BigInt(income - spending) * 100_000n, BigInt(income));
 }
 
-function expenseByMonth(lines: readonly FlowLine[]): Map<string, Map<string, number>> {
+function expenseByMonth(lines: readonly FlowLine[]) {
   const months = new Map<string, Map<string, number>>();
   for (const line of lines) {
     if (!isExpenseLine(line) || line.categoryId === null) {

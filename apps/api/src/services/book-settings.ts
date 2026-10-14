@@ -2,7 +2,6 @@ import { accounts, importBatches, settings } from "@num/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { decidedKeys } from "./decision-keys";
-import { readUnreadable } from "./import-read";
 
 export function settingNumber(
   db: Db,
@@ -49,6 +48,6 @@ export function openUnreadableKeys(db: Db): string[] {
     .all();
   const decided = decidedKeys(db, "import_unreadable");
   return batches
-    .flatMap((batch) => readUnreadable(batch.unreadableJson).map((row) => `import_unreadable:${batch.id}:${row.line}`))
+    .flatMap((batch) => batch.unreadableJson.map((row) => `import_unreadable:${batch.id}:${row.line}`))
     .filter((key) => !decided.has(key));
 }

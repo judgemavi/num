@@ -1,4 +1,4 @@
-import type { Account, AccountCreate, AccountListQuery, AccountUpdate, OpeningSuggestion } from "@num/shared";
+import type { AccountCreate, AccountListQuery, AccountUpdate, OpeningSuggestion } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { activeAndArchived, allPages, fullPage, type ListFilters } from "@/api/pages";
@@ -51,19 +51,7 @@ export function useArchiveAccount() {
 /** Set the opening date and the opening balance of an account from a suggestion. The other fields stay the same. */
 export function useSetOpeningBalance() {
   return useMutation({
-    mutationFn: ({ account, suggestion }: { account: Account; suggestion: OpeningSuggestion }) => {
-      const body: AccountUpdate = {
-        name: account.name,
-        institution: account.institution,
-        kind: account.kind,
-        onBudget: account.onBudget,
-        openingDate: suggestion.date,
-        openingBalance: suggestion.amount,
-        paymentPolicy: account.paymentPolicy,
-        fixedPayment: account.fixedPayment,
-        interestRateMilliPct: account.interestRateMilliPct,
-      };
-      return unwrap(api.accounts[":id"].$patch({ param: { id: account.id }, json: body }));
-    },
+    mutationFn: ({ accountId, suggestion }: { accountId: string; suggestion: OpeningSuggestion }) =>
+      unwrap(api.accounts[":id"].opening.$post({ param: { id: accountId }, json: suggestion })),
   });
 }

@@ -1,5 +1,6 @@
 import { buildInsightChanges, monthLastDay, priorMonths, type InsightChanges } from "@num/shared";
-import { sql } from "drizzle-orm";
+import { transactions } from "@num/db";
+import { isNotNull, min } from "drizzle-orm";
 import type { Db } from "../db";
 import type { LedgerLine } from "./ledger-lines";
 import type { Period } from "./insights-period";
@@ -14,17 +15,19 @@ export function readInsightChanges(db: Db, facts: readonly LedgerLine[], month: 
   const end = monthLastDay(month);
   const through = asOf < end ? asOf : end;
   const from = `${priorMonths(month)[0]}-01`;
-  const merchants = db.all<{ merchantId: string; firstDate: string }>(sql`
-    select merchant_id as merchantId, min(date) as firstDate
-    from transactions
-    where merchant_id is not null
-    group by merchant_id
-  `);
+  const merchants = db
+    .select({ merchantId: transactions.merchantId, firstDate: min(transactions.date) })
+    .from(transactions)
+    .where(isNotNull(transactions.merchantId))
+    .groupBy(transactions.merchantId)
+    .all();
   return buildInsightChanges({
     month,
     lines: facts.filter((fact) => fact.date >= from && fact.date <= through),
-    merchants: merchants.flatMap((row) =>
-      row.firstDate <= through ? [{ merchantId: row.merchantId, firstMonth: row.firstDate.slice(0, 7) }] : [],
+    merchants: merchants.flatMap(({ merchantId, firstDate }) =>
+      merchantId !== null && firstDate !== null && firstDate <= through
+        ? [{ merchantId, firstMonth: firstDate.slice(0, 7) }]
+        : [],
     ),
   });
 }

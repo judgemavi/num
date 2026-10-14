@@ -1,6 +1,5 @@
 import {
   columnMapSchema,
-  errorSchema,
   importDetailSchema,
   importListSchema,
   importPresetListSchema,
@@ -11,7 +10,6 @@ import {
   importReviewResultSchema,
   importUndoSchema,
   isoDateSchema,
-  type ColumnMap,
 } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
@@ -22,21 +20,9 @@ import { getImportDetail, listImportView } from "../services/import-list";
 import { importStatement, listImportBatches, listImportPresets } from "../services/imports";
 import { undoImportBatch } from "../services/import-undo";
 import { validationHook } from "../validation";
+import { errorResponse, idParams } from "./common";
 
 const maxUploadBytes = 20 * 1024 * 1024;
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: {
-    "application/json": {
-      schema: errorSchema,
-    },
-  },
-} as const;
-
-const idParams = z.object({
-  id: z.uuid(),
-});
 
 const presetsRoute = createRoute({
   operationId: "get_import_presets",
@@ -163,12 +149,12 @@ const undoRoute = createRoute({
   },
 });
 
-function blankToNull(value: string | undefined): string | null {
+function blankToNull(value: string | undefined) {
   const text = value?.trim() ?? "";
   return text.length > 0 ? text : null;
 }
 
-function readColumnMap(value: string | undefined): ColumnMap | null {
+function readColumnMap(value: string | undefined) {
   const text = value?.trim() ?? "";
   if (text.length === 0) {
     return null;

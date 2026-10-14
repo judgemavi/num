@@ -1,6 +1,7 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import { autoReasons, type AutoReason, type MatchResult } from "./matching";
+import { queryNumber } from "./list";
 import { dayDistance } from "./recurring-calc";
 import { reviewLevel, reviewLevels } from "./review-level";
 
@@ -23,7 +24,7 @@ export const suggestionSchema = z.object({
 export const suggestionQuerySchema = z.object({
   accountId: z.uuid(),
   payee: z.string().trim().min(1),
-  amount: z.coerce.number().int(),
+  amount: queryNumber(),
   date: z.iso.date().optional(),
 });
 
@@ -79,7 +80,7 @@ export type TransferCandidate = {
   imported: boolean;
 };
 
-function pairAmount(group: TransferCandidate[]): TransferPair[] {
+function pairAmount(group: TransferCandidate[]) {
   const outgoing = group.filter((row) => row.amount < 0);
   const incoming = group.filter((row) => row.amount > 0);
   const used = new Set<string>();

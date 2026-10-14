@@ -4,7 +4,7 @@ import { isUtcTimestamp, utcNow } from "@num/shared";
 import type { Db } from "../db";
 import { dropSettledKeeps } from "./decision-keep";
 
-function jsonText(value: unknown): string | null {
+function jsonText(value: unknown) {
   if (value === undefined) {
     throw new Error("Audit value must be JSON or null");
   }
@@ -34,6 +34,23 @@ export type WriteTx = SqliteTx & {
   audit(entry: AuditEntry): void;
 };
 
+export type WriteInput = {
+  source: AuditSource;
+  at?: string;
+};
+
+export type Reader = Db | WriteTx;
+
+/** The audit log keeps a row without its id. The id is in `entityId`. */
+export function withoutId<T extends { id: string }>({ id, ...rest }: T) {
+  return rest;
+}
+
+/** A field that an update leaves out keeps its stored value. An explicit null clears it. */
+export function keepOmitted<T>(next: T | undefined, stored: T) {
+  return next === undefined ? stored : next;
+}
+
 const auditSourceOverride = new AsyncLocalStorage<AuditSource>();
 
 export function currentAuditSource(): AuditSource | undefined {
@@ -44,7 +61,7 @@ export function withMcpAudit<T>(run: () => T | Promise<T>): Promise<T> {
   return Promise.resolve(auditSourceOverride.run("mcp", run));
 }
 
-export function write<T>(db: Db, options: { source: AuditSource; at?: string }, run: (tx: WriteTx) => T): T {
+export function write<T>(db: Db, options: WriteInput, run: (tx: WriteTx) => T): T {
   const at = options.at ?? utcNow();
   if (!isUtcTimestamp(at)) {
     throw new Error("Audit time must be a UTC timestamp");

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
-import { listQuerySchema, pagedResponseSchema } from "./list";
+import { listQuerySchema, optionalQuery, pagedResponseSchema, queryDate, queryId } from "./list";
 import { isUtcTimestamp } from "./time";
 import { openingSuggestionSchema } from "./opening";
 import { presetSchema, unreadableRowSchema } from "./statement";
@@ -114,23 +114,13 @@ export const importUndoSchema = z.object({
 export type ImportUndo = z.infer<typeof importUndoSchema>;
 export type UndoBlockReason = (typeof undoBlockReasons)[number];
 
-function blankQuery(value: unknown): unknown {
-  if (typeof value === "string" && value.trim() === "") {
-    return undefined;
-  }
-  return value;
-}
-
-const optionalQueryId = z.preprocess(blankQuery, z.uuid().optional());
-const optionalQueryDate = z.preprocess(blankQuery, isoDateSchema.optional());
-
 export const importViewSortColumns = ["date"] as const;
 
 export const importViewQuerySchema = listQuerySchema(importViewSortColumns).extend({
-  accountId: optionalQueryId,
-  status: z.preprocess(blankQuery, z.enum(importViewStatuses).optional()),
-  from: optionalQueryDate,
-  to: optionalQueryDate,
+  accountId: queryId,
+  status: optionalQuery(z.enum(importViewStatuses)),
+  from: queryDate,
+  to: queryDate,
 });
 
 export type ImportViewQuery = z.output<typeof importViewQuerySchema>;

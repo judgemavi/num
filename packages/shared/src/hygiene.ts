@@ -5,7 +5,7 @@ import { centsSchema as cents } from "./money";
 
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
-export const reviewAgeDays = 7;
+export const reviewAgeDays = 7 as const;
 
 const emergencyFundCheckSchema = z.object({
   code: z.literal("emergency_fund"),

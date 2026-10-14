@@ -12,15 +12,15 @@ export type HelpTransaction = {
   payee: string;
 };
 
-function inWindow(row: HelpTransaction, openingDate: string, statementDate: string): boolean {
+function inWindow(row: HelpTransaction, openingDate: string, statementDate: string) {
   return row.date >= openingDate && row.date <= statementDate;
 }
 
-function addDays(iso: string, days: number): string {
+function addDays(iso: string, days: number) {
   return Temporal.PlainDate.from(iso).add({ days }).toString();
 }
 
-function spanDays(from: string, to: string): number {
+function spanDays(from: string, to: string) {
   return dayDistance(from, to) + 1;
 }
 
@@ -40,7 +40,7 @@ function byDateThenId(left: HelpTransaction, right: HelpTransaction): number {
   return 0;
 }
 
-function gaps(openingDate: string, statementDate: string, dates: string[]): CheckpointHelp[] {
+function gaps(openingDate: string, statementDate: string, dates: string[]) {
   if (statementDate < openingDate) {
     return [];
   }

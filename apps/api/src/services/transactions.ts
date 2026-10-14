@@ -1,5 +1,5 @@
-import { transactions } from "@num/db";
-import { autoReasons, utcNow, type AutoReason, type Transaction } from "@num/shared";
+import { transactions, type TransactionRow } from "@num/db";
+import { utcNow, type Transaction } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -11,9 +11,9 @@ import {
   readTransaction,
   recordSource,
   toTransaction,
+  type AutoStamp,
   type Header,
   type TransactionBody,
-  type TxRow,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
 import { linkAutomatic } from "./auto-link";
@@ -27,29 +27,15 @@ import { removeTransaction } from "./transaction-erase";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
 import { isUncategorized, recordKeep } from "./decision-keep";
 import { clearUnreadableLine } from "./unreadable-line";
-import { write, type AuditSource, type WriteTx } from "./write";
-
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-export type AutoStamp = { autoReason: AutoReason | null; autoSourceId: string | null; autoConfidence: number | null };
+import { keepOmitted, write, type AuditSource, type WriteTx, type WriteInput, type Reader } from "./write";
 
 const clearedAuto: AutoStamp = { autoReason: null, autoSourceId: null, autoConfidence: null };
 
-function keptAuto(row: TxRow): AutoStamp {
-  if (row.autoReason && (autoReasons as readonly string[]).includes(row.autoReason)) {
-    return {
-      autoReason: row.autoReason as AutoReason,
-      autoSourceId: row.autoSourceId,
-      autoConfidence: row.autoConfidence,
-    };
-  }
-  return clearedAuto;
+function keptAuto({ autoReason, autoSourceId, autoConfidence }: TransactionRow): AutoStamp {
+  return { autoReason, autoSourceId, autoConfidence };
 }
 
-function labelChanged(existing: TxRow, existingLines: StoredLine[], header: Header, lines: NormalizedLine[]): boolean {
+function labelChanged(existing: TransactionRow, existingLines: StoredLine[], header: Header, lines: NormalizedLine[]) {
   if ((existing.merchantId ?? null) !== (header.merchantId ?? null) || (existing.refundOfId ?? null) !== (header.refundOfId ?? null)) {
     return true;
   }
@@ -58,11 +44,11 @@ function labelChanged(existing: TxRow, existingLines: StoredLine[], header: Head
   return before.length !== after.length || before.some((value, index) => value !== after[index]);
 }
 
-function isTransferOrSplit(lines: NormalizedLine[]): boolean {
+function isTransferOrSplit(lines: NormalizedLine[]) {
   return lines.length !== 1 || lines.some((line) => line.transferAccountId !== null);
 }
 
-function isUserConfirmation(txn: Transaction): boolean {
+function isUserConfirmation(txn: Transaction) {
   if (txn.mirror || txn.lines.length !== 1) {
     return false;
   }
@@ -70,7 +56,7 @@ function isUserConfirmation(txn: Transaction): boolean {
   return line !== undefined && line.categoryId !== null && line.transferAccountId === null;
 }
 
-function requireActive(db: Db | WriteTx, id: string): TxRow {
+function requireActive(db: Reader, id: string): TransactionRow {
   const row = db.select().from(transactions).where(eq(transactions.id, id)).get();
   if (!row) {
     throw new ServiceError("transaction_not_found", 404);
@@ -78,7 +64,7 @@ function requireActive(db: Db | WriteTx, id: string): TxRow {
   return row;
 }
 
-function assertDeletable(db: Db | WriteTx, row: TxRow, peer: TxRow | null): void {
+function assertDeletable(db: Reader, row: TransactionRow, peer: TransactionRow | null): void {
   if (transactionReconciled(db, row.accountId, row.date) || (peer !== null && transactionReconciled(db, peer.accountId, peer.date))) {
     throw new ServiceError("transaction_reconciled", 409);
   }
@@ -92,7 +78,7 @@ export function getTransaction(db: Db, id: string): Transaction | null {
   return toTransaction(db, row, loadLines(db, id));
 }
 
-function headerFor(input: TransactionBody, lines: ReturnType<typeof normalizeLine>[]): Header {
+function headerFor(input: TransactionBody, lines: ReturnType<typeof normalizeLine>[]) {
   const header = headerFrom(input);
   if (lines.some((line) => line.transferAccountId !== null)) {
     return { ...header, merchantId: null };
@@ -138,20 +124,17 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
 
 export function createTransaction(db: Db, input: TransactionBody & WriteInput): Transaction {
   const at = input.at ?? utcNow();
-  let created: Transaction | undefined;
-  write(db, { source: input.source, at }, (tx) => {
-    created = insertTransaction(tx, input, input.source);
+  return write(db, { source: input.source, at }, (tx) => {
+    const created = insertTransaction(tx, input, input.source);
     linkLearnedTransfers(tx, [created.id], new Set([created.id]));
     if (input.unreadableItemKey) {
       clearUnreadableLine(tx, input.unreadableItemKey);
     }
+    return created;
   });
-  if (!created) {
-    throw new Error("Create did not return a transaction");
-  }
-  return created;
 }
 
+/** A merchant or a note that the update leaves out keeps its stored value. An explicit null clears it. */
 export function applyTransactionUpdate(
   tx: WriteTx,
   id: string,
@@ -160,8 +143,15 @@ export function applyTransactionUpdate(
   spread = true,
 ): Transaction {
   const lines = input.lines.map(normalizeLine);
-  const header = headerFor(input, lines);
   const existing = requireActive(tx, id);
+  const header = headerFor(
+    {
+      ...input,
+      merchantId: keepOmitted(input.merchantId, existing.merchantId),
+      notes: keepOmitted(input.notes, existing.notes),
+    },
+    lines,
+  );
   const existingLines = loadLines(tx, id);
   const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
   const peerLines = peer ? loadLines(tx, peer.id) : [];
@@ -194,7 +184,7 @@ export function applyTransactionUpdate(
 }
 
 /** "Looks right" on one row of an automatic pair confirms the other row too. */
-export function confirmLinkedPeer(tx: WriteTx, row: TxRow, at: string): string | null {
+export function confirmLinkedPeer(tx: WriteTx, row: TransactionRow, at: string): string | null {
   if (row.autoReason !== "transfer_match" || !row.transferPeerId) {
     return null;
   }
@@ -210,8 +200,7 @@ export function confirmLinkedPeer(tx: WriteTx, row: TxRow, at: string): string |
 
 export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transaction {
   const at = input.at ?? utcNow();
-  let accepted: Transaction | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const existing = requireActive(tx, id);
     if (existing.autoReason === null) {
       throw new ServiceError("invalid_body", 400);
@@ -226,12 +215,8 @@ export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transac
     }
     linkAutomatic(tx, id);
     linkLearnedTransfers(tx, [id], new Set([id, ...(existing.transferPeerId ? [existing.transferPeerId] : [])]));
-    accepted = readTransaction(tx, id);
+    return readTransaction(tx, id);
   });
-  if (!accepted) {
-    throw new Error("Confirm did not return a transaction");
-  }
-  return accepted;
 }
 
 /**
@@ -263,35 +248,26 @@ export function updateTransaction(
   input: TransactionBody & WriteInput & { keepUncategorized?: boolean },
 ): Transaction {
   const at = input.at ?? utcNow();
-  let updated: Transaction | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const before = readTransaction(tx, id);
     const wasTransfer = before.lines.some((line) => line.transferAccountId !== null);
-    updated = applyTransactionUpdate(tx, id, input, at);
+    const updated = applyTransactionUpdate(tx, id, input, at);
     if (!wasTransfer || (before.autoReason !== null && updated.autoReason === null)) {
       linkLearnedTransfers(tx, [id], new Set([id]));
     }
     if (input.keepUncategorized && isUncategorized(tx, id)) {
       recordKeep(tx, id, at);
     }
+    return updated;
   });
-  if (!updated) {
-    throw new Error("Update did not return a transaction");
-  }
-  return updated;
 }
 
 export function deleteTransaction(db: Db, id: string, input: WriteInput): Transaction {
   const at = input.at ?? utcNow();
-  let deleted: Transaction | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const existing = requireActive(tx, id);
     const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
     assertDeletable(tx, existing, peer);
-    deleted = removeTransaction(tx, id, at);
+    return removeTransaction(tx, id, at);
   });
-  if (!deleted) {
-    throw new Error("Delete did not return a transaction");
-  }
-  return deleted;
 }

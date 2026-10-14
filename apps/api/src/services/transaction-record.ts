@@ -1,28 +1,19 @@
-import { recurringPlans, transactions } from "@num/db";
+import { recurringPlans, transactionLines, transactions, type TransactionRow } from "@num/db";
 import {
-  autoReasons,
   refundOfIdAfterEdit,
   storedPayee,
   transactionInputStatuses,
-  transactionSources,
-  transactionStatuses,
-  type AutoReason,
   type Transaction,
   type TransactionCreate,
   type TransactionInputStatus,
   type TransactionSource,
-  type TransactionStatus,
 } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
-import type { Db } from "../db";
+import { and, count, eq, isNotNull, isNull } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import { loadLines, type StoredLine } from "./transaction-lines";
 import { transactionReconciled } from "./reconciled";
 import { blankToNull, requireText } from "./transaction-rules";
-import type { WriteTx } from "./write";
-
-export type TxRow = typeof transactions.$inferSelect;
-export type Reader = Db | WriteTx;
+import type { WriteTx, Reader } from "./write";
 
 export type Header = {
   accountId: string;
@@ -36,30 +27,12 @@ export type Header = {
   refundOfId?: string | null;
 };
 
+/** The automatic label of a transaction. */
+export type AutoStamp = Pick<TransactionRow, "autoReason" | "autoSourceId" | "autoConfidence">;
+
 export type TransactionBody = Omit<TransactionCreate, "status"> & { status: string };
 
-function asStatus(value: string): TransactionStatus {
-  if (!(transactionStatuses as readonly string[]).includes(value)) {
-    throw new Error("Unknown transaction status");
-  }
-  return value as TransactionStatus;
-}
-
-function asSource(value: string): TransactionSource {
-  if (!(transactionSources as readonly string[]).includes(value)) {
-    throw new Error("Unknown transaction source");
-  }
-  return value as TransactionSource;
-}
-
-function asAutoReason(value: string | null): AutoReason | null {
-  if (value && (autoReasons as readonly string[]).includes(value)) {
-    return value as AutoReason;
-  }
-  return null;
-}
-
-function labelFacts(db: Reader, row: TxRow): { autoSourceName: string | null; autoLearnedCount: number | null } {
+function labelFacts(db: Reader, row: TransactionRow): { autoSourceName: string | null; autoLearnedCount: number | null } {
   if (!row.autoReason) {
     return { autoSourceName: null, autoLearnedCount: null };
   }
@@ -69,16 +42,20 @@ function labelFacts(db: Reader, row: TxRow): { autoSourceName: string | null; au
   } else if (row.autoSourceId) {
     autoSourceName = db.select({ payee: transactions.payeeNormalized }).from(transactions).where(eq(transactions.id, row.autoSourceId)).get()?.payee ?? null;
   }
-  const counted = db.all<{ total: number }>(sql`
-    select count(*) as total
-    from transactions t
-    inner join transaction_lines l on l.transaction_id = t.id
-    where t.auto_reason is null
-      and t.payee_normalized = ${row.payeeNormalized}
-      and l.category_id is not null
-      and l.transfer_account_id is null
-  `);
-  return { autoSourceName, autoLearnedCount: Number(counted[0]?.total ?? 0) };
+  const counted = db
+    .select({ total: count() })
+    .from(transactions)
+    .innerJoin(transactionLines, eq(transactionLines.transactionId, transactions.id))
+    .where(
+      and(
+        isNull(transactions.autoReason),
+        eq(transactions.payeeNormalized, row.payeeNormalized),
+        isNotNull(transactionLines.categoryId),
+        isNull(transactionLines.transferAccountId),
+      ),
+    )
+    .get();
+  return { autoSourceName, autoLearnedCount: counted?.total ?? 0 };
 }
 
 export function recordSource(source: "ui" | TransactionSource): TransactionSource {
@@ -88,11 +65,12 @@ export function recordSource(source: "ui" | TransactionSource): TransactionSourc
   return source;
 }
 
-function inputStatus(status: string): TransactionInputStatus {
-  if ((transactionInputStatuses as readonly string[]).includes(status)) {
-    return status as TransactionInputStatus;
+function inputStatus(status: string) {
+  const known = transactionInputStatuses.find((item) => item === status);
+  if (!known) {
+    throw new ServiceError("transaction_status_invalid", 400);
   }
-  throw new ServiceError("transaction_status_invalid", 400);
+  return known;
 }
 
 export function headerFrom(input: TransactionBody): Header {
@@ -115,7 +93,7 @@ export function headerForWrite(existingRefundOfId: string | null, header: Header
   };
 }
 
-function refundFacts(db: Reader, row: TxRow): {
+function refundFacts(db: Reader, row: TransactionRow): {
   refundOf: { id: string; date: string; amount: number; payeeRaw: string } | null;
   refundedAmount: number | null;
 } {
@@ -150,7 +128,7 @@ function refundFacts(db: Reader, row: TxRow): {
   return { refundOf, refundedAmount: total };
 }
 
-export function toTransaction(db: Reader, row: TxRow, lines: StoredLine[]): Transaction {
+export function toTransaction(db: Reader, row: TransactionRow, lines: StoredLine[]): Transaction {
   return {
     id: row.id,
     accountId: row.accountId,
@@ -160,13 +138,13 @@ export function toTransaction(db: Reader, row: TxRow, lines: StoredLine[]): Tran
     notes: row.notes,
     payeeRaw: row.payeeRaw,
     payeeNormalized: row.payeeNormalized,
-    status: asStatus(row.status),
+    status: row.status,
     reconciled: transactionReconciled(db, row.accountId, row.date),
-    source: asSource(row.source),
+    source: row.source,
     importRowId: row.importRowId,
     transferPeerId: row.transferPeerId,
     mirror: row.mirror,
-    autoReason: asAutoReason(row.autoReason),
+    autoReason: row.autoReason,
     autoSourceId: row.autoSourceId,
     autoConfidence: row.autoConfidence,
     ...labelFacts(db, row),
@@ -176,34 +154,9 @@ export function toTransaction(db: Reader, row: TxRow, lines: StoredLine[]): Tran
   };
 }
 
-function snapshot(record: Transaction) {
-  return {
-    accountId: record.accountId,
-    date: record.date,
-    amount: record.amount,
-    merchantId: record.merchantId,
-    notes: record.notes,
-    payeeRaw: record.payeeRaw,
-    payeeNormalized: record.payeeNormalized,
-    status: record.status,
-    reconciled: record.reconciled,
-    source: record.source,
-    importRowId: record.importRowId,
-    transferPeerId: record.transferPeerId,
-    mirror: record.mirror,
-    autoReason: record.autoReason,
-    autoSourceId: record.autoSourceId,
-    autoConfidence: record.autoConfidence,
-    refundOfId: record.refundOfId,
-    lines: record.lines.map((line) => ({
-      id: line.id,
-      amount: line.amount,
-      memo: line.memo,
-      categoryId: line.categoryId,
-      transferAccountId: line.transferAccountId,
-      tagIds: line.tagIds,
-    })),
-  };
+/** The audit log keeps the stored fields. It leaves out the id and the fields that the read adds. */
+function snapshot({ id, autoSourceName, autoLearnedCount, refundOf, refundedAmount, ...stored }: Transaction) {
+  return stored;
 }
 
 export function readTransaction(db: Reader, id: string): Transaction {
@@ -232,6 +185,6 @@ export function auditTransaction(
 }
 
 /** A peer that only the app linked (no edit by the person) stays unedited when the link goes away, so its import can be undone. */
-export function automaticPair(peer: TxRow): boolean {
+export function automaticPair(peer: TransactionRow): boolean {
   return peer.autoReason === "transfer_match" && peer.editedAt === null;
 }

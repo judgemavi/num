@@ -62,6 +62,7 @@
       "name": "@num/db",
       "version": "0.0.1",
       "dependencies": {
+        "@num/shared": "workspace:*",
         "drizzle-orm": "^0.45.3",
       },
       "devDependencies": {

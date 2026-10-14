@@ -1,17 +1,19 @@
-import { accounts, mortgageTerms, valuations } from "@num/db";
+import { accounts, mortgageTerms, transactionLines, transactions, valuations } from "@num/db";
 import {
   learnedConfidence,
   mortgagePrefillLines,
   mortgageSplitForDate,
   reviewLevel,
-  type Compounding,
   type LearnedRow,
-  type PaymentFrequency,
   type Suggestion,
 } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
-import type { Db } from "../db";
-type Reader = { all<T>(query: ReturnType<typeof sql>): T[] } & Pick<Db, "select">;
+import { and, eq, isNull, lt } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
+import { lineCount, literal } from "./transaction-sql";
+import type { Reader } from "./write";
+
+const principalLine = alias(transactionLines, "principal_line");
+const interestLine = alias(transactionLines, "interest_line");
 
 /** What the user taught for one payee: the mortgage account, and how sure the teaching is. */
 export type MortgageLearned = { accountId: string; confidence: number; count: number; sourceId: string };
@@ -21,19 +23,36 @@ export type MortgageLearned = { accountId: string; confidence: number; count: nu
  * mortgage account and the terms' interest category). Each one teaches its payee.
  */
 export function loadMortgageLearned(db: Reader): Map<string, MortgageLearned> {
-  const rows = db.all<{ id: string; date: string; payee: string; accountId: string }>(sql`
-    select t.id as id, t.date as date, t.payee_normalized as payee, m.account_id as accountId
-    from transactions t
-    inner join mortgage_terms m on m.payment_account_id = t.account_id
-    inner join transaction_lines tl on tl.transaction_id = t.id and tl.transfer_account_id = m.account_id
-    inner join transaction_lines il on il.transaction_id = t.id
-      and il.category_id = m.interest_category_id and il.transfer_account_id is null
-    where 1 = 1
-      and t.mirror = 0
-      and t.amount < 0
-      and t.auto_reason is null
-      and (select count(*) from transaction_lines x where x.transaction_id = t.id) = 2
-  `);
+  const rows = db
+    .select({
+      id: transactions.id,
+      date: transactions.date,
+      payee: transactions.payeeNormalized,
+      accountId: mortgageTerms.accountId,
+    })
+    .from(transactions)
+    .innerJoin(mortgageTerms, eq(mortgageTerms.paymentAccountId, transactions.accountId))
+    .innerJoin(
+      principalLine,
+      and(eq(principalLine.transactionId, transactions.id), eq(principalLine.transferAccountId, mortgageTerms.accountId)),
+    )
+    .innerJoin(
+      interestLine,
+      and(
+        eq(interestLine.transactionId, transactions.id),
+        eq(interestLine.categoryId, mortgageTerms.interestCategoryId),
+        isNull(interestLine.transferAccountId),
+      ),
+    )
+    .where(
+      and(
+        eq(transactions.mirror, literal(0)),
+        lt(transactions.amount, literal(0)),
+        isNull(transactions.autoReason),
+        eq(lineCount(transactions.id), literal(2)),
+      ),
+    )
+    .all();
   const byPayee = new Map<string, LearnedRow[]>();
   for (const row of rows) {
     const learned: LearnedRow = { id: row.id, date: row.date, categoryId: row.accountId, merchantId: null };
@@ -70,11 +89,7 @@ export function mortgageLinesFor(db: Reader, mortgageAccountId: string, fromAcco
     .where(eq(valuations.accountId, mortgageAccountId))
     .all();
   const split = mortgageSplitForDate({
-    terms: {
-      ...terms,
-      compounding: terms.compounding as Compounding,
-      paymentFrequency: terms.paymentFrequency as PaymentFrequency,
-    },
+    terms,
     opening: { balance: account.openingBalance, date: account.openingDate },
     valuations: history,
     date,

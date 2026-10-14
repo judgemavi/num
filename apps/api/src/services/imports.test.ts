@@ -319,7 +319,7 @@ test("a column map is saved after the first import", () => {
     expect(first.closingBalance).toBe(10000);
     expect(first.closingDate).toBe("2026-01-02");
     const saved = book.db.select().from(accounts).where(eq(accounts.id, book.account.id)).get();
-    expect(columnMapSchema.parse(JSON.parse(saved?.columnMap ?? "null"))).toEqual(withBalance);
+    expect(saved?.columnMap).toEqual(withBalance);
 
     const second = importStatement(book.db, book.dir, {
       source: "import",
@@ -336,7 +336,7 @@ test("a column map is saved after the first import", () => {
     }
     expect(second.counts.created).toBe(1);
     const again = book.db.select().from(accounts).where(eq(accounts.id, book.account.id)).get();
-    expect(again?.columnMap).toBe(saved?.columnMap);
+    expect(again?.columnMap).toEqual(saved?.columnMap);
     expect(listImportBatches(book.db, book.account.id).items).toHaveLength(2);
   } finally {
     book.close();

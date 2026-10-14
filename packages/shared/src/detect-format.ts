@@ -169,7 +169,7 @@ function detectPreset(text: string, presets: readonly Preset[]): StatementFormat
   return { kind: "ambiguous", candidates: fits };
 }
 
-function presetFit(rows: string[][], preset: Preset): boolean {
+function presetFit(rows: string[][], preset: Preset) {
   const start = dataStart(rows, preset);
   if (start < 0) {
     return false;
@@ -222,7 +222,7 @@ function dataStart(rows: string[][], preset: Preset): number {
   return rows.length > 1 ? 1 : -1;
 }
 
-function rowFits(row: string[], preset: Preset): boolean {
+function rowFits(row: string[], preset: Preset) {
   if (!dateMatchesFormat(row[preset.date] ?? "", preset.dateFormat)) {
     return false;
   }
@@ -232,7 +232,7 @@ function rowFits(row: string[], preset: Preset): boolean {
   return amountsFit(row, preset);
 }
 
-function dateMatchesFormat(raw: string, format: DateFormat): boolean {
+function dateMatchesFormat(raw: string, format: DateFormat) {
   const text = raw.trim();
   if (format === "iso") {
     return isIsoDate(text);
@@ -243,12 +243,12 @@ function dateMatchesFormat(raw: string, format: DateFormat): boolean {
   return statementDate(text, format) !== null;
 }
 
-function looksLikeMaskedCard(raw: string): boolean {
+function looksLikeMaskedCard(raw: string) {
   const text = raw.trim();
   return /[*xX]/.test(text) && /\d{4}/.test(text);
 }
 
-function amountsFit(row: string[], preset: Preset): boolean {
+function amountsFit(row: string[], preset: Preset) {
   const decimal = preset.decimalSeparator ?? ".";
   const columns = [preset.amount, preset.debit, preset.credit, preset.balance].filter(
     (index): index is number => index != null,
@@ -260,7 +260,7 @@ function amountsFit(row: string[], preset: Preset): boolean {
   return pay.some((index) => (row[index] ?? "").trim().length > 0);
 }
 
-function looksLikeAmount(raw: string, decimal: DecimalSeparator): boolean {
+function looksLikeAmount(raw: string, decimal: DecimalSeparator) {
   let text = raw.trim().replace(/\s/g, "");
   if (text.length === 0) {
     return true;
@@ -278,7 +278,7 @@ function looksLikeAmount(raw: string, decimal: DecimalSeparator): boolean {
   return /^\d{1,3}(,\d{3})*(\.\d+)?$/.test(text) || /^\d+(\.\d+)?$/.test(text);
 }
 
-function columnWidth(preset: Preset): number {
+function columnWidth(preset: Preset) {
   const indexes = [preset.date, preset.description, preset.amount, preset.debit, preset.credit, preset.balance, preset.bankId, preset.card];
   let width = 1;
   for (const index of indexes) {
@@ -289,12 +289,12 @@ function columnWidth(preset: Preset): number {
   return width;
 }
 
-function contentLines(text: string): string[] {
+function contentLines(text: string) {
   const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   return source.split(/\r?\n/).filter((line) => line.trim().length > 0);
 }
 
-function firstOfxDate(text: string): string | null {
+function firstOfxDate(text: string) {
   const head = contentLines(text).slice(0, dateScanLines).join("\n");
   const match = /<DTPOSTED>\s*(\d{4})(\d{2})(\d{2})/i.exec(head);
   if (!match?.[1] || !match[2] || !match[3]) {
@@ -304,7 +304,7 @@ function firstOfxDate(text: string): string | null {
   return isIsoDate(iso) ? iso : null;
 }
 
-function columnMapFromPreset(preset: Preset): ColumnMap {
+function columnMapFromPreset(preset: Preset) {
   return columnMapSchema.parse({
     hasHeader: preset.hasHeader,
     date: preset.date,
@@ -321,7 +321,7 @@ function columnMapFromPreset(preset: Preset): ColumnMap {
   });
 }
 
-function mapSignature(map: ColumnMap): string {
+function mapSignature(map: ColumnMap) {
   return [
     String(map.hasHeader),
     map.date,

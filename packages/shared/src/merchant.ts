@@ -1,15 +1,8 @@
 import { z } from "zod";
-import { listQuerySchema, pagedResponseSchema } from "./list";
+import { archivedQuery, listQuerySchema, pagedResponseSchema } from "./list";
 import { isUtcTimestamp } from "./time";
 
 const nameSchema = z.string().trim().min(1);
-
-const archivedQuery = {
-  archived: z
-    .union([z.boolean(), z.enum(["true", "false"])])
-    .optional()
-    .transform((value) => value === true || value === "true"),
-};
 
 export const merchantSchema = z.object({
   id: z.uuid(),

@@ -7,10 +7,10 @@ import {
   type ImportViewItem,
   type ImportViewQuery,
 } from "@num/shared";
-import { and, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { readUnreadable } from "./import-read";
+import { pageOf } from "./paging";
 
 type OutcomeCounts = {
   created: number;
@@ -32,26 +32,26 @@ function emptyCounts(): OutcomeCounts {
   return { created: 0, matched: 0, duplicate: 0, needsReview: 0 };
 }
 
-function addOutcome(counts: OutcomeCounts, outcome: string) {
+function addOutcome(counts: OutcomeCounts, outcome: string, total: number) {
   if (outcome === "created") {
-    counts.created += 1;
+    counts.created += total;
   } else if (outcome === "matched") {
-    counts.matched += 1;
+    counts.matched += total;
   } else if (outcome === "duplicate") {
-    counts.duplicate += 1;
+    counts.duplicate += total;
   } else if (outcome === "needs_review") {
-    counts.needsReview += 1;
+    counts.needsReview += total;
   }
 }
 
-function newestFirst(query: ImportViewQuery): boolean {
+function newestFirst(query: ImportViewQuery) {
   if (query.sort === undefined && query.dir === undefined) {
     return true;
   }
   return query.dir === "desc";
 }
 
-function compareItems(left: ImportViewItem, right: ImportViewItem, newest: boolean): number {
+function compareItems(left: ImportViewItem, right: ImportViewItem, newest: boolean) {
   if (left.createdAt !== right.createdAt) {
     const order = left.createdAt < right.createdAt ? -1 : 1;
     return newest ? -order : order;
@@ -60,7 +60,7 @@ function compareItems(left: ImportViewItem, right: ImportViewItem, newest: boole
   return newest ? -idOrder : idOrder;
 }
 
-function withinDates(createdAt: string, query: ImportViewQuery): boolean {
+function withinDates(createdAt: string, query: ImportViewQuery) {
   const date = createdAt.slice(0, 10);
   if (query.from && date < query.from) {
     return false;
@@ -90,17 +90,21 @@ function loadItems(db: Db): ImportViewItem[] {
     .innerJoin(accounts, eq(accounts.id, importBatches.accountId))
     .leftJoin(documents, eq(documents.id, importBatches.documentId))
     .all();
-  const outcomes = db.select({ batchId: importRows.batchId, outcome: importRows.outcome }).from(importRows).all();
+  const outcomes = db
+    .select({ batchId: importRows.batchId, outcome: importRows.outcome, total: count() })
+    .from(importRows)
+    .groupBy(importRows.batchId, importRows.outcome)
+    .all();
   const byBatch = new Map<string, OutcomeCounts>();
   for (const row of outcomes) {
     const counts = byBatch.get(row.batchId) ?? emptyCounts();
-    addOutcome(counts, row.outcome);
+    addOutcome(counts, row.outcome, row.total);
     byBatch.set(row.batchId, counts);
   }
 
   return batches.map((batch) => {
     const counts = byBatch.get(batch.id) ?? emptyCounts();
-    const unreadable = readUnreadable(batch.unreadableJson);
+    const unreadable = batch.unreadableJson;
     return {
       id: batch.id,
       accountId: batch.accountId,
@@ -128,16 +132,10 @@ export function listImportView(db: Db, query: ImportViewQuery) {
     .filter((item) => withinDates(item.createdAt, query))
     .filter((item) => (query.status ? item.status === query.status : true))
     .sort((left, right) => compareItems(left, right, newestFirst(query)));
-  const offset = (query.page - 1) * query.pageSize;
-  return {
-    items: items.slice(offset, offset + query.pageSize),
-    page: query.page,
-    pageSize: query.pageSize,
-    total: items.length,
-  };
+  return pageOf(items, query);
 }
 
-function isEarlier(candidate: EarlierCandidate, createdAt: string, rowIndex: number, rowId: string): boolean {
+function isEarlier(candidate: EarlierCandidate, createdAt: string, rowIndex: number, rowId: string) {
   if (candidate.createdAt !== createdAt) {
     return candidate.createdAt < createdAt;
   }
@@ -218,7 +216,7 @@ export function getImportDetail(db: Db, id: string): ImportDetail {
       date: row.date,
       amount: row.amount,
       payeeRaw: row.payeeRaw,
-      outcome: row.outcome as ImportDetailRow["outcome"],
+      outcome: row.outcome,
       transactionId: row.transactionId && liveTransactions.has(row.transactionId) ? row.transactionId : null,
       duplicateBatchId: earlier?.batchId ?? null,
       duplicateRowId: earlier?.id ?? null,
@@ -270,7 +268,7 @@ export function getImportDetail(db: Db, id: string): ImportDetail {
   return {
     item,
     rows: detailRows,
-    unreadable: readUnreadable(batch.unreadableJson).map((row) => ({
+    unreadable: batch.unreadableJson.map((row) => ({
       ...row,
       decision: decided.has(`import_unreadable:${batch.id}:${row.line}`) ? ("not_a_transaction" as const) : null,
     })),

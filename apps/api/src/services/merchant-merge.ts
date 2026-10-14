@@ -3,18 +3,8 @@ import { utcNow, type Merchant } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { toMerchant } from "./merchants";
 import { auditTransaction, readTransaction } from "./transaction-record";
-import { write, type AuditSource, type WriteTx } from "./write";
-
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-function merchantSnapshot(row: { name: string; archivedAt: string | null }) {
-  return { name: row.name, archivedAt: row.archivedAt };
-}
+import { withoutId, write, type WriteTx, type WriteInput } from "./write";
 
 function moveTransactions(tx: WriteTx, sourceId: string, targetId: string, at: string) {
   const rows = tx.select({ id: transactions.id }).from(transactions).where(eq(transactions.merchantId, sourceId)).all();
@@ -44,8 +34,7 @@ export function mergeMerchants(db: Db, sourceId: string, targetId: string, input
     throw new ServiceError("merchant_merge_same", 400);
   }
   const at = input.at ?? utcNow();
-  let merged: Merchant | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const source = tx.select().from(merchants).where(eq(merchants.id, sourceId)).get();
     const target = tx.select().from(merchants).where(eq(merchants.id, targetId)).get();
     if (!source || !target) {
@@ -64,13 +53,9 @@ export function mergeMerchants(db: Db, sourceId: string, targetId: string, input
       entity: "merchants",
       entityId: sourceId,
       action: "merge",
-      before: merchantSnapshot(source),
-      after: { ...merchantSnapshot(next), mergedInto: targetId },
+      before: withoutId(source),
+      after: { ...withoutId(next), mergedInto: targetId },
     });
-    merged = toMerchant(target);
+    return target;
   });
-  if (!merged) {
-    throw new Error("Merge did not return a merchant");
-  }
-  return merged;
 }

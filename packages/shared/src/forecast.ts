@@ -154,7 +154,7 @@ export function spendDeltas(dates: readonly string[], items: readonly { accountI
   return deltas;
 }
 
-function forecastMonths(dates: readonly string[], flows: readonly ForecastFlow[]): ForecastMonth[] {
+function forecastMonths(dates: readonly string[], flows: readonly ForecastFlow[]) {
   const days = new Set(dates);
   const months = new Map<string, ForecastMonth>();
   for (const date of dates) {
@@ -174,7 +174,7 @@ function forecastMonths(dates: readonly string[], flows: readonly ForecastFlow[]
   return [...months.values()];
 }
 
-function dailyShares(total: number, daysInMonth: number): number[] {
+function dailyShares(total: number, daysInMonth: number) {
   const base = Math.floor(total / daysInMonth);
   const extra = total % daysInMonth;
   return Array.from({ length: daysInMonth }, (_, index) => (index < extra ? base + 1 : base));
@@ -229,7 +229,7 @@ export function cardForecastSchedule(input: {
   return { knownPayment, estimatedStatements };
 }
 
-function lowestPoint(dates: readonly string[], values: readonly number[]): { date: string; amount: number } {
+function lowestPoint(dates: readonly string[], values: readonly number[]) {
   let index = 0;
   for (let cursor = 1; cursor < values.length; cursor += 1) {
     if ((values[cursor] ?? 0) < (values[index] ?? 0)) {

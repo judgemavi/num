@@ -1,6 +1,5 @@
 import {
   cardStatements,
-  hygieneSchema,
   isIsoDate,
   monthLastDay,
   reviewAgeDays,
@@ -32,7 +31,7 @@ function requireAsOf(asOf: string) {
   }
 }
 
-function pagesOf<T>(load: (page: number) => { items: T[]; total: number }): T[] {
+function pagesOf<T>(load: (page: number) => { items: T[]; total: number }) {
   const first = load(1);
   const items = [...first.items];
   let page = 2;
@@ -62,7 +61,7 @@ function bills(db: Db) {
   return pagesOf((page) => listPlans(db, { ...query, page } satisfies PlanListQuery));
 }
 
-function ageDays(asOf: string, day: string): number {
+function ageDays(asOf: string, day: string) {
   const days = Temporal.PlainDate.from(day).until(Temporal.PlainDate.from(asOf), { largestUnit: "day" }).days;
   return days < 0 ? 0 : days;
 }
@@ -203,7 +202,7 @@ function overspent(db: Db) {
 export function readHygiene(db: Db, asOf: string): Hygiene {
   requireAsOf(asOf);
   const state = loadReviewState(db, asOf);
-  return hygieneSchema.parse({
+  return {
     asOf,
     checks: [
       emergencyFund(db, asOf),
@@ -215,5 +214,5 @@ export function readHygiene(db: Db, asOf: string): Hygiene {
       recurring(db, state),
       overspent(db),
     ],
-  });
+  };
 }

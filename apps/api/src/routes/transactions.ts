@@ -2,7 +2,6 @@ import {
   approveLevelResultSchema,
   approveLevelSchema,
   asOfQuerySchema,
-  errorSchema,
   refundPurchaseListSchema,
   refundPurchaseQuerySchema,
   transactionCreateSchema,
@@ -21,19 +20,7 @@ import { linkRefundToPurchase } from "../services/refund-answer";
 import { listRefundPurchases } from "../services/refund-link";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: {
-    "application/json": {
-      schema: errorSchema,
-    },
-  },
-} as const;
-
-const idParams = z.object({
-  id: z.uuid(),
-});
+import { errorResponse, idParams } from "./common";
 
 const transactionSaveSchema = transactionSchema.extend({
   applied: z.number().int().nonnegative().optional(),

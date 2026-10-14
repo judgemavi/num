@@ -1,31 +1,11 @@
-import { accounts, categories, mortgageTerms } from "@num/db";
-import type { AccountKind, MortgageTerms, MortgageTermsWrite } from "@num/shared";
+import { accounts, categories, mortgageTerms, type MortgageTermRow } from "@num/db";
+import type { AccountKind, MortgageTermsWrite } from "@num/shared";
 import { eq } from "drizzle-orm";
-import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import type { WriteTx } from "./write";
+import type { Reader, WriteTx } from "./write";
 
-type Reader = Db | WriteTx;
-
-type TermRow = typeof mortgageTerms.$inferSelect;
-
-export function termsSnapshot(row: TermRow): MortgageTerms {
-  return {
-    accountId: row.accountId,
-    rateMilliPct: row.rateMilliPct,
-    compounding: row.compounding as MortgageTerms["compounding"],
-    paymentAmount: row.paymentAmount,
-    paymentFrequency: row.paymentFrequency as MortgageTerms["paymentFrequency"],
-    firstPaymentDate: row.firstPaymentDate,
-    termEnd: row.termEnd,
-    amortizationMonthsRemaining: row.amortizationMonthsRemaining,
-    paymentAccountId: row.paymentAccountId,
-    interestCategoryId: row.interestCategoryId,
-    propertyAccountId: row.propertyAccountId,
-  };
-}
-
-function termsValues(accountId: string, input: MortgageTermsWrite): MortgageTerms {
+/** The stored row of the terms. The keys are in the order of the table columns. */
+function termsValues(accountId: string, input: MortgageTermsWrite) {
   return {
     accountId,
     rateMilliPct: input.rateMilliPct,
@@ -41,7 +21,7 @@ function termsValues(accountId: string, input: MortgageTermsWrite): MortgageTerm
   };
 }
 
-export function readTerms(db: Reader, accountId: string): TermRow | undefined {
+export function readTerms(db: Reader, accountId: string): MortgageTermRow | undefined {
   return db.select().from(mortgageTerms).where(eq(mortgageTerms.accountId, accountId)).get();
 }
 
@@ -62,7 +42,7 @@ export function resolveTerms(
     return requested;
   }
   const existing = readTerms(db, accountId);
-  return existing ? termsValues(accountId, termsSnapshot(existing)) : null;
+  return existing ?? null;
 }
 
 function assertTerms(db: Reader, accountId: string, opening: { date: string; balance: number }, input: MortgageTermsWrite) {
@@ -100,7 +80,7 @@ export function saveTerms(
   if (input === null) {
     if (existing) {
       tx.delete(mortgageTerms).where(eq(mortgageTerms.accountId, accountId)).run();
-      tx.audit({ entity: "mortgage_terms", entityId: accountId, action: "delete", before: termsSnapshot(existing), after: null });
+      tx.audit({ entity: "mortgage_terms", entityId: accountId, action: "delete", before: existing, after: null });
     }
     return;
   }
@@ -109,7 +89,7 @@ export function saveTerms(
   }
   assertTerms(tx, accountId, { date: opening.date, balance: opening.balance }, input);
   const values = termsValues(accountId, input);
-  if (existing && JSON.stringify(termsSnapshot(existing)) === JSON.stringify(values)) {
+  if (existing && JSON.stringify(existing) === JSON.stringify(values)) {
     return;
   }
   if (existing) {
@@ -121,7 +101,7 @@ export function saveTerms(
     entity: "mortgage_terms",
     entityId: accountId,
     action: existing ? "update" : "create",
-    before: existing ? termsSnapshot(existing) : null,
+    before: existing ?? null,
     after: values,
   });
 }

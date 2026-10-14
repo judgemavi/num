@@ -8,7 +8,7 @@ type Block = {
   end: number;
 };
 
-function stripBom(text: string): string {
+function stripBom(text: string) {
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
@@ -30,13 +30,13 @@ function blocks(text: string, tag: string): Block[] {
   });
 }
 
-function tagValue(block: string, tag: string): string | null {
+function tagValue(block: string, tag: string) {
   const match = new RegExp(`<${tag}>\\s*([^<\\r\\n]*)`, "i").exec(block);
   const value = match?.[1]?.trim() ?? "";
   return value.length > 0 ? value : null;
 }
 
-function lineNumber(source: string, index: number): number {
+function lineNumber(source: string, index: number) {
   let line = 1;
   for (let cursor = 0; cursor < index; cursor += 1) {
     if (source[cursor] === "\n") {
@@ -46,7 +46,7 @@ function lineNumber(source: string, index: number): number {
   return line;
 }
 
-function isoDate(raw: string | null): string | null {
+function isoDate(raw: string | null) {
   if (!raw) {
     return null;
   }
@@ -58,7 +58,7 @@ function isoDate(raw: string | null): string | null {
   return isIsoDate(iso) ? iso : null;
 }
 
-function description(block: string): string {
+function description(block: string) {
   return tagValue(block, "NAME") ?? tagValue(block, "MEMO") ?? "";
 }
 

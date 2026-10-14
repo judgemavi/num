@@ -24,12 +24,12 @@ export type PlannedImportRow = PlanInput & {
   suggestion: Suggestion | null;
 };
 
-function fingerprint(accountId: string, date: string, amount: number, payee: string, n: number): string {
+function fingerprint(accountId: string, date: string, amount: number, payee: string, n: number) {
   const text = [accountId, date, String(amount), normalizePayee(payee), String(n)].join("\u001f");
   return `fp:${createHash("sha256").update(text).digest("hex")}`;
 }
 
-function withinThreeDays(left: string, right: string): boolean {
+function withinThreeDays(left: string, right: string) {
   const days = Temporal.PlainDate.from(left).until(Temporal.PlainDate.from(right), { largestUnit: "day" }).days;
   return Math.abs(days) <= 3;
 }

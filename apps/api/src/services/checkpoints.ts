@@ -1,8 +1,6 @@
 import { accounts, checkpoints, importBatches, transactions } from "@num/db";
 import {
-  accountKinds,
   utcNow,
-  type AccountKind,
   type Checkpoint,
   type CheckpointCompare,
   type ClosingHint,
@@ -14,30 +12,9 @@ import { calculatedBalance } from "./checkpoint-balance";
 import { checkpointHelp } from "./checkpoint-help";
 import { effectiveOpeningDate } from "./opening-date";
 import { checkpointOpeningSuggestion } from "./opening-suggestion";
-import { write, type AuditSource, type WriteTx } from "./write";
+import { withoutId, write, type WriteInput, type Reader } from "./write";
 
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-type Reader = Db | WriteTx;
-
-type AccountRow = {
-  id: string;
-  kind: AccountKind;
-  openingDate: string | null;
-  openingBalance: number;
-};
-
-function asKind(value: string): AccountKind {
-  if (!(accountKinds as readonly string[]).includes(value)) {
-    throw new Error("Unknown account kind");
-  }
-  return value as AccountKind;
-}
-
-function requireAccount(db: Reader, id: string): AccountRow {
+function requireAccount(db: Reader, id: string) {
   const row = db
     .select({
       id: accounts.id,
@@ -51,28 +28,7 @@ function requireAccount(db: Reader, id: string): AccountRow {
   if (!row) {
     throw new ServiceError("account_not_found", 404);
   }
-  return { ...row, kind: asKind(row.kind) };
-}
-
-function toCheckpoint(row: typeof checkpoints.$inferSelect): Checkpoint {
-  return {
-    id: row.id,
-    accountId: row.accountId,
-    date: row.date,
-    statementBalance: row.statementBalance,
-    createdAt: row.createdAt,
-    unlockedAt: row.unlockedAt,
-  };
-}
-
-function snapshot(row: Checkpoint) {
-  return {
-    accountId: row.accountId,
-    date: row.date,
-    statementBalance: row.statementBalance,
-    createdAt: row.createdAt,
-    unlockedAt: row.unlockedAt,
-  };
+  return row;
 }
 
 function helpTransactions(db: Reader, accountId: string, openingDate: string, statementDate: string) {
@@ -135,8 +91,7 @@ export function createCheckpoint(
   }
   const at = input.at ?? utcNow();
   const id = crypto.randomUUID();
-  let created: Checkpoint | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const again = compareCheckpoint(tx, accountId, input);
     if (!again.balanced) {
       throw new ServiceError("checkpoint_unbalanced", 409, { difference: String(again.difference) });
@@ -157,14 +112,10 @@ export function createCheckpoint(
       entityId: id,
       action: "create",
       before: null,
-      after: snapshot(row),
+      after: withoutId(row),
     });
-    created = row;
+    return row;
   });
-  if (!created) {
-    throw new Error("Checkpoint was not created");
-  }
-  return created;
 }
 
 export function listCheckpoints(db: Db, accountId: string): { items: Checkpoint[] } {
@@ -174,7 +125,6 @@ export function listCheckpoints(db: Db, accountId: string): { items: Checkpoint[
     .from(checkpoints)
     .where(eq(checkpoints.accountId, accountId))
     .all()
-    .map(toCheckpoint)
     .sort((left, right) => {
       if (left.date !== right.date) {
         return left.date < right.date ? 1 : -1;
@@ -186,8 +136,7 @@ export function listCheckpoints(db: Db, accountId: string): { items: Checkpoint[
 
 export function unlockCheckpoint(db: Db, accountId: string, checkpointId: string, input: WriteInput): Checkpoint {
   const at = input.at ?? utcNow();
-  let unlocked: Checkpoint | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     requireAccount(tx, accountId);
     const row = tx.select().from(checkpoints).where(eq(checkpoints.id, checkpointId)).get();
     if (!row || row.accountId !== accountId) {
@@ -196,21 +145,17 @@ export function unlockCheckpoint(db: Db, accountId: string, checkpointId: string
     if (row.unlockedAt !== null) {
       throw new ServiceError("checkpoint_unlocked", 409);
     }
-    const next = toCheckpoint({ ...row, unlockedAt: at });
+    const next = { ...row, unlockedAt: at };
     tx.update(checkpoints).set({ unlockedAt: at }).where(eq(checkpoints.id, checkpointId)).run();
     tx.audit({
       entity: "checkpoints",
       entityId: checkpointId,
       action: "unlock",
-      before: snapshot(toCheckpoint(row)),
-      after: snapshot(next),
+      before: withoutId(row),
+      after: withoutId(next),
     });
-    unlocked = next;
+    return next;
   });
-  if (!unlocked) {
-    throw new Error("Checkpoint was not unlocked");
-  }
-  return unlocked;
 }
 
 export function latestClosing(db: Db, accountId: string): ClosingHint {

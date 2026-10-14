@@ -6,22 +6,19 @@ import {
   type InboxGroupApply,
   type Transaction,
 } from "@num/shared";
-import { sql } from "drizzle-orm";
+import { transactions } from "@num/db";
+import { and, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { linkAutomatic } from "./auto-link";
 import { readTransaction, type TransactionBody } from "./transaction-record";
 import { mortgageLinesFor } from "./mortgage-learned";
+import { hasOpenLine, lineCount, literal } from "./transaction-sql";
 import { applyTransactionUpdate, spreadAfterConfirmations } from "./transactions";
-import { write, type AuditSource, type WriteTx } from "./write";
-
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
+import { write, type Reader, type WriteTx, type WriteInput } from "./write";
 
 type Patch = Pick<InboxGroupApply, "categoryId" | "transferAccountId" | "merchantId" | "accountId" | "mortgage">;
 
-function statusOf(transaction: Transaction): "open" | "cleared" {
+function statusOf(transaction: Transaction) {
   return transaction.status === "cleared" ? "cleared" : "open";
 }
 
@@ -97,47 +94,49 @@ function bodyFor(transaction: Transaction, patch: Patch): TransactionBody {
   };
 }
 
-export function applySuggestion(tx: WriteTx, id: string, patch: Patch, at: string): GroupSkip | null {
+/** The reason why the group action leaves a row as it is, or the new body of the row. A read: it never writes. */
+function resolve(db: Reader, id: string, patch: Patch): { skip: GroupSkip } | { body: TransactionBody } {
   let transaction: Transaction;
   try {
-    transaction = readTransaction(tx, id);
+    transaction = readTransaction(db, id);
   } catch {
-    return { id, reason: "categorized" };
+    return { skip: { id, reason: "categorized" } };
   }
   const reason = skipReason(transaction, patch);
   if (reason) {
-    return { id, reason };
+    return { skip: { id, reason } };
   }
   const split =
     patch.mortgage && patch.transferAccountId && transaction.amount < 0
-      ? mortgageLinesFor(tx, patch.transferAccountId, transaction.accountId, transaction.date, transaction.amount)
+      ? mortgageLinesFor(db, patch.transferAccountId, transaction.accountId, transaction.date, transaction.amount)
       : null;
   if (patch.mortgage && !split) {
-    return { id, reason: "no_split" };
+    return { skip: { id, reason: "no_split" } };
   }
-  applyTransactionUpdate(tx, id, split ? mortgageBodyFor(transaction, split) : bodyFor(transaction, patch), at, false);
+  return { body: split ? mortgageBodyFor(transaction, split) : bodyFor(transaction, patch) };
+}
+
+export function applySuggestion(tx: WriteTx, id: string, patch: Patch, at: string): GroupSkip | null {
+  const found = resolve(tx, id, patch);
+  if ("skip" in found) {
+    return found.skip;
+  }
+  applyTransactionUpdate(tx, id, found.body, at, false);
   linkAutomatic(tx, id);
   return null;
 }
 
-type OpenRow = { id: string };
-
-function otherIds(reader: { all<T>(query: ReturnType<typeof sql>): T[] }, payee: string, accountId: string, except: ReadonlySet<string>): string[] {
-  const rows = reader.all<OpenRow>(sql`
-    select t.id as id
-    from transactions t
-    where 1 = 1
-      and t.payee_normalized = ${payee}
-      and t.account_id = ${accountId}
-      and exists (
-        select 1 from transaction_lines l
-        where l.transaction_id = t.id
-          and l.category_id is null
-          and l.transfer_account_id is null
-      )
-    order by t.date desc, t.id desc
-  `);
-  return rows.map((row) => row.id).filter((id) => !except.has(id));
+/** The skips of a group in which no row can change. Null when a row can change. */
+function skipsOfIdleGroup(db: Db, targets: readonly string[], patch: Patch) {
+  const skipped: GroupSkip[] = [];
+  for (const id of targets) {
+    const found = resolve(db, id, patch);
+    if (!("skip" in found)) {
+      return null;
+    }
+    skipped.push(found.skip);
+  }
+  return skipped;
 }
 
 export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { applied: number; skipped: GroupSkip[] } {
@@ -145,6 +144,11 @@ export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { 
   const excluded = new Set(input.excludedIds);
   const groupIds = [...new Set(input.transactionIds)];
   const targets = groupIds.filter((id) => !excluded.has(id));
+  // A group in which each row is skipped changes nothing. It has no write and no audit entry.
+  const idle = skipsOfIdleGroup(db, targets, input);
+  if (idle) {
+    return { applied: 0, skipped: idle };
+  }
   let applied = 0;
   const skipped: GroupSkip[] = [];
   const confirmed: string[] = [];
@@ -168,9 +172,19 @@ export function countOtherUncategorized(db: Db, payeeRaw: string, accountId: str
   if (payee.length === 0) {
     return 0;
   }
-  return otherIds(db, payee, accountId, new Set(exceptIds)).filter((id) => {
-    const transaction = readTransaction(db, id);
-    return transaction.lines.length === 1 && transaction.lines[0]?.categoryId === null && transaction.lines[0]?.transferAccountId === null;
-  }).length;
+  const except = new Set(exceptIds);
+  return db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.payeeNormalized, payee),
+        eq(transactions.accountId, accountId),
+        eq(lineCount(transactions.id), literal(1)),
+        hasOpenLine(transactions.id),
+      ),
+    )
+    .all()
+    .filter((row) => !except.has(row.id)).length;
 }
 

@@ -12,11 +12,11 @@ type ReadRow =
   | { ok: true; row: StatementRow; balance: number | null }
   | { ok: false; reason: UnreadableReason };
 
-function stripBom(text: string): string {
+function stripBom(text: string) {
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
-function firstContentIndex(lines: string[]): number {
+function firstContentIndex(lines: string[]) {
   for (let index = 0; index < lines.length; index += 1) {
     if ((lines[index] ?? "").trim().length > 0) {
       return index;
@@ -25,7 +25,7 @@ function firstContentIndex(lines: string[]): number {
   return -1;
 }
 
-function headerIndex(lines: string[], map: ColumnMap): number {
+function headerIndex(lines: string[], map: ColumnMap) {
   const index = firstContentIndex(lines);
   if (index < 0 || map.hasHeader === false) {
     return -1;
@@ -37,14 +37,14 @@ function headerIndex(lines: string[], map: ColumnMap): number {
   return date === null ? index : -1;
 }
 
-function cell(cells: string[], index: number | null | undefined): string {
+function cell(cells: string[], index: number | null | undefined) {
   if (index == null) {
     return "";
   }
   return cells[index] ?? "";
 }
 
-function applySign(amount: number, convention: SignConvention): number {
+function applySign(amount: number, convention: SignConvention) {
   return convention === "inverted" ? -amount : amount;
 }
 
@@ -132,7 +132,7 @@ function readRow(cells: string[], map: ColumnMap, digits: number): ReadRow {
   };
 }
 
-function closing(rows: BalanceRow[], newestFirst: boolean): BalanceRow | null {
+function closing(rows: BalanceRow[], newestFirst: boolean) {
   if (rows.length === 0) {
     return null;
   }
@@ -186,7 +186,7 @@ function earliestRow(
   rows: StatementRow[],
   rowBalances: readonly (number | null)[],
   newestFirst: boolean,
-): { date: string; amount: number; balance: number } | null {
+) {
   if (rows.length === 0) {
     return null;
   }

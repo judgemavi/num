@@ -26,7 +26,7 @@ const asOfDate = {
   pattern: String.raw`^\d{4}-\d{2}-\d{2}$`,
 };
 
-function withAsOfDate(schema: Record<string, unknown>): Record<string, unknown> {
+function withAsOfDate(schema: Record<string, unknown>) {
   const properties = schema.properties;
   if (typeof properties !== "object" || properties === null || !("asOf" in properties)) {
     return schema;

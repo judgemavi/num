@@ -1,4 +1,4 @@
-import { occurrenceLinks, recurringPlans, settings, transactions } from "@num/db";
+import { occurrenceLinks, recurringPlans, settings, transactions, type OccurrenceLinkRow, type RecurringPlanRow } from "@num/db";
 import {
   Temporal,
   planProposalKey,
@@ -13,7 +13,6 @@ import {
   type Occurrence,
   type OccurrenceStatus,
   type OpenOccurrence,
-  type PlanSchedule,
   type RecurringSignals,
 } from "@num/shared";
 import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
@@ -21,15 +20,7 @@ import type { Db } from "../db";
 import { decidedKeys } from "./decision-keys";
 import { ServiceError } from "../service-error";
 import { applyLinkedPlan } from "./match-apply";
-import { write, type AuditSource } from "./write";
-
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-type PlanRow = typeof recurringPlans.$inferSelect;
-type LinkRow = typeof occurrenceLinks.$inferSelect;
+import { withoutId, write, type WriteInput } from "./write";
 
 type TxnRow = {
   id: string;
@@ -41,18 +32,7 @@ type TxnRow = {
 
 const horizonDays = 400;
 
-function scheduleOf(row: PlanRow): PlanSchedule {
-  return {
-    startDate: row.startDate,
-    endDate: row.endDate,
-    freq: row.freq as PlanSchedule["freq"],
-    interval: row.interval,
-    monthDay: row.monthDay,
-    businessDayShift: row.businessDayShift as PlanSchedule["businessDayShift"],
-  };
-}
-
-function graceDays(db: { select: Db["select"] }): number {
+function graceDays(db: { select: Db["select"] }) {
   const row = db.select().from(settings).where(eq(settings.key, "recurringGraceDays")).get();
   const value = Number(row?.value ?? "3");
   if (!Number.isInteger(value) || value < 0) {
@@ -61,11 +41,11 @@ function graceDays(db: { select: Db["select"] }): number {
   return value;
 }
 
-function horizon(asOf: string): string {
+function horizon(asOf: string) {
   return Temporal.PlainDate.from(asOf).add({ days: horizonDays }).toString();
 }
 
-function activePlans(db: Db): PlanRow[] {
+function activePlans(db: Db): RecurringPlanRow[] {
   return db
     .select()
     .from(recurringPlans)
@@ -73,7 +53,7 @@ function activePlans(db: Db): PlanRow[] {
     .filter((row) => row.active && row.archivedAt === null);
 }
 
-function transactionsByIds(db: Db, ids: readonly string[]): Map<string, TxnRow> {
+function transactionsByIds(db: Db, ids: readonly string[]) {
   const found = new Map<string, TxnRow>();
   for (let index = 0; index < ids.length; index += 400) {
     const slice = ids.slice(index, index + 400);
@@ -98,7 +78,7 @@ function transactionsByIds(db: Db, ids: readonly string[]): Map<string, TxnRow> 
   return found;
 }
 
-function transactionsForAccounts(db: Db, accountIds: readonly string[], from: string, to: string): TxnRow[] {
+function transactionsForAccounts(db: Db, accountIds: readonly string[], from: string, to: string) {
   const rows: TxnRow[] = [];
   for (const accountId of accountIds) {
     rows.push(
@@ -140,7 +120,7 @@ function detectionTransactions(db: Db, asOf: string): DetectionTransaction[] {
     .flatMap((row) => (row.merchantId ? [{ ...row, merchantId: row.merchantId }] : []));
 }
 
-function requirePlan(db: Db, id: string): PlanRow {
+function requirePlan(db: Db, id: string): RecurringPlanRow {
   const row = db.select().from(recurringPlans).where(eq(recurringPlans.id, id)).get();
   if (!row) {
     throw new ServiceError("plan_not_found", 404);
@@ -148,17 +128,7 @@ function requirePlan(db: Db, id: string): PlanRow {
   return row;
 }
 
-function linkSnapshot(row: LinkRow) {
-  return {
-    planId: row.planId,
-    dueDate: row.dueDate,
-    transactionId: row.transactionId,
-    skipped: row.skipped,
-    reason: row.reason,
-  };
-}
-
-function amountsByDue(links: LinkRow[], txns: Map<string, TxnRow>, asOf: string): number[] {
+function amountsByDue(links: OccurrenceLinkRow[], txns: Map<string, TxnRow>, asOf: string) {
   return links
     .filter((link) => link.transactionId && link.dueDate <= asOf)
     .sort((left, right) => (left.dueDate < right.dueDate ? 1 : left.dueDate > right.dueDate ? -1 : 0))
@@ -169,11 +139,11 @@ function amountsByDue(links: LinkRow[], txns: Map<string, TxnRow>, asOf: string)
 }
 
 function statusFor(
-  row: PlanRow,
+  row: RecurringPlanRow,
   dueDate: string,
   asOf: string,
   grace: number,
-  link: LinkRow | undefined,
+  link: OccurrenceLinkRow | undefined,
   actual: number | null,
 ): OccurrenceStatus {
   if (link?.skipped) {
@@ -203,7 +173,7 @@ export function listOccurrences(db: Db, planId: string, asOf: string) {
   const actuals = amountsByDue(links, txns, asOf);
   const amounts =
     row.amountMode === "variable" ? variableAmounts(actuals, row.expectedAmount) : { forecast: row.expectedAmount, safe: row.expectedAmount };
-  const items: Occurrence[] = occurrenceDates(scheduleOf(row), horizon(asOf)).map((date) => {
+  const items: Occurrence[] = occurrenceDates(row, horizon(asOf)).map((date) => {
     const link = byDue.get(date.dueDate);
     const txn = link?.transactionId ? txns.get(link.transactionId) : undefined;
     const actual = txn ? txn.amount : null;
@@ -219,13 +189,13 @@ export function listOccurrences(db: Db, planId: string, asOf: string) {
   return { forecastAmount: amounts.forecast, safeAmount: amounts.safe, items };
 }
 
-function openOccurrences(rows: PlanRow[], links: LinkRow[], asOf: string, grace: number): OpenOccurrence[] {
+function openOccurrences(rows: RecurringPlanRow[], links: OccurrenceLinkRow[], asOf: string, grace: number) {
   const linked = new Set(links.map((link) => `${link.planId}|${link.dueDate}`));
   const limit = Temporal.PlainDate.from(asOf).add({ days: grace }).toString();
   const occurrences: OpenOccurrence[] = [];
   for (const row of rows) {
     const from = linkWindowStart(row.startDate, asOf);
-    for (const date of occurrenceDates(scheduleOf(row), limit, from)) {
+    for (const date of occurrenceDates(row, limit, from)) {
       if (linked.has(`${row.id}|${date.dueDate}`)) {
         continue;
       }
@@ -242,7 +212,7 @@ function openOccurrences(rows: PlanRow[], links: LinkRow[], asOf: string, grace:
   return occurrences;
 }
 
-function linkTransactions(db: Db, plans: PlanRow[], asOf: string, grace: number): TxnRow[] {
+function linkTransactions(db: Db, plans: RecurringPlanRow[], asOf: string, grace: number) {
   const accountIds = [...new Set(plans.map((row) => row.accountId))];
   const from = Temporal.PlainDate.from(asOf).subtract({ months: 13 }).subtract({ days: grace }).toString();
   const to = Temporal.PlainDate.from(asOf).add({ days: grace * 2 }).toString();
@@ -279,7 +249,7 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
         });
       }
     }
-    for (const date of occurrenceDates(scheduleOf(row), asOf, missedFrom)) {
+    for (const date of occurrenceDates(row, asOf, missedFrom)) {
       if (byDue.has(date.dueDate) || !isInboxMissed(date.dueDate, asOf, grace)) {
         continue;
       }
@@ -318,7 +288,7 @@ export function autoLink(db: Db, asOf: string, input: WriteInput & { accountId?:
         applyLinkedPlan(tx, plan, pair.transactionId);
       }
       const id = crypto.randomUUID();
-      const row: LinkRow = {
+      const row: OccurrenceLinkRow = {
         id,
         planId: pair.planId,
         dueDate: pair.dueDate,
@@ -332,7 +302,7 @@ export function autoLink(db: Db, asOf: string, input: WriteInput & { accountId?:
         entityId: id,
         action: "link",
         before: null,
-        after: linkSnapshot(row),
+        after: withoutId(row),
       });
     }
   });

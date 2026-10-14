@@ -1,62 +1,31 @@
-import { bucketEvents, buckets, fundingRuns, occurrenceLinks, recurringPlans, transactions } from "@num/db";
+import { bucketEvents, buckets, fundingRuns, occurrenceLinks, recurringPlans, transactions, type BucketRow, type RecurringPlanRow } from "@num/db";
 import {
-  bucketColors,
-  bucketKinds,
   buildMonthPlan,
-  businessDayShifts,
   isIsoDate,
   isYearMonth,
   Temporal,
-  planFrequencies,
-  planKinds,
-  type AmountMode,
-  type BucketColor,
-  type BucketKind,
-  type BusinessDayShift,
   type MonthPlan,
   type MonthPlanBucketSource,
   type MonthPlanLink,
   type MonthPlanSource,
-  type PlanKind,
-  type PlanSchedule,
 } from "@num/shared";
 import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
+import { literal } from "./transaction-sql";
 
-type PlanRow = typeof recurringPlans.$inferSelect;
-type BucketRow = typeof buckets.$inferSelect;
-
-function oneOf<T extends string>(value: string, allowed: readonly T[], label: string): T {
-  if (!(allowed as readonly string[]).includes(value)) {
-    throw new Error(label);
-  }
-  return value as T;
-}
-
-function scheduleOf(row: PlanRow): PlanSchedule {
-  return {
-    startDate: row.startDate,
-    endDate: row.endDate,
-    freq: oneOf(row.freq, planFrequencies, "Unknown frequency"),
-    interval: row.interval,
-    monthDay: row.monthDay,
-    businessDayShift: oneOf(row.businessDayShift, businessDayShifts, "Unknown shift") as BusinessDayShift,
-  };
-}
-
-function planOf(row: PlanRow): MonthPlanSource {
+function planOf(row: RecurringPlanRow): MonthPlanSource {
   return {
     id: row.id,
     name: row.name,
-    kind: oneOf(row.kind, planKinds, "Unknown plan kind") as PlanKind,
-    amountMode: oneOf(row.amountMode, ["fixed", "variable"] as const, "Unknown amount mode") as AmountMode,
+    kind: row.kind,
+    amountMode: row.amountMode,
     expectedAmount: row.expectedAmount,
     fundsBuckets: row.fundsBuckets,
     active: row.active,
     archived: row.archivedAt !== null,
-    schedule: scheduleOf(row),
+    schedule: row,
   };
 }
 
@@ -64,9 +33,9 @@ function bucketOf(row: BucketRow, actualFunded: number): MonthPlanBucketSource {
   return {
     id: row.id,
     name: row.name,
-    kind: oneOf(row.kind, bucketKinds, "Unknown bucket kind") as BucketKind,
+    kind: row.kind,
     priority: row.priority,
-    color: oneOf(row.color, bucketColors, "Unknown bucket color") as BucketColor,
+    color: row.color,
     archived: row.archivedAt !== null,
     balance: 0,
     refillTo: row.refillTo,
@@ -79,7 +48,7 @@ function bucketOf(row: BucketRow, actualFunded: number): MonthPlanBucketSource {
   };
 }
 
-function monthEnd(month: string): { start: string; end: string } {
+function monthEnd(month: string) {
   const start = Temporal.PlainDate.from(`${month}-01`);
   return { start: start.toString(), end: start.with({ day: start.daysInMonth }).toString() };
 }
@@ -128,23 +97,28 @@ export function readMonthPlan(db: Db, asOf: string, month: string | undefined): 
   return buildMonthPlan({ month: selected, asOf, plans, links, buckets: sources });
 }
 
-function loadLinks(db: Db, asOf: string, windowStart: string, windowEnd: string): MonthPlanLink[] {
+function loadLinks(db: Db, asOf: string, windowStart: string, windowEnd: string) {
   const windowRows = db
     .select()
     .from(occurrenceLinks)
     .where(and(gte(occurrenceLinks.dueDate, windowStart), lte(occurrenceLinks.dueDate, windowEnd)))
     .all();
-  const recent = db.all<{ planId: string; dueDate: string; amount: number }>(sql`
-    select plan_id as planId, due_date as dueDate, amount
-    from (
-      select l.plan_id, l.due_date, t.amount,
-             row_number() over (partition by l.plan_id order by l.due_date desc) as n
-      from occurrence_links l
-      inner join transactions t on t.id = l.transaction_id
-      where l.skipped = 0 and l.due_date <= ${asOf}
-    )
-    where n <= 6
-  `);
+  const ranked = db
+    .select({
+      planId: occurrenceLinks.planId,
+      dueDate: occurrenceLinks.dueDate,
+      amount: transactions.amount,
+      rank: sql<number>`row_number() over (partition by ${occurrenceLinks.planId} order by ${occurrenceLinks.dueDate} desc)`.as("rank"),
+    })
+    .from(occurrenceLinks)
+    .innerJoin(transactions, eq(transactions.id, occurrenceLinks.transactionId))
+    .where(and(eq(occurrenceLinks.skipped, literal(0)), lte(occurrenceLinks.dueDate, asOf)))
+    .as("ranked");
+  const recent = db
+    .select({ planId: ranked.planId, dueDate: ranked.dueDate, amount: ranked.amount })
+    .from(ranked)
+    .where(lte(ranked.rank, literal(6)))
+    .all();
   const txnIds = windowRows.flatMap((row) => (row.transactionId ? [row.transactionId] : []));
   const amounts = new Map<string, number>();
   if (txnIds.length > 0) {

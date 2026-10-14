@@ -1,7 +1,6 @@
 import {
   aiAccessSettingSchema,
   currencyUpdateSchema,
-  errorSchema,
   matchingSettingSchema,
   setupRequestSchema,
   setupResultSchema,
@@ -12,15 +11,7 @@ import type { Db } from "../db";
 import { aiCanWrite, changeAiAccess } from "../services/ai-access";
 import { bookCurrency, changeCurrency, changeMatching, matchingSetting, runSetup, setupStatus } from "../services/setup";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: {
-    "application/json": {
-      schema: errorSchema,
-    },
-  },
-} as const;
+import { errorResponse } from "./common";
 
 const setupStatusRoute = createRoute({
   operationId: "get_setup",

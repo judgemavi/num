@@ -1,9 +1,6 @@
 import { checkpoints } from "@num/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import type { Db } from "../db";
-import type { WriteTx } from "./write";
-
-type Reader = Db | WriteTx;
+import type { Reader } from "./write";
 
 export function latestCheckpointDate(db: Reader, accountId: string): string | null {
   const row = db

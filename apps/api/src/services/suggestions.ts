@@ -1,4 +1,4 @@
-import { accounts } from "@num/db";
+import { accounts, transactions } from "@num/db";
 import {
   normalizePayee,
   oppositeTransferAccount,
@@ -9,19 +9,15 @@ import {
   type Suggestion,
   type TransferPair,
 } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, ne, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { mortgageSuggestion } from "./mortgage-learned";
 import { transactionReconciled } from "./reconciled";
+import { isImported, isReconciled, lineCount, literal } from "./transaction-sql";
 import { loadMatchBook, mortgageLearnedFor, scorePayee } from "./match-book";
 import { linkLearnedTransfers, linkTransferPair } from "./transfer-auto";
-import { write, type AuditSource } from "./write";
-
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
+import { write, type WriteInput } from "./write";
 
 export function transferHint(db: Db, input: { accountId: string; date: string; amount: number }): { accountId: string | null } {
   const account = db.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, input.accountId)).get();
@@ -33,35 +29,27 @@ export function transferHint(db: Db, input: { accountId: string; date: string; a
   }
   const start = Temporal.PlainDate.from(input.date).subtract({ days: 3 }).toString();
   const end = Temporal.PlainDate.from(input.date).add({ days: 3 }).toString();
-  const rows = db.all<{ id: string; accountId: string; date: string; amount: number; status: string; lineCount: number }>(sql`
-    select
-      t.id as id,
-      t.account_id as accountId,
-      t.date as date,
-      t.amount as amount,
-      t.status as status,
-      (select count(*) from transaction_lines l where l.transaction_id = t.id) as lineCount
-    from transactions t
-    where 1 = 1
-      and t.transfer_peer_id is null
-      and t.account_id <> ${input.accountId}
-      and t.amount = ${-input.amount}
-      and t.date >= ${start}
-      and t.date <= ${end}
-  `);
-  return {
-    accountId: oppositeTransferAccount(
-      rows.map((row) => ({
-        id: row.id,
-        accountId: row.accountId,
-        date: row.date,
-        amount: row.amount,
-        lineCount: Number(row.lineCount),
-        reconciled: transactionReconciled(db, row.accountId, row.date),
-      })),
-      input,
-    ),
-  };
+  const rows = db
+    .select({
+      id: transactions.id,
+      accountId: transactions.accountId,
+      date: transactions.date,
+      amount: transactions.amount,
+      lineCount: lineCount(transactions.id),
+      reconciled: isReconciled(transactions),
+    })
+    .from(transactions)
+    .where(
+      and(
+        isNull(transactions.transferPeerId),
+        ne(transactions.accountId, input.accountId),
+        eq(transactions.amount, -input.amount),
+        gte(transactions.date, start),
+        lte(transactions.date, end),
+      ),
+    )
+    .all();
+  return { accountId: oppositeTransferAccount(rows, input) };
 }
 
 export function suggestForPayee(db: Db, accountId: string, rawPayee: string, amount: number, date?: string): Suggestion {
@@ -81,22 +69,30 @@ export function suggestForPayee(db: Db, accountId: string, rawPayee: string, amo
 
 export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[] } {
   const start = Temporal.PlainDate.from(asOf).subtract({ days: 90 }).toString();
-  const rows = db.all<{ id: string; accountId: string; date: string; amount: number; imported: number }>(sql`
-    select t.id as id, t.account_id as accountId, t.date as date, t.amount as amount,
-      (t.source = 'import' or t.import_row_id is not null) as imported
-    from transactions t
-    inner join accounts a on a.id = t.account_id
-    where 1 = 1
-      and t.transfer_peer_id is null
-      and a.on_budget = 1
-      and t.amount != 0
-      and t.date >= ${start}
-      and t.date <= ${asOf}
-    order by abs(t.amount), t.date, t.id
-  `);
+  const rows = db
+    .select({
+      id: transactions.id,
+      accountId: transactions.accountId,
+      date: transactions.date,
+      amount: transactions.amount,
+      imported: isImported,
+    })
+    .from(transactions)
+    .innerJoin(accounts, eq(accounts.id, transactions.accountId))
+    .where(
+      and(
+        isNull(transactions.transferPeerId),
+        eq(accounts.onBudget, literal(1)),
+        ne(transactions.amount, literal(0)),
+        gte(transactions.date, start),
+        lte(transactions.date, asOf),
+      ),
+    )
+    .orderBy(sql`abs(${transactions.amount})`, transactions.date, transactions.id)
+    .all();
   return {
     items: transferPairs(
-      rows.map((row) => ({ ...row, onBudget: true, linked: false, imported: row.imported === 1 })),
+      rows.map((row) => ({ ...row, onBudget: true, linked: false })),
       asOf,
     ),
   };

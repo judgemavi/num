@@ -1,53 +1,15 @@
-import { bucketEvents, buckets } from "@num/db";
-import { isIsoDate, utcNow, type BucketCover, type BucketEvent, type BucketEventCreate, type BucketEventKind } from "@num/shared";
+import { bucketEvents, buckets, type BucketEventRow } from "@num/db";
+import { isIsoDate, utcNow, type BucketCover, type BucketEvent, type BucketEventCreate } from "@num/shared";
 import { eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
 import { fundingPosition } from "./funding-book";
-import { write, type AuditSource, type WriteTx } from "./write";
+import { withoutId, write, type WriteTx, type WriteInput } from "./write";
 
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
+type EventWriteInput = WriteInput & {
   asOf?: string;
 };
-
-type EventRow = typeof bucketEvents.$inferSelect;
-
-function asKind(value: string): BucketEventKind {
-  if (value !== "fund" && value !== "move" && value !== "release") {
-    throw new Error("Unknown bucket event kind");
-  }
-  return value;
-}
-
-function snapshot(row: EventRow) {
-  return {
-    kind: row.kind,
-    bucketId: row.bucketId,
-    otherBucketId: row.otherBucketId,
-    amount: row.amount,
-    date: row.date,
-    note: row.note,
-    fundingRunId: row.fundingRunId,
-    undoneAt: row.undoneAt,
-  };
-}
-
-function toEvent(row: EventRow): BucketEvent {
-  return {
-    id: row.id,
-    kind: asKind(row.kind),
-    bucketId: row.bucketId,
-    otherBucketId: row.otherBucketId,
-    amount: row.amount,
-    date: row.date,
-    note: row.note,
-    fundingRunId: row.fundingRunId,
-    undoneAt: row.undoneAt,
-  };
-}
 
 function requireActiveBucket(tx: WriteTx, id: string) {
   const row = tx.select().from(buckets).where(eq(buckets.id, id)).get();
@@ -60,12 +22,12 @@ function requireActiveBucket(tx: WriteTx, id: string) {
   return row;
 }
 
-function cleanNote(note: string | null | undefined): string | null {
+function cleanNote(note: string | null | undefined) {
   const value = note?.trim() ?? "";
   return value.length > 0 ? value : null;
 }
 
-export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCreate & WriteInput): BucketEvent {
+export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCreate & EventWriteInput): BucketEvent {
   if (!isIsoDate(input.date) || !Number.isSafeInteger(input.amount) || input.amount < 1) {
     throw new ServiceError("bucket_fields_invalid", 400);
   }
@@ -77,8 +39,7 @@ export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCr
     throw new ServiceError("bucket_same", 400);
   }
   const id = crypto.randomUUID();
-  let created: BucketEvent | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     requireActiveBucket(tx, bucketId);
     if (otherBucketId) {
       requireActiveBucket(tx, otherBucketId);
@@ -101,7 +62,7 @@ export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCr
         throw new ServiceError("release_over_balance", 409);
       }
     }
-    const row: EventRow = {
+    const row: BucketEventRow = {
       id,
       kind: input.kind,
       bucketId,
@@ -118,20 +79,15 @@ export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCr
       entityId: id,
       action: "create",
       before: null,
-      after: snapshot(row),
+      after: withoutId(row),
     });
-    created = toEvent(row);
+    return row;
   });
-  if (!created) {
-    throw new Error("Create did not return an event");
-  }
-  return created;
 }
 
-export function undoBucketEvent(db: Db, bucketId: string, eventId: string, input: WriteInput): BucketEvent {
+export function undoBucketEvent(db: Db, bucketId: string, eventId: string, input: EventWriteInput): BucketEvent {
   const at = input.at ?? utcNow();
-  let undone: BucketEvent | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const existing = tx.select().from(bucketEvents).where(eq(bucketEvents.id, eventId)).get();
     if (!existing || existing.bucketId !== bucketId) {
       throw new ServiceError("event_not_found", 404);
@@ -148,15 +104,11 @@ export function undoBucketEvent(db: Db, bucketId: string, eventId: string, input
       entity: "bucket_events",
       entityId: eventId,
       action: "undo",
-      before: snapshot(existing),
-      after: snapshot(next),
+      before: withoutId(existing),
+      after: withoutId(next),
     });
-    undone = toEvent(next);
+    return next;
   });
-  if (!undone) {
-    throw new Error("Undo did not return an event");
-  }
-  return undone;
 }
 
 export function listBucketEvents(db: Db): { items: BucketEvent[] } {
@@ -167,10 +119,10 @@ export function listBucketEvents(db: Db): { items: BucketEvent[] } {
     }
     return left.id < right.id ? 1 : -1;
   });
-  return { items: rows.map(toEvent) };
+  return { items: rows };
 }
 
-export function coverBucket(db: Db, bucketId: string, input: BucketCover & WriteInput): BucketEvent {
+export function coverBucket(db: Db, bucketId: string, input: BucketCover & EventWriteInput): BucketEvent {
   if (!isIsoDate(input.date)) {
     throw new ServiceError("bucket_fields_invalid", 400);
   }
@@ -178,8 +130,7 @@ export function coverBucket(db: Db, bucketId: string, input: BucketCover & Write
     throw new ServiceError("bucket_same", 400);
   }
   const id = crypto.randomUUID();
-  let created: BucketEvent | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     requireActiveBucket(tx, bucketId);
     requireActiveBucket(tx, input.fromBucketId);
     const balances = bucketBalances(tx);
@@ -192,7 +143,7 @@ export function coverBucket(db: Db, bucketId: string, input: BucketCover & Write
     if (available < need) {
       throw new ServiceError("bucket_short", 409);
     }
-    const row: EventRow = {
+    const row: BucketEventRow = {
       id,
       kind: "move",
       bucketId: input.fromBucketId,
@@ -209,12 +160,8 @@ export function coverBucket(db: Db, bucketId: string, input: BucketCover & Write
       entityId: id,
       action: "create",
       before: null,
-      after: snapshot(row),
+      after: withoutId(row),
     });
-    created = toEvent(row);
+    return row;
   });
-  if (!created) {
-    throw new Error("Cover did not return an event");
-  }
-  return created;
 }

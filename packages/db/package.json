@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@num/shared": "workspace:*",
     "drizzle-orm": "^0.45.3"
   },
   "devDependencies": {

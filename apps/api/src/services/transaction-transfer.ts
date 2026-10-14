@@ -1,19 +1,20 @@
-import { transactionLines, transactions } from "@num/db";
-import { chooseTransferMatch, utcNow } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
+import { transactionLines, transactions, type TransactionRow } from "@num/db";
+import { chooseTransferMatch, utcNow, type TransactionSource } from "@num/shared";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import { ServiceError } from "../service-error";
-import { transactionReconciled } from "./reconciled";
+import { dateIsReconciled, latestCheckpointDate } from "./reconciled";
 import { eraseTransaction } from "./transaction-erase";
 import { loadLines, replaceLines, type StoredLine } from "./transaction-lines";
-import { auditTransaction, automaticPair, headerForWrite, readTransaction, toTransaction, type Header, type TxRow } from "./transaction-record";
+import { auditTransaction, automaticPair, headerForWrite, readTransaction, toTransaction, type AutoStamp, type Header } from "./transaction-record";
 import { transferLine, type NormalizedLine } from "./transaction-rules";
+import { lineCount } from "./transaction-sql";
 import type { WriteTx } from "./write";
 
 export function insertMirror(
   tx: WriteTx,
   sourceId: string,
   header: Header,
-  source: string,
+  source: TransactionSource,
   targetAccountId: string,
   line: NormalizedLine,
   markEdited: boolean,
@@ -91,28 +92,27 @@ function linkMatch(tx: WriteTx, sourceId: string, sourceAccountId: string, match
   auditTransaction(tx, matchId, "update", before, readTransaction(tx, matchId));
 }
 
-function findTransferMatch(tx: WriteTx, input: { sourceId: string; targetAccountId: string; date: string; lineAmount: number }): string | null {
-  const rows = tx.all<{ id: string; date: string; amount: number; status: string; lineCount: number }>(sql`
-    select
-      t.id as id,
-      t.date as date,
-      t.amount as amount,
-      t.status as status,
-      (select count(*) from transaction_lines l where l.transaction_id = t.id) as lineCount
-    from transactions t
-    where t.transfer_peer_id is null
-      and t.id <> ${input.sourceId}
-      and t.account_id = ${input.targetAccountId}
-      and t.amount = ${-input.lineAmount}
-  `);
+function findTransferMatch(tx: WriteTx, input: { sourceId: string; targetAccountId: string; date: string; lineAmount: number }) {
+  const rows = tx
+    .select({
+      id: transactions.id,
+      date: transactions.date,
+      amount: transactions.amount,
+      lineCount: lineCount(transactions.id),
+    })
+    .from(transactions)
+    .where(
+      and(
+        isNull(transactions.transferPeerId),
+        ne(transactions.id, input.sourceId),
+        eq(transactions.accountId, input.targetAccountId),
+        eq(transactions.amount, -input.lineAmount),
+      ),
+    )
+    .all();
+  const checkpoint = latestCheckpointDate(tx, input.targetAccountId);
   return chooseTransferMatch(
-    rows.map((row) => ({
-      id: row.id,
-      date: row.date,
-      amount: row.amount,
-      lineCount: Number(row.lineCount),
-      reconciled: transactionReconciled(tx, input.targetAccountId, row.date),
-    })),
+    rows.map((row) => ({ ...row, reconciled: dateIsReconciled(row.date, checkpoint) })),
     { date: input.date, lineAmount: input.lineAmount },
   );
 }
@@ -121,7 +121,7 @@ export function attachTransfer(
   tx: WriteTx,
   sourceId: string,
   header: Header,
-  source: string,
+  source: TransactionSource,
   line: NormalizedLine,
   markEdited = true,
 ): void {
@@ -142,7 +142,7 @@ export function attachTransfer(
   insertMirror(tx, sourceId, header, source, target, line, markEdited);
 }
 
-function releasePeer(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: StoredLine[], at: string): void {
+function releasePeer(tx: WriteTx, sourceId: string, peer: TransactionRow, peerLines: StoredLine[], at: string): void {
   const before = toTransaction(tx, peer, peerLines);
   tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, sourceId)).run();
   if (peer.mirror) {
@@ -170,8 +170,8 @@ function releasePeer(tx: WriteTx, sourceId: string, peer: TxRow, peerLines: Stor
 
 function rewriteMirror(
   tx: WriteTx,
-  source: TxRow,
-  peer: TxRow,
+  source: TransactionRow,
+  peer: TransactionRow,
   peerLines: StoredLine[],
   header: Header,
   line: NormalizedLine,
@@ -201,14 +201,14 @@ function rewriteMirror(
 
 export function applyMirrorEdit(
   tx: WriteTx,
-  existing: TxRow,
+  existing: TransactionRow,
   existingLines: StoredLine[],
-  peer: TxRow,
+  peer: TransactionRow,
   peerLines: StoredLine[],
   header: Header,
   lines: NormalizedLine[],
   at: string,
-  auto: { autoReason: string | null; autoSourceId: string | null; autoConfidence: number | null },
+  auto: AutoStamp,
 ): void {
   const line = lines[0];
   if (lines.length !== 1 || !line || line.transferAccountId !== peer.accountId) {
@@ -244,14 +244,14 @@ export function applyMirrorEdit(
 
 export function applySourceEdit(
   tx: WriteTx,
-  existing: TxRow,
+  existing: TransactionRow,
   existingLines: StoredLine[],
-  peer: TxRow | null,
+  peer: TransactionRow | null,
   peerLines: StoredLine[],
   header: Header,
   lines: NormalizedLine[],
   at: string,
-  auto: { autoReason: string | null; autoSourceId: string | null; autoConfidence: number | null },
+  auto: AutoStamp,
 ): void {
   const before = toTransaction(tx, existing, existingLines);
   tx.update(transactions)

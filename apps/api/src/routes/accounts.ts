@@ -5,26 +5,13 @@ import {
   accountSchema,
   accountUpdateSchema,
   archiveAccountSchema,
-  errorSchema,
   openingSuggestionSchema,
 } from "@num/shared";
-import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { applyOpeningSuggestion, archiveAccount, createAccount, getAccount, listAccounts, restoreAccount, updateAccount } from "../services/accounts";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: {
-    "application/json": {
-      schema: errorSchema,
-    },
-  },
-} as const;
-
-const idParams = z.object({
-  id: z.uuid(),
-});
+import { errorResponse, idParams } from "./common";
 
 const listRoute = createRoute({
   operationId: "list_accounts",

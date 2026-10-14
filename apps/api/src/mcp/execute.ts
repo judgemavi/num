@@ -12,7 +12,7 @@ function errorResult(code: string, params: Record<string, string> = {}): CallToo
   return { ...toolResult({ code, params }), isError: true };
 }
 
-async function responseBody(response: Response): Promise<unknown> {
+async function responseBody(response: Response) {
   const type = response.headers.get("content-type") ?? "";
   if (type.includes("application/json")) {
     return response.json();

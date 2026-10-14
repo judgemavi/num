@@ -1,10 +1,9 @@
-import { accounts, categories, merchants, recurringPlans } from "@num/db";
+import { accounts, categories, merchants, recurringPlans, type RecurringPlanRow } from "@num/db";
 import {
   Temporal,
   utcNow,
   type Plan,
   type PlanCreate,
-  type PlanFrequency,
   type PlanKind,
   type PlanListQuery,
   type PlanUpdate,
@@ -12,46 +11,10 @@ import {
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { write, type AuditSource, type WriteTx } from "./write";
+import { keepOmitted, withoutId, write, type WriteTx, type WriteInput } from "./write";
+import { compareText, pageOf } from "./paging";
 
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-type PlanRow = typeof recurringPlans.$inferSelect;
-
-type PlanFields = {
-  name: string;
-  kind: PlanKind;
-  accountId: string;
-  expectedAmount: number;
-  tolerance: number;
-  amountMode: Plan["amountMode"];
-  categoryId: string | null;
-  transferAccountId: string | null;
-  merchantId: string | null;
-  startDate: string;
-  freq: PlanFrequency;
-  interval: number;
-  monthDay: number | null;
-  businessDayShift: Plan["businessDayShift"];
-  endDate: string | null;
-  active: boolean;
-  fundsBuckets: boolean;
-};
-
-function compareText(left: string, right: string): number {
-  if (left < right) {
-    return -1;
-  }
-  if (left > right) {
-    return 1;
-  }
-  return 0;
-}
-
-function compareName(left: string, right: string): number {
+function compareName(left: string, right: string) {
   const folded = compareText(left.toLowerCase(), right.toLowerCase());
   if (folded !== 0) {
     return folded;
@@ -59,73 +22,7 @@ function compareName(left: string, right: string): number {
   return compareText(left, right);
 }
 
-export function toPlan(row: PlanRow): Plan {
-  return {
-    id: row.id,
-    name: row.name,
-    kind: row.kind as PlanKind,
-    accountId: row.accountId,
-    expectedAmount: row.expectedAmount,
-    tolerance: row.tolerance,
-    amountMode: row.amountMode as Plan["amountMode"],
-    categoryId: row.categoryId,
-    transferAccountId: row.transferAccountId,
-    merchantId: row.merchantId,
-    startDate: row.startDate,
-    freq: row.freq as PlanFrequency,
-    interval: row.interval,
-    monthDay: row.monthDay,
-    businessDayShift: row.businessDayShift as Plan["businessDayShift"],
-    endDate: row.endDate,
-    active: row.active,
-    fundsBuckets: row.fundsBuckets,
-    archivedAt: row.archivedAt,
-  };
-}
-
-function snapshot(row: {
-  name: string;
-  kind: string;
-  accountId: string;
-  expectedAmount: number;
-  tolerance: number;
-  amountMode: string;
-  categoryId: string | null;
-  transferAccountId: string | null;
-  merchantId: string | null;
-  startDate: string;
-  freq: string;
-  interval: number;
-  monthDay: number | null;
-  businessDayShift: string;
-  endDate: string | null;
-  active: boolean;
-  fundsBuckets: boolean;
-  archivedAt: string | null;
-}) {
-  return {
-    name: row.name,
-    kind: row.kind,
-    accountId: row.accountId,
-    expectedAmount: row.expectedAmount,
-    tolerance: row.tolerance,
-    amountMode: row.amountMode,
-    categoryId: row.categoryId,
-    transferAccountId: row.transferAccountId,
-    merchantId: row.merchantId,
-    startDate: row.startDate,
-    freq: row.freq,
-    interval: row.interval,
-    monthDay: row.monthDay,
-    businessDayShift: row.businessDayShift,
-    endDate: row.endDate,
-    active: row.active,
-    fundsBuckets: row.fundsBuckets,
-    archivedAt: row.archivedAt,
-  };
-}
-
-function fieldsOf(input: PlanCreate | PlanUpdate): PlanFields {
+function fieldsOf(input: PlanCreate) {
   const transfer = input.kind === "transfer";
   return {
     name: input.name.trim(),
@@ -147,6 +44,8 @@ function fieldsOf(input: PlanCreate | PlanUpdate): PlanFields {
     fundsBuckets: input.kind === "income" ? input.fundsBuckets : false,
   };
 }
+
+type PlanFields = ReturnType<typeof fieldsOf>;
 
 function assertFields(value: PlanFields) {
   if (value.kind === "transfer") {
@@ -219,7 +118,7 @@ function assertRefs(tx: WriteTx, value: PlanFields) {
   }
 }
 
-function requirePlan(tx: WriteTx, id: string): PlanRow {
+function requirePlan(tx: WriteTx, id: string): RecurringPlanRow {
   const row = tx.select().from(recurringPlans).where(eq(recurringPlans.id, id)).get();
   if (!row) {
     throw new ServiceError("plan_not_found", 404);
@@ -232,7 +131,7 @@ export function getPlan(db: Db, id: string): Plan {
   if (!row) {
     throw new ServiceError("plan_not_found", 404);
   }
-  return toPlan(row);
+  return row;
 }
 
 export function listPlans(db: Db, query: PlanListQuery) {
@@ -254,8 +153,7 @@ export function listPlans(db: Db, query: PlanListQuery) {
         return false;
       }
       return true;
-    })
-    .map(toPlan);
+    });
   const dir = query.dir === "desc" ? -1 : 1;
   const sort = query.sort ?? "name";
   rows.sort((left, right) => {
@@ -268,13 +166,7 @@ export function listPlans(db: Db, query: PlanListQuery) {
     }
     return compareText(left.id, right.id);
   });
-  const start = (query.page - 1) * query.pageSize;
-  return {
-    items: rows.slice(start, start + query.pageSize),
-    page: query.page,
-    pageSize: query.pageSize,
-    total: rows.length,
-  };
+  return pageOf(rows, query);
 }
 
 export function createPlan(db: Db, input: PlanCreate & WriteInput): Plan {
@@ -289,17 +181,26 @@ export function createPlan(db: Db, input: PlanCreate & WriteInput): Plan {
       entityId: id,
       action: "create",
       before: null,
-      after: snapshot(row),
+      after: withoutId(row),
     });
   });
-  return toPlan(row);
+  return row;
 }
 
+/** A field that the update leaves out keeps its stored value. An explicit null clears a field that can be empty. */
 export function updatePlan(db: Db, id: string, input: PlanUpdate & WriteInput): Plan {
-  const value = fieldsOf(input);
-  let updated: Plan | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = requirePlan(tx, id);
+    const value = fieldsOf({
+      ...input,
+      categoryId: keepOmitted(input.categoryId, existing.categoryId),
+      transferAccountId: keepOmitted(input.transferAccountId, existing.transferAccountId),
+      merchantId: keepOmitted(input.merchantId, existing.merchantId),
+      monthDay: keepOmitted(input.monthDay, existing.monthDay),
+      endDate: keepOmitted(input.endDate, existing.endDate),
+      active: keepOmitted(input.active, existing.active),
+      fundsBuckets: keepOmitted(input.fundsBuckets, existing.fundsBuckets),
+    });
     assertRefs(tx, value);
     const next = { ...value, archivedAt: existing.archivedAt };
     tx.update(recurringPlans).set(value).where(eq(recurringPlans.id, id)).run();
@@ -307,21 +208,16 @@ export function updatePlan(db: Db, id: string, input: PlanUpdate & WriteInput): 
       entity: "recurring_plans",
       entityId: id,
       action: "update",
-      before: snapshot(existing),
-      after: snapshot(next),
+      before: withoutId(existing),
+      after: next,
     });
-    updated = toPlan({ id, ...next });
+    return { id, ...next };
   });
-  if (!updated) {
-    throw new Error("Update did not return a plan");
-  }
-  return updated;
 }
 
 export function archivePlan(db: Db, id: string, input: WriteInput): Plan {
   const at = input.at ?? utcNow();
-  let archived: Plan | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const existing = requirePlan(tx, id);
     if (existing.archivedAt) {
       throw new ServiceError("plan_archived", 409);
@@ -332,20 +228,15 @@ export function archivePlan(db: Db, id: string, input: WriteInput): Plan {
       entity: "recurring_plans",
       entityId: id,
       action: "archive",
-      before: snapshot(existing),
-      after: snapshot(next),
+      before: withoutId(existing),
+      after: withoutId(next),
     });
-    archived = toPlan(next);
+    return next;
   });
-  if (!archived) {
-    throw new Error("Archive did not return a plan");
-  }
-  return archived;
 }
 
 export function restorePlan(db: Db, id: string, input: WriteInput): Plan {
-  let restored: Plan | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = requirePlan(tx, id);
     if (!existing.archivedAt) {
       throw new ServiceError("plan_not_archived", 409);
@@ -356,13 +247,9 @@ export function restorePlan(db: Db, id: string, input: WriteInput): Plan {
       entity: "recurring_plans",
       entityId: id,
       action: "restore",
-      before: snapshot(existing),
-      after: snapshot(next),
+      before: withoutId(existing),
+      after: withoutId(next),
     });
-    restored = toPlan(next);
+    return next;
   });
-  if (!restored) {
-    throw new Error("Restore did not return a plan");
-  }
-  return restored;
 }

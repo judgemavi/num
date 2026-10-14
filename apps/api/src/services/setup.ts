@@ -1,9 +1,10 @@
 import { categories, categoryGroups, settings, transactions } from "@num/db";
-import { confidenceModes, minorUnitDigits, type CategorySet, type ConfidenceMode, type CurrencyCode } from "@num/shared";
+import { minorUnitDigits, type CategorySet, type ConfidenceMode, type CurrencyCode } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { defaultCategoryGroups } from "./default-categories";
+import { confidenceMode } from "./match-book";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 const settingDefaults = [
@@ -156,11 +157,7 @@ export function changeCurrency(db: Db, input: CurrencyInput): { currency: Curren
 }
 
 export function matchingSetting(db: Db): { autoConfidence: ConfidenceMode } {
-  const row = db.select().from(settings).where(eq(settings.key, "autoConfidence")).get();
-  if (row && (confidenceModes as readonly string[]).includes(row.value)) {
-    return { autoConfidence: row.value as ConfidenceMode };
-  }
-  return { autoConfidence: "balanced" };
+  return { autoConfidence: confidenceMode(db) };
 }
 
 export function changeMatching(db: Db, input: { autoConfidence: ConfidenceMode; source: AuditSource; at?: string }): { autoConfidence: ConfidenceMode } {

@@ -24,14 +24,14 @@ export type OccurrenceDate = {
   dueDate: string;
 };
 
-function clampDay(month: Temporal.PlainDate, monthDay: number): Temporal.PlainDate {
+function clampDay(month: Temporal.PlainDate, monthDay: number) {
   if (monthDay === -1) {
     return month.with({ day: month.daysInMonth });
   }
   return month.with({ day: Math.min(monthDay, month.daysInMonth) });
 }
 
-function nominalOn(start: Temporal.PlainDate, plan: PlanSchedule, index: number): Temporal.PlainDate {
+function nominalOn(start: Temporal.PlainDate, plan: PlanSchedule, index: number) {
   const step = plan.interval * index;
   if (plan.freq === "weekly") {
     return start.add({ days: step * 7 });
@@ -63,7 +63,7 @@ export function occurrenceAt(plan: PlanSchedule, index: number): OccurrenceDate 
   };
 }
 
-function firstIndex(plan: PlanSchedule, from: Temporal.PlainDate): number {
+function firstIndex(plan: PlanSchedule, from: Temporal.PlainDate) {
   const start = Temporal.PlainDate.from(plan.startDate);
   if (Temporal.PlainDate.compare(from, start) <= 0) {
     return 0;
@@ -194,7 +194,7 @@ export type AmbiguousLink = {
   transactionIds: string[];
 };
 
-function occurrenceKey(planId: string, dueDate: string): string {
+function occurrenceKey(planId: string, dueDate: string) {
   return `${planId}|${dueDate}`;
 }
 
@@ -215,7 +215,7 @@ export function isLinkCandidate(
   return withinTolerance(transaction.amount, occurrence.expectedAmount, occurrence.tolerance);
 }
 
-function lowerBound(rows: readonly LinkTransaction[], date: string): number {
+function lowerBound(rows: readonly LinkTransaction[], date: string) {
   let low = 0;
   let high = rows.length;
   while (low < high) {
@@ -229,7 +229,7 @@ function lowerBound(rows: readonly LinkTransaction[], date: string): number {
   return low;
 }
 
-function upperBound(rows: readonly LinkTransaction[], date: string): number {
+function upperBound(rows: readonly LinkTransaction[], date: string) {
   let low = 0;
   let high = rows.length;
   while (low < high) {

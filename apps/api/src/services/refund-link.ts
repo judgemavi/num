@@ -6,7 +6,7 @@ import {
   refundWindowStart,
   type RefundPurchaseItem,
 } from "@num/shared";
-import { and, eq, gte, lt, lte } from "drizzle-orm";
+import { and, eq, gte, isNotNull, lt, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import type { NormalizedLine } from "./transaction-rules";
@@ -100,29 +100,23 @@ export function listRefundPurchases(
       payeeRaw: transactions.payeeRaw,
       payeeNormalized: transactions.payeeNormalized,
       merchantId: transactions.merchantId,
+      categoryId: transactionLines.categoryId,
     })
     .from(transactions)
+    .innerJoin(transactionLines, eq(transactionLines.transactionId, transactions.id))
     .where(
       and(
         eq(transactions.mirror, false),
         lt(transactions.amount, 0),
         gte(transactions.date, start),
         lte(transactions.date, input.asOf),
+        isNotNull(transactionLines.categoryId),
       ),
     )
+    .orderBy(sql`${transactionLines}.rowid`)
     .all();
-  const withCategory = rows.flatMap((row) => {
-    const line = db
-      .select({ categoryId: transactionLines.categoryId })
-      .from(transactionLines)
-      .where(eq(transactionLines.transactionId, row.id))
-      .all()
-      .find((item) => item.categoryId !== null);
-    if (!line?.categoryId) {
-      return [];
-    }
-    return [{ ...row, categoryId: line.categoryId }];
-  });
+  // A purchase with several lines counts one time, with the category of its first line that has one.
+  const withCategory = [...new Map(rows.toReversed().map((row) => [row.id, row])).values()];
   const payee = normalizePayee(input.payee ?? "");
   return rankRefundPurchases(input.asOf, payee, withCategory).flatMap((row) => {
     if (row.categoryId === null) {

@@ -11,11 +11,11 @@ const numberPattern = /^(\d+)(?:\.(\d+))?$/;
 const signMarker = /\b(?:CR|DR)\b/i;
 const currencyWords = new Set<string>([...currencyCodes.map((code) => code.toLowerCase()), "kr"]);
 
-function normalizeLeadingSign(text: string): string {
+function normalizeLeadingSign(text: string) {
   return text.replace(/(^|[^\d])[−–](?=\s*\d)/g, "$1-");
 }
 
-function hasUnknownLetters(text: string): boolean {
+function hasUnknownLetters(text: string) {
   for (const word of text.match(/\p{L}+/gu) ?? []) {
     if (!currencyWords.has(word.toLowerCase())) {
       return true;

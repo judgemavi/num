@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { columnMapSchema } from "./statement";
-import { listQuerySchema, pagedResponseSchema } from "./list";
+import { archivedQuery, listQuerySchema, pagedResponseSchema } from "./list";
 import { interestRateMilliPctSchema } from "./rate";
 import { isUtcTimestamp } from "./time";
 import { centsSchema } from "./money";
@@ -99,6 +99,23 @@ const accountFields = {
     }),
 };
 
+/** The card field that is not correct for the account kind. null when the card fields are correct. */
+export function cardFieldIssue(value: {
+  kind: AccountKind;
+  paymentPolicy?: PaymentPolicy | null;
+  fixedPayment?: number | null;
+}): "paymentPolicy" | "fixedPayment" | null {
+  const policy = value.paymentPolicy ?? null;
+  const fixed = value.fixedPayment ?? null;
+  if (value.kind !== "credit_card") {
+    return policy !== null || fixed !== null ? "paymentPolicy" : null;
+  }
+  if (policy === null) {
+    return "paymentPolicy";
+  }
+  return (policy === "fixed") === (fixed === null) ? "fixedPayment" : null;
+}
+
 function cardAndRateOk(
   value: {
     kind: AccountKind;
@@ -110,18 +127,9 @@ function cardAndRateOk(
   },
   context: z.RefinementCtx,
 ): void {
-  const policy = value.paymentPolicy ?? null;
-  const fixed = value.fixedPayment ?? null;
-  if (value.kind === "credit_card") {
-    if (policy === null) {
-      context.addIssue({ code: "custom", path: ["paymentPolicy"] });
-    } else if (policy === "fixed" && fixed === null) {
-      context.addIssue({ code: "custom", path: ["fixedPayment"] });
-    } else if (policy !== "fixed" && fixed !== null) {
-      context.addIssue({ code: "custom", path: ["fixedPayment"] });
-    }
-  } else if (policy !== null || fixed !== null) {
-    context.addIssue({ code: "custom", path: ["paymentPolicy"] });
+  const cardField = cardFieldIssue(value);
+  if (cardField) {
+    context.addIssue({ code: "custom", path: [cardField] });
   }
   if ((value.mortgageTerms ?? null) !== null) {
     if (value.kind !== "mortgage") {
@@ -174,10 +182,7 @@ export const accountSchema = z.object({
 });
 
 export const accountListQuerySchema = listQuerySchema(["name", "kind"]).extend({
-  archived: z
-    .union([z.boolean(), z.enum(["true", "false"])])
-    .optional()
-    .transform((value) => value === true || value === "true"),
+  ...archivedQuery,
 });
 
 export const accountListSchema = pagedResponseSchema(accountSchema);

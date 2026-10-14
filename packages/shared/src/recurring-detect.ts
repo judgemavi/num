@@ -29,11 +29,11 @@ const detectionPatterns: { freq: PlanFrequency; interval: number }[] = [
   { freq: "yearly", interval: 1 },
 ];
 
-function gapDays(left: Temporal.PlainDate, right: Temporal.PlainDate): number {
+function gapDays(left: Temporal.PlainDate, right: Temporal.PlainDate) {
   return left.until(right, { largestUnit: "day" }).days;
 }
 
-function expectedGap(previous: Temporal.PlainDate, freq: PlanFrequency, interval: number): number {
+function expectedGap(previous: Temporal.PlainDate, freq: PlanFrequency, interval: number) {
   if (freq === "weekly") {
     return 7 * interval;
   }
@@ -43,7 +43,7 @@ function expectedGap(previous: Temporal.PlainDate, freq: PlanFrequency, interval
   return gapDays(previous, previous.add({ years: interval }));
 }
 
-function withinTenPercent(amounts: readonly number[]): boolean {
+function withinTenPercent(amounts: readonly number[]) {
   const mid = medianMinor(amounts);
   if (mid === 0) {
     return amounts.every((amount) => amount === 0);

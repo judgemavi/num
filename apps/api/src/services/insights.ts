@@ -10,7 +10,7 @@ import { categoryRow, donutRows, spendRows, spendTotals } from "./insights-spend
 import { readTimeline } from "./insights-timeline";
 import { netWorthSeries, type MonthPoint } from "./insights-worth";
 
-function monthEnds(asOf: string, count: number): MonthPoint[] {
+function monthEnds(asOf: string, count: number) {
   const end = Temporal.PlainDate.from(asOf).with({ day: 1 });
   const start = end.subtract({ months: count - 1 });
   const points: MonthPoint[] = [];

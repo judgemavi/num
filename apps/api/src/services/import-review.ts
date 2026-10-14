@@ -7,14 +7,9 @@ import { labelFields } from "./match-apply";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { linkAutomatic } from "./auto-link";
 import { auditTransaction, readTransaction } from "./transaction-record";
-import { write, type AuditSource, type WriteTx } from "./write";
+import { write, type WriteTx, type WriteInput } from "./write";
 
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-function withinThreeDays(left: string, right: string): boolean {
+function withinThreeDays(left: string, right: string) {
   const days = Temporal.PlainDate.from(left).until(Temporal.PlainDate.from(right), { largestUnit: "day" }).days;
   return Math.abs(days) <= 3;
 }
@@ -90,8 +85,7 @@ export function resolveImportReview(
   if (!preview || preview.outcome !== "needs_review" || !preview.active) {
     throw new ServiceError("import_review_not_found", 404);
   }
-  let result: { importRowId: string; transactionId: string } | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const row = requireReview(tx, id);
     if (decision.decision === "match") {
       const txn = tx.select().from(transactions).where(eq(transactions.id, decision.transactionId)).get();
@@ -108,13 +102,8 @@ export function resolveImportReview(
       tx.update(importRows).set({ outcome: "matched", transactionId: txn.id, previousStatus: txn.status }).where(eq(importRows.id, row.id)).run();
       tx.update(transactions).set({ importRowId: row.id, status: "cleared" }).where(eq(transactions.id, txn.id)).run();
       auditTransaction(tx, txn.id, "update", before, readTransaction(tx, txn.id));
-      result = { importRowId: row.id, transactionId: txn.id };
-      return;
+      return { importRowId: row.id, transactionId: txn.id };
     }
-    result = { importRowId: row.id, transactionId: createFromReview(tx, row) };
+    return { importRowId: row.id, transactionId: createFromReview(tx, row) };
   });
-  if (!result) {
-    throw new Error("Review did not return a transaction");
-  }
-  return result;
 }

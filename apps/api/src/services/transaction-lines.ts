@@ -1,10 +1,7 @@
 import { lineTags, transactionLines } from "@num/db";
 import { eq, inArray, sql } from "drizzle-orm";
-import type { Db } from "../db";
 import type { NormalizedLine } from "./transaction-rules";
-import type { WriteTx } from "./write";
-
-type Reader = Db | WriteTx;
+import type { WriteTx, Reader } from "./write";
 
 export type StoredLine = NormalizedLine & { id: string };
 

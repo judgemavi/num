@@ -8,6 +8,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { autoReasons, transactionSources, transactionStatuses } from "@num/shared";
 import { accounts } from "./accounts";
 import { categories, merchants, tags } from "./categories";
 import { importRows } from "./imports";
@@ -25,8 +26,8 @@ export const transactions = sqliteTable(
     notes: text("notes"),
     payeeRaw: text("payee_raw").notNull(),
     payeeNormalized: text("payee_normalized").notNull(),
-    status: text("status").notNull(),
-    source: text("source").notNull(),
+    status: text("status", { enum: transactionStatuses }).notNull(),
+    source: text("source", { enum: transactionSources }).notNull(),
     importRowId: text("import_row_id")
       .unique()
       .references(() => importRows.id),
@@ -34,7 +35,7 @@ export const transactions = sqliteTable(
       .unique()
       .references((): AnySQLiteColumn => transactions.id),
     mirror: integer("mirror", { mode: "boolean" }).notNull().default(false),
-    autoReason: text("auto_reason"),
+    autoReason: text("auto_reason", { enum: autoReasons }),
     autoConfidence: integer("auto_confidence"),
     autoSourceId: text("auto_source_id"),
     refundOfId: text("refund_of_id").references((): AnySQLiteColumn => transactions.id),
@@ -48,6 +49,7 @@ export const transactions = sqliteTable(
     index("transactions_payee_normalized").on(table.payeeNormalized, table.date, table.id),
   ],
 );
+export type TransactionRow = typeof transactions.$inferSelect;
 
 export const transactionLines = sqliteTable(
   "transaction_lines",

@@ -39,7 +39,7 @@ const REGIONS = new Set([
   "IT", "NL", "BE", "SE", "NO", "DK", "FI", "JP", "MX", "IN", "SG", "HK", "US",
 ]);
 
-function stripPrefixes(value: string): string {
+function stripPrefixes(value: string) {
   let current = value;
   for (let pass = 0; pass < 4; pass += 1) {
     let next = current;
@@ -62,24 +62,24 @@ function stripPrefixes(value: string): string {
 }
 
 /** A per-payment code: 3+ letters and digits, with no hyphen or other mark. */
-function isReferenceCode(token: string): boolean {
+function isReferenceCode(token: string) {
   return token.length >= 3 && /^[\p{L}\p{N}]+$/u.test(token) && /\p{L}/u.test(token) && /\p{N}/u.test(token);
 }
 
 /** Two or more * , or * with a digit, or XX at the start hides the token. One * before a word is a separator. */
-function isMaskedToken(token: string): boolean {
+function isMaskedToken(token: string) {
   return /^\*{2,}/.test(token) || /^\*.*\d/.test(token) || /^X{2,}/.test(token) || /^X+\*/.test(token);
 }
 
-function isStoreNumber(token: string): boolean {
+function isStoreNumber(token: string) {
   return /^\d+$/.test(token);
 }
 
-function hasRealWord(value: string): boolean {
+function hasRealWord(value: string) {
   return value.split(" ").some((word) => /\p{L}{2,}/u.test(word) && !isReferenceCode(word) && !REGIONS.has(word));
 }
 
-function stripTrailingCodes(value: string): string {
+function stripTrailingCodes(value: string) {
   const words = value.split(" ").filter((word) => word.length > 0);
   while (words.length > 1 && (isReferenceCode(words[words.length - 1] ?? "") || isStoreNumber(words[words.length - 1] ?? ""))) {
     words.pop();
@@ -87,14 +87,14 @@ function stripTrailingCodes(value: string): string {
   return words.join(" ");
 }
 
-function stripMaskedTokens(value: string): string {
+function stripMaskedTokens(value: string) {
   return value
     .split(" ")
     .filter((word) => word.length === 0 || !isMaskedToken(word))
     .join(" ");
 }
 
-function stripNoise(value: string): string {
+function stripNoise(value: string) {
   return stripMaskedTokens(value)
     .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
     .replace(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, " ")
@@ -113,7 +113,7 @@ function stripNoise(value: string): string {
     .trim();
 }
 
-function stripPlace(value: string): string {
+function stripPlace(value: string) {
   const words = value.split(" ").filter((word) => word.length > 0);
   const region = words.at(-1);
   if (!region || words.length < 2 || !REGIONS.has(region)) {
@@ -124,7 +124,7 @@ function stripPlace(value: string): string {
 }
 
 /** A store code (W535) after the first word ends the name. The city after it goes too. */
-function cutAtStoreCode(words: string[], numberIsCode: boolean): string[] | null {
+function cutAtStoreCode(words: string[], numberIsCode: boolean) {
   const index = words.findIndex(
     (word, position) => position >= 1 && (isReferenceCode(word) || (numberIsCode && /^\d{3,}$/.test(word))),
   );
@@ -132,13 +132,13 @@ function cutAtStoreCode(words: string[], numberIsCode: boolean): string[] | null
 }
 
 /** The bank format is "<name> <city>, <region>". Drop the city when a real word stays. */
-function cutCity(words: string[]): string[] {
+function cutCity(words: string[]) {
   const rest = words.slice(0, -1);
   return rest.length > 0 && hasRealWord(rest.join(" ")) ? rest : words;
 }
 
 /** A bare number is a store code only when a region follows the place. */
-function stripLocation(value: string, hasRegion: boolean, cityBeforeRegion: boolean): string {
+function stripLocation(value: string, hasRegion: boolean, cityBeforeRegion: boolean) {
   const words = value.split(" ").filter((word) => word.length > 0);
   const cut = cutAtStoreCode(words, hasRegion);
   if (cut) {
@@ -147,11 +147,11 @@ function stripLocation(value: string, hasRegion: boolean, cityBeforeRegion: bool
   return (cityBeforeRegion ? cutCity(words) : words).join(" ");
 }
 
-function tidy(value: string): string {
+function tidy(value: string) {
   return value.replace(/\s+/g, " ").trim().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
 }
 
-function finish(value: string, cityBeforeRegion = false): string {
+function finish(value: string, cityBeforeRegion = false) {
   const clean = stripNoise(value);
   const words = clean.split(" ");
   const hasRegion = words.length > 1 && REGIONS.has(words[words.length - 1] ?? "");
@@ -171,7 +171,7 @@ export function normalizePayee(description: string): string {
   return finish(stripPrefixes(plain), cityBeforeRegion);
 }
 
-function titleWord(word: string): string {
+function titleWord(word: string) {
   const first = word.charAt(0).toLocaleUpperCase();
   return `${first}${word.slice(1).toLocaleLowerCase()}`;
 }

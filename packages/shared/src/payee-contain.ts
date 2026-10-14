@@ -6,7 +6,7 @@ type Entry = { payee: string; words: string[] };
 
 export type PayeeIndex = Map<string, Entry[]>;
 
-function wordsOf(payee: string): string[] {
+function wordsOf(payee: string) {
   return payee.split(" ").filter((word) => word.length > 0);
 }
 
@@ -30,7 +30,7 @@ export function buildPayeeIndex(learned: Iterable<string>): PayeeIndex {
 }
 
 /** The learned words are in the new words in order. Only the last new word may be the start of a learned word. */
-function isContained(learned: readonly string[], words: readonly string[]): boolean {
+function isContained(learned: readonly string[], words: readonly string[]) {
   let position = 0;
   for (const word of learned) {
     let found = false;

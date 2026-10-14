@@ -1,14 +1,13 @@
-import { accounts, categories, merchants, tags } from "@num/db";
+import { accounts, categories, merchants, tags, type TransactionRow } from "@num/db";
 import { eq } from "drizzle-orm";
-import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import type { StoredLine } from "./transaction-lines";
-import type { Header, TxRow } from "./transaction-record";
+import type { Header } from "./transaction-record";
 import type { NormalizedLine } from "./transaction-rules";
 import { transactionReconciled } from "./reconciled";
-import type { WriteTx } from "./write";
+import type { WriteTx, Reader } from "./write";
 
-function moneySame(existing: TxRow, existingLines: StoredLine[], header: Header, lines: NormalizedLine[]): boolean {
+function moneySame(existing: TransactionRow, existingLines: StoredLine[], header: Header, lines: NormalizedLine[]) {
   if (header.date !== existing.date || header.accountId !== existing.accountId || header.amount !== existing.amount) {
     return false;
   }
@@ -22,10 +21,10 @@ function moneySame(existing: TxRow, existingLines: StoredLine[], header: Header,
 }
 
 export function assertReconciledMoney(
-  db: Db | WriteTx,
-  existing: TxRow,
+  db: Reader,
+  existing: TransactionRow,
   existingLines: StoredLine[],
-  peer: TxRow | null,
+  peer: TransactionRow | null,
   header: Header,
   lines: NormalizedLine[],
 ): void {

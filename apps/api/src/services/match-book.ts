@@ -1,4 +1,4 @@
-import { settings } from "@num/db";
+import { accounts, occurrenceLinks, recurringPlans, settings, transactions, type TransactionRow } from "@num/db";
 import {
   Temporal,
   amountsWithinOnePercent,
@@ -18,43 +18,37 @@ import {
   type FamilySignal,
   type MatchResult,
   type PayeeIndex,
-  type PlanSchedule,
   type RecurringSignal,
   type ScoreInput,
 } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
-import type { Db } from "../db";
+import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import { loadMortgageLearned, type MortgageHit, type MortgageLearned } from "./mortgage-learned";
-type Reader = { all<T>(query: ReturnType<typeof sql>): T[] } & Pick<Db, "select">;
+import { literal } from "./transaction-sql";
+import type { Reader } from "./write";
 
-type ConfirmRow = {
-  id: string;
-  date: string;
-  amount: number;
-  payee: string;
-  merchantId: string | null;
+/**
+ * The two reads below return one row for each confirmed transaction of the book. They stay raw SQL: the driver
+ * makes the row objects, and the query builder is slower for a result of this size. The row types use the column types.
+ */
+type ConfirmRow = Pick<TransactionRow, "id" | "date" | "amount" | "merchantId"> & {
+  payee: TransactionRow["payeeNormalized"];
   categoryId: string;
 };
 
-type PlanRow = {
-  id: string;
-  name: string;
-  kind: string;
-  accountId: string;
-  expectedAmount: number;
-  tolerance: number;
-  categoryId: string | null;
-  transferAccountId: string | null;
-  merchantId: string | null;
-  startDate: string;
-  endDate: string | null;
-  freq: string;
-  interval: number;
-  monthDay: number | null;
-  businessDayShift: string;
+type TransferRow = Pick<TransactionRow, "id" | "date"> & {
+  payee: TransactionRow["payeeNormalized"];
+  transferAccountId: string;
 };
 
-type TransferRow = { id: string; date: string; payee: string; transferAccountId: string };
+/** A confirmed row with one line: not a mirror and not an automatic label. */
+const confirmedLine = sql`
+  t.mirror = 0
+  and t.auto_reason is null
+  and not exists (
+    select 1 from transaction_lines extra
+    where extra.transaction_id = t.id and extra.id <> l.id
+  )
+`;
 
 export type MatchBook = {
   mode: ConfidenceMode;
@@ -72,16 +66,9 @@ export type MatchBook = {
   families: Map<string, FamilySignal | null>;
 };
 
-function asMode(value: string | undefined): ConfidenceMode {
-  if (value && (confidenceModes as readonly string[]).includes(value)) {
-    return value as ConfidenceMode;
-  }
-  return "balanced";
-}
-
 export function confidenceMode(db: Reader): ConfidenceMode {
   const row = db.select({ value: settings.value }).from(settings).where(eq(settings.key, "autoConfidence")).get();
-  return asMode(row?.value);
+  return confidenceModes.find((mode) => mode === row?.value) ?? "balanced";
 }
 
 export function loadMatchBook(db: Reader): MatchBook {
@@ -90,15 +77,9 @@ export function loadMatchBook(db: Reader): MatchBook {
       t.merchant_id as merchantId, l.category_id as categoryId
     from transactions t
     inner join transaction_lines l on l.transaction_id = t.id
-    where 1 = 1
-      and t.mirror = 0
-      and t.auto_reason is null
+    where ${confirmedLine}
       and l.category_id is not null
       and l.transfer_account_id is null
-      and not exists (
-        select 1 from transaction_lines extra
-        where extra.transaction_id = t.id and extra.id <> l.id
-      )
   `);
   const byPayee = new Map<string, ConfirmRow[]>();
   for (const row of rows) {
@@ -113,15 +94,9 @@ export function loadMatchBook(db: Reader): MatchBook {
     select t.id as id, t.date as date, t.payee_normalized as payee, l.transfer_account_id as transferAccountId
     from transactions t
     inner join transaction_lines l on l.transaction_id = t.id
-    where 1 = 1
-      and t.mirror = 0
-      and t.auto_reason is null
+    where ${confirmedLine}
       and l.category_id is null
       and l.transfer_account_id is not null
-      and not exists (
-        select 1 from transaction_lines extra
-        where extra.transaction_id = t.id and extra.id <> l.id
-      )
   `);
   const transfersByPayee = new Map<string, TransferRow[]>();
   for (const row of transfers) {
@@ -254,18 +229,7 @@ export function scorePayee(
   return scoreMatch(scored);
 }
 
-function scheduleOf(row: PlanRow): PlanSchedule {
-  return {
-    startDate: row.startDate,
-    endDate: row.endDate,
-    freq: row.freq as PlanSchedule["freq"],
-    interval: row.interval,
-    monthDay: row.monthDay,
-    businessDayShift: row.businessDayShift as PlanSchedule["businessDayShift"],
-  };
-}
-
-function graceDays(db: Reader): number {
+function graceDays(db: Reader) {
   const row = db.select({ value: settings.value }).from(settings).where(eq(settings.key, "recurringGraceDays")).get();
   const parsed = Number(row?.value ?? "3");
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 3;
@@ -278,27 +242,25 @@ export function recurringForRows(db: Reader, pending: readonly LinkTransaction[]
   if (pending.length === 0) {
     return hits;
   }
-  const plans = db.all<PlanRow>(sql`
-    select id, name, kind, account_id as accountId, expected_amount as expectedAmount, tolerance,
-      category_id as categoryId, transfer_account_id as transferAccountId, merchant_id as merchantId,
-      start_date as startDate, end_date as endDate, freq, interval, month_day as monthDay,
-      business_day_shift as businessDayShift
-    from recurring_plans
-    where active = 1 and archived_at is null
-  `);
+  const plans = db
+    .select()
+    .from(recurringPlans)
+    .where(and(eq(recurringPlans.active, literal(1)), isNull(recurringPlans.archivedAt)))
+    .all();
   if (plans.length === 0) {
     return hits;
   }
   const grace = graceDays(db);
-  const links = db.all<{ planId: string; dueDate: string; transactionId: string | null }>(sql`
-    select plan_id as planId, due_date as dueDate, transaction_id as transactionId from occurrence_links
-  `);
+  const links = db
+    .select({ planId: occurrenceLinks.planId, dueDate: occurrenceLinks.dueDate, transactionId: occurrenceLinks.transactionId })
+    .from(occurrenceLinks)
+    .all();
   const linked = new Set(links.map((link) => `${link.planId}|${link.dueDate}`));
   const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
   const limit = Temporal.PlainDate.from(asOf).add({ days: grace }).toString();
   const occurrences = plans.flatMap((plan) => {
     const from = linkWindowStart(plan.startDate, asOf);
-    return occurrenceDates(scheduleOf(plan), limit, from).flatMap((date) =>
+    return occurrenceDates(plan, limit, from).flatMap((date) =>
       linked.has(`${plan.id}|${date.dueDate}`)
         ? []
         : [
@@ -316,11 +278,18 @@ export function recurringForRows(db: Reader, pending: readonly LinkTransaction[]
   const accountIds = new Set(plans.map((plan) => plan.accountId));
   const from = Temporal.PlainDate.from(asOf).subtract({ months: 13 }).subtract({ days: grace }).toString();
   const to = Temporal.PlainDate.from(asOf).add({ days: grace * 2 }).toString();
-  const existing = db.all<LinkTransaction>(sql`
-    select id, account_id as accountId, date, amount, merchant_id as merchantId
-    from transactions
-    where date >= ${from} and date <= ${to}
-  `).filter((row) => accountIds.has(row.accountId) && !taken.has(row.id));
+  const existing = db
+    .select({
+      id: transactions.id,
+      accountId: transactions.accountId,
+      date: transactions.date,
+      amount: transactions.amount,
+      merchantId: transactions.merchantId,
+    })
+    .from(transactions)
+    .where(and(gte(transactions.date, from), lte(transactions.date, to)))
+    .all()
+    .filter((row) => accountIds.has(row.accountId) && !taken.has(row.id));
   const pendingIds = new Set(pending.map((row) => row.id));
   const unique = matchLinks(
     occurrences,
@@ -328,7 +297,12 @@ export function recurringForRows(db: Reader, pending: readonly LinkTransaction[]
     grace,
   ).unique;
   const mortgages = new Set(
-    db.all<{ id: string }>(sql`select id from accounts where kind = 'mortgage'`).map((row) => row.id),
+    db
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(eq(accounts.kind, "mortgage"))
+      .all()
+      .map((row) => row.id),
   );
   const byPlan = new Map(plans.map((plan) => [plan.id, plan]));
   for (const pair of unique) {

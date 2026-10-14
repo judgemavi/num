@@ -9,7 +9,7 @@ export type Period = {
   to: string;
 };
 
-function monthStart(date: string): string {
+function monthStart(date: string) {
   return `${date.slice(0, 7)}-01`;
 }
 

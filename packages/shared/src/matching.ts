@@ -138,7 +138,7 @@ function newestFirst(left: { date: string; id: string }, right: { date: string; 
   return left.id < right.id ? 1 : left.id > right.id ? -1 : 0;
 }
 
-function candidateKey(categoryId: string, merchantId: string | null): string {
+function candidateKey(categoryId: string, merchantId: string | null) {
   return `${categoryId}\0${merchantId ?? ""}`;
 }
 
@@ -255,7 +255,7 @@ function pushTransfers(
   }
 }
 
-function collectSignals(input: ScoreInput): MatchSignal[] {
+function collectSignals(input: ScoreInput) {
   const signals: MatchSignal[] = [];
   if (input.recurring?.mortgage) {
     signals.push({
@@ -317,7 +317,7 @@ function collectSignals(input: ScoreInput): MatchSignal[] {
   return signals;
 }
 
-function groupCandidates(signals: readonly MatchSignal[]): Candidate[] {
+function groupCandidates(signals: readonly MatchSignal[]) {
   const groups = new Map<string, Candidate>();
   for (const signal of signals) {
     const key = signal.transferAccountId

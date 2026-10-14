@@ -1,19 +1,12 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { documents } from "@num/db";
+import { documents, type DocumentRow } from "@num/db";
 import { utcNow, type Document } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { write, type AuditSource } from "./write";
-
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-type DocumentRow = typeof documents.$inferSelect;
+import { withoutId, write, type WriteInput } from "./write";
 
 export type DocumentFile = {
   filename: string;
@@ -21,48 +14,25 @@ export type DocumentFile = {
   bytes: Uint8Array;
 };
 
-function snapshot(row: DocumentRow) {
-  return {
-    filename: row.filename,
-    hash: row.hash,
-    mimeType: row.mimeType,
-    storagePath: row.storagePath,
-    uploadedAt: row.uploadedAt,
-    deletedAt: row.deletedAt,
-  };
-}
-
-function toDocument(row: DocumentRow): Document {
-  return {
-    id: row.id,
-    filename: row.filename,
-    hash: row.hash,
-    mimeType: row.mimeType,
-    storagePath: row.storagePath,
-    uploadedAt: row.uploadedAt,
-    deletedAt: row.deletedAt,
-  };
-}
-
-function cleanFilename(value: string): string {
+function cleanFilename(value: string) {
   const base = value.split(/[/\\]/).pop()?.replace(/[\r\n"]/g, "").trim() ?? "";
   return base.length > 0 ? base : "upload";
 }
 
-function cleanMimeType(value: string): string {
+function cleanMimeType(value: string) {
   const text = value.trim();
   return text.length > 0 ? text : "application/octet-stream";
 }
 
-function sha256(bytes: Uint8Array): string {
+function sha256(bytes: Uint8Array) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function storedFile(dataDir: string, hash: string): string {
+function storedFile(dataDir: string, hash: string) {
   return join(dataDir, "uploads", hash);
 }
 
-function isHashConflict(error: unknown): boolean {
+function isHashConflict(error: unknown) {
   const cause = error instanceof Error && error.cause instanceof Error ? error.cause.message : "";
   const message = error instanceof Error ? error.message : "";
   return `${message} ${cause}`.includes("documents.hash");
@@ -80,10 +50,9 @@ export function restoreDocument(db: Db, id: string, input: WriteInput): Document
   return restoreStoredDocument(db, row, input);
 }
 
-function restoreStoredDocument(db: Db, row: DocumentRow, input: WriteInput): Document {
+function restoreStoredDocument(db: Db, row: DocumentRow, input: WriteInput) {
   const at = input.at ?? utcNow();
-  let restored: DocumentRow | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const current = tx.select().from(documents).where(eq(documents.id, row.id)).get();
     if (!current) {
       throw new ServiceError("document_not_found", 404);
@@ -91,26 +60,23 @@ function restoreStoredDocument(db: Db, row: DocumentRow, input: WriteInput): Doc
     if (current.deletedAt) {
       tx.update(documents).set({ deletedAt: null }).where(eq(documents.id, current.id)).run();
     }
-    restored = { ...current, deletedAt: null };
+    const restored = { ...current, deletedAt: null };
     tx.audit({
       entity: "documents",
       entityId: current.id,
       action: "restore",
-      before: snapshot(current),
-      after: snapshot(restored),
+      before: withoutId(current),
+      after: withoutId(restored),
     });
+    return restored;
   });
-  if (!restored) {
-    throw new ServiceError("document_not_found", 404);
-  }
-  return toDocument(restored);
 }
 
-function sameDocument(db: Db, row: DocumentRow, input: WriteInput): Document {
+function sameDocument(db: Db, row: DocumentRow, input: WriteInput) {
   if (row.deletedAt) {
     return restoreStoredDocument(db, row, input);
   }
-  return toDocument(row);
+  return row;
 }
 
 export function uploadDocument(
@@ -145,7 +111,7 @@ export function uploadDocument(
         entityId: row.id,
         action: "create",
         before: null,
-        after: snapshot(row),
+        after: withoutId(row),
       });
     });
   } catch (error) {
@@ -156,7 +122,7 @@ export function uploadDocument(
     throw error;
   }
 
-  return toDocument(row);
+  return row;
 }
 
 export function readDocumentFile(db: Db, dataDir: string, id: string): DocumentFile {
@@ -173,25 +139,21 @@ export function readDocumentFile(db: Db, dataDir: string, id: string): DocumentF
 
 export function deleteDocument(db: Db, id: string, input: WriteInput): Document {
   const at = input.at ?? utcNow();
-  let updated: DocumentRow | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const existing = tx.select().from(documents).where(eq(documents.id, id)).get();
     if (!existing || existing.deletedAt) {
       throw new ServiceError("document_not_found", 404);
     }
     const deletedAt = at;
     tx.update(documents).set({ deletedAt }).where(eq(documents.id, id)).run();
-    updated = { ...existing, deletedAt };
+    const updated = { ...existing, deletedAt };
     tx.audit({
       entity: "documents",
       entityId: id,
       action: "delete",
-      before: snapshot(existing),
-      after: snapshot(updated),
+      before: withoutId(existing),
+      after: withoutId(updated),
     });
+    return updated;
   });
-  if (!updated) {
-    throw new ServiceError("document_not_found", 404);
-  }
-  return toDocument(updated);
 }

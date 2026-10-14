@@ -1,6 +1,5 @@
 import {
   autoLinkResultSchema,
-  errorSchema,
   isoDateSchema,
   occurrenceLinkBodySchema,
   occurrenceLinkSchema,
@@ -19,13 +18,8 @@ import { archivePlan, createPlan, getPlan, listPlans, restorePlan, updatePlan } 
 import { linkOccurrence, restoreSkip, skipOccurrence, unlinkOccurrence } from "../services/recurring-links";
 import { autoLink, listOccurrences, recurringSignals } from "../services/recurring-view";
 import { validationHook } from "../validation";
+import { errorResponse, idParams } from "./common";
 
-const errorResponse = {
-  description: "The request is not valid",
-  content: { "application/json": { schema: errorSchema } },
-} as const;
-
-const idParams = z.object({ id: z.uuid() });
 const occurrenceParams = z.object({ id: z.uuid(), dueDate: isoDateSchema });
 const asOfQuery = z.object({ asOf: isoDateSchema });
 

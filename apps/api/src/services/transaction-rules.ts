@@ -25,7 +25,7 @@ export function requireText(value: string, field: string): string {
   return trimmed;
 }
 
-function uniqueIds(ids: string[]): string[] {
+function uniqueIds(ids: string[]) {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const id of ids) {

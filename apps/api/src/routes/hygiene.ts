@@ -1,13 +1,9 @@
-import { asOfQuerySchema, errorSchema, hygieneSchema } from "@num/shared";
+import { asOfQuerySchema, hygieneSchema } from "@num/shared";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { readHygiene } from "../services/hygiene";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: { "application/json": { schema: errorSchema } },
-} as const;
+import { errorResponse } from "./common";
 
 const hygieneRoute = createRoute({
   operationId: "get_hygiene",

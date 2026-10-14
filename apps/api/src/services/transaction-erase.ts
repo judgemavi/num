@@ -1,22 +1,10 @@
-import {
-  bucketEvents,
-  fundingRuns,
-  importRows,
-  inboxDecisions,
-  lineTags,
-  occurrenceLinks,
-  transactionLines,
-  transactions,
-} from "@num/db";
+import { bucketEvents, fundingRuns, importRows, inboxDecisions, lineTags, occurrenceLinks, transactionLines, transactions, type TransactionRow } from "@num/db";
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
-import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { clearRefundLinks } from "./refund-link";
 import { loadLines, replaceLines } from "./transaction-lines";
-import { auditTransaction, automaticPair, readTransaction, toTransaction, type TxRow } from "./transaction-record";
-import type { WriteTx } from "./write";
-
-type Reader = Db | WriteTx;
+import { auditTransaction, automaticPair, readTransaction, toTransaction } from "./transaction-record";
+import type { WriteTx, Reader } from "./write";
 
 function activeFundingRun(tx: Reader, incomeTransactionId: string) {
   return tx
@@ -133,7 +121,7 @@ export function eraseTransaction(tx: WriteTx, id: string): void {
   tx.delete(transactions).where(eq(transactions.id, id)).run();
 }
 
-function unlinkPeer(tx: WriteTx, sourceId: string, peer: TxRow, at: string): void {
+function unlinkPeer(tx: WriteTx, sourceId: string, peer: TransactionRow, at: string): void {
   const peerLines = loadLines(tx, peer.id);
   const before = toTransaction(tx, peer, peerLines);
   tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, sourceId)).run();

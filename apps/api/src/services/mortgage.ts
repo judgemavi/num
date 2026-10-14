@@ -1,4 +1,4 @@
-import { accounts, mortgageTerms, valuations } from "@num/db";
+import { accounts, mortgageTerms, transactions, valuations } from "@num/db";
 import {
   mortgageExtraEffect,
   mortgageLoan,
@@ -10,14 +10,14 @@ import {
   type MortgageValuation,
   type MortgageView,
 } from "@num/shared";
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, eq, lt, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { balanceOf } from "./account-balance";
 import { ServiceError } from "../service-error";
-import { termsSnapshot } from "./mortgage-terms";
-import type { WriteTx } from "./write";
+import { hasTransferLine, literal } from "./transaction-sql";
+import type { Reader } from "./write";
 
-function requireMortgage(db: Db | WriteTx, accountId: string) {
+function requireMortgage(db: Reader, accountId: string) {
   const account = db.select().from(accounts).where(eq(accounts.id, accountId)).get();
   if (!account) {
     throw new ServiceError("account_not_found", 404);
@@ -29,14 +29,14 @@ function requireMortgage(db: Db | WriteTx, accountId: string) {
 }
 
 /** A mortgage with terms always has a stored opening date (decision 0027). */
-function storedOpeningDate(account: { openingDate: string | null }): string {
+function storedOpeningDate(account: { openingDate: string | null }) {
   if (account.openingDate === null) {
     throw new Error("A mortgage with terms has no opening date");
   }
   return account.openingDate;
 }
 
-function activeValuations(db: Db | WriteTx, accountId: string): MortgageValuation[] {
+function activeValuations(db: Reader, accountId: string): MortgageValuation[] {
   return db
     .select({ date: valuations.date, balance: valuations.balance })
     .from(valuations)
@@ -51,23 +51,16 @@ export function getMortgageTerms(db: Db, accountId: string): MortgageTerms {
   if (!row) {
     throw new ServiceError("mortgage_terms_not_found", 404);
   }
-  return termsSnapshot(row);
+  return row;
 }
 
-function actualPayments(db: Db, accountId: string): MortgageView["actualPayments"] {
-  const rows = db.all<{ id: string; date: string; amount: number }>(sql`
-    select t.id as id, t.date as date, -t.amount as amount
-    from transactions t
-    where 1 = 1
-      and t.mirror = 0
-      and t.amount < 0
-      and exists (
-        select 1 from transaction_lines l
-        where l.transaction_id = t.id and l.transfer_account_id = ${accountId}
-      )
-    order by t.date asc, t.id asc
-  `);
-  return rows.map((row) => ({ id: row.id, date: row.date, amount: row.amount }));
+function actualPayments(db: Db, accountId: string) {
+  return db
+    .select({ id: transactions.id, date: transactions.date, amount: sql<number>`-${transactions.amount}` })
+    .from(transactions)
+    .where(and(eq(transactions.mirror, literal(0)), lt(transactions.amount, literal(0)), hasTransferLine(transactions.id, accountId)))
+    .orderBy(asc(transactions.date), asc(transactions.id))
+    .all();
 }
 
 export function mortgageAccountView(
@@ -85,7 +78,7 @@ export function mortgageAccountView(
   const lump = options.lumpSum && options.lumpSum > 0 && options.lumpDate ? { date: options.lumpDate, amount: options.lumpSum } : null;
   const effect = perPayment > 0 || lump ? mortgageExtraEffect(loan, checkpoints, { perPayment, lumpSum: lump }) : null;
   return {
-    balance: balanceOf(db, { id: account.id, kind: "mortgage", openingBalance: account.openingBalance }, undefined, undefined, asOf),
+    balance: balanceOf(db, { id: account.id, kind: "mortgage", openingBalance: account.openingBalance }, asOf),
     rateMilliPct: terms.rateMilliPct,
     payoffDate: schedule.payoffDate,
     nonAmortizing: schedule.nonAmortizing,
@@ -108,7 +101,7 @@ export function mortgageAccountView(
   };
 }
 
-function mortgagePaidFrom(db: Db, fromAccountId: string): string | null {
+function mortgagePaidFrom(db: Db, fromAccountId: string) {
   const rows = db.select().from(mortgageTerms).where(eq(mortgageTerms.paymentAccountId, fromAccountId)).all();
   if (rows.length !== 1) {
     return null;
@@ -130,7 +123,7 @@ export function mortgagePrefill(db: Db, fromAccountId: string, toAccountId: stri
     return null;
   }
   const split = mortgageSplitForDate({
-    terms: termsSnapshot(row),
+    terms: row,
     opening: { balance: account.openingBalance, date: storedOpeningDate(account) },
     valuations: activeValuations(db, targetId),
     date,

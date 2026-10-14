@@ -20,7 +20,7 @@ export type MortgageScheduleMatch = {
   actual: MortgageActualPayment | null;
 };
 
-function dayDistance(left: string, right: string): number {
+function dayDistance(left: string, right: string) {
   return Math.abs(Temporal.PlainDate.from(left).until(Temporal.PlainDate.from(right), { largestUnit: "day" }).days);
 }
 

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { insightChangesSchema } from "./insights-changes";
+import { optionalQuery, queryDate, queryId, queryIdOrNone } from "./list";
 import { isMonthKey } from "./month";
 import { centsSchema as cents } from "./money";
 
@@ -14,28 +15,19 @@ export const insightRowKinds = ["item", "none", "uncategorized"] as const;
 
 export type InsightRowKind = (typeof insightRowKinds)[number];
 
-function blank(value: unknown): unknown {
-  if (typeof value === "string" && value.trim() === "") {
-    return undefined;
-  }
-  return value;
-}
-
-function windowText(value: unknown): unknown {
-  return typeof value === "number" ? String(value) : blank(value);
-}
-
-const optionalDate = z.preprocess(blank, isoDateSchema.optional());
-const optionalId = z.preprocess(blank, z.uuid().optional());
-const optionalMonth = z.preprocess(blank, z.string().refine(isMonthKey).optional());
+// The router reads `window=6` in the URL as the number 6.
+const windowQuery = z.preprocess(
+  (value: InsightWindow | number | "" | undefined) => (typeof value === "number" ? String(value) : value),
+  optionalQuery(z.enum(insightWindows)),
+);
 
 const insightsSearchFields = z.object({
-  window: z.preprocess(windowText, z.enum(insightWindows).optional()),
-  from: optionalDate,
-  to: optionalDate,
-  month: optionalMonth,
-  group: z.preprocess(blank, z.union([z.uuid(), z.literal("none")]).optional()),
-  category: optionalId,
+  window: windowQuery,
+  from: queryDate,
+  to: queryDate,
+  month: optionalQuery(z.string().refine(isMonthKey)),
+  group: queryIdOrNone,
+  category: queryId,
 });
 
 function checkPeriod(value: { window?: InsightWindow; from?: string; to?: string }, context: z.RefinementCtx) {

@@ -116,23 +116,23 @@ export type MonthPlan = z.infer<typeof monthPlanSchema>;
 
 type Hit = { date: string; safe: number };
 
-function monthRange(month: string): { start: string; end: string } {
+function monthRange(month: string) {
   const start = Temporal.PlainDate.from(`${month}-01`);
   return { start: start.toString(), end: start.with({ day: start.daysInMonth }).toString() };
 }
 
-function inMonth(date: string, month: string): boolean {
+function inMonth(date: string, month: string) {
   return date.slice(0, 7) === month;
 }
 
-function shareUp(total: number, count: number): number {
+function shareUp(total: number, count: number) {
   if (count <= 0 || total <= 0) {
     return 0;
   }
   return Math.ceil(total / count);
 }
 
-function amountOf(plan: MonthPlanSource, links: readonly MonthPlanLink[], asOf: string, which: "forecast" | "safe"): number {
+function amountOf(plan: MonthPlanSource, links: readonly MonthPlanLink[], asOf: string, which: "forecast" | "safe") {
   if (plan.amountMode !== "variable") {
     return plan.expectedAmount;
   }
@@ -144,15 +144,15 @@ function amountOf(plan: MonthPlanSource, links: readonly MonthPlanLink[], asOf: 
   return which === "forecast" ? both.forecast : both.safe;
 }
 
-function openPlans(plans: readonly MonthPlanSource[]): MonthPlanSource[] {
+function openPlans(plans: readonly MonthPlanSource[]) {
   return plans.filter((plan) => plan.active && !plan.archived && plan.kind !== "transfer");
 }
 
-function skippedKey(planId: string, dueDate: string): string {
+function skippedKey(planId: string, dueDate: string) {
   return `${planId}|${dueDate}`;
 }
 
-function nextMonth(month: string): string {
+function nextMonth(month: string) {
   return Temporal.PlainDate.from(`${month}-01`).add({ months: 1 }).toString().slice(0, 7);
 }
 
@@ -162,7 +162,7 @@ function openingsFor(input: {
   plans: readonly MonthPlanSource[];
   links: readonly MonthPlanLink[];
   buckets: readonly MonthPlanBucketSource[];
-}): MonthPlanBucketSource[] {
+}) {
   const origin = input.asOf.slice(0, 7);
   if (input.month <= origin) {
     return [...input.buckets];
@@ -181,7 +181,7 @@ function openingsFor(input: {
 function surplusShares(
   surplus: number,
   buckets: readonly { bucketId: string; perPaycheck: number; dueDate: string | null }[],
-): Map<string, number> {
+) {
   const blocked = buckets.filter((bucket) => bucket.dueDate !== null && surplus - (buckets.reduce((sum, item) => sum + item.perPaycheck, 0) - bucket.perPaycheck) <= 0);
   const shares = new Map<string, number>();
   if (surplus <= 0 || blocked.length === 0) {
@@ -213,7 +213,7 @@ function monthFigures(input: {
   plans: readonly MonthPlanSource[];
   links: readonly MonthPlanLink[];
   buckets: readonly MonthPlanBucketSource[];
-}): MonthPlan {
+}) {
   const { start, end } = monthRange(input.month);
   const horizon = Temporal.PlainDate.from(start).add({ years: 20 }).toString();
   const skipped = new Set(input.links.filter((link) => link.skipped).map((link) => skippedKey(link.planId, link.dueDate)));
@@ -380,7 +380,7 @@ function monthFigures(input: {
   };
 }
 
-function dateAfter(hits: readonly { date: string }[], count: number): string | null {
+function dateAfter(hits: readonly { date: string }[], count: number) {
   const hit = hits[count - 1];
   if (!hit) {
     return null;

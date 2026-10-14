@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
-import { listQuerySchema, pagedResponseSchema } from "./list";
+import { archivedQuery, listQuerySchema, pagedResponseSchema } from "./list";
 import { isUtcTimestamp } from "./time";
 import { nonNegativeCentsSchema as cents } from "./money";
 
@@ -47,13 +47,6 @@ export type BucketIcon = (typeof bucketIcons)[number];
 
 const nameSchema = z.string().trim().min(1);
 const positiveCents = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
-
-const archivedQuery = {
-  archived: z
-    .union([z.boolean(), z.enum(["true", "false"])])
-    .optional()
-    .transform((value) => value === true || value === "true"),
-};
 
 const bucketFields = {
   name: nameSchema,

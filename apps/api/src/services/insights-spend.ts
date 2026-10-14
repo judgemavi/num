@@ -13,11 +13,11 @@ import type { Period } from "./insights-period";
 /** The donut level: all groups, or the categories of one group ("none" = categories with no group). */
 export type DonutLevel = { group: string | null };
 
-function inPeriod(fact: LedgerLine, period: Period): boolean {
+function inPeriod(fact: LedgerLine, period: Period) {
   return fact.date >= period.from && fact.date <= period.to;
 }
 
-function compareRows(left: InsightRow, right: InsightRow): number {
+function compareRows(left: InsightRow, right: InsightRow) {
   if (left.amount !== right.amount) {
     return right.amount - left.amount;
   }

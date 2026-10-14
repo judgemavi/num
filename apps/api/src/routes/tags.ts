@@ -1,21 +1,9 @@
-import { errorSchema, tagCreateSchema, tagListQuerySchema, tagListSchema, tagSchema, tagUpdateSchema } from "@num/shared";
-import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { tagCreateSchema, tagListQuerySchema, tagListSchema, tagSchema, tagUpdateSchema } from "@num/shared";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { archiveTag, createTag, getTag, listTags, restoreTag, updateTag } from "../services/tags";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: {
-    "application/json": {
-      schema: errorSchema,
-    },
-  },
-} as const;
-
-const idParams = z.object({
-  id: z.uuid(),
-});
+import { errorResponse, idParams } from "./common";
 
 const listRoute = createRoute({
   operationId: "get_tags",

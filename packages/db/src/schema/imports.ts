@@ -7,6 +7,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { importRowOutcomes, transactionStatuses, type UnreadableRow } from "@num/shared";
 import { accounts } from "./accounts";
 import { transactions } from "./ledger";
 
@@ -19,6 +20,7 @@ export const documents = sqliteTable("documents", {
   uploadedAt: text("uploaded_at").notNull(),
   deletedAt: text("deleted_at"),
 });
+export type DocumentRow = typeof documents.$inferSelect;
 
 export const importBatches = sqliteTable("import_batches", {
   id: text("id").primaryKey(),
@@ -33,10 +35,11 @@ export const importBatches = sqliteTable("import_batches", {
   periodEnd: text("period_end").notNull(),
   closingBalance: integer("closing_balance"),
   closingDate: text("closing_date"),
-  unreadableJson: text("unreadable_json").notNull().default("[]"),
+  unreadableJson: text("unreadable_json", { mode: "json" }).$type<UnreadableRow[]>().notNull().default([]),
   createdAt: text("created_at").notNull(),
   undoneAt: text("undone_at"),
 });
+export type ImportBatchRow = typeof importBatches.$inferSelect;
 
 export const importRows = sqliteTable(
   "import_rows",
@@ -54,10 +57,10 @@ export const importRows = sqliteTable(
     payeeRaw: text("payee_raw").notNull(),
     bankId: text("bank_id"),
     identity: text("identity").notNull(),
-    outcome: text("outcome").notNull(),
+    outcome: text("outcome", { enum: importRowOutcomes }).notNull(),
     transactionId: text("transaction_id").references((): AnySQLiteColumn => transactions.id),
     active: integer("active", { mode: "boolean" }).notNull().default(true),
-    previousStatus: text("previous_status"),
+    previousStatus: text("previous_status", { enum: transactionStatuses }),
   },
   (table) => [
     uniqueIndex("import_rows_batch_row_unique").on(table.batchId, table.rowIndex),

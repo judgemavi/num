@@ -1,16 +1,15 @@
 import {
-  autoReasons,
   isIsoDate,
   reviewLevel,
   suggestionFromMatch,
-  type AutoReason,
   type RecurringSignals,
   type ReviewCounts,
   type ReviewLevel,
   type Suggestion,
   type TransactionReview,
 } from "@num/shared";
-import { sql } from "drizzle-orm";
+import { transactions } from "@num/db";
+import { inArray, isNotNull, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { keepKey } from "./decision-keep";
@@ -20,19 +19,9 @@ import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
 import { mortgageSuggestion } from "./mortgage-learned";
 import { listTransferPairs } from "./suggestions";
-type Base = {
-  id: string;
-  accountId: string;
-  date: string;
-  amount: number;
-  payeeRaw: string;
-  payee: string;
-  merchantId: string | null;
-  autoReason: string | null;
-  openLine: number;
-  lineCount: number;
-  reconciled: number;
-};
+import { hasOpenLine, isReconciled, lineCount } from "./transaction-sql";
+
+type Base = ReturnType<typeof loadBases>[number];
 
 export type NeedsReviewHit = {
   id: string;
@@ -50,14 +39,7 @@ export function requireAsOf(asOf: string) {
   }
 }
 
-function asReason(value: string | null): AutoReason | null {
-  if (value && (autoReasons as readonly string[]).includes(value)) {
-    return value as AutoReason;
-  }
-  return null;
-}
-
-function chunks<T>(values: readonly T[], size: number): T[][] {
+export function chunks<T>(values: readonly T[], size: number) {
   const groups: T[][] = [];
   for (let index = 0; index < values.length; index += size) {
     groups.push(values.slice(index, index + size));
@@ -65,46 +47,39 @@ function chunks<T>(values: readonly T[], size: number): T[][] {
   return groups;
 }
 
-function loadBases(db: Db, ids: readonly string[]): Base[] {
-  const found: Base[] = [];
-  for (const group of chunks([...new Set(ids)], 400)) {
-    if (group.length === 0) {
-      continue;
-    }
-    const list = sql.join(group.map((id) => sql`${id}`), sql`, `);
-    found.push(
-      ...db.all<Base>(sql`
-        select t.id as id, t.account_id as accountId, t.date as date, t.amount as amount,
-          t.payee_raw as payeeRaw, t.payee_normalized as payee, t.merchant_id as merchantId,
-          t.auto_reason as autoReason,
-          exists (
-            select 1 from transaction_lines l
-            where l.transaction_id = t.id and l.category_id is null and l.transfer_account_id is null
-          ) as openLine,
-          (select count(*) from transaction_lines l where l.transaction_id = t.id) as lineCount,
-          case when t.date <= (
-            select max(c.date) from checkpoints c
-            where c.account_id = t.account_id and c.unlocked_at is null
-          ) then 1 else 0 end as reconciled
-        from transactions t
-        where t.id in (${list})
-      `),
-    );
-  }
-  return found;
+function loadBases(db: Db, ids: readonly string[]) {
+  return chunks([...new Set(ids)], 400).flatMap((group) =>
+    db
+      .select({
+        id: transactions.id,
+        accountId: transactions.accountId,
+        date: transactions.date,
+        amount: transactions.amount,
+        payeeRaw: transactions.payeeRaw,
+        payee: transactions.payeeNormalized,
+        merchantId: transactions.merchantId,
+        autoReason: transactions.autoReason,
+        openLine: sql<boolean>`${hasOpenLine(transactions.id)}`.mapWith(Boolean),
+        lineCount: lineCount(transactions.id),
+        reconciled: isReconciled(transactions),
+      })
+      .from(transactions)
+      .where(inArray(transactions.id, group))
+      .all(),
+  );
 }
 
 /** Sure and Likely are bulk levels. A row has one only when the bulk action can apply it. */
-function rowLevel(row: Base, automatic: boolean, suggestion: Suggestion | null): ReviewLevel {
+function rowLevel(row: Base, automatic: boolean, suggestion: Suggestion | null) {
   const level = reviewLevel(automatic, suggestion ? suggestion.confidence / 1000 : null);
   if (level !== "likely") {
     return level;
   }
-  const canApply = Number(row.lineCount) === 1 && !(suggestion?.transferAccountId && Number(row.reconciled) === 1);
+  const canApply = row.lineCount === 1 && !(suggestion?.transferAccountId && row.reconciled);
   return canApply ? "likely" : "maybe";
 }
 
-function emptyReview(level: ReviewLevel, reason: AutoReason | null): TransactionReview {
+function emptyReview(level: ReviewLevel, reason: TransactionReview["reason"]): TransactionReview {
   return {
     level,
     reason,
@@ -144,14 +119,11 @@ export function listNeedsReview(
   }
   const changedById = new Map(changed.map((item) => [item.transactionId, item]));
   const refundById = refundQuestions(db, hidden);
-  const openIds = db.all<{ id: string }>(sql`
-    select t.id as id from transactions t
-    where t.auto_reason is not null
-      or exists (
-        select 1 from transaction_lines l
-        where l.transaction_id = t.id and l.category_id is null and l.transfer_account_id is null
-      )
-  `);
+  const openIds = db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(or(isNotNull(transactions.autoReason), hasOpenLine(transactions.id)))
+    .all();
   const ids = [
     ...openIds.map((row) => row.id),
     ...pairById.keys(),
@@ -165,12 +137,11 @@ export function listNeedsReview(
   const scored = new Map<string, { suggestion: Suggestion; learnedCount: number | null }>();
   const hits: NeedsReviewHit[] = [];
   for (const row of bases) {
-    const reason = asReason(row.autoReason);
+    const reason = row.autoReason;
     const automatic = reason !== null;
-    const openLine = Number(row.openLine) === 1;
     let suggestion: Suggestion | null = null;
     let learnedCount: number | null = null;
-    if (!automatic && openLine) {
+    if (!automatic && row.openLine) {
       const key = `${row.payee}\u0000${row.amount}`;
       let cached = scored.get(key);
       if (!cached) {
@@ -182,7 +153,7 @@ export function listNeedsReview(
         suggestion = cached.suggestion;
         learnedCount = cached.learnedCount;
       }
-      const mortgage = Number(row.lineCount) === 1 && Number(row.reconciled) === 0 ? mortgageSuggestion(db, mortgageLearnedFor(book, row.payee), row) : null;
+      const mortgage = row.lineCount === 1 && !row.reconciled ? mortgageSuggestion(db, mortgageLearnedFor(book, row.payee), row) : null;
       if (mortgage && (suggestion === null || mortgage.suggestion.confidence > suggestion.confidence)) {
         suggestion = mortgage.suggestion;
         learnedCount = mortgage.learnedCount;
@@ -195,8 +166,8 @@ export function listNeedsReview(
     const asksQuestion =
       pair !== undefined || ambiguous !== undefined || amountChanged !== undefined || refundAsk !== undefined;
     const level = asksQuestion ? "none" : rowLevel(row, automatic, suggestion);
-    const kept = openLine && hidden.has(keepKey(row.id));
-    const needs = automatic || (openLine && !kept) || asksQuestion;
+    const kept = row.openLine && hidden.has(keepKey(row.id));
+    const needs = automatic || (row.openLine && !kept) || asksQuestion;
     if (!needs) {
       continue;
     }

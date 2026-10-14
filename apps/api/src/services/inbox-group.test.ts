@@ -151,6 +151,39 @@ test("a categorized row, a split and a reconciled transfer are skipped", () => {
   }
 });
 
+test("a group in which each row is skipped returns the skips and writes nothing", () => {
+  const sample = book();
+  try {
+    const cash = createAccount(sample.db, { name: "Cash", institution: null, kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+    const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
+    const done = pay(sample.db, cash.id, "2026-03-01", -400, "Blue Bottle", null, [{ amount: -400, categoryId: food.id }]);
+    const split = pay(sample.db, cash.id, "2026-03-02", -500, "Blue Bottle", null, [
+      { amount: -200, categoryId: null },
+      { amount: -300, categoryId: null },
+    ]);
+    const open = pay(sample.db, cash.id, "2026-03-03", -600, "Blue Bottle");
+    const applyAt = "2026-10-08T19:00:00Z";
+    const group = { accountId: cash.id, categoryId: food.id, transferAccountId: null, merchantId: null, source: "ui" as const, at: applyAt };
+
+    expect(applyInboxGroup(sample.db, { ...group, transactionIds: [done.id, split.id], excludedIds: [] })).toEqual({
+      applied: 0,
+      skipped: [
+        { id: done.id, reason: "categorized" },
+        { id: split.id, reason: "split" },
+      ],
+    });
+    expect(applyInboxGroup(sample.db, { ...group, transactionIds: [open.id], excludedIds: [open.id] })).toEqual({ applied: 0, skipped: [] });
+    expect(getTransaction(sample.db, open.id)?.lines[0]?.categoryId).toBeNull();
+    expect(sample.db.select().from(auditLog).where(eq(auditLog.at, applyAt)).all()).toHaveLength(0);
+
+    const mixed = applyInboxGroup(sample.db, { ...group, transactionIds: [done.id, open.id], excludedIds: [] });
+    expect(mixed).toEqual({ applied: 1, skipped: [{ id: done.id, reason: "categorized" }] });
+    expect(getTransaction(sample.db, open.id)?.lines[0]?.categoryId).toBe(food.id);
+  } finally {
+    sample.close();
+  }
+});
+
 test("a group keeps an existing merchant and a transfer clears it on PATCH", () => {
   const sample = book();
   try {

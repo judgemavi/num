@@ -11,7 +11,7 @@ type Journal = {
   entries: { tag: string }[];
 };
 
-function migrationHash(tag: string): string {
+function migrationHash(tag: string) {
   const sql = readFileSync(join(migrationsFolder, `${tag}.sql`), "utf8");
   return createHash("sha256").update(sql).digest("hex");
 }

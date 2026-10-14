@@ -1,8 +1,10 @@
 import { index, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { inboxDecisionCodes } from "@num/shared";
+import { auditSources } from "./codes";
 
 export const inboxDecisions = sqliteTable("inbox_decisions", {
   itemKey: text("item_key").primaryKey(),
-  decision: text("decision").notNull(),
+  decision: text("decision", { enum: inboxDecisionCodes }).notNull(),
   reason: text("reason"),
   decidedAt: text("decided_at").notNull(),
 });
@@ -16,7 +18,7 @@ export const auditLog = sqliteTable(
     action: text("action").notNull(),
     before: text("before"),
     after: text("after"),
-    source: text("source").notNull(),
+    source: text("source", { enum: auditSources }).notNull(),
     at: text("at").notNull(),
   },
   (table) => [index("audit_log_entity").on(table.entity, table.entityId)],

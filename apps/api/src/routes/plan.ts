@@ -1,17 +1,9 @@
-import { errorSchema, monthPlanQuerySchema, monthPlanSchema } from "@num/shared";
+import { monthPlanQuerySchema, monthPlanSchema } from "@num/shared";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { readMonthPlan } from "../services/month-plan";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: {
-    "application/json": {
-      schema: errorSchema,
-    },
-  },
-} as const;
+import { errorResponse } from "./common";
 
 const monthPlanRoute = createRoute({
   operationId: "get_plan",

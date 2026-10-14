@@ -5,12 +5,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { transactionReconciled } from "./reconciled";
 import { auditTransaction, readTransaction } from "./transaction-record";
-import { write, type AuditSource } from "./write";
-
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
+import { write, type WriteInput } from "./write";
 
 export function setClearance(
   db: Db,

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { accountKinds } from "./account";
 import { isoDateSchema } from "./date";
 import { approveLevels, skippedRowSchema } from "./review";
-import { listQuerySchema, pagedResponseSchema } from "./list";
+import { listQuerySchema, pagedResponseSchema, queryDate, queryFlag, queryId, queryIdOrNone, queryText } from "./list";
 import { autoReasons } from "./matching";
 import { centsSchema } from "./money";
 import { reviewCountSchema, transactionReviewSchema } from "./review";
@@ -103,34 +103,17 @@ export const transactionSaveResultSchema = transactionSchema.extend({
   skipped: z.array(skippedRowSchema).optional(),
 });
 
-function blankQuery(value: unknown): unknown {
-  if (typeof value === "string" && value.trim() === "") {
-    return undefined;
-  }
-  return value;
-}
-
-const optionalQueryText = z.preprocess(blankQuery, z.string().trim().min(1).optional());
-const optionalQueryId = z.preprocess(blankQuery, z.uuid().optional());
-const optionalQueryDate = z.preprocess(blankQuery, isoDateSchema.optional());
-const optionalIdOrNone = z.preprocess(blankQuery, z.union([z.uuid(), z.literal("none")]).optional());
-
 export const transactionSortColumns = ["date", "amount", "payeeRaw"] as const;
 
-const queryFlag = z
-  .union([z.boolean(), z.enum(["true", "false"])])
-  .optional()
-  .transform((value) => value === true || value === "true");
-
 export const transactionFilterSchema = z.object({
-  q: optionalQueryText,
-  accountId: optionalQueryId,
-  categoryId: optionalQueryId,
-  groupId: optionalIdOrNone,
-  merchantId: optionalIdOrNone,
-  tagId: optionalIdOrNone,
-  from: optionalQueryDate,
-  to: optionalQueryDate,
+  q: queryText,
+  accountId: queryId,
+  categoryId: queryId,
+  groupId: queryIdOrNone,
+  merchantId: queryIdOrNone,
+  tagId: queryIdOrNone,
+  from: queryDate,
+  to: queryDate,
   uncategorized: queryFlag,
   automatic: queryFlag,
 });
@@ -140,7 +123,7 @@ export const transactionListQuerySchema = listQuerySchema(transactionSortColumns
   .extend({ needsReview: queryFlag });
 
 export const transactionListApiQuerySchema = transactionListQuerySchema.extend({
-  asOf: optionalQueryDate,
+  asOf: queryDate,
 });
 
 export const approveLevelSchema = transactionFilterSchema.extend({

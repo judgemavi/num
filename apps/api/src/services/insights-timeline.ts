@@ -11,11 +11,10 @@ import {
 } from "@num/shared";
 import { and, gte, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { balanceOf } from "./account-balance";
+import { balancesOf } from "./account-balance";
 import { usesValuation } from "./account-rules";
 import { readForecast } from "./forecast";
 import { periodMonths, type Period } from "./insights-period";
-import { asKind } from "./insights-worth";
 import type { LedgerLine } from "./ledger-lines";
 
 /** Actual income and spending of each month in the period. With a category, only that category's spending. */
@@ -59,7 +58,7 @@ function onBudgetAccounts(db: Db) {
     .filter((row) => row.onBudget)
     .map((row) => ({
       id: row.id,
-      kind: asKind(row.kind),
+      kind: row.kind,
       openingBalance: row.openingBalance,
       archivedOn: row.archivedAt === null ? null : row.archivedAt.slice(0, 10),
     }));
@@ -73,7 +72,7 @@ export function dailyBalances(db: Db, period: Period): { date: string; amount: n
   const open = onBudgetAccounts(db);
   const ids = new Set(open.map((row) => row.id));
   const before = Temporal.PlainDate.from(period.from).subtract({ days: 1 }).toString();
-  const balances = new Map(open.map((row) => [row.id, balanceOf(db, row, undefined, undefined, before)]));
+  const balances = new Map(balancesOf(db, open, before).map((item) => [item.account.id, item.balance]));
   const valued = new Set(open.filter((row) => usesValuation(row.kind)).map((row) => row.id));
   const moves = new Map<string, { accountId: string; total: number }[]>();
   for (const row of db

@@ -1,47 +1,23 @@
-import { bucketCategories, buckets, categories } from "@num/db";
+import { bucketCategories, buckets, categories, type BucketRow } from "@num/db";
 import {
-  bucketColors,
-  bucketIcons,
-  bucketKinds,
   isIsoDate,
   kindFieldsValid,
   nextBucketColor,
-  sinkingRepeats,
   utcNow,
   type Bucket,
-  type BucketColor,
   type BucketCreate,
-  type BucketIcon,
-  type BucketKind,
   type BucketListQuery,
   type BucketWrite,
   type OverspentBucket,
-  type SinkingRepeat,
 } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { bucketBalances, type Reader } from "./bucket-balance";
-import { write, type AuditSource, type WriteTx } from "./write";
+import { bucketBalances } from "./bucket-balance";
+import { withoutId, write, type WriteTx, type WriteInput, type Reader } from "./write";
+import { compareText, pageOf } from "./paging";
 
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-type BucketRow = typeof buckets.$inferSelect;
-
-function compareText(left: string, right: string): number {
-  if (left < right) {
-    return -1;
-  }
-  if (left > right) {
-    return 1;
-  }
-  return 0;
-}
-
-function compareName(left: string, right: string): number {
+function compareName(left: string, right: string) {
   const folded = compareText(left.toLowerCase(), right.toLowerCase());
   if (folded !== 0) {
     return folded;
@@ -49,39 +25,14 @@ function compareName(left: string, right: string): number {
   return compareText(left, right);
 }
 
-function oneOf<T extends string>(value: string, allowed: readonly T[], label: string): T {
-  if (!(allowed as readonly string[]).includes(value)) {
-    throw new Error(label);
-  }
-  return value as T;
-}
-
-function asKind(value: string): BucketKind {
-  return oneOf(value, bucketKinds, "Unknown bucket kind");
-}
-
-function asColor(value: string): BucketColor {
-  return oneOf(value, bucketColors, "Unknown bucket color");
-}
-
-function asIcon(value: string): BucketIcon {
-  return oneOf(value, bucketIcons, "Unknown bucket icon");
-}
-
-function asRepeat(value: string | null): SinkingRepeat | null {
-  if (value === null) {
-    return null;
-  }
-  return oneOf(value, sinkingRepeats, "Unknown sinking repeat");
-}
-
+/** The route schema uses the same rule. This check is for callers that are not routes. */
 function assertKindFields(input: BucketCreate) {
   if (!kindFieldsValid(input)) {
     throw new ServiceError("bucket_fields_invalid", 400);
   }
 }
 
-function categoryIdsFor(db: Reader, bucketId: string): string[] {
+function categoryIdsFor(db: Reader, bucketId: string) {
   return db
     .select({ categoryId: bucketCategories.categoryId })
     .from(bucketCategories)
@@ -91,7 +42,7 @@ function categoryIdsFor(db: Reader, bucketId: string): string[] {
     .sort(compareText);
 }
 
-function allCategoryIds(db: Reader): Map<string, string[]> {
+function allCategoryIds(db: Reader) {
   const map = new Map<string, string[]>();
   for (const row of db.select().from(bucketCategories).all()) {
     const list = map.get(row.bucketId) ?? [];
@@ -104,55 +55,36 @@ function allCategoryIds(db: Reader): Map<string, string[]> {
   return map;
 }
 
+/** The audit log keeps the bucket row without its id, and the categories of the bucket. */
 function snapshot(row: BucketRow, categoryIds: string[]) {
-  return {
-    name: row.name,
-    kind: row.kind,
-    priority: row.priority,
-    essential: row.essential,
-    color: row.color,
-    icon: row.icon,
-    startDate: row.startDate,
-    archivedAt: row.archivedAt,
-    refillTo: row.refillTo,
-    amount: row.amount,
-    dueDate: row.dueDate,
-    repeat: row.repeat,
-    target: row.target,
-    targetDate: row.targetDate,
-    fixedAmount: row.fixedAmount,
-    categoryIds,
-  };
+  return { ...withoutId(row), categoryIds };
 }
 
-function toBucket(row: BucketRow, categoryIds: string[], balance: number): Bucket {
-  return {
-    id: row.id,
-    name: row.name,
-    kind: asKind(row.kind),
-    priority: row.priority,
-    essential: row.essential,
-    color: asColor(row.color),
-    icon: asIcon(row.icon),
-    archivedAt: row.archivedAt,
-    refillTo: row.refillTo,
-    amount: row.amount,
-    dueDate: row.dueDate,
-    repeat: asRepeat(row.repeat),
-    target: row.target,
-    targetDate: row.targetDate,
-    fixedAmount: row.fixedAmount,
-    categoryIds,
-    startDate: row.startDate,
-    balance,
-  };
+function toBucket({ startDate, ...row }: BucketRow, categoryIds: string[], balance: number): Bucket {
+  return { ...row, categoryIds, startDate, balance };
 }
 
 function replaceCategories(tx: WriteTx, bucketId: string, categoryIds: string[]) {
   const previous = new Set(categoryIdsFor(tx, bucketId));
   const next = [...new Set(categoryIds)].sort(compareText);
+  const found = new Map(
+    tx
+      .select()
+      .from(categories)
+      .where(inArray(categories.id, next))
+      .all()
+      .map((row) => [row.id, row]),
+  );
+  const owners = new Map(
+    tx
+      .select()
+      .from(bucketCategories)
+      .where(inArray(bucketCategories.categoryId, next))
+      .all()
+      .map((row) => [row.categoryId, row.bucketId]),
+  );
   for (const categoryId of next) {
-    const category = tx.select().from(categories).where(eq(categories.id, categoryId)).get();
+    const category = found.get(categoryId);
     if (!category) {
       throw new ServiceError("category_not_found", 404);
     }
@@ -162,12 +94,8 @@ function replaceCategories(tx: WriteTx, bucketId: string, categoryIds: string[])
     if (category.archivedAt && !previous.has(categoryId)) {
       throw new ServiceError("category_archived", 409);
     }
-    const owner = tx
-      .select({ bucketId: bucketCategories.bucketId })
-      .from(bucketCategories)
-      .where(eq(bucketCategories.categoryId, categoryId))
-      .get();
-    if (owner && owner.bucketId !== bucketId) {
+    const owner = owners.get(categoryId);
+    if (owner !== undefined && owner !== bucketId) {
       throw new ServiceError("category_in_bucket", 409);
     }
   }
@@ -210,7 +138,7 @@ export function readBucket(db: Reader, id: string): Bucket {
   return toBucket(row, categoryIdsFor(db, id), balance);
 }
 
-function bucketCount(db: Reader): number {
+function bucketCount(db: Reader) {
   const row = db.select({ total: sql<number>`count(*)` }).from(buckets).get();
   return row?.total ?? 0;
 }
@@ -238,14 +166,7 @@ export function listBuckets(db: Db, query: BucketListQuery) {
     }
     return compareText(left.id, right.id);
   });
-  const start = (query.page - 1) * query.pageSize;
-  return {
-    items: rows.slice(start, start + query.pageSize),
-    page: query.page,
-    pageSize: query.pageSize,
-    total: rows.length,
-    nextColor: nextBucketColor(bucketCount(db)),
-  };
+  return { ...pageOf(rows, query), nextColor: nextBucketColor(bucketCount(db)) };
 }
 
 export function listOverspent(db: Db): { items: OverspentBucket[] } {
@@ -258,8 +179,8 @@ export function listOverspent(db: Db): { items: OverspentBucket[] } {
     .map((row) => ({
       id: row.id,
       name: row.name,
-      color: asColor(row.color),
-      icon: asIcon(row.icon),
+      color: row.color,
+      icon: row.icon,
       balance: balances.get(row.id) ?? 0,
     }))
     .filter((row) => row.balance < 0);
@@ -273,7 +194,7 @@ export function createBucket(db: Db, input: BucketCreate & WriteInput & { asOf: 
     throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
   }
   const id = crypto.randomUUID();
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const row = rowValues(id, { ...input, startDate: input.startDate ?? input.asOf }, null);
     tx.insert(buckets).values(row).run();
     const categoryIds = replaceCategories(tx, id, input.categoryIds);
@@ -284,38 +205,20 @@ export function createBucket(db: Db, input: BucketCreate & WriteInput & { asOf: 
       before: null,
       after: snapshot(row, categoryIds),
     });
+    return readBucket(tx, id);
   });
-  return readBucket(db, id);
 }
 
 export function updateBucket(db: Db, id: string, input: BucketWrite & WriteInput): Bucket {
   assertKindFields(input);
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = tx.select().from(buckets).where(eq(buckets.id, id)).get();
     if (!existing) {
       throw new ServiceError("bucket_not_found", 404);
     }
     const beforeIds = categoryIdsFor(tx, id);
     const row = rowValues(id, input, existing.archivedAt);
-    tx.update(buckets)
-      .set({
-        name: row.name,
-        kind: row.kind,
-        priority: row.priority,
-        essential: row.essential,
-        color: row.color,
-        icon: row.icon,
-        startDate: row.startDate,
-        refillTo: row.refillTo,
-        amount: row.amount,
-        dueDate: row.dueDate,
-        repeat: row.repeat,
-        target: row.target,
-        targetDate: row.targetDate,
-        fixedAmount: row.fixedAmount,
-      })
-      .where(eq(buckets.id, id))
-      .run();
+    tx.update(buckets).set(withoutId(row)).where(eq(buckets.id, id)).run();
     const categoryIds = replaceCategories(tx, id, input.categoryIds);
     tx.audit({
       entity: "buckets",
@@ -324,13 +227,13 @@ export function updateBucket(db: Db, id: string, input: BucketWrite & WriteInput
       before: snapshot(existing, beforeIds),
       after: snapshot(row, categoryIds),
     });
+    return readBucket(tx, id);
   });
-  return readBucket(db, id);
 }
 
 export function archiveBucket(db: Db, id: string, input: WriteInput): Bucket {
   const at = input.at ?? utcNow();
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const existing = tx.select().from(buckets).where(eq(buckets.id, id)).get();
     if (!existing) {
       throw new ServiceError("bucket_not_found", 404);
@@ -353,12 +256,12 @@ export function archiveBucket(db: Db, id: string, input: WriteInput): Bucket {
       before: snapshot(existing, categoryIds),
       after: snapshot(next, []),
     });
+    return readBucket(tx, id);
   });
-  return readBucket(db, id);
 }
 
 export function restoreBucket(db: Db, id: string, input: WriteInput): Bucket {
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = tx.select().from(buckets).where(eq(buckets.id, id)).get();
     if (!existing) {
       throw new ServiceError("bucket_not_found", 404);
@@ -376,6 +279,6 @@ export function restoreBucket(db: Db, id: string, input: WriteInput): Bucket {
       before: snapshot(existing, categoryIds),
       after: snapshot(next, categoryIds),
     });
+    return readBucket(tx, id);
   });
-  return readBucket(db, id);
 }

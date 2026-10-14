@@ -19,11 +19,11 @@ export const cardStatementListSchema = z.object({
 
 export type CardStatement = z.infer<typeof cardStatementSchema>;
 
-function daysBetween(from: string, to: string): number {
+function daysBetween(from: string, to: string) {
   return Temporal.PlainDate.from(from).until(Temporal.PlainDate.from(to), { largestUnit: "day" }).days;
 }
 
-function dueGap(statements: readonly { date: string }[], paymentDates: readonly string[]): number {
+function dueGap(statements: readonly { date: string }[], paymentDates: readonly string[]) {
   const payments = [...paymentDates].sort();
   const gaps: number[] = [];
   for (const statement of statements) {
@@ -38,7 +38,7 @@ function dueGap(statements: readonly { date: string }[], paymentDates: readonly 
   return medianMinor(gaps);
 }
 
-function dueDate(statementDate: string, gapDays: number): string {
+function dueDate(statementDate: string, gapDays: number) {
   return Temporal.PlainDate.from(statementDate).add({ days: gapDays }).toString();
 }
 

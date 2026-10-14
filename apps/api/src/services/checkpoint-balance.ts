@@ -1,17 +1,14 @@
 import { transactions, valuations } from "@num/db";
 import type { AccountKind } from "@num/shared";
 import { and, eq, gt, lte, sql } from "drizzle-orm";
-import type { Db } from "../db";
 import { accountBalance } from "./account-rules";
-import type { WriteTx } from "./write";
+import type { Reader } from "./write";
 
-type Reader = Db | WriteTx;
-
-function readSum(row: { total: number } | undefined): number {
+function readSum(row: { total: number } | undefined) {
   return row?.total ?? 0;
 }
 
-function sumBetween(db: Reader, accountId: string, after: string | null, through: string): number {
+function sumBetween(db: Reader, accountId: string, after: string | null, through: string) {
   const filters = [eq(transactions.accountId, accountId), lte(transactions.date, through)];
   if (after !== null) {
     filters.push(gt(transactions.date, after));
@@ -26,7 +23,7 @@ function sumBetween(db: Reader, accountId: string, after: string | null, through
   return readSum(row);
 }
 
-function valuationOn(db: Reader, accountId: string, date: string): { date: string; balance: number } | null {
+function valuationOn(db: Reader, accountId: string, date: string) {
   const rows = db
     .select({
       date: valuations.date,

@@ -1,6 +1,5 @@
 import { bucketCategories, categories, categoryGroups, transactionLines } from "@num/db";
 import {
-  categoryKinds,
   utcNow,
   type Category,
   type CategoryCreate,
@@ -14,74 +13,15 @@ import {
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { write, type AuditSource, type WriteTx } from "./write";
+import { withoutId, write, type WriteTx, type WriteInput } from "./write";
+import { compareText, pageOf } from "./paging";
 
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-type CategoryRow = typeof categories.$inferSelect;
-type GroupRow = typeof categoryGroups.$inferSelect;
-
-function asKind(value: string): CategoryKind {
-  if (!(categoryKinds as readonly string[]).includes(value)) {
-    throw new Error("Unknown category kind");
-  }
-  return value as CategoryKind;
-}
-
-function compareText(left: string, right: string): number {
-  if (left < right) {
-    return -1;
-  }
-  if (left > right) {
-    return 1;
-  }
-  return 0;
-}
-
-function compareName(left: string, right: string): number {
+function compareName(left: string, right: string) {
   const folded = compareText(left.toLowerCase(), right.toLowerCase());
   if (folded !== 0) {
     return folded;
   }
   return compareText(left, right);
-}
-
-function groupSnapshot(row: { name: string }) {
-  return { name: row.name };
-}
-
-function categorySnapshot(row: {
-  name: string;
-  kind: string;
-  groupId: string | null;
-  essential: boolean;
-  archivedAt: string | null;
-}) {
-  return {
-    name: row.name,
-    kind: row.kind,
-    groupId: row.groupId,
-    essential: row.essential,
-    archivedAt: row.archivedAt,
-  };
-}
-
-function toGroup(row: GroupRow): CategoryGroup {
-  return { id: row.id, name: row.name };
-}
-
-function toCategory(row: CategoryRow): Category {
-  return {
-    id: row.id,
-    name: row.name,
-    kind: asKind(row.kind),
-    groupId: row.groupId,
-    essential: row.essential,
-    archivedAt: row.archivedAt,
-  };
 }
 
 function assertGroup(tx: WriteTx, groupId: string | null) {
@@ -142,7 +82,7 @@ export function getCategoryGroup(db: Db, id: string): CategoryGroup {
   if (!row) {
     throw new ServiceError("group_not_found", 404);
   }
-  return toGroup(row);
+  return row;
 }
 
 export function getCategory(db: Db, id: string): Category {
@@ -150,19 +90,18 @@ export function getCategory(db: Db, id: string): Category {
   if (!row) {
     throw new ServiceError("category_not_found", 404);
   }
-  return toCategory(row);
+  return row;
 }
 
 export function listCategoryGroups(db: Db): { items: CategoryGroup[] } {
-  const items = db.select().from(categoryGroups).all().map(toGroup);
+  const items = db.select().from(categoryGroups).all();
   items.sort((left, right) => compareName(left.name, right.name) || compareText(left.id, right.id));
   return { items };
 }
 
 export function createCategoryGroup(db: Db, input: CategoryGroupCreate & WriteInput): CategoryGroup {
   const id = crypto.randomUUID();
-  let created: CategoryGroup | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const row = { id, name: input.name.trim() };
     assertGroupName(tx, row.name);
     tx.insert(categoryGroups).values(row).run();
@@ -171,14 +110,10 @@ export function createCategoryGroup(db: Db, input: CategoryGroupCreate & WriteIn
       entityId: id,
       action: "create",
       before: null,
-      after: groupSnapshot(row),
+      after: withoutId(row),
     });
-    created = toGroup(row);
+    return row;
   });
-  if (!created) {
-    throw new Error("Create did not return a group");
-  }
-  return created;
 }
 
 export function updateCategoryGroup(
@@ -186,8 +121,7 @@ export function updateCategoryGroup(
   id: string,
   input: CategoryGroupUpdate & WriteInput,
 ): CategoryGroup {
-  let updated: CategoryGroup | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = tx.select().from(categoryGroups).where(eq(categoryGroups.id, id)).get();
     if (!existing) {
       throw new ServiceError("group_not_found", 404);
@@ -199,15 +133,11 @@ export function updateCategoryGroup(
       entity: "category_groups",
       entityId: id,
       action: "update",
-      before: groupSnapshot(existing),
-      after: groupSnapshot(next),
+      before: withoutId(existing),
+      after: next,
     });
-    updated = toGroup({ id, ...next });
+    return { id, ...next };
   });
-  if (!updated) {
-    throw new Error("Update did not return a group");
-  }
-  return updated;
 }
 
 export function deleteCategoryGroup(db: Db, id: string, input: WriteInput): void {
@@ -224,8 +154,8 @@ export function deleteCategoryGroup(db: Db, id: string, input: WriteInput): void
         entity: "categories",
         entityId: category.id,
         action: "update",
-        before: categorySnapshot(category),
-        after: categorySnapshot(next),
+        before: withoutId(category),
+        after: withoutId(next),
       });
     }
     tx.delete(categoryGroups).where(eq(categoryGroups.id, id)).run();
@@ -233,7 +163,7 @@ export function deleteCategoryGroup(db: Db, id: string, input: WriteInput): void
       entity: "category_groups",
       entityId: id,
       action: "delete",
-      before: groupSnapshot(existing),
+      before: withoutId(existing),
       after: null,
     });
   });
@@ -253,8 +183,7 @@ export function listCategories(db: Db, query: CategoryListQuery) {
         return row.groupId === null;
       }
       return row.groupId === query.groupId;
-    })
-    .map(toCategory);
+    });
   const sort = query.sort ?? "name";
   const dir = query.dir === "desc" ? -1 : 1;
   rows.sort((left, right) => {
@@ -264,13 +193,7 @@ export function listCategories(db: Db, query: CategoryListQuery) {
     }
     return compareText(left.id, right.id);
   });
-  const start = (query.page - 1) * query.pageSize;
-  return {
-    items: rows.slice(start, start + query.pageSize),
-    page: query.page,
-    pageSize: query.pageSize,
-    total: rows.length,
-  };
+  return pageOf(rows, query);
 }
 
 export function createCategory(db: Db, input: CategoryCreate & WriteInput): Category {
@@ -294,21 +217,19 @@ export function createCategory(db: Db, input: CategoryCreate & WriteInput): Cate
       entityId: id,
       action: "create",
       before: null,
-      after: categorySnapshot(row),
+      after: withoutId(row),
     });
   });
-  return toCategory(row);
+  return row;
 }
 
 export function updateCategory(db: Db, id: string, input: CategoryUpdate & WriteInput): Category {
-  let updated: Category | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = tx.select().from(categories).where(eq(categories.id, id)).get();
     if (!existing) {
       throw new ServiceError("category_not_found", 404);
     }
-    const kind = asKind(existing.kind);
-    assertKindChange(tx, id, kind, input.kind);
+    assertKindChange(tx, id, existing.kind, input.kind);
     assertEssential(input.kind, input.essential);
     assertGroup(tx, input.groupId);
     const name = input.name.trim();
@@ -328,21 +249,16 @@ export function updateCategory(db: Db, id: string, input: CategoryUpdate & Write
       entity: "categories",
       entityId: id,
       action: "update",
-      before: categorySnapshot(existing),
-      after: categorySnapshot(next),
+      before: withoutId(existing),
+      after: next,
     });
-    updated = toCategory({ id, ...next });
+    return { id, ...next };
   });
-  if (!updated) {
-    throw new Error("Update did not return a category");
-  }
-  return updated;
 }
 
 export function archiveCategory(db: Db, id: string, input: WriteInput): Category {
   const at = input.at ?? utcNow();
-  let archived: Category | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const existing = tx.select().from(categories).where(eq(categories.id, id)).get();
     if (!existing) {
       throw new ServiceError("category_not_found", 404);
@@ -356,20 +272,15 @@ export function archiveCategory(db: Db, id: string, input: WriteInput): Category
       entity: "categories",
       entityId: id,
       action: "archive",
-      before: categorySnapshot(existing),
-      after: categorySnapshot(next),
+      before: withoutId(existing),
+      after: withoutId(next),
     });
-    archived = toCategory(next);
+    return next;
   });
-  if (!archived) {
-    throw new Error("Archive did not return a category");
-  }
-  return archived;
 }
 
 export function restoreCategory(db: Db, id: string, input: WriteInput): Category {
-  let restored: Category | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = tx.select().from(categories).where(eq(categories.id, id)).get();
     if (!existing) {
       throw new ServiceError("category_not_found", 404);
@@ -383,13 +294,9 @@ export function restoreCategory(db: Db, id: string, input: WriteInput): Category
       entity: "categories",
       entityId: id,
       action: "restore",
-      before: categorySnapshot(existing),
-      after: categorySnapshot(next),
+      before: withoutId(existing),
+      after: withoutId(next),
     });
-    restored = toCategory(next);
+    return next;
   });
-  if (!restored) {
-    throw new Error("Restore did not return a category");
-  }
-  return restored;
 }

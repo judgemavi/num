@@ -1,24 +1,12 @@
-import { documentSchema, errorSchema } from "@num/shared";
+import { documentSchema } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import type { Db } from "../db";
 import { deleteDocument, readDocumentFile, uploadDocument } from "../services/documents";
 import { validationHook } from "../validation";
+import { errorResponse, idParams } from "./common";
 
 const maxUploadBytes = 20 * 1024 * 1024;
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: {
-    "application/json": {
-      schema: errorSchema,
-    },
-  },
-} as const;
-
-const idParams = z.object({
-  id: z.uuid(),
-});
 
 const uploadRoute = createRoute({
   operationId: "post_documents",
@@ -81,12 +69,12 @@ const deleteRoute = createRoute({
   },
 });
 
-function contentDisposition(filename: string): string {
+function contentDisposition(filename: string) {
   const ascii = filename.replace(/[^\x20-\x7E]/g, "_");
   return `attachment; filename="${ascii}"`;
 }
 
-function responseBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+function responseBytes(bytes: Uint8Array) {
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
   return copy;

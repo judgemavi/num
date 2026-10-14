@@ -1,10 +1,9 @@
 import { importBatches } from "@num/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { ServiceError } from "../service-error";
-import { readUnreadable } from "./import-read";
 import type { WriteTx } from "./write";
 
-function unreadableParts(itemKey: string): { batchId: string; line: number } | null {
+function unreadableParts(itemKey: string) {
   const prefix = "import_unreadable:";
   if (!itemKey.startsWith(prefix)) {
     return null;
@@ -34,18 +33,17 @@ export function clearUnreadableLine(tx: WriteTx, itemKey: string): void {
   if (!parts || !batch) {
     throw new ServiceError("inbox_item_not_found", 404);
   }
-  const rows = readUnreadable(batch.unreadableJson);
-  const next = rows.filter((row) => row.line !== parts.line);
-  if (next.length === rows.length) {
+  const next = batch.unreadableJson.filter((row) => row.line !== parts.line);
+  if (next.length === batch.unreadableJson.length) {
     throw new ServiceError("inbox_item_not_found", 404);
   }
-  const after = JSON.stringify(next);
-  tx.update(importBatches).set({ unreadableJson: after }).where(eq(importBatches.id, batch.id)).run();
+  tx.update(importBatches).set({ unreadableJson: next }).where(eq(importBatches.id, batch.id)).run();
+  // The audit log keeps the lines as JSON text, the same text that the column stores.
   tx.audit({
     entity: "import_batches",
     entityId: batch.id,
     action: "update",
-    before: { unreadableJson: batch.unreadableJson },
-    after: { unreadableJson: after },
+    before: { unreadableJson: JSON.stringify(batch.unreadableJson) },
+    after: { unreadableJson: JSON.stringify(next) },
   });
 }

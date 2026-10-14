@@ -1,58 +1,25 @@
-import { accounts } from "@num/db";
+import { accounts, type AccountRow } from "@num/db";
 import {
-  accountKinds,
+  allowsInterestRate,
   defaultOnBudget,
-  paymentPolicies,
   type Account,
   type AccountCreate,
-  type AccountKind,
   type AccountListQuery,
   type AccountUpdate,
-  type PaymentPolicy,
   utcNow,
 } from "@num/shared";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { balanceOf, latestValuations, transactionTotals } from "./account-balance";
-import { assertCanArchive, assertSameClass, cardFields, interestRate, type CardFields } from "./account-rules";
-import { accountAuditSnapshot, readColumnMap } from "./account-snapshot";
+import { balanceOf, balancesOf } from "./account-balance";
+import { assertCanArchive, assertSameClass, cardFields, interestRate } from "./account-rules";
+import { accountAuditSnapshot } from "./account-snapshot";
 import { hasTerms, resolveTerms, saveTerms } from "./mortgage-terms";
-import { earliestTransactionDate, effectiveOpeningDate } from "./opening-date";
-import { write, type AuditSource, type WriteTx } from "./write";
+import { automaticOpening, automaticOpenings, effectiveOpeningDate, type AutomaticOpening } from "./opening-date";
+import { keepOmitted, write, type WriteInput } from "./write";
+import { compareText, pageOf } from "./paging";
 
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-type AccountRow = typeof accounts.$inferSelect;
-
-function asKind(value: string): AccountKind {
-  if (!(accountKinds as readonly string[]).includes(value)) {
-    throw new Error("Unknown account kind");
-  }
-  return value as AccountKind;
-}
-
-function asPolicy(value: string | null): PaymentPolicy | null {
-  if (value === null) {
-    return null;
-  }
-  if (!(paymentPolicies as readonly string[]).includes(value)) {
-    throw new Error("Unknown payment policy");
-  }
-  return value as PaymentPolicy;
-}
-
-function resolveOpening(input: { openingDate?: string | null; openingBalance?: number }, storedDate: string | null) {
-  return {
-    openingDate: input.openingDate === undefined ? storedDate : input.openingDate,
-    openingBalance: input.openingBalance ?? 0,
-  };
-}
-
-function blankToNull(value: string | null | undefined): string | null {
+function blankToNull(value: string | null | undefined) {
   if (value === undefined || value === null) {
     return null;
   }
@@ -60,65 +27,24 @@ function blankToNull(value: string | null | undefined): string | null {
   return trimmed.length === 0 ? null : trimmed;
 }
 
-function toAccount(db: Db | WriteTx, row: AccountRow, balance: number): Account {
-  const automaticOpeningDate = effectiveOpeningDate(db, { id: row.id, openingDate: null });
+function toAccount(row: AccountRow, balance: number, automatic: AutomaticOpening): Account {
+  const { id, name, institution, kind, onBudget, openingDate, ...rest } = row;
   return {
-    id: row.id,
-    name: row.name,
-    institution: row.institution,
-    kind: asKind(row.kind),
-    onBudget: row.onBudget,
-    openingDate: row.openingDate ?? automaticOpeningDate,
-    openingAutomatic: row.openingDate === null,
-    automaticOpeningDate,
-    automaticFollowsTransactions: earliestTransactionDate(db, row.id) !== null,
-    openingBalance: row.openingBalance,
-    archivedAt: row.archivedAt,
-    paymentPolicy: asPolicy(row.paymentPolicy),
-    fixedPayment: row.fixedPayment,
-    interestRateMilliPct: row.interestRateMilliPct,
-    importPreset: row.importPreset,
-    columnMap: readColumnMap(row.columnMap),
+    id,
+    name,
+    institution,
+    kind,
+    onBudget,
+    openingDate: openingDate ?? automatic.date,
+    openingAutomatic: openingDate === null,
+    automaticOpeningDate: automatic.date,
+    automaticFollowsTransactions: automatic.followsTransactions,
+    ...rest,
     balance,
   };
 }
 
-function storedFields(input: {
-  name: string;
-  institution: string | null;
-  kind: AccountKind;
-  onBudget: boolean;
-  openingDate: string | null;
-  openingBalance: number;
-  archivedAt: string | null;
-  card: CardFields;
-  interestRateMilliPct: number | null;
-}) {
-  return {
-    name: input.name,
-    institution: input.institution,
-    kind: input.kind,
-    onBudget: input.onBudget,
-    openingDate: input.openingDate,
-    openingBalance: input.openingBalance,
-    archivedAt: input.archivedAt,
-    paymentPolicy: input.card.paymentPolicy,
-    fixedPayment: input.card.fixedPayment,
-    interestRateMilliPct: input.interestRateMilliPct,
-  };
-}
-
-function compareText(left: string, right: string): number {
-  if (left < right) {
-    return -1;
-  }
-  if (left > right) {
-    return 1;
-  }
-  return 0;
-}
-
-function compareName(left: string, right: string): number {
+function compareName(left: string, right: string) {
   const folded = compareText(left.toLowerCase(), right.toLowerCase());
   if (folded !== 0) {
     return folded;
@@ -130,11 +56,19 @@ export function listAccounts(db: Db, query: AccountListQuery) {
   const rows = db
     .select()
     .from(accounts)
-    .all()
-    .filter((row) => (query.archived ? row.archivedAt !== null : row.archivedAt === null));
-  const totals = transactionTotals(db);
-  const latest = latestValuations(db);
-  const items = rows.map((row) => toAccount(db, row, balanceOf(db, { ...row, kind: asKind(row.kind) }, totals, latest)));
+    .where(query.archived ? isNotNull(accounts.archivedAt) : isNull(accounts.archivedAt))
+    .all();
+  const openings = automaticOpenings(
+    db,
+    rows.map((row) => row.id),
+  );
+  const items = balancesOf(db, rows).map(({ account, balance }) => {
+    const automatic = openings.get(account.id);
+    if (!automatic) {
+      throw new Error("Account has no creation record");
+    }
+    return toAccount(account, balance, automatic);
+  });
   const sort = query.sort ?? "name";
   const dir = query.dir === "desc" ? -1 : 1;
   items.sort((left, right) => {
@@ -144,35 +78,26 @@ export function listAccounts(db: Db, query: AccountListQuery) {
     }
     return compareText(left.id, right.id);
   });
-  const start = (query.page - 1) * query.pageSize;
-  return {
-    items: items.slice(start, start + query.pageSize),
-    page: query.page,
-    pageSize: query.pageSize,
-    total: items.length,
-  };
+  return pageOf(items, query);
 }
 
 export function createAccount(db: Db, input: AccountCreate & WriteInput): Account {
   const card = cardFields(input.kind, input);
   const rate = interestRate(input.kind, input.interestRateMilliPct);
   const at = input.at ?? utcNow();
-  const opening = resolveOpening(input, null);
   const id = crypto.randomUUID();
   const terms = resolveTerms(db, id, input.kind, input.mortgageTerms);
-  const row = {
+  const row: AccountRow = {
     id,
-    ...storedFields({
-      name: input.name.trim(),
-      institution: blankToNull(input.institution),
-      kind: input.kind,
-      onBudget: input.onBudget ?? defaultOnBudget(input.kind),
-      openingDate: opening.openingDate,
-      openingBalance: opening.openingBalance,
-      archivedAt: null,
-      card,
-      interestRateMilliPct: rate,
-    }),
+    name: input.name.trim(),
+    institution: blankToNull(input.institution),
+    kind: input.kind,
+    onBudget: input.onBudget ?? defaultOnBudget(input.kind),
+    openingDate: input.openingDate ?? null,
+    openingBalance: input.openingBalance ?? 0,
+    archivedAt: null,
+    ...card,
+    interestRateMilliPct: rate,
     importPreset: null,
     columnMap: null,
   };
@@ -187,55 +112,49 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
     });
     saveTerms(tx, id, { date: row.openingDate, balance: row.openingBalance }, terms);
   });
-  return toAccount(db, row, row.openingBalance);
+  return toAccount(row, row.openingBalance, automaticOpening(db, id));
 }
 
+/** A field that the update leaves out keeps its stored value. An explicit null clears a field that can be empty. */
 export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteInput): Account {
   const at = input.at ?? utcNow();
-  let updated: Account | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const existing = tx.select().from(accounts).where(eq(accounts.id, id)).get();
     if (!existing) {
       throw new ServiceError("account_not_found", 404);
     }
-    const currentKind = asKind(existing.kind);
-    assertSameClass(currentKind, input.kind);
-    const card = cardFields(input.kind, input);
-    const rate = interestRate(input.kind, input.interestRateMilliPct);
+    assertSameClass(existing.kind, input.kind);
+    // The two card fields go together. A card keeps them when the update leaves out the two.
+    const keepsCard = input.kind === "credit_card" && input.paymentPolicy === undefined && input.fixedPayment === undefined;
+    const card = cardFields(input.kind, keepsCard ? existing : input);
+    const keepsRate = input.interestRateMilliPct === undefined && allowsInterestRate(input.kind);
+    const rate = interestRate(input.kind, keepsRate ? existing.interestRateMilliPct : input.interestRateMilliPct);
     const terms = resolveTerms(tx, id, input.kind, input.mortgageTerms);
-    const opening = resolveOpening(input, existing.openingDate);
+    const requestedDate = keepOmitted(input.openingDate, existing.openingDate);
     // A mortgage with terms has a fixed opening date (decision 0027).
-    const openingDate = terms && opening.openingDate === null ? effectiveOpeningDate(tx, existing) : opening.openingDate;
-    const next = storedFields({
+    const openingDate = terms && requestedDate === null ? effectiveOpeningDate(tx, existing) : requestedDate;
+    const next = {
       name: input.name.trim(),
-      institution: blankToNull(input.institution),
+      institution: input.institution === undefined ? existing.institution : blankToNull(input.institution),
       kind: input.kind,
       onBudget: input.onBudget,
       openingDate,
-      openingBalance: opening.openingBalance,
-      archivedAt: existing.archivedAt,
-      card,
+      openingBalance: input.openingBalance ?? existing.openingBalance,
+      ...card,
       interestRateMilliPct: rate,
-    });
+    };
+    const saved = { ...existing, ...next };
     tx.update(accounts).set(next).where(eq(accounts.id, id)).run();
     tx.audit({
       entity: "accounts",
       entityId: id,
       action: "update",
       before: accountAuditSnapshot(existing),
-      after: accountAuditSnapshot({ ...existing, ...next }),
+      after: accountAuditSnapshot(saved),
     });
     saveTerms(tx, id, { date: openingDate, balance: next.openingBalance }, terms);
-    updated = toAccount(
-      tx,
-      { ...existing, ...next },
-      balanceOf(tx, { id, kind: input.kind, openingBalance: next.openingBalance }),
-    );
+    return toAccount(saved, balanceOf(tx, saved), automaticOpening(tx, id));
   });
-  if (!updated) {
-    throw new Error("Update did not return an account");
-  }
-  return updated;
 }
 
 export function applyOpeningSuggestion(
@@ -252,14 +171,10 @@ export function applyOpeningSuggestion(
   }
   return updateAccount(db, id, {
     name: existing.name,
-    institution: existing.institution,
-    kind: asKind(existing.kind),
+    kind: existing.kind,
     onBudget: existing.onBudget,
     openingDate: input.date,
     openingBalance: input.amount,
-    paymentPolicy: asPolicy(existing.paymentPolicy),
-    fixedPayment: existing.fixedPayment,
-    interestRateMilliPct: existing.interestRateMilliPct,
     source: input.source,
     at: input.at,
   });
@@ -271,8 +186,7 @@ export function archiveAccount(
   input: { confirm: boolean } & WriteInput,
 ): Account {
   const at = input.at ?? utcNow();
-  let archived: Account | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const existing = tx.select().from(accounts).where(eq(accounts.id, id)).get();
     if (!existing) {
       throw new ServiceError("account_not_found", 404);
@@ -280,8 +194,7 @@ export function archiveAccount(
     if (existing.archivedAt) {
       throw new ServiceError("account_archived", 409);
     }
-    const kind = asKind(existing.kind);
-    const balance = balanceOf(tx, { id, kind, openingBalance: existing.openingBalance });
+    const balance = balanceOf(tx, existing);
     assertCanArchive(balance, input.confirm);
     const next = { ...existing, archivedAt: at };
     tx.update(accounts).set({ archivedAt: at }).where(eq(accounts.id, id)).run();
@@ -292,17 +205,12 @@ export function archiveAccount(
       before: accountAuditSnapshot(existing),
       after: accountAuditSnapshot(next),
     });
-    archived = toAccount(tx, next, balance);
+    return toAccount(next, balance, automaticOpening(tx, id));
   });
-  if (!archived) {
-    throw new Error("Archive did not return an account");
-  }
-  return archived;
 }
 
 export function restoreAccount(db: Db, id: string, input: WriteInput): Account {
-  let restored: Account | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = tx.select().from(accounts).where(eq(accounts.id, id)).get();
     if (!existing) {
       throw new ServiceError("account_not_found", 404);
@@ -310,7 +218,6 @@ export function restoreAccount(db: Db, id: string, input: WriteInput): Account {
     if (!existing.archivedAt) {
       throw new ServiceError("account_not_archived", 409);
     }
-    const kind = asKind(existing.kind);
     const next = { ...existing, archivedAt: null };
     tx.update(accounts).set({ archivedAt: null }).where(eq(accounts.id, id)).run();
     tx.audit({
@@ -320,12 +227,8 @@ export function restoreAccount(db: Db, id: string, input: WriteInput): Account {
       before: accountAuditSnapshot(existing),
       after: accountAuditSnapshot(next),
     });
-    restored = toAccount(tx, next, balanceOf(tx, { id, kind, openingBalance: existing.openingBalance }));
+    return toAccount(next, balanceOf(tx, existing), automaticOpening(tx, id));
   });
-  if (!restored) {
-    throw new Error("Restore did not return an account");
-  }
-  return restored;
 }
 
 export function getAccount(db: Db, id: string): Account {
@@ -333,5 +236,5 @@ export function getAccount(db: Db, id: string): Account {
   if (!row) {
     throw new ServiceError("account_not_found", 404);
   }
-  return toAccount(db, row, balanceOf(db, { id: row.id, kind: asKind(row.kind), openingBalance: row.openingBalance }));
+  return toAccount(row, balanceOf(db, row), automaticOpening(db, id));
 }

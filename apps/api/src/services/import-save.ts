@@ -206,7 +206,7 @@ function saveFormat(
   }
   const next = {
     importPreset: presetId ?? existing.importPreset,
-    columnMap: columnMap ? JSON.stringify(columnMap) : existing.columnMap,
+    columnMap: columnMap ?? existing.columnMap,
   };
   if (next.importPreset === existing.importPreset && next.columnMap === existing.columnMap) {
     return;
@@ -240,116 +240,111 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
     writeNewFile(input.dataDir, input.document.hash, input.bytes);
   }
   const batchId = crypto.randomUUID();
-  let saved: ImportBatch | undefined;
   try {
-  write(db, { source: input.source, at: input.at }, (tx) => {
-    if (input.newFile) {
-      tx.insert(documents).values(input.document).run();
+    return write(db, { source: input.source, at: input.at }, (tx) => {
+      if (input.newFile) {
+        tx.insert(documents).values(input.document).run();
+        tx.audit({
+          entity: "documents",
+          entityId: input.document.id,
+          action: "create",
+          before: null,
+          after: {
+            filename: input.document.filename,
+            hash: input.document.hash,
+            mimeType: input.document.mimeType,
+            storagePath: input.document.storagePath,
+            uploadedAt: input.document.uploadedAt,
+            deletedAt: null,
+          },
+        });
+      } else if (input.restoreDocument) {
+        const current = tx.select().from(documents).where(eq(documents.id, input.document.id)).get();
+        if (!current) {
+          throw new Error("Document is missing");
+        }
+        tx.update(documents).set({ deletedAt: null }).where(eq(documents.id, current.id)).run();
+        tx.audit({
+          entity: "documents",
+          entityId: current.id,
+          action: "restore",
+          before: { ...current },
+          after: { ...current, deletedAt: null },
+        });
+      }
+      tx.insert(importBatches)
+        .values({
+          id: batchId,
+          accountId: input.accountId,
+          documentId: input.document.id,
+          parser: input.parser,
+          periodStart,
+          periodEnd,
+          closingBalance: input.closingBalance,
+          closingDate: input.closingDate,
+          unreadableJson: input.unreadable,
+          createdAt: input.at,
+          undoneAt: null,
+        })
+        .run();
+      const created = input.rows.filter((row) => row.outcome === "created");
+      const book = loadMatchBook(tx);
+      const pending = created.map((row) => ({
+        id: `import:${row.rowIndex}`,
+        accountId: input.accountId,
+        date: row.date,
+        amount: row.amount,
+        merchantId: null,
+      }));
+      const recurring = input.asOf ? recurringForRows(tx, pending, input.asOf) : new Map();
+      const scores = new Map<number, MatchResult>();
+      for (const row of created) {
+        const hit = recurring.get(`import:${row.rowIndex}`) ?? null;
+        scores.set(row.rowIndex, scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: hit }));
+      }
+      const createdIds: string[] = [];
+      for (const row of input.rows) {
+        if (row.outcome === "created") {
+          const hit = recurring.get(`import:${row.rowIndex}`);
+          const newId = insertCreated(tx, batchId, input.accountId, row, scores.get(row.rowIndex) ?? scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: null }), hit?.dueDate ?? null);
+          createdIds.push(newId);
+        } else if (row.outcome === "matched") {
+          insertMatched(tx, batchId, input.accountId, row);
+        } else {
+          insertPlain(tx, batchId, input.accountId, row);
+        }
+      }
+      for (const newId of createdIds) {
+        linkAutomatic(tx, newId);
+      }
+      saveFormat(tx, input.accountId, input.presetId, input.columnMap);
+      const batch = tx.select().from(importBatches).where(eq(importBatches.id, batchId)).get();
+      if (!batch) {
+        throw new Error("Import batch is missing");
+      }
+      const presented = presentBatch(tx, batch);
       tx.audit({
-        entity: "documents",
-        entityId: input.document.id,
+        entity: "import_batches",
+        entityId: batchId,
         action: "create",
         before: null,
         after: {
-          filename: input.document.filename,
-          hash: input.document.hash,
-          mimeType: input.document.mimeType,
-          storagePath: input.document.storagePath,
-          uploadedAt: input.document.uploadedAt,
-          deletedAt: null,
+          accountId: batch.accountId,
+          documentId: batch.documentId,
+          parser: batch.parser,
+          periodStart: batch.periodStart,
+          periodEnd: batch.periodEnd,
+          closingBalance: batch.closingBalance,
+          closingDate: batch.closingDate,
+          counts: countOutcomes(input.rows, input.unreadable.length),
         },
       });
-    } else if (input.restoreDocument) {
-      const current = tx.select().from(documents).where(eq(documents.id, input.document.id)).get();
-      if (!current) {
-        throw new Error("Document is missing");
-      }
-      tx.update(documents).set({ deletedAt: null }).where(eq(documents.id, current.id)).run();
-      tx.audit({
-        entity: "documents",
-        entityId: current.id,
-        action: "restore",
-        before: { ...current },
-        after: { ...current, deletedAt: null },
-      });
-    }
-    tx.insert(importBatches)
-      .values({
-        id: batchId,
-        accountId: input.accountId,
-        documentId: input.document.id,
-        parser: input.parser,
-        periodStart,
-        periodEnd,
-        closingBalance: input.closingBalance,
-        closingDate: input.closingDate,
-        unreadableJson: JSON.stringify(input.unreadable),
-        createdAt: input.at,
-        undoneAt: null,
-      })
-      .run();
-    const created = input.rows.filter((row) => row.outcome === "created");
-    const book = loadMatchBook(tx);
-    const pending = created.map((row) => ({
-      id: `import:${row.rowIndex}`,
-      accountId: input.accountId,
-      date: row.date,
-      amount: row.amount,
-      merchantId: null,
-    }));
-    const recurring = input.asOf ? recurringForRows(tx, pending, input.asOf) : new Map();
-    const scores = new Map<number, MatchResult>();
-    for (const row of created) {
-      const hit = recurring.get(`import:${row.rowIndex}`) ?? null;
-      scores.set(row.rowIndex, scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: hit }));
-    }
-    const createdIds: string[] = [];
-    for (const row of input.rows) {
-      if (row.outcome === "created") {
-        const hit = recurring.get(`import:${row.rowIndex}`);
-        const newId = insertCreated(tx, batchId, input.accountId, row, scores.get(row.rowIndex) ?? scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: null }), hit?.dueDate ?? null);
-        createdIds.push(newId);
-      } else if (row.outcome === "matched") {
-        insertMatched(tx, batchId, input.accountId, row);
-      } else {
-        insertPlain(tx, batchId, input.accountId, row);
-      }
-    }
-    for (const newId of createdIds) {
-      linkAutomatic(tx, newId);
-    }
-    saveFormat(tx, input.accountId, input.presetId, input.columnMap);
-    const batch = tx.select().from(importBatches).where(eq(importBatches.id, batchId)).get();
-    if (!batch) {
-      throw new Error("Import batch is missing");
-    }
-    const presented = presentBatch(tx, batch);
-    tx.audit({
-      entity: "import_batches",
-      entityId: batchId,
-      action: "create",
-      before: null,
-      after: {
-        accountId: batch.accountId,
-        documentId: batch.documentId,
-        parser: batch.parser,
-        periodStart: batch.periodStart,
-        periodEnd: batch.periodEnd,
-        closingBalance: batch.closingBalance,
-        closingDate: batch.closingDate,
-        counts: countOutcomes(input.rows, input.unreadable.length),
-      },
+      return presented;
     });
-    saved = presented;
-  });
   } catch (error) {
     if (input.newFile) {
       unlinkSync(join(input.dataDir, "uploads", input.document.hash));
     }
     throw error;
   }
-  if (!saved) {
-    throw new Error("Import did not return a batch");
-  }
-  return saved;
 }

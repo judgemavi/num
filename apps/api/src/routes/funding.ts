@@ -1,6 +1,5 @@
 import {
   asOfQuerySchema,
-  errorSchema,
   fundingPaycheckListSchema,
   fundingPositionSchema,
   fundingProposalQuerySchema,
@@ -9,25 +8,13 @@ import {
   fundingRunListSchema,
   fundingRunSchema,
 } from "@num/shared";
-import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { fundingPosition, fundingProposalFor } from "../services/funding-book";
 import { listFundingPaychecks } from "../services/funding-paychecks";
 import { createFundingRun, listFundingRuns, undoFundingRun } from "../services/funding-runs";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: {
-    "application/json": {
-      schema: errorSchema,
-    },
-  },
-} as const;
-
-const idParams = z.object({
-  id: z.uuid(),
-});
+import { errorResponse, idParams } from "./common";
 
 const positionRoute = createRoute({
   operationId: "get_funding_position",

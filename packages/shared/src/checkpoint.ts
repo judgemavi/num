@@ -5,6 +5,7 @@ import { openingSuggestionSchema } from "./opening";
 import { transactionInputStatuses } from "./transaction";
 import { isUtcTimestamp } from "./time";
 import { centsSchema } from "./money";
+import { queryFlag, queryNumber } from "./list";
 
 
 export const checkpointCreateSchema = z.object({
@@ -80,11 +81,8 @@ export const clearanceResultSchema = z.object({
 });
 
 export const accountActivityQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  reconcile: z
-    .union([z.boolean(), z.enum(["true", "false"])])
-    .optional()
-    .transform((value) => value === true || value === "true"),
+  page: queryNumber().min(1).default(1),
+  reconcile: queryFlag,
 });
 
 export type Checkpoint = z.infer<typeof checkpointSchema>;

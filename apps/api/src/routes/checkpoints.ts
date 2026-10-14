@@ -7,7 +7,6 @@ import {
   clearanceResultSchema,
   clearanceSchema,
   closingHintSchema,
-  errorSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
@@ -21,15 +20,7 @@ import {
 import { listCardStatements } from "../services/card-statements";
 import { setClearance } from "../services/transaction-clearance";
 import { validationHook } from "../validation";
-
-const errorResponse = {
-  description: "The request is not valid",
-  content: {
-    "application/json": {
-      schema: errorSchema,
-    },
-  },
-} as const;
+import { errorResponse } from "./common";
 
 const accountParams = z.object({
   id: z.uuid(),

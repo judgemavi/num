@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { accounts, documents, importBatches, importRows, settings, transactions } from "@num/db";
+import { accounts, documents, importBatches, importRows, settings, transactions, type AccountRow } from "@num/db";
 import {
   chosenPresetId,
   detectStatementFormat,
@@ -14,7 +14,6 @@ import {
 import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { readColumnMap } from "./account-snapshot";
 import { restoreDocument } from "./documents";
 import { planImportRows } from "./import-plan";
 import { presentBatch } from "./import-read";
@@ -46,7 +45,7 @@ type ReadyParse = {
   columnMap: ColumnMap | null;
 };
 
-function minorDigits(db: Db): number {
+function minorDigits(db: Db) {
   const row = db.select().from(settings).where(eq(settings.key, "currency")).get();
   const digits = row ? minorUnitDigits(row.value) : undefined;
   if (digits === undefined) {
@@ -55,11 +54,11 @@ function minorDigits(db: Db): number {
   return digits;
 }
 
-function textOf(bytes: Uint8Array): string {
+function textOf(bytes: Uint8Array) {
   return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 }
 
-function previewRows(text: string): string[][] {
+function previewRows(text: string) {
   return sampleCsvRows(text, 6);
 }
 
@@ -98,7 +97,7 @@ function resolveParse(
   filename: string,
   text: string,
   digits: number,
-  account: { importPreset: string | null; columnMap: string | null },
+  account: Pick<AccountRow, "importPreset" | "columnMap">,
   request: { presetId: string | null; columnMap: ColumnMap | null },
 ): ReadyParse | { kind: "preview"; rows: string[][] } {
   if (request.columnMap) {
@@ -129,9 +128,8 @@ function resolveParse(
       columnMap: null,
     };
   }
-  const columnMap = readColumnMap(account.columnMap);
-  if (columnMap) {
-    return { parser: "csv", statement: parseCsvStatement(text, columnMap, digits), presetId: null, columnMap: null };
+  if (account.columnMap) {
+    return { parser: "csv", statement: parseCsvStatement(text, account.columnMap, digits), presetId: null, columnMap: null };
   }
   const rows = previewRows(text);
   if (rows.length === 0) {
@@ -140,7 +138,7 @@ function resolveParse(
   return { kind: "preview", rows };
 }
 
-function dateWindow(dates: readonly string[]): { start: string; end: string } {
+function dateWindow(dates: readonly string[]) {
   const ordered = [...dates].sort();
   const first = ordered[0];
   const last = ordered[ordered.length - 1];

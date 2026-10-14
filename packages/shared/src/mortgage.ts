@@ -1,6 +1,7 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import { isoDateSchema } from "./date";
+import { queryNumber } from "./list";
 import { interestRateMilliPctSchema } from "./rate";
 import { centsSchema, nonNegativeCentsSchema as cents } from "./money";
 
@@ -112,7 +113,7 @@ export function mortgagePeriodRate(rateMilliPct: number, compound: Compounding, 
   return Math.expm1(Math.log1p(nominal / compounds) * (compounds / periods));
 }
 
-function clampDay(month: Temporal.PlainDate, day: number): string {
+function clampDay(month: Temporal.PlainDate, day: number) {
   return month.with({ day: Math.min(day, month.daysInMonth) }).toString();
 }
 
@@ -143,11 +144,11 @@ export function mortgageFirstPaymentOffPeriod(
   return mortgagePaymentDate(openingDate, 1, frequency) !== firstPaymentDate;
 }
 
-function daysBetween(from: string, to: string): number {
+function daysBetween(from: string, to: string) {
   return Temporal.PlainDate.from(from).until(Temporal.PlainDate.from(to), { largestUnit: "day" }).days;
 }
 
-function chargeRate(regular: number, periods: number, from: string, to: string, frequency: PaymentFrequency): number {
+function chargeRate(regular: number, periods: number, from: string, to: string, frequency: PaymentFrequency) {
   if (from === to || mortgagePaymentDate(from, 1, frequency) === to) {
     return regular;
   }
@@ -158,11 +159,11 @@ function chargeRate(regular: number, periods: number, from: string, to: string, 
   return Math.expm1(Math.log1p(regular) * ((days * periods) / 365));
 }
 
-function owed(balance: number): number {
+function owed(balance: number) {
   return balance < 0 ? -balance : balance;
 }
 
-function sortedValuations(valuations: MortgageValuation[]): MortgageValuation[] {
+function sortedValuations(valuations: MortgageValuation[]) {
   return [...valuations].sort((left, right) => (left.date < right.date ? -1 : left.date > right.date ? 1 : 0));
 }
 
@@ -367,8 +368,8 @@ export const mortgagePrefillSchema = z.object({
 export const mortgageViewQuerySchema = z
   .object({
     asOf: isoDateSchema,
-    extra: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
-    lumpSum: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+    extra: queryNumber().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+    lumpSum: queryNumber().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
     lumpDate: isoDateSchema.optional(),
   })
   .superRefine((value, ctx) => {

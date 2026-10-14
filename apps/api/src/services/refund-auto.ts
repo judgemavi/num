@@ -1,4 +1,4 @@
-import { inboxDecisions, transactionLines, transactions } from "@num/db";
+import { categories, inboxDecisions, transactionLines, transactions } from "@num/db";
 import {
   autoRefundPurchase,
   candidateKind,
@@ -9,62 +9,97 @@ import {
   type RefundCandidate,
   type RefundSubject,
 } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
-import type { Db } from "../db";
+import { and, eq, exists, gt, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { alias, QueryBuilder, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { auditTransaction, readTransaction } from "./transaction-record";
-import type { WriteTx } from "./write";
+import { lineCategory, lineCount, literal, refundedSum } from "./transaction-sql";
+import type { WriteTx, Reader } from "./write";
 
-type Reader = Db | WriteTx;
+type RefundRow = ReturnType<typeof loadRefunds>[number];
 
-type RefundRow = { id: string; accountId: string; categoryId: string | null; date: string; amount: number; payee: string };
+const subquery = new QueryBuilder();
+const incoming = alias(transactions, "incoming");
+const incomingLine = alias(transactionLines, "incoming_line");
+const purchaseLine = alias(transactionLines, "purchase_line");
 
 /** Rows with one expense-category line. A transfer or a split is never a refund or a purchase. */
-function expenseLineOf(alias: string) {
-  const t = sql.raw(alias);
-  return sql`
-  (select count(*) from transaction_lines l where l.transaction_id = ${t}.id) = 1
-  and exists (
-    select 1 from transaction_lines l
-    inner join categories c on c.id = l.category_id
-    where l.transaction_id = ${t}.id and l.transfer_account_id is null and c.kind = 'expense'
-  )
-`;
+function hasOneExpenseLine(transactionId: AnySQLiteColumn) {
+  return and(
+    eq(lineCount(transactionId), literal(1)),
+    exists(
+      subquery
+        .select({ found: sql`1` })
+        .from(transactionLines)
+        .innerJoin(categories, eq(categories.id, transactionLines.categoryId))
+        .where(
+          and(
+            eq(transactionLines.transactionId, transactionId),
+            isNull(transactionLines.transferAccountId),
+            eq(categories.kind, "expense"),
+          ),
+        ),
+    ),
+  );
 }
 
-const expenseLine = expenseLineOf("t");
+/** The fields of a spending row that a refund can point to. */
+const purchaseColumns = {
+  id: transactions.id,
+  accountId: transactions.accountId,
+  date: transactions.date,
+  amount: transactions.amount,
+  payeeRaw: transactions.payeeRaw,
+  payeeNormalized: transactions.payeeNormalized,
+  refunded: sql<number>`coalesce(${refundedSum(transactions.id)}, 0)`,
+};
 
 export function refundItemKey(transactionId: string): string {
   return `refund_link:${transactionId}`;
 }
 
 /** Refunds: money in, one expense-category line, no linked purchase. Give an id to read one row. */
-function loadRefunds(db: Reader, id?: string): RefundRow[] {
-  return db.all<RefundRow>(sql`
-    select t.id as id, t.account_id as accountId, t.date as date, t.amount as amount, t.payee_normalized as payee,
-      (select l.category_id from transaction_lines l where l.transaction_id = t.id) as categoryId
-    from transactions t
-    where t.mirror = 0 and t.amount > 0 and t.refund_of_id is null
-      and ${expenseLine}
-      ${id ? sql`and t.id = ${id}` : sql``}
-  `);
+function loadRefunds(db: Reader, id?: string) {
+  return db
+    .select({
+      id: transactions.id,
+      accountId: transactions.accountId,
+      date: transactions.date,
+      amount: transactions.amount,
+      payee: transactions.payeeNormalized,
+      categoryId: lineCategory(transactions.id),
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.mirror, literal(0)),
+        gt(transactions.amount, literal(0)),
+        isNull(transactions.refundOfId),
+        hasOneExpenseLine(transactions.id),
+        id ? eq(transactions.id, id) : undefined,
+      ),
+    )
+    .all();
 }
 
 /** Purchases of these payees dated on or after `from`. An older purchase cannot be a candidate. */
-function loadPurchases(db: Reader, payees: readonly string[], from: string): RefundCandidate[] {
+function loadPurchases(db: Reader, payees: readonly string[], from: string) {
   const found: RefundCandidate[] = [];
   const unique = [...new Set(payees)];
   for (let index = 0; index < unique.length; index += 400) {
-    const list = sql.join(unique.slice(index, index + 400).map((payee) => sql`${payee}`), sql`, `);
     found.push(
-      ...db.all<RefundCandidate>(sql`
-        select t.id as id, t.account_id as accountId, t.date as date, t.amount as amount, t.payee_raw as payeeRaw,
-          t.payee_normalized as payeeNormalized,
-          (select l.category_id from transaction_lines l where l.transaction_id = t.id) as categoryId,
-          coalesce((select sum(r.amount) from transactions r where r.refund_of_id = t.id), 0) as refunded
-        from transactions t
-        where t.mirror = 0 and t.amount < 0 and t.date >= ${from} and t.payee_normalized in (${list})
-          and ${expenseLine}
-      `),
+      ...db
+        .select({ ...purchaseColumns, categoryId: lineCategory(transactions.id) })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.mirror, literal(0)),
+            lt(transactions.amount, literal(0)),
+            gte(transactions.date, from),
+            inArray(transactions.payeeNormalized, unique.slice(index, index + 400)),
+            hasOneExpenseLine(transactions.id),
+          ),
+        )
+        .all(),
     );
   }
   return found;
@@ -74,21 +109,36 @@ function loadPurchases(db: Reader, payees: readonly string[], from: string): Ref
  * Same-day reversal candidates (decision 0023): spending in the same account and expense category, the same
  * absolute amount, dated 0 to 3 days before the refund. One indexed join; give an id to read one refund.
  */
-function loadReversals(db: Reader, id?: string): Map<string, RefundCandidate[]> {
-  const rows = db.all<RefundCandidate & { refundId: string }>(sql`
-    select r.id as refundId, p.id as id, p.account_id as accountId, p.date as date, p.amount as amount,
-      p.payee_raw as payeeRaw, p.payee_normalized as payeeNormalized, rl.category_id as categoryId,
-      coalesce((select sum(x.amount) from transactions x where x.refund_of_id = p.id), 0) as refunded
-    from transactions r
-    inner join transaction_lines rl on rl.transaction_id = r.id
-    inner join transactions p on p.account_id = r.account_id and p.amount = -r.amount
-      and p.date <= r.date and p.date >= date(r.date, ${`-${reversalWindowDays} days`})
-    inner join transaction_lines pl on pl.transaction_id = p.id and pl.category_id = rl.category_id
-    where r.mirror = 0 and r.amount > 0 and r.refund_of_id is null and p.mirror = 0
-      ${id ? sql`and r.id = ${id}` : sql``}
-      and ${expenseLineOf("r")}
-      and ${expenseLineOf("p")}
-  `);
+function loadReversals(db: Reader, id?: string) {
+  const rows = db
+    .select({ ...purchaseColumns, refundId: incoming.id, categoryId: incomingLine.categoryId })
+    .from(incoming)
+    .innerJoin(incomingLine, eq(incomingLine.transactionId, incoming.id))
+    .innerJoin(
+      transactions,
+      and(
+        eq(transactions.accountId, incoming.accountId),
+        eq(transactions.amount, sql`-${incoming.amount}`),
+        lte(transactions.date, incoming.date),
+        gte(transactions.date, sql`date(${incoming.date}, ${`-${reversalWindowDays} days`})`),
+      ),
+    )
+    .innerJoin(
+      purchaseLine,
+      and(eq(purchaseLine.transactionId, transactions.id), eq(purchaseLine.categoryId, incomingLine.categoryId)),
+    )
+    .where(
+      and(
+        eq(incoming.mirror, literal(0)),
+        gt(incoming.amount, literal(0)),
+        isNull(incoming.refundOfId),
+        eq(transactions.mirror, literal(0)),
+        id ? eq(incoming.id, id) : undefined,
+        hasOneExpenseLine(incoming.id),
+        hasOneExpenseLine(transactions.id),
+      ),
+    )
+    .all();
   const found = new Map<string, RefundCandidate[]>();
   for (const { refundId, ...row } of rows) {
     found.set(refundId, [...(found.get(refundId) ?? []), row]);
@@ -195,7 +245,7 @@ export function recordRefundNo(tx: WriteTx, transactionId: string, at: string): 
   if (tx.select().from(inboxDecisions).where(eq(inboxDecisions.itemKey, itemKey)).get()) {
     return;
   }
-  const row = { itemKey, decision: "not_linked", reason: null, decidedAt: at };
+  const row = { itemKey, decision: "not_linked" as const, reason: null, decidedAt: at };
   tx.insert(inboxDecisions).values(row).run();
   tx.audit({ entity: "inbox_decisions", entityId: itemKey, action: "create", before: null, after: row });
 }

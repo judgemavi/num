@@ -88,7 +88,7 @@ function hasAmountColumn(map: {
   amount?: number | null;
   debit?: number | null;
   credit?: number | null;
-}): boolean {
+}) {
   return map.amount != null || map.debit != null || map.credit != null;
 }
 

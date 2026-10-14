@@ -1,203 +1,235 @@
-import { accounts } from "@num/db";
-import { accountKinds, autoReasons, transactionStatuses, type AccountKind, type AutoReason, type TransactionFilter, type TransactionListItem, type TransactionListQuery, type TransactionReview, type TransactionStatus } from "@num/shared";
-import { eq, sql, type SQL } from "drizzle-orm";
+import { accounts, categories, lineTags, merchants, recurringPlans, transactionLines, transactions } from "@num/db";
+import type { TransactionFilter, TransactionListItem, TransactionListQuery, TransactionReview } from "@num/shared";
+import { and, asc, count, desc, eq, exists, gte, inArray, isNotNull, isNull, lte, notExists, or, sql, type SQL } from "drizzle-orm";
+import { alias, QueryBuilder, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { linesForIds } from "./transaction-list-lines";
-import { listNeedsReview, reviewCounts, type NeedsReviewHit } from "./needs-review";
-const sortColumns = {
-  date: "t.date",
-  amount: "t.amount",
-  payeeRaw: "t.payee_raw",
-} as const;
+import { chunks, listNeedsReview, reviewCounts, type NeedsReviewHit } from "./needs-review";
+import { hasOpenLine, isReconciled, refundedSum } from "./transaction-sql";
 
-type ListRow = {
-  id: string;
-  accountId: string;
-  accountName: string;
-  accountKind: string;
-  date: string;
-  amount: number;
-  payeeRaw: string;
-  merchantId: string | null;
-  merchantName: string | null;
-  status: string;
-  reconciled: number;
-  accountOpening: number;
-  runningBalance: number | null;
-  autoReason: string | null;
-  autoConfidence: number | null;
-  autoSourceName: string | null;
-  autoLearnedCount: number | null;
-  refundOfDate: string | null;
-  refundOfAmount: number | null;
-  refundOfPayee: string | null;
-  refundOfKey: string | null;
-  refundedAmount: number | null;
+const sortColumns = {
+  date: transactions.date,
+  amount: transactions.amount,
+  payeeRaw: transactions.payeeRaw,
 };
 
-function asKind(value: string): AccountKind {
-  if (!(accountKinds as readonly string[]).includes(value)) {
-    throw new Error("Unknown account kind");
-  }
-  return value as AccountKind;
+const subquery = new QueryBuilder();
+const purchase = alias(transactions, "purchase");
+const labelSource = alias(transactions, "label_source");
+const learned = alias(transactions, "learned");
+const learnedLine = alias(transactionLines, "learned_line");
+const onMerchant = eq(merchants.id, transactions.merchantId);
+
+/** One field of the purchase that a refund points to. */
+function purchaseField<T extends AnySQLiteColumn>(field: T) {
+  return sql<T["_"]["data"] | null>`${subquery.select({ field }).from(purchase).where(eq(purchase.id, transactions.refundOfId))}`;
 }
 
-function asAutoReason(value: string | null): AutoReason | null {
-  if (value && (autoReasons as readonly string[]).includes(value)) {
-    return value as AutoReason;
-  }
-  return null;
+const planName = subquery.select({ name: recurringPlans.name }).from(recurringPlans).where(eq(recurringPlans.id, transactions.autoSourceId));
+const sourcePayee = subquery
+  .select({ payee: labelSource.payeeNormalized })
+  .from(labelSource)
+  .where(eq(labelSource.id, transactions.autoSourceId));
+const learnedRows = subquery
+  .select({ total: count() })
+  .from(learned)
+  .innerJoin(learnedLine, eq(learnedLine.transactionId, learned.id))
+  .where(
+    and(
+      isNull(learned.autoReason),
+      eq(learned.payeeNormalized, transactions.payeeNormalized),
+      isNotNull(learnedLine.categoryId),
+      isNull(learnedLine.transferAccountId),
+    ),
+  );
+
+const listColumns = {
+  id: transactions.id,
+  accountId: transactions.accountId,
+  accountName: accounts.name,
+  accountKind: accounts.kind,
+  date: transactions.date,
+  amount: transactions.amount,
+  payeeRaw: transactions.payeeRaw,
+  merchantId: transactions.merchantId,
+  merchantName: merchants.name,
+  status: transactions.status,
+  reconciled: isReconciled(transactions),
+  accountOpening: accounts.openingBalance,
+  autoReason: transactions.autoReason,
+  autoConfidence: transactions.autoConfidence,
+  autoSourceName: sql<string | null>`case when ${eq(transactions.autoReason, "recurring")} then ${planName} else ${sourcePayee} end`,
+  autoLearnedCount: sql<number | null>`case when ${isNull(transactions.autoReason)} then null else ${learnedRows} end`,
+  refundOfKey: purchaseField(purchase.id),
+  refundOfDate: purchaseField(purchase.date),
+  refundOfAmount: purchaseField(purchase.amount),
+  refundOfPayee: purchaseField(purchase.payeeRaw),
+  refundedAmount: refundedSum(transactions.id),
+};
+
+function selectRows(db: Db) {
+  return db
+    .select(listColumns)
+    .from(transactions)
+    .innerJoin(accounts, eq(accounts.id, transactions.accountId))
+    .leftJoin(merchants, onMerchant);
 }
 
-function asStatus(value: string): TransactionStatus {
-  if (!(transactionStatuses as readonly string[]).includes(value)) {
-    throw new Error("Unknown transaction status");
-  }
-  return value as TransactionStatus;
-}
+type ListRow = ReturnType<ReturnType<typeof selectRows>["all"]>[number];
 
-function orderSql(query: TransactionListQuery): SQL {
+function order(query: TransactionListQuery) {
   if (query.automatic && query.sort === undefined) {
-    return sql`t.auto_confidence asc, t.id asc`;
+    return [asc(transactions.autoConfidence), asc(transactions.id)];
   }
-  const column = sortColumns[query.sort ?? "date"];
-  const direction = query.dir ?? (query.sort === undefined ? "desc" : "asc");
-  return sql.raw(`${column} ${direction}, t.id ${direction}`);
+  const direction = (query.dir ?? (query.sort === undefined ? "desc" : "asc")) === "desc" ? desc : asc;
+  return [direction(sortColumns[query.sort ?? "date"]), direction(transactions.id)];
 }
 
-function filters(query: TransactionFilter): SQL {
-  const parts: SQL[] = [];
+/**
+ * A line of the transaction that has a category. Give the condition on the category, and one on the line if necessary.
+ * The categories are a list that SQLite makes one time. A join reads the category of each line.
+ */
+function categoryLine(category: SQL, line?: SQL) {
+  const matching = subquery.select({ id: categories.id }).from(categories).where(category);
+  return exists(
+    subquery
+      .select({ found: sql`1` })
+      .from(transactionLines)
+      .where(and(eq(transactionLines.transactionId, transactions.id), inArray(transactionLines.categoryId, matching), line)),
+  );
+}
+
+/**
+ * The transactions that have a line in the category, or a line with the tag.
+ * These subqueries do not refer to the outer row, and SQLite reads the index of the category or of the tag one time.
+ * In a correlated EXISTS, SQLite reads that index one time for each transaction.
+ */
+const lineOwner = { id: transactionLines.transactionId };
+
+function inCategory(categoryId: string) {
+  return inArray(transactions.id, subquery.select(lineOwner).from(transactionLines).where(eq(transactionLines.categoryId, categoryId)));
+}
+
+function hasTag(tagId: string) {
+  return inArray(
+    transactions.id,
+    subquery
+      .select(lineOwner)
+      .from(transactionLines)
+      .innerJoin(lineTags, eq(lineTags.lineId, transactionLines.id))
+      .where(eq(lineTags.tagId, tagId)),
+  );
+}
+
+function contains(text: SQL, needle: string) {
+  return sql`instr(lower(${text}), lower(${needle})) > 0`;
+}
+
+function filters(query: TransactionFilter) {
+  const parts: (SQL | undefined)[] = [];
   if (query.accountId) {
-    parts.push(sql`t.account_id = ${query.accountId}`);
+    parts.push(eq(transactions.accountId, query.accountId));
   }
   if (query.merchantId === "none") {
-    parts.push(sql`t.merchant_id is null`);
+    parts.push(isNull(transactions.merchantId));
   } else if (query.merchantId) {
-    parts.push(sql`t.merchant_id = ${query.merchantId}`);
+    parts.push(eq(transactions.merchantId, query.merchantId));
   }
   if (query.groupId === "none") {
-    parts.push(sql`exists (
-      select 1 from transaction_lines l
-      join categories c on c.id = l.category_id
-      where l.transaction_id = t.id and c.group_id is null
-    )`);
+    parts.push(categoryLine(isNull(categories.groupId)));
   } else if (query.groupId) {
-    parts.push(sql`exists (
-      select 1 from transaction_lines l
-      join categories c on c.id = l.category_id
-      where l.transaction_id = t.id and c.group_id = ${query.groupId}
-    )`);
+    parts.push(categoryLine(eq(categories.groupId, query.groupId)));
   }
   if (query.from) {
-    parts.push(sql`t.date >= ${query.from}`);
+    parts.push(gte(transactions.date, query.from));
   }
   if (query.to) {
-    parts.push(sql`t.date <= ${query.to}`);
+    parts.push(lte(transactions.date, query.to));
   }
   if (query.categoryId) {
-    parts.push(sql`exists (
-      select 1 from transaction_lines l
-      where l.transaction_id = t.id and l.category_id = ${query.categoryId}
-    )`);
+    parts.push(inCategory(query.categoryId));
   }
   if (query.tagId === "none") {
-    parts.push(sql`exists (
-      select 1 from transaction_lines l
-      join categories c on c.id = l.category_id
-      where l.transaction_id = t.id
-        and c.kind = 'expense'
-        and not exists (select 1 from line_tags lt where lt.line_id = l.id)
-    )`);
+    parts.push(
+      categoryLine(
+        eq(categories.kind, "expense"),
+        notExists(subquery.select({ found: sql`1` }).from(lineTags).where(eq(lineTags.lineId, transactionLines.id))),
+      ),
+    );
   } else if (query.tagId) {
-    parts.push(sql`exists (
-      select 1 from transaction_lines l
-      join line_tags lt on lt.line_id = l.id
-      where l.transaction_id = t.id and lt.tag_id = ${query.tagId}
-    )`);
+    parts.push(hasTag(query.tagId));
   }
   if (query.uncategorized) {
-    parts.push(sql`exists (
-      select 1 from transaction_lines l
-      where l.transaction_id = t.id
-        and l.category_id is null
-        and l.transfer_account_id is null
-    )`);
+    parts.push(hasOpenLine(transactions.id));
   }
   if (query.automatic) {
-    parts.push(sql`t.auto_reason is not null`);
+    parts.push(isNotNull(transactions.autoReason));
   }
   if (query.q) {
-    const needle = query.q;
-    parts.push(sql`(
-      instr(lower(t.payee_raw), lower(${needle})) > 0
-      or instr(lower(ifnull(t.notes, '')), lower(${needle})) > 0
-      or instr(lower(ifnull(m.name, '')), lower(${needle})) > 0
-    )`);
+    parts.push(
+      or(
+        contains(sql`${transactions.payeeRaw}`, query.q),
+        contains(sql`ifnull(${transactions.notes}, '')`, query.q),
+        contains(sql`ifnull(${merchants.name}, '')`, query.q),
+      ),
+    );
   }
-  if (parts.length === 0) {
-    return sql`1 = 1`;
-  }
-  return sql.join(parts, sql` and `);
+  return and(...parts);
 }
 
-function toItem(row: ListRow, lines: TransactionListItem["lines"], review: TransactionReview | null): TransactionListItem {
+function toItem(
+  row: ListRow,
+  lines: TransactionListItem["lines"],
+  review: TransactionReview | null,
+  runningBalance: number | null,
+): TransactionListItem {
+  const { accountOpening, refundOfKey, refundOfDate, refundOfAmount, refundOfPayee, refundedAmount, ...rest } = row;
+  const { autoReason, autoConfidence, autoSourceName, autoLearnedCount, ...head } = rest;
   return {
-    id: row.id,
-    accountId: row.accountId,
-    accountName: row.accountName,
-    accountKind: asKind(row.accountKind),
-    date: row.date,
-    amount: row.amount,
-    payeeRaw: row.payeeRaw,
-    merchantId: row.merchantId,
-    merchantName: row.merchantName,
-    status: asStatus(row.status),
-    reconciled: row.reconciled === 1,
-    runningBalance: row.runningBalance,
-    autoReason: asAutoReason(row.autoReason),
-    autoConfidence: row.autoConfidence,
-    autoSourceName: row.autoSourceName,
-    autoLearnedCount: row.autoLearnedCount === null ? null : Number(row.autoLearnedCount),
+    ...head,
+    runningBalance,
+    autoReason,
+    autoConfidence,
+    autoSourceName,
+    autoLearnedCount,
     refundOf:
-      row.refundOfKey === null || row.refundOfDate === null || row.refundOfAmount === null || row.refundOfPayee === null
+      refundOfKey === null || refundOfDate === null || refundOfAmount === null || refundOfPayee === null
         ? null
-        : { id: row.refundOfKey, date: row.refundOfDate, amount: row.refundOfAmount, payeeRaw: row.refundOfPayee },
-    refundedAmount: row.refundedAmount,
+        : { id: refundOfKey, date: refundOfDate, amount: refundOfAmount, payeeRaw: refundOfPayee },
+    refundedAmount,
     lines,
-    review:
-      review === null
-        ? null
-        : {
-            ...review,
-            learnedCount: review.learnedCount ?? (row.autoLearnedCount === null ? null : Number(row.autoLearnedCount)),
-          },
+    review: review === null ? null : { ...review, learnedCount: review.learnedCount ?? autoLearnedCount },
   };
 }
 
-function usesTransactionBalance(db: Db, accountId: string): boolean {
+function usesTransactionBalance(db: Db, accountId: string) {
   const row = db.select({ kind: accounts.kind }).from(accounts).where(eq(accounts.id, accountId)).get();
   return row !== undefined && row.kind !== "investment" && row.kind !== "property";
 }
 
-function fillRunningBalances(db: Db, accountId: string, rows: ListRow[]): void {
+/** The balance of the account after each row: the opening balance and all the rows up to it. One window query. */
+function runningBalances(db: Db, accountId: string, rows: readonly ListRow[]) {
+  const balances = new Map<string, number>();
   if (rows.length === 0) {
-    return;
+    return balances;
   }
-  const ids = sql.join(
-    rows.map((row) => sql`${row.id}`),
-    sql`, `,
+  const running = db
+    .select({
+      id: transactions.id,
+      spent: sql<number>`sum(${transactions.amount}) over (order by ${transactions.date} asc, ${transactions.id} asc)`.as("spent"),
+    })
+    .from(transactions)
+    .where(eq(transactions.accountId, accountId))
+    .as("running");
+  const spentById = new Map(
+    db
+      .select({ id: running.id, spent: running.spent })
+      .from(running)
+      .where(inArray(running.id, rows.map((row) => row.id)))
+      .all()
+      .map((row) => [row.id, row.spent]),
   );
-  const balances = db.all<{ id: string; spent: number }>(sql`
-    select id, spent from (
-      select tx.id as id,
-        sum(tx.amount) over (order by tx.date asc, tx.id asc) as spent
-      from transactions tx
-      where tx.account_id = ${accountId}
-    )
-    where id in (${ids})
-  `);
-  const spentById = new Map(balances.map((row) => [row.id, row.spent]));
   for (const row of rows) {
     const spent = spentById.get(row.id);
     if (spent === undefined) {
@@ -207,81 +239,38 @@ function fillRunningBalances(db: Db, accountId: string, rows: ListRow[]): void {
     if (!Number.isSafeInteger(balance)) {
       throw new Error("Sum is not an integer");
     }
-    row.runningBalance = balance;
+    balances.set(row.id, balance);
   }
+  return balances;
 }
 
-function pageHits(hits: readonly NeedsReviewHit[], query: TransactionListQuery): NeedsReviewHit[] {
+function pageHits(hits: readonly NeedsReviewHit[], query: TransactionListQuery) {
   const offset = (query.page - 1) * query.pageSize;
   return hits.slice(offset, offset + query.pageSize);
 }
 
-function rowsForIds(db: Db, ids: readonly string[]): ListRow[] {
+function rowsForIds(db: Db, ids: readonly string[]) {
   if (ids.length === 0) {
     return [];
   }
-  const list = sql.join(ids.map((id) => sql`${id}`), sql`, `);
-  return db.all<ListRow>(sql`
-    select
-      t.id as id,
-      t.account_id as accountId,
-      a.name as accountName,
-      a.kind as accountKind,
-      t.date as date,
-      t.amount as amount,
-      t.payee_raw as payeeRaw,
-      t.merchant_id as merchantId,
-      m.name as merchantName,
-      t.status as status,
-      case when t.date <= (
-        select max(c.date) from checkpoints c
-        where c.account_id = t.account_id and c.unlocked_at is null
-      ) then 1 else 0 end as reconciled,
-      a.opening_balance as accountOpening,
-      null as runningBalance,
-      t.auto_reason as autoReason,
-      t.auto_confidence as autoConfidence,
-      case
-        when t.auto_reason = 'recurring' then (select p.name from recurring_plans p where p.id = t.auto_source_id)
-        else (select s.payee_normalized from transactions s where s.id = t.auto_source_id)
-      end as autoSourceName,
-      case when t.auto_reason is null then null else (
-        select count(*) from transactions c
-        inner join transaction_lines cl on cl.transaction_id = c.id
-        where c.auto_reason is null and c.payee_normalized = t.payee_normalized
-          and cl.category_id is not null and cl.transfer_account_id is null
-      ) end as autoLearnedCount,
-      (select p.id from transactions p where p.id = t.refund_of_id) as refundOfKey,
-      (select p.date from transactions p where p.id = t.refund_of_id) as refundOfDate,
-      (select p.amount from transactions p where p.id = t.refund_of_id) as refundOfAmount,
-      (select p.payee_raw from transactions p where p.id = t.refund_of_id) as refundOfPayee,
-      (select sum(r.amount) from transactions r where r.refund_of_id = t.id) as refundedAmount
-    from transactions t
-    join accounts a on a.id = t.account_id
-    left join merchants m on m.id = t.merchant_id
-    where t.id in (${list})
-  `);
-}
-
-function hasFilter(filter: TransactionFilter): boolean {
-  return Object.values(filter).some((value) => value !== undefined && value !== false);
+  return selectRows(db).where(inArray(transactions.id, [...ids])).all();
 }
 
 /** Needs review rows that also match the other filters. Bulk approval uses the same set. */
 export function filteredReviewHits(db: Db, filter: TransactionFilter, asOf: string): NeedsReviewHit[] {
   const hits = listNeedsReview(db, asOf);
-  if (!hasFilter(filter)) {
+  const where = filters(filter);
+  if (where === undefined) {
     return hits;
   }
   const matching = new Set(
-    db
-      .all<{ id: string }>(sql`
-        select t.id as id
-        from transactions t
-        ${filter.q ? sql`left join merchants m on m.id = t.merchant_id` : sql``}
-        where ${filters(filter)}
-      `)
-      .map((row) => row.id),
+    chunks(hits.map((hit) => hit.id), 400).flatMap((group) => {
+      const ids = db.select({ id: transactions.id }).from(transactions).$dynamic();
+      return (filter.q ? ids.leftJoin(merchants, onMerchant) : ids)
+        .where(and(inArray(transactions.id, group), where))
+        .all()
+        .map((row) => row.id);
+    }),
   );
   return hits.filter((hit) => matching.has(hit.id));
 }
@@ -298,7 +287,7 @@ export function listTransactions(db: Db, query: TransactionListQuery & { asOf?: 
     return {
       items: page.flatMap((hit) => {
         const row = byId.get(hit.id);
-        return row ? [toItem(row, lines.get(hit.id) ?? [], hit.review)] : [];
+        return row ? [toItem(row, lines.get(hit.id) ?? [], hit.review, null)] : [];
       }),
       page: query.page,
       pageSize: query.pageSize,
@@ -307,66 +296,22 @@ export function listTransactions(db: Db, query: TransactionListQuery & { asOf?: 
     };
   }
   const where = filters(query);
-  const merchantJoin = sql`left join merchants m on m.id = t.merchant_id`;
-  const totalRows = db.all<{ total: number }>(sql`
-    select count(*) as total
-    from transactions t
-    ${query.q ? merchantJoin : sql``}
-    where ${where}
-  `);
-  const total = totalRows[0]?.total ?? 0;
-  const offset = (query.page - 1) * query.pageSize;
-  const rows = db.all<ListRow>(sql`
-    select
-      t.id as id,
-      t.account_id as accountId,
-      a.name as accountName,
-      a.kind as accountKind,
-      t.date as date,
-      t.amount as amount,
-      t.payee_raw as payeeRaw,
-      t.merchant_id as merchantId,
-      m.name as merchantName,
-      t.status as status,
-      case when t.date <= (
-        select max(c.date) from checkpoints c
-        where c.account_id = t.account_id and c.unlocked_at is null
-      ) then 1 else 0 end as reconciled,
-      a.opening_balance as accountOpening,
-      null as runningBalance,
-      t.auto_reason as autoReason,
-      t.auto_confidence as autoConfidence,
-      case
-        when t.auto_reason = 'recurring' then (select p.name from recurring_plans p where p.id = t.auto_source_id)
-        else (select s.payee_normalized from transactions s where s.id = t.auto_source_id)
-      end as autoSourceName,
-      case when t.auto_reason is null then null else (
-        select count(*) from transactions c
-        inner join transaction_lines cl on cl.transaction_id = c.id
-        where c.auto_reason is null and c.payee_normalized = t.payee_normalized
-          and cl.category_id is not null and cl.transfer_account_id is null
-      ) end as autoLearnedCount,
-      (select p.id from transactions p where p.id = t.refund_of_id) as refundOfKey,
-      (select p.date from transactions p where p.id = t.refund_of_id) as refundOfDate,
-      (select p.amount from transactions p where p.id = t.refund_of_id) as refundOfAmount,
-      (select p.payee_raw from transactions p where p.id = t.refund_of_id) as refundOfPayee,
-      (select sum(r.amount) from transactions r where r.refund_of_id = t.id) as refundedAmount
-    from transactions t
-    join accounts a on a.id = t.account_id
-    ${merchantJoin}
-    where ${where}
-    order by ${orderSql(query)}
-    limit ${query.pageSize} offset ${offset}
-  `);
-  if (query.accountId && usesTransactionBalance(db, query.accountId)) {
-    fillRunningBalances(db, query.accountId, rows);
-  }
+  const counted = db.select({ total: count() }).from(transactions).$dynamic();
+  const total = (query.q ? counted.leftJoin(merchants, onMerchant) : counted).where(where).get()?.total ?? 0;
+  const rows = selectRows(db)
+    .where(where)
+    .orderBy(...order(query))
+    .limit(query.pageSize)
+    .offset((query.page - 1) * query.pageSize)
+    .all();
+  const balances =
+    query.accountId && usesTransactionBalance(db, query.accountId) ? runningBalances(db, query.accountId, rows) : null;
   const lines = linesForIds(
     db,
     rows.map((row) => row.id),
   );
   return {
-    items: rows.map((row) => toItem(row, lines.get(row.id) ?? [], null)),
+    items: rows.map((row) => toItem(row, lines.get(row.id) ?? [], null, balances?.get(row.id) ?? null)),
     page: query.page,
     pageSize: query.pageSize,
     total,

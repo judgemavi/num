@@ -1,4 +1,4 @@
-import { importBatches, importRows, transactions } from "@num/db";
+import { importBatches, importRows, transactions, type TransactionRow } from "@num/db";
 import { utcNow, type ImportUndo, type UndoBlockReason } from "@num/shared";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
@@ -6,10 +6,10 @@ import { ServiceError } from "../service-error";
 import { presentBatch } from "./import-read";
 import { transactionReconciled } from "./reconciled";
 import { hasActiveFundingRun, removeTransaction } from "./transaction-erase";
-import { auditTransaction, readTransaction, type TxRow } from "./transaction-record";
+import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource } from "./write";
 
-function blockReason(db: Db, txn: TxRow | undefined): UndoBlockReason | "removed" | null {
+function blockReason(db: Db, txn: TransactionRow | undefined): UndoBlockReason | "removed" | null {
   if (!txn) {
     return "removed";
   }
@@ -79,7 +79,7 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
   }
 
   const at = input.at ?? utcNow();
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     for (const rowId of removeIds) {
       const row = tx.select().from(importRows).where(eq(importRows.id, rowId)).get();
       if (!row?.transactionId) {
@@ -128,11 +128,6 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
       before: { undoneAt: batch.undoneAt },
       after: { undoneAt: next.undoneAt, blocked: blocked.length },
     });
+    return { batch: presentBatch(tx, next), blocked };
   });
-
-  const next = db.select().from(importBatches).where(eq(importBatches.id, id)).get();
-  if (!next) {
-    throw new ServiceError("import_not_found", 404);
-  }
-  return { batch: presentBatch(db, next), blocked };
 }

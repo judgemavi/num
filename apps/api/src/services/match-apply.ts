@@ -1,23 +1,16 @@
 import { accounts, occurrenceLinks, transactionLines, transactions } from "@num/db";
 import { utcNow, type MatchResult } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { mortgageLinesFor } from "./mortgage-learned";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { linkRefundIfSure } from "./refund-auto";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { replaceLines } from "./transaction-lines";
+import { isOnlyLine, literal } from "./transaction-sql";
 import { attachTransfer } from "./transaction-transfer";
 import type { WriteTx } from "./write";
 
-type OpenRow = {
-  id: string;
-  accountId: string;
-  date: string;
-  amount: number;
-  payee: string;
-  merchantId: string | null;
-  lineId: string;
-};
+type OpenRow = ReturnType<typeof openRows>[number];
 
 export function mortgageSplitLines(tx: WriteTx, result: MatchResult, fromAccountId: string, date: string, amount: number) {
   if (!result.mortgage || !result.transferAccountId) {
@@ -160,6 +153,30 @@ function applyRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
   linkRefundIfSure(tx, row.id);
 }
 
+/** Rows of these payees that have one line with no category and no transfer. */
+function openRows(tx: WriteTx, payees: string[]) {
+  return tx
+    .select({
+      id: transactions.id,
+      amount: transactions.amount,
+      payee: transactions.payeeNormalized,
+      merchantId: transactions.merchantId,
+      lineId: transactionLines.id,
+    })
+    .from(transactions)
+    .innerJoin(transactionLines, eq(transactionLines.transactionId, transactions.id))
+    .where(
+      and(
+        eq(transactions.mirror, literal(0)),
+        inArray(transactions.payeeNormalized, payees),
+        isNull(transactionLines.categoryId),
+        isNull(transactionLines.transferAccountId),
+        isOnlyLine,
+      ),
+    )
+    .all();
+}
+
 /** Labels uncategorized rows for these payees. */
 export function spreadSureLabels(tx: WriteTx, payees: readonly string[], except: ReadonlySet<string>): void {
   const wanted = new Set(payees.filter((payee) => payee.length > 0));
@@ -167,22 +184,7 @@ export function spreadSureLabels(tx: WriteTx, payees: readonly string[], except:
     return;
   }
   const book = loadMatchBook(tx);
-  const list = sql.join([...wanted].map((payee) => sql`${payee}`), sql`, `);
-  const rows = tx.all<OpenRow>(sql`
-    select t.id as id, t.account_id as accountId, t.date as date, t.amount as amount,
-      t.payee_normalized as payee, t.merchant_id as merchantId, l.id as lineId
-    from transactions t
-    inner join transaction_lines l on l.transaction_id = t.id
-    where 1 = 1
-      and t.mirror = 0
-      and t.payee_normalized in (${list})
-      and l.category_id is null
-      and l.transfer_account_id is null
-      and not exists (
-        select 1 from transaction_lines extra
-        where extra.transaction_id = t.id and extra.id <> l.id
-      )
-  `).filter((row) => !except.has(row.id));
+  const rows = openRows(tx, [...wanted]).filter((row) => !except.has(row.id));
   for (const row of rows) {
     const result = scorePayee(book, { payee: row.payee, amount: row.amount, recurring: null });
     if (result.level !== "automatic") {

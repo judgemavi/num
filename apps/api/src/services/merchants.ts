@@ -6,46 +6,15 @@ import {
   type MerchantListQuery,
   type MerchantUpdate,
 } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
+import { eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { write, type AuditSource, type WriteTx } from "./write";
+import { withoutId, write, type WriteTx, type WriteInput } from "./write";
+import { compareText, pageOf } from "./paging";
 
-type WriteInput = {
-  source: AuditSource;
-  at?: string;
-};
-
-type MerchantRow = typeof merchants.$inferSelect;
-
-function compareText(left: string, right: string): number {
-  if (left < right) {
-    return -1;
-  }
-  if (left > right) {
-    return 1;
-  }
-  return 0;
-}
-
-function compareName(left: string, right: string): number {
+function compareName(left: string, right: string) {
   const folded = compareText(left.toLowerCase(), right.toLowerCase());
   return folded === 0 ? compareText(left, right) : folded;
-}
-
-function snapshot(row: { name: string; archivedAt: string | null }) {
-  return {
-    name: row.name,
-    archivedAt: row.archivedAt,
-  };
-}
-
-export function toMerchant(row: MerchantRow): Merchant {
-  return {
-    id: row.id,
-    name: row.name,
-    archivedAt: row.archivedAt,
-  };
 }
 
 function assertName(tx: WriteTx, name: string, exceptId?: string) {
@@ -64,25 +33,18 @@ export function getMerchant(db: Db, id: string): Merchant {
   if (!row) {
     throw new ServiceError("merchant_not_found", 404);
   }
-  return toMerchant(row);
+  return row;
 }
 
 export function listMerchants(db: Db, query: MerchantListQuery) {
   const rows = db
     .select()
     .from(merchants)
-    .all()
-    .filter((row) => (query.archived ? row.archivedAt !== null : row.archivedAt === null))
-    .map(toMerchant);
+    .where(query.archived ? isNotNull(merchants.archivedAt) : isNull(merchants.archivedAt))
+    .all();
   const dir = query.dir === "desc" ? -1 : 1;
   rows.sort((left, right) => compareName(left.name, right.name) * dir || compareText(left.id, right.id));
-  const start = (query.page - 1) * query.pageSize;
-  return {
-    items: rows.slice(start, start + query.pageSize),
-    page: query.page,
-    pageSize: query.pageSize,
-    total: rows.length,
-  };
+  return pageOf(rows, query);
 }
 
 export function createMerchant(db: Db, input: MerchantCreate & WriteInput): Merchant {
@@ -95,14 +57,13 @@ export function createMerchant(db: Db, input: MerchantCreate & WriteInput): Merc
   write(db, { source: input.source, at: input.at }, (tx) => {
     assertName(tx, row.name);
     tx.insert(merchants).values(row).run();
-    tx.audit({ entity: "merchants", entityId: id, action: "create", before: null, after: snapshot(row) });
+    tx.audit({ entity: "merchants", entityId: id, action: "create", before: null, after: withoutId(row) });
   });
-  return toMerchant(row);
+  return row;
 }
 
 export function updateMerchant(db: Db, id: string, input: MerchantUpdate & WriteInput): Merchant {
-  let updated: Merchant | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = tx.select().from(merchants).where(eq(merchants.id, id)).get();
     if (!existing) {
       throw new ServiceError("merchant_not_found", 404);
@@ -117,21 +78,16 @@ export function updateMerchant(db: Db, id: string, input: MerchantUpdate & Write
       entity: "merchants",
       entityId: id,
       action: "update",
-      before: snapshot(existing),
-      after: snapshot(next),
+      before: withoutId(existing),
+      after: next,
     });
-    updated = toMerchant({ id, ...next });
+    return { id, ...next };
   });
-  if (!updated) {
-    throw new Error("Update did not return a merchant");
-  }
-  return updated;
 }
 
 export function archiveMerchant(db: Db, id: string, input: WriteInput): Merchant {
   const at = input.at ?? utcNow();
-  let archived: Merchant | undefined;
-  write(db, { source: input.source, at }, (tx) => {
+  return write(db, { source: input.source, at }, (tx) => {
     const existing = tx.select().from(merchants).where(eq(merchants.id, id)).get();
     if (!existing) {
       throw new ServiceError("merchant_not_found", 404);
@@ -141,18 +97,13 @@ export function archiveMerchant(db: Db, id: string, input: WriteInput): Merchant
     }
     const next = { ...existing, archivedAt: at };
     tx.update(merchants).set({ archivedAt: at }).where(eq(merchants.id, id)).run();
-    tx.audit({ entity: "merchants", entityId: id, action: "archive", before: snapshot(existing), after: snapshot(next) });
-    archived = toMerchant(next);
+    tx.audit({ entity: "merchants", entityId: id, action: "archive", before: withoutId(existing), after: withoutId(next) });
+    return next;
   });
-  if (!archived) {
-    throw new Error("Archive did not return a merchant");
-  }
-  return archived;
 }
 
 export function restoreMerchant(db: Db, id: string, input: WriteInput): Merchant {
-  let restored: Merchant | undefined;
-  write(db, { source: input.source, at: input.at }, (tx) => {
+  return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = tx.select().from(merchants).where(eq(merchants.id, id)).get();
     if (!existing) {
       throw new ServiceError("merchant_not_found", 404);
@@ -162,11 +113,7 @@ export function restoreMerchant(db: Db, id: string, input: WriteInput): Merchant
     }
     const next = { ...existing, archivedAt: null };
     tx.update(merchants).set({ archivedAt: null }).where(eq(merchants.id, id)).run();
-    tx.audit({ entity: "merchants", entityId: id, action: "restore", before: snapshot(existing), after: snapshot(next) });
-    restored = toMerchant(next);
+    tx.audit({ entity: "merchants", entityId: id, action: "restore", before: withoutId(existing), after: withoutId(next) });
+    return next;
   });
-  if (!restored) {
-    throw new Error("Restore did not return a merchant");
-  }
-  return restored;
 }

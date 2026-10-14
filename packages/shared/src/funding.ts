@@ -95,7 +95,7 @@ export type FundingIncome = {
   dueDate: string;
 };
 
-function monthOf(iso: string): string {
+function monthOf(iso: string) {
   return iso.slice(0, 7);
 }
 
@@ -110,14 +110,14 @@ export function isFirstPaycheckOfMonth(paycheckDate: string, incomes: readonly F
   return paycheckDate === earliest;
 }
 
-function withCurrent(incomes: readonly FundingIncome[], planId: string, dueDate: string): FundingIncome[] {
+function withCurrent(incomes: readonly FundingIncome[], planId: string, dueDate: string) {
   if (incomes.some((income) => income.planId === planId && income.dueDate === dueDate)) {
     return [...incomes];
   }
   return [...incomes, { planId, dueDate }];
 }
 
-function remainingPaychecks(paycheckDate: string, due: string, incomes: readonly FundingIncome[]): number {
+function remainingPaychecks(paycheckDate: string, due: string, incomes: readonly FundingIncome[]) {
   let count = 0;
   for (const income of incomes) {
     if (income.dueDate >= paycheckDate && income.dueDate < due) {
@@ -127,7 +127,7 @@ function remainingPaychecks(paycheckDate: string, due: string, incomes: readonly
   return count;
 }
 
-function idealAmount(bucket: FundingBucketInput, paycheckDate: string, incomes: readonly FundingIncome[]): number {
+function idealAmount(bucket: FundingBucketInput, paycheckDate: string, incomes: readonly FundingIncome[]) {
   if (bucket.archived) {
     return 0;
   }
