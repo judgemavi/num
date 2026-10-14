@@ -1,13 +1,13 @@
-import { checkpointListSchema, checkpointSchema, type Checkpoint } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import type { Checkpoint } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
+import { checkpointListQuery, useUnlockCheckpoint } from "@/api/checkpoints";
+import { errorCode } from "@/api/client";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { apiRequest } from "@/request";
 import { formatDate } from "@/transactions/format";
 
 type CheckpointHistoryProps = {
@@ -17,20 +17,14 @@ type CheckpointHistoryProps = {
 };
 
 export function CheckpointHistory({ accountId, currency, owed }: CheckpointHistoryProps) {
-  const queryClient = useQueryClient();
   const { confirm } = useEditors();
-  const [error, setError] = useState<string | null>(null);
-
-  const checkpoints = useQuery({
-    queryKey: ["checkpoints", accountId],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/accounts/${accountId}/checkpoints`, checkpointListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
+  const checkpoints = useQuery(checkpointListQuery(accountId));
+  const unlockCheckpoint = useUnlockCheckpoint();
+  const error = !unlockCheckpoint.error
+    ? null
+    : errorCode(unlockCheckpoint.error) === "checkpoint_unlocked"
+      ? "This checkpoint is already unlocked."
+      : "The checkpoint did not unlock. Try again.";
 
   async function unlock(item: Checkpoint) {
     const ok = await confirm({
@@ -38,25 +32,9 @@ export function CheckpointHistory({ accountId, currency, owed }: CheckpointHisto
       description: `Transactions that only the ${formatDate(item.date)} checkpoint covers return to cleared. You can edit them again.`,
       confirmLabel: "Unlock checkpoint",
     });
-    if (!ok) {
-      return;
+    if (ok) {
+      unlockCheckpoint.mutate({ accountId, checkpointId: item.id });
     }
-    const result = await apiRequest(
-      `/api/accounts/${accountId}/checkpoints/${item.id}/unlock`,
-      checkpointSchema,
-      { method: "POST" },
-    );
-    if (!result.ok) {
-      setError(result.code === "checkpoint_unlocked" ? "This checkpoint is already unlocked." : "The checkpoint did not unlock. Try again.");
-      return;
-    }
-    setError(null);
-    await queryClient.invalidateQueries({ queryKey: ["checkpoints", accountId] });
-    await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
-    await queryClient.invalidateQueries({ queryKey: ["reconcile", accountId] });
-    await queryClient.invalidateQueries({ queryKey: ["account", accountId] });
   }
 
   return (

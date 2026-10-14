@@ -1,24 +1,22 @@
 import {
-  accountListSchema,
   chosenPresetId,
   firstStatementDate,
   guessImportAccount,
   orderByFirstDate,
-  importPresetListSchema,
-  importResultSchema,
   sampleCsvRows,
   type Account,
   type ColumnMap,
 } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { ImportDropZone, ImportFileList, type ImportFileRow } from "@/accounts/import-file-list";
 import { importError } from "@/accounts/import-format";
 import { ImportMapForm } from "@/accounts/import-map-form";
 import { dateFor, formatFromChoice, knownAccount, readImportFile, rowNeedsColumnMap, syncImportRows } from "@/accounts/import-prepare";
 import { localAsOf } from "@/as-of";
-import { loadAllPages } from "@/settings/load-all-pages";
-import { apiRequest } from "@/request";
+import { activeAccountsQuery } from "@/api/accounts";
+import { errorCode } from "@/api/client";
+import { importPresetsQuery, useImportFile } from "@/api/imports";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogPanel } from "@/editors/form-chrome";
@@ -32,7 +30,6 @@ export function ImportForm({
   onClose: () => void;
   onImported: () => void;
 }) {
-  const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const rowsRef = useRef<ImportFileRow[]>([]);
   const pendingRef = useRef(false);
@@ -46,20 +43,9 @@ export function ImportForm({
   const [finished, setFinished] = useState(false);
   const fallbackId = account?.id ?? "";
 
-  const accounts = useQuery({
-    queryKey: ["accounts", "import-choices"],
-    queryFn: () => loadAllPages("/api/accounts", accountListSchema, { archived: false, sort: "name", dir: "asc" }),
-  });
-  const presets = useQuery({
-    queryKey: ["import-presets"],
-    queryFn: async () => {
-      const response = await apiRequest("/api/import-presets", importPresetListSchema);
-      if (!response.ok) {
-        throw new Error(response.code);
-      }
-      return response.data.presets;
-    },
-  });
+  const accounts = useQuery(activeAccountsQuery());
+  const presets = useQuery(importPresetsQuery());
+  const importFile = useImportFile();
 
   const presetList = presets.data ?? [];
   const loaded = accounts.data?.items ?? [];
@@ -179,29 +165,20 @@ export function ImportForm({
       return "ok";
     }
     updateRow(row.key, { phase: "importing", message: null });
-    const body = new FormData();
-    body.set("file", row.file);
-    body.set("accountId", row.accountId);
-    body.set("asOf", localAsOf());
-    const presetId = chosenPresetId(row.format);
-    if (presetId) {
-      body.set("presetId", presetId);
-    }
-    if (row.columnMap) {
-      body.set("columnMap", JSON.stringify(row.columnMap));
-    }
     try {
-      const response = await apiRequest("/api/imports", importResultSchema, { method: "POST", body });
-      if (!response.ok) {
-        updateRow(row.key, { phase: "error", message: importError(response.code) });
-        return "ok";
-      }
-      if (response.data.kind === "preview") {
+      const result = await importFile.mutateAsync({
+        file: row.file,
+        accountId: row.accountId,
+        asOf: localAsOf(),
+        presetId: chosenPresetId(row.format),
+        columnMap: row.columnMap,
+      });
+      if (result.kind === "preview") {
         if (!allowPreview) {
           updateRow(row.key, { phase: "error", message: importError("invalid_body") });
           return "ok";
         }
-        const map = await askForMap(row, response.data.rows);
+        const map = await askForMap(row, result.rows);
         if (!map) {
           updateRow(row.key, { phase: "ready" });
           return "cancelled";
@@ -211,30 +188,30 @@ export function ImportForm({
         const latest = rowsRef.current.find((item) => item.key === row.key);
         return latest ? postFile(latest, false) : "cancelled";
       }
-      if (response.data.kind === "unreadable") {
+      if (result.kind === "unreadable") {
         updateRow(row.key, {
           phase: "done",
           alreadyImported: false,
           batchId: null,
           createdAt: null,
-          unreadable: response.data.unreadable,
-          counts: { created: 0, matched: 0, duplicate: 0, needsReview: 0, unreadable: response.data.unreadable.length },
+          unreadable: result.unreadable,
+          counts: { created: 0, matched: 0, duplicate: 0, needsReview: 0, unreadable: result.unreadable.length },
         });
         return "ok";
       }
       updateRow(row.key, {
         phase: "done",
-        alreadyImported: response.data.alreadyImported,
-        counts: response.data.alreadyImported ? null : response.data.counts,
-        unreadable: response.data.unreadable,
-        batchId: response.data.id,
-        createdAt: response.data.createdAt,
-        openingSuggestion: response.data.openingSuggestion,
+        alreadyImported: result.alreadyImported,
+        counts: result.alreadyImported ? null : result.counts,
+        unreadable: result.unreadable,
+        batchId: result.id,
+        createdAt: result.createdAt,
+        openingSuggestion: result.openingSuggestion,
         message: null,
       });
       return "ok";
-    } catch {
-      updateRow(row.key, { phase: "error", message: importError("internal_error") });
+    } catch (error) {
+      updateRow(row.key, { phase: "error", message: importError(error instanceof Error ? errorCode(error) : undefined) });
       return "ok";
     }
   }
@@ -267,10 +244,6 @@ export function ImportForm({
     }
     if (rowsRef.current.some((row) => row.phase === "done")) {
       onImported();
-      await queryClient.invalidateQueries({ queryKey: ["imports"] });
-      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-      await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
     }
     setFinished(true);
     pendingRef.current = false;

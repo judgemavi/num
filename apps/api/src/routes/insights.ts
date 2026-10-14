@@ -1,7 +1,8 @@
 import { errorSchema, insightsQuerySchema, insightsSchema } from "@num/shared";
-import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { readInsights } from "../services/insights";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -24,6 +25,9 @@ const insightsRoute = createRoute({
   },
 });
 
-export function registerInsights(app: OpenAPIHono, db: Db) {
-  app.openapi(insightsRoute, (c) => c.json(readInsights(db, c.req.valid("query")), 200));
+export function insightsRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(insightsRoute, (c) => c.json(readInsights(db, c.req.valid("query")), 200));
 }
+
+export type InsightsRoutes = ReturnType<typeof insightsRoutes>;

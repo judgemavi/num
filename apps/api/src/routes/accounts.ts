@@ -8,9 +8,10 @@ import {
   errorSchema,
   openingSuggestionSchema,
 } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { applyOpeningSuggestion, archiveAccount, createAccount, getAccount, listAccounts, restoreAccount, updateAccount } from "../services/accounts";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -204,39 +205,36 @@ const openingRoute = createRoute({
   },
 });
 
-export function registerAccounts(app: OpenAPIHono, db: Db) {
-  app.openapi(listRoute, (c) => c.json(listAccounts(db, c.req.valid("query")), 200));
-
-  app.openapi(readRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(getAccount(db, id), 200);
-  });
-
-  app.openapi(createRouteDef, (c) => {
-    const body = c.req.valid("json");
-    return c.json(createAccount(db, { ...body, source: "ui" }), 200);
-  });
-
-  app.openapi(updateRoute, (c) => {
-    const body = c.req.valid("json");
-    const { id } = c.req.valid("param");
-    return c.json(updateAccount(db, id, { ...body, source: "ui" }), 200);
-  });
-
-  app.openapi(archiveRoute, (c) => {
-    const body = c.req.valid("json");
-    const { id } = c.req.valid("param");
-    return c.json(archiveAccount(db, id, { confirm: body.confirm, source: "ui" }), 200);
-  });
-
-  app.openapi(restoreRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(restoreAccount(db, id, { source: "ui" }), 200);
-  });
-
-  app.openapi(openingRoute, (c) => {
-    const { id } = c.req.valid("param");
-    const body = c.req.valid("json");
-    return c.json(applyOpeningSuggestion(db, id, { amount: body.amount, date: body.date, source: "ui" }), 200);
-  });
+export function accountRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(listRoute, (c) => c.json(listAccounts(db, c.req.valid("query")), 200))
+    .openapi(readRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(getAccount(db, id), 200);
+    })
+    .openapi(createRouteDef, (c) => {
+      const body = c.req.valid("json");
+      return c.json(createAccount(db, { ...body, source: "ui" }), 200);
+    })
+    .openapi(updateRoute, (c) => {
+      const body = c.req.valid("json");
+      const { id } = c.req.valid("param");
+      return c.json(updateAccount(db, id, { ...body, source: "ui" }), 200);
+    })
+    .openapi(archiveRoute, (c) => {
+      const body = c.req.valid("json");
+      const { id } = c.req.valid("param");
+      return c.json(archiveAccount(db, id, { confirm: body.confirm, source: "ui" }), 200);
+    })
+    .openapi(restoreRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(restoreAccount(db, id, { source: "ui" }), 200);
+    })
+    .openapi(openingRoute, (c) => {
+      const { id } = c.req.valid("param");
+      const body = c.req.valid("json");
+      return c.json(applyOpeningSuggestion(db, id, { amount: body.amount, date: body.date, source: "ui" }), 200);
+    });
 }
+
+export type AccountRoutes = ReturnType<typeof accountRoutes>;

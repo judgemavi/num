@@ -1,15 +1,12 @@
-import {
-  bucketEventSchema,
-  forecastSchema,
-  fundingPaycheckListSchema,
-  hygieneSchema,
-  insightsSchema,
-  monthPlanSchema,
-  overspentListSchema,
-  recurringSignalsSchema,
-} from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { overspentQuery, useCoverBucket } from "@/api/buckets";
+import { errorCode } from "@/api/client";
+import { fundingPaychecksQuery } from "@/api/funding";
+import { hygieneQuery, insightsQuery } from "@/api/insights";
+import { forecastQuery, monthPlanQuery } from "@/api/plan";
+import { recurringSignalsQuery } from "@/api/recurring";
+import { useDecideItem } from "@/api/review";
 import { localAsOf } from "@/as-of";
 import { OverspentPanel } from "@/buckets/overspent-panel";
 import { Amount } from "@/components/amount";
@@ -29,96 +26,31 @@ import { HygienePanel } from "@/insights/hygiene-panel";
 import { formatMoney } from "@/money";
 import { signedMoney } from "@/insights/format";
 import { formatDate, levelLabel } from "@/transactions/format";
-import { apiRequest } from "@/request";
 import { useState } from "react";
-import { decideItem } from "@/review/actions";
 
 export function HomeScreen() {
   const asOf = localAsOf();
-  const month = asOf.slice(0, 7);
   const currency = useBookCurrency();
-  const queryClient = useQueryClient();
   const categories = useCategories();
   const buckets = useActiveBuckets();
   const { openEditor } = useEditors();
   const plans = useActivePlans();
   const [coverFrom, setCoverFrom] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
   const bookCurrency = currency.data ?? "USD";
   const planName = new Map((plans.data?.items ?? []).map((item) => [item.id, item.name]));
   const categoryName = new Map((categories.data ?? []).map((item) => [item.id, item.name]));
 
-  const forecast = useQuery({
-    queryKey: ["forecast", asOf],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/forecast?asOf=${asOf}`, forecastSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-  const plan = useQuery({
-    queryKey: ["month-plan", asOf, month],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/plan?asOf=${asOf}&month=${month}`, monthPlanSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-  const hygiene = useQuery({
-    queryKey: ["hygiene", asOf],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/hygiene?asOf=${asOf}`, hygieneSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const forecast = useQuery(forecastQuery(asOf));
+  const plan = useQuery(monthPlanQuery(asOf));
+  const hygiene = useQuery(hygieneQuery(asOf));
   const review = useReviewSummary();
-  const paychecks = useQuery({
-    queryKey: ["funding-paychecks"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/funding/paychecks", fundingPaycheckListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
-  const signals = useQuery({
-    queryKey: ["recurring-signals", asOf],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/recurring/signals?asOf=${asOf}`, recurringSignalsSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-  const overspent = useQuery({
-    queryKey: ["buckets", "overspent"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/buckets/overspent", overspentListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
-  const insights = useQuery({
-    queryKey: ["insights", asOf, "home"],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/insights?asOf=${asOf}&window=1`, insightsSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const paychecks = useQuery(fundingPaychecksQuery());
+  const signals = useQuery(recurringSignalsQuery(asOf, true));
+  const overspent = useQuery(overspentQuery());
+  const insights = useQuery(insightsQuery(asOf, { window: "1" }));
+  const decide = useDecideItem();
+  const coverBucket = useCoverBucket();
+  const actionFailure = decide.error ?? coverBucket.error;
 
   const openPaychecks = (paychecks.data ?? []).filter((item) => !item.kept);
   const counts = review.data?.counts;
@@ -132,9 +64,9 @@ export function HomeScreen() {
   return (
     <>
       <PageHeader kicker={clear ? "All clear" : "This week"} title="Home" />
-      {error ? (
+      {actionFailure ? (
         <p role="alert" className="text-sm text-attn">
-          {error}
+          {inboxError(errorCode(actionFailure))}
         </p>
       ) : null}
       <SummaryStrip
@@ -215,15 +147,8 @@ export function HomeScreen() {
                 variant="ghost"
                 onClick={(event) => {
                   event.stopPropagation();
-                  void decideItem(asOf, `paycheck_funding:${item.incomeTransactionId}`, "keep_unassigned").then(async (result) => {
-                    if (!result.ok) {
-                      setError(inboxError(result.code));
-                      return;
-                    }
-                    setError(null);
-                    await queryClient.invalidateQueries({ queryKey: ["funding-paychecks"] });
-                    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
-                  });
+                  coverBucket.reset();
+                  decide.mutate({ asOf, itemKey: `paycheck_funding:${item.incomeTransactionId}`, decision: "keep_unassigned" });
                 }}
               >
                 Keep it unassigned
@@ -262,19 +187,8 @@ export function HomeScreen() {
             if (!fromBucketId) {
               return;
             }
-            void apiRequest(`/api/buckets/${id}/cover`, bucketEventSchema, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ fromBucketId, date: asOf }),
-            }).then(async (result) => {
-              if (!result.ok) {
-                setError(inboxError(result.code));
-                return;
-              }
-              setError(null);
-              await queryClient.invalidateQueries({ queryKey: ["buckets", "overspent"] });
-              await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
-            });
+            decide.reset();
+            coverBucket.mutate({ id, body: { fromBucketId, date: asOf } });
           }}
         />
       ) : null}

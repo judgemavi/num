@@ -1,7 +1,9 @@
-import { merchantListSchema, merchantSchema, type Merchant, type MerchantListQuery } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Merchant, MerchantListQuery } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
+import { errorCode } from "@/api/client";
+import { merchantListQuery, useArchiveMerchant } from "@/api/merchants";
 import { useEditors } from "@/editors/editor-api";
 import { FilterBar } from "@/components/filter-bar";
 import { ListCard, ListRow, listName } from "@/components/list-card";
@@ -12,9 +14,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
-import { apiRequest } from "@/request";
 import { merchantError } from "@/settings/format";
-import { loadAllPages } from "@/settings/load-all-pages";
 import { SettingsBack } from "@/settings/settings-nav";
 
 const merchantsRoute = getRouteApi("/settings/merchants");
@@ -32,39 +32,15 @@ function applySort(value: string): Partial<MerchantListQuery> {
 }
 
 export function MerchantsPage() {
-  const queryClient = useQueryClient();
   const search = merchantsRoute.useSearch();
   const navigate = merchantsRoute.useNavigate();
   const { openEditor, confirm } = useEditors();
   const [archived, setArchived] = useState(search.archived);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const merchants = useQuery({
-    queryKey: ["merchants", search],
-    queryFn: () => loadAllPages("/api/merchants", merchantListSchema, { archived: search.archived, sort: search.sort, dir: search.dir }),
-  });
+  const merchants = useQuery(merchantListQuery({ archived: search.archived, sort: search.sort, dir: search.dir }));
+  const archive = useArchiveMerchant();
 
   function changeFilters(patch: Partial<MerchantListQuery>) {
     void navigate({ search: { ...search, ...patch, page: 1 } });
-  }
-
-  async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: ["merchants"] });
-    await queryClient.invalidateQueries({ queryKey: ["suggestion"] });
-    await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
-  }
-
-  async function archiveRow(row: Merchant) {
-    const path = row.archivedAt ? "restore" : "archive";
-    const result = await apiRequest(`/api/merchants/${row.id}/${path}`, merchantSchema, { method: "POST" });
-    if (!result.ok) {
-      setActionError(merchantError(result.code));
-      return;
-    }
-    setActionError(null);
-    await refresh();
   }
 
   function askArchive(row: Merchant) {
@@ -75,7 +51,7 @@ export function MerchantsPage() {
       confirmLabel: restore ? "Restore" : "Archive",
     }).then((ok) => {
       if (ok) {
-        void archiveRow(row);
+        archive.mutate({ id: row.id, restore });
       }
     });
   }
@@ -134,9 +110,9 @@ export function MerchantsPage() {
           </Field>
         }
       />
-      {actionError ? (
+      {archive.error ? (
         <p role="alert" className="text-sm text-attn">
-          {actionError}
+          {merchantError(errorCode(archive.error))}
         </p>
       ) : null}
       <ListCard label="Merchants">

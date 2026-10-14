@@ -1,9 +1,10 @@
 import type { Account, ColumnMap, ImportCounts, OpeningSuggestion, Preset, StatementFormat, UnreadableRow } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState, type DragEvent, type RefObject } from "react";
+import type { DragEvent, RefObject } from "react";
+import { accountQuery, useSetOpeningBalance } from "@/api/accounts";
 import { formatImportDate, importCountText, unreadableLabel } from "@/accounts/import-format";
 import { accountLabel } from "@/accounts/label";
-import { loadAccount, setOpeningBalance } from "@/accounts/opening-action";
 import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
 import { rowNeedsColumnMap, totalCounts } from "@/accounts/import-prepare";
@@ -190,35 +191,22 @@ export function ImportFileList({
 function OpeningBalanceButton({ row, onApplied }: { row: ImportFileRow; onApplied: () => void }) {
   const currency = useBookCurrency();
   const suggestion = row.openingSuggestion;
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const account = useQuery(accountQuery(row.accountId.length > 0 ? row.accountId : null));
+  const opening = useSetOpeningBalance();
   if (!suggestion || row.accountId.length === 0) {
     return null;
   }
+  const message = account.isError ? "The account did not load." : opening.isError ? "The opening balance did not save." : null;
   return (
     <div className="grid gap-1">
       <Button
         type="button"
         variant="outline"
-        disabled={pending || !currency.data}
+        disabled={opening.isPending || !currency.data || !account.data}
         onClick={() => {
-          void (async () => {
-            setPending(true);
-            setMessage(null);
-            const account = await loadAccount(row.accountId);
-            if (!account) {
-              setPending(false);
-              setMessage("The account did not load.");
-              return;
-            }
-            const code = await setOpeningBalance(account, suggestion);
-            setPending(false);
-            if (code) {
-              setMessage("The opening balance did not save.");
-              return;
-            }
-            onApplied();
-          })();
+          if (account.data) {
+            opening.mutate({ account: account.data, suggestion }, { onSuccess: onApplied });
+          }
         }}
       >
         Set the opening balance from this statement

@@ -67,6 +67,16 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 - Style with Tailwind classes in the components. `index.css` contains only tokens (`@theme`), base styles and the font.
   Do not write global component CSS. Do not target shadcn internals (`data-slot`) from CSS.
 - The web app imports only `packages/shared`. Do not import `packages/db` or API code in the web app.
+  Exception: `apps/web/src/api/client.ts` imports the API route types with `import type` for the RPC client (decision 0032).
+- Calls from the web app to the API (decision 0032):
+  - Use only the Hono RPC client (`api` in `apps/web/src/api/client.ts`). Do not call `fetch` in a component.
+  - Put the query options and the mutation hooks in `apps/web/src/api/`, one file for each resource.
+  - A read is a `useQuery`. A write is a `useMutation`.
+  - Get the loading state and the error from the query or the mutation. Do not keep them in `useState`.
+  - Do not call `invalidateQueries`. One rule in `main.tsx` invalidates all queries after each successful mutation.
+  - Do not parse a response body with Zod. The route gives its type.
+  - A callback in `mutate(...)` does not run if the component that called `useMutation` is removed before the
+    refetch ends. Call `useMutation` in a component that no query state can remove (example: `SingleEditor`).
 - Use `Temporal.PlainDate` for calendar dates. Do not use `Date` for calendar dates.
 - Lists: one shared Zod query schema for the URL and the API. Follow decision 0004.
 

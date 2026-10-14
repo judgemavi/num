@@ -1,11 +1,10 @@
-import { setupStatusSchema } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Ellipsis, type LucideIcon } from "lucide-react";
+import { setupStatusQuery } from "@/api/setup";
 import { EditorHost } from "@/editors/editor-host";
 import { useReviewSummary } from "@/editors/lookups";
 import { moreNav, phoneMoreNav, primaryNav, settingsNav, type NavPath } from "@/nav";
-import { apiRequest } from "@/request";
 import { SetupScreen } from "@/setup-screen";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -201,16 +200,7 @@ function AppShell() {
 }
 
 export function RootLayout() {
-  const setup = useQuery({
-    queryKey: ["setup"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/setup", setupStatusSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const setup = useQuery(setupStatusQuery());
 
   if (setup.isPending) {
     return <p className="mx-auto grid min-h-svh content-center px-4 text-muted-foreground">Loading setup.</p>;
@@ -226,7 +216,7 @@ export function RootLayout() {
     );
   }
   if (!setup.data.complete) {
-    return <SetupScreen onDone={() => void setup.refetch()} />;
+    return <SetupScreen onAlreadyComplete={() => void setup.refetch()} />;
   }
   return (
     <EditorHost>

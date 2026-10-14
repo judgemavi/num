@@ -1,7 +1,9 @@
-import { tagListSchema, tagSchema, type Tag, type TagListQuery } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { TagListQuery } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
+import { errorCode } from "@/api/client";
+import { tagListQuery, useArchiveTag } from "@/api/tags";
 import { useEditors } from "@/editors/editor-api";
 import { FilterBar } from "@/components/filter-bar";
 import { sortChoice } from "@/components/sort-choice";
@@ -12,9 +14,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
-import { apiRequest } from "@/request";
 import { tagError } from "@/settings/format";
-import { loadAllPages } from "@/settings/load-all-pages";
 import { SettingsBack } from "@/settings/settings-nav";
 
 const tagsRoute = getRouteApi("/settings/tags");
@@ -32,35 +32,15 @@ function applySort(value: string): Partial<TagListQuery> {
 }
 
 export function TagsPage() {
-  const queryClient = useQueryClient();
   const search = tagsRoute.useSearch();
   const navigate = tagsRoute.useNavigate();
   const { openEditor, confirm } = useEditors();
   const [archived, setArchived] = useState(search.archived);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const tags = useQuery({
-    queryKey: ["tags", search],
-    queryFn: () => loadAllPages("/api/tags", tagListSchema, { archived: search.archived, sort: search.sort, dir: search.dir }),
-  });
+  const tags = useQuery(tagListQuery({ archived: search.archived, sort: search.sort, dir: search.dir }));
+  const archive = useArchiveTag();
 
   function changeFilters(patch: Partial<TagListQuery>) {
     void navigate({ search: { ...search, ...patch, page: 1 } });
-  }
-
-  async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: ["tags"] });
-  }
-
-  async function archiveTag(tag: Tag) {
-    const path = tag.archivedAt ? "restore" : "archive";
-    const result = await apiRequest(`/api/tags/${tag.id}/${path}`, tagSchema, { method: "POST" });
-    if (!result.ok) {
-      setActionError(tagError(result.code));
-      return;
-    }
-    setActionError(null);
-    await refresh();
   }
 
   if (tags.isPending) {
@@ -116,9 +96,9 @@ export function TagsPage() {
           </Field>
         }
       />
-      {actionError ? (
+      {archive.error ? (
         <p role="alert" className="text-sm text-attn">
-          {actionError}
+          {tagError(errorCode(archive.error))}
         </p>
       ) : null}
       <ListCard label="Tags">
@@ -141,7 +121,7 @@ export function TagsPage() {
                       confirmLabel: restore ? "Restore tag" : "Archive tag",
                     }).then((ok) => {
                       if (ok) {
-                        void archiveTag(tag);
+                        archive.mutate({ id: tag.id, restore });
                       }
                     });
                   }}

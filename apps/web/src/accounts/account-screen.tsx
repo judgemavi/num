@@ -1,7 +1,8 @@
-import { accountClass, accountSchema, currencyUpdateSchema } from "@num/shared";
+import { accountClass } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { accountQuery } from "@/api/accounts";
 import { AccountImports } from "@/accounts/account-imports";
 import { MortgagePanel } from "@/accounts/mortgage-panel";
 import { AccountTransactions } from "@/accounts/account-transactions";
@@ -9,10 +10,10 @@ import { CheckpointHistory } from "@/accounts/checkpoint-history";
 import { accountDetail, kindLabel } from "@/accounts/format";
 import { accountLabel } from "@/accounts/label";
 import { useEditors } from "@/editors/editor-api";
+import { useBookCurrency } from "@/editors/lookups";
 import { Amount } from "@/components/amount";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { apiRequest } from "@/request";
 
 const accountRoute = getRouteApi("/accounts_/$accountId");
 
@@ -22,27 +23,8 @@ export function AccountScreen() {
   const navigate = accountRoute.useNavigate();
   const { openEditor, dismissKind } = useEditors();
 
-  const currency = useQuery({
-    queryKey: ["book-currency"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/settings/currency", currencyUpdateSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.currency;
-    },
-  });
-
-  const account = useQuery({
-    queryKey: ["account", accountId],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/accounts/${accountId}`, accountSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const currency = useBookCurrency();
+  const account = useQuery(accountQuery(accountId));
 
   useEffect(() => {
     if (!search.reconcile) {

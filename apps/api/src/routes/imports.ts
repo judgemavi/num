@@ -13,7 +13,7 @@ import {
   isoDateSchema,
   type ColumnMap,
 } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -21,6 +21,7 @@ import { resolveImportReview } from "../services/import-review";
 import { getImportDetail, listImportView } from "../services/import-list";
 import { importStatement, listImportBatches, listImportPresets } from "../services/imports";
 import { undoImportBatch } from "../services/import-undo";
+import { validationHook } from "../validation";
 
 const maxUploadBytes = 20 * 1024 * 1024;
 
@@ -185,7 +186,8 @@ function readColumnMap(value: string | undefined): ColumnMap | null {
   return parsed.data;
 }
 
-export function registerImports(app: OpenAPIHono, db: Db, dataDir: string) {
+export function importRoutes(db: Db, dataDir: string) {
+  const app = new OpenAPIHono({ defaultHook: validationHook });
   app.use(
     "/api/imports",
     bodyLimit({
@@ -193,38 +195,36 @@ export function registerImports(app: OpenAPIHono, db: Db, dataDir: string) {
       onError: (c) => c.json({ code: "document_too_large" as const, params: {} }, 413),
     }),
   );
-
-  app.openapi(presetsRoute, (c) => c.json(listImportPresets(), 200));
-  app.openapi(viewRoute, (c) => c.json(listImportView(db, c.req.valid("query")), 200));
-  app.openapi(detailRoute, (c) => c.json(getImportDetail(db, c.req.valid("param").id), 200));
-
-  app.openapi(listRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(listImportBatches(db, id), 200);
-  });
-
-  app.openapi(importRoute, async (c) => {
-    const body = c.req.valid("form");
-    const result = importStatement(db, dataDir, {
-      accountId: body.accountId,
-      filename: body.file.name,
-      mimeType: body.file.type,
-      bytes: new Uint8Array(await body.file.arrayBuffer()),
-      presetId: blankToNull(body.presetId),
-      columnMap: readColumnMap(body.columnMap),
-      asOf: body.asOf,
-      source: "import",
+  return app
+    .openapi(presetsRoute, (c) => c.json(listImportPresets(), 200))
+    .openapi(viewRoute, (c) => c.json(listImportView(db, c.req.valid("query")), 200))
+    .openapi(detailRoute, (c) => c.json(getImportDetail(db, c.req.valid("param").id), 200))
+    .openapi(listRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(listImportBatches(db, id), 200);
+    })
+    .openapi(importRoute, async (c) => {
+      const body = c.req.valid("form");
+      const result = importStatement(db, dataDir, {
+        accountId: body.accountId,
+        filename: body.file.name,
+        mimeType: body.file.type,
+        bytes: new Uint8Array(await body.file.arrayBuffer()),
+        presetId: blankToNull(body.presetId),
+        columnMap: readColumnMap(body.columnMap),
+        asOf: body.asOf,
+        source: "import",
+      });
+      return c.json(result, 200);
+    })
+    .openapi(reviewRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(resolveImportReview(db, id, c.req.valid("json"), { source: "import" }), 200);
+    })
+    .openapi(undoRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(undoImportBatch(db, id, { source: "import" }), 200);
     });
-    return c.json(result, 200);
-  });
-
-  app.openapi(reviewRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(resolveImportReview(db, id, c.req.valid("json"), { source: "import" }), 200);
-  });
-
-  app.openapi(undoRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(undoImportBatch(db, id, { source: "import" }), 200);
-  });
 }
+
+export type ImportRoutes = ReturnType<typeof importRoutes>;

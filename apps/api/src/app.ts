@@ -2,36 +2,36 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { dataDirectory, type Db } from "./db";
 import { registerMcp } from "./mcp/register";
-import { registerAccounts } from "./routes/accounts";
-import { registerCheckpoints } from "./routes/checkpoints";
-import { registerBuckets } from "./routes/buckets";
-import { registerForecast } from "./routes/forecast";
-import { registerHygiene } from "./routes/hygiene";
-import { registerPlan } from "./routes/plan";
-import { registerFunding } from "./routes/funding";
-import { registerCategories } from "./routes/categories";
-import { registerDocuments } from "./routes/documents";
-import { registerImports } from "./routes/imports";
-import { registerInbox } from "./routes/inbox";
-import { registerInsights } from "./routes/insights";
-import { healthRoute } from "./routes/health";
-import { registerMerchants } from "./routes/merchants";
-import { registerMortgage } from "./routes/mortgage";
-import { registerRecurring } from "./routes/recurring";
-import { registerSuggestions } from "./routes/suggestions";
-import { registerSetup } from "./routes/setup";
-import { registerTags } from "./routes/tags";
-import { registerTransactions } from "./routes/transactions";
+import { accountRoutes } from "./routes/accounts";
+import { bucketRoutes } from "./routes/buckets";
+import { categoryRoutes } from "./routes/categories";
+import { checkpointRoutes } from "./routes/checkpoints";
+import { documentRoutes } from "./routes/documents";
+import { forecastRoutes } from "./routes/forecast";
+import { fundingRoutes } from "./routes/funding";
+import { healthRoutes } from "./routes/health";
+import { hygieneRoutes } from "./routes/hygiene";
+import { importRoutes } from "./routes/imports";
+import { inboxRoutes } from "./routes/inbox";
+import { insightsRoutes } from "./routes/insights";
+import { merchantRoutes } from "./routes/merchants";
+import { mortgageRoutes } from "./routes/mortgage";
+import { planRoutes } from "./routes/plan";
+import { recurringRoutes } from "./routes/recurring";
+import { setupRoutes } from "./routes/setup";
+import { suggestionRoutes } from "./routes/suggestions";
+import { tagRoutes } from "./routes/tags";
+import { transactionRoutes } from "./routes/transactions";
 import { ServiceError } from "./service-error";
 import { validationHook } from "./validation";
 import { hasFileExtension, webFile, webIndex } from "./web-files";
 
 export function createApp(db: Db, options: { dataDir?: string } = {}) {
-  const app = new OpenAPIHono({
+  const base = new OpenAPIHono({
     defaultHook: validationHook,
   });
 
-  app.onError((error, c) => {
+  base.onError((error, c) => {
     if (error instanceof ServiceError) {
       return c.json({ code: error.code, params: error.params }, error.status);
     }
@@ -42,26 +42,28 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
     return c.json({ code: "internal_error" as const, params: {} }, 500);
   });
 
-  app.openapi(healthRoute, (c) => c.json({ ok: true as const }, 200));
-  registerSetup(app, db);
-  registerDocuments(app, db, options.dataDir ?? dataDirectory(undefined));
-  registerImports(app, db, options.dataDir ?? dataDirectory(undefined));
-  registerInbox(app, db);
-  registerAccounts(app, db);
-  registerMortgage(app, db);
-  registerInsights(app, db);
-  registerCheckpoints(app, db);
-  registerBuckets(app, db);
-  registerFunding(app, db);
-  registerForecast(app, db);
-  registerHygiene(app, db);
-  registerPlan(app, db);
-  registerCategories(app, db);
-  registerTags(app, db);
-  registerMerchants(app, db);
-  registerSuggestions(app, db);
-  registerRecurring(app, db);
-  registerTransactions(app, db);
+  const dataDir = options.dataDir ?? dataDirectory(undefined);
+  const app = base
+    .route("/", healthRoutes())
+    .route("/", setupRoutes(db))
+    .route("/", documentRoutes(db, dataDir))
+    .route("/", importRoutes(db, dataDir))
+    .route("/", inboxRoutes(db))
+    .route("/", accountRoutes(db))
+    .route("/", mortgageRoutes(db))
+    .route("/", insightsRoutes(db))
+    .route("/", checkpointRoutes(db))
+    .route("/", bucketRoutes(db))
+    .route("/", fundingRoutes(db))
+    .route("/", forecastRoutes(db))
+    .route("/", hygieneRoutes(db))
+    .route("/", planRoutes(db))
+    .route("/", categoryRoutes(db))
+    .route("/", tagRoutes(db))
+    .route("/", merchantRoutes(db))
+    .route("/", suggestionRoutes(db))
+    .route("/", recurringRoutes(db))
+    .route("/", transactionRoutes(db));
   registerMcp(app, db);
 
   app.doc("/api/openapi.json", {

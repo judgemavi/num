@@ -1,17 +1,19 @@
-import { currencyCodes, setupRequestSchema, setupResultSchema, type CategorySet, type CurrencyCode } from "@num/shared";
+import { setupRequestSchema, type CategorySet, type ErrorCode } from "@num/shared";
 import { useState, type FormEvent } from "react";
 import { CurrencyCombobox } from "@/currency-combobox";
-import { apiRequest } from "@/request";
+import { errorCode } from "@/api/client";
+import { useCompleteSetup } from "@/api/setup";
 import { Button } from "@/components/ui/button";
 import { ChoiceCard } from "@/components/choice-card";
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { RadioGroup } from "@/components/ui/radio-group";
 
 type SetupScreenProps = {
-  onDone: () => void;
+  /** The book is already set up, thus the setup status on the screen is old. */
+  onAlreadyComplete: () => void;
 };
 
-function messageFor(code: string): string {
+function messageFor(code: ErrorCode | undefined): string {
   switch (code) {
     case "setup_already_complete":
       return "Setup is already complete.";
@@ -22,49 +24,28 @@ function messageFor(code: string): string {
   }
 }
 
-function isCurrency(code: string): code is CurrencyCode {
-  return (currencyCodes as readonly string[]).includes(code);
-}
-
-export function SetupScreen({ onDone }: SetupScreenProps) {
+export function SetupScreen({ onAlreadyComplete }: SetupScreenProps) {
   const [currency, setCurrency] = useState("");
   const [categorySet, setCategorySet] = useState<CategorySet>("default");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [invalid, setInvalid] = useState(false);
+  const setup = useCompleteSetup();
+  const saving = setup.isPending;
+  const error = invalid ? "Choose a currency." : setup.error ? messageFor(errorCode(setup.error)) : null;
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!isCurrency(currency)) {
-      setError("Choose a currency.");
-      return;
-    }
     const body = setupRequestSchema.safeParse({ currency, categorySet });
+    setInvalid(!body.success);
     if (!body.success) {
-      setError("Choose a currency.");
       return;
     }
-    setSaving(true);
-    setError(null);
-    try {
-      const result = await apiRequest("/api/setup", setupResultSchema, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body.data),
-      });
-      if (!result.ok) {
-        if (result.code === "setup_already_complete") {
-          onDone();
-          return;
+    setup.mutate(body.data, {
+      onError: (failure) => {
+        if (errorCode(failure) === "setup_already_complete") {
+          onAlreadyComplete();
         }
-        setError(messageFor(result.code));
-        return;
-      }
-      onDone();
-    } catch {
-      setError("Setup did not save. Try again.");
-    } finally {
-      setSaving(false);
-    }
+      },
+    });
   }
 
   return (
@@ -77,7 +58,7 @@ export function SetupScreen({ onDone }: SetupScreenProps) {
       </p>
       <h1 className="font-display text-4xl leading-none font-extrabold uppercase [font-stretch:72%]">Set up your book</h1>
       <p className="text-muted-foreground">Choose the currency for this book. You cannot change it after you add a transaction.</p>
-      <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
+      <form className="grid gap-4" onSubmit={onSubmit}>
         <Field data-invalid={error !== null && currency.length === 0}>
           <FieldLabel htmlFor="currency">Currency</FieldLabel>
           <CurrencyCombobox id="currency" value={currency} invalid={error !== null && currency.length === 0} onChange={setCurrency} />

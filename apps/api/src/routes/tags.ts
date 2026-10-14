@@ -1,7 +1,8 @@
 import { errorSchema, tagCreateSchema, tagListQuerySchema, tagListSchema, tagSchema, tagUpdateSchema } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { archiveTag, createTag, getTag, listTags, restoreTag, updateTag } from "../services/tags";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -119,24 +120,27 @@ const readRoute = createRoute({
   },
 });
 
-export function registerTags(app: OpenAPIHono, db: Db) {
-  app.openapi(listRoute, (c) => c.json(listTags(db, c.req.valid("query")), 200));
-  app.openapi(readRoute, (c) => c.json(getTag(db, c.req.valid("param").id), 200));
-  app.openapi(createRouteDef, (c) => {
-    const body = c.req.valid("json");
-    return c.json(createTag(db, { ...body, source: "ui" }), 200);
-  });
-  app.openapi(updateRoute, (c) => {
-    const body = c.req.valid("json");
-    const { id } = c.req.valid("param");
-    return c.json(updateTag(db, id, { ...body, source: "ui" }), 200);
-  });
-  app.openapi(archiveRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(archiveTag(db, id, { source: "ui" }), 200);
-  });
-  app.openapi(restoreRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(restoreTag(db, id, { source: "ui" }), 200);
-  });
+export function tagRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(listRoute, (c) => c.json(listTags(db, c.req.valid("query")), 200))
+    .openapi(readRoute, (c) => c.json(getTag(db, c.req.valid("param").id), 200))
+    .openapi(createRouteDef, (c) => {
+      const body = c.req.valid("json");
+      return c.json(createTag(db, { ...body, source: "ui" }), 200);
+    })
+    .openapi(updateRoute, (c) => {
+      const body = c.req.valid("json");
+      const { id } = c.req.valid("param");
+      return c.json(updateTag(db, id, { ...body, source: "ui" }), 200);
+    })
+    .openapi(archiveRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(archiveTag(db, id, { source: "ui" }), 200);
+    })
+    .openapi(restoreRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(restoreTag(db, id, { source: "ui" }), 200);
+    });
 }
+
+export type TagRoutes = ReturnType<typeof tagRoutes>;

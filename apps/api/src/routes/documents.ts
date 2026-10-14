@@ -1,8 +1,9 @@
 import { documentSchema, errorSchema } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import type { Db } from "../db";
 import { deleteDocument, readDocumentFile, uploadDocument } from "../services/documents";
+import { validationHook } from "../validation";
 
 const maxUploadBytes = 20 * 1024 * 1024;
 
@@ -91,7 +92,8 @@ function responseBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
   return copy;
 }
 
-export function registerDocuments(app: OpenAPIHono, db: Db, dataDir: string) {
+export function documentRoutes(db: Db, dataDir: string) {
+  const app = new OpenAPIHono({ defaultHook: validationHook });
   app.use(
     "/api/documents",
     bodyLimit({
@@ -99,29 +101,29 @@ export function registerDocuments(app: OpenAPIHono, db: Db, dataDir: string) {
       onError: (c) => c.json({ code: "document_too_large" as const, params: {} }, 413),
     }),
   );
-
-  app.openapi(uploadRoute, async (c) => {
-    const { file } = c.req.valid("form");
-    const document = uploadDocument(db, dataDir, {
-      bytes: new Uint8Array(await file.arrayBuffer()),
-      filename: file.name,
-      mimeType: file.type,
-      source: "ui",
+  return app
+    .openapi(uploadRoute, async (c) => {
+      const { file } = c.req.valid("form");
+      const document = uploadDocument(db, dataDir, {
+        bytes: new Uint8Array(await file.arrayBuffer()),
+        filename: file.name,
+        mimeType: file.type,
+        source: "ui",
+      });
+      return c.json(document, 200);
+    })
+    .openapi(downloadRoute, (c) => {
+      const { id } = c.req.valid("param");
+      const file = readDocumentFile(db, dataDir, id);
+      return c.body(responseBytes(file.bytes), 200, {
+        "Content-Type": file.mimeType,
+        "Content-Disposition": contentDisposition(file.filename),
+      });
+    })
+    .openapi(deleteRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(deleteDocument(db, id, { source: "ui" }), 200);
     });
-    return c.json(document, 200);
-  });
-
-  app.openapi(downloadRoute, (c) => {
-    const { id } = c.req.valid("param");
-    const file = readDocumentFile(db, dataDir, id);
-    return c.body(responseBytes(file.bytes), 200, {
-      "Content-Type": file.mimeType,
-      "Content-Disposition": contentDisposition(file.filename),
-    });
-  });
-
-  app.openapi(deleteRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(deleteDocument(db, id, { source: "ui" }), 200);
-  });
 }
+
+export type DocumentRoutes = ReturnType<typeof documentRoutes>;

@@ -8,7 +8,9 @@ import {
   type Suggestion,
   type WhatChoice,
 } from "@num/shared";
-import { useRestoreNamed } from "@/editors/restore-named";
+import { useArchiveAccount } from "@/api/accounts";
+import { useArchiveCategory } from "@/api/categories";
+import { useArchiveMerchant } from "@/api/merchants";
 import { InlineAccount, InlineCategory, InlineMerchant } from "@/editors/inline-records";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -172,7 +174,9 @@ export function WhatIsThis({
   asOf = "",
   depth = 0,
 }: WhatIsThisProps) {
-  const restoreNamed = useRestoreNamed();
+  const archiveAccount = useArchiveAccount();
+  const archiveCategory = useArchiveCategory();
+  const archiveMerchant = useArchiveMerchant();
   const transferLabel = direction === "out" ? "To account" : "From account";
   const choices = choicesForDirection(direction, groupMode);
   const categoryList = categoryGroups(categories, choice, categoryId);
@@ -186,19 +190,11 @@ export function WhatIsThis({
     .map((category) => ({ id: category.id, label: category.name }));
 
   function restoreCategory(id: string, onPicked: (id: string) => void) {
-    void restoreNamed(`/api/categories/${id}/restore`).then((restored) => {
-      if (restored) {
-        onPicked(restored);
-      }
-    });
+    archiveCategory.mutate({ id, restore: true }, { onSuccess: (restored) => onPicked(restored.id) });
   }
 
   function restoreAccount(id: string, onPicked: (id: string) => void) {
-    void restoreNamed(`/api/accounts/${id}/restore`).then((restored) => {
-      if (restored) {
-        onPicked(restored);
-      }
-    });
+    archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => onPicked(restored.id) });
   }
 
   function updateLine(key: string, patch: Partial<SplitLine>) {
@@ -334,13 +330,7 @@ export function WhatIsThis({
             depth={depth}
             suggestedName={suggestedMerchant}
             archived={archivedMerchants}
-            onRestore={(id) => {
-              void restoreNamed(`/api/merchants/${id}/restore`).then((restored) => {
-                if (restored) {
-                  onMerchantId(restored);
-                }
-              });
-            }}
+            onRestore={(id) => archiveMerchant.mutate({ id, restore: true }, { onSuccess: (restored) => onMerchantId(restored.id) })}
             onChange={onMerchantId}
             renderForm={(name, finish) => <InlineMerchant name={name} depth={depth + 1} onDone={finish} />}
           />

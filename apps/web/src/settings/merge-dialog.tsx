@@ -1,11 +1,12 @@
-import { merchantSchema, type Merchant } from "@num/shared";
+import type { Merchant } from "@num/shared";
 import { useState } from "react";
+import { errorCode } from "@/api/client";
+import { useMergeMerchant } from "@/api/merchants";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogPanel } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { OptionCombobox } from "@/transactions/option-combobox";
-import { apiRequest } from "@/request";
 import { merchantError } from "@/settings/format";
 
 type MergeDialogProps = {
@@ -16,27 +17,16 @@ type MergeDialogProps = {
 
 export function MergeDialog({ source, merchants, onMerged }: MergeDialogProps) {
   const [targetId, setTargetId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [targetMissing, setTargetMissing] = useState(false);
+  const merge = useMergeMerchant();
+  const error = targetMissing ? "Choose the merchant that remains." : merge.error ? merchantError(errorCode(merge.error)) : null;
   const options = merchants.filter((merchant) => merchant.id !== source.id && merchant.archivedAt === null);
 
-  async function merge() {
-    if (!targetId) {
-      setError("Choose the merchant that remains.");
-      return;
+  function submit() {
+    setTargetMissing(!targetId);
+    if (targetId) {
+      merge.mutate({ id: source.id, targetId }, { onSuccess: onMerged });
     }
-    setSaving(true);
-    const result = await apiRequest(`/api/merchants/${source.id}/merge`, merchantSchema, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ targetId }),
-    });
-    setSaving(false);
-    if (!result.ok) {
-      setError(merchantError(result.code));
-      return;
-    }
-    onMerged();
   }
 
   return (
@@ -66,8 +56,8 @@ export function MergeDialog({ source, merchants, onMerged }: MergeDialogProps) {
             Cancel
           </Button>
         </DialogClose>
-        <Button type="button" disabled={saving} onClick={() => void merge()}>
-          {saving ? "Merging" : "Merge merchants"}
+        <Button type="button" disabled={merge.isPending} onClick={submit}>
+          {merge.isPending ? "Merging" : "Merge merchants"}
         </Button>
       </DialogFooter>
     </DialogPanel>

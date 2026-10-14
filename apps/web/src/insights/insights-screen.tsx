@@ -1,6 +1,8 @@
-import { defaultInsightWindow, insightsSchema, Temporal, type ErrorCode, type InsightWindow, type InsightsSearch } from "@num/shared";
+import { defaultInsightWindow, Temporal, type ErrorCode, type InsightWindow, type InsightsSearch } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
+import { errorCode } from "@/api/client";
+import { insightsQuery } from "@/api/insights";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
 import { PageHeader } from "@/components/page-header";
@@ -15,7 +17,6 @@ import { PeriodSelect } from "@/insights/period-select";
 import { TimelineChart } from "@/insights/timeline-chart";
 import { formatMoney } from "@/money";
 import { ForecastChart } from "@/plan/forecast-chart";
-import { apiRequest } from "@/request";
 
 const insightsRoute = getRouteApi("/insights");
 
@@ -44,31 +45,15 @@ function apiSearch(search: InsightsSearch): InsightsSearch {
   return picked;
 }
 
-function insightsPath(asOf: string, search: InsightsSearch): string {
-  const params = new URLSearchParams({ asOf });
-  for (const [key, value] of Object.entries(search)) {
-    params.set(key, String(value));
-  }
-  return `/api/insights?${params}`;
-}
-
 export function InsightsScreen() {
   const asOf = localAsOf();
   const search = apiSearch(insightsRoute.useSearch());
   const navigateSearch = insightsRoute.useNavigate();
   const currency = useBookCurrency();
   const categories = useCategories();
-  const report = useQuery({
-    queryKey: ["insights", asOf, search],
-    queryFn: async () => {
-      const result = await apiRequest(insightsPath(asOf, search), insightsSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const report = useQuery(insightsQuery(asOf, search));
 
+  const reportCode = errorCode(report.error);
   const bookCurrency = currency.data ?? "USD";
   const data = report.data;
   const latest = data?.netWorth.at(-1);
@@ -105,7 +90,7 @@ export function InsightsScreen() {
       {report.isPending ? <p className="text-muted-foreground">Loading insights.</p> : null}
       {report.isError ? (
         <div className="grid gap-3">
-          <p role="alert">{errorText[(report.error instanceof Error ? report.error.message : "") as ErrorCode] ?? "Insights did not load."}</p>
+          <p role="alert">{(reportCode && errorText[reportCode]) ?? "Insights did not load."}</p>
           <Button type="button" onClick={() => void report.refetch()}>
             Try again
           </Button>

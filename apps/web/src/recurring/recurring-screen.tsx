@@ -1,15 +1,5 @@
-import {
-  accountListSchema,
-  autoLinkResultSchema,
-  currencyUpdateSchema,
-  merchantListSchema,
-  planListSchema,
-  planSchema,
-  recurringSignalsSchema,
-  type Plan,
-  type PlanListQuery,
-} from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { PlanListQuery } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Plus, Repeat } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -17,10 +7,12 @@ import { PlanFilters } from "@/recurring/filters";
 import { kindLabel, localAsOf, planError, scheduleLabel } from "@/recurring/format";
 import { PlanDetail } from "@/recurring/plan-detail";
 import { useEditors } from "@/editors/editor-api";
-import { planPath } from "@/recurring/query";
+import { useBookCurrency } from "@/editors/lookups";
 import { ReviewList } from "@/recurring/review-list";
-import { loadAllPages } from "@/settings/load-all-pages";
-import { apiRequest } from "@/request";
+import { activeAccountsQuery } from "@/api/accounts";
+import { errorCode } from "@/api/client";
+import { merchantListQuery } from "@/api/merchants";
+import { planListQuery, recurringSignalsQuery, recurringSyncQuery, useArchivePlan } from "@/api/recurring";
 import { Amount } from "@/components/amount";
 import { IconTile } from "@/components/icon-tile";
 import { PaydayIllustration } from "@/components/illustrations";
@@ -38,12 +30,10 @@ const asOf = localAsOf();
 const hues = { income: "mint", bill: "lilac", transfer: "butter" } as const;
 
 export function RecurringScreen() {
-  const queryClient = useQueryClient();
   const search = recurringRoute.useSearch();
   const navigate = recurringRoute.useNavigate();
   const { openEditor, confirm } = useEditors();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const changeFilters = useCallback(
     (patch: Partial<PlanListQuery>) => {
@@ -52,77 +42,21 @@ export function RecurringScreen() {
     [navigate, search],
   );
 
-  const currency = useQuery({
-    queryKey: ["book-currency"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/settings/currency", currencyUpdateSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.currency;
-    },
-  });
+  const currency = useBookCurrency();
+  const sync = useQuery(recurringSyncQuery(asOf));
+  const plans = useQuery(planListQuery(search, sync.isSuccess));
+  const signals = useQuery(recurringSignalsQuery(asOf, sync.isSuccess));
+  const accounts = useQuery(activeAccountsQuery());
+  const merchants = useQuery(merchantListQuery({ archived: false }));
+  const archive = useArchivePlan();
 
-  const sync = useQuery({
-    queryKey: ["recurring-sync", asOf],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/recurring/auto-link?asOf=${asOf}`, autoLinkResultSchema, { method: "POST" });
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-
-  const plans = useQuery({
-    queryKey: ["plans", search],
-    enabled: sync.isSuccess,
-    queryFn: async () => {
-      const result = await apiRequest(planPath(search), planListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-
-  const signals = useQuery({
-    queryKey: ["recurring-signals", asOf],
-    enabled: sync.isSuccess,
-    queryFn: async () => {
-      const result = await apiRequest(`/api/recurring/signals?asOf=${asOf}`, recurringSignalsSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-
-  const accounts = useQuery({
-    queryKey: ["accounts", "recurring"],
-    queryFn: () => loadAllPages("/api/accounts", accountListSchema, { archived: false }),
-  });
-  const merchants = useQuery({
-    queryKey: ["merchants", "recurring"],
-    queryFn: () => loadAllPages("/api/merchants", merchantListSchema, { archived: false }),
-  });
-
-  async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: ["plans"] });
-    await queryClient.invalidateQueries({ queryKey: ["recurring-signals"] });
-    await queryClient.invalidateQueries({ queryKey: ["recurring-sync"] });
-    await queryClient.invalidateQueries({ queryKey: ["occurrences"] });
-  }
-
-  async function archivePlan(plan: Plan) {
-    const path = plan.archivedAt ? "restore" : "archive";
-    const result = await apiRequest(`/api/recurring/${plan.id}/${path}`, planSchema, { method: "POST" });
-    if (!result.ok) {
-      setActionError(planError(result.code));
-      return;
+  function tryAgain() {
+    void currency.refetch();
+    void accounts.refetch();
+    void sync.refetch();
+    if (sync.isSuccess) {
+      void plans.refetch();
     }
-    setActionError(null);
-    await refresh();
   }
 
   const rows = plans.data?.items ?? [];
@@ -139,7 +73,7 @@ export function RecurringScreen() {
     return (
       <div className="grid content-start gap-5">
         <p>Recurring did not load.</p>
-        <Button type="button" onClick={() => void refresh()}>
+        <Button type="button" onClick={tryAgain}>
           Try again
         </Button>
       </div>
@@ -188,15 +122,15 @@ export function RecurringScreen() {
         illustration={<PaydayIllustration />}
       />
       <PlanFilters search={search} accounts={accounts.data?.items ?? []} onChange={changeFilters} />
-      {actionError ? (
+      {archive.error ? (
         <p role="alert" className="text-sm text-attn">
-          {actionError}
+          {planError(errorCode(archive.error))}
         </p>
       ) : null}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <div className="grid gap-5">
           {signals.data ? (
-            <ReviewList signals={signals.data} merchants={merchants.data?.items ?? []} onDone={() => void signals.refetch()} />
+            <ReviewList signals={signals.data} merchants={merchants.data?.items ?? []} />
           ) : null}
           <ListCard label="Recurring">
             {grouped.length === 0 ? (
@@ -236,7 +170,7 @@ export function RecurringScreen() {
                               confirmLabel: restore ? "Restore" : "Archive",
                             }).then((ok) => {
                               if (ok) {
-                                void archivePlan(plan);
+                                archive.mutate({ id: plan.id, restore });
                               }
                             });
                           }}

@@ -86,7 +86,7 @@ export function refundedText(currency: string, amount: number): string {
   return `Refunded ${formatMoney(currency, amount)}`;
 }
 
-export function transactionError(code: string): string {
+export function transactionError(code: string | undefined): string {
   switch (code) {
     case "lines_sum_mismatch":
       return "The lines must add up to the amount.";

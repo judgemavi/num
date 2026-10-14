@@ -7,10 +7,11 @@ import {
   setupResultSchema,
   setupStatusSchema,
 } from "@num/shared";
-import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { aiCanWrite, changeAiAccess } from "../services/ai-access";
 import { bookCurrency, changeCurrency, changeMatching, matchingSetting, runSetup, setupStatus } from "../services/setup";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -180,32 +181,28 @@ const matchingRoute = createRoute({
   },
 });
 
-export function registerSetup(app: OpenAPIHono, db: Db) {
-  app.openapi(setupStatusRoute, (c) => c.json(setupStatus(db), 200));
-
-  app.openapi(setupRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(runSetup(db, { ...body, source: "ui" }), 200);
-  });
-
-  app.openapi(currencyReadRoute, (c) => c.json(bookCurrency(db), 200));
-
-  app.openapi(currencyRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(changeCurrency(db, { currency: body.currency, source: "ui" }), 200);
-  });
-
-  app.openapi(matchingReadRoute, (c) => c.json(matchingSetting(db), 200));
-
-  app.openapi(matchingRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(changeMatching(db, { autoConfidence: body.autoConfidence, source: "ui" }), 200);
-  });
-
-  app.openapi(aiReadRoute, (c) => c.json({ aiCanWrite: aiCanWrite(db) }, 200));
-
-  app.openapi(aiRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(changeAiAccess(db, { aiCanWrite: body.aiCanWrite, source: "ui" }), 200);
-  });
+export function setupRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(setupStatusRoute, (c) => c.json(setupStatus(db), 200))
+    .openapi(setupRoute, (c) => {
+      const body = c.req.valid("json");
+      return c.json(runSetup(db, { ...body, source: "ui" }), 200);
+    })
+    .openapi(currencyReadRoute, (c) => c.json(bookCurrency(db), 200))
+    .openapi(currencyRoute, (c) => {
+      const body = c.req.valid("json");
+      return c.json(changeCurrency(db, { currency: body.currency, source: "ui" }), 200);
+    })
+    .openapi(matchingReadRoute, (c) => c.json(matchingSetting(db), 200))
+    .openapi(matchingRoute, (c) => {
+      const body = c.req.valid("json");
+      return c.json(changeMatching(db, { autoConfidence: body.autoConfidence, source: "ui" }), 200);
+    })
+    .openapi(aiReadRoute, (c) => c.json({ aiCanWrite: aiCanWrite(db) }, 200))
+    .openapi(aiRoute, (c) => {
+      const body = c.req.valid("json");
+      return c.json(changeAiAccess(db, { aiCanWrite: body.aiCanWrite, source: "ui" }), 200);
+    });
 }
+
+export type SetupRoutes = ReturnType<typeof setupRoutes>;

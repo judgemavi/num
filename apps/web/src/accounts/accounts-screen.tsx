@@ -1,15 +1,15 @@
-import { accountClass, netWorthOf, accountListSchema, accountSchema, currencyUpdateSchema, type Account } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { accountClass, netWorthOf } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Upload } from "lucide-react";
-import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
+import { useBookCurrency } from "@/editors/lookups";
 import { AccountIcon } from "@/accounts/account-icon";
 import { accountCountLabel, accountDetail, accountError, formatBalance, formatMoney, kindLabel } from "@/accounts/format";
 import { accountLabel } from "@/accounts/label";
 import { groupAccounts, groupHue, groupLabel } from "@/accounts/groups";
-import { loadAllPages } from "@/settings/load-all-pages";
-import { apiRequest } from "@/request";
+import { accountListQuery, useArchiveAccount } from "@/api/accounts";
+import { errorCode } from "@/api/client";
 import { Amount } from "@/components/amount";
 import { AccountFilterBar } from "@/accounts/filters";
 import { Button } from "@/components/ui/button";
@@ -28,54 +28,13 @@ import { hueColor } from "@/components/hue";
 const accountsRoute = getRouteApi("/accounts");
 
 export function AccountsScreen() {
-  const queryClient = useQueryClient();
   const search = accountsRoute.useSearch();
   const navigate = accountsRoute.useNavigate();
   const openAccount = useNavigate();
   const { openEditor, confirm } = useEditors();
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const currency = useQuery({
-    queryKey: ["book-currency"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/settings/currency", currencyUpdateSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.currency;
-    },
-  });
-
-  const accounts = useQuery({
-    queryKey: ["accounts", search],
-    queryFn: () =>
-      loadAllPages("/api/accounts", accountListSchema, {
-        archived: search.archived,
-        sort: search.sort,
-        dir: search.dir,
-      }),
-  });
-
-  async function archiveAccount(account: Account) {
-    const restoring = account.archivedAt !== null;
-    const result = await apiRequest(
-      `/api/accounts/${account.id}/${restoring ? "restore" : "archive"}`,
-      accountSchema,
-      restoring
-        ? { method: "POST" }
-        : {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ confirm: true }),
-          },
-    );
-    if (!result.ok) {
-      setActionError(accountError(result.code));
-      return;
-    }
-    setActionError(null);
-    await queryClient.invalidateQueries({ queryKey: ["accounts"] });
-  }
+  const currency = useBookCurrency();
+  const accounts = useQuery(accountListQuery({ archived: search.archived, sort: search.sort, dir: search.dir }));
+  const archive = useArchiveAccount();
 
   if (currency.isPending || accounts.isPending) {
     return <p className="text-muted-foreground">Loading accounts.</p>;
@@ -162,9 +121,9 @@ export function AccountsScreen() {
         }
         illustration={<BalanceScaleIllustration />}
       />
-      {actionError ? (
+      {archive.error ? (
         <p role="alert" className="text-sm text-attn">
-          {actionError}
+          {accountError(errorCode(archive.error))}
         </p>
       ) : null}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
@@ -237,7 +196,7 @@ export function AccountsScreen() {
                               confirmLabel: restore ? "Restore account" : "Archive account",
                             }).then((ok) => {
                               if (ok) {
-                                void archiveAccount(account);
+                                archive.mutate({ id: account.id, restore });
                               }
                             });
                           }}

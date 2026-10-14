@@ -11,7 +11,7 @@ import {
   categoryUpdateSchema,
   errorSchema,
 } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import {
   archiveCategory,
@@ -26,6 +26,7 @@ import {
   updateCategory,
   updateCategoryGroup,
 } from "../services/categories";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -228,41 +229,43 @@ const readCategoryRoute = createRoute({
   },
 });
 
-export function registerCategories(app: OpenAPIHono, db: Db) {
-  app.openapi(listGroupsRoute, (c) => c.json(listCategoryGroups(db), 200));
-  app.openapi(readGroupRoute, (c) => c.json(getCategoryGroup(db, c.req.valid("param").id), 200));
-  app.openapi(createGroupRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(createCategoryGroup(db, { ...body, source: "ui" }), 200);
-  });
-  app.openapi(updateGroupRoute, (c) => {
-    const body = c.req.valid("json");
-    const { id } = c.req.valid("param");
-    return c.json(updateCategoryGroup(db, id, { ...body, source: "ui" }), 200);
-  });
-  app.openapi(deleteGroupRoute, (c) => {
-    const { id } = c.req.valid("param");
-    deleteCategoryGroup(db, id, { source: "ui" });
-    return c.json({ ok: true as const }, 200);
-  });
-
-  app.openapi(listCategoriesRoute, (c) => c.json(listCategories(db, c.req.valid("query")), 200));
-  app.openapi(readCategoryRoute, (c) => c.json(getCategory(db, c.req.valid("param").id), 200));
-  app.openapi(createCategoryRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(createCategory(db, { ...body, source: "ui" }), 200);
-  });
-  app.openapi(updateCategoryRoute, (c) => {
-    const body = c.req.valid("json");
-    const { id } = c.req.valid("param");
-    return c.json(updateCategory(db, id, { ...body, source: "ui" }), 200);
-  });
-  app.openapi(archiveCategoryRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(archiveCategory(db, id, { source: "ui" }), 200);
-  });
-  app.openapi(restoreCategoryRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(restoreCategory(db, id, { source: "ui" }), 200);
-  });
+export function categoryRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(listGroupsRoute, (c) => c.json(listCategoryGroups(db), 200))
+    .openapi(readGroupRoute, (c) => c.json(getCategoryGroup(db, c.req.valid("param").id), 200))
+    .openapi(createGroupRoute, (c) => {
+      const body = c.req.valid("json");
+      return c.json(createCategoryGroup(db, { ...body, source: "ui" }), 200);
+    })
+    .openapi(updateGroupRoute, (c) => {
+      const body = c.req.valid("json");
+      const { id } = c.req.valid("param");
+      return c.json(updateCategoryGroup(db, id, { ...body, source: "ui" }), 200);
+    })
+    .openapi(deleteGroupRoute, (c) => {
+      const { id } = c.req.valid("param");
+      deleteCategoryGroup(db, id, { source: "ui" });
+      return c.json({ ok: true as const }, 200);
+    })
+    .openapi(listCategoriesRoute, (c) => c.json(listCategories(db, c.req.valid("query")), 200))
+    .openapi(readCategoryRoute, (c) => c.json(getCategory(db, c.req.valid("param").id), 200))
+    .openapi(createCategoryRoute, (c) => {
+      const body = c.req.valid("json");
+      return c.json(createCategory(db, { ...body, source: "ui" }), 200);
+    })
+    .openapi(updateCategoryRoute, (c) => {
+      const body = c.req.valid("json");
+      const { id } = c.req.valid("param");
+      return c.json(updateCategory(db, id, { ...body, source: "ui" }), 200);
+    })
+    .openapi(archiveCategoryRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(archiveCategory(db, id, { source: "ui" }), 200);
+    })
+    .openapi(restoreCategoryRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(restoreCategory(db, id, { source: "ui" }), 200);
+    });
 }
+
+export type CategoryRoutes = ReturnType<typeof categoryRoutes>;

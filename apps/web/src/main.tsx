@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -6,7 +6,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { routeTree } from "./routeTree.gen";
 import "./index.css";
 
-const queryClient = new QueryClient();
+// The one invalidation rule: after each successful mutation, all queries are invalidated.
+// The promise is returned, thus the mutation stays pending until the active queries have new data.
+const queryClient: QueryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    onSuccess: () => queryClient.invalidateQueries(),
+  }),
+});
 
 const router = createRouter({
   routeTree,

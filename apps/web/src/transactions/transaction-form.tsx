@@ -10,6 +10,8 @@ import {
   type WhatChoice,
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
+import { errorCode } from "@/api/client";
+import { useUndoDecision } from "@/api/review";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
@@ -17,11 +19,11 @@ import { FieldError } from "@/components/ui/field";
 import { accountLabel, accountOptionLabel } from "@/accounts/label";
 import { formatMoney } from "@/money";
 import { inboxError } from "@/review/format";
-import { formatDate, refundedText } from "@/transactions/format";
+import { formatDate, refundedText, transactionError } from "@/transactions/format";
 import { MortgageSplitWatch } from "@/transactions/mortgage-split-watch";
 import { AutomaticReason, DeleteMenu, MoneySection, MoreDetails, type TransactionFormProps } from "@/transactions/transaction-parts";
 import { alreadyChosen, choiceOf, linesOf, signedTotal, useApplySuggestion } from "@/transactions/transaction-draft";
-import { submitTransaction } from "@/transactions/transaction-submit";
+import { buildTransactionSave } from "@/transactions/transaction-submit";
 import { merchantOptionLists } from "@/transactions/merchant-options";
 import { splitBlank, splitRemainder, type SplitLine } from "@/transactions/what-choice";
 import { WhatIsThis } from "@/transactions/what-is-this";
@@ -37,11 +39,12 @@ export function TransactionForm({
   rawLine,
   initialAccountId,
   unreadableItemKey,
+  onClose,
   onSaved,
-  onDelete,
+  save,
+  remove,
   deleteKind = "plain",
   decisions = [],
-  onUndoDecision,
 }: TransactionFormProps) {
   const reconciled = transaction?.reconciled === true;
   const imported = transaction?.source === "import";
@@ -71,11 +74,13 @@ export function TransactionForm({
   const [tagIds, setTagIds] = useState<string[]>(() => [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])]);
   const [more, setMore] = useState(false);
   const [touched, setTouched] = useState(alreadyChosen(transaction));
-  const [error, setError] = useState<string | null>(null);
-  const [undoError, setUndoError] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const undo = useUndoDecision();
+  const saving = save.isPending;
+  const failure = save.error ?? remove.error;
+  const error = invalid ?? (failure ? transactionError(errorCode(failure)) : null);
 
   const hintAmount = signedTotal(currency, imported, transaction, amount, direction);
   const suggestion = useApplySuggestion({
@@ -137,35 +142,33 @@ export function TransactionForm({
     }
   }
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setInvalid(null);
     if (payee.trim().length === 0) {
-      setError("Enter the bank text.");
+      setInvalid("Enter the bank text.");
       setMore(true);
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      setError("Choose a date.");
+      setInvalid("Choose a date.");
       return;
     }
     if (totalMinor === null) {
-      setError("Enter a positive amount.");
+      setInvalid("Enter a positive amount.");
       return;
     }
     if (choice === "transfer" && !transferAccountId) {
-      setError("Choose the other account.");
+      setInvalid("Choose the other account.");
       return;
     }
     if (choice === "split" && (left !== 0 || splitBlank(lines))) {
-      setError("Assign the whole amount.");
+      setInvalid("Assign the whole amount.");
       return;
     }
-    setSaving(true);
-    const result = await submitTransaction({
+    const built = buildTransactionSave({
       currency,
       transaction,
-      reconciled,
       accountId,
       date,
       totalMinor,
@@ -181,22 +184,26 @@ export function TransactionForm({
       refundOfId,
       unreadableItemKey,
     });
-    setSaving(false);
-    if (!result.ok) {
-      setError(result.error);
+    if (!built.ok) {
+      setInvalid(built.error);
       return;
     }
-    if (result.skipped > 0) {
-      setNotice(`Applied to ${result.applied} · skipped ${result.skipped}`);
-      setSavedId(result.id);
-      return;
-    }
-    onSaved(result.id);
+    remove.reset();
+    save.mutate(built.save, {
+      onSuccess: (result) => {
+        if (result.skipped > 0) {
+          setNotice(`Applied to ${result.applied} · skipped ${result.skipped}`);
+          setSavedId(result.id);
+          return;
+        }
+        onSaved(result.id);
+      },
+    });
   }
   const summary = `${formatDate(date)} · ${accountName} · ${direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(imported && transaction ? transaction.amount : (totalMinor ?? 0)))} · ${payee}`;
 
   return (
-    <DialogForm onSubmit={(event) => void onSubmit(event)}>
+    <DialogForm onSubmit={onSubmit}>
       <DialogHeader>
         <DialogTitle>{transaction ? "Edit transaction" : "New transaction"}</DialogTitle>
         <DialogDescription>
@@ -207,28 +214,14 @@ export function TransactionForm({
       {decisions.map((row) => (
         <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
           <span>{row.text}</span>
-          {onUndoDecision ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                void onUndoDecision(row.itemKey).then((result) => {
-                  if (!result.ok) {
-                    setUndoError(inboxError(result.code ?? "internal_error"));
-                    return;
-                  }
-                  setUndoError(null);
-                });
-              }}
-            >
-              Undo
-            </Button>
-          ) : null}
+          <Button type="button" variant="outline" onClick={() => undo.mutate(row.itemKey)}>
+            Undo
+          </Button>
         </p>
       ))}
-      {undoError ? (
+      {undo.error ? (
         <p role="alert" className="text-sm text-attn">
-          {undoError}
+          {inboxError(errorCode(undo.error))}
         </p>
       ) : null}
       {rawLine ? (
@@ -362,11 +355,10 @@ export function TransactionForm({
         {transaction && !reconciled ? (
           <DeleteMenu
             kind={deleteKind}
-            onDelete={async () => {
-              const message = await onDelete();
-              if (message) {
-                setError(message);
-              }
+            onDelete={() => {
+              setInvalid(null);
+              save.reset();
+              remove.mutate(transaction.id, { onSuccess: onClose });
             }}
           />
         ) : null}

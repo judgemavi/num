@@ -12,10 +12,11 @@ import {
   errorSchema,
   overspentListSchema,
 } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { coverBucket, createBucketEvent, listBucketEvents, undoBucketEvent } from "../services/bucket-events";
 import { archiveBucket, createBucket, listBuckets, listOverspent, readBucket, restoreBucket, updateBucket } from "../services/buckets";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -217,36 +218,39 @@ const readRoute = createRoute({
   },
 });
 
-export function registerBuckets(app: OpenAPIHono, db: Db) {
-  app.openapi(listRoute, (c) => c.json(listBuckets(db, c.req.valid("query")), 200));
-  app.openapi(eventsRoute, (c) => c.json(listBucketEvents(db), 200));
-  app.openapi(overspentRoute, (c) => c.json(listOverspent(db), 200));
-  app.openapi(readRoute, (c) => c.json(readBucket(db, c.req.valid("param").id), 200));
-  app.openapi(createRouteDef, (c) =>
-    c.json(createBucket(db, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200),
-  );
-  app.openapi(updateRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(updateBucket(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
-  });
-  app.openapi(archiveRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(archiveBucket(db, id, { source: "ui" }), 200);
-  });
-  app.openapi(restoreRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(restoreBucket(db, id, { source: "ui" }), 200);
-  });
-  app.openapi(eventRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(createBucketEvent(db, id, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200);
-  });
-  app.openapi(undoRoute, (c) => {
-    const { id, eventId } = c.req.valid("param");
-    return c.json(undoBucketEvent(db, id, eventId, { source: "ui" }), 200);
-  });
-  app.openapi(coverRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(coverBucket(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
-  });
+export function bucketRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(listRoute, (c) => c.json(listBuckets(db, c.req.valid("query")), 200))
+    .openapi(eventsRoute, (c) => c.json(listBucketEvents(db), 200))
+    .openapi(overspentRoute, (c) => c.json(listOverspent(db), 200))
+    .openapi(readRoute, (c) => c.json(readBucket(db, c.req.valid("param").id), 200))
+    .openapi(createRouteDef, (c) =>
+      c.json(createBucket(db, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200),
+    )
+    .openapi(updateRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(updateBucket(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
+    })
+    .openapi(archiveRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(archiveBucket(db, id, { source: "ui" }), 200);
+    })
+    .openapi(restoreRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(restoreBucket(db, id, { source: "ui" }), 200);
+    })
+    .openapi(eventRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(createBucketEvent(db, id, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200);
+    })
+    .openapi(undoRoute, (c) => {
+      const { id, eventId } = c.req.valid("param");
+      return c.json(undoBucketEvent(db, id, eventId, { source: "ui" }), 200);
+    })
+    .openapi(coverRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(coverBucket(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
+    });
 }
+
+export type BucketRoutes = ReturnType<typeof bucketRoutes>;

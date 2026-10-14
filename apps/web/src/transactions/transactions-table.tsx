@@ -13,7 +13,7 @@ import type { Names } from "@/transactions/names";
 import { formatDate, levelLabel, refundOfText, refundedText } from "@/transactions/format";
 import { ReviewCell } from "@/transactions/review-cell";
 import { hasFilters } from "@/transactions/query";
-import { useReviewActions } from "@/transactions/use-review-actions";
+import type { ReviewActions } from "@/transactions/use-review-actions";
 
 type SortColumn = NonNullable<TransactionListQuery["sort"]>;
 type GroupKey = "sure" | "likely" | "maybe" | "questions";
@@ -35,6 +35,8 @@ export type Selection = {
 };
 
 type Props = {
+  /** The review actions of the parent. The parent stays on the screen when the list loads again. */
+  actions: ReviewActions;
   search: TransactionListQuery;
   rows: TransactionListItem[];
   counts: ReviewCounts | null;
@@ -60,9 +62,8 @@ function SortHead({ column, label, props, className }: { column: SortColumn; lab
 }
 
 export function TransactionsTable(props: Props) {
-  const { search, rows, counts, currency, accounts, categories, merchants, showBalance, hideAccount, selection } = props;
+  const { actions, search, rows, counts, currency, accounts, categories, merchants, showBalance, hideAccount, selection } = props;
   const { openEditor } = useEditors();
-  const actions = useReviewActions(search);
   const accountNames = accountLabels(accounts);
   const names: Names = {
     categories: new Map(categories.map((category) => [category.id, category.name])),
@@ -134,7 +135,7 @@ export function TransactionsTable(props: Props) {
           </TableCell>
         ) : null}
         <TableCell>
-          <ReviewCell row={row} currency={currency} names={names} pending={actions.pending} planById={actions.planById} run={actions.run} />
+          <ReviewCell row={row} currency={currency} names={names} actions={actions} />
         </TableCell>
       </TableRow>
     );

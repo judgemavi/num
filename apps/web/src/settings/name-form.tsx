@@ -13,8 +13,10 @@ type NameFormProps = {
   initialName: string;
   inline?: boolean;
   idPrefix?: string;
+  pending: boolean;
+  error: string | null;
   onClose: () => void;
-  onSubmit: (name: string) => Promise<string | null>;
+  onSubmit: (name: string) => void;
 };
 
 export function NameForm({
@@ -26,38 +28,27 @@ export function NameForm({
   initialName,
   inline = false,
   idPrefix = "record-name",
+  pending,
+  error,
   onClose,
   onSubmit,
 }: NameFormProps) {
   const [name, setName] = useState(initialName);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [nameMissing, setNameMissing] = useState(false);
+  const message = nameMissing ? "Enter a name." : error;
 
-  async function submit() {
+  function submit() {
     const trimmed = name.trim();
-    if (trimmed.length === 0) {
-      setError("Enter a name.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const message = await onSubmit(trimmed);
-      if (message) {
-        setError(message);
-        return;
-      }
-      onClose();
-    } catch {
-      setError("The change did not save. Try again.");
-    } finally {
-      setSaving(false);
+    setNameMissing(trimmed.length === 0);
+    if (trimmed.length > 0) {
+      onSubmit(trimmed);
     }
   }
 
   return (
     <>
       <FormHeading inline={inline} title={title} description={description} />
-      <FormShell inline={inline} className="flex flex-col gap-4" onSubmit={() => void submit()}>
+      <FormShell inline={inline} className="flex flex-col gap-4" onSubmit={submit}>
         <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
         <Field>
           <FieldLabel htmlFor={idPrefix}>{label}</FieldLabel>
@@ -68,14 +59,14 @@ export function NameForm({
             onChange={(event) => setName(event.target.value)}
           />
         </Field>
-        {error ? <FieldError>{error}</FieldError> : null}
+        {message ? <FieldError>{message}</FieldError> : null}
         </DialogBody>
         <FormActions inline={inline}>
           <FormCancel inline={inline} onClose={onClose}>
             Cancel
           </FormCancel>
-          <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void submit() : undefined}>
-            {saving ? savingLabel : submitLabel}
+          <Button type={inline ? "button" : "submit"} disabled={pending} onClick={inline ? submit : undefined}>
+            {pending ? savingLabel : submitLabel}
           </Button>
         </FormActions>
       </FormShell>

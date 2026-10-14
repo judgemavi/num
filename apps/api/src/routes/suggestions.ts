@@ -9,9 +9,10 @@ import {
   transferPairListSchema,
   transferPairSchema,
 } from "@num/shared";
-import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { acceptTransferPair, listTransferPairs, suggestForPayee, transferHint } from "../services/suggestions";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -73,18 +74,21 @@ const hintRoute = createRoute({
   },
 });
 
-export function registerSuggestions(app: OpenAPIHono, db: Db) {
-  app.openapi(hintRoute, (c) => {
-    const query = c.req.valid("query");
-    return c.json(transferHint(db, { accountId: query.accountId, date: query.date, amount: query.amount }), 200);
-  });
-  app.openapi(suggestRoute, (c) => {
-    const query = c.req.valid("query");
-    return c.json(suggestForPayee(db, query.accountId, query.payee, query.amount, query.date), 200);
-  });
-  app.openapi(transfersRoute, (c) => c.json(listTransferPairs(db, c.req.valid("query").asOf), 200));
-  app.openapi(pairRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(acceptTransferPair(db, c.req.valid("query").asOf, body.leftId, body.rightId, { source: "ui" }), 200);
-  });
+export function suggestionRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(hintRoute, (c) => {
+      const query = c.req.valid("query");
+      return c.json(transferHint(db, { accountId: query.accountId, date: query.date, amount: query.amount }), 200);
+    })
+    .openapi(suggestRoute, (c) => {
+      const query = c.req.valid("query");
+      return c.json(suggestForPayee(db, query.accountId, query.payee, query.amount, query.date), 200);
+    })
+    .openapi(transfersRoute, (c) => c.json(listTransferPairs(db, c.req.valid("query").asOf), 200))
+    .openapi(pairRoute, (c) => {
+      const body = c.req.valid("json");
+      return c.json(acceptTransferPair(db, c.req.valid("query").asOf, body.leftId, body.rightId, { source: "ui" }), 200);
+    });
 }
+
+export type SuggestionRoutes = ReturnType<typeof suggestionRoutes>;

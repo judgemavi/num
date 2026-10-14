@@ -12,7 +12,7 @@ import {
   transactionSchema,
   transactionWriteSchema,
 } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { approveFiltered } from "../services/review-approve";
@@ -20,6 +20,7 @@ import { listTransactions } from "../services/transaction-list";
 import { linkRefundToPurchase } from "../services/refund-answer";
 import { listRefundPurchases } from "../services/refund-link";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -225,47 +226,44 @@ const deleteRoute = createRoute({
   },
 });
 
-export function registerTransactions(app: OpenAPIHono, db: Db) {
-  app.openapi(approveRoute, (c) => {
-    const { level, count, ...filter } = c.req.valid("json");
-    return c.json(approveFiltered(db, c.req.valid("query").asOf, filter, level, count, { source: "ui" }), 200);
-  });
-  app.openapi(refundPurchasesRoute, (c) => c.json({ items: listRefundPurchases(db, c.req.valid("query")) }, 200));
-  app.openapi(listRoute, (c) => c.json(listTransactions(db, c.req.valid("query")), 200));
-
-  app.openapi(readRoute, (c) => {
-    const { id } = c.req.valid("param");
-    const record = getTransaction(db, id);
-    if (!record) {
-      throw new ServiceError("transaction_not_found", 404);
-    }
-    return c.json(record, 200);
-  });
-
-  app.openapi(createRouteDef, (c) => {
-    const body = c.req.valid("json");
-    return c.json(createTransaction(db, { ...body, source: "ui" }), 200);
-  });
-
-  app.openapi(looksRightRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(acceptLooksRight(db, id, { source: "ui" }), 200);
-  });
-
-  app.openapi(refundOfRoute, (c) => {
-    const { id } = c.req.valid("param");
-    const { purchaseId } = c.req.valid("json");
-    return c.json(linkRefundToPurchase(db, id, purchaseId, { source: "ui" }), 200);
-  });
-
-  app.openapi(updateRoute, (c) => {
-    const body = c.req.valid("json");
-    const { id } = c.req.valid("param");
-    return c.json(updateTransaction(db, id, { ...body, source: "ui" }), 200);
-  });
-
-  app.openapi(deleteRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(deleteTransaction(db, id, { source: "ui" }), 200);
-  });
+export function transactionRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(approveRoute, (c) => {
+      const { level, count, ...filter } = c.req.valid("json");
+      return c.json(approveFiltered(db, c.req.valid("query").asOf, filter, level, count, { source: "ui" }), 200);
+    })
+    .openapi(refundPurchasesRoute, (c) => c.json({ items: listRefundPurchases(db, c.req.valid("query")) }, 200))
+    .openapi(listRoute, (c) => c.json(listTransactions(db, c.req.valid("query")), 200))
+    .openapi(readRoute, (c) => {
+      const { id } = c.req.valid("param");
+      const record = getTransaction(db, id);
+      if (!record) {
+        throw new ServiceError("transaction_not_found", 404);
+      }
+      return c.json(record, 200);
+    })
+    .openapi(createRouteDef, (c) => {
+      const body = c.req.valid("json");
+      return c.json(createTransaction(db, { ...body, source: "ui" }), 200);
+    })
+    .openapi(looksRightRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(acceptLooksRight(db, id, { source: "ui" }), 200);
+    })
+    .openapi(refundOfRoute, (c) => {
+      const { id } = c.req.valid("param");
+      const { purchaseId } = c.req.valid("json");
+      return c.json(linkRefundToPurchase(db, id, purchaseId, { source: "ui" }), 200);
+    })
+    .openapi(updateRoute, (c) => {
+      const body = c.req.valid("json");
+      const { id } = c.req.valid("param");
+      return c.json(updateTransaction(db, id, { ...body, source: "ui" }), 200);
+    })
+    .openapi(deleteRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(deleteTransaction(db, id, { source: "ui" }), 200);
+    });
 }
+
+export type TransactionRoutes = ReturnType<typeof transactionRoutes>;

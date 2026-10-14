@@ -1,22 +1,8 @@
 import { AssignEditor, FundEditor, ImportEditor, MoveEditor, ReconcileEditor } from "@/editors/action-editors";
 import type { EditorInput, EditorKind } from "@/editors/editor-types";
-import {
-  ImportInfoEditor,
-  LinkOccurrenceEditor,
-  MergeEditor,
-  SkipNextEditor,
-  SkipOccurrenceEditor,
-} from "@/editors/more-editors";
-import {
-  AccountRecord,
-  BucketRecord,
-  CategoryRecord,
-  GroupRecord,
-  MerchantRecord,
-  PlanRecord,
-  TagRecord,
-  TransactionRecord,
-} from "@/editors/record-editors";
+import { ImportInfoEditor, LinkOccurrenceEditor, SkipNextEditor, SkipOccurrenceEditor } from "@/editors/more-editors";
+import { AccountRecord, BucketRecord, PlanRecord, TransactionRecord } from "@/editors/record-editors";
+import { CategoryRecord, GroupRecord, MerchantRecord, MergeEditor, TagRecord } from "@/editors/settings-editors";
 
 type BodyProps = {
   kind: EditorKind;

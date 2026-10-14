@@ -1,4 +1,6 @@
-export function categoryError(code: string): string {
+import type { ErrorCode } from "@num/shared";
+
+export function categoryError(code: ErrorCode | undefined): string {
   switch (code) {
     case "category_name_taken":
       return "A category already uses this name.";
@@ -23,7 +25,7 @@ export function categoryError(code: string): string {
   }
 }
 
-export function tagError(code: string): string {
+export function tagError(code: ErrorCode | undefined): string {
   switch (code) {
     case "tag_name_taken":
       return "A tag already uses this name.";
@@ -40,7 +42,7 @@ export function tagError(code: string): string {
   }
 }
 
-export function merchantError(code: string): string {
+export function merchantError(code: ErrorCode | undefined): string {
   switch (code) {
     case "merchant_name_taken":
       return "A merchant already uses this name.";

@@ -1,7 +1,12 @@
-import { accountSchema, currencyUpdateSchema, importDetailSchema, importReviewResultSchema, importUndoSchema, type ImportDetailRow } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ImportDetailRow, ImportUndo } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { accountQuery } from "@/api/accounts";
+import { errorCode } from "@/api/client";
+import { documentPath } from "@/api/documents";
+import { importDetailQuery, useResolveImportRow, useUndoImport } from "@/api/imports";
+import { useDecideItem, useUndoDecision } from "@/api/review";
 import {
   formatImportDate,
   formatImportPeriod,
@@ -14,7 +19,6 @@ import {
   unreadableLabel,
 } from "@/accounts/import-format";
 import { accountLabel } from "@/accounts/label";
-import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
@@ -24,7 +28,6 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
-import { decideItem, undoDecision } from "@/review/actions";
 import { localAsOf } from "@/as-of";
 import { inboxError } from "@/review/format";
 
@@ -32,21 +35,24 @@ const detailRoute = getRouteApi("/accounts_/imports_/$importId");
 
 export function ImportDetailScreen() {
   const { importId } = detailRoute.useParams();
-  const queryClient = useQueryClient();
   const { openEditor, confirm } = useEditors();
   const currency = useBookCurrency();
-  const [error, setError] = useState<string | null>(null);
+  const detail = useQuery(importDetailQuery(importId));
+  const undoImport = useUndoImport();
+  const resolve = useResolveImportRow();
+  const decide = useDecideItem();
+  const undoDecision = useUndoDecision();
+  const importFailure = undoImport.error ?? resolve.error;
+  const reviewFailure = decide.error ?? undoDecision.error;
+  const error = importFailure ? importError(errorCode(importFailure)) : reviewFailure ? inboxError(errorCode(reviewFailure)) : null;
 
-  const detail = useQuery({
-    queryKey: ["import-detail", importId],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/imports/${importId}`, importDetailSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  /** Remove the error of each request. A new action starts with no old message. */
+  function clearErrors() {
+    undoImport.reset();
+    resolve.reset();
+    decide.reset();
+    undoDecision.reset();
+  }
 
   useEffect(() => {
     const id = window.location.hash.replace("#", "");
@@ -56,20 +62,9 @@ export function ImportDetailScreen() {
     document.getElementById(id)?.scrollIntoView({ block: "center" });
   }, [detail.data]);
 
-  const accountId = detail.data?.item.accountId;
-  const account = useQuery({
-    queryKey: ["account", accountId],
-    enabled: Boolean(accountId),
-    queryFn: async () => {
-      const result = await apiRequest(`/api/accounts/${accountId}`, accountSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const account = useQuery(accountQuery(detail.data?.item.accountId ?? null));
 
-  async function undoImport(filename: string) {
+  async function undo(filename: string) {
     const ok = await confirm({
       title: "Undo this import?",
       description: `Remove the transactions from ${filename} that are still unchanged. Matched rows lose their link.`,
@@ -78,42 +73,39 @@ export function ImportDetailScreen() {
     if (!ok) {
       return;
     }
-    const result = await apiRequest(`/api/imports/${importId}/undo`, importUndoSchema, { method: "POST" });
-    if (!result.ok) {
-      setError(importError(result.code));
-      return;
-    }
-    setError(null);
-    await queryClient.invalidateQueries({ queryKey: ["import-detail", importId] });
-    await queryClient.invalidateQueries({ queryKey: ["import-view"] });
-    await queryClient.invalidateQueries({ queryKey: ["imports"] });
-    await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
-    if (result.data.blocked.length > 0) {
-      await confirm({
-        title: "Some rows stayed",
-        description: (
-          <div className="grid gap-3">
-            <p>These rows were edited or reconciled, so this undo left them in place.</p>
-            <ul className="grid max-h-64 gap-3 overflow-y-auto">
-              {result.data.blocked.map((row) => (
-                <li key={row.rowIndex} className="grid gap-1 border-t pt-3 text-sm">
-                  <p className="font-semibold text-foreground">
-                    {formatStatementDate(row.date)} · {row.payeeRaw || "No description"}
-                  </p>
-                  <p>
-                    {currency.data ? <Amount currency={currency.data} minor={row.amount} /> : null} · {undoBlockLabel(row.reason)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ),
-        confirmLabel: "Close",
-        hideCancel: true,
-      });
-    }
+    clearErrors();
+    undoImport.mutate(importId, {
+      onSuccess: (result) => {
+        if (result.blocked.length > 0) {
+          void showBlocked(result.blocked);
+        }
+      },
+    });
+  }
+
+  function showBlocked(blocked: ImportUndo["blocked"]) {
+    return confirm({
+      title: "Some rows stayed",
+      description: (
+        <div className="grid gap-3">
+          <p>These rows were edited or reconciled, so this undo left them in place.</p>
+          <ul className="grid max-h-64 gap-3 overflow-y-auto">
+            {blocked.map((row) => (
+              <li key={row.rowIndex} className="grid gap-1 border-t pt-3 text-sm">
+                <p className="font-semibold text-foreground">
+                  {formatStatementDate(row.date)} · {row.payeeRaw || "No description"}
+                </p>
+                <p>
+                  {currency.data ? <Amount currency={currency.data} minor={row.amount} /> : null} · {undoBlockLabel(row.reason)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ),
+      confirmLabel: "Close",
+      hideCancel: true,
+    });
   }
 
   if (detail.isPending) {
@@ -122,7 +114,7 @@ export function ImportDetailScreen() {
   if (detail.isError || !detail.data) {
     return (
       <div className="grid gap-3">
-        <p>{importError(detail.error instanceof Error ? detail.error.message : "import_not_found")}</p>
+        <p>{importError(errorCode(detail.error))}</p>
         <Button type="button" variant="secondary" asChild>
           <Link to="/accounts/imports" search={{ page: 1, pageSize: 50 }}>
             Back to imports
@@ -144,12 +136,12 @@ export function ImportDetailScreen() {
           <>
             {item.documentId ? (
               <Button type="button" variant="secondary" asChild>
-                <a href={`/api/documents/${item.documentId}`}>Download file</a>
+                <a href={documentPath(item.documentId)}>Download file</a>
               </Button>
             ) : null}
             {item.status === "undone" ? null : (
               <RowMenu label={`Actions for ${filename}`}>
-                <DropdownMenuItem className="min-h-11" onSelect={() => void undoImport(filename)}>
+                <DropdownMenuItem className="min-h-11" onSelect={() => void undo(filename)}>
                   Undo
                 </DropdownMenuItem>
               </RowMenu>
@@ -182,33 +174,14 @@ export function ImportDetailScreen() {
             key={row.id}
             row={row}
             onOpenTransaction={(id) => void openEditor("transaction", { id })}
+            currency={currency.data}
             onMatch={(transactionId) => {
-              void apiRequest(`/api/imports/rows/${row.id}/resolve`, importReviewResultSchema, {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ decision: "match", transactionId }),
-              }).then(async (result) => {
-                if (!result.ok) {
-                  setError(importError(result.code));
-                  return;
-                }
-                setError(null);
-                await queryClient.invalidateQueries({ queryKey: ["import-detail", importId] });
-              });
+              clearErrors();
+              resolve.mutate({ rowId: row.id, body: { decision: "match", transactionId } });
             }}
             onAddNew={() => {
-              void apiRequest(`/api/imports/rows/${row.id}/resolve`, importReviewResultSchema, {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ decision: "create" }),
-              }).then(async (result) => {
-                if (!result.ok) {
-                  setError(importError(result.code));
-                  return;
-                }
-                setError(null);
-                await queryClient.invalidateQueries({ queryKey: ["import-detail", importId] });
-              });
+              clearErrors();
+              resolve.mutate({ rowId: row.id, body: { decision: "create" } });
             }}
           />
         ))}
@@ -225,16 +198,8 @@ export function ImportDetailScreen() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  void undoDecision(`import_unreadable:${importId}:${row.line}`).then(async (result) => {
-                    if (!result.ok) {
-                      setError(inboxError(result.code));
-                      return;
-                    }
-                    setError(null);
-                    await queryClient.invalidateQueries({ queryKey: ["import-detail", importId] });
-                    await queryClient.invalidateQueries({ queryKey: ["import-view"] });
-                    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-                  });
+                  clearErrors();
+                  undoDecision.mutate(`import_unreadable:${importId}:${row.line}`);
                 }}
               >
                 Undo
@@ -256,14 +221,8 @@ export function ImportDetailScreen() {
                   type="button"
                   variant="ghost"
                   onClick={() => {
-                    void decideItem(localAsOf(), `import_unreadable:${importId}:${row.line}`, "not_a_transaction").then(async (result) => {
-                      if (!result.ok) {
-                        setError(inboxError(result.code ?? "internal_error"));
-                        return;
-                      }
-                      setError(null);
-                      await queryClient.invalidateQueries({ queryKey: ["import-detail", importId] });
-                    });
+                    clearErrors();
+                    decide.mutate({ asOf: localAsOf(), itemKey: `import_unreadable:${importId}:${row.line}`, decision: "not_a_transaction" });
                   }}
                 >
                   Not a transaction
@@ -279,11 +238,13 @@ export function ImportDetailScreen() {
 
 function DetailRow({
   row,
+  currency,
   onOpenTransaction,
   onMatch,
   onAddNew,
 }: {
   row: ImportDetailRow;
+  currency: string | undefined;
   onOpenTransaction: (id: string) => void;
   onMatch: (transactionId: string) => void;
   onAddNew: () => void;
@@ -309,7 +270,7 @@ function DetailRow({
           </Button>
         </span>
       ) : null}
-      <RowAmount row={row} />
+      {currency ? <Amount currency={currency} minor={row.amount} /> : null}
     </ListRow>
   );
 }
@@ -335,21 +296,4 @@ function RowLinks({ row, onOpenTransaction }: { row: ImportDetailRow; onOpenTran
     );
   }
   return null;
-}
-
-function RowAmount({ row }: { row: ImportDetailRow }) {
-  const currency = useQuery({
-    queryKey: ["book-currency"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/settings/currency", currencyUpdateSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.currency;
-    },
-  });
-  if (!currency.data) {
-    return null;
-  }
-  return <Amount currency={currency.data} minor={row.amount} />;
 }

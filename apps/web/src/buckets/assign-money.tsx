@@ -1,7 +1,7 @@
-import { bucketEventSchema, toMinorUnits, type Bucket, type BucketEventKind } from "@num/shared";
+import { toMinorUnits, type Bucket, type BucketEventKind } from "@num/shared";
 import { useState, type FormEvent } from "react";
-import { bucketError, today } from "@/buckets/format";
-import { apiRequest } from "@/request";
+import { useAddBucketEvent } from "@/api/buckets";
+import { requestError, today } from "@/buckets/format";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
@@ -34,50 +34,33 @@ export function AssignMoney({ currency, bucket, kind, onSaved }: AssignMoneyProp
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today());
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const save = useAddBucketEvent();
   const labels = copy[kind];
+  const error = invalid ?? (save.error ? requestError(save.error, "The money did not move. Try again.") : null);
 
-  async function onSubmit(event: FormEvent) {
+  function onSubmit(event: FormEvent) {
     event.preventDefault();
     let minor = 0;
     try {
       minor = toMinorUnits(currency, amount.trim());
     } catch {
-      setError("Enter the amount as a number.");
+      setInvalid("Enter the amount as a number.");
       return;
     }
     if (minor < 1) {
-      setError("Enter an amount greater than zero.");
+      setInvalid("Enter an amount greater than zero.");
       return;
     }
-    setSaving(true);
-    try {
-      const params = new URLSearchParams({ asOf: today() });
-      const result = await apiRequest(`/api/buckets/${bucket.id}/events?${params.toString()}`, bucketEventSchema, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          kind,
-          amount: minor,
-          date,
-          note: note.trim() === "" ? null : note.trim(),
-        }),
-      });
-      if (!result.ok) {
-        setError(bucketError(result.code));
-        return;
-      }
-      onSaved();
-    } catch {
-      setError("The money did not move. Try again.");
-    } finally {
-      setSaving(false);
-    }
+    setInvalid(null);
+    save.mutate(
+      { bucketId: bucket.id, asOf: today(), body: { kind, amount: minor, date, note: note.trim() === "" ? null : note.trim() } },
+      { onSuccess: onSaved },
+    );
   }
 
   return (
-    <DialogForm onSubmit={(event) => void onSubmit(event)}>
+    <DialogForm onSubmit={onSubmit}>
       <DialogHeader>
         <DialogTitle>{labels.title}</DialogTitle>
         <DialogDescription>
@@ -105,7 +88,7 @@ export function AssignMoney({ currency, bucket, kind, onSaved }: AssignMoneyProp
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={save.isPending}>
           {labels.action}
         </Button>
       </DialogFooter>

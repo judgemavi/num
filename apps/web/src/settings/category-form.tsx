@@ -1,24 +1,21 @@
 import {
-  bucketSchema,
   bucketWriteSchema,
-  categoryCreateSchema,
   categoryKinds,
-  categorySchema,
-  categoryGroupSchema,
   categoryUpdateSchema,
   type Category,
   type CategoryGroup,
   type CategoryKind,
 } from "@num/shared";
-import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useUpdateBucket } from "@/api/buckets";
+import { useSaveCategory, useSaveGroup } from "@/api/categories";
+import { errorCode } from "@/api/client";
 import { useActiveBuckets } from "@/editors/lookups";
 import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { categoryError } from "@/settings/format";
 import { NameForm } from "@/settings/name-form";
 import { OptionCombobox } from "@/transactions/option-combobox";
-import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
@@ -43,7 +40,6 @@ function isKind(value: string): value is CategoryKind {
 }
 
 export function CategoryForm({ category, groups, initialName, initialKind, inline = false, depth = 0, onClose, onSaved }: CategoryFormProps) {
-  const queryClient = useQueryClient();
   const buckets = useActiveBuckets();
   const [name, setName] = useState(category?.name ?? initialName ?? "");
   const [kind, setKind] = useState<CategoryKind>(category?.kind ?? initialKind ?? "expense");
@@ -51,8 +47,11 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
   const [extraGroups, setExtraGroups] = useState<CategoryGroup[]>([]);
   const [essential, setEssential] = useState(category?.essential ?? false);
   const [bucketId, setBucketId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [invalid, setInvalid] = useState(false);
+  const save = useSaveCategory();
+  const saveGroup = useSaveGroup();
+  const addToBucket = useUpdateBucket();
+  const pending = save.isPending || addToBucket.isPending;
   const fieldId = inline ? `category-${depth}` : "category";
   const expense = kind === "expense";
   const groupOptions = [...groups, ...extraGroups.filter((group) => !groups.some((item) => item.id === group.id))].map((group) => ({
@@ -60,54 +59,40 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
     label: group.name,
   }));
 
-  async function submit() {
-    const body = {
+  function errorText(): string | null {
+    if (invalid) {
+      return "Check the fields.";
+    }
+    if (addToBucket.isError) {
+      return "The category was saved. The bucket did not update.";
+    }
+    return save.error ? categoryError(errorCode(save.error)) : null;
+  }
+
+  function addCategoryToBucket(categoryId: string) {
+    const bucket = category || !bucketId ? undefined : buckets.data?.items.find((item) => item.id === bucketId);
+    const body = bucket ? bucketWriteSchema.safeParse({ ...bucket, categoryIds: [...bucket.categoryIds, categoryId] }) : undefined;
+    if (!bucket || !body?.success) {
+      onSaved(categoryId);
+      return;
+    }
+    addToBucket.mutate({ id: bucket.id, body: body.data }, { onSettled: () => onSaved(categoryId) });
+  }
+
+  function submit() {
+    const parsed = categoryUpdateSchema.safeParse({
       name,
       kind,
       groupId: groupId === noGroup ? null : groupId,
       essential: expense ? essential : false,
-    };
-    const parsed = (category ? categoryUpdateSchema : categoryCreateSchema).safeParse(body);
-    if (!parsed.success) {
-      setError("Check the fields.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const result = await apiRequest(category ? `/api/categories/${category.id}` : "/api/categories", categorySchema, {
-        method: category ? "PATCH" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(parsed.data),
-      });
-      if (!result.ok) {
-        setError(categoryError(result.code));
-        return;
-      }
-      if (!category && bucketId) {
-        const bucket = buckets.data?.items.find((item) => item.id === bucketId);
-        if (bucket) {
-          const body = bucketWriteSchema.safeParse({ ...bucket, categoryIds: [...bucket.categoryIds, result.data.id] });
-          if (body.success) {
-            const added = await apiRequest(`/api/buckets/${bucket.id}`, bucketSchema, {
-              method: "PATCH",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify(body.data),
-            });
-            if (!added.ok) {
-              setError("The category was saved. The bucket did not update.");
-              onSaved(result.data.id);
-              return;
-            }
-          }
-        }
-      }
-      onSaved(result.data.id);
-    } catch {
-      setError("The change did not save. Try again.");
-    } finally {
-      setSaving(false);
+    });
+    setInvalid(!parsed.success);
+    if (parsed.success) {
+      save.mutate({ id: category?.id ?? null, body: parsed.data }, { onSuccess: (saved) => addCategoryToBucket(saved.id) });
     }
   }
+
+  const error = errorText();
 
   return (
     <>
@@ -118,7 +103,7 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
           category ? "Change the name, the kind, the group, or whether it is essential." : "Add a category for income or expenses."
         }
       />
-      <FormShell inline={inline} className="flex flex-col gap-4" onSubmit={() => void submit()}>
+      <FormShell inline={inline} className="flex flex-col gap-4" onSubmit={submit}>
         <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
         <Field>
           <FieldLabel htmlFor={`${fieldId}-name`}>Name</FieldLabel>
@@ -158,9 +143,7 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
             noun="group"
             depth={depth}
             onChange={(id) => setGroupId(id ?? noGroup)}
-            renderForm={(typed, finish) => {
-              let createdGroup: string | null = null;
-              return (
+            renderForm={(typed, finish) => (
               <NameForm
                 inline
                 idPrefix={`${fieldId}-group-name`}
@@ -170,24 +153,22 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
                 submitLabel="Add group"
                 savingLabel="Saving group"
                 initialName={typed}
-                onClose={() => finish(createdGroup)}
-                onSubmit={async (groupName) => {
-                  const result = await apiRequest("/api/category-groups", categoryGroupSchema, {
-                    method: "POST",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ name: groupName }),
-                  });
-                  if (!result.ok) {
-                    return categoryError(result.code);
-                  }
-                  createdGroup = result.data.id;
-                  setExtraGroups((current) => [...current, { id: result.data.id, name: groupName }]);
-                  await queryClient.invalidateQueries({ queryKey: ["category-groups"] });
-                  return null;
-                }}
+                pending={saveGroup.isPending}
+                error={saveGroup.error ? categoryError(errorCode(saveGroup.error)) : null}
+                onClose={() => finish(null)}
+                onSubmit={(groupName) =>
+                  saveGroup.mutate(
+                    { id: null, name: groupName },
+                    {
+                      onSuccess: (group) => {
+                        setExtraGroups((current) => [...current, group]);
+                        finish(group.id);
+                      },
+                    },
+                  )
+                }
               />
-              );
-            }}
+            )}
           />
         </Field>
         {!category && expense ? (
@@ -222,8 +203,8 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
           <FormCancel inline={inline} onClose={onClose}>
             Cancel
           </FormCancel>
-          <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void submit() : undefined}>
-            {saving ? "Saving category" : "Save category"}
+          <Button type={inline ? "button" : "submit"} disabled={pending} onClick={inline ? submit : undefined}>
+            {pending ? "Saving category" : "Save category"}
           </Button>
         </FormActions>
       </FormShell>

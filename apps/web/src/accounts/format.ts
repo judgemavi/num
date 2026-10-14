@@ -70,7 +70,7 @@ export function accountDetail(account: Account): string | null {
   return null;
 }
 
-export function accountError(code: string): string {
+export function accountError(code: string | undefined): string {
   switch (code) {
     case "kind_class_mismatch":
       return "Choose a kind in the same group.";

@@ -1,13 +1,12 @@
-import { accountListSchema, importViewListSchema, type ImportViewItem, type ImportViewQuery, type ImportViewStatus } from "@num/shared";
+import type { ImportViewItem, ImportViewQuery, ImportViewStatus } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useCallback, useEffect } from "react";
 import { ImportFilterBar } from "@/accounts/import-filters";
 import { accountLabelOf, accountLabels } from "@/accounts/label";
 import { formatImportDate, formatImportPeriod, importCountText, importStatusLabel } from "@/accounts/import-format";
-import { importViewPath } from "@/accounts/import-query";
-import { apiRequest } from "@/request";
-import { loadAllPages } from "@/settings/load-all-pages";
+import { activeAccountsQuery } from "@/api/accounts";
+import { importViewQuery } from "@/api/imports";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListCard, ListRow, listName } from "@/components/list-card";
@@ -29,21 +28,8 @@ export function ImportViewScreen() {
   const search = importsRoute.useSearch();
   const navigate = importsRoute.useNavigate();
 
-  const accounts = useQuery({
-    queryKey: ["accounts", "import-view"],
-    queryFn: () => loadAllPages("/api/accounts", accountListSchema, { archived: false, sort: "name", dir: "asc" }),
-  });
-
-  const imports = useQuery({
-    queryKey: ["import-view", search],
-    queryFn: async () => {
-      const result = await apiRequest(importViewPath(search), importViewListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const accounts = useQuery(activeAccountsQuery());
+  const imports = useQuery(importViewQuery(search));
 
   const changeFilters = useCallback(
     (patch: Partial<ImportViewQuery>) => {

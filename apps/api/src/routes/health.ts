@@ -1,10 +1,11 @@
-import { createRoute, z } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { validationHook } from "../validation";
 
 const healthSchema = z.object({
   ok: z.literal(true),
 });
 
-export const healthRoute = createRoute({
+const healthRoute = createRoute({
   operationId: "get_health",
   description: "Check that the API is running. This does not read or change the books. Amounts are integer minor units. Money that enters the account is positive.",
   method: "get",
@@ -20,3 +21,9 @@ export const healthRoute = createRoute({
     },
   },
 });
+
+export function healthRoutes() {
+  return new OpenAPIHono({ defaultHook: validationHook }).openapi(healthRoute, (c) => c.json({ ok: true as const }, 200));
+}
+
+export type HealthRoutes = ReturnType<typeof healthRoutes>;

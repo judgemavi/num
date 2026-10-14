@@ -1,7 +1,5 @@
 import {
-  bucketSchema,
   bucketWriteSchema,
-  categoryListSchema,
   fromMinorUnits,
   toMinorUnits,
   type Bucket,
@@ -15,10 +13,9 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { BucketPickers } from "@/buckets/bucket-pickers";
-import { bucketError, today } from "@/buckets/format";
-import { loadBuckets } from "@/buckets/query";
-import { apiRequest } from "@/request";
-import { loadAllPages } from "@/settings/load-all-pages";
+import { requestError, today } from "@/buckets/format";
+import { bucketOptionsQuery, useCreateBucket, useUpdateBucket } from "@/api/buckets";
+import { categoryOptionsQuery } from "@/api/categories";
 import { ChoiceCard } from "@/components/choice-card";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -81,37 +78,27 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
   const [priority, setPriority] = useState(String(current?.priority ?? suggestedPriority));
   const [essential, setEssential] = useState(current?.essential ?? false);
   const [more, setMore] = useState(Boolean(current?.essential));
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const create = useCreateBucket();
+  const update = useUpdateBucket();
+  const failure = create.error ?? update.error;
+  const error = invalid ?? (failure ? requestError(failure, "The bucket did not save. Try again.") : null);
+  const saving = create.isPending || update.isPending;
 
-  const categories = useQuery({
-    queryKey: ["categories", "expense-active"],
-    queryFn: () => loadAllPages("/api/categories", categoryListSchema, { archived: false }),
-  });
-  const archivedCategories = useQuery({
-    queryKey: ["categories", "expense-archived"],
-    queryFn: () => loadAllPages("/api/categories", categoryListSchema, { archived: true }),
-  });
-  const used = useQuery({
-    queryKey: ["buckets", "category-map"],
-    queryFn: async () => {
-      const active = await loadBuckets({ archived: false });
-      const archived = await loadBuckets({ archived: true });
-      return [...active.items, ...archived.items];
-    },
-  });
+  const categories = useQuery(categoryOptionsQuery());
+  const used = useQuery(bucketOptionsQuery());
 
   const taken = new Set(
     (used.data ?? [])
       .filter((bucket) => bucket.id !== current?.id)
       .flatMap((bucket) => bucket.categoryIds),
   );
-  const expense = [...(categories.data?.items ?? []), ...(archivedCategories.data?.items ?? [])].filter(
+  const expense = (categories.data ?? []).filter(
     (category) => category.kind === "expense" && (!category.archivedAt || categoryIds.includes(category.id)),
   );
   const choices = expense.filter((category) => !taken.has(category.id) || categoryIds.includes(category.id));
 
-  async function onSubmit(event: FormEvent) {
+  function onSubmit(event: FormEvent) {
     event.preventDefault();
     let body;
     try {
@@ -134,36 +121,25 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
         fixedAmount: kind === "goal" && goalMode === "paycheck" ? readMoney(currency, fixedAmount) : null,
       };
     } catch {
-      setError("Enter amounts as numbers.");
+      setInvalid("Enter amounts as numbers.");
       return;
     }
     const parsed = bucketWriteSchema.safeParse(body);
     if (!parsed.success) {
-      setError("Check the bucket fields.");
+      setInvalid("Check the bucket fields.");
       return;
     }
-    setSaving(true);
-    try {
-      const path = current ? `/api/buckets/${current.id}` : `/api/buckets?${new URLSearchParams({ asOf: today() })}`;
-      const result = await apiRequest(path, bucketSchema, {
-        method: current ? "PATCH" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(parsed.data),
-      });
-      if (!result.ok) {
-        setError(bucketError(result.code));
-        return;
-      }
-      onSaved(result.data.id);
-    } catch {
-      setError("The bucket did not save. Try again.");
-    } finally {
-      setSaving(false);
+    setInvalid(null);
+    const done = { onSuccess: (saved: { id: string }) => onSaved(saved.id) };
+    if (current) {
+      update.mutate({ id: current.id, body: parsed.data }, done);
+    } else {
+      create.mutate({ asOf: today(), body: parsed.data }, done);
     }
   }
 
   return (
-    <DialogForm onSubmit={(event) => void onSubmit(event)}>
+    <DialogForm onSubmit={onSubmit}>
       <DialogHeader>
         <DialogTitle>{current ? "Edit bucket" : "New bucket"}</DialogTitle>
         <DialogDescription>A bucket keeps money for one purpose. The balance carries over.</DialogDescription>

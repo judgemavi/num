@@ -1,7 +1,8 @@
 import { asOfQuerySchema, errorSchema, hygieneSchema } from "@num/shared";
-import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { readHygiene } from "../services/hygiene";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -23,6 +24,9 @@ const hygieneRoute = createRoute({
   },
 });
 
-export function registerHygiene(app: OpenAPIHono, db: Db) {
-  app.openapi(hygieneRoute, (c) => c.json(readHygiene(db, c.req.valid("query").asOf), 200));
+export function hygieneRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(hygieneRoute, (c) => c.json(readHygiene(db, c.req.valid("query").asOf), 200));
 }
+
+export type HygieneRoutes = ReturnType<typeof hygieneRoutes>;

@@ -1,11 +1,9 @@
-import { categoryGroupDeleteSchema, categoryGroupListSchema, categoryListSchema, type CategoryGroup } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { categoryOptionsQuery, groupListQuery, useDeleteGroup } from "@/api/categories";
+import { errorCode } from "@/api/client";
 import { useEditors } from "@/editors/editor-api";
 import { categoryError } from "@/settings/format";
-import { loadAllPages } from "@/settings/load-all-pages";
 import { SettingsBack } from "@/settings/settings-nav";
-import { apiRequest } from "@/request";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
@@ -17,44 +15,10 @@ function countLabel(count: number) {
 }
 
 export function GroupsPage() {
-  const queryClient = useQueryClient();
   const { openEditor, confirm } = useEditors();
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const groups = useQuery({
-    queryKey: ["category-groups"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/category-groups", categoryGroupListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
-
-  const categories = useQuery({
-    queryKey: ["categories", "counts"],
-    queryFn: async () => {
-      const active = await loadAllPages("/api/categories", categoryListSchema, { archived: false });
-      const archived = await loadAllPages("/api/categories", categoryListSchema, { archived: true });
-      return { items: [...active.items, ...archived.items] };
-    },
-  });
-
-  async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: ["category-groups"] });
-    await queryClient.invalidateQueries({ queryKey: ["categories"] });
-  }
-
-  async function deleteGroup(group: CategoryGroup) {
-    const result = await apiRequest(`/api/category-groups/${group.id}`, categoryGroupDeleteSchema, { method: "DELETE" });
-    if (!result.ok) {
-      setActionError(categoryError(result.code));
-      return;
-    }
-    setActionError(null);
-    await refresh();
-  }
+  const groups = useQuery(groupListQuery());
+  const categories = useQuery(categoryOptionsQuery());
+  const deleteGroup = useDeleteGroup();
 
   if (groups.isPending || categories.isPending) {
     return <p className="text-muted-foreground">Loading groups.</p>;
@@ -78,7 +42,7 @@ export function GroupsPage() {
 
   const rows = groups.data ?? [];
   const counts = new Map<string, number>();
-  for (const category of categories.data?.items ?? []) {
+  for (const category of categories.data ?? []) {
     if (!category.groupId) {
       continue;
     }
@@ -97,9 +61,9 @@ export function GroupsPage() {
           </Button>
         }
       />
-      {actionError ? (
+      {deleteGroup.error ? (
         <p role="alert" className="text-sm text-attn">
-          {actionError}
+          {categoryError(errorCode(deleteGroup.error))}
         </p>
       ) : null}
       <ListCard label="Groups">
@@ -122,7 +86,7 @@ export function GroupsPage() {
                       confirmLabel: "Delete group",
                     }).then((ok) => {
                       if (ok) {
-                        void deleteGroup(group);
+                        deleteGroup.mutate(group.id);
                       }
                     });
                   }}

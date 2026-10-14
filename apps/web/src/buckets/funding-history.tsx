@@ -1,9 +1,9 @@
-import { fundingRunListSchema, fundingRunSchema, type FundingRun } from "@num/shared";
+import type { FundingRun } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { errorCode } from "@/api/client";
+import { fundingRunsQuery, useUndoFundingRun } from "@/api/funding";
 import { bucketError, formatDate } from "@/buckets/format";
 import { useEditors } from "@/editors/editor-api";
-import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
@@ -12,22 +12,12 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 type FundingHistoryProps = {
   currency: string;
-  onDone: () => void;
 };
 
-export function FundingHistory({ currency, onDone }: FundingHistoryProps) {
+export function FundingHistory({ currency }: FundingHistoryProps) {
   const { confirm } = useEditors();
-  const [error, setError] = useState<string | null>(null);
-  const runs = useQuery({
-    queryKey: ["funding-runs"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/funding/runs", fundingRunListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
+  const runs = useQuery(fundingRunsQuery());
+  const undoRun = useUndoFundingRun();
 
   async function undo(run: FundingRun) {
     const ok = await confirm({
@@ -35,17 +25,9 @@ export function FundingHistory({ currency, onDone }: FundingHistoryProps) {
       description: "The money returns to Unassigned. The funding record stays.",
       confirmLabel: "Undo",
     });
-    if (!ok) {
-      return;
+    if (ok) {
+      undoRun.mutate(run.id);
     }
-    const result = await apiRequest(`/api/funding/runs/${run.id}/undo`, fundingRunSchema, { method: "POST" });
-    if (!result.ok) {
-      setError(bucketError(result.code));
-      return;
-    }
-    setError(null);
-    await runs.refetch();
-    onDone();
   }
 
   if (runs.isPending) {
@@ -64,9 +46,9 @@ export function FundingHistory({ currency, onDone }: FundingHistoryProps) {
 
   return (
     <>
-      {error ? (
+      {undoRun.error ? (
         <p role="alert" className="text-sm text-attn">
-          {error}
+          {bucketError(errorCode(undoRun.error))}
         </p>
       ) : null}
       <ListCard label="Funding history">

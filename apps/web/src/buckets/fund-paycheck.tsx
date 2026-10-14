@@ -1,16 +1,9 @@
-import {
-  type ErrorCode,
-  fromMinorUnits,
-  fundingPaycheckListSchema,
-  fundingProposalSchema,
-  fundingRunSchema,
-  toMinorUnits,
-  type FundingProposal,
-} from "@num/shared";
+import { fromMinorUnits, toMinorUnits, type FundingProposal, type FundingRunCreate } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
-import { bucketError, formatDate } from "@/buckets/format";
-import { apiRequest } from "@/request";
+import { errorCode } from "@/api/client";
+import { fundingPaychecksQuery, fundingProposalQuery, useFundPaycheck } from "@/api/funding";
+import { bucketError, formatDate, requestError } from "@/buckets/format";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -28,29 +21,11 @@ type FundPaycheckProps = {
 
 export function FundPaycheck({ currency, asOf, incomeTransactionId, onSaved }: FundPaycheckProps) {
   const [chosen, setChosen] = useState<string | null>(null);
-  const paychecks = useQuery({
-    queryKey: ["funding-paychecks"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/funding/paychecks", fundingPaycheckListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
+  const fund = useFundPaycheck();
+  const paychecks = useQuery(fundingPaychecksQuery());
   const selected = chosen ?? incomeTransactionId ?? paychecks.data?.[0]?.incomeTransactionId ?? null;
-  const proposal = useQuery({
-    queryKey: ["funding-proposal", selected, asOf],
-    enabled: selected !== null,
-    queryFn: async () => {
-      const params = new URLSearchParams({ asOf, incomeTransactionId: selected ?? "" });
-      const result = await apiRequest(`/api/funding/proposal?${params.toString()}`, fundingProposalSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  // The proposal of a funded paycheck gives an error. Thus this read stops when the funding starts.
+  const proposal = useQuery(fundingProposalQuery(selected, asOf, fund.isIdle || fund.isError));
 
   const status = (
     <>
@@ -67,7 +42,13 @@ export function FundPaycheck({ currency, asOf, incomeTransactionId, onSaved }: F
       {paychecks.data && paychecks.data.length > 1 ? (
         <Field>
           <FieldLabel htmlFor="fund-paycheck">Paycheck</FieldLabel>
-          <Select value={selected ?? undefined} onValueChange={setChosen}>
+          <Select
+            value={selected ?? undefined}
+            onValueChange={(value) => {
+              fund.reset();
+              setChosen(value);
+            }}
+          >
             <SelectTrigger id="fund-paycheck" className="w-full">
               <SelectValue placeholder="Choose a paycheck" />
             </SelectTrigger>
@@ -84,7 +65,7 @@ export function FundPaycheck({ currency, asOf, incomeTransactionId, onSaved }: F
       {proposal.isPending && selected ? <p className="text-muted-foreground">Loading the proposal.</p> : null}
       {proposal.isError ? (
         <div className="grid gap-3">
-          <p>{proposal.error instanceof Error ? bucketError(proposal.error.message as ErrorCode) : "The proposal did not load."}</p>
+          <p>{bucketError(errorCode(proposal.error))}</p>
           <Button type="button" onClick={() => void proposal.refetch()}>
             Try again
           </Button>
@@ -104,9 +85,10 @@ export function FundPaycheck({ currency, asOf, incomeTransactionId, onSaved }: F
           key={`${proposal.data.incomeTransactionId}:${proposal.data.lines.map((line) => line.amount).join(",")}`}
           leading={status}
           currency={currency}
-          asOf={asOf}
           proposal={proposal.data}
-          onSaved={onSaved}
+          pending={fund.isPending}
+          failure={fund.error}
+          onFund={(lines) => fund.mutate({ asOf, body: { incomeTransactionId: proposal.data.incomeTransactionId, lines } }, { onSuccess: onSaved })}
         />
       ) : (
         <DialogPanel>
@@ -127,15 +109,17 @@ export function FundPaycheck({ currency, asOf, incomeTransactionId, onSaved }: F
 function ProposalForm({
   leading,
   currency,
-  asOf,
   proposal,
-  onSaved,
+  pending,
+  failure,
+  onFund,
 }: {
   leading: ReactNode;
   currency: string;
-  asOf: string;
   proposal: FundingProposal;
-  onSaved: () => void;
+  pending: boolean;
+  failure: Error | null;
+  onFund: (lines: FundingRunCreate["lines"]) => void;
 }) {
   const [amounts, setAmounts] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -144,10 +128,10 @@ function ProposalForm({
     }
     return initial;
   });
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const error = invalid ?? (failure ? requestError(failure, "The paycheck was not funded. Try again.") : null);
 
-  async function onSubmit(event: FormEvent) {
+  function onSubmit(event: FormEvent) {
     event.preventDefault();
     const lines = [];
     let sum = 0;
@@ -160,11 +144,11 @@ function ProposalForm({
       try {
         minor = toMinorUnits(currency, text);
       } catch {
-        setError("Enter each amount as a number.");
+        setInvalid("Enter each amount as a number.");
         return;
       }
       if (minor < 0) {
-        setError("Enter an amount of zero or more.");
+        setInvalid("Enter an amount of zero or more.");
         return;
       }
       if (minor === 0) {
@@ -174,35 +158,19 @@ function ProposalForm({
       sum += minor;
     }
     if (lines.length === 0) {
-      setError("Enter an amount for at least one bucket.");
+      setInvalid("Enter an amount for at least one bucket.");
       return;
     }
     if (sum > proposal.limit) {
-      setError("That is more than this paycheck can assign.");
+      setInvalid("That is more than this paycheck can assign.");
       return;
     }
-    setSaving(true);
-    try {
-      const params = new URLSearchParams({ asOf });
-      const result = await apiRequest(`/api/funding/runs?${params.toString()}`, fundingRunSchema, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ incomeTransactionId: proposal.incomeTransactionId, lines }),
-      });
-      if (!result.ok) {
-        setError(bucketError(result.code));
-        return;
-      }
-      onSaved();
-    } catch {
-      setError("The paycheck was not funded. Try again.");
-    } finally {
-      setSaving(false);
-    }
+    setInvalid(null);
+    onFund(lines);
   }
 
   return (
-    <DialogForm onSubmit={(event) => void onSubmit(event)}>
+    <DialogForm onSubmit={onSubmit}>
       <DialogBody>
       {leading}
       <p className="text-sm text-muted-foreground">
@@ -228,7 +196,7 @@ function ProposalForm({
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" disabled={saving || proposal.lines.length === 0}>
+        <Button type="submit" disabled={pending || proposal.lines.length === 0}>
           Fund this paycheck
         </Button>
       </DialogFooter>

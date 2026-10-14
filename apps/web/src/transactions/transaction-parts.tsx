@@ -2,8 +2,10 @@ import type { Account, AutoReason, Category, Merchant, MoneyDirection, Tag, Tran
 import { ChevronRight, Ellipsis } from "lucide-react";
 import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
-import { InlineNamed } from "@/editors/inline-records";
-import { useRestoreNamed } from "@/editors/restore-named";
+import { useArchiveAccount } from "@/api/accounts";
+import { useArchiveTag } from "@/api/tags";
+import type { useDeleteTransaction, useSaveTransaction } from "@/api/transactions";
+import { InlineAccount, InlineTag } from "@/editors/inline-records";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,7 +22,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { InlineAccount } from "@/editors/inline-records";
 import { automaticReasonText } from "@/transactions/format";
 import { type Option } from "@/transactions/option-combobox";
 
@@ -51,7 +52,7 @@ export function MoneySection({
   date: string;
   onDate: (date: string) => void;
 }) {
-  const restoreNamed = useRestoreNamed();
+  const archiveAccount = useArchiveAccount();
   return (
     <>
       <Field>
@@ -86,13 +87,7 @@ export function MoneySection({
             disabled={accountLocked || (accountOptions.length === 0 && archivedAccounts.length === 0)}
             noun="account"
             archived={archivedAccounts}
-            onRestore={(id) => {
-              void restoreNamed(`/api/accounts/${id}/restore`).then((restored) => {
-                if (restored) {
-                  onAccount(restored);
-                }
-              });
-            }}
+            onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => onAccount(restored.id) })}
             onChange={(id) => {
               if (id) {
                 onAccount(id);
@@ -139,7 +134,7 @@ export function MoreDetails({
   onCleared: (cleared: boolean) => void;
   clearedLocked: boolean;
 }) {
-  const restoreNamed = useRestoreNamed();
+  const archiveTag = useArchiveTag();
   const [created, setCreated] = useState<Tag[]>([]);
   const allTags = [...tags, ...created.filter((tag) => !tags.some((item) => item.id === tag.id))];
   const selected = allTags.filter((tag) => tagIds.includes(tag.id));
@@ -166,25 +161,15 @@ export function MoreDetails({
             placeholder="Add a tag"
             noun="tag"
             archived={allTags.filter((tag) => tag.archivedAt).map((tag) => ({ id: tag.id, label: tag.name }))}
-            onRestore={(id) => {
-              void restoreNamed(`/api/tags/${id}/restore`).then((restored) => {
-                if (restored) {
-                  onTags([...tagIds, restored]);
-                }
-              });
-            }}
+            onRestore={(id) => archiveTag.mutate({ id, restore: true }, { onSuccess: (restored) => onTags([...tagIds, restored.id]) })}
             onChange={(tagId) => {
               if (tagId) {
                 onTags([...tagIds, tagId]);
               }
             }}
             renderForm={(name, finish) => (
-              <InlineNamed
-                noun="tag"
-                title="New tag"
-                description="Use a tag for a trip or a project."
+              <InlineTag
                 name={name}
-                path="/api/tags"
                 idPrefix="inline-tag-name"
                 onDone={(id) => {
                   if (id) {
@@ -271,10 +256,10 @@ export type TransactionFormProps = {
   unreadableItemKey?: string;
   onClose: () => void;
   onSaved: (id: string) => void;
-  onDelete: () => Promise<string | null>;
+  save: ReturnType<typeof useSaveTransaction>;
+  remove: ReturnType<typeof useDeleteTransaction>;
   deleteKind?: "plain" | "mirror" | "linked";
   decisions?: { itemKey: string; text: string }[];
-  onUndoDecision?: (itemKey: string) => Promise<{ ok: boolean; code?: string }>;
 };
 
 export function AutomaticReason({

@@ -10,10 +10,11 @@ import {
   payeeCountQuerySchema,
   payeeCountSchema,
 } from "@num/shared";
-import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { decideInboxItem, decisionRows, undoInboxDecision } from "../services/inbox-decisions";
 import { applyInboxGroup, countOtherUncategorized } from "../services/inbox-group";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -94,16 +95,19 @@ function exceptIds(except: string | undefined): string[] {
   return except.split(",").map((id) => id.trim()).filter((id) => id.length > 0);
 }
 
-export function registerInbox(app: OpenAPIHono, db: Db) {
-  app.openapi(groupRoute, (c) => c.json(applyInboxGroup(db, { ...c.req.valid("json"), source: "ui" }), 200));
-  app.openapi(payeeCountRoute, (c) => {
-    const query = c.req.valid("query");
-    return c.json({ count: countOtherUncategorized(db, query.payee, query.accountId, exceptIds(query.except)) }, 200);
-  });
-  app.openapi(decisionsRoute, (c) => c.json({ items: decisionRows(db) }, 200));
-  app.openapi(decideRoute, (c) => {
-    const body = c.req.valid("json");
-    return c.json(decideInboxItem(db, c.req.valid("query").asOf, body.itemKey, body.decision, { source: "ui" }), 200);
-  });
-  app.openapi(undoRoute, (c) => c.json(undoInboxDecision(db, c.req.valid("json").itemKey, { source: "ui" }), 200));
+export function inboxRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(groupRoute, (c) => c.json(applyInboxGroup(db, { ...c.req.valid("json"), source: "ui" }), 200))
+    .openapi(payeeCountRoute, (c) => {
+      const query = c.req.valid("query");
+      return c.json({ count: countOtherUncategorized(db, query.payee, query.accountId, exceptIds(query.except)) }, 200);
+    })
+    .openapi(decisionsRoute, (c) => c.json({ items: decisionRows(db) }, 200))
+    .openapi(decideRoute, (c) => {
+      const body = c.req.valid("json");
+      return c.json(decideInboxItem(db, c.req.valid("query").asOf, body.itemKey, body.decision, { source: "ui" }), 200);
+    })
+    .openapi(undoRoute, (c) => c.json(undoInboxDecision(db, c.req.valid("json").itemKey, { source: "ui" }), 200));
 }
+
+export type InboxRoutes = ReturnType<typeof inboxRoutes>;

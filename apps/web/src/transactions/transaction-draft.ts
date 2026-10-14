@@ -4,9 +4,7 @@ import {
   moneyDirection,
   resolveEditorChoice,
   signedAmount,
-  suggestionSchema,
   toMinorUnits,
-  transferHintSchema,
   type Category,
   type MoneyDirection,
   type Suggestion,
@@ -16,7 +14,7 @@ import {
 } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { apiRequest } from "@/request";
+import { suggestionQuery, transferHintQuery } from "@/api/suggestions";
 import type { SplitLine } from "@/transactions/what-choice";
 
 export function readPositive(currency: string, text: string): number {
@@ -111,33 +109,8 @@ type ApplyChoice = {
 };
 
 export function useApplySuggestion(input: ApplyChoice): Suggestion | null {
-  const suggestion = useQuery({
-    queryKey: ["suggestion", input.accountId, input.payee, input.amount, input.date],
-    enabled: input.accountId.length > 0 && input.payee.trim().length > 0 && input.amount !== null,
-    queryFn: async () => {
-      const params = new URLSearchParams({ accountId: input.accountId, payee: input.payee, amount: String(input.amount) });
-      if (/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
-        params.set("date", input.date);
-      }
-      const result = await apiRequest(`/api/suggestions?${params.toString()}`, suggestionSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-  const transferHint = useQuery({
-    queryKey: ["transfer-hint", input.accountId, input.date, input.amount],
-    enabled: input.accountId.length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(input.date) && input.amount !== null && input.amount !== 0,
-    queryFn: async () => {
-      const params = new URLSearchParams({ accountId: input.accountId, date: input.date, amount: String(input.amount) });
-      const result = await apiRequest(`/api/transfer-hint?${params.toString()}`, transferHintSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const suggestion = useQuery(suggestionQuery(input));
+  const transferHint = useQuery(transferHintQuery(input));
   const suggestionKey = [
     suggestion.data?.reason ?? "",
     suggestion.data?.transferAccountId ?? "",

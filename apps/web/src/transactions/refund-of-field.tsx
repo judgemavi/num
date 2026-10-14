@@ -1,8 +1,8 @@
-import { categoryForRefund, refundPurchaseListSchema } from "@num/shared";
+import { categoryForRefund } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
+import { refundPurchasesQuery } from "@/api/transactions";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { refundPurchaseLabel } from "@/transactions/format";
-import { apiRequest } from "@/request";
 import { OptionCombobox } from "@/transactions/option-combobox";
 
 export function RefundOfField({
@@ -30,20 +30,7 @@ export function RefundOfField({
   onCategory: (id: string | null) => void;
   onMerchant: (id: string | null) => void;
 }) {
-  const purchases = useQuery({
-    queryKey: ["refund-purchases", asOf, payee],
-    queryFn: async () => {
-      const params = new URLSearchParams({ asOf });
-      if (payee.trim().length > 0) {
-        params.set("payee", payee);
-      }
-      const result = await apiRequest(`/api/transactions/refund-purchases?${params.toString()}`, refundPurchaseListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
+  const purchases = useQuery(refundPurchasesQuery(asOf, payee));
   const options = (purchases.data ?? []).map((item) => ({
     id: item.id,
     label: refundPurchaseLabel(currency, item.payeeRaw, item.date, item.amount),

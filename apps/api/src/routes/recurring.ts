@@ -13,11 +13,12 @@ import {
   planUpdateSchema,
   recurringSignalsSchema,
 } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { archivePlan, createPlan, getPlan, listPlans, restorePlan, updatePlan } from "../services/recurring-plans";
 import { linkOccurrence, restoreSkip, skipOccurrence, unlinkOccurrence } from "../services/recurring-links";
 import { autoLink, listOccurrences, recurringSignals } from "../services/recurring-view";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -206,37 +207,40 @@ const readRoute = createRoute({
   },
 });
 
-export function registerRecurring(app: OpenAPIHono, db: Db) {
-  app.openapi(listRoute, (c) => c.json(listPlans(db, c.req.valid("query")), 200));
-  app.openapi(signalsRoute, (c) => c.json(recurringSignals(db, c.req.valid("query").asOf), 200));
-  app.openapi(readRoute, (c) => c.json(getPlan(db, c.req.valid("param").id), 200));
-  app.openapi(autoLinkRoute, (c) => c.json(autoLink(db, c.req.valid("query").asOf, { source: "ui" }), 200));
-  app.openapi(createRouteDef, (c) => c.json(createPlan(db, { ...c.req.valid("json"), source: "ui" }), 200));
-  app.openapi(updateRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(updatePlan(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
-  });
-  app.openapi(archiveRoute, (c) => c.json(archivePlan(db, c.req.valid("param").id, { source: "ui" }), 200));
-  app.openapi(restoreRoute, (c) => c.json(restorePlan(db, c.req.valid("param").id, { source: "ui" }), 200));
-  app.openapi(occurrencesRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(listOccurrences(db, id, c.req.valid("query").asOf), 200);
-  });
-  app.openapi(linkRoute, (c) => {
-    const { id, dueDate } = c.req.valid("param");
-    const { transactionId } = c.req.valid("json");
-    return c.json(linkOccurrence(db, id, dueDate, transactionId, { source: "ui" }), 200);
-  });
-  app.openapi(unlinkRoute, (c) => {
-    const { id, dueDate } = c.req.valid("param");
-    return c.json(unlinkOccurrence(db, id, dueDate, { source: "ui" }), 200);
-  });
-  app.openapi(skipRoute, (c) => {
-    const { id, dueDate } = c.req.valid("param");
-    return c.json(skipOccurrence(db, id, dueDate, c.req.valid("json").reason, { source: "ui" }), 200);
-  });
-  app.openapi(restoreSkipRoute, (c) => {
-    const { id, dueDate } = c.req.valid("param");
-    return c.json(restoreSkip(db, id, dueDate, { source: "ui" }), 200);
-  });
+export function recurringRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(listRoute, (c) => c.json(listPlans(db, c.req.valid("query")), 200))
+    .openapi(signalsRoute, (c) => c.json(recurringSignals(db, c.req.valid("query").asOf), 200))
+    .openapi(readRoute, (c) => c.json(getPlan(db, c.req.valid("param").id), 200))
+    .openapi(autoLinkRoute, (c) => c.json(autoLink(db, c.req.valid("query").asOf, { source: "ui" }), 200))
+    .openapi(createRouteDef, (c) => c.json(createPlan(db, { ...c.req.valid("json"), source: "ui" }), 200))
+    .openapi(updateRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(updatePlan(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
+    })
+    .openapi(archiveRoute, (c) => c.json(archivePlan(db, c.req.valid("param").id, { source: "ui" }), 200))
+    .openapi(restoreRoute, (c) => c.json(restorePlan(db, c.req.valid("param").id, { source: "ui" }), 200))
+    .openapi(occurrencesRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(listOccurrences(db, id, c.req.valid("query").asOf), 200);
+    })
+    .openapi(linkRoute, (c) => {
+      const { id, dueDate } = c.req.valid("param");
+      const { transactionId } = c.req.valid("json");
+      return c.json(linkOccurrence(db, id, dueDate, transactionId, { source: "ui" }), 200);
+    })
+    .openapi(unlinkRoute, (c) => {
+      const { id, dueDate } = c.req.valid("param");
+      return c.json(unlinkOccurrence(db, id, dueDate, { source: "ui" }), 200);
+    })
+    .openapi(skipRoute, (c) => {
+      const { id, dueDate } = c.req.valid("param");
+      return c.json(skipOccurrence(db, id, dueDate, c.req.valid("json").reason, { source: "ui" }), 200);
+    })
+    .openapi(restoreSkipRoute, (c) => {
+      const { id, dueDate } = c.req.valid("param");
+      return c.json(restoreSkip(db, id, dueDate, { source: "ui" }), 200);
+    });
 }
+
+export type RecurringRoutes = ReturnType<typeof recurringRoutes>;

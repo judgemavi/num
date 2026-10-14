@@ -9,11 +9,12 @@ import {
   fundingRunListSchema,
   fundingRunSchema,
 } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { fundingPosition, fundingProposalFor } from "../services/funding-book";
 import { listFundingPaychecks } from "../services/funding-paychecks";
 import { createFundingRun, listFundingRuns, undoFundingRun } from "../services/funding-runs";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -122,16 +123,19 @@ const undoRoute = createRoute({
   },
 });
 
-export function registerFunding(app: OpenAPIHono, db: Db) {
-  app.openapi(positionRoute, (c) => c.json(fundingPosition(db, c.req.valid("query").asOf), 200));
-  app.openapi(paychecksRoute, (c) => c.json(listFundingPaychecks(db), 200));
-  app.openapi(proposalRoute, (c) => {
-    const query = c.req.valid("query");
-    return c.json(fundingProposalFor(db, query.incomeTransactionId, query.asOf), 200);
-  });
-  app.openapi(listRoute, (c) => c.json(listFundingRuns(db), 200));
-  app.openapi(createRouteDef, (c) =>
-    c.json(createFundingRun(db, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200),
-  );
-  app.openapi(undoRoute, (c) => c.json(undoFundingRun(db, c.req.valid("param").id, { source: "ui" }), 200));
+export function fundingRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(positionRoute, (c) => c.json(fundingPosition(db, c.req.valid("query").asOf), 200))
+    .openapi(paychecksRoute, (c) => c.json(listFundingPaychecks(db), 200))
+    .openapi(proposalRoute, (c) => {
+      const query = c.req.valid("query");
+      return c.json(fundingProposalFor(db, query.incomeTransactionId, query.asOf), 200);
+    })
+    .openapi(listRoute, (c) => c.json(listFundingRuns(db), 200))
+    .openapi(createRouteDef, (c) =>
+      c.json(createFundingRun(db, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200),
+    )
+    .openapi(undoRoute, (c) => c.json(undoFundingRun(db, c.req.valid("param").id, { source: "ui" }), 200));
 }
+
+export type FundingRoutes = ReturnType<typeof fundingRoutes>;

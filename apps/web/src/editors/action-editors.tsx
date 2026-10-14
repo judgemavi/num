@@ -1,5 +1,6 @@
-import { accountSchema, bucketSchema } from "@num/shared";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { accountQuery } from "@/api/accounts";
+import { bucketQuery } from "@/api/buckets";
 import { ImportForm } from "@/accounts/import-dialog";
 import { ReconcileDialog } from "@/accounts/reconcile-dialog";
 import { localAsOf } from "@/as-of";
@@ -7,23 +8,13 @@ import { AssignMoney } from "@/buckets/assign-money";
 import { FundPaycheck } from "@/buckets/fund-paycheck";
 import { MoveMoney } from "@/buckets/move-money";
 import type { EditorInput } from "@/editors/editor-types";
-import { useActiveBuckets, useBookCurrency, useRecord } from "@/editors/lookups";
+import { useActiveBuckets, useBookCurrency } from "@/editors/lookups";
 import { LoadError, LoadingLine } from "@/editors/load-state";
 
 type Finish = { onClose: () => void; onSaved: (id: string) => void };
 
-function useRefresh(keys: string[][]) {
-  const queryClient = useQueryClient();
-  return async () => {
-    for (const key of keys) {
-      await queryClient.invalidateQueries({ queryKey: key });
-    }
-  };
-}
-
 export function ImportEditor({ props, onClose, onSaved }: { props: EditorInput["import"] } & Finish) {
-  const account = useRecord("account", props.accountId, `/api/accounts/${props.accountId ?? ""}`, accountSchema);
-  const refresh = useRefresh([["imports"], ["accounts"], ["account"], ["transactions"], ["needs-review"]]);
+  const account = useQuery(accountQuery(props.accountId));
   if (props.accountId && account.isPending) {
     return <LoadingLine label="Loading the account." />;
   }
@@ -35,28 +26,25 @@ export function ImportEditor({ props, onClose, onSaved }: { props: EditorInput["
       key={props.accountId ?? "none"}
       account={props.accountId ? (account.data ?? null) : null}
       onClose={onClose}
-      onImported={() => {
-        void refresh().then(() => onSaved("ok"));
-      }}
+      onImported={() => onSaved("ok")}
     />
   );
 }
 
 export function ReconcileEditor({ props, onClose }: { props: EditorInput["reconcile"] } & Pick<Finish, "onClose">) {
   const currency = useBookCurrency();
-  const account = useRecord("account", props.accountId, `/api/accounts/${props.accountId}`, accountSchema);
+  const account = useQuery(accountQuery(props.accountId));
   if (!currency.data || account.isPending) {
     return <LoadingLine label="Loading the account." />;
   }
   if (currency.isError || account.isError || !account.data) {
     return <LoadError label="The account did not load." onRetry={() => void account.refetch()} />;
   }
-  return <ReconcileDialog accountId={props.accountId} currency={currency.data} kind={account.data.kind} onClose={onClose} />;
+  return <ReconcileDialog account={account.data} currency={currency.data} onClose={onClose} />;
 }
 
 export function FundEditor({ props, onSaved }: { props: EditorInput["fundPaycheck"] } & Finish) {
   const currency = useBookCurrency();
-  const refresh = useRefresh([["buckets"], ["funding-position"], ["funding-paychecks"], ["funding-proposal"], ["funding-runs"], ["needs-review"], ["hygiene"]]);
   if (!currency.data) {
     return <LoadingLine label="Loading the paycheck." />;
   }
@@ -65,17 +53,14 @@ export function FundEditor({ props, onSaved }: { props: EditorInput["fundPaychec
       currency={currency.data}
       asOf={localAsOf()}
       incomeTransactionId={props.incomeTransactionId}
-      onSaved={() => {
-        void refresh().then(() => onSaved("ok"));
-      }}
+      onSaved={() => onSaved("ok")}
     />
   );
 }
 
 export function AssignEditor({ props, onClose, onSaved }: { props: EditorInput["assignMoney"] } & Finish) {
   const currency = useBookCurrency();
-  const bucket = useRecord("bucket", props.bucketId, `/api/buckets/${props.bucketId}`, bucketSchema);
-  const refresh = useRefresh([["buckets"], ["bucket-events"], ["funding-position"], ["hygiene"]]);
+  const bucket = useQuery(bucketQuery(props.bucketId));
   if (!currency.data || bucket.isPending) {
     return <LoadingLine label="Loading the bucket." />;
   }
@@ -88,9 +73,7 @@ export function AssignEditor({ props, onClose, onSaved }: { props: EditorInput["
       bucket={bucket.data}
       kind={props.kind}
       onClose={onClose}
-      onSaved={() => {
-        void refresh().then(() => onSaved("ok"));
-      }}
+      onSaved={() => onSaved("ok")}
     />
   );
 }
@@ -98,7 +81,6 @@ export function AssignEditor({ props, onClose, onSaved }: { props: EditorInput["
 export function MoveEditor({ props, onClose, onSaved }: { props: EditorInput["moveMoney"] } & Finish) {
   const currency = useBookCurrency();
   const board = useActiveBuckets();
-  const refresh = useRefresh([["buckets"], ["bucket-events"], ["funding-position"], ["hygiene"]]);
   if (!currency.data || board.isPending) {
     return <LoadingLine label="Loading buckets." />;
   }
@@ -111,9 +93,7 @@ export function MoveEditor({ props, onClose, onSaved }: { props: EditorInput["mo
       buckets={board.data.items}
       fromId={props.fromId}
       onClose={onClose}
-      onSaved={() => {
-        void refresh().then(() => onSaved("ok"));
-      }}
+      onSaved={() => onSaved("ok")}
     />
   );
 }

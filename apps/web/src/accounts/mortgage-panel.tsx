@@ -1,6 +1,7 @@
-import { milliPctToPercent, mortgageViewSchema, Temporal, toMinorUnits } from "@num/shared";
+import { milliPctToPercent, Temporal, toMinorUnits } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { mortgageViewQuery } from "@/api/mortgage";
 import { frequencyLabels } from "@/accounts/mortgage-format";
 import { MortgageSchedule } from "@/accounts/mortgage-schedule";
 import { useEditors } from "@/editors/editor-api";
@@ -12,7 +13,6 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/money";
-import { apiRequest } from "@/request";
 
 function formatDay(iso: string): string {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -29,27 +29,7 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
   const [lumpDate, setLumpDate] = useState("");
   const [extraError, setExtraError] = useState<string | null>(null);
 
-  const view = useQuery({
-    queryKey: ["mortgage-view", accountId, asOf, extra, lumpSum, lumpDate],
-    queryFn: async () => {
-      const params = new URLSearchParams({ asOf });
-      if (extra > 0) {
-        params.set("extra", String(extra));
-      }
-      if (lumpSum > 0 && lumpDate.length > 0) {
-        params.set("lumpSum", String(lumpSum));
-        params.set("lumpDate", lumpDate);
-      }
-      const result = await apiRequest(`/api/accounts/${accountId}/mortgage?${params.toString()}`, mortgageViewSchema);
-      if (!result.ok) {
-        if (result.code === "mortgage_terms_not_found") {
-          return null;
-        }
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const view = useQuery(mortgageViewQuery(accountId, asOf, { extra, lumpSum, lumpDate }));
 
   function openTerms() {
     void openEditor("account", { id: accountId });

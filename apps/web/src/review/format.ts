@@ -53,7 +53,7 @@ export function decisionText(code: InboxDecisionCode): string {
   }
 }
 
-export function inboxError(code: string): string {
+export function inboxError(code: string | undefined): string {
   switch (code) {
     case "import_match_invalid":
       return "That match is no longer available.";

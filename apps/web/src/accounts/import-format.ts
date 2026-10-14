@@ -82,7 +82,7 @@ export function formatStatementDate(iso: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(year, month - 1, day));
 }
 
-export function importError(code: string): string {
+export function importError(code: string | undefined): string {
   switch (code) {
     case "account_not_found":
       return "Choose an account.";

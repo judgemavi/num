@@ -1,13 +1,15 @@
-import { clearanceResultSchema, transactionListSchema, type TransactionListQuery } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { TransactionListQuery } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useMarkClearance } from "@/api/checkpoints";
+import { errorCode } from "@/api/client";
+import { transactionListQuery } from "@/api/transactions";
 import { ListCard } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
 import { useAccounts, useCategories, useMerchants } from "@/editors/lookups";
-import { apiRequest } from "@/request";
 import { localAsOf } from "@/as-of";
-import { transactionPath } from "@/transactions/query";
 import { TransactionsTable } from "@/transactions/transactions-table";
+import { useReviewActions } from "@/transactions/use-review-actions";
 
 const selectionLimit = 200;
 
@@ -42,11 +44,10 @@ function withLimit(current: string[], ids: string[], on: boolean): { next: strin
 }
 
 export function AccountTransactions({ accountId, currency, showBalance, page, onPage }: AccountTransactionsProps) {
-  const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string[]>([]);
   const [capped, setCapped] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const clearance = useMarkClearance();
+  const pending = clearance.isPending;
 
   const [sort, setSort] = useState<SortColumn>("date");
   const [dir, setDir] = useState<"asc" | "desc">("desc");
@@ -63,16 +64,8 @@ export function AccountTransactions({ accountId, currency, showBalance, page, on
     ...(sort === "date" && dir === "desc" ? {} : { sort, dir }),
   };
 
-  const transactions = useQuery({
-    queryKey: ["transactions", accountId, page, sort, dir],
-    queryFn: async () => {
-      const result = await apiRequest(transactionPath(search, localAsOf()), transactionListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const transactions = useQuery(transactionListQuery(search, localAsOf()));
+  const actions = useReviewActions(search);
 
   const rows = transactions.data?.items ?? [];
   const selectable = rows.filter((row) => !row.reconciled);
@@ -108,38 +101,26 @@ export function AccountTransactions({ accountId, currency, showBalance, page, on
     return dir === "asc" ? "ascending" : "descending";
   }
 
-  async function mark(status: "open" | "cleared") {
+  function mark(status: "open" | "cleared") {
     if (selected.length === 0) {
       return;
     }
-    setPending(true);
-    setError(null);
-    try {
-      const result = await apiRequest(`/api/accounts/${accountId}/clearance`, clearanceResultSchema, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ transactionIds: selected, status }),
-      });
-      if (!result.ok) {
-        setError(
-          result.code === "transaction_reconciled"
-            ? "Unlock the checkpoint before you change a reconciled transaction."
-            : "The transactions did not update. Try again.",
-        );
-        return;
-      }
-      setSelected([]);
-      setCapped(false);
-      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-      await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
-      await queryClient.invalidateQueries({ queryKey: ["reconcile", accountId] });
-    } catch {
-      setError("The transactions did not update. Try again.");
-    } finally {
-      setPending(false);
-    }
+    clearance.mutate(
+      { accountId, body: { transactionIds: selected, status } },
+      {
+        onSuccess: () => {
+          setSelected([]);
+          setCapped(false);
+        },
+      },
+    );
   }
+
+  const error = !clearance.error
+    ? null
+    : errorCode(clearance.error) === "transaction_reconciled"
+      ? "Unlock the checkpoint before you change a reconciled transaction."
+      : "The transactions did not update. Try again.";
 
   return (
     <ListCard
@@ -147,10 +128,10 @@ export function AccountTransactions({ accountId, currency, showBalance, page, on
       title="Transactions"
       actions={
         <>
-          <Button type="button" variant="outline" disabled={pending || selected.length === 0} onClick={() => void mark("cleared")}>
+          <Button type="button" variant="outline" disabled={pending || selected.length === 0} onClick={() => mark("cleared")}>
             Mark cleared
           </Button>
-          <Button type="button" variant="outline" disabled={pending || selected.length === 0} onClick={() => void mark("open")}>
+          <Button type="button" variant="outline" disabled={pending || selected.length === 0} onClick={() => mark("open")}>
             Mark open
           </Button>
         </>
@@ -163,6 +144,7 @@ export function AccountTransactions({ accountId, currency, showBalance, page, on
       ) : null}
       {transactions.data && accounts.data && categories.data && merchants.data && rows.length > 0 ? (
         <TransactionsTable
+          actions={actions}
           search={search}
           rows={rows}
           counts={null}

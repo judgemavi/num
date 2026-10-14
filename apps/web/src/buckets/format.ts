@@ -1,4 +1,5 @@
 import { Temporal, type Bucket, type BucketColor, type BucketIcon, type ErrorCode } from "@num/shared";
+import { errorCode } from "@/api/client";
 import { formatMoney } from "@/money";
 
 const colors: Record<BucketColor, string> = {
@@ -86,7 +87,7 @@ export function bucketTarget(bucket: Bucket): number {
   return bucket.target ?? 0;
 }
 
-export function bucketError(code: ErrorCode): string {
+export function bucketError(code: ErrorCode | undefined): string {
   if (code === "category_in_bucket") {
     return "That category is already in a bucket. Remove it there first.";
   }
@@ -151,4 +152,10 @@ export function bucketError(code: ErrorCode): string {
     return "Check the bucket fields.";
   }
   return "That did not work. Try again.";
+}
+
+/** The message for a write that failed. `noAnswer` is the message when the API gave no error code. */
+export function requestError(error: Error, noAnswer: string): string {
+  const code = errorCode(error);
+  return code ? bucketError(code) : noAnswer;
 }

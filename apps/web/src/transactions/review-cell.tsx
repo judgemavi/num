@@ -1,8 +1,9 @@
-import type { Plan, TransactionListItem } from "@num/shared";
+import type { TransactionListItem } from "@num/shared";
 import { Badge } from "@/components/ui/badge";
 import { levelLabel, plainReason } from "@/transactions/format";
 import { targetText, type Names } from "@/transactions/names";
 import { ReviewAnswers } from "@/transactions/review-answers";
+import type { ReviewActions } from "@/transactions/use-review-actions";
 
 function questionText(row: TransactionListItem): string | null {
   const review = row.review;
@@ -56,13 +57,11 @@ type Props = {
   row: TransactionListItem;
   currency: string;
   names: Names;
-  pending: boolean;
-  planById: Map<string, Plan>;
-  run: (action: () => Promise<{ ok: boolean }>) => Promise<void>;
+  actions: ReviewActions;
 };
 
 /** The Review column. The level, the proposed answer, the question, the reason and the one-click answers. */
-export function ReviewCell({ row, currency, names, pending, planById, run }: Props) {
+export function ReviewCell({ row, currency, names, actions }: Props) {
   const review = row.review;
   if (review === null && row.autoReason === null) {
     return null;
@@ -81,7 +80,7 @@ export function ReviewCell({ row, currency, names, pending, planById, run }: Pro
       {question ? <div className="text-muted-foreground">{question}</div> : null}
       {reason ? <div className="text-sm text-muted-foreground">{reason}</div> : null}
       <div className="mt-1 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-        <ReviewAnswers row={row} currency={currency} pending={pending} planById={planById} run={run} />
+        <ReviewAnswers row={row} currency={currency} actions={actions} />
       </div>
     </>
   );

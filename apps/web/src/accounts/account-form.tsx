@@ -2,7 +2,6 @@ import {
   accountClass,
   accountCreateSchema,
   accountKinds,
-  accountSchema,
   accountUpdateSchema,
   allowsInterestRate,
   balanceFromEntry,
@@ -24,7 +23,8 @@ import { draftFromTerms, draftIsBlank, firstPaymentNotAfterOpening, termsFromDra
 import { MortgageSection, openingDateHelp } from "@/accounts/mortgage-section";
 import { KindPicker } from "@/accounts/kind-picker";
 import { sameClassKinds } from "@/accounts/groups";
-import { apiRequest } from "@/request";
+import type { useSaveAccount } from "@/api/accounts";
+import { errorCode } from "@/api/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -44,6 +44,8 @@ type AccountFormProps = {
   terms?: MortgageTerms | null;
   inline?: boolean;
   below?: ReactNode;
+  /** The save mutation of the parent. The parent stays on the screen until the save ends, thus `onSaved` always runs. */
+  save: ReturnType<typeof useSaveAccount>;
   onClose: () => void;
   onSaved: (id: string) => void;
 };
@@ -85,7 +87,7 @@ function localToday(): string {
   return Temporal.Now.plainDateISO().toString();
 }
 
-export function AccountForm({ currency, account, terms = null, initialName, inline = false, below, onClose, onSaved }: AccountFormProps) {
+export function AccountForm({ currency, account, terms = null, initialName, inline = false, below, save, onClose, onSaved }: AccountFormProps) {
   const [name, setName] = useState(account?.name ?? initialName ?? "");
   const [institution, setInstitution] = useState(account?.institution ?? "");
   const [kind, setKind] = useState<AccountKind>(account?.kind ?? "chequing");
@@ -104,8 +106,9 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
       : milliPctToPercent(account.interestRateMilliPct),
   );
   const [mortgage, setMortgage] = useState<MortgageDraft>(() => draftFromTerms(currency, terms));
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const saving = save.isPending;
+  const error = invalid ?? (save.error ? accountError(errorCode(save.error)) : null);
   const liability = accountClass(kind) === "liability";
   const hasSection = kind === "mortgage" && !inline;
   const termsOn = hasSection && !draftIsBlank(mortgage);
@@ -136,24 +139,33 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
     }
   }
 
-  async function onSubmit() {
-    setError(null);
+  function saveInput(body: unknown) {
+    if (account) {
+      const parsed = accountUpdateSchema.safeParse(body);
+      return parsed.success ? { id: account.id, body: parsed.data } : null;
+    }
+    const parsed = accountCreateSchema.safeParse(body);
+    return parsed.success ? { id: null, body: parsed.data } : null;
+  }
+
+  function onSubmit() {
+    setInvalid(null);
     let body: unknown;
     try {
       if (kind === "credit_card" && paymentPolicy === null) {
-        setError("Choose how you pay this card.");
+        setInvalid("Choose how you pay this card.");
         return;
       }
       if ((!automatic || termsOn) && openingDate.trim().length === 0) {
-        setError("Enter the date, or use the automatic date.");
+        setInvalid("Enter the date, or use the automatic date.");
         return;
       }
       if (termsOn && firstPaymentNotAfterOpening(openingDate, mortgage)) {
-        setError("The first payment must be after the opening date.");
+        setInvalid("The first payment must be after the opening date.");
         return;
       }
       if (termsOn && (openingBalance.trim().length === 0 || readAmount(currency, openingBalance, "the amount owed") === 0)) {
-        setError("Enter the amount owed on the opening date.");
+        setInvalid("Enter the amount owed on the opening date.");
         return;
       }
       const card =
@@ -185,33 +197,16 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
         ...(hasSection ? { mortgageTerms: termsFromDraft(currency, mortgage) } : {}),
       };
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Check the account fields.");
+      setInvalid(caught instanceof Error ? caught.message : "Check the account fields.");
       return;
     }
 
-    const parsed = (account ? accountUpdateSchema : accountCreateSchema).safeParse(body);
-    if (!parsed.success) {
-      setError("Check the account fields.");
+    const input = saveInput(body);
+    if (!input) {
+      setInvalid("Check the account fields.");
       return;
     }
-
-    setSaving(true);
-    try {
-      const result = await apiRequest(account ? `/api/accounts/${account.id}` : "/api/accounts", accountSchema, {
-        method: account ? "PATCH" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(parsed.data),
-      });
-      if (!result.ok) {
-        setError(accountError(result.code));
-        return;
-      }
-      onSaved(result.data.id);
-    } catch {
-      setError("The account did not save. Try again.");
-    } finally {
-      setSaving(false);
-    }
+    save.mutate(input, { onSuccess: (saved) => onSaved(saved.id) });
   }
 
   return (
@@ -221,7 +216,7 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
         title={account ? "Edit account" : "Add an account"}
         description={account ? "Change the details of this account." : "Add an account to the book."}
       />
-      <FormShell inline={inline} className="grid gap-4" onSubmit={() => void onSubmit()}>
+      <FormShell inline={inline} className="grid gap-4" onSubmit={onSubmit}>
         <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
         <Field>
           <FieldLabel htmlFor="account-name">Name</FieldLabel>
@@ -351,7 +346,7 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
           <FormCancel inline={inline} onClose={onClose}>
             Cancel
           </FormCancel>
-          <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void onSubmit() : undefined}>
+          <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? onSubmit : undefined}>
             {saving ? "Saving account" : account ? "Save account" : "Add account"}
           </Button>
         </FormActions>

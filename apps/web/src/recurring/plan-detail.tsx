@@ -1,17 +1,11 @@
-import {
-  inboxDecisionListSchema,
-  occurrenceLinkSchema,
-  occurrenceListSchema,
-  type Occurrence,
-  type Plan,
-} from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import type { Occurrence, Plan } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
+import { errorCode } from "@/api/client";
+import { occurrencesQuery, useRestoreOccurrence, useUnlinkOccurrence } from "@/api/recurring";
+import { inboxDecisionsQuery, useUndoDecision } from "@/api/review";
 import { useEditors } from "@/editors/editor-api";
-import { undoDecision } from "@/review/actions";
 import { decisionText, inboxError } from "@/review/format";
 import { formatDate, planError } from "@/recurring/format";
-import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -43,50 +37,20 @@ function statusText(item: Occurrence): string | null {
 }
 
 export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
-  const queryClient = useQueryClient();
   const { openEditor } = useEditors();
-  const [error, setError] = useState<string | null>(null);
+  const decisions = useQuery(inboxDecisionsQuery());
+  const occurrences = useQuery(occurrencesQuery(plan.id, asOf));
+  const unlink = useUnlinkOccurrence();
+  const restore = useRestoreOccurrence();
+  const undoDecision = useUndoDecision();
+  const planFailure = unlink.error ?? restore.error;
+  const error = planFailure ? planError(errorCode(planFailure)) : undoDecision.error ? inboxError(errorCode(undoDecision.error)) : null;
 
-  const decisions = useQuery({
-    queryKey: ["inbox-decisions"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/review/decisions", inboxDecisionListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
-
-  const occurrences = useQuery({
-    queryKey: ["occurrences", plan.id, asOf],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/recurring/${plan.id}/occurrences?asOf=${asOf}`, occurrenceListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-
-  async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: ["occurrences", plan.id] });
-    await queryClient.invalidateQueries({ queryKey: ["recurring-signals"] });
-    await queryClient.invalidateQueries({ queryKey: ["recurring-sync"] });
-  }
-
-  async function post(path: string, body?: unknown) {
-    const result = await apiRequest(`/api/recurring/${plan.id}/occurrences/${path}`, occurrenceLinkSchema, {
-      method: "POST",
-      headers: body ? { "content-type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (!result.ok) {
-      setError(planError(result.code));
-      return;
-    }
-    setError(null);
-    await refresh();
+  /** Remove the error of each request. A new action starts with no old message. */
+  function clearErrors() {
+    unlink.reset();
+    restore.reset();
+    undoDecision.reset();
   }
 
   const items = occurrences.data?.items ?? [];
@@ -113,15 +77,19 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
           </div>
           <RowMenu label={`Actions for ${formatDate(item.dueDate)}`}>
             {item.transactionId ? (
-              <DropdownMenuItem className="min-h-11" onSelect={() => void post(`${item.dueDate}/unlink`)}>
+              <DropdownMenuItem
+                className="min-h-11"
+                onSelect={() => {
+                  clearErrors();
+                  unlink.mutate({ planId: plan.id, dueDate: item.dueDate });
+                }}
+              >
                 Remove link
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem
                 className="min-h-11"
-                onSelect={() => {
-                  void openEditor("linkOccurrence", { planId: plan.id, accountId: plan.accountId, dueDate: item.dueDate }).then(() => refresh());
-                }}
+                onSelect={() => void openEditor("linkOccurrence", { planId: plan.id, accountId: plan.accountId, dueDate: item.dueDate })}
               >
                 Link a transaction
               </DropdownMenuItem>
@@ -130,30 +98,27 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
               <DropdownMenuItem
                 className="min-h-11"
                 onSelect={() => {
-                  void undoDecision(keptKey).then(async (result) => {
-                    if (!result.ok) {
-                      setError(inboxError(result.code));
-                      return;
-                    }
-                    setError(null);
-                    await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
-                    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-                  });
+                  clearErrors();
+                  undoDecision.mutate(keptKey);
                 }}
               >
                 Undo
               </DropdownMenuItem>
             ) : null}
             {item.status === "skipped" ? (
-              <DropdownMenuItem className="min-h-11" onSelect={() => void post(`${item.dueDate}/restore`)}>
+              <DropdownMenuItem
+                className="min-h-11"
+                onSelect={() => {
+                  clearErrors();
+                  restore.mutate({ planId: plan.id, dueDate: item.dueDate });
+                }}
+              >
                 Restore this occurrence
               </DropdownMenuItem>
             ) : item.transactionId ? null : (
               <DropdownMenuItem
                 className="min-h-11"
-                onSelect={() => {
-                  void openEditor("skipOccurrence", { planId: plan.id, dueDate: item.dueDate }).then(() => refresh());
-                }}
+                onSelect={() => void openEditor("skipOccurrence", { planId: plan.id, dueDate: item.dueDate })}
               >
                 Skip
               </DropdownMenuItem>

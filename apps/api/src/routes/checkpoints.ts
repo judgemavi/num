@@ -9,7 +9,7 @@ import {
   closingHintSchema,
   errorSchema,
 } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import {
   compareCheckpoint,
@@ -20,6 +20,7 @@ import {
 } from "../services/checkpoints";
 import { listCardStatements } from "../services/card-statements";
 import { setClearance } from "../services/transaction-clearance";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -169,30 +170,27 @@ const statementsRoute = createRoute({
   },
 });
 
-export function registerCheckpoints(app: OpenAPIHono, db: Db) {
-  app.openapi(listRoute, (c) => c.json(listCheckpoints(db, c.req.valid("param").id), 200));
-
-  app.openapi(statementsRoute, (c) => c.json(listCardStatements(db, c.req.valid("param").id), 200));
-
-  app.openapi(compareRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(compareCheckpoint(db, id, c.req.valid("json")), 200);
-  });
-
-  app.openapi(createRouteDef, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(createCheckpoint(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
-  });
-
-  app.openapi(unlockRoute, (c) => {
-    const { id, checkpointId } = c.req.valid("param");
-    return c.json(unlockCheckpoint(db, id, checkpointId, { source: "ui" }), 200);
-  });
-
-  app.openapi(closingRoute, (c) => c.json(latestClosing(db, c.req.valid("param").id), 200));
-
-  app.openapi(clearanceRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(setClearance(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
-  });
+export function checkpointRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(listRoute, (c) => c.json(listCheckpoints(db, c.req.valid("param").id), 200))
+    .openapi(statementsRoute, (c) => c.json(listCardStatements(db, c.req.valid("param").id), 200))
+    .openapi(compareRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(compareCheckpoint(db, id, c.req.valid("json")), 200);
+    })
+    .openapi(createRouteDef, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(createCheckpoint(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
+    })
+    .openapi(unlockRoute, (c) => {
+      const { id, checkpointId } = c.req.valid("param");
+      return c.json(unlockCheckpoint(db, id, checkpointId, { source: "ui" }), 200);
+    })
+    .openapi(closingRoute, (c) => c.json(latestClosing(db, c.req.valid("param").id), 200))
+    .openapi(clearanceRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(setClearance(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
+    });
 }
+
+export type CheckpointRoutes = ReturnType<typeof checkpointRoutes>;

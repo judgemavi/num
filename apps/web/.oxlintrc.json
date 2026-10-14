@@ -8,9 +8,15 @@
       {
         "patterns": [
           {
-            "group": ["@num/db", "@num/db/*", "api", "api/*"],
+            "group": ["@num/db", "@num/db/*"],
             "message": "The web app imports only packages/shared.",
             "caseSensitive": true
+          },
+          {
+            "group": ["api", "api/*"],
+            "message": "The web app imports only types from the API package, for the RPC client.",
+            "caseSensitive": true,
+            "allowTypeImports": true
           }
         ]
       }

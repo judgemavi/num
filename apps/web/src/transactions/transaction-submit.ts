@@ -2,22 +2,18 @@ import {
   merchantForChoice,
   moneyDirection,
   signedAmount,
-  transactionSaveResultSchema,
-  transactionSchema,
   transactionWriteSchema,
   type Transaction,
   type TransactionUpdate as TransactionWrite,
   type WhatChoice,
 } from "@num/shared";
-import { apiRequest } from "@/request";
-import { transactionError } from "@/transactions/format";
+import type { TransactionSave } from "@/api/transactions";
 import { readPositive } from "@/transactions/transaction-draft";
 import { lineDirection, type SplitLine } from "@/transactions/what-choice";
 
 type SubmitInput = {
   currency: string;
   transaction: Transaction | null;
-  reconciled: boolean;
   accountId: string;
   date: string;
   totalMinor: number;
@@ -34,9 +30,7 @@ type SubmitInput = {
   unreadableItemKey?: string;
 };
 
-export type SubmitResult =
-  | { ok: true; id: string; skipped: number; applied: number }
-  | { ok: false; error: string };
+type BuildResult = { ok: true; save: TransactionSave } | { ok: false; error: string };
 
 function sameTags(a: string[], b: string[]): boolean {
   return a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
@@ -72,20 +66,11 @@ function hasOpenLine(lines: readonly { categoryId?: string | null; transferAccou
   return lines.some((line) => !line.categoryId && !line.transferAccountId);
 }
 
-function looksRight(id: string) {
-  return apiRequest(`/api/transactions/${id}/looks-right`, transactionSchema, { method: "POST" });
-}
-
-/** On a row that needs review, Save is the answer: the automatic label is confirmed. */
-async function saveAsAnswer(existing: Transaction, body: TransactionWrite): Promise<SubmitResult | null> {
-  if (!unchanged(existing, body)) {
-    return null;
-  }
-  const result = await looksRight(existing.id);
-  return result.ok ? { ok: true, id: result.data.id, skipped: 0, applied: 0 } : { ok: false, error: transactionError(result.code) };
-}
-
-export async function submitTransaction(input: SubmitInput): Promise<SubmitResult> {
+/**
+ * Make the save for the Transaction editor from the form fields.
+ * On a transaction with an automatic label, Save is the answer: the label is confirmed.
+ */
+export function buildTransactionSave(input: SubmitInput): BuildResult {
   const memoAt = (index: number) => input.transaction?.lines[index]?.memo ?? null;
   let built;
   try {
@@ -125,31 +110,14 @@ export async function submitTransaction(input: SubmitInput): Promise<SubmitResul
   if (!parsed.success) {
     return { ok: false, error: "Check the transaction fields." };
   }
-  const keep = input.transaction !== null && hasOpenLine(input.transaction.lines) && hasOpenLine(parsed.data.lines);
-  if (input.transaction?.autoReason && !keep) {
-    const answered = await saveAsAnswer(input.transaction, parsed.data);
-    if (answered) {
-      return answered;
-    }
+  const existing = input.transaction;
+  if (!existing) {
+    return { ok: true, save: { kind: "create", body: { ...parsed.data, unreadableItemKey: input.unreadableItemKey } } };
   }
-  const result = await apiRequest(input.transaction ? `/api/transactions/${input.transaction.id}` : "/api/transactions", transactionSaveResultSchema, {
-    method: input.transaction ? "PATCH" : "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(input.transaction ? { ...parsed.data, keepUncategorized: keep } : { ...parsed.data, unreadableItemKey: input.unreadableItemKey }),
-  });
-  if (!result.ok) {
-    return { ok: false, error: transactionError(result.code) };
+  const keep = hasOpenLine(existing.lines) && hasOpenLine(parsed.data.lines);
+  const labelled = existing.autoReason !== null;
+  if (labelled && !keep && unchanged(existing, parsed.data)) {
+    return { ok: true, save: { kind: "confirm", id: existing.id } };
   }
-  if (input.transaction?.autoReason && result.data.autoReason !== null) {
-    const confirmed = await looksRight(result.data.id);
-    if (!confirmed.ok) {
-      return { ok: false, error: transactionError(confirmed.code) };
-    }
-  }
-  return {
-    ok: true,
-    id: result.data.id,
-    skipped: result.data.skipped?.length ?? 0,
-    applied: result.data.applied ?? 0,
-  };
+  return { ok: true, save: { kind: "update", id: existing.id, body: { ...parsed.data, keepUncategorized: keep }, confirmLabel: labelled } };
 }

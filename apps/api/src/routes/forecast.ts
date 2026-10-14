@@ -1,7 +1,8 @@
 import { asOfQuerySchema, errorSchema, forecastSchema } from "@num/shared";
-import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { readForecast } from "../services/forecast";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -27,9 +28,12 @@ const forecastRoute = createRoute({
   },
 });
 
-export function registerForecast(app: OpenAPIHono, db: Db) {
-  app.openapi(forecastRoute, (c) => {
-    const asOf = c.req.valid("query").asOf;
-    return c.json(readForecast(db, asOf), 200);
-  });
+export function forecastRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(forecastRoute, (c) => {
+      const asOf = c.req.valid("query").asOf;
+      return c.json(readForecast(db, asOf), 200);
+    });
 }
+
+export type ForecastRoutes = ReturnType<typeof forecastRoutes>;

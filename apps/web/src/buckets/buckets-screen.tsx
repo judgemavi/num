@@ -1,14 +1,5 @@
-import {
-  bucketEventSchema,
-  bucketSchema,
-  monthPlanSchema,
-  currencyUpdateSchema,
-  fundingPositionSchema,
-  overspentListSchema,
-  type Bucket,
-  type BucketKind,
-} from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { BucketKind } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useState } from "react";
@@ -21,8 +12,11 @@ import { GoalFeasibility } from "@/plan/month-board";
 import { BucketFilterBar } from "@/buckets/filters";
 import { bucketError, today } from "@/buckets/format";
 import { formatMoney } from "@/money";
-import { loadBuckets } from "@/buckets/query";
-import { apiRequest } from "@/request";
+import { bucketListQuery, coverSourcesQuery, overspentQuery, useArchiveBucket, useCoverBucket } from "@/api/buckets";
+import { errorCode } from "@/api/client";
+import { fundingPositionQuery } from "@/api/funding";
+import { monthPlanQuery } from "@/api/plan";
+import { bookCurrencyQuery } from "@/api/settings";
 import { Amount } from "@/components/amount";
 import { JarsIllustration } from "@/components/illustrations";
 import { ListCard, ListGroup } from "@/components/list-card";
@@ -39,104 +33,29 @@ const groupOrder: { kind: BucketKind; label: string }[] = [
 ];
 
 export function BucketsScreen() {
-  const queryClient = useQueryClient();
   const search = bucketsRoute.useSearch();
   const navigate = bucketsRoute.useNavigate();
   const { openEditor, confirm } = useEditors();
-  const [actionError, setActionError] = useState<string | null>(null);
   const [coverFrom, setCoverFrom] = useState<Record<string, string>>({});
   const asOf = today();
 
-  const currency = useQuery({
-    queryKey: ["book-currency"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/settings/currency", currencyUpdateSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.currency;
-    },
-  });
-  const board = useQuery({
-    queryKey: ["buckets", search],
-    queryFn: () => loadBuckets(search),
-  });
-  const position = useQuery({
-    queryKey: ["funding-position", asOf],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/funding/position?asOf=${asOf}`, fundingPositionSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-  const monthPlan = useQuery({
-    queryKey: ["month-plan", asOf, asOf.slice(0, 7)],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/plan?asOf=${asOf}&month=${asOf.slice(0, 7)}`, monthPlanSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-  const overspent = useQuery({
-    queryKey: ["buckets", "overspent"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/buckets/overspent", overspentListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
-  const sources = useQuery({
-    queryKey: ["buckets", "cover-sources"],
-    queryFn: () => loadBuckets({ archived: false }),
-    enabled: search.archived,
-  });
+  const currency = useQuery(bookCurrencyQuery());
+  const board = useQuery(bucketListQuery(search));
+  const position = useQuery(fundingPositionQuery(asOf));
+  const monthPlan = useQuery(monthPlanQuery(asOf));
+  const overspent = useQuery(overspentQuery());
+  const sources = useQuery(coverSourcesQuery(search.archived));
+  const archive = useArchiveBucket();
+  const coverBucket = useCoverBucket();
+  const actionFailure = archive.error ?? coverBucket.error;
 
-  async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: ["buckets"] });
-    await queryClient.invalidateQueries({ queryKey: ["bucket-events"] });
-    await queryClient.invalidateQueries({ queryKey: ["funding-position"] });
-    await queryClient.invalidateQueries({ queryKey: ["funding-paychecks"] });
-    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
-    await queryClient.invalidateQueries({ queryKey: ["funding-proposal"] });
-    await queryClient.invalidateQueries({ queryKey: ["funding-runs"] });
-  }
-
-  async function archiveBucket(bucket: Bucket) {
-    const restoring = bucket.archivedAt !== null;
-    const result = await apiRequest(`/api/buckets/${bucket.id}/${restoring ? "restore" : "archive"}`, bucketSchema, {
-      method: "POST",
-    });
-    if (!result.ok) {
-      setActionError(bucketError(result.code));
-      return;
-    }
-    setActionError(null);
-    await refresh();
-  }
-
-  async function cover(id: string) {
+  function cover(id: string) {
     const fromBucketId = coverFrom[id];
     if (!fromBucketId) {
       return;
     }
-    const result = await apiRequest(`/api/buckets/${id}/cover`, bucketEventSchema, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ fromBucketId, date: today() }),
-    });
-    if (!result.ok) {
-      setActionError(bucketError(result.code));
-      return;
-    }
-    setActionError(null);
-    await refresh();
+    archive.reset();
+    coverBucket.mutate({ id, body: { fromBucketId, date: today() } });
   }
 
   if (currency.isPending || board.isPending || overspent.isPending || position.isPending) {
@@ -214,9 +133,9 @@ export function BucketsScreen() {
         }
         illustration={<JarsIllustration />}
       />
-      {actionError ? (
+      {actionFailure ? (
         <p role="alert" className="text-sm text-attn">
-          {actionError}
+          {bucketError(errorCode(actionFailure))}
         </p>
       ) : null}
       {monthPlan.data ? <GoalFeasibility plan={monthPlan.data} currency={bookCurrency} /> : null}
@@ -273,7 +192,8 @@ export function BucketsScreen() {
                           confirmLabel: restore ? "Restore" : "Archive",
                         }).then((ok) => {
                           if (ok) {
-                            void archiveBucket(bucket);
+                            coverBucket.reset();
+                            archive.mutate({ id: bucket.id, restore });
                           }
                         });
                       }}
@@ -284,8 +204,8 @@ export function BucketsScreen() {
             })
           )}
         </ListCard>
-        <FundingHistory currency={bookCurrency} onDone={() => void refresh()} />
-        <ActivityList currency={bookCurrency} buckets={search.archived ? [...(sources.data?.items ?? []), ...rows] : rows} onDone={() => void refresh()} />
+        <FundingHistory currency={bookCurrency} />
+        <ActivityList currency={bookCurrency} buckets={search.archived ? [...(sources.data?.items ?? []), ...rows] : rows} />
         </div>
         <OverspentPanel
           currency={bookCurrency}
@@ -293,7 +213,7 @@ export function BucketsScreen() {
           pool={pool}
           coverFrom={coverFrom}
           onCoverFrom={(id, bucketId) => setCoverFrom((current) => ({ ...current, [id]: bucketId }))}
-          onCover={(id) => void cover(id)}
+          onCover={cover}
         />
       </div>
     </>

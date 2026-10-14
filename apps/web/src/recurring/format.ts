@@ -59,7 +59,7 @@ export function amountFromForm(kind: PlanKind, minor: number): number {
   return minor;
 }
 
-export function planError(code: string): string {
+export function planError(code: string | undefined): string {
   switch (code) {
     case "plan_not_found":
       return "That recurring item is not in the book.";

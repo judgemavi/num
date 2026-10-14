@@ -1,5 +1,7 @@
 import { mortgageFirstPaymentOffPeriod, type Account, type Category, type Compounding, type PaymentFrequency } from "@num/shared";
 import { ChevronRight } from "lucide-react";
+import { useArchiveAccount } from "@/api/accounts";
+import { useArchiveCategory } from "@/api/categories";
 import { accountLabel } from "@/accounts/label";
 import { compoundingLabels, frequencyLabels } from "@/accounts/mortgage-format";
 import { draftIsBlank, firstPaymentNotAfterOpening, type MortgageDraft } from "@/accounts/mortgage-draft";
@@ -13,7 +15,6 @@ import { InlineAccount, InlineCategory } from "@/editors/inline-records";
 import { LoadingLine } from "@/editors/load-state";
 import { useAccounts, useCategories } from "@/editors/lookups";
 import { ManagedPicker } from "@/editors/managed-picker";
-import { useRestoreNamed } from "@/editors/restore-named";
 
 export const mortgageTermsHelp = "Add the terms to see the payment schedule and to split each payment into interest and principal.";
 export const openingDateHelp = "Use the date of the last payment before the first payment in Num. Use the amount owed after that payment.";
@@ -45,7 +46,8 @@ function categoryOptions(categories: Category[]) {
 }
 
 export function MortgageSection({ accountId, openingDate, draft, onChange, onClear }: SectionProps) {
-  const restoreNamed = useRestoreNamed();
+  const archiveAccount = useArchiveAccount();
+  const archiveCategory = useArchiveCategory();
   const accounts = useAccounts();
   const categories = useCategories();
   if (accounts.isPending || categories.isPending) {
@@ -143,11 +145,7 @@ export function MortgageSection({ accountId, openingDate, draft, onChange, onCle
               placeholder="Choose an account"
               noun="account"
               archived={accountOptions(archivedAccounts)}
-              onRestore={(id) => {
-                void restoreNamed(`/api/accounts/${id}/restore`).then((restored) => {
-                  if (restored) change({ paymentAccountId: restored });
-                });
-              }}
+              onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => change({ paymentAccountId: restored.id }) })}
               onChange={(id) => change({ paymentAccountId: id })}
               renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
             />
@@ -161,11 +159,7 @@ export function MortgageSection({ accountId, openingDate, draft, onChange, onCle
               placeholder="Choose a category"
               noun="category"
               archived={categoryOptions(archivedInterest)}
-              onRestore={(id) => {
-                void restoreNamed(`/api/categories/${id}/restore`).then((restored) => {
-                  if (restored) change({ interestCategoryId: restored });
-                });
-              }}
+              onRestore={(id) => archiveCategory.mutate({ id, restore: true }, { onSuccess: (restored) => change({ interestCategoryId: restored.id }) })}
               onChange={(id) => change({ interestCategoryId: id })}
               renderForm={(name, finish) => <InlineCategory name={name} kind="expense" depth={1} onDone={finish} />}
             />
@@ -180,11 +174,7 @@ export function MortgageSection({ accountId, openingDate, draft, onChange, onCle
               emptyLabel="No property"
               noun="account"
               archived={accountOptions(archivedProperties)}
-              onRestore={(id) => {
-                void restoreNamed(`/api/accounts/${id}/restore`).then((restored) => {
-                  if (restored) change({ propertyAccountId: restored });
-                });
-              }}
+              onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => change({ propertyAccountId: restored.id }) })}
               onChange={(id) => change({ propertyAccountId: id })}
               renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
             />

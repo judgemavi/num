@@ -1,10 +1,9 @@
-import { confidenceModes, matchingSettingSchema, type ConfidenceMode } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { confidenceModes, type ConfidenceMode } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
+import { matchingSettingQuery, useSaveMatchingSetting } from "@/api/settings";
 import { PageHeader } from "@/components/page-header";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { apiRequest } from "@/request";
 import { SettingsBack } from "@/settings/settings-nav";
 
 const labels: Record<ConfidenceMode, string> = {
@@ -14,34 +13,14 @@ const labels: Record<ConfidenceMode, string> = {
 };
 
 export function MatchingPage() {
-  const queryClient = useQueryClient();
-  const setting = useQuery({
-    queryKey: ["matching-setting"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/settings/matching", matchingSettingSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-  const [error, setError] = useState<string | null>(null);
+  const setting = useQuery(matchingSettingQuery());
+  const save = useSaveMatchingSetting();
 
-  async function save(value: string) {
-    if (!(confidenceModes as readonly string[]).includes(value)) {
-      return;
+  function change(value: string) {
+    const mode = confidenceModes.find((item) => item === value);
+    if (mode) {
+      save.mutate(mode);
     }
-    const result = await apiRequest("/api/settings/matching", matchingSettingSchema, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ autoConfidence: value }),
-    });
-    if (!result.ok) {
-      setError("The setting did not save.");
-      return;
-    }
-    setError(null);
-    await queryClient.invalidateQueries({ queryKey: ["matching-setting"] });
   }
 
   return (
@@ -52,7 +31,7 @@ export function MatchingPage() {
       {setting.data ? (
         <Field>
           <FieldLabel htmlFor="auto-confidence">Label for me</FieldLabel>
-          <Select value={setting.data.autoConfidence} onValueChange={(value) => void save(value)}>
+          <Select value={setting.data.autoConfidence} onValueChange={change}>
             <SelectTrigger id="auto-confidence" className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -67,7 +46,7 @@ export function MatchingPage() {
           <FieldDescription>Only when very sure, when sure, or more often. The app never shows a percentage.</FieldDescription>
         </Field>
       ) : null}
-      {error ? <p role="alert">{error}</p> : null}
+      {save.isError ? <p role="alert">The setting did not save.</p> : null}
     </>
   );
 }

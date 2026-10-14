@@ -1,9 +1,9 @@
-import { bucketEventListSchema, bucketEventSchema, type Bucket, type BucketEvent } from "@num/shared";
+import type { Bucket, BucketEvent } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { bucketEventsQuery, useUndoBucketEvent } from "@/api/buckets";
+import { errorCode } from "@/api/client";
 import { bucketError, formatDate } from "@/buckets/format";
 import { useEditors } from "@/editors/editor-api";
-import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
@@ -13,7 +13,6 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 type ActivityListProps = {
   currency: string;
   buckets: Bucket[];
-  onDone: () => void;
 };
 
 const kindLabel = {
@@ -22,19 +21,10 @@ const kindLabel = {
   release: "Release",
 } as const;
 
-export function ActivityList({ currency, buckets, onDone }: ActivityListProps) {
+export function ActivityList({ currency, buckets }: ActivityListProps) {
   const { confirm } = useEditors();
-  const [error, setError] = useState<string | null>(null);
-  const events = useQuery({
-    queryKey: ["bucket-events"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/buckets/events", bucketEventListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
+  const events = useQuery(bucketEventsQuery());
+  const undoEvent = useUndoBucketEvent();
 
   async function undo(event: BucketEvent) {
     const ok = await confirm({
@@ -42,19 +32,9 @@ export function ActivityList({ currency, buckets, onDone }: ActivityListProps) {
       description: "The money goes back. The event stays in the record.",
       confirmLabel: "Undo",
     });
-    if (!ok) {
-      return;
+    if (ok) {
+      undoEvent.mutate({ bucketId: event.bucketId, eventId: event.id });
     }
-    const result = await apiRequest(`/api/buckets/${event.bucketId}/events/${event.id}/undo`, bucketEventSchema, {
-      method: "POST",
-    });
-    if (!result.ok) {
-      setError(bucketError(result.code));
-      return;
-    }
-    setError(null);
-    await events.refetch();
-    onDone();
   }
 
   if (events.isPending) {
@@ -75,9 +55,9 @@ export function ActivityList({ currency, buckets, onDone }: ActivityListProps) {
 
   return (
     <>
-      {error ? (
+      {undoEvent.error ? (
         <p role="alert" className="text-sm text-attn">
-          {error}
+          {bucketError(errorCode(undoEvent.error))}
         </p>
       ) : null}
       <ListCard label="Activity">

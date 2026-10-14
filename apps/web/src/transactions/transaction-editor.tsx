@@ -1,11 +1,10 @@
-import { inboxDecisionListSchema, transactionSchema, type Transaction } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Transaction } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
+import { inboxDecisionsQuery } from "@/api/review";
+import { transactionQuery, useDeleteTransaction, useSaveTransaction } from "@/api/transactions";
 import { LoadError, LoadingLine } from "@/editors/load-state";
 import { useAccounts, useBookCurrency, useCategories, useMerchants, useTags } from "@/editors/lookups";
-import { apiRequest } from "@/request";
-import { undoDecision } from "@/review/actions";
 import { decisionText } from "@/review/format";
-import { transactionError } from "@/transactions/format";
 import { GroupEditor } from "@/transactions/transaction-group";
 import { TransactionForm } from "@/transactions/transaction-form";
 
@@ -55,62 +54,24 @@ function GroupHost({ ids, onSaved }: { ids: string[]; onSaved: (id: string) => v
 }
 
 function SingleEditor({ id, rawLine, initialAccountId, unreadableItemKey, onClose, onSaved }: TransactionEditorProps) {
-  const queryClient = useQueryClient();
   const currency = useBookCurrency();
   const accounts = useAccounts();
   const categories = useCategories();
   const tags = useTags();
   const merchants = useMerchants();
-  const decisions = useQuery({
-    queryKey: ["inbox-decisions"],
-    enabled: id !== null,
-    queryFn: async () => {
-      const result = await apiRequest("/api/review/decisions", inboxDecisionListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
-  const transaction = useQuery({
-    queryKey: ["transaction", id],
-    enabled: id !== null,
-    queryFn: async () => {
-      const result = await apiRequest(`/api/transactions/${id}`, transactionSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const save = useSaveTransaction();
+  const remove = useDeleteTransaction();
+  // The editor stops its reads when a save or a delete starts. Thus the form stays on the screen until the editor
+  // closes, and a deleted transaction is not read again.
+  const live = (save.isIdle || save.isError) && (remove.isIdle || remove.isError);
+  const decisions = useQuery(inboxDecisionsQuery(id !== null));
+  const transaction = useQuery(transactionQuery(id, live));
   const peerId = transaction.data?.transferPeerId ?? null;
-  const peer = useQuery({
-    queryKey: ["transaction", peerId],
-    enabled: peerId !== null,
-    queryFn: async () => {
-      const result = await apiRequest(`/api/transactions/${peerId}`, transactionSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
+  const peer = useQuery(transactionQuery(peerId, live));
 
   const listsReady = currency.data && accounts.data && categories.data && tags.data && merchants.data;
   const loading = !listsReady || (id !== null && (transaction.isPending || (peerId !== null && peer.isPending)));
   const failed = (id !== null && transaction.isError) || currency.isError || accounts.isError || categories.isError || tags.isError || merchants.isError;
-
-  async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    await queryClient.invalidateQueries({ queryKey: ["transaction"] });
-    await queryClient.invalidateQueries({ queryKey: ["accounts"] });
-    await queryClient.invalidateQueries({ queryKey: ["account"] });
-    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-    await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
-    await queryClient.invalidateQueries({ queryKey: ["import-detail"] });
-    await queryClient.invalidateQueries({ queryKey: ["import-view"] });
-    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
-  }
 
   if (loading) {
     return <LoadingLine label="Loading the transaction." />;
@@ -144,16 +105,6 @@ function SingleEditor({ id, rawLine, initialAccountId, unreadableItemKey, onClos
     <TransactionForm
       key={id ?? "new"}
       decisions={notes}
-      onUndoDecision={async (itemKey) => {
-        const result = await undoDecision(itemKey);
-        if (!result.ok) {
-          return result;
-        }
-        await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
-        await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-        await queryClient.invalidateQueries({ queryKey: ["funding-paychecks"] });
-        return result;
-      }}
       currency={currency.data}
       transaction={id === null ? null : (transaction.data ?? null)}
       amountLocked={transaction.data ? amountLocked(transaction.data, peer.data) : false}
@@ -165,23 +116,10 @@ function SingleEditor({ id, rawLine, initialAccountId, unreadableItemKey, onClos
       initialAccountId={initialAccountId}
       unreadableItemKey={unreadableItemKey}
       onClose={onClose}
-      onSaved={(savedId) => {
-        void refresh();
-        onSaved(savedId);
-      }}
+      onSaved={onSaved}
       deleteKind={transaction.data?.transferPeerId ? (peer.data?.mirror ? "mirror" : "linked") : "plain"}
-      onDelete={async () => {
-        if (!transaction.data) {
-          return null;
-        }
-        const result = await apiRequest(`/api/transactions/${transaction.data.id}`, transactionSchema, { method: "DELETE" });
-        if (!result.ok) {
-          return transactionError(result.code);
-        }
-        await refresh();
-        onClose();
-        return null;
-      }}
+      save={save}
+      remove={remove}
     />
   );
 }

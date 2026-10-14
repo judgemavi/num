@@ -7,10 +7,11 @@ import {
   merchantSchema,
   merchantUpdateSchema,
 } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { mergeMerchants } from "../services/merchant-merge";
 import { archiveMerchant, createMerchant, getMerchant, listMerchants, restoreMerchant, updateMerchant } from "../services/merchants";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -117,18 +118,21 @@ const readRoute = createRoute({
   },
 });
 
-export function registerMerchants(app: OpenAPIHono, db: Db) {
-  app.openapi(listRoute, (c) => c.json(listMerchants(db, c.req.valid("query")), 200));
-  app.openapi(readRoute, (c) => c.json(getMerchant(db, c.req.valid("param").id), 200));
-  app.openapi(createRouteDef, (c) => c.json(createMerchant(db, { ...c.req.valid("json"), source: "ui" }), 200));
-  app.openapi(updateRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(updateMerchant(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
-  });
-  app.openapi(archiveRoute, (c) => c.json(archiveMerchant(db, c.req.valid("param").id, { source: "ui" }), 200));
-  app.openapi(restoreRoute, (c) => c.json(restoreMerchant(db, c.req.valid("param").id, { source: "ui" }), 200));
-  app.openapi(mergeRoute, (c) => {
-    const { id } = c.req.valid("param");
-    return c.json(mergeMerchants(db, id, c.req.valid("json").targetId, { source: "ui" }), 200);
-  });
+export function merchantRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(listRoute, (c) => c.json(listMerchants(db, c.req.valid("query")), 200))
+    .openapi(readRoute, (c) => c.json(getMerchant(db, c.req.valid("param").id), 200))
+    .openapi(createRouteDef, (c) => c.json(createMerchant(db, { ...c.req.valid("json"), source: "ui" }), 200))
+    .openapi(updateRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(updateMerchant(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
+    })
+    .openapi(archiveRoute, (c) => c.json(archiveMerchant(db, c.req.valid("param").id, { source: "ui" }), 200))
+    .openapi(restoreRoute, (c) => c.json(restoreMerchant(db, c.req.valid("param").id, { source: "ui" }), 200))
+    .openapi(mergeRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(mergeMerchants(db, id, c.req.valid("json").targetId, { source: "ui" }), 200);
+    });
 }
+
+export type MerchantRoutes = ReturnType<typeof merchantRoutes>;

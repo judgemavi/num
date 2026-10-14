@@ -1,7 +1,8 @@
 import { errorSchema, monthPlanQuerySchema, monthPlanSchema } from "@num/shared";
-import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { readMonthPlan } from "../services/month-plan";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -27,9 +28,12 @@ const monthPlanRoute = createRoute({
   },
 });
 
-export function registerPlan(app: OpenAPIHono, db: Db) {
-  app.openapi(monthPlanRoute, (c) => {
-    const query = c.req.valid("query");
-    return c.json(readMonthPlan(db, query.asOf, query.month), 200);
-  });
+export function planRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(monthPlanRoute, (c) => {
+      const query = c.req.valid("query");
+      return c.json(readMonthPlan(db, query.asOf, query.month), 200);
+    });
 }
+
+export type PlanRoutes = ReturnType<typeof planRoutes>;

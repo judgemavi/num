@@ -1,8 +1,6 @@
 import {
   fromMinorUnits,
   planCreateSchema,
-  planSchema,
-  planUpdateSchema,
   toMinorUnits,
   type Account,
   type AmountMode,
@@ -20,7 +18,8 @@ import { useState, type FormEvent } from "react";
 import { amountForForm, amountFromForm, kindLabel, planError, recurringTitle } from "@/recurring/format";
 import { InlineAccount, InlineCategory, InlineMerchant } from "@/editors/inline-records";
 import { ManagedPicker } from "@/editors/managed-picker";
-import { apiRequest } from "@/request";
+import { errorCode } from "@/api/client";
+import { useSavePlan } from "@/api/recurring";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -80,8 +79,9 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
   const [endDate, setEndDate] = useState(current?.endDate ?? "");
   const [active, setActive] = useState(current?.active ?? true);
   const [fundsBuckets, setFundsBuckets] = useState(current?.fundsBuckets ?? false);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const save = useSavePlan();
+  const saving = save.isPending;
   const [more, setMore] = useState(Boolean(current?.merchantId || current?.categoryId || current?.endDate));
 
   const accountOptions = accounts.filter((item) => !item.archivedAt).map((item) => ({ id: item.id, label: accountLabel(item) }));
@@ -89,10 +89,22 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
     .filter((item) => !item.archivedAt && item.kind === (kind === "income" ? "income" : "expense"))
     .map((item) => ({ id: item.id, label: item.name }));
 
-  async function onSubmit(event: FormEvent) {
+  function errorText(): string | null {
+    if (invalid) {
+      return invalid;
+    }
+    if (!save.error) {
+      return null;
+    }
+    const code = errorCode(save.error);
+    return code ? planError(code) : "This did not save. Try again.";
+  }
+
+  function onSubmit(event: FormEvent) {
     event.preventDefault();
+    setInvalid(null);
     if (!accountId) {
-      setError("Choose an account.");
+      setInvalid("Choose an account.");
       return;
     }
     let expectedAmount = 0;
@@ -101,12 +113,12 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
       expectedAmount = amountFromForm(kind, toMinorUnits(currency, amount.trim()));
       toleranceAmount = Math.abs(toMinorUnits(currency, tolerance.trim() || "0"));
     } catch {
-      setError("Enter the amount as a number.");
+      setInvalid("Enter the amount as a number.");
       return;
     }
     const every = Number(interval);
     if (!Number.isInteger(every) || every < 1) {
-      setError("Enter how often this repeats as a whole number.");
+      setInvalid("Enter how often this repeats as a whole number.");
       return;
     }
     const body: PlanCreate = {
@@ -128,29 +140,15 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
       active,
       fundsBuckets: kind === "income" ? fundsBuckets : false,
     };
-    const parsed = (current ? planUpdateSchema : planCreateSchema).safeParse(body);
+    const parsed = planCreateSchema.safeParse(body);
     if (!parsed.success) {
-      setError("Check the details and try again.");
+      setInvalid("Check the details and try again.");
       return;
     }
-    setSaving(true);
-    try {
-      const result = await apiRequest(current ? `/api/recurring/${current.id}` : "/api/recurring", planSchema, {
-        method: current ? "PATCH" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(parsed.data),
-      });
-      if (!result.ok) {
-        setError(planError(result.code));
-        return;
-      }
-      onSaved(result.data.id);
-    } catch {
-      setError("This did not save. Try again.");
-    } finally {
-      setSaving(false);
-    }
+    save.mutate({ id: current?.id ?? null, body: parsed.data }, { onSuccess: (saved) => onSaved(saved.id) });
   }
+
+  const error = errorText();
 
   return (
     <>
@@ -160,7 +158,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
           {current ? "Change what you expect and when." : "Add a payment or deposit you expect on a schedule."}
         </DialogDescription>
       </DialogHeader>
-      <DialogForm onSubmit={(event) => void onSubmit(event)}>
+      <DialogForm onSubmit={onSubmit}>
         <DialogBody>
         <Field>
           <FieldLabel htmlFor="plan-name">Name</FieldLabel>

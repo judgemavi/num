@@ -1,41 +1,21 @@
-import {
-  accountListSchema,
-  categoryListSchema,
-  currencyUpdateSchema,
-  tagListSchema,
-  transactionListSchema,
-  type Account,
-  type Category,
-  type Tag,
-  type TransactionListQuery,
-} from "@num/shared";
+import type { TransactionListQuery } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { localAsOf } from "@/as-of";
-import { apiRequest } from "@/request";
-import { loadAllPages } from "@/settings/load-all-pages";
+import { transactionListQuery } from "@/api/transactions";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { TransactionFilterBar } from "@/transactions/filters";
-import { transactionPath } from "@/transactions/query";
 import { TransactionsTable } from "@/transactions/transactions-table";
+import { useReviewActions } from "@/transactions/use-review-actions";
 import { useEditors } from "@/editors/editor-api";
-import { useGroups, useMerchants } from "@/editors/lookups";
+import { useAccounts, useBookCurrency, useCategories, useGroups, useMerchants, useTags } from "@/editors/lookups";
 
 const transactionsRoute = getRouteApi("/transactions");
 
 type SortColumn = NonNullable<TransactionListQuery["sort"]>;
-
-async function loadNamed<T extends { id: string }>(
-  base: string,
-  schema: { parse: (data: unknown) => { items: T[]; page: number; pageSize: number; total: number } },
-): Promise<T[]> {
-  const active = await loadAllPages(base, schema, { archived: false });
-  const archived = await loadAllPages(base, schema, { archived: true });
-  return [...active.items, ...archived.items];
-}
 
 export function TransactionsScreen() {
   const search = transactionsRoute.useSearch();
@@ -43,41 +23,14 @@ export function TransactionsScreen() {
   const navigate = transactionsRoute.useNavigate();
   const { openEditor } = useEditors();
 
-  const currency = useQuery({
-    queryKey: ["book-currency"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/settings/currency", currencyUpdateSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.currency;
-    },
-  });
+  const currency = useBookCurrency();
+  const transactions = useQuery(transactionListQuery(search, localAsOf()));
 
-  const transactions = useQuery({
-    queryKey: ["transactions", search, search.needsReview ? localAsOf() : null],
-    queryFn: async () => {
-      const result = await apiRequest(transactionPath(search, localAsOf()), transactionListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data;
-    },
-  });
-
-  const accounts = useQuery({
-    queryKey: ["accounts", "options"],
-    queryFn: () => loadNamed<Account>("/api/accounts", accountListSchema),
-  });
-  const categories = useQuery({
-    queryKey: ["categories", "options"],
-    queryFn: () => loadNamed<Category>("/api/categories", categoryListSchema),
-  });
-  const tags = useQuery({
-    queryKey: ["tags", "options"],
-    queryFn: () => loadNamed<Tag>("/api/tags", tagListSchema),
-  });
+  const accounts = useAccounts();
+  const categories = useCategories();
+  const tags = useTags();
   const merchants = useMerchants();
+  const actions = useReviewActions(search);
 
   const changeFilters = useCallback(
     (patch: Partial<TransactionListQuery>) => {
@@ -202,6 +155,7 @@ export function TransactionsScreen() {
         onChange={changeFilters}
       />
       <TransactionsTable
+        actions={actions}
         search={search}
         rows={rows}
         counts={page.reviewCounts}

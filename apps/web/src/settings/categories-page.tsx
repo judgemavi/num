@@ -1,14 +1,9 @@
-import {
-  categoryGroupListSchema,
-  categoryListSchema,
-  categorySchema,
-  type Category,
-  type CategoryGroup,
-  type CategoryListQuery,
-} from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { CategoryListQuery } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
+import { categoryListQuery, groupListQuery, useArchiveCategory } from "@/api/categories";
+import { errorCode } from "@/api/client";
 import { useEditors } from "@/editors/editor-api";
 import { FilterBar } from "@/components/filter-bar";
 import { sortChoice } from "@/components/sort-choice";
@@ -21,9 +16,7 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiRequest } from "@/request";
 import { categoryError } from "@/settings/format";
-import { loadAllPages } from "@/settings/load-all-pages";
 import { SettingsBack } from "@/settings/settings-nav";
 
 const categoriesRoute = getRouteApi("/settings/categories");
@@ -64,53 +57,18 @@ function applySort(value: string): Partial<CategoryListQuery> {
 }
 
 export function CategoriesPage() {
-  const queryClient = useQueryClient();
   const search = categoriesRoute.useSearch();
   const navigate = categoriesRoute.useNavigate();
   const { openEditor, confirm } = useEditors();
   const [draft, setDraft] = useState<Draft>(() => draftFrom(search));
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const groups = useQuery({
-    queryKey: ["category-groups"],
-    queryFn: async () => {
-      const result = await apiRequest("/api/category-groups", categoryGroupListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
-
-  const categories = useQuery({
-    queryKey: ["categories", search],
-    queryFn: () =>
-      loadAllPages("/api/categories", categoryListSchema, {
-        archived: search.archived,
-        groupId: search.groupId,
-        sort: search.sort,
-        dir: search.dir,
-      }),
-  });
+  const groups = useQuery(groupListQuery());
+  const categories = useQuery(
+    categoryListQuery({ archived: search.archived, groupId: search.groupId, sort: search.sort, dir: search.dir }),
+  );
+  const archive = useArchiveCategory();
 
   function changeFilters(patch: Partial<CategoryListQuery>) {
     void navigate({ search: { ...search, ...patch, page: 1 } });
-  }
-
-  async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: ["category-groups"] });
-    await queryClient.invalidateQueries({ queryKey: ["categories"] });
-  }
-
-  async function archiveCategory(category: Category, restore: boolean) {
-    const path = restore ? "restore" : "archive";
-    const result = await apiRequest(`/api/categories/${category.id}/${path}`, categorySchema, { method: "POST" });
-    if (!result.ok) {
-      setActionError(categoryError(result.code));
-      return;
-    }
-    setActionError(null);
-    await refresh();
   }
 
   if (groups.isPending || categories.isPending) {
@@ -187,7 +145,7 @@ export function CategoriesPage() {
                   <SelectItem value="none" className="min-h-11">
                     No group
                   </SelectItem>
-                  {groupRows.map((group: CategoryGroup) => (
+                  {groupRows.map((group) => (
                     <SelectItem key={group.id} value={group.id} className="min-h-11">
                       {group.name}
                     </SelectItem>
@@ -206,9 +164,9 @@ export function CategoriesPage() {
           </>
         }
       />
-      {actionError ? (
+      {archive.error ? (
         <p role="alert" className="text-sm text-attn">
-          {actionError}
+          {categoryError(errorCode(archive.error))}
         </p>
       ) : null}
       <ListCard label="Categories">
@@ -235,7 +193,7 @@ export function CategoriesPage() {
                       confirmLabel: restore ? "Restore category" : "Archive category",
                     }).then((ok) => {
                       if (ok) {
-                        void archiveCategory(category, restore);
+                        archive.mutate({ id: category.id, restore });
                       }
                     });
                   }}

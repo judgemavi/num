@@ -6,9 +6,10 @@ import {
   mortgageViewQuerySchema,
   mortgageViewSchema,
 } from "@num/shared";
-import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { getMortgageTerms, mortgageAccountView, mortgagePrefill } from "../services/mortgage";
+import { validationHook } from "../validation";
 
 const errorResponse = {
   description: "The request is not valid",
@@ -73,18 +74,21 @@ const prefillRoute = createRoute({
   },
 });
 
-export function registerMortgage(app: OpenAPIHono, db: Db) {
-  app.openapi(readRoute, (c) => c.json(getMortgageTerms(db, c.req.valid("param").id), 200));
-  app.openapi(viewRoute, (c) => {
-    const { id } = c.req.valid("param");
-    const query = c.req.valid("query");
-    return c.json(
-      mortgageAccountView(db, id, query.asOf, { extra: query.extra, lumpSum: query.lumpSum, lumpDate: query.lumpDate }),
-      200,
-    );
-  });
-  app.openapi(prefillRoute, (c) => {
-    const query = c.req.valid("query");
-    return c.json(mortgagePrefill(db, query.fromAccountId, query.toAccountId, query.date), 200);
-  });
+export function mortgageRoutes(db: Db) {
+  return new OpenAPIHono({ defaultHook: validationHook })
+    .openapi(readRoute, (c) => c.json(getMortgageTerms(db, c.req.valid("param").id), 200))
+    .openapi(viewRoute, (c) => {
+      const { id } = c.req.valid("param");
+      const query = c.req.valid("query");
+      return c.json(
+        mortgageAccountView(db, id, query.asOf, { extra: query.extra, lumpSum: query.lumpSum, lumpDate: query.lumpDate }),
+        200,
+      );
+    })
+    .openapi(prefillRoute, (c) => {
+      const query = c.req.valid("query");
+      return c.json(mortgagePrefill(db, query.fromAccountId, query.toAccountId, query.date), 200);
+    });
 }
+
+export type MortgageRoutes = ReturnType<typeof mortgageRoutes>;

@@ -1,13 +1,14 @@
-import { inboxDecisionListSchema, merchantSchema, type Merchant } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Merchant } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { errorCode } from "@/api/client";
+import { useSaveMerchant } from "@/api/merchants";
+import { inboxDecisionsQuery, useUndoDecision } from "@/api/review";
 import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
-import { undoDecision } from "@/review/actions";
 import { decisionText, inboxError } from "@/review/format";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { apiRequest } from "@/request";
 import { merchantError } from "@/settings/format";
 
 type MerchantFormProps = {
@@ -21,43 +22,26 @@ type MerchantFormProps = {
 
 export function MerchantForm({ merchant, initialName, inline = false, depth = 0, onClose, onSaved }: MerchantFormProps) {
   const [name, setName] = useState(merchant?.name ?? initialName ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [undoError, setUndoError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const queryClient = useQueryClient();
+  const [nameMissing, setNameMissing] = useState(false);
+  const save = useSaveMerchant();
+  const undo = useUndoDecision();
   const decisions = useQuery({
-    queryKey: ["inbox-decisions", merchant?.id],
+    ...inboxDecisionsQuery(),
     enabled: merchant !== null,
-    queryFn: async () => {
-      const result = await apiRequest("/api/review/decisions", inboxDecisionListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items.filter((row) => row.decision === "not_recurring" && merchant !== null && row.itemKey.includes(`:${merchant.id}:`));
-    },
+    select: (rows) => rows.filter((row) => row.decision === "not_recurring" && merchant !== null && row.itemKey.includes(`:${merchant.id}:`)),
   });
+  const error = nameMissing ? "Enter a name." : save.error ? merchantError(errorCode(save.error)) : null;
 
-  async function submit() {
-    if (name.trim().length === 0) {
-      setError("Enter a name.");
-      return;
+  function submit() {
+    const trimmed = name.trim();
+    setNameMissing(trimmed.length === 0);
+    if (trimmed.length > 0) {
+      save.mutate({ id: merchant?.id ?? null, name: trimmed }, { onSuccess: (saved) => onSaved(saved.id) });
     }
-    setSaving(true);
-    const result = await apiRequest(merchant ? `/api/merchants/${merchant.id}` : "/api/merchants", merchantSchema, {
-      method: merchant ? "PATCH" : "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: name.trim() }),
-    });
-    setSaving(false);
-    if (!result.ok) {
-      setError(merchantError(result.code));
-      return;
-    }
-    onSaved(result.data.id);
   }
 
   return (
-    <FormShell inline={inline} className="grid gap-4" onSubmit={() => void submit()}>
+    <FormShell inline={inline} className="grid gap-4" onSubmit={submit}>
       <FormHeading
         inline={inline}
         title={merchant ? "Edit merchant" : "New merchant"}
@@ -67,28 +51,14 @@ export function MerchantForm({ merchant, initialName, inline = false, depth = 0,
       {(decisions.data ?? []).map((row) => (
         <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
           <span>{decisionText(row.decision)}</span>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              void undoDecision(row.itemKey).then(async (result) => {
-                if (!result.ok) {
-                  setUndoError(inboxError(result.code));
-                  return;
-                }
-                setUndoError(null);
-                await queryClient.invalidateQueries({ queryKey: ["inbox-decisions"] });
-                await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-              });
-            }}
-          >
+          <Button type="button" variant="outline" onClick={() => undo.mutate(row.itemKey)}>
             Undo
           </Button>
         </p>
       ))}
-      {undoError ? (
+      {undo.error ? (
         <p role="alert" className="text-sm text-attn">
-          {undoError}
+          {inboxError(errorCode(undo.error) ?? "internal_error")}
         </p>
       ) : null}
       <Field data-invalid={error !== null || undefined}>
@@ -101,8 +71,8 @@ export function MerchantForm({ merchant, initialName, inline = false, depth = 0,
         <FormCancel inline={inline} onClose={onClose}>
           Cancel
         </FormCancel>
-        <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? () => void submit() : undefined}>
-          {saving ? "Saving" : merchant ? "Save merchant" : "Add merchant"}
+        <Button type={inline ? "button" : "submit"} disabled={save.isPending} onClick={inline ? submit : undefined}>
+          {save.isPending ? "Saving" : merchant ? "Save merchant" : "Add merchant"}
         </Button>
       </FormActions>
     </FormShell>

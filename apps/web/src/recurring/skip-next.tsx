@@ -1,7 +1,9 @@
-import { occurrenceLinkSchema, occurrenceListSchema, type Plan } from "@num/shared";
+import type { Plan } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { errorCode } from "@/api/client";
+import { occurrencesQuery, useSkipOccurrence } from "@/api/recurring";
 import { planError } from "@/recurring/format";
-import { apiRequest } from "@/request";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
@@ -9,50 +11,31 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 type SkipNextProps = {
-  plan: Plan | null;
+  plan: Plan;
   reason: string;
   asOf: string;
-  error: string | null;
   onReason: (value: string) => void;
   onDone: () => void;
-  onError: (value: string) => void;
 };
 
-export function SkipNext({ plan, reason, asOf, error, onReason, onDone, onError }: SkipNextProps) {
-  const [saving, setSaving] = useState(false);
-  if (!plan) {
-    return null;
-  }
+export function SkipNext({ plan, reason, asOf, onReason, onDone }: SkipNextProps) {
+  const [nothingToSkip, setNothingToSkip] = useState(false);
+  const occurrences = useQuery(occurrencesQuery(plan.id, asOf));
+  const skip = useSkipOccurrence();
+  const failure = occurrences.error ?? skip.error;
+  const error = nothingToSkip ? "There is no occurrence to skip." : failure ? planError(errorCode(failure)) : null;
   return (
     <DialogForm
       onSubmit={(event) => {
         event.preventDefault();
-        setSaving(true);
-        void (async () => {
-          const list = await apiRequest(`/api/recurring/${plan.id}/occurrences?asOf=${asOf}`, occurrenceListSchema);
-          if (!list.ok) {
-            onError(planError(list.code));
-            setSaving(false);
-            return;
-          }
-          const next = list.data.items.find((item) => item.status === "missed" || item.status === "open");
-          if (!next) {
-            onError("There is no occurrence to skip.");
-            setSaving(false);
-            return;
-          }
-          const result = await apiRequest(`/api/recurring/${plan.id}/occurrences/${next.dueDate}/skip`, occurrenceLinkSchema, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ reason: reason.trim() }),
-          });
-          setSaving(false);
-          if (!result.ok) {
-            onError(planError(result.code));
-            return;
-          }
-          onDone();
-        })();
+        if (!occurrences.data) {
+          return;
+        }
+        const next = occurrences.data.items.find((item) => item.status === "missed" || item.status === "open");
+        setNothingToSkip(!next);
+        if (next) {
+          skip.mutate({ planId: plan.id, dueDate: next.dueDate, reason: reason.trim() }, { onSuccess: onDone });
+        }
       }}
     >
       <DialogHeader>
@@ -72,7 +55,7 @@ export function SkipNext({ plan, reason, asOf, error, onReason, onDone, onError 
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" disabled={saving || reason.trim().length === 0}>
+        <Button type="submit" disabled={skip.isPending || occurrences.isPending || reason.trim().length === 0}>
           Skip
         </Button>
       </DialogFooter>

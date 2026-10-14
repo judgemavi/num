@@ -1,9 +1,9 @@
-import { importListSchema, importUndoSchema, type ImportBatch, type ImportUndo } from "@num/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import type { ImportBatch, ImportUndo } from "@num/shared";
+import { useQuery } from "@tanstack/react-query";
+import { errorCode } from "@/api/client";
+import { accountImportsQuery, useUndoImport } from "@/api/imports";
 import { formatImportDate, formatStatementDate, importCountText, importError, undoBlockLabel } from "@/accounts/import-format";
 import { useEditors } from "@/editors/editor-api";
-import { apiRequest } from "@/request";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
@@ -16,20 +16,10 @@ type AccountImportsProps = {
 };
 
 export function AccountImports({ accountId, accountName, currency }: AccountImportsProps) {
-  const queryClient = useQueryClient();
   const { openEditor, confirm } = useEditors();
-  const [error, setError] = useState<string | null>(null);
-
-  const imports = useQuery({
-    queryKey: ["imports", accountId],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/accounts/${accountId}/imports`, importListSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.items;
-    },
-  });
+  const imports = useQuery(accountImportsQuery(accountId));
+  const undoImport = useUndoImport();
+  const error = undoImport.error ? importError(errorCode(undoImport.error)) : null;
 
   async function undo(item: ImportBatch) {
     const ok = await confirm({
@@ -40,21 +30,13 @@ export function AccountImports({ accountId, accountName, currency }: AccountImpo
     if (!ok) {
       return;
     }
-    const result = await apiRequest(`/api/imports/${item.id}/undo`, importUndoSchema, { method: "POST" });
-    if (!result.ok) {
-      setError(importError(result.code));
-      return;
-    }
-    setError(null);
-    await queryClient.invalidateQueries({ queryKey: ["imports", accountId] });
-    await queryClient.invalidateQueries({ queryKey: ["accounts"] });
-    await queryClient.invalidateQueries({ queryKey: ["account"] });
-    await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-    await queryClient.invalidateQueries({ queryKey: ["hygiene"] });
-    if (result.data.blocked.length > 0) {
-      await showBlocked(result.data.blocked);
-    }
+    undoImport.mutate(item.id, {
+      onSuccess: (result) => {
+        if (result.blocked.length > 0) {
+          void showBlocked(result.blocked);
+        }
+      },
+    });
   }
 
   function showBlocked(blocked: ImportUndo["blocked"]) {

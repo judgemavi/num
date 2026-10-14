@@ -1,18 +1,19 @@
 import {
   choicesForDirection,
   defaultChoice,
-  inboxGroupApplyResultSchema,
   merchantForChoice,
   moneyDirection,
-  transactionSchema,
   type Account,
   type Category,
   type Merchant,
   type Transaction,
   type WhatChoice,
 } from "@num/shared";
-import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
+import { errorCode } from "@/api/client";
+import { useApplyGroup } from "@/api/review";
+import { transactionQuery } from "@/api/transactions";
 import { accountLabel } from "@/accounts/label";
 import { LoadError, LoadingLine } from "@/editors/load-state";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { FieldError, FieldLabel } from "@/components/ui/field";
-import { apiRequest } from "@/request";
 import { formatMoney as formatDisplayMoney } from "@/money";
 import { transactionError } from "@/transactions/format";
 import { WhatIsThis } from "@/transactions/what-is-this";
@@ -35,19 +35,7 @@ type GroupEditorProps = {
 };
 
 export function GroupEditor({ ids, currency, accounts, categories, merchants, onSaved }: GroupEditorProps) {
-  const queryClient = useQueryClient();
-  const loaded = useQueries({
-    queries: ids.map((id) => ({
-      queryKey: ["transaction", id],
-      queryFn: async () => {
-        const result = await apiRequest(`/api/transactions/${id}`, transactionSchema);
-        if (!result.ok) {
-          throw new Error(result.code);
-        }
-        return result.data;
-      },
-    })),
-  });
+  const loaded = useQueries({ queries: ids.map((id) => transactionQuery(id)) });
   const transactions = loaded.flatMap((query) => (query.data ? [query.data] : []));
   const pending = loaded.some((query) => query.isPending);
   const failed = loaded.some((query) => query.isError);
@@ -57,21 +45,7 @@ export function GroupEditor({ ids, currency, accounts, categories, merchants, on
   if (failed || transactions.length !== ids.length) {
     return <LoadError label="The transactions did not load." onRetry={() => loaded.forEach((query) => void query.refetch())} />;
   }
-  return (
-    <GroupForm
-      currency={currency}
-      transactions={transactions}
-      accounts={accounts}
-      categories={categories}
-      merchants={merchants}
-      onSaved={async (id) => {
-        await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-        await queryClient.invalidateQueries({ queryKey: ["transaction"] });
-        await queryClient.invalidateQueries({ queryKey: ["needs-review"] });
-        onSaved(id);
-      }}
-    />
-  );
+  return <GroupForm currency={currency} transactions={transactions} accounts={accounts} categories={categories} merchants={merchants} onSaved={onSaved} />;
 }
 
 function GroupForm({
@@ -95,9 +69,11 @@ function GroupForm({
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [transferAccountId, setTransferAccountId] = useState<string | null>(null);
   const [merchantId, setMerchantId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const apply = useApplyGroup();
+  const saving = apply.isPending;
+  const error = invalid ?? (apply.error ? transactionError(errorCode(apply.error)) : null);
+  const notice = apply.data && apply.data.skipped.length > 0 ? `Applied to ${apply.data.applied} · skipped ${apply.data.skipped.length}` : null;
   const included = transactions.filter((item) => !excluded.includes(item.id));
   const total = included.reduce((sum, item) => sum + item.amount, 0);
   const sameSign = included.every((item) => item.amount === 0 || Math.sign(item.amount) === Math.sign(total || item.amount));
@@ -116,45 +92,39 @@ function GroupForm({
   const archivedMerchants = merchants.filter((merchant) => merchant.archivedAt).map((merchant) => ({ id: merchant.id, label: merchant.name }));
   const saveDisabled = saving || included.length === 0 || (choice === "transfer" && !transferAccountId);
 
-  async function save() {
+  function save() {
     if (included.length === 0) {
       return;
     }
     if (choice !== "transfer" && !categoryId) {
-      setError("Choose a category.");
+      setInvalid("Choose a category.");
       return;
     }
-    setSaving(true);
-    setError(null);
-    const result = await apiRequest("/api/transactions/group", inboxGroupApplyResultSchema, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+    setInvalid(null);
+    apply.mutate(
+      {
         accountId,
         transactionIds: transactions.map((item) => item.id),
         excludedIds: excluded,
         categoryId: choice === "transfer" ? null : categoryId,
         transferAccountId: choice === "transfer" ? transferAccountId : null,
         merchantId: choice === "transfer" ? null : merchantId,
-      }),
-    });
-    setSaving(false);
-    if (!result.ok) {
-      setError(transactionError(result.code));
-      return;
-    }
-    if (result.data.skipped.length > 0) {
-      setNotice(`Applied to ${result.data.applied} · skipped ${result.data.skipped.length}`);
-      return;
-    }
-    onSaved(included[0]?.id ?? "");
+      },
+      {
+        onSuccess: (result) => {
+          if (result.skipped.length === 0) {
+            onSaved(included[0]?.id ?? "");
+          }
+        },
+      },
+    );
   }
 
   return (
     <DialogForm
       onSubmit={(event) => {
         event.preventDefault();
-        void save();
+        save();
       }}
     >
       <DialogHeader>
