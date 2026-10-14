@@ -1,6 +1,6 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, useMatch } from "@tanstack/react-router";
-import { transactionListQuery } from "@/api/transactions";
+import { transactionListQuery, transactionReviewListQuery } from "@/api/transactions";
 import { localAsOf } from "@/as-of";
 import { useListSearch } from "@/lists/use-list-search";
 
@@ -12,17 +12,57 @@ export function useOnReview() {
   return useMatch({ from: "/transactions_/review", shouldThrow: false }) !== undefined;
 }
 
-/** The filters, the sort order and the page of the Transactions list of the page in the URL. */
+/** The filters, the sort order and the page of the All page. */
+export function useAllSearch() {
+  return useListSearch(allRoute.useSearch(), allRoute.useNavigate(), { sort: "date", dir: "desc" });
+}
+
+/** The filters, the sort order and the page of the Needs review page. It also sorts by confidence (decision 0049). */
+export function useReviewSearch() {
+  return useListSearch(reviewRoute.useSearch(), reviewRoute.useNavigate(), { sort: "date", dir: "desc" });
+}
+
+/**
+ * The search of the page in the URL. The two pages have the same filters and pages. Their sort columns are not the
+ * same: a sort control calls `useAllSearch` or `useReviewSearch`. The page does not change while the screen is
+ * on it, thus each render calls the same hooks.
+ */
 export function useTransactionSearch() {
-  const route = useOnReview() ? reviewRoute : allRoute;
-  return useListSearch(route.useSearch(), route.useNavigate(), { sort: "date", dir: "desc" });
+  const useSearchOfPage = useOnReview() ? useReviewSearch : useAllSearch;
+  return useSearchOfPage();
+}
+
+/** The page of the All page. The page on the screen stays while a new page loads. */
+function useAllPage() {
+  const list = useAllSearch();
+  return { ...list, page: useSuspenseQuery(transactionListQuery(list.shown, localAsOf())).data };
+}
+
+/** The page of the Needs review page, with the counts of the levels on all pages. */
+export function useReviewPage() {
+  const list = useReviewSearch();
+  return { ...list, page: useSuspenseQuery(transactionReviewListQuery(list.shown, localAsOf())).data };
 }
 
 /**
  * The page of transactions for the URL. Each part of the screen that shows the page calls this hook.
- * The parts share one read. The page on the screen stays while a new page loads.
+ * The parts share one read.
  */
 export function useTransactionPage() {
-  const list = useTransactionSearch();
-  return { ...list, page: useSuspenseQuery(transactionListQuery(list.shown, localAsOf(), useOnReview())).data };
+  const usePageOfScreen = useOnReview() ? useReviewPage : useAllPage;
+  return usePageOfScreen();
+}
+
+function usePrefetchAll() {
+  usePrefetchQuery(transactionListQuery(useAllSearch().shown, localAsOf()));
+}
+
+function usePrefetchReview() {
+  usePrefetchQuery(transactionReviewListQuery(useReviewSearch().shown, localAsOf()));
+}
+
+/** Starts the read of the page of the URL. */
+export function usePrefetchTransactionPage() {
+  const usePrefetchOfPage = useOnReview() ? usePrefetchReview : usePrefetchAll;
+  usePrefetchOfPage();
 }

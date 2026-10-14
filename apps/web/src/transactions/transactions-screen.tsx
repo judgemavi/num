@@ -1,7 +1,4 @@
-import { usePrefetchQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { localAsOf } from "@/as-of";
-import { transactionListQuery } from "@/api/transactions";
 import { Boundary } from "@/components/boundary";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
@@ -12,7 +9,7 @@ import { hasFilters } from "@/transactions/query";
 import { TransactionTabs } from "@/transactions/transaction-tabs";
 import { TransactionsTable } from "@/transactions/transactions-table";
 import { ApproveAll } from "@/transactions/approve-all";
-import { useOnReview, useTransactionPage, useTransactionSearch } from "@/transactions/use-transaction-list";
+import { useOnReview, usePrefetchTransactionPage, useTransactionPage } from "@/transactions/use-transaction-list";
 import { useEditors } from "@/editors/editor-api";
 import { useAccounts } from "@/editors/lookups";
 
@@ -24,7 +21,7 @@ import { useAccounts } from "@/editors/lookups";
  */
 export function TransactionsScreen() {
   // The list does not need the lists of the filter bar. Its read starts here, thus it does not wait for them.
-  usePrefetchQuery(transactionListQuery(useTransactionSearch().shown, localAsOf(), useOnReview()));
+  usePrefetchTransactionPage();
 
   return (
     <Boundary loading="Loading transactions." failed="The transactions did not load.">

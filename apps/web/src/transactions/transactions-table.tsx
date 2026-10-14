@@ -1,4 +1,4 @@
-import { accountClass, type TransactionListItem, type TransactionListQuery } from "@num/shared";
+import { accountClass, type TransactionListItem, type TransactionListQuery, type TransactionReviewListQuery } from "@num/shared";
 import { Lock } from "lucide-react";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,12 @@ import { useAccountLabels, useBookCurrency } from "@/editors/lookups";
 import { CategoryCell, ProposedCategoryCell } from "@/transactions/category-cell";
 import { formatDate, refundOfText, refundedText } from "@/transactions/format";
 import { ReviewConfidence, ReviewStatus } from "@/transactions/review-status";
-import { useOnReview } from "@/transactions/use-transaction-list";
+import { useOnReview, useReviewSearch } from "@/transactions/use-transaction-list";
 
 export type TransactionSort = SortChoice<NonNullable<TransactionListQuery["sort"]>>;
+
+/** The sort order of the table. The Needs review page also sorts by confidence (decision 0049). */
+type TableSort = SortChoice<NonNullable<TransactionReviewListQuery["sort"]>>;
 
 export type Selection = {
   ids: string[];
@@ -28,23 +31,38 @@ type Props = {
   showBalance: boolean;
   hideAccount?: boolean;
   selection?: Selection;
-  sort: TransactionSort;
+  sort: TableSort;
   onSort: (column: TransactionSort["sort"]) => void;
 };
 
-function SortHead({ column, label, props, className }: { column: TransactionSort["sort"]; label: string; props: Props; className?: string }) {
-  const sorted = props.sort.sort !== column ? "none" : props.sort.dir === "asc" ? "ascending" : "descending";
+type SortHeadProps<Column extends string> = {
+  column: Column;
+  label: string;
+  sort: TableSort;
+  onSort: (column: Column) => void;
+  className?: string;
+};
+
+/** A column header that sorts the table by its column. */
+function SortHead<Column extends string>({ column, label, sort, onSort, className }: SortHeadProps<Column>) {
+  const sorted = sort.sort !== column ? "none" : sort.dir === "asc" ? "ascending" : "descending";
   return (
     <TableHead aria-sort={sorted} className={className}>
-      <Button type="button" variant="ghost" size="sm" onClick={() => props.onSort(column)}>
+      <Button type="button" variant="ghost" size="sm" onClick={() => onSort(column)}>
         {label}
       </Button>
     </TableHead>
   );
 }
 
+/** The Confidence header of Needs review sorts by confidence (decision 0049). */
+function ConfidenceHead() {
+  const { sort, sortBy } = useReviewSearch();
+  return <SortHead column="confidence" label="Confidence" sort={sort} onSort={sortBy} />;
+}
+
 export function TransactionsTable(props: Props) {
-  const { rows, empty, showBalance, hideAccount, selection } = props;
+  const { rows, empty, showBalance, hideAccount, selection, sort, onSort } = props;
   const { openEditor } = useEditors();
   const currency = useBookCurrency();
   const accountNames = useAccountLabels();
@@ -135,13 +153,13 @@ export function TransactionsTable(props: Props) {
                 />
               </TableHead>
             ) : null}
-            <SortHead column="date" label="Date" props={props} />
+            <SortHead column="date" label="Date" sort={sort} onSort={onSort} />
             {hideAccount ? null : <TableHead>Account</TableHead>}
-            <SortHead column="payeeRaw" label="Payee" props={props} />
+            <SortHead column="payeeRaw" label="Payee" sort={sort} onSort={onSort} />
             <TableHead>Category</TableHead>
-            <SortHead column="amount" label="Amount" props={props} className="text-right" />
+            <SortHead column="amount" label="Amount" sort={sort} onSort={onSort} className="text-right" />
             {showBalance ? <TableHead className="text-right">Balance</TableHead> : null}
-            <TableHead>{onReview ? "Confidence" : "Status"}</TableHead>
+            {onReview ? <ConfidenceHead /> : <TableHead>Status</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>

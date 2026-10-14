@@ -28,6 +28,8 @@ export type NeedsReviewHit = {
   date: string;
   accountId: string;
   merchantId: string | null;
+  /** The score of the automatic label. A Sure row sorts by it (decision 0049). */
+  autoConfidence: number | null;
   review: TransactionReview;
 };
 
@@ -57,6 +59,7 @@ function loadBases(db: Db, ids: readonly string[]) {
         payee: transactions.payeeNormalized,
         merchantId: transactions.merchantId,
         autoReason: transactions.autoReason,
+        autoConfidence: transactions.autoConfidence,
         openLine: sql<boolean>`${hasOpenLine(transactions.id)}`.mapWith(Boolean),
         lineCount: lineCount(transactions.id),
         reconciled: isReconciled(transactions),
@@ -191,7 +194,7 @@ export function listNeedsReview(
       // "Yes" to a "no category" suggestion is the keep decision (decision 0046).
       review.itemKey = suggestion?.keep ? keepKey(row.id) : null;
     }
-    hits.push({ id: row.id, date: row.date, accountId: row.accountId, merchantId: row.merchantId, review });
+    hits.push({ id: row.id, date: row.date, accountId: row.accountId, merchantId: row.merchantId, autoConfidence: row.autoConfidence, review });
   }
   return hits;
 }

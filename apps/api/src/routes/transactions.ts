@@ -99,7 +99,7 @@ const listRoute = createRoute({
 
 const reviewListRoute = createRoute({
   operationId: "search_transactions_review",
-  description: "Read the transactions that need review, with the same filters, sort order and pages as search_transactions. Each row has its review. The counts are for all pages. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read the transactions that need review, with the same filters, sort order and pages as search_transactions. sort=confidence also sorts by the review level (no suggestion, question, Maybe, Likely, Sure), then by the score. Each row has its review. The counts are for all pages. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/transactions/review",
   request: { query: transactionReviewQuerySchema },

@@ -135,8 +135,14 @@ export const transactionListApiQuerySchema = transactionListQuerySchema.extend({
   asOf: queryDate,
 });
 
-/** The Needs review list: the same filters, sort order and pages as the transaction list (decision 0047). */
-export const transactionReviewQuerySchema = transactionListQuerySchema.extend(asOfQuerySchema.shape);
+/** The Needs review list also sorts by confidence (decision 0049). */
+export const reviewSortColumns = [...transactionSortColumns, "confidence"] as const;
+
+/** The Needs review list: the same filters and pages as the transaction list (decision 0047), and one more sort column. */
+export const transactionReviewListQuerySchema = listQuerySchema(reviewSortColumns).extend(transactionFilterSchema.shape);
+
+/** The query of the Needs review read: the list query and `asOf`. */
+export const transactionReviewQuerySchema = transactionReviewListQuerySchema.extend(asOfQuerySchema.shape);
 
 export const approveLevelSchema = transactionFilterSchema.extend({
   level: z.enum(approveLevels),
@@ -191,4 +197,5 @@ export type ReviewAnswer = z.infer<typeof reviewAnswerSchema>;
 export type TransactionWrite = z.infer<typeof transactionWriteSchema>;
 export type Transaction = z.infer<typeof transactionSchema>;
 export type TransactionListQuery = z.output<typeof transactionListQuerySchema>;
+export type TransactionReviewListQuery = z.output<typeof transactionReviewListQuerySchema>;
 export type TransactionListItem = z.infer<typeof transactionListItemSchema>;

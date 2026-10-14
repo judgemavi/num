@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useEditors } from "@/editors/editor-api";
 import { levelLabel } from "@/transactions/format";
 import { filterBody } from "@/transactions/query";
-import { useTransactionPage } from "@/transactions/use-transaction-list";
+import { useReviewPage } from "@/transactions/use-transaction-list";
 
 const levels: ApproveLevel[] = ["sure", "likely"];
 
@@ -17,16 +17,13 @@ const levels: ApproveLevel[] = ["sure", "likely"];
  */
 export function ApproveAll() {
   const { confirm } = useEditors();
-  const { shown, page } = useTransactionPage();
+  const { shown, page } = useReviewPage();
   const approveLevel = useApproveLevel();
   const listLoading = useTransactionListFetching();
   const writing = useIsMutating() > 0;
   // The counts are old from the write until the list has the new rows.
   const busy = writing || approveLevel.isPending || (approveLevel.isSuccess && listLoading);
   const counts = page.reviewCounts;
-  if (counts === null) {
-    return null;
-  }
 
   async function approve(level: ApproveLevel, count: number) {
     const name = levelLabel(level);

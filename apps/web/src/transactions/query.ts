@@ -1,6 +1,6 @@
-import type { TransactionFilter, TransactionListQuery } from "@num/shared";
+import type { TransactionFilter } from "@num/shared";
 
-export function hasFilters(search: TransactionListQuery): boolean {
+export function hasFilters(search: TransactionFilter): boolean {
   return Boolean(
     search.q ||
       search.accountId ||
@@ -16,7 +16,7 @@ export function hasFilters(search: TransactionListQuery): boolean {
 }
 
 /** The filters that choose which rows a bulk approval covers. */
-export function filterBody(search: TransactionListQuery): TransactionFilter {
+export function filterBody(search: TransactionFilter): TransactionFilter {
   return {
     q: search.q,
     accountId: search.accountId,

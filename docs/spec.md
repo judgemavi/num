@@ -601,14 +601,16 @@ The best candidate (§7.3) preselects the choice: a category, or a learned trans
 **Needs review (decisions 0021, 0047).** A transaction needs review when it has an automatic label, a suggestion,
 no category, or an open question (possible transfer, more than one recurring candidate, refund of which purchase).
 A changed recurring amount is not in Needs review: the Recurring plan screen shows it (§7.4).
-Needs review is its own page, `/transactions/review`, with the same table, columns, sort order and pages as
-`/transactions`. The page has only the transactions that need review. Both pages show two tabs: "All" and
+Needs review is its own page, `/transactions/review`, with the same table and pages as `/transactions`.
+It has the same sort orders, and also a sort by confidence (decision 0049). The page has only the transactions that need review. Both pages show two tabs: "All" and
 "Needs review · N".
 - **Status column (All page):** a row that needs review shows its level (Sure, Likely, Maybe) when it has a suggestion
   or an automatic label, and "Needs review" when it has a question or no suggestion. Other rows show nothing.
 - **Needs review page (decision 0048):** the Status column is the Confidence column. It shows the level, "Question" for
   a question, and nothing for a row with no suggestion. The Category column shows the proposed label and merchant of a
   suggestion, and "Transfer to <account>" for a possible transfer. Other rows show the stored label.
+  The Confidence column header sorts the page by confidence (decision 0049): from low to high, no suggestion,
+  Question, Maybe, Likely, Sure, and in a level, the lower score first.
 - **Answer in the editor:** a row has no buttons. A click on the row opens the transaction editor, and Save is the
   answer. A question is a field of the editor, filled with the proposed answer:
   - Possible transfer: "What is this?" is Transfer, with the other account and its matched transaction. Save as a

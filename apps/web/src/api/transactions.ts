@@ -1,4 +1,4 @@
-import type { Transaction, TransactionCreate, TransactionListQuery, TransactionUpdate } from "@num/shared";
+import type { Transaction, TransactionCreate, TransactionListQuery, TransactionReviewListQuery, TransactionUpdate } from "@num/shared";
 import { queryOptions, useIsFetching, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, formWrite, unwrap } from "@/api/client";
 import { transactionError } from "@/transactions/format";
@@ -8,16 +8,22 @@ export function useTransactionListFetching() {
   return useIsFetching({ queryKey: ["transactions"] }) > 0;
 }
 
-/**
- * One page of the transaction list. Each row that needs review on `asOf` has its review. With `review`, the page has
- * only the rows that need review (decision 0047), and the counts of their levels on all pages.
- */
-export function transactionListQuery(search: TransactionListQuery, asOf: string, review = false) {
-  const query = { ...search, asOf };
+/** One page of the transaction list. Each row that needs review on `asOf` has its review. */
+export function transactionListQuery(search: TransactionListQuery, asOf: string) {
   return queryOptions({
-    queryKey: ["transactions", review ? "review" : "all", search, asOf],
-    queryFn: async () =>
-      review ? unwrap(api.transactions.review.$get({ query })) : { ...(await unwrap(api.transactions.$get({ query }))), reviewCounts: null },
+    queryKey: ["transactions", "all", search, asOf],
+    queryFn: () => unwrap(api.transactions.$get({ query: { ...search, asOf } })),
+  });
+}
+
+/**
+ * One page of the rows that need review (decision 0047), and the counts of their levels on all pages. The page also
+ * sorts by confidence (decision 0049).
+ */
+export function transactionReviewListQuery(search: TransactionReviewListQuery, asOf: string) {
+  return queryOptions({
+    queryKey: ["transactions", "review", search, asOf],
+    queryFn: () => unwrap(api.transactions.review.$get({ query: { ...search, asOf } })),
   });
 }
 

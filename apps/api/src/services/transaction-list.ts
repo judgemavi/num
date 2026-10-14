@@ -1,5 +1,11 @@
 import { accounts, categories, lineTags, merchants, transactionLines, transactions } from "@num/db";
-import type { TransactionFilter, TransactionListItem, TransactionListQuery, TransactionReview } from "@num/shared";
+import type {
+  TransactionFilter,
+  TransactionListItem,
+  TransactionListQuery,
+  TransactionReview,
+  TransactionReviewListQuery,
+} from "@num/shared";
 import { and, asc, count, desc, eq, exists, gte, inArray, isNotNull, isNull, lte, notExists, or, sql, type SQL } from "drizzle-orm";
 import { alias, QueryBuilder, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { Db } from "../db";
@@ -53,7 +59,7 @@ function selectRows(db: Db) {
 
 type ListRow = ReturnType<ReturnType<typeof selectRows>["all"]>[number];
 
-function order(query: TransactionListQuery) {
+function order(query: Pick<TransactionListQuery, "automatic" | "sort" | "dir">) {
   if (query.automatic && query.sort === undefined) {
     return [asc(transactions.autoConfidence), asc(transactions.id)];
   }
@@ -236,13 +242,19 @@ export function filteredReviewHits(db: Db, filter: TransactionFilter, asOf: stri
   return hits.filter((hit) => matching.has(hit.id));
 }
 
-/** One page of rows for the condition, in the sort order of the query, with the running balance of one account. */
-function readPage(db: Db, query: TransactionListQuery, where: SQL | undefined, review: (ids: string[]) => Map<string, TransactionReview>) {
+/** One page of rows for the condition, in the sort order, with the running balance of one account. */
+function readPage(
+  db: Db,
+  query: TransactionListQuery | TransactionReviewListQuery,
+  where: SQL | undefined,
+  sortOrder: SQL[],
+  review: (ids: string[]) => Map<string, TransactionReview>,
+) {
   const counted = db.select({ total: count() }).from(transactions).$dynamic();
   const total = (query.q ? counted.leftJoin(merchants, onMerchant) : counted).where(where).get()?.total ?? 0;
   const rows = selectRows(db)
     .where(where)
-    .orderBy(...order(query))
+    .orderBy(...sortOrder)
     .limit(query.pageSize)
     .offset((query.page - 1) * query.pageSize)
     .all();
@@ -266,17 +278,43 @@ function reviewMap(hits: readonly NeedsReviewHit[]) {
 /** A page of transactions. With `asOf`, each row that needs review has its review: only the rows of the page get a score. */
 export function listTransactions(db: Db, query: TransactionListQuery & { asOf?: string }) {
   const { asOf } = query;
-  return readPage(db, query, filters(query), (ids) =>
+  return readPage(db, query, filters(query), order(query), (ids) =>
     asOf && ids.length > 0 ? reviewMap(listNeedsReview(db, asOf, { only: ids })) : new Map(),
   );
 }
 
-/** A page of the transactions that need review (decision 0047). The same filters, sort order and pages as the list. */
-export function listReviewTransactions(db: Db, query: TransactionListQuery & { asOf: string }) {
+/** The levels from low to high confidence. A question has no level (decision 0049). */
+const levelRanks = { none: 0, question: 1, maybe: 2, likely: 3, sure: 4 };
+
+/** The score of a row in its level: the score of the automatic label or of the suggestion. Scores are 0 to 1000. */
+function confidenceRank({ review, autoConfidence }: NeedsReviewHit) {
+  if (review.question !== "categorize") {
+    return levelRanks.question * 1001;
+  }
+  const score = review.level === "sure" ? (autoConfidence ?? 0) : review.level === "none" ? 0 : (review.suggestion?.confidence ?? 0);
+  return levelRanks[review.level] * 1001 + score;
+}
+
+/**
+ * The confidence order of the review rows: the level first, then the score. Equal rows are newest first.
+ * One parameter: a JSON object of the rank of each id that SQLite reads with `json_each`.
+ */
+function confidenceOrder(hits: readonly NeedsReviewHit[], dir: TransactionReviewListQuery["dir"]) {
+  const ranks = JSON.stringify(Object.fromEntries(hits.map((hit) => [hit.id, confidenceRank(hit)])));
+  const rank = sql`(select value from json_each(${ranks}) where key = ${transactions.id})`;
+  return [(dir === "desc" ? desc : asc)(rank), desc(transactions.date), desc(transactions.id)];
+}
+
+/**
+ * A page of the transactions that need review (decision 0047). The same filters and pages as the list.
+ * The list also sorts by confidence (decision 0049).
+ */
+export function listReviewTransactions(db: Db, query: TransactionReviewListQuery & { asOf: string }) {
   const hits = filteredReviewHits(db, query, query.asOf);
   const reviews = reviewMap(hits);
   const where = hits.length === 0 ? sql`0` : idIn(hits.map((hit) => hit.id));
-  return { ...readPage(db, query, where, () => reviews), reviewCounts: reviewCounts(hits) };
+  const sortOrder = query.sort === "confidence" ? confidenceOrder(hits, query.dir) : order({ ...query, sort: query.sort });
+  return { ...readPage(db, query, where, sortOrder, () => reviews), reviewCounts: reviewCounts(hits) };
 }
 
 /** The review of one transaction: the question and the proposed answer that the editor shows. */

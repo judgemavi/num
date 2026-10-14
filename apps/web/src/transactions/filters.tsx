@@ -1,9 +1,9 @@
-import type { TransactionListQuery } from "@num/shared";
+import type { TransactionFilter } from "@num/shared";
 import { accountLabel } from "@/accounts/label";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
 import { useAccounts, useCategories, useGroups, useMerchants, useTags } from "@/editors/lookups";
 import { formatDate } from "@/transactions/format";
-import { useTransactionSearch } from "@/transactions/use-transaction-list";
+import { useAllSearch, useOnReview, useReviewSearch, useTransactionSearch } from "@/transactions/use-transaction-list";
 import { SortSelect } from "@/lists/sort-select";
 import { SearchBox } from "@/lists/search-box";
 import { useAppForm } from "@/forms/form-hook";
@@ -17,6 +17,23 @@ const sortOptions = [
   { sort: "payeeRaw", dir: "asc", label: "Payee, A to Z" },
   { sort: "payeeRaw", dir: "desc", label: "Payee, Z to A" },
 ] as const;
+
+/** Needs review also sorts by confidence (decision 0049). */
+const reviewSortOptions = [
+  ...sortOptions,
+  { sort: "confidence", dir: "asc", label: "Confidence, low to high" },
+  { sort: "confidence", dir: "desc", label: "Confidence, high to low" },
+] as const;
+
+function AllSort() {
+  const { sort, setSort } = useAllSearch();
+  return <SortSelect id="transaction-sort" label="Sort" value={sort} options={sortOptions} onChange={setSort} />;
+}
+
+function ReviewSort() {
+  const { sort, setSort } = useReviewSearch();
+  return <SortSelect id="transaction-sort" label="Sort" value={sort} options={reviewSortOptions} onChange={setSort} />;
+}
 
 /** The filters of the panel with no choice. The controls use null and "" for no choice. */
 const noFilters = {
@@ -32,7 +49,7 @@ const noFilters = {
 };
 
 /** The values of the filter panel for the filters in the URL. */
-function panelValues(search: TransactionListQuery) {
+function panelValues(search: TransactionFilter) {
   return {
     accountId: search.accountId ?? null,
     categoryId: search.categoryId ?? null,
@@ -67,7 +84,8 @@ function namedOptions(items: { id: string; name: string; archivedAt?: string | n
 
 /** The filter bar of the Transactions list. It reads the filters from the URL and changes them there. */
 export function TransactionFilterBar() {
-  const { search, sort, patch, setSort } = useTransactionSearch();
+  const { search, patch } = useTransactionSearch();
+  const review = useOnReview();
   const accounts = useAccounts();
   const categories = useCategories();
   const groups = useGroups();
@@ -140,7 +158,7 @@ export function TransactionFilterBar() {
       onApply={() => void panel.handleSubmit()}
       onClear={() => panel.reset(noFilters, { keepDefaultValues: true })}
       onClearAll={() => patch(urlFilters(noFilters))}
-      sort={<SortSelect id="transaction-sort" label="Sort" value={sort} options={sortOptions} onChange={setSort} />}
+      sort={review ? <ReviewSort /> : <AllSort />}
       fields={
         <>
           <panel.AppField name="accountId">
