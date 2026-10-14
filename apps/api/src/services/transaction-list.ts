@@ -39,6 +39,7 @@ const learnedRows = subquery
     and(
       isNull(learned.autoReason),
       eq(learned.payeeNormalized, transactions.payeeNormalized),
+      sql`(${learned.amount} < 0) = (${transactions.amount} < 0)`,
       isNotNull(learnedLine.categoryId),
       isNull(learnedLine.transferAccountId),
     ),

@@ -39,7 +39,7 @@ export function applyLinkedPlan(
     level: "automatic" as const,
     confidence: 0.99,
     confidenceMilli: 990,
-    lead: 1,
+    leadMilli: 1000,
     reason: "recurring" as const,
     sourceId: plan.id,
     sourceName: plan.name,

@@ -46,11 +46,12 @@ export function plainReason(input: {
     return input.sourceName ? `Matches your ${input.sourceName} payment` : "Matches your recurring payment";
   }
   if (input.reason === "learned_amount" || input.reason === "learned_payee") {
+    const subject = input.reason === "learned_amount" ? "this payee and amount" : "this payee";
     if (input.learnedCount === null) {
-      return "You chose this for this payee";
+      return `You chose this for ${subject}`;
     }
     const times = input.learnedCount === 1 ? "1 time" : `${input.learnedCount} times`;
-    return `You chose this ${times} for this payee`;
+    return `You chose this ${times} for ${subject}`;
   }
   if (input.reason === "similar") {
     return input.sourceName ? `Same as ${input.sourceName}` : "Same as a similar payee";

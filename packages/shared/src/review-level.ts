@@ -4,13 +4,13 @@ export const reviewLevels = ["sure", "likely", "maybe", "none"] as const;
 
 export type ReviewLevel = (typeof reviewLevels)[number];
 
-/** Shown level. Sure is an applied automatic label only. A suggestion is Likely from 0.75 and Maybe below that. */
-export function reviewLevel(automatic: boolean, confidence: number | null): ReviewLevel {
+/** Shown level. Sure is an applied automatic label only. A suggestion is Likely from 750 thousandths and Maybe below that. */
+export function reviewLevel(automatic: boolean, confidenceMilli: number | null): ReviewLevel {
   if (automatic) {
     return "sure";
   }
-  if (confidence === null || confidence < suggestionFloor) {
+  if (confidenceMilli === null || confidenceMilli < suggestionFloor) {
     return "none";
   }
-  return confidence >= likelyMinimum ? "likely" : "maybe";
+  return confidenceMilli >= likelyMinimum ? "likely" : "maybe";
 }

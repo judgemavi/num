@@ -62,7 +62,7 @@ export function suggestionFromMatch(result: MatchResult): Suggestion {
     categoryId: result.categoryId,
     transferAccountId: result.transferAccountId,
     reason,
-    level: reviewLevel(false, result.confidenceMilli / 1000),
+    level: reviewLevel(false, result.confidenceMilli),
     sourceId: result.sourceId,
     sourceName: result.reason === "similar" || result.reason === "family" ? result.sourceName : null,
     confidence: result.confidenceMilli,

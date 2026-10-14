@@ -502,7 +502,7 @@ two forms of one merchant. Example: remove a trailing region code ("CA", "ON"), 
 | Signal | Confidence |
 |---|---|
 | Recurring link (exactly one matching occurrence, §7.4) | 0.99 |
-| Learned payee + amount (the normalized payee and the same amount, ±1%) | learned formula |
+| Learned payee + amount (decision 0036): the band of the learned label contains the amount | learned formula × width factor |
 | Learned payee | learned formula × 0.95 |
 | Similar payee (decision 0026): a learned payee is contained, from the first word, in the new payee | that payee's learned confidence × 0.9, never automatic |
 | Brand family (decision 0026): 2 or more learned payees with the same first word all have the same label | lowest of their learned confidences × 0.85, never automatic |
@@ -511,11 +511,17 @@ Learned formula: confidence = agreement × certainty.
 - agreement = a / t. a = recency-weighted confirmations for the candidate, t = recency-weighted confirmations for the key.
   Each confirmation weighs half as much as the next more recent one.
 - certainty = 1 − 0.15 × 0.6^(n − 1), where n = number of confirmations for the key (n = 1: 0.85, 2: 0.91, 3: 0.946).
+Learned key (decision 0036): the normalized payee and the direction (money out, or money in; zero is money in).
+Learned transfers ignore the direction.
+Amount band (decision 0036): for each learned label, the newest 6 confirmed amounts. The band is from the lowest − 1%
+to the highest + 1% (1 amount: that amount ±1%). width = (highest − lowest) / highest (absolute values).
+Width factor = 1 − 0.05 × min(1, width / 0.5).
 Examples: payee + amount with 1 answer = 0.85; payee only with 1 answer = 0.85 × 0.95 = 0.81; payee only with 2 agreeing
 answers = 0.86; Coffee, Eating out, Coffee (newest first) = 0.71 × 0.946 = 0.68.
 A confirmation is a category or merchant that the user chose or accepted ("Looks right"), not one that the app set.
 
-Combining: signals for the same candidate combine as 1 − Π(1 − cᵢ). The best candidate must lead the second by ≥ 0.2;
+Combining: signals for the same candidate combine as 1 − Π(1 − cᵢ). Exception: the payee + amount signal and the payee
+signal for the same candidate do not combine; the candidate takes the higher one (decision 0036). The best candidate must lead the second by ≥ 0.2;
 otherwise it is a suggestion only.
 Exception: a recurring link is the user's own intent. It always labels (automatic), and other signals do not compete with it.
 It applies on every link: automatic link on import, and a manual link in the UI.
@@ -524,11 +530,13 @@ Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default,
 - confidence ≥ `autoConfidence` and a clear lead: **automatic** (the label is applied; it still needs review).
 - confidence ≥ 0.60: **suggestion** (preselected, not applied).
 - less: no suggestion.
+The app compares confidence in thousandths (0–1000) with the thresholds (decision 0036).
 
 **Levels (decision 0021).** The UI never shows a percentage. It shows a level and a plain reason:
 - **Sure:** automatic. **Likely:** a suggestion with confidence ≥ 0.75. **Maybe:** a suggestion below 0.75.
   No level: no suggestion.
-- Reasons: "Matches your Rent payment" (recurring), "You chose this N times for this payee" (learned),
+- Reasons: "Matches your Rent payment" (recurring), "You chose this N times for this payee and amount" (learned payee +
+  amount), "You chose this N times for this payee" (learned payee),
   "Same as <learned payee>" (similar), "Same as other <first word> payees" (family).
 - Settings → Matching shows `autoConfidence` as "Label for me: only when very sure (careful) · when sure (balanced) ·
   more often (eager)".

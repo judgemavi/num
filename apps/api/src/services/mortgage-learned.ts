@@ -1,5 +1,6 @@
 import { accounts, mortgageTerms, transactionLines, transactions, valuations } from "@num/db";
 import {
+  confidenceMilli,
   learnedConfidence,
   mortgagePrefillLines,
   mortgageSplitForDate,
@@ -121,7 +122,8 @@ export function mortgageSuggestion(
   if (!hit || row.amount >= 0 || !mortgageLinesFor(db, hit.accountId, row.accountId, row.date, row.amount)) {
     return null;
   }
-  const level = reviewLevel(false, hit.confidence);
+  const confidence = confidenceMilli(hit.confidence);
+  const level = reviewLevel(false, confidence);
   if (level === "none") {
     return null;
   }
@@ -135,7 +137,7 @@ export function mortgageSuggestion(
       level,
       sourceId: hit.sourceId,
       sourceName: hit.similarTo,
-      confidence: Math.round(hit.confidence * 1000),
+      confidence,
       mortgage: true,
     },
   };

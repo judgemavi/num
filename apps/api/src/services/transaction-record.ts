@@ -8,10 +8,11 @@ import {
   type TransactionInputStatus,
   type TransactionSource,
 } from "@num/shared";
-import { and, count, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, count, eq, gte, isNotNull, isNull, lt } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import { loadLines, type StoredLine } from "./transaction-lines";
 import { transactionReconciled } from "./reconciled";
+import { literal } from "./transaction-sql";
 import { blankToNull, requireText } from "./transaction-rules";
 import type { WriteTx, Reader } from "./write";
 
@@ -50,6 +51,7 @@ function labelFacts(db: Reader, row: TransactionRow): { autoSourceName: string |
       and(
         isNull(transactions.autoReason),
         eq(transactions.payeeNormalized, row.payeeNormalized),
+        row.amount < 0 ? lt(transactions.amount, literal(0)) : gte(transactions.amount, literal(0)),
         isNotNull(transactionLines.categoryId),
         isNull(transactionLines.transferAccountId),
       ),

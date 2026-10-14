@@ -71,7 +71,7 @@ function loadBases(db: Db, ids: readonly string[]) {
 
 /** Sure and Likely are bulk levels. A row has one only when the bulk action can apply it. */
 function rowLevel(row: Base, automatic: boolean, suggestion: Suggestion | null) {
-  const level = reviewLevel(automatic, suggestion ? suggestion.confidence / 1000 : null);
+  const level = reviewLevel(automatic, suggestion ? suggestion.confidence : null);
   if (level !== "likely") {
     return level;
   }

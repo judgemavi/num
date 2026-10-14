@@ -1,25 +1,28 @@
 import { accounts, occurrenceLinks, recurringPlans, settings, transactions, type TransactionRow } from "@num/db";
 import {
   Temporal,
-  amountsWithinOnePercent,
   buildPayeeIndex,
   containedMatch,
   familyMatch,
   confidenceModes,
+  fitLabels,
   learnedConfidence,
+  labelScores,
+  learnedLabels,
   linkWindowStart,
   matchLinks,
   occurrenceDates,
   scoreMatch,
   similarFactor,
   type ConfidenceMode,
+  type LearnedLabel,
   type LearnedRow,
+  type LearnedScore,
   type LinkTransaction,
   type FamilySignal,
   type MatchResult,
   type PayeeIndex,
   type RecurringSignal,
-  type ScoreInput,
 } from "@num/shared";
 import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import { loadMortgageLearned, type MortgageHit, type MortgageLearned } from "./mortgage-learned";
@@ -50,25 +53,87 @@ const confirmedLine = sql`
   )
 `;
 
+type Direction = "out" | "in";
+
+/** Decision 0036: the learned key is the payee and the direction. Zero is money in. */
+function directionOf(amount: number): Direction {
+  return amount < 0 ? "out" : "in";
+}
+
+type LabelTop = Omit<FamilySignal, "word">;
+
+/** What the confirmed rows of one direction teach. Each map is keyed by the normalized payee. */
+type Side = {
+  bands: Map<string, LearnedLabel[]>;
+  payeeLearned: Map<string, LearnedScore[]>;
+  /** Payee + amount scores, keyed by the payee and the labels whose band contains the amount. */
+  amountLearned: Map<string, LearnedScore[]>;
+  labels: Map<string, string>;
+  tops: Map<string, LabelTop>;
+  index: PayeeIndex;
+  contained: Map<string, string | null>;
+  families: Map<string, FamilySignal | null>;
+};
+
 export type MatchBook = {
   mode: ConfidenceMode;
-  byPayee: Map<string, ConfirmRow[]>;
+  sides: Record<Direction, Side>;
   transfersByPayee: Map<string, TransferRow[]>;
   mortgageLearned: Map<string, MortgageLearned>;
-  payeeLearned: Map<string, ReturnType<typeof learnedConfidence>>;
-  amountLearned: Map<string, ReturnType<typeof learnedConfidence>>;
-  labels: Map<string, string>;
-  tops: Map<string, Omit<FamilySignal, "word">>;
-  index: PayeeIndex;
   mortgageIndex: PayeeIndex;
-  contained: Map<string, string | null>;
   mortgageContained: Map<string, MortgageHit | null>;
-  families: Map<string, FamilySignal | null>;
 };
 
 export function confidenceMode(db: Reader): ConfidenceMode {
   const row = db.select({ value: settings.value }).from(settings).where(eq(settings.key, "autoConfidence")).get();
   return confidenceModes.find((mode) => mode === row?.value) ?? "balanced";
+}
+
+function byPayee<T extends { payee: string }>(rows: readonly T[]): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const list = groups.get(row.payee);
+    if (list) {
+      list.push(row);
+    } else {
+      groups.set(row.payee, [row]);
+    }
+  }
+  return groups;
+}
+
+/** A category label wins over a learned transfer. Learned transfers ignore the direction. */
+function buildSide(rows: readonly ConfirmRow[], transferTops: ReadonlyMap<string, LabelTop>): Side {
+  const bands = new Map<string, LearnedLabel[]>();
+  const payeeLearned = new Map<string, LearnedScore[]>();
+  const labels = new Map<string, string>();
+  const tops = new Map<string, LabelTop>();
+  for (const [payee, list] of byPayee(rows)) {
+    const scores = learnedConfidence(list);
+    payeeLearned.set(payee, scores);
+    bands.set(payee, learnedLabels(list));
+    const top = scores[0];
+    if (top) {
+      labels.set(payee, `${top.categoryId}\0${top.merchantId ?? ""}`);
+      tops.set(payee, { ...top, transferAccountId: null });
+    }
+  }
+  for (const [payee, top] of transferTops) {
+    if (!labels.has(payee)) {
+      labels.set(payee, `transfer\0${top.transferAccountId}`);
+      tops.set(payee, top);
+    }
+  }
+  return {
+    bands,
+    payeeLearned,
+    amountLearned: new Map(),
+    labels,
+    tops,
+    index: buildPayeeIndex(labels.keys()),
+    contained: new Map(),
+    families: new Map(),
+  };
 }
 
 export function loadMatchBook(db: Reader): MatchBook {
@@ -81,15 +146,6 @@ export function loadMatchBook(db: Reader): MatchBook {
       and l.category_id is not null
       and l.transfer_account_id is null
   `);
-  const byPayee = new Map<string, ConfirmRow[]>();
-  for (const row of rows) {
-    const list = byPayee.get(row.payee);
-    if (list) {
-      list.push(row);
-    } else {
-      byPayee.set(row.payee, [row]);
-    }
-  }
   const transfers = db.all<TransferRow>(sql`
     select t.id as id, t.date as date, t.payee_normalized as payee, l.transfer_account_id as transferAccountId
     from transactions t
@@ -98,84 +154,60 @@ export function loadMatchBook(db: Reader): MatchBook {
       and l.category_id is null
       and l.transfer_account_id is not null
   `);
-  const transfersByPayee = new Map<string, TransferRow[]>();
-  for (const row of transfers) {
-    const list = transfersByPayee.get(row.payee);
-    if (list) {
-      list.push(row);
-    } else {
-      transfersByPayee.set(row.payee, [row]);
-    }
-  }
-  const payeeLearned = new Map<string, ReturnType<typeof learnedConfidence>>();
-  const labels = new Map<string, string>();
-  const tops: MatchBook["tops"] = new Map();
-  for (const [payee, rows] of byPayee) {
-    const scores = learnedConfidence(learnedOf(rows));
-    payeeLearned.set(payee, scores);
-    const top = scores[0];
+  const transfersByPayee = byPayee(transfers);
+  const transferTops = new Map<string, LabelTop>();
+  for (const [payee, list] of transfersByPayee) {
+    const top = learnedConfidence(transferLearned(list))[0];
     if (top) {
-      labels.set(payee, `${top.categoryId}\0${top.merchantId ?? ""}`);
-      tops.set(payee, { ...top, transferAccountId: null });
+      transferTops.set(payee, { ...top, categoryId: null, merchantId: null, transferAccountId: top.categoryId });
     }
   }
-  for (const [payee, rows] of transfersByPayee) {
-    const top = learnedConfidence(rows.map((row) => ({ id: row.id, date: row.date, categoryId: row.transferAccountId, merchantId: null })))[0];
-    if (top && !labels.has(payee)) {
-      labels.set(payee, `transfer\0${top.categoryId}`);
-      tops.set(payee, { ...top, categoryId: null, merchantId: null, transferAccountId: top.categoryId });
-    }
+  const out: ConfirmRow[] = [];
+  const incoming: ConfirmRow[] = [];
+  for (const row of rows) {
+    (directionOf(row.amount) === "out" ? out : incoming).push(row);
   }
   const mortgageLearned = loadMortgageLearned(db);
-  const index = buildPayeeIndex(labels.keys());
-  const mortgageIndex = buildPayeeIndex(mortgageLearned.keys());
   return {
     mode: confidenceMode(db),
-    byPayee,
+    sides: { out: buildSide(out, transferTops), in: buildSide(incoming, transferTops) },
     transfersByPayee,
     mortgageLearned,
-    payeeLearned,
-    amountLearned: new Map(),
-    labels,
-    tops,
-    index,
-    mortgageIndex,
-    contained: new Map(),
+    mortgageIndex: buildPayeeIndex(mortgageLearned.keys()),
     mortgageContained: new Map(),
-    families: new Map(),
   };
 }
 
-function learnedOf(rows: readonly ConfirmRow[]): LearnedRow[] {
-  return rows.map((row) => ({ id: row.id, date: row.date, categoryId: row.categoryId, merchantId: row.merchantId }));
+function transferLearned(rows: readonly TransferRow[]): LearnedRow[] {
+  return rows.map((row) => ({ id: row.id, date: row.date, categoryId: row.transferAccountId, merchantId: null }));
 }
 
 /** The learned payee that a payee without answers of its own contains (decision 0026). */
-export function containedFor(book: MatchBook, payee: string): string | null {
-  if (book.labels.has(payee)) {
+function containedFor(side: Side, payee: string): string | null {
+  if (side.labels.has(payee)) {
     return null;
   }
-  let found = book.contained.get(payee);
+  let found = side.contained.get(payee);
   if (found === undefined) {
-    found = containedMatch(book.index, payee, (learned) => book.labels.get(learned) ?? null);
-    book.contained.set(payee, found);
+    found = containedMatch(side.index, payee, (learned) => side.labels.get(learned) ?? null);
+    side.contained.set(payee, found);
   }
   return found;
 }
 
 /** The answer that other learned payees with the same first word teach, when they all agree (decision 0026, rule 7). */
-export function familyFor(book: MatchBook, payee: string): FamilySignal | null {
-  if (book.labels.has(payee)) {
+function familyFor(side: Side, payee: string): FamilySignal | null {
+  if (side.labels.has(payee)) {
     return null;
   }
-  let found = book.families.get(payee);
+  let found = side.families.get(payee);
   if (found === undefined) {
-    const family = familyMatch(book.index, payee, (learned) => book.labels.get(learned) ?? null);
-    const tops = (family?.payees ?? []).map((name) => book.tops.get(name));
+    const family = familyMatch(side.index, payee, (learned) => side.labels.get(learned) ?? null);
+    const tops = (family?.payees ?? []).map((name) => side.tops.get(name));
     const first = tops[0];
     const lowest = tops.reduce((low, top) => Math.min(low, top?.confidence ?? 0), 1);
     found = family && first ? { ...first, word: family.word, confidence: lowest } : null;
-    book.families.set(payee, found);
+    side.families.set(payee, found);
   }
   return found;
 }
@@ -200,33 +232,31 @@ export function scorePayee(
   book: MatchBook,
   input: { payee: string; amount: number; recurring: RecurringSignal | null },
 ): MatchResult {
-  const contained = containedFor(book, input.payee);
-  const family = contained ? null : familyFor(book, input.payee);
-  const same = book.byPayee.get(input.payee) ?? [];
-  const amountKey = `${input.payee}\0${input.amount}`;
-  let amountScores = book.amountLearned.get(amountKey);
+  const side = book.sides[directionOf(input.amount)];
+  const contained = containedFor(side, input.payee);
+  const family = contained ? null : familyFor(side, input.payee);
+  const fit = fitLabels(side.bands.get(input.payee) ?? [], input.amount);
+  const fitKey = `${input.payee}\0${fit.map((label) => label.key).join("\0")}`;
+  let amountScores = side.amountLearned.get(fitKey);
   if (!amountScores) {
-    amountScores = learnedConfidence(learnedOf(same.filter((row) => amountsWithinOnePercent(row.amount, input.amount))));
-    book.amountLearned.set(amountKey, amountScores);
+    amountScores = labelScores(fit);
+    side.amountLearned.set(fitKey, amountScores);
   }
-  const scored: ScoreInput = {
+  return scoreMatch({
     mode: book.mode,
     recurring: input.recurring,
-    amountRows: [],
-    payeeRows: [],
     amountScores,
-    payeeScores: book.payeeLearned.get(input.payee) ?? [],
+    payeeScores: side.payeeLearned.get(input.payee) ?? [],
     similar: contained
       ? {
           payee: contained,
-          scores: book.payeeLearned.get(contained) ?? [],
+          scores: side.payeeLearned.get(contained) ?? [],
           transferRows: book.transfersByPayee.get(contained) ?? [],
         }
       : null,
     family,
     transferRows: book.transfersByPayee.get(input.payee) ?? [],
-  };
-  return scoreMatch(scored);
+  });
 }
 
 function graceDays(db: Reader) {
@@ -325,8 +355,4 @@ export function recurringForRows(db: Reader, pending: readonly LinkTransaction[]
     });
   }
   return hits;
-}
-
-export function learnedCount(rows: readonly LearnedRow[]): number {
-  return learnedConfidence(rows).reduce((max, score) => Math.max(max, score.count), 0);
 }

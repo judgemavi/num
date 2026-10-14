@@ -6,15 +6,16 @@ export const confidenceModes = ["careful", "balanced", "eager"] as const;
 
 export type ConfidenceMode = (typeof confidenceModes)[number];
 
+/** Thresholds in thousandths. The level compares them with `confidenceMilli` (decision 0036). */
 export const confidenceThresholds: Record<ConfidenceMode, number> = {
-  careful: 0.95,
-  balanced: 0.85,
-  eager: 0.75,
+  careful: 950,
+  balanced: 850,
+  eager: 750,
 };
 
-export const suggestionFloor = 0.6;
-export const likelyMinimum = 0.75;
-export const leadMinimum = 0.2;
+export const suggestionFloor = 600;
+export const likelyMinimum = 750;
+export const leadMinimum = 200;
 export const similarFactor = 0.9;
 export const familyFactor = 0.85;
 export const recurringConfidence = 0.99;
@@ -67,10 +68,8 @@ export type FamilySignal = {
 export type ScoreInput = {
   mode: ConfidenceMode;
   recurring: RecurringSignal | null;
-  amountRows: readonly LearnedRow[];
-  payeeRows: readonly LearnedRow[];
-  amountScores?: readonly LearnedScore[];
-  payeeScores?: readonly LearnedScore[];
+  amountScores: readonly LearnedScore[];
+  payeeScores: readonly LearnedScore[];
   similar: SimilarPayee | null;
   family?: FamilySignal | null;
   transferRows: readonly { id: string; date: string; transferAccountId: string }[];
@@ -91,7 +90,7 @@ export type MatchResult = {
   level: MatchLevel;
   confidence: number;
   confidenceMilli: number;
-  lead: number;
+  leadMilli: number;
   reason: AutoReason | null;
   sourceId: string | null;
   sourceName: string | null;
@@ -104,14 +103,9 @@ export type MatchResult = {
 };
 
 type Candidate = {
-  categoryId: string | null;
-  merchantId: string | null;
-  transferAccountId: string | null;
   confidence: number;
-  reason: AutoReason;
-  sourceId: string | null;
-  sourceName: string | null;
-  count: number;
+  /** The strongest signal. It gives the answer, the reason, the source and the count. */
+  top: MatchSignal;
   signals: MatchSignal[];
 };
 
@@ -119,7 +113,7 @@ const emptyMatch: MatchResult = {
   level: "none",
   confidence: 0,
   confidenceMilli: 0,
-  lead: 0,
+  leadMilli: 0,
   reason: null,
   sourceId: null,
   sourceName: null,
@@ -131,14 +125,14 @@ const emptyMatch: MatchResult = {
   signals: [],
 };
 
-function newestFirst(left: { date: string; id: string }, right: { date: string; id: string }): number {
+export function newestFirst(left: { date: string; id: string }, right: { date: string; id: string }): number {
   if (left.date !== right.date) {
     return left.date < right.date ? 1 : -1;
   }
   return left.id < right.id ? 1 : left.id > right.id ? -1 : 0;
 }
 
-function candidateKey(categoryId: string, merchantId: string | null) {
+export function candidateKey(categoryId: string, merchantId: string | null) {
   return `${categoryId}\0${merchantId ?? ""}`;
 }
 
@@ -190,6 +184,7 @@ export function confidenceMilli(confidence: number): number {
   return Math.min(1000, Math.max(0, Math.round(confidence * 1000)));
 }
 
+/** Confidence and lead are in thousandths. */
 export function matchLevel(confidence: number, lead: number, mode: ConfidenceMode, suggestionOnly: boolean): MatchLevel {
   if (confidence < suggestionFloor) {
     return "none";
@@ -198,12 +193,6 @@ export function matchLevel(confidence: number, lead: number, mode: ConfidenceMod
     return "suggestion";
   }
   return confidence >= confidenceThresholds[mode] ? "automatic" : "suggestion";
-}
-
-export function amountsWithinOnePercent(left: number, right: number): boolean {
-  const delta = Math.abs(left - right);
-  const scale = Math.max(Math.abs(left), Math.abs(right));
-  return delta * 100 <= scale;
 }
 
 function pushLearned(
@@ -295,8 +284,8 @@ function collectSignals(input: ScoreInput) {
       count: 0,
     });
   }
-  pushLearned(signals, input.amountScores ?? learnedConfidence(input.amountRows), "learned_amount", 1, null);
-  pushLearned(signals, input.payeeScores ?? learnedConfidence(input.payeeRows), "learned_payee", 0.95, null);
+  pushLearned(signals, input.amountScores, "learned_amount", 1, null);
+  pushLearned(signals, input.payeeScores, "learned_payee", 0.95, null);
   if (input.similar) {
     pushLearned(signals, input.similar.scores, "similar", similarFactor, input.similar.payee);
     pushTransfers(signals, input.similar.transferRows, "similar", similarFactor, input.similar.payee);
@@ -317,8 +306,22 @@ function collectSignals(input: ScoreInput) {
   return signals;
 }
 
-function groupCandidates(signals: readonly MatchSignal[]) {
-  const groups = new Map<string, Candidate>();
+/** Decision 0036: payee + amount and payee learn from the same rows. The candidate takes the higher one of the two. */
+function candidateConfidence(signals: readonly MatchSignal[]) {
+  let learned = 0;
+  const others: number[] = [];
+  for (const signal of signals) {
+    if (signal.reason === "learned_amount" || signal.reason === "learned_payee") {
+      learned = Math.max(learned, signal.confidence);
+    } else {
+      others.push(signal.confidence);
+    }
+  }
+  return combineConfidence([learned, ...others]);
+}
+
+function groupCandidates(signals: readonly MatchSignal[]): Candidate[] {
+  const groups = new Map<string, MatchSignal[]>();
   for (const signal of signals) {
     const key = signal.transferAccountId
       ? `transfer\0${signal.transferAccountId}`
@@ -328,52 +331,40 @@ function groupCandidates(signals: readonly MatchSignal[]) {
     if (key.length === 0) {
       continue;
     }
-    const current = groups.get(key);
-    if (!current) {
-      groups.set(key, {
-        categoryId: signal.categoryId,
-        merchantId: signal.merchantId,
-        transferAccountId: signal.transferAccountId,
-        confidence: signal.confidence,
-        reason: signal.reason,
-        sourceId: signal.sourceId,
-        sourceName: signal.sourceName,
-        count: signal.count,
-        signals: [signal],
-      });
-      continue;
-    }
-    current.signals.push(signal);
-    current.confidence = combineConfidence(current.signals.map((item) => item.confidence));
-    const strongest = [...current.signals].sort((left, right) => right.confidence - left.confidence)[0];
-    if (strongest) {
-      current.reason = strongest.reason;
-      current.sourceId = strongest.sourceId;
-      current.sourceName = strongest.sourceName ?? current.sourceName;
-      current.count = Math.max(current.count, strongest.count);
+    const list = groups.get(key);
+    if (list) {
+      list.push(signal);
+    } else {
+      groups.set(key, [signal]);
     }
   }
-  return [...groups.values()].sort((left, right) => right.confidence - left.confidence);
+  return [...groups.values()]
+    .map((list) => ({
+      confidence: candidateConfidence(list),
+      top: list.reduce((best, signal) => (signal.confidence > best.confidence ? signal : best)),
+      signals: list,
+    }))
+    .sort((left, right) => right.confidence - left.confidence);
 }
 
 function resultFrom(candidate: Candidate, second: number | null, mode: ConfidenceMode, mortgage: boolean): MatchResult {
-  const lead = second === null ? 1 : candidate.confidence - second;
-  const transfer = candidate.transferAccountId !== null && candidate.categoryId === null;
-  const learned = candidate.signals.find((signal) => signal.reason === "learned_amount" || signal.reason === "learned_payee" || signal.reason === "similar" || signal.reason === "family");
+  const { top } = candidate;
+  const milli = confidenceMilli(candidate.confidence);
+  const leadMilli = second === null ? 1000 : milli - confidenceMilli(second);
+  const transfer = top.transferAccountId !== null && top.categoryId === null;
   const similar = candidate.signals.some((signal) => signal.reason === "similar" || signal.reason === "family");
-  const level = mortgage ? "automatic" : matchLevel(candidate.confidence, lead, mode, transfer || similar);
   return {
-    level,
+    level: mortgage ? "automatic" : matchLevel(milli, leadMilli, mode, transfer || similar),
     confidence: candidate.confidence,
-    confidenceMilli: confidenceMilli(candidate.confidence),
-    lead,
-    reason: candidate.reason,
-    sourceId: candidate.sourceId,
-    sourceName: candidate.sourceName,
-    categoryId: candidate.categoryId,
-    merchantId: candidate.merchantId,
-    transferAccountId: candidate.transferAccountId,
-    learnedCount: learned && learned.count > 0 ? learned.count : null,
+    confidenceMilli: milli,
+    leadMilli,
+    reason: top.reason,
+    sourceId: top.sourceId,
+    sourceName: top.sourceName,
+    categoryId: top.categoryId,
+    merchantId: top.merchantId,
+    transferAccountId: top.transferAccountId,
+    learnedCount: top.count > 0 ? top.count : null,
     mortgage,
     signals: candidate.signals,
   };

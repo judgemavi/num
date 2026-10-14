@@ -26,6 +26,7 @@ function reasonText(suggestion: Suggestion) {
     case "recurring":
       return "Matches your recurring payment";
     case "learned_amount":
+      return "You chose this for this payee and amount";
     case "learned_payee":
       return "You chose this for this payee";
     case "similar":
