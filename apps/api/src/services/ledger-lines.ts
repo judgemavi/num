@@ -1,5 +1,5 @@
 import { categories, lineTags, transactionLines, transactions } from "@num/db";
-import { storyLineKind, type StoryLine } from "@num/shared";
+import { flowLineKind, type FlowLine } from "@num/shared";
 import { and, eq, gte, lte } from "drizzle-orm";
 import type { Db } from "../db";
 
@@ -11,7 +11,7 @@ export type LedgerLine = {
   categoryId: string | null;
   groupId: string | null;
   merchantId: string | null;
-  kind: StoryLine["kind"];
+  kind: FlowLine["kind"];
   transfer: boolean;
   tagIds: string[];
 };
@@ -53,7 +53,7 @@ export function loadLedgerLines(db: Db, range?: { from: string; through: string 
     categoryId: row.categoryId,
     groupId: row.groupId,
     merchantId: row.merchantId,
-    kind: storyLineKind(row.kind),
+    kind: flowLineKind(row.kind),
     transfer: row.transferAccountId !== null,
     tagIds: byLine.get(row.lineId) ?? [],
   }));

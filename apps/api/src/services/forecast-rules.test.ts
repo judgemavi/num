@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, monthCloses, openDatabase } from "@num/db";
+import { migrateDatabase, openDatabase } from "@num/db";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
@@ -70,12 +70,6 @@ function payCard(db: Db, fromId: string, cardId: string, date: string, amount: n
     lines: [{ amount: -amount, transferAccountId: cardId }],
     ...saved,
   });
-}
-
-function closeMonth(db: Db, month: string) {
-  db.insert(monthCloses)
-    .values({ month, closedAt: at })
-    .run();
 }
 
 function bill(
@@ -163,8 +157,8 @@ test("a stale statement still schedules the next payment from the balance at asO
   try {
     const cash = cashAccount(book.db, "Cash", 10_000);
     const card = cardAccount(book.db, "full");
-    spend(book.db, card.id, expense(book.db, "Shop").id, "2026-08-01", -3_000);
-    createCheckpoint(book.db, card.id, { date: "2026-08-01", statementBalance: -3_000, ...saved });
+    spend(book.db, card.id, expense(book.db, "Shop").id, "2026-07-01", -3_000);
+    createCheckpoint(book.db, card.id, { date: "2026-07-01", statementBalance: -3_000, ...saved });
     const forecast = readForecast(book.db, "2026-10-08");
     const due = forecast.dates.indexOf("2026-10-22");
     const before = forecast.dates.indexOf("2026-10-21");
@@ -229,7 +223,6 @@ test("off-budget lines are excluded from category medians", () => {
     });
     const snacks = expense(book.db, "Snacks");
     for (const month of ["2026-01", "2026-02", "2026-03"]) {
-      closeMonth(book.db, month);
       spend(book.db, cash.id, snacks.id, `${month}-10`, -100);
       spend(book.db, outside.id, snacks.id, `${month}-11`, -10_000);
     }
@@ -270,7 +263,6 @@ test("a bill linked to a plan is not in the category median", () => {
     const snacks = expense(book.db, "Snacks");
     const plan = bill(book.db, cash.id, -400, "2026-01-12", "none", 12);
     for (const month of ["2026-01", "2026-02", "2026-03"]) {
-      closeMonth(book.db, month);
       spend(book.db, cash.id, snacks.id, `${month}-10`, -100);
       const linked = spend(book.db, cash.id, snacks.id, `${month}-12`, -400);
       linkOccurrence(book.db, plan.id, `${month}-12`, linked.id, saved);

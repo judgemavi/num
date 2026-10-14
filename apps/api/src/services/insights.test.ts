@@ -187,6 +187,64 @@ test("the window sets the period up to asOf, and a month limits the breakdowns",
   }
 });
 
+test("changes use the selected month, or the month of the period end", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db, "Chequing", "chequing", "2025-01-01");
+    const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
+    const fun = createCategory(book.db, { name: "Fun", kind: "expense", ...saved });
+    const old = createMerchant(book.db, { name: "Old shop", ...saved });
+    const fresh = createMerchant(book.db, { name: "New shop", ...saved });
+    const later = createMerchant(book.db, { name: "Later shop", ...saved });
+    for (const [date, amount] of [["2025-11-10", -1_000], ["2025-12-10", -2_000], ["2026-01-10", -3_000]] as const) {
+      spend(book.db, { accountId: chequing.id, date, amount, categoryId: groceries.id, merchantId: old.id });
+    }
+    spend(book.db, { accountId: chequing.id, date: "2026-02-10", amount: -6_000, categoryId: groceries.id, merchantId: fresh.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-01-12", amount: -500, categoryId: fun.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-03-05", amount: -700, categoryId: fun.id, merchantId: old.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-03-20", amount: -9_000, categoryId: fun.id, merchantId: later.id });
+
+    const asOf = "2026-03-16";
+    expect(readInsights(book.db, { asOf }).changes).toEqual({
+      month: "2026-03",
+      increases: [{ categoryId: fun.id, amount: 700, median: 0, delta: 700 }],
+      decreases: [{ categoryId: groceries.id, amount: 0, median: 3_000, delta: -3_000 }],
+      newMerchants: [],
+    });
+    expect(readInsights(book.db, { asOf, month: "2026-02" }).changes).toEqual({
+      month: "2026-02",
+      increases: [{ categoryId: groceries.id, amount: 6_000, median: 2_000, delta: 4_000 }],
+      decreases: [],
+      newMerchants: [{ merchantId: fresh.id }],
+    });
+    const custom = readInsights(book.db, { asOf, window: "custom", from: "2025-11-01", to: "2026-01-20" });
+    expect(custom.changes.month).toBe("2026-01");
+    expect(custom.changes.increases.map((row) => row.categoryId)).toEqual([groceries.id, fun.id]);
+    expect(readInsights(book.db, { asOf, window: "1" }).changes.month).toBe("2026-03");
+  } finally {
+    book.close();
+  }
+});
+
+test("the savings rate is for the breakdown range, and it is null when income is 0", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db, "Chequing", "chequing", "2026-01-01");
+    const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
+    const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
+    spend(book.db, { accountId: chequing.id, date: "2026-02-05", amount: 10_000, categoryId: pay.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-02-10", amount: -2_500, categoryId: groceries.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-03-10", amount: -1_500, categoryId: groceries.id });
+
+    const asOf = "2026-03-16";
+    expect(readInsights(book.db, { asOf })).toMatchObject({ income: 10_000, spending: 4_000, savingsRateMilliPct: 60_000 });
+    expect(readInsights(book.db, { asOf, month: "2026-02" }).savingsRateMilliPct).toBe(75_000);
+    expect(readInsights(book.db, { asOf, month: "2026-03" })).toMatchObject({ income: 0, savingsRateMilliPct: null });
+  } finally {
+    book.close();
+  }
+});
+
 test("net worth at the current month end equals the Accounts balance", () => {
   const book = tempDatabase();
   try {

@@ -20,7 +20,7 @@ All features must support one of these three loops:
 |---|---|---|---|
 | Weekly review | One time each week | 10 min | Statements are imported. Nothing needs review. Home is all clear. |
 | Paycheck funding | At each paycheck | 2 min | The paycheck is assigned to buckets with one click. |
-| Monthly close | At the start of each month | 15 min | Balances agree with statements. The month is marked as reviewed. The month story is available. |
+| Monthly reconcile | At the start of each month | 15 min | Balances agree with statements. Insights shows the changes of the month. |
 
 If a screen or feature does not support one of these loops, do not add it.
 
@@ -31,7 +31,7 @@ If a screen or feature does not support one of these loops, do not add it.
 3. **Money never changes by itself.** The app does not create, change or delete money (amounts, dates, accounts,
    transfers, splits) without a user action. Labels (category and merchant) can be automatic when the app is sure
    (§7.3). An automatic label always shows its reason and is easy to correct. Example: "Learned from Mar 12".
-4. **Reversible.** The user can undo imports and funding. The user can open a closed month again.
+4. **Reversible.** The user can undo imports and funding.
    The user can restore archived accounts, categories, tags, merchants, recurring items and buckets.
    The audit log records each of these actions.
 5. **Exceptions only.** Home shows only what needs the user. The user approves sure labels in bulk and answers the rest.
@@ -344,13 +344,11 @@ Fields: `filename`, `hash` (unique), `mimeType`, `storagePath`, `uploadedAt`.
 
 Keep documents permanently. Use only a soft delete.
 
-### 5.13 Checkpoint and month close
+### 5.13 Checkpoint
 
 Checkpoint fields: `accountId`, `date`, `statementBalance`, `createdAt`, `unlockedAt?`.
 - The app creates a checkpoint only if the calculated balance on `date` is equal to `statementBalance`.
 - After a checkpoint, the transactions of the account on or before `date` are reconciled (calculated, §5.4).
-
-Month close fields: `month` (`YYYY-MM`), `closedAt`. A month close is a "reviewed" mark. It does not lock the month.
 
 **Card statements are derived (no fixed days):**
 - A checkpoint of a `credit_card` account is a statement: its date and balance.
@@ -615,7 +613,7 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
   - Read only the transactions inside these windows from the database. Do not load all transactions.
 - Plans do not create transactions.
 
-### 7.5 Reconcile and close
+### 7.5 Reconcile
 
 **Checkpoint.**
 1. The user enters the statement date and balance. Or, the import supplies them.
@@ -625,13 +623,6 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
 3. The user cannot force a checkpoint when the balances are not equal.
 
 **Unlock.** The user can unlock a checkpoint to edit reconciled transactions. The audit log records the unlock.
-
-**Month close.** The user can close a month only when the month has ended (`asOf` is after its last day) and:
-- Each on-budget account has a checkpoint on or after the last day of the month.
-- No transaction in that month needs review, and Home has no open item for that month.
-
-A month close records that the user reviewed the month. It does not lock the month and it stores no summary: the month
-story is always calculated from current data (§9). The user can open the month again; this removes the mark (audited).
 
 ### 7.6 Paycheck funding
 
@@ -677,7 +668,9 @@ The forecast is daily, for 90 days. It shows each on-budget account and the tota
 **Estimated series:** the known series + variable spending.
 - Spending buckets: `refillTo`, divided equally across the days of each month.
   Use the account that usually pays for the bucket's categories.
-- Expense categories without a bucket: the median of the last 3 closed months, divided equally across the days.
+- Expense categories without a bucket: the median of the last 3 complete months, divided equally across the days.
+  A complete month is a calendar month whose last day is before `asOf` and that is not before the month of the first
+  transaction in the book (decision 0031).
   Do not include transactions that link to a plan.
   Do not include lines larger than 3 × the median line of that category.
 
@@ -696,13 +689,12 @@ After 90 days, show only the monthly net values (Home, this month). Do not show 
 
 ## 9. Insights
 
-- **Month story.** The app calculates it for any month, closed or not. It shows:
-  - Income, spending and savings rate.
-  - The 3 largest increases and the 3 largest decreases by category, compared with the 3-month median.
-  - New merchants.
-  - Changes to recurring payments.
-  - Bucket results.
-  - Plan compared with actual.
+- **Summary.** Income, spending, savings and the savings rate of the breakdown range. Decision 0031.
+- **Changes.** The changes of one month, the change month. Decision 0031.
+  - The change month is the selected month. If no month is selected, it is the month of the last day of the period.
+  - The 3 largest increases and the 3 largest decreases by category, compared with the median of the 3 months
+    before the change month.
+  - New merchants: merchants whose first transaction is in the change month.
 - **Period.** One selector: 1, 3, 6 or 12 months, All, or Custom (From and To). Decision 0030.
 - **Timeline.** One chart: monthly income and spending bars, and the daily on-budget balance line.
   After `asOf`, it shows the forecast (§8). A click on a month bar limits the breakdowns to that month. Decision 0030.
@@ -721,10 +713,9 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 | Emergency fund | Essential goal buckets (or savings accounts, if there are no essential goal buckets) ≥ `emergencyFundMonths` × (monthly bills + monthly essential refills) |
 | Cards paid in full | The last statement balance of each `full` card was paid by its derived due date (§5.13) |
 | Imports are current | Each on-budget account has an import in the last `staleImportDays` days |
-| Months are closed | The previous month is closed |
 | Review | No transaction has needed review for more than 7 days |
 | Sinking funds | Each yearly `bill` plan has a sinking bucket for its category |
-| Savings rate | The savings rate of the last 3 closed months is 0% or more. Show the percentage. |
+| Savings rate | The savings rate of the last 3 complete months (§8) is 0% or more. Show the percentage. |
 | Recurring | There are no changed or missed occurrences |
 | Overspent | No bucket has a negative balance |
 
@@ -737,7 +728,6 @@ Undo is available for:
 - Funding run.
 - Bucket move.
 - Checkpoint (unlock).
-- Month close (open again).
 
 To correct other records, the user edits them. The audit log records each edit.
 
@@ -803,7 +793,7 @@ There are 7 screens (decision 0021).
 | Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Transactions → Needs review); hygiene checks (§10); this month: income → bills → bucket funding → left to save, "Fund this paycheck", missed payments, overspent buckets, goal status; spending changes this month; net worth. Each card links to its screen. |
 | Transactions | Search and filter, Needs review view (§7.3), detail and edit, lines, tags, transfers |
 | Buckets | Balances, funding history, moves, goals (feasibility), settings |
-| Insights | Month story, timeline (actual and forecast), spending donut (groups, categories), merchants, tags, net worth, mortgage. Decision 0030. |
+| Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups, categories), merchants, tags, net worth, mortgage. Decision 0030. |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
 | Recurring | Plans, occurrences, links, skips, Detected (new plan suggestions) |
 | Settings | Subpages: Groups, Categories, Tags, Merchants, Matching (`autoConfidence`), AI access, Backup. |

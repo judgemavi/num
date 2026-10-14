@@ -16,7 +16,6 @@ import { registerInbox } from "./routes/inbox";
 import { registerInsights } from "./routes/insights";
 import { healthRoute } from "./routes/health";
 import { registerMerchants } from "./routes/merchants";
-import { registerMonths } from "./routes/months";
 import { registerMortgage } from "./routes/mortgage";
 import { registerRecurring } from "./routes/recurring";
 import { registerSuggestions } from "./routes/suggestions";
@@ -50,7 +49,6 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
   registerInbox(app, db);
   registerAccounts(app, db);
   registerMortgage(app, db);
-  registerMonths(app, db);
   registerInsights(app, db);
   registerCheckpoints(app, db);
   registerBuckets(app, db);

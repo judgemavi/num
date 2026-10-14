@@ -2,12 +2,12 @@ import {
   cardStatements,
   hygieneSchema,
   isIsoDate,
+  monthLastDay,
   reviewAgeDays,
   Temporal,
   type AccountListQuery,
   type BucketListQuery,
   type Hygiene,
-  type MonthList,
   type PlanListQuery,
 } from "@num/shared";
 import type { Db } from "../db";
@@ -15,11 +15,13 @@ import { ServiceError } from "../service-error";
 import { listAccounts } from "./accounts";
 import { listBuckets, listOverspent } from "./buckets";
 import { cardLedger } from "./card-statements";
+import { lastCompleteMonths } from "./complete-months";
 import { monthlyBills } from "./funding-book";
 import { importFreshness, settingNumber } from "./book-settings";
 import { decidedKeys } from "./decision-keys";
+import { spendTotals } from "./insights-spend";
+import { loadLedgerLines } from "./ledger-lines";
 import { loadReviewState, type ReviewState } from "./needs-review";
-import { closedStories, listMonths } from "./months";
 import { listPlans } from "./recurring-plans";
 
 const pageSize = 200;
@@ -63,10 +65,6 @@ function bills(db: Db) {
 function ageDays(asOf: string, day: string): number {
   const days = Temporal.PlainDate.from(day).until(Temporal.PlainDate.from(asOf), { largestUnit: "day" }).days;
   return days < 0 ? 0 : days;
-}
-
-function previousMonth(asOf: string): string {
-  return Temporal.PlainDate.from(asOf).with({ day: 1 }).subtract({ months: 1 }).toString().slice(0, 7);
 }
 
 function emergencyFund(db: Db, asOf: string) {
@@ -150,13 +148,6 @@ function importsCurrent(db: Db, asOf: string) {
   return { code: "imports_current" as const, pass: items.every((item) => item.pass), staleImportDays, items };
 }
 
-function monthClosed(asOf: string, months: MonthList) {
-  const month = previousMonth(asOf);
-  const listed = months.items.find((item) => item.month === month);
-  const status = listed?.status ?? "none";
-  return { code: "month_closed" as const, pass: status === "closed" || status === "none", month, status };
-}
-
 function reviewAge(state: ReviewState, asOf: string) {
   const limit = Temporal.PlainDate.from(asOf).subtract({ days: reviewAgeDays }).toString();
   const old = state.hits.filter((item) => item.date < limit);
@@ -182,12 +173,15 @@ function sinkingFunds(db: Db) {
   return { code: "sinking_funds" as const, pass: missing.length === 0, yearly: yearly.length, missing };
 }
 
-function savingsRate(db: Db, months: MonthList, asOf: string) {
-  const closed = months.items.filter((item) => item.status === "closed").slice(0, 3);
-  const stories = closedStories(db, closed.map((item) => item.month), asOf);
-  const rows = closed.map((item) => {
-    const story = stories.get(item.month);
-    return { month: item.month, savingsRateMilliPct: story?.savingsRateMilliPct ?? null, savings: story?.savings ?? 0 };
+/** The last 3 complete months, newest first (decision 0031). */
+function savingsRate(db: Db, asOf: string) {
+  const months = lastCompleteMonths(db, asOf, 3).reverse();
+  const oldest = months[months.length - 1];
+  const newest = months[0];
+  const facts = oldest && newest ? loadLedgerLines(db, { from: `${oldest}-01`, through: monthLastDay(newest) }) : [];
+  const rows = months.map((month) => {
+    const totals = spendTotals(facts, { from: `${month}-01`, to: monthLastDay(month) });
+    return { month, savingsRateMilliPct: totals.savingsRateMilliPct, savings: totals.savings };
   });
   return { code: "savings_rate" as const, pass: rows.every((item) => item.savings >= 0), months: rows };
 }
@@ -209,17 +203,15 @@ function overspent(db: Db) {
 export function readHygiene(db: Db, asOf: string): Hygiene {
   requireAsOf(asOf);
   const state = loadReviewState(db, asOf);
-  const months = listMonths(db, asOf, state);
   return hygieneSchema.parse({
     asOf,
     checks: [
       emergencyFund(db, asOf),
       cardsPaid(db, asOf),
       importsCurrent(db, asOf),
-      monthClosed(asOf, months),
       reviewAge(state, asOf),
       sinkingFunds(db),
-      savingsRate(db, months, asOf),
+      savingsRate(db, asOf),
       recurring(db, state),
       overspent(db),
     ],

@@ -13,8 +13,6 @@ import {
 import { sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { listOverspent } from "./buckets";
-import { openFundingPaychecks } from "./funding-paychecks";
 import { keepKey } from "./decision-keep";
 import { decidedKeys, pairKey } from "./decision-keys";
 import { loadMatchBook, mortgageLearnedFor, scorePayee } from "./match-book";
@@ -274,7 +272,6 @@ export function reviewCounts(hits: readonly NeedsReviewHit[]): ReviewCounts {
 export type ReviewState = {
   signals: RecurringSignals;
   hits: NeedsReviewHit[];
-  paychecks: { date: string }[];
 };
 
 /** Reads the review sources once so one request does not compute them again. */
@@ -285,24 +282,5 @@ export function loadReviewState(db: Db, asOf: string): ReviewState {
   return {
     signals,
     hits: listNeedsReview(db, asOf, { signals, pairs }),
-    paychecks: openFundingPaychecks(db),
   };
-}
-
-export function needsReviewMonths(state: ReviewState): Set<string> {
-  return new Set(state.hits.map((hit) => hit.date.slice(0, 7)));
-}
-
-export function homeOpenMonths(db: Db, asOf: string, state: ReviewState): Set<string> {
-  const months = new Set<string>();
-  for (const item of state.paychecks) {
-    months.add(item.date.slice(0, 7));
-  }
-  for (const item of state.signals.missed) {
-    months.add(item.dueDate.slice(0, 7));
-  }
-  if (listOverspent(db).items.length > 0) {
-    months.add(asOf.slice(0, 7));
-  }
-  return months;
 }

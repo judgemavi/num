@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, monthCloses, openDatabase } from "@num/db";
+import { migrateDatabase, openDatabase } from "@num/db";
 import type { PlanCreate } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
@@ -81,7 +81,6 @@ test("forecast months: unlinked income, bills and variable spending; card paymen
     linkOccurrence(book.db, salary.id, "2026-10-01", paid.id, saved);
 
     for (const month of ["2026-07", "2026-08", "2026-09"]) {
-      book.db.insert(monthCloses).values({ month, closedAt: saved.at }).run();
       record(book.db, cash.id, `${month}-15`, -9_300, { categoryId: groceries.id });
     }
     createBucket(book.db, {
@@ -123,6 +122,41 @@ test("forecast months: unlinked income, bills and variable spending; card paymen
       { month: "2026-11", income: 5_000, spending: 3_000 + 9_300 + 3_100 },
       { month: "2026-12", income: 5_000, spending: 3_000 + 300 * 29 + 100 * 29 },
     ]);
+  } finally {
+    book.close();
+  }
+});
+
+test("category spending uses complete months only: not the month of asOf", () => {
+  const book = tempDatabase();
+  try {
+    const cash = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 500_000, ...saved });
+    const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
+    record(book.db, cash.id, "2026-01-15", -3_100, { categoryId: groceries.id });
+    record(book.db, cash.id, "2026-02-15", -3_100, { categoryId: groceries.id });
+    record(book.db, cash.id, "2026-03-15", -6_200, { categoryId: groceries.id });
+    record(book.db, cash.id, "2026-04-05", -6_200, { categoryId: groceries.id });
+
+    const inApril = readForecast(book.db, "2026-04-30");
+    expect(inApril.months[1]).toEqual({ month: "2026-05", income: 0, spending: 3_100 });
+    const inMay = readForecast(book.db, "2026-05-01");
+    expect(inMay.months[1]).toEqual({ month: "2026-06", income: 0, spending: 6_200 });
+  } finally {
+    book.close();
+  }
+});
+
+test("category spending does not count months before the first transaction", () => {
+  const book = tempDatabase();
+  try {
+    const cash = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 500_000, ...saved });
+    const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
+    record(book.db, cash.id, "2026-03-15", -3_100, { categoryId: groceries.id });
+
+    const noMonth = readForecast(book.db, "2026-03-20");
+    expect(noMonth.months[1]).toEqual({ month: "2026-04", income: 0, spending: 0 });
+    const oneMonth = readForecast(book.db, "2026-04-20");
+    expect(oneMonth.months[1]).toEqual({ month: "2026-05", income: 0, spending: 3_100 });
   } finally {
     book.close();
   }

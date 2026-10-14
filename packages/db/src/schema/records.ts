@@ -1,10 +1,5 @@
 import { index, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const monthCloses = sqliteTable("month_closes", {
-  month: text("month").primaryKey(),
-  closedAt: text("closed_at").notNull(),
-});
-
 export const inboxDecisions = sqliteTable("inbox_decisions", {
   itemKey: text("item_key").primaryKey(),
   decision: text("decision").notNull(),

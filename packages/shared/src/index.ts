@@ -427,34 +427,25 @@ export {
 } from "./forecast";
 export { isUtcTimestamp, utcNow } from "./time";
 export {
-  buildMonthStory,
-  closeBlockerCodes,
+  completeMonths,
   expenseSpending,
+  flowLineKind,
   isExpenseLine,
   isIncomeLine,
   isMonthKey,
   isUncategorizedLine,
-  storyLineKind,
   uncategorizedFlows,
-  monthDetailSchema,
   monthKeySchema,
   monthLastDay,
-  monthListSchema,
-  monthStatuses,
-  monthStorySchema,
   priorMonths,
-  storyThrough,
-  type CloseBlockerCode,
-  type MonthDetail,
-  type MonthList,
-  type MonthStatus,
-  type MonthStory,
-  type MonthStoryInput,
-  type StoryBucketBalance,
-  type StoryLine,
-  type StoryMerchant,
-  type StoryOccurrence,
+  type FlowLine,
 } from "./month";
+export {
+  buildInsightChanges,
+  insightChangesSchema,
+  savingsRateMilliPct,
+  type InsightChanges,
+} from "./insights-changes";
 export {
   hygieneCheckSchema,
   hygieneSchema,

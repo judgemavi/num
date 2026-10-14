@@ -4,7 +4,6 @@ import {
   buckets,
   categories,
   checkpoints,
-  monthCloses,
   occurrenceLinks,
   recurringPlans,
   settings,
@@ -37,6 +36,7 @@ import {
 import { and, eq, gt, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { balanceOf } from "./account-balance";
+import { lastCompleteMonths } from "./complete-months";
 import { ServiceError } from "../service-error";
 
 type PlanRow = typeof recurringPlans.$inferSelect;
@@ -103,16 +103,6 @@ function bufferOf(db: Db): number {
   }
   const value = Number(row.value);
   return Number.isSafeInteger(value) ? value : 0;
-}
-
-function closedMonths(db: Db): string[] {
-  return db
-    .select()
-    .from(monthCloses)
-    .all()
-    .map((row) => row.month)
-    .sort()
-    .slice(-3);
 }
 
 export function balanceAsOf(
@@ -217,7 +207,7 @@ export function readForecast(db: Db, asOf: string): Forecast {
     }
   }
 
-  const months = closedMonths(db);
+  const months = lastCompleteMonths(db, asOf, 3);
   const bucketOf = new Map(db.select().from(bucketCategories).all().map((row) => [row.categoryId, row.bucketId]));
   const spending = db
     .select()

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditLog, migrateDatabase, monthCloses, openDatabase, settings } from "@num/db";
+import { auditLog, migrateDatabase, openDatabase, settings } from "@num/db";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
@@ -73,12 +73,6 @@ function payCard(db: Db, fromId: string, cardId: string, date: string, amount: n
   });
 }
 
-function closeMonth(db: Db, month: string) {
-  db.insert(monthCloses)
-    .values({ month, closedAt: at })
-    .run();
-}
-
 test("a card purchase moves cash on the due date only", () => {
   const book = tempDatabase();
   try {
@@ -133,7 +127,6 @@ test("bucket spending is not counted two times", () => {
       ...saved,
     });
     for (const month of ["2026-07", "2026-08", "2026-09"]) {
-      closeMonth(book.db, month);
       spend(book.db, cash.id, groceries.id, `${month}-15`, -9_000);
     }
     const forecast = readForecast(book.db, "2026-10-01");
@@ -150,7 +143,6 @@ test("outlier lines are not included in category spending", () => {
     const cash = cashAccount(book.db, "Cash", 100_000);
     const snacks = expense(book.db, "Snacks");
     for (const month of ["2026-01", "2026-02", "2026-03"]) {
-      closeMonth(book.db, month);
       spend(book.db, cash.id, snacks.id, `${month}-15`, -100);
     }
     spend(book.db, cash.id, snacks.id, "2026-02-16", -10_000);

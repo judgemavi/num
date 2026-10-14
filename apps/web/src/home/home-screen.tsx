@@ -4,13 +4,12 @@ import {
   fundingPaycheckListSchema,
   hygieneSchema,
   insightsSchema,
-  monthDetailSchema,
   monthPlanSchema,
   overspentListSchema,
   recurringSignalsSchema,
 } from "@num/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { localAsOf } from "@/as-of";
 import { OverspentPanel } from "@/buckets/overspent-panel";
 import { Amount } from "@/components/amount";
@@ -38,7 +37,6 @@ export function HomeScreen() {
   const asOf = localAsOf();
   const month = asOf.slice(0, 7);
   const currency = useBookCurrency();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const categories = useCategories();
   const buckets = useActiveBuckets();
@@ -68,16 +66,6 @@ export function HomeScreen() {
         throw new Error(result.code);
       }
       return result.data;
-    },
-  });
-  const story = useQuery({
-    queryKey: ["month", month, asOf],
-    queryFn: async () => {
-      const result = await apiRequest(`/api/months/${month}?asOf=${asOf}`, monthDetailSchema);
-      if (!result.ok) {
-        throw new Error(result.code);
-      }
-      return result.data.story;
     },
   });
   const hygiene = useQuery({
@@ -124,7 +112,7 @@ export function HomeScreen() {
   const insights = useQuery({
     queryKey: ["insights", asOf, "home"],
     queryFn: async () => {
-      const result = await apiRequest(`/api/insights?asOf=${asOf}`, insightsSchema);
+      const result = await apiRequest(`/api/insights?asOf=${asOf}&window=1`, insightsSchema);
       if (!result.ok) {
         throw new Error(result.code);
       }
@@ -139,6 +127,7 @@ export function HomeScreen() {
   const feasibility = plan.data?.feasibility;
   const worth = insights.data?.netWorth.slice(-12) ?? [];
   const latestWorth = worth.at(-1);
+  const changes = insights.data?.changes;
 
   return (
     <>
@@ -187,9 +176,6 @@ export function HomeScreen() {
         hygiene={hygiene.data}
         pending={hygiene.isPending}
         failed={hygiene.isError}
-        onMonth={(next) => {
-          void navigate({ to: "/insights/months", search: { month: next } });
-        }}
       />
       {plan.data ? (
         <>
@@ -301,7 +287,7 @@ export function HomeScreen() {
           </Button>
         }
       >
-        {story.data?.increases.map((item) => (
+        {changes?.increases.map((item) => (
           <ListRow key={`up-${item.categoryId}`} simple>
             <span className={listName}>
               {categoryName.get(item.categoryId) ?? "Category"}
@@ -312,7 +298,7 @@ export function HomeScreen() {
             </span>
           </ListRow>
         ))}
-        {story.data?.decreases.map((item) => (
+        {changes?.decreases.map((item) => (
           <ListRow key={`down-${item.categoryId}`} simple>
             <span className={listName}>
               {categoryName.get(item.categoryId) ?? "Category"}
@@ -323,7 +309,7 @@ export function HomeScreen() {
             </span>
           </ListRow>
         ))}
-        {story.data && story.data.increases.length === 0 && story.data.decreases.length === 0 ? (
+        {changes && changes.increases.length === 0 && changes.decreases.length === 0 ? (
           <p className="px-5 py-4 text-muted-foreground">No spending change this month.</p>
         ) : null}
       </ListCard>

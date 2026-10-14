@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
+import { insightChangesSchema } from "./insights-changes";
 import { isMonthKey } from "./month";
 import { centsSchema as cents } from "./money";
 
@@ -100,6 +101,8 @@ export const insightsSchema = z.object({
   income: cents,
   spending: cents,
   savings: cents,
+  savingsRateMilliPct: z.number().int().nullable(),
+  changes: insightChangesSchema,
   donut: z.array(rowSchema),
   rows: z.array(rowSchema),
   merchants: z.array(rowSchema),

@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrateDatabase, openDatabase, settings } from "@num/db";
-import { addDays, columnMapSchema, monthLastDay, type ColumnMap, type HygieneCheck } from "@num/shared";
+import { columnMapSchema, type ColumnMap, type HygieneCheck } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
@@ -11,7 +11,6 @@ import { createCategory } from "./categories";
 import { createCheckpoint } from "./checkpoints";
 import { readHygiene } from "./hygiene";
 import { importStatement } from "./imports";
-import { closeMonth } from "./months";
 import { createPlan } from "./recurring-plans";
 import { createTransaction } from "./transactions";
 
@@ -94,11 +93,6 @@ function post(db: Db, accountId: string, date: string, amount: number, categoryI
     lines: [{ amount, categoryId }],
     ...saved,
   });
-}
-
-function shut(db: Db, accountId: string, month: string, balance: number) {
-  createCheckpoint(db, accountId, { date: monthLastDay(month), statementBalance: balance, ...saved });
-  closeMonth(db, month, addDays(monthLastDay(month), 1), saved);
 }
 
 function spendBucket(db: Db, categoryId: string, essential: boolean, refillTo: number) {
@@ -244,22 +238,6 @@ test("imports fail when an on-budget account has no recent import", () => {
     expect(row.items[0]?.ageDays).toBe(37);
   });
 });
-test("the previous month passes when it is closed", () => {
-  withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 500);
-    createCheckpoint(db, cash.id, { date: "2026-03-31", statementBalance: 500, ...saved });
-    closeMonth(db, "2026-03", "2026-04-02", saved);
-    expect(check(db, "2026-04-02", "month_closed")).toMatchObject({ pass: true, month: "2026-03", status: "closed" });
-  });
-});
-
-test("the previous month fails when it is still open", () => {
-  withBook((db) => {
-    account(db, "chequing", "Cash", 500);
-    expect(check(db, "2026-04-02", "month_closed")).toMatchObject({ pass: false, month: "2026-03", status: "open" });
-  });
-});
-
 test("the inbox passes when every item is within 7 days", () => {
   withBook((db) => {
     const cash = account(db, "chequing", "Cash", 100);
@@ -332,39 +310,55 @@ test("sinking funds fail when a yearly bill has no sinking bucket for its catego
   });
 });
 
-test("the savings rate passes when each of the last 3 closed months saved", () => {
-  withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 0);
-    const pay = createCategory(db, { name: "Pay", kind: "income", ...saved });
-    let balance = 0;
-    for (const month of ["2026-01", "2026-02", "2026-03"]) {
-      post(db, cash.id, `${month}-05`, 1_000, pay.id);
-      balance += 1_000;
-      shut(db, cash.id, month, balance);
-    }
-    const row = check(db, "2026-04-15", "savings_rate");
-    expect(row.pass).toBe(true);
-    expect(row.months.map((item) => item.savingsRateMilliPct)).toEqual([100_000, 100_000, 100_000]);
-  });
-});
-
-test("the savings rate fails when one of the last 3 closed months spent more than it received", () => {
+test("the savings rate uses the last 3 complete months: not older months, not the month of asOf", () => {
   withBook((db) => {
     const cash = account(db, "chequing", "Cash", 0);
     const pay = createCategory(db, { name: "Pay", kind: "income", ...saved });
     const food = expense(db, "Food");
-    let balance = 0;
+    for (const month of ["2025-12", "2026-01", "2026-02", "2026-03"]) {
+      post(db, cash.id, `${month}-05`, 1_000, pay.id);
+    }
+    post(db, cash.id, "2025-12-06", -4_000, food.id);
+    post(db, cash.id, "2026-04-05", -5_000, food.id);
+    const row = check(db, "2026-04-30", "savings_rate");
+    expect(row.pass).toBe(true);
+    expect(row.months).toEqual([
+      { month: "2026-03", savingsRateMilliPct: 100_000, savings: 1_000 },
+      { month: "2026-02", savingsRateMilliPct: 100_000, savings: 1_000 },
+      { month: "2026-01", savingsRateMilliPct: 100_000, savings: 1_000 },
+    ]);
+    const next = check(db, "2026-05-01", "savings_rate");
+    expect(next.pass).toBe(false);
+    expect(next.months[0]).toEqual({ month: "2026-04", savingsRateMilliPct: null, savings: -5_000 });
+  });
+});
+
+test("the savings rate fails when one of the last 3 complete months spent more than it received", () => {
+  withBook((db) => {
+    const cash = account(db, "chequing", "Cash", 0);
+    const pay = createCategory(db, { name: "Pay", kind: "income", ...saved });
+    const food = expense(db, "Food");
     for (const month of ["2026-01", "2026-02"]) {
       post(db, cash.id, `${month}-05`, 1_000, pay.id);
-      balance += 1_000;
-      shut(db, cash.id, month, balance);
     }
     post(db, cash.id, "2026-03-05", -2_000, food.id);
-    balance -= 2_000;
-    shut(db, cash.id, "2026-03", balance);
     const row = check(db, "2026-04-15", "savings_rate");
     expect(row.pass).toBe(false);
     expect(row.months[0]).toMatchObject({ month: "2026-03", savings: -2_000, savingsRateMilliPct: null });
+  });
+});
+
+test("the savings rate does not count months before the first transaction", () => {
+  withBook((db) => {
+    const cash = account(db, "chequing", "Cash", 0);
+    const pay = createCategory(db, { name: "Pay", kind: "income", ...saved });
+    const food = expense(db, "Food");
+    post(db, cash.id, "2026-03-05", 1_000, pay.id);
+    post(db, cash.id, "2026-03-06", -250, food.id);
+    expect(check(db, "2026-03-20", "savings_rate")).toMatchObject({ pass: true, months: [] });
+    expect(check(db, "2026-04-15", "savings_rate").months).toEqual([
+      { month: "2026-03", savingsRateMilliPct: 75_000, savings: 750 },
+    ]);
   });
 });
 

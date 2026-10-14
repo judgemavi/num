@@ -8,13 +8,11 @@ import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
-import { createCheckpoint } from "./checkpoints";
 import { readHygiene } from "./hygiene";
 import { decideInboxItem, decisionRows, undoInboxDecision } from "./inbox-decisions";
-import { closeMonth, listMonths } from "./months";
 import { listNeedsReview } from "./needs-review";
 import { approveFiltered } from "./review-approve";
-import { linkOccurrence, skipOccurrence } from "./recurring-links";
+import { linkOccurrence } from "./recurring-links";
 import { filteredReviewHits } from "./transaction-list";
 import { createPlan } from "./recurring-plans";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
@@ -242,53 +240,6 @@ test("a row has a bulk level only when the bulk action can apply it", () => {
     const result = approve(db, "likely", 1, noFilter, "2026-04-02T18:20:00Z");
     expect(result.ids).toEqual([likely.id]);
     expect(approve(db, "likely", 0, noFilter, "2026-04-02T18:21:00Z")).toEqual({ level: "likely", count: 0, ids: [] });
-  });
-});
-
-test("month close uses needs review and an open Home item for that month", () => {
-  withBook((db) => {
-    const cash = account(db, "Cash");
-    const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-    const posted = pay(db, cash.id, "2026-03-10", -40, "Shop");
-    createCheckpoint(db, cash.id, { date: "2026-03-31", statementBalance: 49_960, ...saved });
-    expect(listMonths(db, asOf).items.find((item) => item.month === "2026-03")?.blockers.map((item) => item.code)).toEqual([
-      "needs_review",
-    ]);
-    updateTransaction(db, posted.id, {
-      accountId: posted.accountId,
-      date: posted.date,
-      amount: posted.amount,
-      payeeRaw: posted.payeeRaw,
-      status: "cleared",
-      lines: [{ amount: posted.amount, categoryId: food.id }],
-      ...saved,
-    });
-    expect(listMonths(db, asOf).items.find((item) => item.month === "2026-03")?.blockers).toEqual([]);
-    const gym = createPlan(db, {
-      name: "Gym",
-      kind: "bill",
-      accountId: cash.id,
-      expectedAmount: -1_000,
-      tolerance: 0,
-      amountMode: "fixed",
-      categoryId: food.id,
-      transferAccountId: null,
-      merchantId: null,
-      startDate: "2026-03-15",
-      freq: "monthly",
-      interval: 1,
-      monthDay: 15,
-      businessDayShift: "none",
-      endDate: "2026-03-15",
-      active: true,
-      fundsBuckets: false,
-      ...saved,
-    });
-    expect(listMonths(db, asOf).items.find((item) => item.month === "2026-03")?.blockers.map((item) => item.code)).toEqual([
-      "home_open",
-    ]);
-    skipOccurrence(db, gym.id, "2026-03-15", "Away", saved);
-    expect(closeMonth(db, "2026-03", asOf, saved).status).toBe("closed");
   });
 });
 

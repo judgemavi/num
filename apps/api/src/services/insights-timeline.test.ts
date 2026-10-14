@@ -70,6 +70,7 @@ test("the month of asOf has an actual part to asOf and a forecast part after it"
     monthly(book.db, cash.id, "bill", -1_000, 25);
     monthly(book.db, cash.id, "income", 3_000, 28);
 
+    // September is the one complete month. Its 700 is the monthly estimate: 23 on days 1 to 18, then 22.
     const asOf = "2026-10-15";
     const report = readInsights(book.db, { asOf, window: "3" });
     const months = report.timeline.months;
@@ -78,9 +79,9 @@ test("the month of asOf has an actual part to asOf and a forecast part after it"
     expect(months[2]).toEqual({
       month: "2026-10",
       actual: { income: 2_000, spending: 400 },
-      forecast: { income: 3_000, spending: 1_000 },
+      forecast: { income: 3_000, spending: 1_000 + 4 * 23 + 13 * 22 },
     });
-    expect(months[3]).toEqual({ month: "2026-11", actual: null, forecast: { income: 3_000, spending: 1_000 } });
+    expect(months[3]).toEqual({ month: "2026-11", actual: null, forecast: { income: 3_000, spending: 1_000 + 700 } });
 
     const balances = report.timeline.balances;
     expect(balances[0]).toEqual({ date: "2026-08-01", amount: 10_000 });

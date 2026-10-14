@@ -47,13 +47,6 @@ const importsCheckSchema = z.object({
   items: z.array(importFreshSchema),
 });
 
-const monthClosedCheckSchema = z.object({
-  code: z.literal("month_closed"),
-  pass: z.boolean(),
-  month: monthKeySchema,
-  status: z.enum(["open", "ready", "closed", "none"]),
-});
-
 const reviewCheckSchema = z.object({
   code: z.literal("review"),
   pass: z.boolean(),
@@ -104,7 +97,6 @@ export const hygieneCheckSchema = z.discriminatedUnion("code", [
   emergencyFundCheckSchema,
   cardsPaidCheckSchema,
   importsCheckSchema,
-  monthClosedCheckSchema,
   reviewCheckSchema,
   sinkingCheckSchema,
   savingsRateCheckSchema,
@@ -118,8 +110,7 @@ export const hygieneSchema = z.object({
     emergencyFundCheckSchema,
     cardsPaidCheckSchema,
     importsCheckSchema,
-    monthClosedCheckSchema,
-    reviewCheckSchema,
+      reviewCheckSchema,
     sinkingCheckSchema,
     savingsRateCheckSchema,
     recurringCheckSchema,

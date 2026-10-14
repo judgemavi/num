@@ -84,8 +84,8 @@ Goal: recurring plans, buckets and paycheck funding.
 
 | Slice | Contents | Acceptance criteria |
 |---|---|---|
-| 4.1 Month close | Close rules and open again (§7.5). Decision 0020: the close is a reviewed mark only. | Tests: a missing checkpoint blocks the close. Open Needs review items block the close. |
-| 4.2 Insights | Month story, category, merchant and tag reports, trends, net worth (§9). | Tests: refund decreases spending. Transfers are not spending or income. Month story calculations (changes against the 3-month median, savings rate). Net worth at month end. |
+| 4.1 Month close | Decision 0031 removed the month close. This slice has no contents. | None. |
+| 4.2 Insights | Changes of a month, category, merchant and tag reports, trends, net worth (§9). | Tests: refund decreases spending. Transfers are not spending or income. Changes calculations (changes against the 3-month median, new merchants, the change month). Savings rate. Net worth at month end. |
 | 4.3 Hygiene panel | All checks in §10. | One test for each check: pass case and fail case. |
 
 ## Phase 5 — Forecast and mortgage

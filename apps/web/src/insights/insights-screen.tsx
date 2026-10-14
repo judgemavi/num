@@ -1,6 +1,6 @@
 import { defaultInsightWindow, insightsSchema, Temporal, type ErrorCode, type InsightWindow, type InsightsSearch } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
-import { getRouteApi, Link } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
 import { PageHeader } from "@/components/page-header";
@@ -8,7 +8,8 @@ import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBookCurrency, useCategories } from "@/editors/lookups";
-import { monthTitle } from "@/insights/format";
+import { ChangesCard } from "@/insights/changes-card";
+import { monthTitle, rateText } from "@/insights/format";
 import { InsightsBreakdown } from "@/insights/insights-breakdown";
 import { PeriodSelect } from "@/insights/period-select";
 import { TimelineChart } from "@/insights/timeline-chart";
@@ -99,15 +100,7 @@ export function InsightsScreen() {
 
   return (
     <>
-      <PageHeader
-        kicker="Insights"
-        title="Spending"
-        actions={
-          <Button type="button" variant="secondary" asChild>
-            <Link to="/insights/months">Months</Link>
-          </Button>
-        }
-      />
+      <PageHeader kicker="Insights" title="Spending" />
       <PeriodSelect window={search.window} from={search.from} to={search.to} onWindow={chooseWindow} onRange={patchSearch} />
       {report.isPending ? <p className="text-muted-foreground">Loading insights.</p> : null}
       {report.isError ? (
@@ -132,6 +125,7 @@ export function InsightsScreen() {
               <Fact label="Saved">
                 <Amount currency={bookCurrency} minor={data.savings} />
               </Fact>
+              {data.savingsRateMilliPct === null ? null : <Fact label="Savings rate">{rateText(data.savingsRateMilliPct)}</Fact>}
             </>
           }
         />
@@ -160,6 +154,7 @@ export function InsightsScreen() {
         </Card>
       ) : null}
       {data ? <InsightsBreakdown currency={bookCurrency} data={data} search={search} patchSearch={patchSearch} /> : null}
+      {data ? <ChangesCard currency={bookCurrency} changes={data.changes} /> : null}
       {data ? (
         <Card>
           <CardContent className="grid gap-2 p-5 md:p-6">

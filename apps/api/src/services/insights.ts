@@ -3,6 +3,7 @@ import { defaultInsightWindow, Temporal, type Insights, type InsightsQuery } fro
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { changeMonth, readInsightChanges } from "./insights-changes";
 import { loadLedgerLines } from "./ledger-lines";
 import { breakdownRange, firstTransactionDate, windowPeriod } from "./insights-period";
 import { categoryRow, donutRows, spendRows, spendTotals } from "./insights-spend";
@@ -55,6 +56,8 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
     income: totals.income,
     spending: totals.spending,
     savings: totals.savings,
+    savingsRateMilliPct: totals.savingsRateMilliPct,
+    changes: readInsightChanges(db, facts, changeMonth(period, query.month), query.asOf),
     donut,
     rows: category === null ? donut : [categoryRow(facts, range, category)],
     merchants: spendRows(facts, range, (fact) => (fact.merchantId ? [fact.merchantId] : []), true),

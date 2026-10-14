@@ -39,15 +39,6 @@ function detail(check: HygieneCheck, currency: string): string {
     const absent = missing.length === 1 ? "1 not imported." : `${missing.length} not imported.`;
     return imported === 0 ? absent : `${fresh} ${absent}`;
   }
-  if (check.code === "month_closed") {
-    if (check.status === "none") {
-      return `${monthTitle(check.month)} is not in the book.`;
-    }
-    if (check.status === "closed") {
-      return `${monthTitle(check.month)} is closed.`;
-    }
-    return `${monthTitle(check.month)} is still open.`;
-  }
   if (check.code === "review") {
     if (check.oldCount === 0) {
       return `Nothing is older than ${reviewAgeDays} days.`;
@@ -65,7 +56,7 @@ function detail(check: HygieneCheck, currency: string): string {
   }
   if (check.code === "savings_rate") {
     if (check.months.length === 0) {
-      return "No closed months yet.";
+      return "No complete month yet.";
     }
     return check.months.map((item) => `${monthTitle(item.month)} ${rateText(item.savingsRateMilliPct)}`).join(" · ");
   }
@@ -89,7 +80,6 @@ const titles: Record<HygieneCheck["code"], string> = {
   emergency_fund: "Emergency fund",
   cards_paid: "Cards paid in full",
   imports_current: "Imports are current",
-  month_closed: "Previous month",
   review: "Review",
   sinking_funds: "Sinking funds",
   savings_rate: "Savings rate",
@@ -101,10 +91,9 @@ const places: Record<HygieneCheck["code"], string> = {
   emergency_fund: "Buckets",
   cards_paid: "Accounts",
   imports_current: "Imports",
-  month_closed: "This month",
   review: "Review",
   sinking_funds: "Buckets",
-  savings_rate: "Months",
+  savings_rate: "Insights",
   recurring: "Needs review and Home",
   overspent: "Buckets",
 };
@@ -114,13 +103,11 @@ export function HygienePanel({
   hygiene,
   pending,
   failed,
-  onMonth,
 }: {
   currency: string;
   hygiene: Hygiene | undefined;
   pending: boolean;
   failed: boolean;
-  onMonth: (month: string) => void;
 }) {
   const go = useNavigate();
   const failedCount = hygiene?.checks.filter((item) => !item.pass).length ?? 0;
@@ -149,13 +136,9 @@ export function HygienePanel({
       void go({ to: "/transactions", search: { page: 1, pageSize: 50, needsReview: true, uncategorized: false, automatic: false } });
       return;
     }
-    if (check.code === "month_closed" && check.status !== "none") {
-      onMonth(check.month);
-      return;
-    }
     const month = check.code === "savings_rate" ? check.months[0]?.month : undefined;
     if (month) {
-      onMonth(month);
+      void go({ to: "/insights", search: { month } });
     }
   }
 

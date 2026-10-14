@@ -3,6 +3,7 @@ import {
   isExpenseLine,
   isIncomeLine,
   isUncategorizedLine,
+  savingsRateMilliPct,
   uncategorizedFlows,
   type InsightRow,
 } from "@num/shared";
@@ -54,7 +55,7 @@ export function spendTotals(facts: readonly LedgerLine[], period: Period) {
       spending += expenseSpending(fact.amount);
     }
   }
-  return { income, spending, savings: income - spending };
+  return { income, spending, savings: income - spending, savingsRateMilliPct: savingsRateMilliPct(income, spending) };
 }
 
 /**
