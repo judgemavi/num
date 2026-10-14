@@ -6,7 +6,6 @@ import { useDeleteTransaction, useSaveTransaction } from "@/api/transactions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FieldError } from "@/components/ui/field";
 import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody } from "@/editors/form-chrome";
 import { useAccountLabels, useAccounts, useBookCurrency, useCategories } from "@/editors/lookups";
@@ -80,7 +79,6 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
       if (!built?.ok) {
         return;
       }
-      remove.reset();
       // An edit with no change closes without a write.
       if (!built.save) {
         close();
@@ -185,7 +183,7 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
           {transaction?.refundedAmount ? <p className="text-sm text-muted-foreground">{refundedText(currency, transaction.refundedAmount)}</p> : null}
           <MoreDetails form={form} payeeLocked={imported} clearedLocked={reconciled} />
           {values.mortgageFilled ? <p role="status">{mortgageNotice}</p> : null}
-          {remove.error ? <FieldError>{transactionError(errorCode(remove.error))}</FieldError> : <form.FormError />}
+          <form.FormError />
         </DialogBody>
         <DialogFooter>
           {transaction && !reconciled ? (

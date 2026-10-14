@@ -1,7 +1,6 @@
 import type { Bucket } from "@num/shared";
 import { useArchiveBucket } from "@/api/buckets";
-import { errorCode } from "@/api/client";
-import { barLabel, bucketDetail, bucketError, bucketTarget } from "@/buckets/format";
+import { barLabel, bucketDetail, bucketTarget } from "@/buckets/format";
 import { BucketGlyph } from "@/buckets/icons";
 import { BucketBar } from "@/buckets/bucket-bar";
 import { Amount } from "@/components/amount";
@@ -80,11 +79,6 @@ export function BucketRow({ bucket }: { bucket: Bucket }) {
           />
         </RowMenu>
       </ListRow>
-      {archive.error ? (
-        <p role="alert" className="px-5 pb-2 text-sm text-attn">
-          {bucketError(errorCode(archive.error))}
-        </p>
-      ) : null}
     </>
   );
 }

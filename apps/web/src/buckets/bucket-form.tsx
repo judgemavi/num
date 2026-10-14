@@ -112,7 +112,16 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
             )}
           </form.Field>
           {kind === "spending" ? (
-            <form.AppField name="refillTo">{(field) => <field.MoneyField id="bucket-refill" label="Fill up to" required />}</form.AppField>
+            <form.AppField name="refillTo">
+              {(field) => (
+                <field.MoneyField
+                  id="bucket-refill"
+                  label="Fill up to"
+                  required
+                  description="Each month the bucket is topped up to this amount. Money you did not spend stays in the bucket."
+                />
+              )}
+            </form.AppField>
           ) : null}
           {kind === "sinking" ? (
             <>

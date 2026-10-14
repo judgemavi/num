@@ -175,7 +175,8 @@ export const bucketEventCreateSchema = z
   .refine((value) => (value.kind === "move") === (value.otherBucketId != null), { path: ["otherBucketId"] });
 
 export const bucketCoverSchema = z.object({
-  fromBucketId: z.uuid(),
+  /** The bucket that gives the money. Null takes the money from Unassigned. */
+  fromBucketId: z.uuid().nullable().meta({ description: "The bucket that gives the money. null takes it from Unassigned." }),
   date: isoDateSchema,
 });
 

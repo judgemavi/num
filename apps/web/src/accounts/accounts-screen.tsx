@@ -5,11 +5,10 @@ import { Plus, Upload } from "lucide-react";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
 import { AccountIcon } from "@/accounts/account-icon";
-import { accountCountLabel, accountDetail, accountError, formatBalance, formatMoney, kindLabel } from "@/accounts/format";
+import { accountCountLabel, accountDetail, formatBalance, formatMoney, kindLabel, owedToYou, owedToYouWarning } from "@/accounts/format";
 import { accountLabel } from "@/accounts/label";
 import { groupAccounts, groupHue, groupLabel } from "@/accounts/groups";
 import { accountListQuery, useArchiveAccount } from "@/api/accounts";
-import { errorCode } from "@/api/client";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
 import { AccountFilterBar } from "@/accounts/filters";
@@ -104,11 +103,6 @@ function AccountsPage() {
         }
         illustration={<BalanceScaleIllustration />}
       />
-      {archive.error ? (
-        <p role="alert" className="text-sm text-attn">
-          {accountError(errorCode(archive.error))}
-        </p>
-      ) : null}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <ListCard label="All accounts">
           {groups.length === 0 ? (
@@ -144,6 +138,7 @@ function AccountsPage() {
                       <div className="ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
                         <Amount value={account.balance} owed={accountClass(account.kind) === "liability"} />
                         {detail ? <small>{detail}</small> : null}
+                        {owedToYou(account) ? <small className="text-attn">{owedToYouWarning}</small> : null}
                       </div>
                       <RowMenu label={`Actions for ${accountLabel(account)}`}>
                         <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("account", { id: account.id })}>

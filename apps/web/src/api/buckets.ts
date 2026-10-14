@@ -1,7 +1,10 @@
 import type { BucketCover, BucketCreate, BucketEventCreate, BucketListQuery, BucketUpdate } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
-import { api, unwrap } from "@/api/client";
+import { useArchiveWrite } from "@/api/archive";
+import { undoToast } from "@/components/undo-toast";
+import { api, formWrite, unwrap } from "@/api/client";
 import { activeAndArchived, allPages, fullPage, type ListFilters } from "@/api/pages";
+import { bucketError } from "@/buckets/format";
 
 /** The Buckets list. It reads all pages. The key has only the values that the request uses. */
 export function bucketListQuery({ archived, sort, dir }: ListFilters<BucketListQuery>) {
@@ -49,26 +52,32 @@ export function bucketQuery(id: string) {
 /** Create a bucket. The opening state of the bucket uses `asOf`. */
 export function useCreateBucket() {
   return useMutation({
+    meta: formWrite,
     mutationFn: ({ asOf, body }: { asOf: string; body: BucketCreate }) => unwrap(api.buckets.$post({ query: { asOf }, json: body })),
   });
 }
 
 export function useUpdateBucket() {
   return useMutation({
+    meta: formWrite,
     mutationFn: ({ id, body }: { id: string; body: BucketUpdate }) => unwrap(api.buckets[":id"].$patch({ param: { id }, json: body })),
   });
 }
 
 export function useArchiveBucket() {
-  return useMutation({
-    mutationFn: ({ id, restore }: { id: string; restore: boolean }) =>
-      unwrap(restore ? api.buckets[":id"].restore.$post({ param: { id } }) : api.buckets[":id"].archive.$post({ param: { id } })),
-  });
+  return useArchiveWrite("Bucket archived.", bucketError, ({ id, restore }) =>
+    unwrap(restore ? api.buckets[":id"].restore.$post({ param: { id } }) : api.buckets[":id"].archive.$post({ param: { id } })),
+  );
 }
+
+const eventDone = { fund: "Money assigned.", release: "Money released.", move: "Money moved." } as const;
 
 /** Fund a bucket, release money from a bucket, or move money to a second bucket. */
 export function useAddBucketEvent() {
+  const undo = useUndoBucketEvent();
   return useMutation({
+    meta: formWrite,
+    onSuccess: (event) => undoToast(eventDone[event.kind], () => undo.mutate({ bucketId: event.bucketId, eventId: event.id })),
     mutationFn: ({ bucketId, asOf, body }: { bucketId: string; asOf: string; body: BucketEventCreate }) =>
       unwrap(api.buckets[":id"].events.$post({ param: { id: bucketId }, query: { asOf }, json: body })),
   });
@@ -76,6 +85,7 @@ export function useAddBucketEvent() {
 
 export function useUndoBucketEvent() {
   return useMutation({
+    meta: { errorText: bucketError },
     mutationFn: ({ bucketId, eventId }: { bucketId: string; eventId: string }) =>
       unwrap(api.buckets[":id"].events[":eventId"].undo.$post({ param: { id: bucketId, eventId } })),
   });
@@ -83,7 +93,11 @@ export function useUndoBucketEvent() {
 
 /** Cover an overspent bucket with money from a second bucket. */
 export function useCoverBucket() {
+  const undo = useUndoBucketEvent();
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: BucketCover }) => unwrap(api.buckets[":id"].cover.$post({ param: { id }, json: body })),
+    meta: { errorText: bucketError },
+    onSuccess: (event) => undoToast("Bucket covered.", () => undo.mutate({ bucketId: event.bucketId, eventId: event.id })),
+    mutationFn: ({ id, asOf, body }: { id: string; asOf: string; body: BucketCover }) =>
+      unwrap(api.buckets[":id"].cover.$post({ param: { id }, query: { asOf }, json: body })),
   });
 }

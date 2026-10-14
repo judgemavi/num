@@ -1,10 +1,8 @@
 import type { TransactionListQuery } from "@num/shared";
-import { errorCode } from "@/api/client";
 import { useApproveLevel, type ApproveLevel } from "@/api/review";
 import { useTransactionListFetching } from "@/api/transactions";
 import { localAsOf } from "@/as-of";
 import { useEditors } from "@/editors/editor-api";
-import { inboxError } from "@/review/format";
 import { levelLabel } from "@/transactions/format";
 import { filterBody } from "@/transactions/query";
 
@@ -15,9 +13,6 @@ export function useApproveAll(search: TransactionListQuery) {
   const listLoading = useTransactionListFetching();
 
   function message() {
-    if (approveLevel.error) {
-      return inboxError(errorCode(approveLevel.error));
-    }
     if (approveLevel.data?.changed && approveLevel.data.left === 0) {
       return `Nothing is left to approve in ${levelLabel(approveLevel.data.level)}.`;
     }

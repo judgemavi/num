@@ -145,14 +145,5 @@ export function ReviewAnswers({ row }: { row: TransactionListItem }) {
     );
   }
 
-  return (
-    <>
-      {buttons()}
-      {answer.isError ? (
-        <p role="alert" className="basis-full">
-          That answer did not save.
-        </p>
-      ) : null}
-    </>
-  );
+  return buttons();
 }

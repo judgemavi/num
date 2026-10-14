@@ -3,7 +3,6 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { ChevronRight, Ellipsis } from "lucide-react";
 import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
-import { errorCode } from "@/api/client";
 import { inboxDecisionsQuery, useUndoDecision } from "@/api/review";
 import { useArchiveTag } from "@/api/tags";
 import { useTags } from "@/editors/lookups";
@@ -22,7 +21,7 @@ import { useStore } from "@tanstack/react-form";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TagForm } from "@/settings/tag-form";
-import { decisionText, inboxError } from "@/review/format";
+import { decisionText } from "@/review/format";
 import { AccountPicker } from "@/transactions/pickers";
 import { blankTransaction, quietChange } from "@/transactions/transaction-draft";
 
@@ -239,11 +238,6 @@ export function DecisionNotes({ transactionId }: { transactionId: string }) {
           </Button>
         </p>
       ))}
-      {undo.error ? (
-        <p role="alert" className="text-sm text-attn">
-          {inboxError(errorCode(undo.error))}
-        </p>
-      ) : null}
     </>
   );
 }

@@ -1,4 +1,5 @@
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Ellipsis, type LucideIcon } from "lucide-react";
 import { reviewSummaryQuery } from "@/api/review";
@@ -40,14 +41,15 @@ function NavItem({
   label,
   icon: Icon,
   pathname,
-  count,
+  badge,
   onClick,
 }: {
   to: NavPath;
   label: string;
   icon: LucideIcon;
   pathname: string;
-  count?: number;
+  /** A badge after the label, for example the number of Needs review items. */
+  badge?: ReactNode;
   onClick?: () => void;
 }) {
   const current = isCurrent(pathname, to);
@@ -57,14 +59,35 @@ function NavItem({
         <Link to={to} aria-current={current ? "page" : undefined} onClick={onClick}>
           <Icon strokeWidth={1.8} aria-hidden="true" />
           <span>{label}</span>
-          {count !== undefined && count > 0 ? <Badge variant="count" className="ml-auto group-data-[collapsible=icon]:hidden">{count}</Badge> : null}
+          {badge}
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
 }
 
-function AppSidebar({ pathname, reviewCount }: { pathname: string; reviewCount?: number }) {
+/**
+ * The number of Needs review items. The count is a detail of the navigation: the navigation shows before the count is
+ * known, and a read that fails shows no badge.
+ */
+function ReviewCount({ className }: { className: string }) {
+  return (
+    <Boundary loading={null} failed={() => null}>
+      <ReviewCountBadge className={className} />
+    </Boundary>
+  );
+}
+
+function ReviewCountBadge({ className }: { className: string }) {
+  const { data: review } = useSuspenseQuery(reviewSummaryQuery(localAsOf()));
+  return review.total > 0 ? (
+    <Badge variant="count" className={className}>
+      {review.total}
+    </Badge>
+  ) : null;
+}
+
+function AppSidebar({ pathname }: { pathname: string }) {
   return (
     <Sidebar collapsible="icon" className="h-svh border-r bg-card">
       <SidebarHeader className="px-2 pt-4">
@@ -83,7 +106,12 @@ function AppSidebar({ pathname, reviewCount }: { pathname: string; reviewCount?:
           <SidebarGroupContent>
             <SidebarMenu>
               {primaryNav.map((item) => (
-                <NavItem key={item.to} {...item} pathname={pathname} count={item.to === "/" ? reviewCount : undefined} />
+                <NavItem
+                  key={item.to}
+                  {...item}
+                  pathname={pathname}
+                  badge={item.to === "/" ? <ReviewCount className="ml-auto group-data-[collapsible=icon]:hidden" /> : null}
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -118,7 +146,7 @@ function sidebarDefaultOpen() {
   return found.slice(prefix.length) === "true";
 }
 
-function PhoneTabs({ pathname, reviewCount }: { pathname: string; reviewCount?: number }) {
+function PhoneTabs({ pathname }: { pathname: string }) {
   const moreCurrent = phoneMoreNav.some((item) => isCurrent(pathname, item.to));
   const tabs = primaryNav;
   return (
@@ -139,9 +167,7 @@ function PhoneTabs({ pathname, reviewCount }: { pathname: string; reviewCount?: 
             >
               <Icon size={24} strokeWidth={1.8} aria-hidden="true" />
               {item.label}
-              {item.to === "/" && reviewCount !== undefined && reviewCount > 0 ? (
-                <Badge variant="count" className="absolute top-0 left-[calc(50%+6px)]">{reviewCount}</Badge>
-              ) : null}
+              {item.to === "/" ? <ReviewCount className="absolute top-0 left-[calc(50%+6px)]" /> : null}
             </Link>
           );
         })}
@@ -188,17 +214,15 @@ function PhoneTabs({ pathname, reviewCount }: { pathname: string; reviewCount?: 
 function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   useStartSharedLists();
-  // The count is a detail of the navigation. The navigation shows before the count is known, with no badge.
-  const review = useQuery(reviewSummaryQuery(localAsOf()));
   return (
     <SidebarProvider defaultOpen={sidebarDefaultOpen()} className="h-svh overflow-hidden bg-background">
-      <AppSidebar pathname={pathname} reviewCount={review.data?.total} />
+      <AppSidebar pathname={pathname} />
       <SidebarInset className="min-h-0 overflow-y-auto bg-background">
         <main className="grid content-start gap-5 px-4 pt-2 pb-[calc(96px+env(safe-area-inset-bottom))] md:px-8 md:py-7 md:pb-9">
           <Outlet />
         </main>
       </SidebarInset>
-      <PhoneTabs pathname={pathname} reviewCount={review.data?.total} />
+      <PhoneTabs pathname={pathname} />
     </SidebarProvider>
   );
 }

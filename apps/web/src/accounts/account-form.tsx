@@ -2,7 +2,7 @@ import { accountClass, accountKinds, allowsInterestRate, defaultOnBudget, paymen
 import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { accountBody, accountValues, automaticOpeningDate, blankAccount } from "@/accounts/account-values";
-import { accountError, policyLabel } from "@/accounts/format";
+import { accountError, owedToYou, owedToYouWarning, policyLabel } from "@/accounts/format";
 import { sameClassKinds } from "@/accounts/groups";
 import { KindPicker } from "@/accounts/kind-picker";
 import { draftIsBlank } from "@/accounts/mortgage-draft";
@@ -110,6 +110,11 @@ export function AccountForm({ account, terms = null, initialName, inline = false
                 <p className="text-sm text-muted-foreground" style={{ marginTop: 0 }}>
                   Leave the balance blank to start at 0. Num counts forward from this date.
                 </p>
+                {account && owedToYou({ kind, balance: account.balance }) ? (
+                  <p role="status" className="text-sm text-attn">
+                    {owedToYouWarning}
+                  </p>
+                ) : null}
                 {kind === "mortgage" && !inline ? (
                   <Boundary look="panel" loading="Loading the mortgage terms." failed="The mortgage terms did not load.">
                     <MortgageSection form={form} accountId={account?.id ?? null} />

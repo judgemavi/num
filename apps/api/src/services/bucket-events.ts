@@ -123,38 +123,45 @@ export function listBucketEvents(db: Db): { items: BucketEvent[] } {
   return { items: rows };
 }
 
-export function coverBucket(db: Db, bucketId: string, input: BucketCover & EventWriteInput): BucketEvent {
+/**
+ * Cover an overspent bucket with the amount that it is over: a move from a second bucket, or money from Unassigned
+ * (a fund event). The source must have the whole amount.
+ */
+export function coverBucket(db: Db, bucketId: string, input: BucketCover & WriteInput & { asOf: string }): BucketEvent {
   if (!isIsoDate(input.date)) {
     throw new ServiceError("bucket_fields_invalid", 400);
   }
-  if (input.fromBucketId === bucketId) {
+  if (!isIsoDate(input.asOf)) {
+    throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
+  }
+  const fromBucketId = input.fromBucketId;
+  if (fromBucketId === bucketId) {
     throw new ServiceError("bucket_same", 400);
   }
   const id = crypto.randomUUID();
   return write(db, { source: input.source, at: input.at }, (tx) => {
     requireActiveBucket(tx, bucketId);
-    requireActiveBucket(tx, input.fromBucketId);
     const balances = bucketBalances(tx);
     const balance = balances.get(bucketId) ?? 0;
     if (balance >= 0) {
       throw new ServiceError("bucket_not_overspent", 409);
     }
     const need = -balance;
-    const available = balances.get(input.fromBucketId) ?? 0;
-    if (available < need) {
-      throw new ServiceError("bucket_short", 409);
+    if (fromBucketId === null) {
+      if (fundingPosition(tx, input.asOf).unassigned < need) {
+        throw new ServiceError("fund_over_unassigned", 409);
+      }
+    } else {
+      requireActiveBucket(tx, fromBucketId);
+      if ((balances.get(fromBucketId) ?? 0) < need) {
+        throw new ServiceError("bucket_short", 409);
+      }
     }
-    const row: BucketEventRow = {
-      id,
-      kind: "move",
-      bucketId: input.fromBucketId,
-      otherBucketId: bucketId,
-      amount: need,
-      date: input.date,
-      note: null,
-      fundingRunId: null,
-      undoneAt: null,
-    };
+    const event = { id, amount: need, date: input.date, note: null, fundingRunId: null, undoneAt: null };
+    const row: BucketEventRow =
+      fromBucketId === null
+        ? { ...event, kind: "fund", bucketId, otherBucketId: null }
+        : { ...event, kind: "move", bucketId: fromBucketId, otherBucketId: bucketId };
     tx.insert(bucketEvents).values(row).run();
     tx.audit({
       entity: "bucket_events",

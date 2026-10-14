@@ -3,11 +3,10 @@ import { Plus, Repeat } from "lucide-react";
 import { useState } from "react";
 import { PlanFilters } from "@/recurring/filters";
 import { usePlanSearch } from "@/recurring/use-plan-search";
-import { kindLabel, planError, scheduleLabel } from "@/recurring/format";
+import { kindLabel, scheduleLabel } from "@/recurring/format";
 import { PlanDetail } from "@/recurring/plan-detail";
 import { useEditors } from "@/editors/editor-api";
 import { ReviewList } from "@/recurring/review-list";
-import { errorCode } from "@/api/client";
 import { localAsOf } from "@/as-of";
 import { planListQuery, recurringSignalsQuery, recurringSyncQuery, useArchivePlan } from "@/api/recurring";
 import { Amount } from "@/components/amount";
@@ -93,11 +92,6 @@ function RecurringPage() {
         illustration={<PaydayIllustration />}
       />
       <PlanFilters />
-      {archive.error ? (
-        <p role="alert" className="text-sm text-attn">
-          {planError(errorCode(archive.error))}
-        </p>
-      ) : null}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <div className="grid gap-5">
           <ReviewList />

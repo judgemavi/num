@@ -1,7 +1,9 @@
 import type { CategoryCreate, CategoryListQuery, CategoryUpdate } from "@num/shared";
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, unwrap } from "@/api/client";
+import { useArchiveWrite } from "@/api/archive";
+import { api, formWrite, unwrap } from "@/api/client";
 import { activeAndArchived, allPages, fullPage, type ListFilters } from "@/api/pages";
+import { categoryError } from "@/settings/format";
 
 /** The Categories list. It reads all pages. The key has only the values that the request uses. */
 export function categoryListQuery({ archived, groupId, sort, dir }: ListFilters<CategoryListQuery>) {
@@ -29,18 +31,18 @@ export function categoryQuery(id: string) {
 /** Create a category (`id` is null) or change a category. */
 export function useSaveCategory() {
   return useMutation({
+    meta: formWrite,
     mutationFn: (input: { id: null; body: CategoryCreate } | { id: string; body: CategoryUpdate }) =>
       unwrap(input.id === null ? api.categories.$post({ json: input.body }) : api.categories[":id"].$patch({ param: { id: input.id }, json: input.body })),
   });
 }
 
 export function useArchiveCategory() {
-  return useMutation({
-    mutationFn: ({ id, restore }: { id: string; restore: boolean }) =>
-      unwrap(
-        restore ? api.categories[":id"].restore.$post({ param: { id } }) : api.categories[":id"].archive.$post({ param: { id } }),
-      ),
-  });
+  return useArchiveWrite("Category archived.", categoryError, ({ id, restore }) =>
+    unwrap(
+      restore ? api.categories[":id"].restore.$post({ param: { id } }) : api.categories[":id"].archive.$post({ param: { id } }),
+    ),
+  );
 }
 
 export function groupListQuery() {
@@ -60,6 +62,7 @@ export function groupQuery(id: string) {
 /** Create a group (`id` is null) or rename a group. */
 export function useSaveGroup() {
   return useMutation({
+    meta: formWrite,
     mutationFn: ({ id, name }: { id: string | null; name: string }) =>
       unwrap(
         id ? api["category-groups"][":id"].$patch({ param: { id }, json: { name } }) : api["category-groups"].$post({ json: { name } }),
@@ -71,6 +74,7 @@ export function useSaveGroup() {
 export function useDeleteGroup() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { errorText: categoryError },
     mutationFn: async (id: string) => {
       const deleted = await unwrap(api["category-groups"][":id"].$delete({ param: { id } }));
       queryClient.removeQueries({ queryKey: groupQuery(id).queryKey });

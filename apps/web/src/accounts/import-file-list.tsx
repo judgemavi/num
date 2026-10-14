@@ -175,7 +175,6 @@ function OpeningBalanceButton({ row, onApplied }: { row: ImportFileRow; onApplie
         Set the opening balance from this statement
         {` · ${formatMoney(currency, suggestion.amount)}`}
       </Button>
-      {opening.isError ? <p className="text-sm text-attn">The opening balance did not save.</p> : null}
     </div>
   );
 }

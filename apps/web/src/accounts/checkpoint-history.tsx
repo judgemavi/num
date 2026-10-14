@@ -2,7 +2,6 @@ import { accountClass, type Checkpoint } from "@num/shared";
 import { useSuspenseQueries } from "@tanstack/react-query";
 import { accountQuery } from "@/api/accounts";
 import { checkpointListQuery, useUnlockCheckpoint } from "@/api/checkpoints";
-import { errorCode } from "@/api/client";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
@@ -15,11 +14,6 @@ import { formatDate } from "@/transactions/format";
 export function CheckpointHistory({ accountId }: { accountId: string }) {
   const { confirm } = useEditors();
   const unlockCheckpoint = useUnlockCheckpoint();
-  const error = !unlockCheckpoint.error
-    ? null
-    : errorCode(unlockCheckpoint.error) === "checkpoint_unlocked"
-      ? "This checkpoint is already unlocked."
-      : "The checkpoint did not unlock. Try again.";
 
   async function unlock(item: Checkpoint) {
     const ok = await confirm({
@@ -39,11 +33,6 @@ export function CheckpointHistory({ accountId }: { accountId: string }) {
           <CheckpointRows accountId={accountId} onUnlock={(item) => void unlock(item)} />
         </Boundary>
       </ListCard>
-      {error ? (
-        <p role="alert" className="text-sm text-attn">
-          {error}
-        </p>
-      ) : null}
     </>
   );
 }

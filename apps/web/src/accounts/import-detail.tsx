@@ -30,7 +30,6 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useEditors } from "@/editors/editor-api";
 import { useAccountLabels } from "@/editors/lookups";
 import { localAsOf } from "@/as-of";
-import { inboxError } from "@/review/format";
 
 const detailRoute = getRouteApi("/accounts_/imports_/$importId");
 
@@ -64,18 +63,6 @@ function ImportDetailPage() {
   const resolve = useResolveImportRow();
   const decide = useDecideItem();
   const undoDecision = useUndoDecision();
-  const importFailure = undoImport.error ?? resolve.error;
-  const reviewFailure = decide.error ?? undoDecision.error;
-  const error = importFailure ? importError(errorCode(importFailure)) : reviewFailure ? inboxError(errorCode(reviewFailure)) : null;
-
-  /** Remove the error of each request. A new action starts with no old message. */
-  function clearErrors() {
-    undoImport.reset();
-    resolve.reset();
-    decide.reset();
-    undoDecision.reset();
-  }
-
   useEffect(() => {
     const id = window.location.hash.replace("#", "");
     if (!id) {
@@ -93,7 +80,6 @@ function ImportDetailPage() {
     if (!ok) {
       return;
     }
-    clearErrors();
     undoImport.mutate(importId, {
       onSuccess: (result) => {
         if (result.blocked.length > 0) {
@@ -168,11 +154,6 @@ function ImportDetailPage() {
         {" · "}
         {importCountText(item.counts)}
       </p>
-      {error ? (
-        <p role="alert" className="text-sm text-attn">
-          {error}
-        </p>
-      ) : null}
       <ListCard label="Rows in this file" title="Rows">
         {detail.rows.length === 0 && detail.unreadable.length === 0 ? (
           <p className="px-5 py-4 text-muted-foreground">This file has no rows.</p>
@@ -182,11 +163,9 @@ function ImportDetailPage() {
             key={row.id}
             row={row}
             onMatch={(transactionId) => {
-              clearErrors();
               resolve.mutate({ rowId: row.id, body: { decision: "match", transactionId } });
             }}
             onAddNew={() => {
-              clearErrors();
               resolve.mutate({ rowId: row.id, body: { decision: "create" } });
             }}
           />
@@ -204,7 +183,6 @@ function ImportDetailPage() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  clearErrors();
                   undoDecision.mutate(`import_unreadable:${importId}:${row.line}`);
                 }}
               >
@@ -227,7 +205,6 @@ function ImportDetailPage() {
                   type="button"
                   variant="ghost"
                   onClick={() => {
-                    clearErrors();
                     decide.mutate({ asOf: localAsOf(), itemKey: `import_unreadable:${importId}:${row.line}`, decision: "not_a_transaction" });
                   }}
                 >

@@ -1,6 +1,6 @@
 import { planProposalKey, type PlanCreate, type PlanProposal } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { recurringSignalsQuery, useSavePlan } from "@/api/recurring";
+import { recurringSignalsQuery, useAddDetectedPlan } from "@/api/recurring";
 import { useDecideItem } from "@/api/review";
 import { localAsOf } from "@/as-of";
 import { useMerchantNames } from "@/editors/lookups";
@@ -36,17 +36,15 @@ export function ReviewList() {
   const asOf = localAsOf();
   const { data: signals } = useSuspenseQuery(recurringSignalsQuery(asOf));
   const merchantName = useMerchantNames();
-  const create = useSavePlan();
+  const create = useAddDetectedPlan();
   const decide = useDecideItem();
   const pending = create.isPending || decide.isPending;
-  const error = create.isError ? "The plan was not created." : decide.isError ? "That answer did not save." : null;
   if (signals.proposals.length === 0) {
     return null;
   }
 
   return (
     <ListCard label="Detected" title="Detected">
-      {error ? <p className="px-5 py-2 text-sm text-attn">{error}</p> : null}
       {signals.proposals.map((item) => {
         const name = merchantName.get(item.merchantId) ?? "Merchant";
         const itemKey = planProposalKey(item);
@@ -62,8 +60,7 @@ export function ReviewList() {
               type="button"
               disabled={pending}
               onClick={() => {
-                decide.reset();
-                create.mutate({ id: null, body: proposedPlan(item, name) });
+                create.mutate(proposedPlan(item, name));
               }}
             >
               {item.expectedAmount >= 0 ? "Add recurring income" : "Add a recurring payment"}
@@ -73,7 +70,6 @@ export function ReviewList() {
               variant="ghost"
               disabled={pending}
               onClick={() => {
-                create.reset();
                 decide.mutate({ asOf, itemKey, decision: "not_recurring" });
               }}
             >

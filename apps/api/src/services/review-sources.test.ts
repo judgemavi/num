@@ -216,7 +216,7 @@ test("each review source appears and leaves after its action", () => {
     pay(sample.db, cash.id, "2026-03-08", -42000, "Dining out", dining.id);
     createBucketEvent(sample.db, spare.id, { kind: "fund", amount: 50000, date: "2026-03-01", asOf, ...saved });
     expect(overspentIds(sample.db)).toEqual([meals.id]);
-    coverBucket(sample.db, meals.id, { fromBucketId: spare.id, date: asOf, ...saved });
+    coverBucket(sample.db, meals.id, { fromBucketId: spare.id, date: asOf, asOf, ...saved });
     expect(overspentIds(sample.db)).toEqual([]);
 
     const changedPlan = createPlan(sample.db, { ...planFields(cash.id, null, -10000, "2026-03-15"), ...saved });

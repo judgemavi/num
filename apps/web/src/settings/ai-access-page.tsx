@@ -31,7 +31,6 @@ function AiAccessSetting() {
           When this is off, an AI can read the books and cannot change them. A change still needs your approval.
         </FieldDescription>
       </Field>
-      {save.isError ? <p role="alert">The setting did not save.</p> : null}
     </>
   );
 }

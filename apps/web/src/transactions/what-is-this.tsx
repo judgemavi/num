@@ -26,13 +26,14 @@ function SuggestionHint({ suggestion }: { suggestion: Suggestion }) {
   const merchant = useMerchantNames().get(suggestion.merchantId ?? "");
   const category = useCategoryNames().get(suggestion.categoryId ?? "");
   const account = useAccountLabels().get(suggestion.transferAccountId ?? "");
-  const parts = [merchant ? `Merchant: ${merchant}` : null, category ? `Category: ${category}` : null, account ? `Transfer: ${account}` : null].filter(
-    (part): part is string => part !== null,
-  );
-  if (suggestion.reason === "none" || parts.length === 0) {
+  const parts = suggestion.mortgage
+    ? [account ? `Mortgage payment · ${account}` : null]
+    : [merchant ? `Merchant: ${merchant}` : null, category ? `Category: ${category}` : null, account ? `Transfer: ${account}` : null];
+  const shown = parts.filter((part): part is string => part !== null);
+  if (suggestion.reason === "none" || shown.length === 0) {
     return null;
   }
-  const text = `${parts.join(". ")}.`;
+  const text = `${shown.join(". ")}.`;
   return <FieldDescription role="status">{suggestion.level === "none" ? text : `${levelLabel(suggestion.level)}. ${text}`}</FieldDescription>;
 }
 

@@ -1,8 +1,7 @@
 import type { FundingRun } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { errorCode } from "@/api/client";
 import { fundingRunsQuery, useUndoFundingRun } from "@/api/funding";
-import { bucketError, formatDate } from "@/buckets/format";
+import { formatDate } from "@/buckets/format";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
@@ -36,11 +35,6 @@ function FundingRuns() {
 
   return (
     <>
-      {undoRun.error ? (
-        <p role="alert" className="text-sm text-attn">
-          {bucketError(errorCode(undoRun.error))}
-        </p>
-      ) : null}
       <ListCard label="Funding history">
         {runs.length === 0 ? (
           <p className="px-5 py-5 text-muted-foreground">No paycheck has been funded.</p>

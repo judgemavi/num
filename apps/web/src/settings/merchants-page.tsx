@@ -1,6 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { errorCode } from "@/api/client";
 import { merchantListQuery, useArchiveMerchant } from "@/api/merchants";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { Boundary } from "@/components/boundary";
@@ -13,7 +12,6 @@ import { useEditors } from "@/editors/editor-api";
 import { ArchivedFilterBar } from "@/lists/archived-filter-bar";
 import { nameSortOptions } from "@/lists/list-search";
 import { useListSearch } from "@/lists/use-list-search";
-import { merchantError } from "@/settings/format";
 import { SettingsBack } from "@/settings/settings-nav";
 
 const merchantsRoute = getRouteApi("/settings/merchants");
@@ -47,11 +45,6 @@ function Merchants() {
         }
       />
       <ArchivedFilterBar list={list} switchId="filter-archived-merchants" sortId="merchant-sort" sortLabel="Sort merchants" sortOptions={nameSortOptions} />
-      {archive.error ? (
-        <p role="alert" className="text-sm text-attn">
-          {merchantError(errorCode(archive.error))}
-        </p>
-      ) : null}
       <ListCard label="Merchants">
         {rows.length === 0 ? (
           <p className="px-5 py-5 text-muted-foreground">{list.shown.archived ? "No archived merchants." : "No merchants yet."}</p>

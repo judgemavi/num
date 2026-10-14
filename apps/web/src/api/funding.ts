@@ -1,6 +1,8 @@
 import type { FundingRunCreate } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
-import { api, unwrap } from "@/api/client";
+import { undoToast } from "@/components/undo-toast";
+import { api, formWrite, unwrap } from "@/api/client";
+import { bucketError } from "@/buckets/format";
 
 /** The money that is not in a bucket. */
 export function fundingPositionQuery(asOf: string) {
@@ -35,13 +37,17 @@ export function fundingRunsQuery() {
 
 /** Assign a paycheck to buckets. */
 export function useFundPaycheck() {
+  const undo = useUndoFundingRun();
   return useMutation({
+    meta: formWrite,
     mutationFn: ({ asOf, body }: { asOf: string; body: FundingRunCreate }) => unwrap(api.funding.runs.$post({ query: { asOf }, json: body })),
+    onSuccess: (run) => undoToast("Paycheck funded.", () => undo.mutate(run.id)),
   });
 }
 
 export function useUndoFundingRun() {
   return useMutation({
+    meta: { errorText: bucketError },
     mutationFn: (id: string) => unwrap(api.funding.runs[":id"].undo.$post({ param: { id } })),
   });
 }

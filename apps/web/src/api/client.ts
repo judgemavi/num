@@ -19,6 +19,23 @@ import { hc, type ClientResponse } from "hono/client";
  */
 export const api = hc<AppType>("/").api;
 
+/** The meta of a mutation hook. The error rule in `main.tsx` reads it. */
+type WriteMeta = {
+  /** The hook of a form. The form shows the error of the write, thus the rule shows no toast. */
+  form?: boolean;
+  /** The text of the error toast for the error code of a write that has no form. */
+  errorText?: (code: ErrorCode | undefined) => string;
+};
+
+declare module "@tanstack/react-query" {
+  interface Register {
+    mutationMeta: WriteMeta;
+  }
+}
+
+/** The meta of a mutation hook that a form uses. */
+export const formWrite: WriteMeta = { form: true };
+
 export class ApiError extends Error {
   readonly code: ErrorCode;
   readonly params: ErrorBody["params"];

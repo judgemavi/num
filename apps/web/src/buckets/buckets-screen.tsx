@@ -8,7 +8,6 @@ import { localAsOf } from "@/as-of";
 import { ActivityList } from "@/buckets/activity-list";
 import { BucketRow } from "@/buckets/bucket-row";
 import { BucketFilterBar } from "@/buckets/filters";
-import { bucketError } from "@/buckets/format";
 import { FundingHistory } from "@/buckets/funding-history";
 import { OverspentPanel } from "@/buckets/overspent-panel";
 import { useBucketBoard, useBucketSearch } from "@/buckets/use-board";
@@ -52,7 +51,7 @@ export function BucketsScreen() {
           <ActivityList />
         </div>
         <Boundary loading="Loading the overspent buckets." failed="The overspent buckets did not load.">
-          <OverspentPanel errorText={bucketError} />
+          <OverspentPanel />
         </Boundary>
       </div>
     </Boundary>

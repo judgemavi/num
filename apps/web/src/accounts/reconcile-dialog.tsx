@@ -52,7 +52,7 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
   const kind = account.kind;
   // The values that the person sent with "Check". The compare read runs for them. An edit of a value clears them.
   const [checked, setChecked] = useState<CheckpointCreate | null>(null);
-  const check = useQuery({ ...checkpointCompareQuery(accountId, checked ?? { date: "", statementBalance: 0 }), enabled: checked !== null });
+  const check = useQuery(checkpointCompareQuery(accountId, checked));
   const create = useCreateCheckpoint();
   const opening = useSetOpeningBalance();
   const compare = checked ? (check.data ?? null) : null;
@@ -67,7 +67,6 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
     },
     onSubmit: async ({ value, formApi }) => {
       const body = checkpointOf(currency, kind, value);
-      opening.reset();
       if (!body || !compare?.balanced) {
         setChecked(body);
         return;
@@ -185,7 +184,6 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
           </div>
         ) : null}
         {checked && check.isError ? <FieldError>The balances did not load. Try again.</FieldError> : null}
-        {opening.isError ? <FieldError>The opening balance did not save.</FieldError> : null}
         <form.FormError />
         </DialogBody>
         <DialogFooter>

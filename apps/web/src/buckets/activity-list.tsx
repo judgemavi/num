@@ -1,8 +1,7 @@
 import type { BucketEvent } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { bucketEventsQuery, useUndoBucketEvent } from "@/api/buckets";
-import { errorCode } from "@/api/client";
-import { bucketError, formatDate } from "@/buckets/format";
+import { formatDate } from "@/buckets/format";
 import { useBucketBoard } from "@/buckets/use-board";
 import { useEditors } from "@/editors/editor-api";
 import { useBucketNames } from "@/editors/lookups";
@@ -48,11 +47,6 @@ function Activity() {
 
   return (
     <>
-      {undoEvent.error ? (
-        <p role="alert" className="text-sm text-attn">
-          {bucketError(errorCode(undoEvent.error))}
-        </p>
-      ) : null}
       <ListCard label="Activity">
         {events.length === 0 ? (
           <p className="px-5 py-5 text-muted-foreground">No activity yet.</p>

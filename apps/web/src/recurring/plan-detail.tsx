@@ -1,13 +1,12 @@
 import type { Occurrence, Plan } from "@num/shared";
 import { useSuspenseQueries } from "@tanstack/react-query";
 import { useDeferredValue } from "react";
-import { errorCode } from "@/api/client";
 import { occurrencesQuery, useRestoreOccurrence, useUnlinkOccurrence } from "@/api/recurring";
 import { inboxDecisionsQuery, useUndoDecision } from "@/api/review";
 import { localAsOf } from "@/as-of";
 import { useEditors } from "@/editors/editor-api";
-import { decisionText, inboxError } from "@/review/format";
-import { formatDate, planError } from "@/recurring/format";
+import { decisionText } from "@/review/format";
+import { formatDate } from "@/recurring/format";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
 import { Button } from "@/components/ui/button";
@@ -53,16 +52,6 @@ function PlanOccurrences({ plan: chosen }: PlanDetailProps) {
   const unlink = useUnlinkOccurrence();
   const restore = useRestoreOccurrence();
   const undoDecision = useUndoDecision();
-  const planFailure = unlink.error ?? restore.error;
-  const error = planFailure ? planError(errorCode(planFailure)) : undoDecision.error ? inboxError(errorCode(undoDecision.error)) : null;
-
-  /** Remove the error of each request. A new action starts with no old message. */
-  function clearErrors() {
-    unlink.reset();
-    restore.reset();
-    undoDecision.reset();
-  }
-
   const items = occurrences.items;
   const past = items.filter((item) => item.dueDate < asOf).slice(-8);
   const upcoming = items.filter((item) => item.dueDate >= asOf).slice(0, 8);
@@ -90,7 +79,6 @@ function PlanOccurrences({ plan: chosen }: PlanDetailProps) {
               <DropdownMenuItem
                 className="min-h-11"
                 onSelect={() => {
-                  clearErrors();
                   unlink.mutate({ planId: plan.id, dueDate: item.dueDate });
                 }}
               >
@@ -108,7 +96,6 @@ function PlanOccurrences({ plan: chosen }: PlanDetailProps) {
               <DropdownMenuItem
                 className="min-h-11"
                 onSelect={() => {
-                  clearErrors();
                   undoDecision.mutate(keptKey);
                 }}
               >
@@ -119,7 +106,6 @@ function PlanOccurrences({ plan: chosen }: PlanDetailProps) {
               <DropdownMenuItem
                 className="min-h-11"
                 onSelect={() => {
-                  clearErrors();
                   restore.mutate({ planId: plan.id, dueDate: item.dueDate });
                 }}
               >
@@ -160,11 +146,6 @@ function PlanOccurrences({ plan: chosen }: PlanDetailProps) {
           ) : null}
         </div>
       </SidePanel>
-      {error ? (
-        <p role="alert" className="text-sm text-attn">
-          {error}
-        </p>
-      ) : null}
       <ListCard label="Occurrences">
         <ListGroup label="Upcoming" />
         {rows(upcoming)}

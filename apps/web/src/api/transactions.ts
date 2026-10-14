@@ -1,6 +1,7 @@
 import type { Transaction, TransactionCreate, TransactionListQuery, TransactionUpdate } from "@num/shared";
 import { queryOptions, useIsFetching, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, unwrap } from "@/api/client";
+import { api, formWrite, unwrap } from "@/api/client";
+import { transactionError } from "@/transactions/format";
 
 /** True while a page of the transaction list loads, the first time or again. */
 export function useTransactionListFetching() {
@@ -58,6 +59,7 @@ export type TransactionSave =
 
 export function useSaveTransaction() {
   return useMutation({
+    meta: formWrite,
     mutationFn: async (save: TransactionSave) => {
       if (save.kind === "confirm") {
         return looksRight(save.id);
@@ -81,6 +83,7 @@ export function useSaveTransaction() {
 export function useDeleteTransaction() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { errorText: transactionError },
     mutationFn: async ({ id, transferPeerId }: Pick<Transaction, "id" | "transferPeerId">) => {
       const deleted = await unwrap(api.transactions[":id"].$delete({ param: { id } }));
       queryClient.removeQueries({ queryKey: transactionQuery(id).queryKey });

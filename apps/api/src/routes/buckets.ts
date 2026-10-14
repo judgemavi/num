@@ -175,16 +175,17 @@ const undoRoute = createRoute({
 
 const coverRoute = createRoute({
   operationId: "post_buckets_id_cover",
-  description: "Create or run buckets (cover). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Cover an overspent bucket with the amount that it is over, from a second bucket (fromBucketId) or from Unassigned (fromBucketId null). The source must have the whole amount. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/buckets/{id}/cover",
   request: {
     params: idParams,
+    query: asOfQuerySchema,
     body: { required: true, content: { "application/json": { schema: bucketCoverSchema } } },
   },
   responses: {
     200: {
-      description: "The move that covers the bucket",
+      description: "The move or the fund event that covers the bucket",
       content: { "application/json": { schema: bucketEventSchema } },
     },
     400: errorResponse,
@@ -236,7 +237,7 @@ export function bucketRoutes(db: Db) {
     })
     .openapi(coverRoute, (c) => {
       const { id } = c.req.valid("param");
-      return c.json(coverBucket(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
+      return c.json(coverBucket(db, id, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200);
     });
 }
 

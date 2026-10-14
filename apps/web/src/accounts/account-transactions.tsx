@@ -3,7 +3,6 @@ import { getRouteApi } from "@tanstack/react-router";
 import { useDeferredValue, useState } from "react";
 import { accountQuery } from "@/api/accounts";
 import { useMarkClearance } from "@/api/checkpoints";
-import { errorCode } from "@/api/client";
 import { transactionListQuery } from "@/api/transactions";
 import { Boundary } from "@/components/boundary";
 import { ListCard } from "@/components/list-card";
@@ -120,11 +119,6 @@ function AccountActivity() {
     );
   }
 
-  const error = !clearance.error
-    ? null
-    : errorCode(clearance.error) === "transaction_reconciled"
-      ? "Unlock the checkpoint before you change a reconciled transaction."
-      : "The transactions did not update. Try again.";
 
   return (
     <ListCard
@@ -158,11 +152,6 @@ function AccountActivity() {
       {capped || selected.length >= selectionLimit ? (
         <p role="status" className="px-5 py-3 text-sm text-muted-foreground">
           You can mark 200 transactions at a time.
-        </p>
-      ) : null}
-      {error ? (
-        <p role="alert" className="px-5 py-3 text-sm text-attn">
-          {error}
         </p>
       ) : null}
       <ListPager page={page} lastPage={lastPage} onPage={setPage} className="flex items-center justify-end gap-2 px-5 py-3" />

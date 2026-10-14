@@ -1,9 +1,7 @@
 import { useDeleteGroup } from "@/api/categories";
-import { errorCode } from "@/api/client";
 import { Boundary } from "@/components/boundary";
 import { useEditors } from "@/editors/editor-api";
 import { useCategories, useGroups } from "@/editors/lookups";
-import { categoryError } from "@/settings/format";
 import { SettingsBack } from "@/settings/settings-nav";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
@@ -49,11 +47,6 @@ function Groups() {
           </Button>
         }
       />
-      {deleteGroup.error ? (
-        <p role="alert" className="text-sm text-attn">
-          {categoryError(errorCode(deleteGroup.error))}
-        </p>
-      ) : null}
       <ListCard label="Groups">
         {rows.length === 0 ? (
           <p className="px-5 py-5 text-muted-foreground">No groups.</p>

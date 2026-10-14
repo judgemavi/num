@@ -1,7 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { overspentQuery } from "@/api/buckets";
-import { errorCode } from "@/api/client";
 import { fundingPaychecksQuery } from "@/api/funding";
 import { insightsQuery } from "@/api/insights";
 import { forecastQuery, monthPlanQuery } from "@/api/plan";
@@ -23,7 +22,7 @@ import { signedMoney } from "@/insights/format";
 import { formatMoney } from "@/money";
 import { ForecastChart } from "@/plan/forecast-chart";
 import { MonthDetails, MonthFlow } from "@/plan/month-board";
-import { inboxError, paydayHint } from "@/review/format";
+import { paydayHint } from "@/review/format";
 import { formatDate, levelLabel } from "@/transactions/format";
 
 export function ForecastStrip() {
@@ -116,11 +115,6 @@ export function PaychecksCard() {
   }
   return (
     <>
-      {decide.error ? (
-        <p role="alert" className="text-sm text-attn">
-          {inboxError(errorCode(decide.error))}
-        </p>
-      ) : null}
       <ListCard label="Fund this paycheck" title="Fund this paycheck">
         {open.map((item) => (
           <ListRow key={item.incomeTransactionId} onOpen={() => void openEditor("fundPaycheck", { incomeTransactionId: item.incomeTransactionId })}>
@@ -188,7 +182,7 @@ export function MissedPaymentsCard() {
 /** The overspent buckets. The card shows only when there is one. */
 export function OverspentCard() {
   const { data: overspent } = useSuspenseQuery(overspentQuery());
-  return overspent.length > 0 ? <OverspentPanel errorText={inboxError} /> : null;
+  return overspent.length > 0 ? <OverspentPanel /> : null;
 }
 
 function useHomeInsights() {

@@ -5,7 +5,7 @@ import { useSaveMerchant } from "@/api/merchants";
 import { inboxDecisionsQuery, useUndoDecision } from "@/api/review";
 import { useEditorFrame } from "@/editors/editor-api";
 import { useAppForm } from "@/forms/form-hook";
-import { decisionText, inboxError } from "@/review/format";
+import { decisionText } from "@/review/format";
 import { Button } from "@/components/ui/button";
 import { merchantError } from "@/settings/format";
 import { NameFields } from "@/settings/name-form";
@@ -34,11 +34,6 @@ function NotRecurringNotes({ merchantId }: { merchantId: string }) {
           </Button>
         </p>
       ))}
-      {undo.error ? (
-        <p role="alert" className="text-sm text-attn">
-          {inboxError(errorCode(undo.error) ?? "internal_error")}
-        </p>
-      ) : null}
     </>
   );
 }

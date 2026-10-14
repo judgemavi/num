@@ -62,10 +62,10 @@ test("cover rejects the same bucket, a bucket that is not overspent, and a short
     const meals = spending(book.db, "Dining", [dining.id]);
     const food = spending(book.db, "Groceries", []);
     createBucketEvent(book.db, food.id, { kind: "fund", amount: 10_000, date: "2026-03-01", asOf: "2026-03-01", ...saved });
-    expectCode(() => coverBucket(book.db, meals.id, { fromBucketId: meals.id, date: "2026-03-02", ...saved }), "bucket_same");
-    expectCode(() => coverBucket(book.db, food.id, { fromBucketId: meals.id, date: "2026-03-02", ...saved }), "bucket_not_overspent");
+    expectCode(() => coverBucket(book.db, meals.id, { fromBucketId: meals.id, date: "2026-03-02", asOf: "2026-03-02", ...saved }), "bucket_same");
+    expectCode(() => coverBucket(book.db, food.id, { fromBucketId: meals.id, date: "2026-03-02", asOf: "2026-03-02", ...saved }), "bucket_not_overspent");
     purchase(book.db, account.id, dining.id, -42_000);
-    expectCode(() => coverBucket(book.db, meals.id, { fromBucketId: food.id, date: "2026-03-02", ...saved }), "bucket_short");
+    expectCode(() => coverBucket(book.db, meals.id, { fromBucketId: food.id, date: "2026-03-02", asOf: "2026-03-02", ...saved }), "bucket_short");
     expect(readBucket(book.db, meals.id).balance).toBe(-42_000);
     expect(readBucket(book.db, food.id).balance).toBe(10_000);
   } finally {
@@ -123,13 +123,33 @@ test("cover moves the shortfall from another bucket", () => {
     const food = spending(book.db, "Groceries", [groceries.id]);
     createBucketEvent(book.db, food.id, { kind: "fund", amount: 80_000, date: "2026-03-01", asOf: "2026-03-01", ...saved });
     purchase(book.db, account.id, dining.id, -42_000);
-    const cover = coverBucket(book.db, meals.id, { fromBucketId: food.id, date: "2026-03-02", ...saved });
+    const cover = coverBucket(book.db, meals.id, { fromBucketId: food.id, date: "2026-03-02", asOf: "2026-03-02", ...saved });
     expect(cover.kind).toBe("move");
     expect(cover.amount).toBe(42_000);
     expect(cover.bucketId).toBe(food.id);
     expect(cover.otherBucketId).toBe(meals.id);
     expect(readBucket(book.db, meals.id).balance).toBe(0);
     expect(readBucket(book.db, food.id).balance).toBe(38_000);
+  } finally {
+    book.close();
+  }
+});
+
+test("cover from Unassigned funds the overspent bucket when Unassigned has the whole amount", () => {
+  const book = tempDatabase();
+  try {
+    const account = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 100_000, ...saved });
+    const dining = expense(book.db, "Dining");
+    const meals = spending(book.db, "Dining", [dining.id]);
+    const food = spending(book.db, "Groceries", []);
+    createBucketEvent(book.db, food.id, { kind: "fund", amount: 20_000, date: "2026-03-01", asOf: "2026-03-01", ...saved });
+    purchase(book.db, account.id, dining.id, -42_000);
+    // Unassigned = 100 000 − 42 000 − 20 000 = 38 000: it cannot cover 42 000.
+    expectCode(() => coverBucket(book.db, meals.id, { fromBucketId: null, date: "2026-03-02", asOf: "2026-03-02", ...saved }), "fund_over_unassigned");
+    createBucketEvent(book.db, food.id, { kind: "release", amount: 20_000, date: "2026-03-02", ...saved });
+    const cover = coverBucket(book.db, meals.id, { fromBucketId: null, date: "2026-03-02", asOf: "2026-03-02", ...saved });
+    expect(cover).toMatchObject({ kind: "fund", bucketId: meals.id, otherBucketId: null, amount: 42_000 });
+    expect(readBucket(book.db, meals.id).balance).toBe(0);
   } finally {
     book.close();
   }

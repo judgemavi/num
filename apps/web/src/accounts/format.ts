@@ -105,3 +105,23 @@ export function accountError(code: ErrorCode | undefined): string {
       return "The account did not save. Try again.";
   }
 }
+
+/** The text of a failed "Mark cleared" or "Mark open" on the transactions of an account. */
+export function clearanceError(code: ErrorCode | undefined): string {
+  return code === "transaction_reconciled"
+    ? "Unlock the checkpoint before you change a reconciled transaction."
+    : "The transactions did not update. Try again.";
+}
+
+/** The text of a failed unlock of a checkpoint. */
+export function unlockError(code: ErrorCode | undefined): string {
+  return code === "checkpoint_unlocked" ? "This checkpoint is already unlocked." : "The checkpoint did not unlock. Try again.";
+}
+
+/** The warning of a mortgage or a loan with a positive balance: the book shows money owed to the person. */
+export const owedToYouWarning = "This shows money owed to you. Check the amount owed.";
+
+/** True when a mortgage or a loan has a positive balance. A loan that the person owes has a negative balance. */
+export function owedToYou(account: { kind: AccountKind; balance: number }) {
+  return (account.kind === "mortgage" || account.kind === "loan") && account.balance > 0;
+}

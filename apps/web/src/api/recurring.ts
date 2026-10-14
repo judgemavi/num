@@ -1,7 +1,9 @@
 import type { PlanCreate, PlanListQuery, PlanUpdate } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
-import { api, unwrap } from "@/api/client";
+import { useArchiveWrite } from "@/api/archive";
+import { api, formWrite, unwrap } from "@/api/client";
 import { allPages, fullPage } from "@/api/pages";
+import { planError } from "@/recurring/format";
 
 export function activePlansQuery() {
   return queryOptions({
@@ -57,14 +59,18 @@ export function savePlan(input: { id: null; body: PlanCreate } | { id: string; b
 }
 
 export function useSavePlan() {
-  return useMutation({ mutationFn: savePlan });
+  return useMutation({ meta: formWrite, mutationFn: savePlan });
+}
+
+/** Add a plan that the app detected, with one click. */
+export function useAddDetectedPlan() {
+  return useMutation({ meta: { errorText: planError }, mutationFn: (body: PlanCreate) => savePlan({ id: null, body }) });
 }
 
 export function useArchivePlan() {
-  return useMutation({
-    mutationFn: ({ id, restore }: { id: string; restore: boolean }) =>
-      unwrap(restore ? api.recurring[":id"].restore.$post({ param: { id } }) : api.recurring[":id"].archive.$post({ param: { id } })),
-  });
+  return useArchiveWrite("Recurring item archived.", planError, ({ id, restore }) =>
+    unwrap(restore ? api.recurring[":id"].restore.$post({ param: { id } }) : api.recurring[":id"].archive.$post({ param: { id } })),
+  );
 }
 
 type OccurrenceRef = { planId: string; dueDate: string };
@@ -74,11 +80,12 @@ export function linkOccurrence({ planId, dueDate, transactionId }: OccurrenceRef
 }
 
 export function useLinkOccurrence() {
-  return useMutation({ mutationFn: linkOccurrence });
+  return useMutation({ meta: formWrite, mutationFn: linkOccurrence });
 }
 
 export function useUnlinkOccurrence() {
   return useMutation({
+    meta: { errorText: planError },
     mutationFn: ({ planId, dueDate }: OccurrenceRef) =>
       unwrap(api.recurring[":id"].occurrences[":dueDate"].unlink.$post({ param: { id: planId, dueDate } })),
   });
@@ -86,6 +93,7 @@ export function useUnlinkOccurrence() {
 
 export function useSkipOccurrence() {
   return useMutation({
+    meta: formWrite,
     mutationFn: ({ planId, dueDate, reason }: OccurrenceRef & { reason: string }) =>
       unwrap(api.recurring[":id"].occurrences[":dueDate"].skip.$post({ param: { id: planId, dueDate }, json: { reason } })),
   });
@@ -93,6 +101,7 @@ export function useSkipOccurrence() {
 
 export function useRestoreOccurrence() {
   return useMutation({
+    meta: { errorText: planError },
     mutationFn: ({ planId, dueDate }: OccurrenceRef) =>
       unwrap(api.recurring[":id"].occurrences[":dueDate"].restore.$post({ param: { id: planId, dueDate } })),
   });

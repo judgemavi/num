@@ -140,6 +140,13 @@ Use shadcn `Table` only for the Transactions list. All other record lists use Li
 - Show a status only when it is not the default. Example: show an "Essential" badge; do not show "Not essential".
 - Do not repeat information that the group already gives. Example: no "Income" label on rows in the Income group.
 
+**Messages after a write (decision 0042):** shadcn `Sonner` toasts, one `Toaster` at the app root, bottom centre.
+- A write that has no form (a row action, a one-click answer, archive, undo, cover) shows an error toast when it
+  fails. Do not show the error of such a write in the page.
+- A form shows the error of its write in the form (`FormError`). It shows no toast.
+- A write that can be undone with an existing route shows a success toast with an "Undo" action. Other writes show no
+  success toast, except "Approve all", which shows the number of approved transactions.
+
 **Settings:** each area is its own subpage with its own URL: `/settings/groups`, `/settings/categories`,
 `/settings/tags`, `/settings/backup`. Desktop: a settings sub-navigation (a short vertical list) on the left of the content.
 Phone: `/settings` shows the list of areas; each opens its own page with a back link. Do not put all areas on one page.

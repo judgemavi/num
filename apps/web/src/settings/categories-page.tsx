@@ -1,7 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { categoryListQuery, useArchiveCategory } from "@/api/categories";
-import { errorCode } from "@/api/client";
 import { useEditors } from "@/editors/editor-api";
 import { useGroupNames, useGroups } from "@/editors/lookups";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
@@ -15,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { useAppForm } from "@/forms/form-hook";
 import { SortSelect } from "@/lists/sort-select";
 import { useListSearch } from "@/lists/use-list-search";
-import { categoryError } from "@/settings/format";
 import { SettingsBack } from "@/settings/settings-nav";
 
 const categoriesRoute = getRouteApi("/settings/categories");
@@ -108,11 +106,6 @@ function Categories() {
           </>
         }
       />
-      {archive.error ? (
-        <p role="alert" className="text-sm text-attn">
-          {categoryError(errorCode(archive.error))}
-        </p>
-      ) : null}
       <ListCard label="Categories">
         {rows.length === 0 ? (
           <p className="px-5 py-5 text-muted-foreground">{shown.archived ? "No archived categories." : "No categories."}</p>

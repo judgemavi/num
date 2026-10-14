@@ -1,9 +1,8 @@
 import type { ImportBatch, ImportUndo } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { accountQuery } from "@/api/accounts";
-import { errorCode } from "@/api/client";
 import { accountImportsQuery, useUndoImport } from "@/api/imports";
-import { formatImportDate, formatStatementDate, importCountText, importError, undoBlockLabel } from "@/accounts/import-format";
+import { formatImportDate, formatStatementDate, importCountText, undoBlockLabel } from "@/accounts/import-format";
 import { accountLabel } from "@/accounts/label";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
@@ -17,7 +16,6 @@ export function AccountImports({ accountId }: { accountId: string }) {
   const { confirm } = useEditors();
   const { data: account } = useSuspenseQuery(accountQuery(accountId));
   const undoImport = useUndoImport();
-  const error = undoImport.error ? importError(errorCode(undoImport.error)) : null;
 
   async function undo(item: ImportBatch) {
     const ok = await confirm({
@@ -69,11 +67,6 @@ export function AccountImports({ accountId }: { accountId: string }) {
           <ImportRows accountId={accountId} onUndo={(item) => void undo(item)} />
         </Boundary>
       </ListCard>
-      {error ? (
-        <p role="alert" className="text-sm text-attn">
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

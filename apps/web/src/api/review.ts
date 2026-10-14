@@ -1,8 +1,11 @@
 import type { approveLevels, InboxDecisionCode, InboxGroupApply, Suggestion, TransactionFilter } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api, errorCode, unwrap } from "@/api/client";
 import { linkOccurrence, savePlan } from "@/api/recurring";
 import { linkRefund, looksRight } from "@/api/transactions";
+import { undoToast } from "@/components/undo-toast";
+import { inboxError } from "@/review/format";
 
 export function reviewSummaryQuery(asOf: string) {
   return queryOptions({
@@ -28,11 +31,17 @@ function decideItem({ asOf, itemKey, decision }: { asOf: string; itemKey: string
 
 /** Record the answer to a Needs review item. */
 export function useDecideItem() {
-  return useMutation({ mutationFn: decideItem });
+  const undo = useUndoDecision();
+  return useMutation({
+    meta: { errorText: inboxError },
+    mutationFn: decideItem,
+    onSuccess: (_decision, { itemKey }) => undoToast("Answer saved.", () => undo.mutate(itemKey)),
+  });
 }
 
 export function useUndoDecision() {
   return useMutation({
+    meta: { errorText: inboxError },
     mutationFn: (itemKey: string) => unwrap(api.review.decisions.undo.$post({ json: { itemKey } })),
   });
 }
@@ -43,7 +52,7 @@ function applyGroup(body: InboxGroupApply) {
 
 /** Give one answer to a group of transactions of one account. */
 export function useApplyGroup() {
-  return useMutation({ mutationFn: applyGroup });
+  return useMutation({ meta: { errorText: inboxError }, mutationFn: applyGroup });
 }
 
 /**
@@ -95,9 +104,17 @@ function answerReview(answer: ReviewAnswer) {
 
 /** Save a one-click answer. One mutation for all answers gives the row one saving state and one error. */
 export function useAnswerReview() {
+  const undo = useUndoDecision();
   return useMutation({
+    meta: { errorText: inboxError },
     mutationFn: async (answer: ReviewAnswer) => {
       await answerReview(answer);
+    },
+    // A "no" answer is a decision that can be undone.
+    onSuccess: (_result, answer) => {
+      if (answer.kind === "decide") {
+        undoToast("Answer saved.", () => undo.mutate(answer.itemKey));
+      }
     },
   });
 }
@@ -113,6 +130,7 @@ type ApproveInput = { asOf: string; filter: TransactionFilter; level: ApproveLev
  */
 export function useApproveLevel() {
   return useMutation({
+    meta: { errorText: inboxError },
     mutationFn: async ({ asOf, filter, level, count }: ApproveInput) => {
       try {
         await unwrap(api.transactions.approve.$post({ query: { asOf }, json: { ...filter, level, count } }));
@@ -126,6 +144,12 @@ export function useApproveLevel() {
           () => 0,
         );
         return { changed: true as const, level, left };
+      }
+    },
+    // No route undoes an approval, thus the toast has no "Undo".
+    onSuccess: (result, { count }) => {
+      if (!result.changed) {
+        toast.success(count === 1 ? "1 transaction approved." : `${count} transactions approved.`);
       }
     },
   });

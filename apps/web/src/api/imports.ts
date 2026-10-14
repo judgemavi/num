@@ -1,6 +1,8 @@
 import type { ColumnMap, ImportReviewResolve, ImportViewQuery } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
-import { api, unwrap } from "@/api/client";
+import { undoToast } from "@/components/undo-toast";
+import { api, formWrite, unwrap } from "@/api/client";
+import { importError } from "@/accounts/import-format";
 
 export function importPresetsQuery() {
   return queryOptions({
@@ -54,12 +56,22 @@ export function importFile({ file, accountId, asOf, presetId, columnMap }: Impor
 }
 
 export function useImportFile() {
-  return useMutation({ mutationFn: importFile });
+  const undo = useUndoImport();
+  return useMutation({
+    meta: formWrite,
+    mutationFn: importFile,
+    onSuccess: (result) => {
+      if (result.kind === "batch" && !result.alreadyImported) {
+        undoToast(`${result.filename ?? "The file"} is imported.`, () => undo.mutate(result.id));
+      }
+    },
+  });
 }
 
 /** Answer an import row that needs review: use an existing transaction or add a new one. */
 export function useResolveImportRow() {
   return useMutation({
+    meta: { errorText: importError },
     mutationFn: ({ rowId, body }: { rowId: string; body: ImportReviewResolve }) =>
       unwrap(api.imports.rows[":id"].resolve.$post({ param: { id: rowId }, json: body })),
   });
@@ -67,6 +79,7 @@ export function useResolveImportRow() {
 
 export function useUndoImport() {
   return useMutation({
+    meta: { errorText: importError },
     mutationFn: (id: string) => unwrap(api.imports[":id"].undo.$post({ param: { id } })),
   });
 }
