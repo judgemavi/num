@@ -8,7 +8,8 @@ import { TransactionFilterBar } from "@/transactions/filters";
 import { hasFilters } from "@/transactions/query";
 import { TransactionTabs } from "@/transactions/transaction-tabs";
 import { TransactionsTable } from "@/transactions/transactions-table";
-import { ApproveAll } from "@/transactions/approve-all";
+import { SelectionBar } from "@/transactions/selection-bar";
+import { SelectionProvider } from "@/transactions/selection";
 import { useOnReview, usePrefetchTransactionPage, useTransactionPage } from "@/transactions/use-transaction-list";
 import { useEditors } from "@/editors/editor-api";
 import { useAccounts } from "@/editors/lookups";
@@ -17,7 +18,7 @@ import { useAccounts } from "@/editors/lookups";
  * The screen of `/transactions` and of `/transactions/review` (decision 0047). The two pages show the same table.
  * The screen puts the parts in their places. Each part reads its own data. The filter bar shows new filters at once.
  * The rows and the count load in their own boundaries. Thus a read of the rows never removes the filter bar, and the
- * search box keeps the focus while the rows load.
+ * search box keeps the focus while the rows load. The rows can be selected for approve and bulk edit (decision 0051).
  */
 export function TransactionsScreen() {
   // The list does not need the lists of the filter bar. Its read starts here, thus it does not wait for them.
@@ -25,12 +26,15 @@ export function TransactionsScreen() {
 
   return (
     <Boundary loading="Loading transactions." failed="The transactions did not load.">
-      <TransactionsHeader />
-      <TransactionFilterBar />
-      <Boundary loading="Loading transactions." failed="The transactions did not load.">
-        <TransactionList />
-        <Pager />
-      </Boundary>
+      <SelectionProvider>
+        <TransactionsHeader />
+        <TransactionFilterBar />
+        <Boundary loading="Loading transactions." failed="The transactions did not load.">
+          <TransactionList />
+          <Pager />
+          <SelectionBar />
+        </Boundary>
+      </SelectionProvider>
     </Boundary>
   );
 }
@@ -62,15 +66,7 @@ function TransactionsHeader() {
         </Boundary>
       }
       title="Transactions"
-      actions={
-        review ? (
-          <Boundary loading={null} failed={() => null}>
-            <ApproveAll />
-          </Boundary>
-        ) : (
-          <NewTransaction />
-        )
-      }
+      actions={review ? undefined : <NewTransaction />}
       tabs={<TransactionTabs />}
     />
   );

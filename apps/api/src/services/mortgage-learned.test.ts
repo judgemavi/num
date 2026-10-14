@@ -7,11 +7,10 @@ import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
-import { applyInboxGroup } from "./inbox-group";
 import { mortgageAccountView } from "./mortgage";
 import { suggestForPayee } from "./suggestions";
 import { listNeedsReview } from "./needs-review";
-import { approveFiltered } from "./review-approve";
+import { approveSelected } from "./review-approve";
 import { createTransaction, getTransaction } from "./transactions";
 
 const at = "2026-10-08T16:00:00.000Z";
@@ -140,16 +139,7 @@ test("Yes writes the split for the date and amount of each row", () => {
     for (const row of [april, may]) {
       const suggestion = reviewOf(sample.db, row.id)?.suggestion;
       expect(suggestion?.mortgage).toBe(true);
-      const result = applyInboxGroup(sample.db, {
-        accountId: sample.account.id,
-        transactionIds: [row.id],
-        categoryId: null,
-        transferAccountId: suggestion?.transferAccountId ?? null,
-        merchantId: null,
-        mortgage: true,
-        ...saved,
-      });
-      expect(result.applied).toBe(1);
+      expect(approveSelected(sample.db, asOf, [row.id], saved)).toEqual({ approved: 1, skipped: [] });
     }
     const aprilInterest = interestOn(sample, "2026-04-01");
     const mayInterest = interestOn(sample, "2026-05-01");
@@ -167,14 +157,14 @@ test("Yes writes the split for the date and amount of each row", () => {
   }
 });
 
-test("Approve all Likely writes each date's own interest", () => {
+test("Approve writes each date's own interest", () => {
   const sample = book();
   try {
     confirmSplit(sample, "2026-03-01", -581_600);
     const dates = ["2026-04-01", "2026-05-01", "2026-06-01"];
     const rows = dates.map((date) => open(sample.db, sample.account.id, date, -581_600));
-    const result = approveFiltered(sample.db, asOf, { uncategorized: false, automatic: false }, "likely", 3, saved);
-    expect(result.count).toBe(3);
+    const result = approveSelected(sample.db, asOf, rows.map((row) => row.id), saved);
+    expect(result.approved).toBe(3);
     const interests = dates.map((date) => interestOn(sample, date));
     expect(new Set(interests).size).toBeGreaterThan(1);
     rows.forEach((row, index) => {

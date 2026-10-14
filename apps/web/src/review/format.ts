@@ -69,8 +69,6 @@ export function inboxError(code: ErrorCode | undefined): string {
       return "Unassigned does not have enough to cover this.";
     case "inbox_item_not_found":
       return "That item no longer needs an answer.";
-    case "review_changed":
-      return "The list changed. Check the new number.";
     case "decision_not_found":
       return "That decision is already undone.";
     case "occurrence_taken":

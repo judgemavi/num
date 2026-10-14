@@ -130,13 +130,17 @@ export function createTransaction(db: Db, input: TransactionCreate & WriteInput)
   });
 }
 
-/** A merchant that the update leaves out keeps its stored value. An explicit null clears it. */
+/**
+ * A merchant that the update leaves out keeps its stored value. An explicit null clears it.
+ * `spread: false` leaves the spread of labels to the caller (a batch spreads once). `confirm: true` makes the update a
+ * confirmation: it also clears an automatic label that stays (decision 0051).
+ */
 export function applyTransactionUpdate(
   tx: WriteTx,
   id: string,
   input: TransactionCreate,
   at: string,
-  spread = true,
+  { spread = true, confirm = false }: { spread?: boolean; confirm?: boolean } = {},
 ): Transaction {
   const lines = input.lines.map(normalizeLine);
   const existing = requireActive(tx, id);
@@ -153,7 +157,7 @@ export function applyTransactionUpdate(
   assertRefundLink(tx, savedHeader, id);
   const linked = withRefundPurchase(tx, savedHeader, lines);
   const changed = labelChanged(existing, existingLines, linked.header, linked.lines);
-  const auto: AutoStamp = changed || isTransferOrSplit(lines) ? clearedAuto : keptAuto(existing);
+  const auto: AutoStamp = confirm || changed || isTransferOrSplit(lines) ? clearedAuto : keptAuto(existing);
   if (peer && isMirrorSide(existingLines, peer.accountId, peerLines.length)) {
     applyMirrorEdit(tx, existing, existingLines, peer, peerLines, linked.header, linked.lines, at, auto);
   } else {

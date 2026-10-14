@@ -1,12 +1,9 @@
-import type { Transaction, TransactionCreate, TransactionListQuery, TransactionReviewListQuery, TransactionUpdate } from "@num/shared";
-import { queryOptions, useIsFetching, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { BulkEdit, Transaction, TransactionCreate, TransactionListQuery, TransactionReviewListQuery, TransactionUpdate } from "@num/shared";
+import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api, formWrite, unwrap } from "@/api/client";
-import { transactionError } from "@/transactions/format";
-
-/** True while a page of the transaction list loads, the first time or again. */
-export function useTransactionListFetching() {
-  return useIsFetching({ queryKey: ["transactions"] }) > 0;
-}
+import { localAsOf } from "@/as-of";
+import { countText, transactionError } from "@/transactions/format";
 
 /** One page of the transaction list. Each row that needs review on `asOf` has its review. */
 export function transactionListQuery(search: TransactionListQuery, asOf: string) {
@@ -110,5 +107,17 @@ export function useDeleteTransaction() {
       }
       return deleted;
     },
+  });
+}
+
+/**
+ * The bulk edit of the selected rows (decision 0051). A field that is not in the body does not change. The server
+ * skips a row that cannot take the change. The toast shows the count of changed and skipped rows.
+ */
+export function useBulkEdit() {
+  return useMutation({
+    meta: formWrite,
+    mutationFn: (body: BulkEdit) => unwrap(api.transactions.bulk.$post({ query: { asOf: localAsOf() }, json: body })),
+    onSuccess: (result) => toast.success(countText(result.changed, "changed", result.skipped.length)),
   });
 }

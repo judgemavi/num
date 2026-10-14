@@ -4,13 +4,10 @@ import {
   inboxDecisionListSchema,
   inboxDecisionSchema,
   inboxDecisionUndoSchema,
-  inboxGroupApplyResultSchema,
-  inboxGroupApplySchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { decideInboxItem, decisionRows, undoInboxDecision } from "../services/inbox-decisions";
-import { applyInboxGroup } from "../services/inbox-group";
 import { validationHook } from "../validation";
 import { errorResponse } from "./common";
 
@@ -55,23 +52,8 @@ const undoRoute = createRoute({
   },
 });
 
-const groupRoute = createRoute({
-  operationId: "post_transactions_group",
-  description: "Apply one category, transfer or merchant to selected transactions.",
-  method: "post",
-  path: "/api/transactions/group",
-  request: { body: { required: true, content: { "application/json": { schema: inboxGroupApplySchema } } } },
-  responses: {
-    200: { description: "The group was categorized", content: { "application/json": { schema: inboxGroupApplyResultSchema } } },
-    400: errorResponse,
-    404: errorResponse,
-    409: errorResponse,
-  },
-});
-
 export function inboxRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook })
-    .openapi(groupRoute, (c) => c.json(applyInboxGroup(db, { ...c.req.valid("json"), source: "ui" }), 200))
     .openapi(decisionsRoute, (c) => c.json({ items: decisionRows(db) }, 200))
     .openapi(decideRoute, (c) => {
       const body = c.req.valid("json");

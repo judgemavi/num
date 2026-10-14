@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { accountKinds } from "./account";
 import { asOfQuerySchema, isoDateSchema } from "./date";
-import { approveLevels } from "./review";
 import { listQuerySchema, pagedResponseSchema, queryDate, queryFlag, queryId, queryIdOrNone, queryText } from "./list";
 import { autoReasons } from "./matching";
 import { amountSchema } from "./money";
@@ -136,11 +135,6 @@ export const transactionReviewListQuerySchema = listQuerySchema(reviewSortColumn
 
 /** The query of the Needs review read: the list query and `asOf`. */
 export const transactionReviewQuerySchema = transactionReviewListQuerySchema.extend(asOfQuerySchema.shape);
-
-export const approveLevelSchema = transactionFilterSchema.extend({
-  level: z.enum(approveLevels),
-  count: z.number().int().nonnegative(),
-});
 
 export const transactionListItemSchema = z.object({
   id: z.uuid(),

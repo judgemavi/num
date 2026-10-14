@@ -13,14 +13,13 @@ import { importStatement } from "./imports";
 import { decideInboxItem } from "./inbox-decisions";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { listNeedsReview } from "./needs-review";
-import { approveFiltered } from "./review-approve";
+import { approveSelected } from "./review-approve";
 import { acceptLooksRight, createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const at = "2026-10-08T16:00:00.000Z";
 const saved = { source: "ui" as const, at };
 const asOf = "2026-10-01";
 const payee = "E-TRANSFER";
-const noFilter = { uncategorized: false, automatic: false };
 
 const columnMap = columnMapSchema.parse({
   hasHeader: true,
@@ -149,13 +148,13 @@ test("Looks right on an automatic no category records the keep and clears the au
   }
 });
 
-test("Approve all Sure records the keep of each automatic no category", () => {
+test("Approve records the keep of each automatic no category", () => {
   const sample = book();
   try {
     const first = sample.open("2026-05-10", 40_000);
     const second = sample.open("2026-05-11", 40_000);
     sample.keep("2026-05-01", 40_000);
-    approveFiltered(sample.db, asOf, noFilter, "sure", 2, saved);
+    approveSelected(sample.db, asOf, [first, second], saved);
     for (const id of [first, second]) {
       expect(sample.read(id)).toEqual({ categoryId: null, autoReason: null, autoSourceId: null, autoConfidence: null });
       expect(sample.kept(id)).toBe(true);
@@ -183,12 +182,12 @@ test("a no category suggestion has the keep item key, and Yes records the keep",
   }
 });
 
-test("Approve all Likely records the keep of a no category suggestion", () => {
+test("Approve of a suggestion records the keep of a no category suggestion", () => {
   const sample = book();
   try {
     sample.keep("2026-05-01", 40_000);
     const bulk = sample.open("2026-05-11", 41_000);
-    approveFiltered(sample.db, asOf, noFilter, "likely", 1, saved);
+    approveSelected(sample.db, asOf, [bulk], saved);
     expect(sample.kept(bulk)).toBe(true);
     expect(sample.read(bulk)).toEqual({ categoryId: null, autoReason: null, autoSourceId: null, autoConfidence: null });
     expect(sample.hit(bulk)).toBeUndefined();

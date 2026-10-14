@@ -44,7 +44,7 @@ Put these in `apps/web/src/index.css` as CSS variables. Map them to the shadcn v
 | est | `#7C7B88` | estimated forecast line |
 | row-hover | `#EFEFFC` | list row hover |
 | scrim | `rgb(23 23 28 / .45)` | dialog overlay |
-| shadow | `0 1px 2px rgb(0 0 0/.05), 0 16px 40px rgb(23 23 28/.14)` | dialogs, popovers only |
+| shadow | `0 1px 2px rgb(0 0 0/.05), 0 16px 40px rgb(23 23 28/.14)` | dialogs, popovers, the action bar |
 
 **Identity hues** (soft fill / deep glyph):
 
@@ -62,7 +62,7 @@ Other screens use the surface colour.
 
 **Radius:** cards 16px, inputs 12px, dialogs 20px, icon tiles 10px, buttons and chips fully round (999px).
 
-**Shadows:** only on dialogs, popovers and tooltips. Cards have a 1px `hair` border and no shadow.
+**Shadows:** only on dialogs, popovers, tooltips and the action bar. Cards have a 1px `hair` border and no shadow.
 
 ## 3. Type
 
@@ -127,6 +127,7 @@ global component CSS (AGENTS.md).
 | Choice cards | Radio choices as cards with a title and a one-line description (example: account kind). Selected: iris border and `primary-soft` fill. |
 | Reveal | A sub-section that shows only after a choice (example: card details). `bg` fill, hairline border, radius 14px. |
 | Disclosure | "More options: …" link-style button that opens optional fields. |
+| ActionBar | Actions for the selected rows of a table (decision 0051). A floating `ink` pill with white text, bottom centre of the screen, with the dialog shadow. Left: "N selected". Then 44px buttons: an outline button on the dark fill (white text, white border at low opacity), one primary (iris) button, and a ghost "Clear". It shows only while one or more rows are selected. The page gets space at its end, thus the bar does not cover the last rows and the pager. |
 
 Use shadcn `Table` only for the Transactions list. All other record lists use ListCard rows.
 
@@ -145,7 +146,8 @@ Use shadcn `Table` only for the Transactions list. All other record lists use Li
   fails. Do not show the error of such a write in the page.
 - A form shows the error of its write in the form (`FormError`). It shows no toast.
 - A write that can be undone with an existing route shows a success toast with an "Undo" action. Other writes show no
-  success toast, except "Approve all", which shows the number of approved transactions.
+  success toast, except Approve and the bulk editor (decision 0051), which show the number of approved or changed
+  transactions and the number of skipped rows: "10 changed · 2 skipped".
 
 **Settings:** each area is its own subpage with its own URL: `/settings/groups`, `/settings/categories`,
 `/settings/tags`, `/settings/backup`. Desktop: a settings sub-navigation (a short vertical list) on the left of the content.
@@ -205,7 +207,12 @@ Order, top to bottom:
 Needs review is its own route with the same table (decision 0047): `/transactions` shows all transactions and
 `/transactions/review` shows only the transactions that need review. There is no second list component. Both pages show
 two tabs (links) in the page header: "All" and "Needs review · N". A tab link does not keep the search and the filters.
-Columns: Date, Account, Payee, Category, Amount, Status (and Balance when one account is shown).
+Columns: a checkbox, Date, Account, Payee, Category, Amount, Status (and Balance when one account is shown).
+The checkbox column (decision 0051) shows only on these two pages, not on the page of an account. A click on the
+checkbox selects the row; a click on another part of the row opens the editor. Shift and click selects a range. The
+header checkbox selects all rows of the page. The checkbox of a split is disabled, with the Tooltip "Split
+transactions are edited one at a time." With a selection, the ActionBar (§6) shows "N selected", "Approve · N"
+(outline), "Edit…" (primary) and "Clear". Approve has no confirm.
 The Category column shows the category, "Transfer to <account>", or "Uncategorized", and the merchant below it.
 The Amount cell shows only the exceptions: a lock icon for a reconciled row (Tooltip: "Checked against your balance on <date>")
 and "Pending" for an open row (entered by hand, not yet on a statement). A cleared row shows nothing.
@@ -216,12 +223,22 @@ and nothing for a row with no suggestion. The Confidence header is a sort button
 (decision 0049). There, the Category column shows the proposed label and merchant of a
 suggestion (the same text as a stored label; the level tells that it is a proposal) and "Transfer to <account>" for a
 possible transfer. A row has no buttons. The whole row opens the editor. No dismiss, no queue mode.
-The table has no group rows. The page header of `/transactions/review` has "Approve all Sure · N" and
-"Approve all Likely · N" (shared confirm) for the rows that match the filters.
+The table has no group rows. The page header of `/transactions/review` has no "Approve all" buttons.
+
+**Bulk editor (decision 0051).** "Edit…" in the ActionBar opens it through `openEditor` (§6b). It is not in the URL.
+- Header: "Edit N transactions", and below it the account (or "N accounts"), the date range and the total.
+- Fields, each starts as "No change": **What is this?** (ToggleGroup: No change, the category choices of the direction,
+  Transfer; Transfer only when all rows are in one account, with an "Other account" Combobox; money out and money in
+  together: only No change and Transfer), **Merchant** (No change or Change; Change shows the merchant Combobox with
+  "No merchant"; hidden for Transfer), **Add tags** (the tag picker) and **Remove tags** (a toggle for each tag of the
+  selected rows).
+- Below the fields: a short list of the selected rows (date, payee, current category, amount).
+- Footer: Cancel and "Save N transactions" (primary). No confirm. The toast shows the counts.
 
 ## 6b. Shared editors and the dialog host
 
 - One editor component for each entity: Transaction, Account, Category, Group, Tag, Merchant, Bucket, Recurring.
+  The bulk editor of selected transactions (§6a) is a separate editor; the transaction editor has no group mode.
   Each editor is built from one form component. The same form is used in a dialog and inline (create on the spot).
   The same editor creates and edits, on every screen.
 - One dialog host at the app root. Screens call `openEditor(kind, props)`. Screens do not render their own dialogs.

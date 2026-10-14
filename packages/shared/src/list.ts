@@ -31,10 +31,13 @@ export const queryFlag = z
 
 export const archivedQuery = { archived: queryFlag };
 
+/** The most rows on one page of a list. Approve and bulk edit also take one page at most (decision 0051). */
+export const maxPageSize = 200;
+
 export function listQuerySchema<const T extends readonly [string, ...string[]]>(columns: T) {
   return z.object({
     page: queryNumber().min(1).default(1),
-    pageSize: queryNumber().min(1).max(200).default(50),
+    pageSize: queryNumber().min(1).max(maxPageSize).default(50),
     sort: z.enum(columns).optional(),
     dir: z.enum(sortDirections).optional(),
   });

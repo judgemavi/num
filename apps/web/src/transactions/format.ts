@@ -18,6 +18,11 @@ export function levelLabel(level: ReviewLevel): string {
   return "No suggestion";
 }
 
+/** The text of the toast after approve or a bulk edit (decision 0051): "10 approved · 2 skipped". */
+export function countText(done: number, doneWord: string, skipped: number): string {
+  return skipped > 0 ? `${done} ${doneWord} · ${skipped} skipped` : `${done} ${doneWord}`;
+}
+
 export function refundOfText(currency: string, date: string, amount: number): string {
   const day = Temporal.PlainDate.from(date).toLocaleString(undefined, { month: "short", day: "numeric" });
   return `Refund of ${day} · ${formatMoney(currency, Math.abs(amount))}`;

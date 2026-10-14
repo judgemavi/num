@@ -70,7 +70,7 @@ function loadBases(db: Db, ids: readonly string[]) {
   );
 }
 
-/** Sure and Likely are bulk levels. A row has one only when the bulk action can apply it. */
+/** A row is Likely only when Approve can apply its suggestion (decision 0051). Other rows with a suggestion are Maybe. */
 function rowLevel(row: Base, automatic: boolean, suggestion: Suggestion | null) {
   const level = reviewLevel(automatic, suggestion ? suggestion.confidence : null);
   if (level !== "likely") {

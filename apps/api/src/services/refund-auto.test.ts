@@ -8,7 +8,7 @@ import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { decideInboxItem } from "./inbox-decisions";
-import { applyInboxGroup } from "./inbox-group";
+import { bulkEdit } from "./bulk-edit";
 import { createMerchant } from "./merchants";
 import { listNeedsReview } from "./needs-review";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
@@ -48,14 +48,7 @@ function money(db: Db, accountId: string, date: string, amount: number, category
 /** The person says Yes to a category for an uncategorized refund. This is an approval, so it can link. */
 function approved(db: Db, ids: { account: string; food: string }, date: string, amount: number) {
   const refund = money(db, ids.account, date, amount);
-  applyInboxGroup(db, {
-    accountId: ids.account,
-    transactionIds: [refund.id],
-    categoryId: ids.food,
-    transferAccountId: null,
-    merchantId: null,
-    ...saved,
-  });
+  bulkEdit(db, asOf, { transactionIds: [refund.id], what: { kind: "category", categoryId: ids.food }, ...saved });
   return refund;
 }
 

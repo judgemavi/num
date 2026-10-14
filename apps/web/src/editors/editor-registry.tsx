@@ -10,11 +10,13 @@ import type { EditorFrame, EditorInput, EditorKind } from "@/editors/editor-type
 import { LinkOccurrenceEditor, PlanEditor, SkipOccurrenceEditor } from "@/editors/recurring-editors";
 import { SkipNext } from "@/recurring/skip-next";
 import { CategoryEditor, GroupEditor, MergeEditor, MerchantEditor, TagEditor } from "@/editors/settings-editors";
+import { BulkEditor } from "@/transactions/bulk-editor";
 import { TransactionEditor } from "@/transactions/transaction-editor";
 
 /** The editor component of each kind. The input of the kind is the props of the component. */
 const editors: { [K in EditorKind]: (input: EditorInput[K]) => ReactNode } = {
   transaction: TransactionEditor,
+  bulkEdit: BulkEditor,
   account: AccountEditor,
   category: CategoryEditor,
   group: GroupEditor,
@@ -37,6 +39,7 @@ const editors: { [K in EditorKind]: (input: EditorInput[K]) => ReactNode } = {
 /** The text of each kind while the editor loads its data, and the text after a read fails. */
 const loadText: { [K in EditorKind]: { loading: string; failed: string } } = {
   transaction: { loading: "Loading the transaction.", failed: "The transaction did not load." },
+  bulkEdit: { loading: "Loading the transactions.", failed: "The transactions did not load." },
   account: { loading: "Loading the account.", failed: "The account did not load." },
   category: { loading: "Loading the category.", failed: "The category did not load." },
   group: { loading: "Loading the group.", failed: "The group did not load." },

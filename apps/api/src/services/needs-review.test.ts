@@ -5,15 +5,13 @@ import { auditLog, migrateDatabase, openDatabase, settings, transactions } from 
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
-import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { readHygiene } from "./hygiene";
 import { decideInboxItem, decisionRows, undoInboxDecision } from "./inbox-decisions";
 import { listNeedsReview } from "./needs-review";
-import { approveFiltered } from "./review-approve";
+import { approveSelected } from "./review-approve";
 import { linkOccurrence } from "./recurring-links";
-import { filteredReviewHits } from "./transaction-list";
 import { createPlan } from "./recurring-plans";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
@@ -49,11 +47,9 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
   });
 }
 
-function approve(db: Db, level: "sure" | "likely", count: number, filter: Parameters<typeof filteredReviewHits>[1], at: string) {
-  return approveFiltered(db, asOf, filter, level, count, { source: "ui", at });
+function approve(db: Db, ids: string[], at: string) {
+  return approveSelected(db, asOf, ids, { source: "ui", at });
 }
-
-const noFilter = { uncategorized: false, automatic: false };
 
 function stampAuto(db: Db, id: string, sourceId: string) {
   db.update(transactions)
@@ -146,7 +142,7 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
   });
 });
 
-test("approve all Sure confirms only the Sure rows in one write and counts as confirmations", () => {
+test("approve confirms the automatic label and applies the suggestion of the selected rows, and counts as confirmations", () => {
   withBook((db) => {
     const cash = account(db, "Cash");
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
@@ -156,62 +152,50 @@ test("approve all Sure confirms only the Sure rows in one write and counts as co
     stampAuto(db, sureA.id, known.id);
     stampAuto(db, sureB.id, known.id);
     const openCafe = pay(db, cash.id, "2026-03-04", -10_000, "Cafe");
-    const marketKnown = pay(db, cash.id, "2026-03-05", -20_000, "Market", food.id);
+    pay(db, cash.id, "2026-03-05", -20_000, "Market", food.id);
     const likely = pay(db, cash.id, "2026-03-06", -20_000, "Market");
+    const notSelected = pay(db, cash.id, "2026-03-07", -20_000, "Market");
     const at = "2026-04-02T18:00:00Z";
-    const result = approve(db, "sure", 2, noFilter, at);
-    expect(result.ids.sort()).toEqual([sureA.id, sureB.id].sort());
-    expect(result.count).toBe(2);
+    const result = approve(db, [sureA.id, sureB.id, likely.id], at);
+    expect(result).toEqual({ approved: 3, skipped: [] });
     expect(getTransaction(db, sureA.id)?.autoReason).toBeNull();
     expect(getTransaction(db, sureB.id)?.autoReason).toBeNull();
-    expect(getTransaction(db, likely.id)?.lines[0]?.categoryId).toBeNull();
-    expect(getTransaction(db, openCafe.id)?.lines[0]?.categoryId).toBe(food.id);
-    const audits = db.select().from(auditLog).where(eq(auditLog.at, at)).all();
-    expect(audits.length).toBeGreaterThan(0);
-    expect(new Set(audits.map((row) => row.at)).size).toBe(1);
-    expect(getTransaction(db, marketKnown.id)?.autoReason).toBeNull();
-  });
-});
-
-test("approve all Likely applies the suggestion", () => {
-  withBook((db) => {
-    const cash = account(db, "Cash");
-    const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-    pay(db, cash.id, "2026-03-01", -20_000, "Market", food.id);
-    const likely = pay(db, cash.id, "2026-03-02", -20_000, "Market");
-    const sure = pay(db, cash.id, "2026-03-03", -9000, "Cafe", food.id);
-    stampAuto(db, sure.id, sure.id);
-    const result = approve(db, "likely", 1, noFilter, "2026-04-02T18:05:00Z");
-    expect(result.ids).toEqual([likely.id]);
     expect(getTransaction(db, likely.id)?.lines[0]?.categoryId).toBe(food.id);
     expect(getTransaction(db, likely.id)?.autoReason).toBeNull();
-    expect(getTransaction(db, sure.id)?.autoReason).toBe("learned_amount");
+    // The confirmations teach: the open rows of the same payees get the label.
+    expect(getTransaction(db, openCafe.id)?.lines[0]?.categoryId).toBe(food.id);
+    expect(getTransaction(db, notSelected.id)?.autoReason).not.toBeNull();
+    const audits = db.select().from(auditLog).where(eq(auditLog.at, at)).all();
+    expect(new Set(audits.map((row) => row.at)).size).toBe(1);
   });
 });
 
-test("approval uses the active filters and stops when the count changed", () => {
-  withBook((db) => {
-    const cash = account(db, "Cash");
-    const other = account(db, "Other");
-    const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-    const known = pay(db, cash.id, "2026-03-01", -10_000, "Cafe", food.id);
-    const here = pay(db, cash.id, "2026-03-02", -10_000, "Cafe", food.id);
-    const there = pay(db, other.id, "2026-03-03", -10_000, "Cafe", food.id);
-    stampAuto(db, here.id, known.id);
-    stampAuto(db, there.id, known.id);
-    expect(filteredReviewHits(db, { ...noFilter, accountId: cash.id }, asOf).map((hit) => hit.id)).toEqual([here.id]);
-    expect(() => approve(db, "sure", 2, { ...noFilter, accountId: cash.id }, "2026-04-02T18:10:00Z")).toThrow(ServiceError);
-    expect(getTransaction(db, here.id)?.autoReason).not.toBeNull();
-    const result = approve(db, "sure", 1, { ...noFilter, accountId: cash.id }, "2026-04-02T18:11:00Z");
-    expect(result.ids).toEqual([here.id]);
-    expect(getTransaction(db, there.id)?.autoReason).not.toBeNull();
-  });
-});
-
-test("a row has a bulk level only when the bulk action can apply it", () => {
+test("approve skips a row with a question, a row with no suggestion and a row that does not need review", () => {
   withBook((db) => {
     const cash = account(db, "Cash");
     const savings = account(db, "Savings");
+    const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
+    const none = pay(db, cash.id, "2026-03-03", -4000, "Odd shop");
+    const done = pay(db, cash.id, "2026-03-04", -4000, "Shop", food.id);
+    const out = pay(db, cash.id, "2026-03-05", -500_000, "Move");
+    pay(db, savings.id, "2026-03-05", 500_000, "Move");
+    db.update(transactions).set({ source: "import" }).where(eq(transactions.id, out.id)).run();
+    const at = "2026-04-02T18:10:00Z";
+    expect(approve(db, [none.id, done.id, out.id], at)).toEqual({
+      approved: 0,
+      skipped: [
+        { id: none.id, reason: "no_suggestion" },
+        { id: done.id, reason: "no_suggestion" },
+        { id: out.id, reason: "question" },
+      ],
+    });
+    expect(db.select().from(auditLog).where(eq(auditLog.at, at)).all()).toHaveLength(0);
+  });
+});
+
+test("a row is Likely only when approve can apply its suggestion", () => {
+  withBook((db) => {
+    const cash = account(db, "Cash");
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
     const other = createCategory(db, { name: "Other", kind: "expense", ...saved });
     pay(db, cash.id, "2026-03-01", -20_000, "Market", food.id);
@@ -227,17 +211,10 @@ test("a row has a bulk level only when the bulk action can apply it", () => {
       ],
       ...saved,
     });
-    const out = pay(db, cash.id, "2026-03-05", -500_000, "Move");
-    pay(db, savings.id, "2026-03-06", 500_000, "Move");
-    db.update(transactions).set({ source: "import" }).where(eq(transactions.id, out.id)).run();
     const hits = new Map(listNeedsReview(db, asOf).map((hit) => [hit.id, hit]));
     expect(hits.get(likely.id)?.review.level).toBe("likely");
     expect(hits.get(split.id)?.review.level).toBe("maybe");
-    expect(hits.get(out.id)?.review.question).toBe("transfer_pair");
-    expect(hits.get(out.id)?.review.level).toBe("none");
-    const result = approve(db, "likely", 1, noFilter, "2026-04-02T18:20:00Z");
-    expect(result.ids).toEqual([likely.id]);
-    expect(approve(db, "likely", 0, noFilter, "2026-04-02T18:21:00Z")).toEqual({ level: "likely", count: 0, ids: [] });
+    expect(approve(db, [likely.id, split.id], "2026-04-02T18:20:00Z")).toEqual({ approved: 1, skipped: [{ id: split.id, reason: "split" }] });
   });
 });
 
@@ -293,7 +270,7 @@ test("saving an automatically labelled row with no category keeps it out of Need
     expect(getTransaction(db, row.id)?.autoReason).toBe(null);
     expect(decisionRows(db).map((item) => item.itemKey)).toEqual([`uncategorized:${row.id}`]);
     expect(listNeedsReview(db, asOf)).toEqual([]);
-    expect(approve(db, "likely", 0, noFilter, "2026-04-02T18:00:00Z").ids).toEqual([]);
+    expect(approve(db, [row.id], "2026-04-02T18:00:00Z")).toEqual({ approved: 0, skipped: [{ id: row.id, reason: "no_suggestion" }] });
     expect(getTransaction(db, row.id)?.lines[0]?.categoryId).toBe(null);
 
     updateTransaction(db, row.id, { lines: [{ amount: 40_000, categoryId: rental.id }], ...saved });

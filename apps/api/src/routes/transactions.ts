@@ -1,7 +1,9 @@
 import {
-  approveLevelResultSchema,
-  approveLevelSchema,
+  approveResultSchema,
+  approveSelectedSchema,
   asOfQuerySchema,
+  bulkEditResultSchema,
+  bulkEditSchema,
   refundPurchaseListSchema,
   refundPurchaseQuerySchema,
   transactionCreateSchema,
@@ -16,7 +18,8 @@ import {
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { approveFiltered } from "../services/review-approve";
+import { bulkEdit } from "../services/bulk-edit";
+import { approveSelected } from "../services/review-approve";
 import { listReviewTransactions, listTransactions, transactionReview } from "../services/transaction-list";
 import { linkRefundToPurchase } from "../services/refund-answer";
 import { listRefundPurchases } from "../services/refund-link";
@@ -59,19 +62,39 @@ const refundPurchasesRoute = createRoute({
 
 const approveRoute = createRoute({
   operationId: "post_transactions_approve",
-  description: "Confirm every Needs review row at one level that matches the filters. Send the count that the person saw. A different count gives a 409. Sure clears the automatic reason. Likely applies the suggestion. One write. This counts as a confirmation.",
+  description: "Approve the selected transactions (one page at most): apply the automatic label or the suggestion of each row as a confirmation. A row with a question or with no suggestion is skipped, with a reason. One write. Each approved row counts as a confirmation.",
   method: "post",
   path: "/api/transactions/approve",
   request: {
     query: asOfQuerySchema,
-    body: { required: true, content: { "application/json": { schema: approveLevelSchema } } },
+    body: { required: true, content: { "application/json": { schema: approveSelectedSchema } } },
   },
   responses: {
     200: {
-      description: "The rows that were confirmed",
-      content: { "application/json": { schema: approveLevelResultSchema } },
+      description: "The number of approved rows and the skipped rows",
+      content: { "application/json": { schema: approveResultSchema } },
     },
     400: errorResponse,
+    404: errorResponse,
+  },
+});
+
+const bulkRoute = createRoute({
+  operationId: "post_transactions_bulk",
+  description: "Change the selected transactions (one page at most): \"What is this?\" (a category, or a transfer from the account of the rows), the merchant, tags to add and tags to remove. A field that is not in the body does not change. A row that cannot take the change is skipped, with a reason. A category on a row with an open question records the no answer. One write. Each changed row counts as a confirmation.",
+  method: "post",
+  path: "/api/transactions/bulk",
+  request: {
+    query: asOfQuerySchema,
+    body: { required: true, content: { "application/json": { schema: bulkEditSchema } } },
+  },
+  responses: {
+    200: {
+      description: "The number of changed rows and the skipped rows",
+      content: { "application/json": { schema: bulkEditResultSchema } },
+    },
+    400: errorResponse,
+    404: errorResponse,
     409: errorResponse,
   },
 });
@@ -242,10 +265,8 @@ const deleteRoute = createRoute({
 
 export function transactionRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook })
-    .openapi(approveRoute, (c) => {
-      const { level, count, ...filter } = c.req.valid("json");
-      return c.json(approveFiltered(db, c.req.valid("query").asOf, filter, level, count, { source: "ui" }), 200);
-    })
+    .openapi(approveRoute, (c) => c.json(approveSelected(db, c.req.valid("query").asOf, c.req.valid("json").transactionIds, { source: "ui" }), 200))
+    .openapi(bulkRoute, (c) => c.json(bulkEdit(db, c.req.valid("query").asOf, { ...c.req.valid("json"), source: "ui" }), 200))
     .openapi(refundPurchasesRoute, (c) => c.json({ items: listRefundPurchases(db, c.req.valid("query")) }, 200))
     .openapi(listRoute, (c) => c.json(listTransactions(db, c.req.valid("query")), 200))
     .openapi(reviewListRoute, (c) => c.json(listReviewTransactions(db, c.req.valid("query")), 200))

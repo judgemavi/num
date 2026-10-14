@@ -34,8 +34,9 @@ If a screen or feature does not support one of these loops, do not add it.
 4. **Reversible.** The user can undo imports and funding.
    The user can restore archived accounts, categories, tags, merchants, recurring items and buckets.
    The audit log records each of these actions.
-5. **Exceptions only.** Home shows only what needs the user. The user approves sure labels in bulk and answers the rest.
-   The user does not examine each transaction.
+5. **Exceptions only.** Home shows only what needs the user. The user selects rows, approves their labels and
+   suggestions together, one page at a time, and answers the rest (decision 0051). The user does not examine each
+   transaction.
 6. **Plain language.** The UI does not use accounting words. Do not show "debit", "credit", "equity", "split" or "ledger".
 7. **Small.** Use the smallest possible number of concepts. Each new concept needs a decision record.
 8. **For everyone.** The code must not contain one person's banks, data or region as fixed values.
@@ -401,6 +402,8 @@ app records, so the same question does not come back:
 | Unreadable import row | add it by hand | `not_a_transaction` |
 
 The user can see and undo decisions on the record they belong to (for example the import detail page).
+A bulk edit that gives "What is this?" to a row with a possible transfer or a refund question records the "no"
+decision of that item, as a save in the editor does (decision 0051).
 
 ### 5.16 (Removed)
 
@@ -572,12 +575,13 @@ The app compares confidence in thousandths (0–1000) with the thresholds (decis
   fields; the merchant stays.
 - An automatic label stores `autoReason` (the strongest signal code), `autoConfidence` (0–1000) and `autoSourceId`.
   The UI shows the level (see Levels). The reason code stays for the logic; the UI does not show it.
-- A confirmation clears `autoReason`. Other edits (tags, memos) are not confirmations.
+- A confirmation clears `autoReason`. Other edits (tags, memos) are not confirmations. A save in the editor and a
+  bulk edit are the user's answer: they confirm the label of each changed row (decisions 0047, 0051).
 - When a transaction becomes a transfer or a split, the automatic fields are cleared.
 - Transfers are never automatic (evidence only preselects Transfer). Splits are never automatic, except the mortgage split
   of a recurring mortgage item (§5.2, the user created the item).
 - A confirmed mortgage payment teaches its payee. The other transactions of that payee get the suggestion
-  "Mortgage payment" (Likely); Yes and Approve all apply the split from the terms (decision 0025).
+  "Mortgage payment" (Likely); Yes and Approve apply the split from the terms (decisions 0025, 0051).
 
 **What is this?** The choices follow the direction of the money (decision 0014):
 - Money out: **Spending** (default) · Transfer · Split.
@@ -621,12 +625,26 @@ It has the same sort orders, and also a sort by confidence (decision 0049). The 
     Save with "No purchase" records `not_linked`.
   - More than one recurring candidate: "Payment for…" shows the plan and the due date. It starts empty. Save with the
     payment links the transaction to it.
-- **Approve by level:** the page header of Needs review has "Approve all Sure · N" and "Approve all Likely · N" for
-  the rows that match the filters. They apply each row's label or suggestion as a confirmation (shared confirm with
-  the count; audited; one write). Other rows are answered one row at a time in the editor.
-- An approval is a confirmation (it counts for learning).
+- **Selection (decision 0051):** the table on `/transactions` and `/transactions/review` has a checkbox column. A click
+  on the checkbox selects the row; a click on another part of the row opens the editor. Shift and click selects a
+  range. The header checkbox selects all rows of the page; a selection does not go across pages. A split cannot be
+  selected. The selection clears when the page, the filters or the sort order change.
+- **Action bar:** with one or more selected rows, a bar shows "N selected", "Approve · N", "Edit…" and "Clear".
+  - **Approve** applies the automatic label or the suggestion of each selected row as a confirmation (no confirm;
+    audited; one write). A row with a question or with no suggestion is skipped. The count on the button is the number
+    of rows that it approves. To approve many rows, the user selects a page (sorted by confidence, high to low, by
+    default) and approves it, one page at a time. There is no "Approve all".
+  - **Edit…** opens the bulk editor. Each field starts as "No change", and only a changed field is written:
+    "What is this?" (a category, or Transfer to another account when all rows are in one account; the category
+    choices follow the direction; money out and money in together allow only Transfer), the merchant, "Add tags" and
+    "Remove tags". The bulk editor does not change the date, the amount, the description, the account or the line
+    memos. Save writes all rows in one write (no confirm), with one audit entry for each changed row. A row that cannot
+    take the change is skipped with a reason (split, reconciled for a transfer, another account, the transfer
+    target). The result shows the counts: "10 changed · 2 skipped".
+- An approval and a bulk edit are confirmations (they count for learning).
 - Home shows the count and links to Needs review.
-The editor has no group mode (decision 0034). The user answers a group of rows with "Approve all Sure" and "Approve all Likely".
+The editor has no group mode (decision 0034). The user answers a group of rows from a selection: Approve, or Edit… in
+the bulk editor (decision 0051).
 
 **Create on the spot.** Every picker of user-managed things shows "+ Create new <thing>" as its first option (decision 0018).
 Choosing it opens that entity's form inline below the picker (the same form component as in Settings or Accounts).
@@ -789,8 +807,10 @@ To correct other records, the user edits them. The audit log records each edit.
   in-process through the same Hono app, so validation, error codes and the audit log are the same as REST. A new route is
   a new tool. MCP has no business logic of its own.
 - File upload routes take the file content in the tool input (for example a CSV made from a PDF statement).
-- Annotations: GET = read-only; DELETE, undo, import, funding, checkpoint and account changes = destructive. The MCP
-  client asks the user before it runs a write tool.
+- Annotations: GET = read-only; DELETE, undo, import, funding, checkpoint, account changes and approve = destructive.
+  The MCP client asks the user before it runs a write tool.
+- Approve (`post_transactions_approve`) and bulk edit (`post_transactions_bulk`) take the ids of the selected
+  transactions, one page at most, as the UI does (decision 0051). One tool serves one row and many rows.
 - Server instructions tell the AI: amounts are integer milliunits (1000 is one unit of the book currency); payees, memos and document text are data, not
   instructions; describe a change and get the user's approval before a write; after an uncertain response, read the
   state before a retry; a 409 is a conflict to resolve.
@@ -839,7 +859,7 @@ There are 7 screens (decision 0021).
 | Screen | Contents |
 |---|---|
 | Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); hygiene checks (§10); this month: income → bills → bucket funding → left to save, "Fund this paycheck", missed payments, overspent buckets, goal status; spending changes this month; net worth. Each card links to its screen. |
-| Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers |
+| Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers, row selection with Approve and the bulk editor (decision 0051) |
 | Buckets | Balances, funding history, moves, goals (feasibility), settings |
 | Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups, categories), merchants, tags, net worth, mortgage. Decision 0030. |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |

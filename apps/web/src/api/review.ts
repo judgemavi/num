@@ -1,9 +1,11 @@
-import type { approveLevels, InboxDecisionCode, TransactionFilter } from "@num/shared";
+import type { InboxDecisionCode } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api, errorCode, unwrap } from "@/api/client";
+import { api, unwrap } from "@/api/client";
+import { localAsOf } from "@/as-of";
 import { undoToast } from "@/components/undo-toast";
 import { inboxError } from "@/review/format";
+import { countText } from "@/transactions/format";
 
 export function reviewSummaryQuery(asOf: string) {
   return queryOptions({
@@ -44,38 +46,15 @@ export function useUndoDecision() {
   });
 }
 
-export type ApproveLevel = (typeof approveLevels)[number];
-
-type ApproveInput = { asOf: string; filter: TransactionFilter; level: ApproveLevel; count: number };
-
 /**
- * Confirm all Needs review rows of one level that match the filters. `count` is the number that the person saw.
- * When the number is different on the server, no row changes. The result then has `changed: true` and `left`,
- * the number of rows at that level now. All queries are invalidated, thus the screen shows the new list.
+ * Approve the selected rows (decision 0051): apply the automatic label or the suggestion of each row as a confirmation.
+ * The server skips a row with a question or with no suggestion. No route undoes an approval, thus the toast has no "Undo".
  */
-export function useApproveLevel() {
+export function useApproveSelected() {
   return useMutation({
     meta: { errorText: inboxError },
-    mutationFn: async ({ asOf, filter, level, count }: ApproveInput) => {
-      try {
-        await unwrap(api.transactions.approve.$post({ query: { asOf }, json: { ...filter, level, count } }));
-        return { changed: false as const, level };
-      } catch (error) {
-        if (!(error instanceof Error) || errorCode(error) !== "review_changed") {
-          throw error;
-        }
-        const left = await unwrap(api.transactions.review.$get({ query: { ...filter, asOf, page: 1, pageSize: 1 } })).then(
-          (fresh) => fresh.reviewCounts[level],
-          () => 0,
-        );
-        return { changed: true as const, level, left };
-      }
-    },
-    // No route undoes an approval, thus the toast has no "Undo".
-    onSuccess: (result, { count }) => {
-      if (!result.changed) {
-        toast.success(count === 1 ? "1 transaction approved." : `${count} transactions approved.`);
-      }
-    },
+    mutationFn: (transactionIds: string[]) =>
+      unwrap(api.transactions.approve.$post({ query: { asOf: localAsOf() }, json: { transactionIds } })),
+    onSuccess: (result) => toast.success(countText(result.approved, "approved", result.skipped.length)),
   });
 }

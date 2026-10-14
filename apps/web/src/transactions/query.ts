@@ -14,19 +14,3 @@ export function hasFilters(search: TransactionFilter): boolean {
       search.automatic,
   );
 }
-
-/** The filters that choose which rows a bulk approval covers. */
-export function filterBody(search: TransactionFilter): TransactionFilter {
-  return {
-    q: search.q,
-    accountId: search.accountId,
-    categoryId: search.categoryId,
-    groupId: search.groupId,
-    merchantId: search.merchantId,
-    tagId: search.tagId,
-    from: search.from,
-    to: search.to,
-    uncategorized: search.uncategorized,
-    automatic: search.automatic,
-  };
-}

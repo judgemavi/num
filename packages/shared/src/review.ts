@@ -5,6 +5,7 @@ import { reviewLevels } from "./review-level";
 import { amountSchema } from "./money";
 import { suggestionSchema } from "./suggest";
 import { isUtcTimestamp } from "./time";
+import { maxPageSize } from "./list";
 
 const itemKey = z.string().trim().min(1).max(500);
 
@@ -54,14 +55,6 @@ export const reviewCountSchema = z.object({
   maybe: z.number().int().nonnegative(),
   none: z.number().int().nonnegative(),
   questions: z.number().int().nonnegative(),
-});
-
-export const approveLevels = ["sure", "likely"] as const;
-
-export const approveLevelResultSchema = z.object({
-  level: z.enum(approveLevels),
-  count: z.number().int().nonnegative(),
-  ids: z.array(z.uuid()),
 });
 
 export type TransactionReview = z.infer<typeof transactionReviewSchema>;
@@ -119,32 +112,80 @@ export const transferPairAcceptSchema = z.object({
   rightId: z.uuid(),
 });
 
-export const groupSkipReasons = ["split", "reconciled", "other_account", "categorized", "no_split"] as const;
+/**
+ * Why approve or bulk edit leaves a selected row as it is (decision 0051).
+ * - `split`: the row (or the other side of its transfer) has more than one line.
+ * - `reconciled`: the change moves money of a reconciled row (a transfer).
+ * - `other_account`: a transfer applies only to the rows of its account.
+ * - `transfer_target`: the row is in the account that the transfer goes to.
+ * - `direction`: an income category on money out.
+ * - `refund_linked`: a linked refund takes its category and merchant from the purchase.
+ * - `unchanged`: the row already has the values.
+ * - `question`, `no_suggestion`: approve has nothing to apply.
+ * - `no_split`: the mortgage schedule gives no split for the row.
+ */
+const bulkSkipReasons = [
+  "split",
+  "reconciled",
+  "other_account",
+  "transfer_target",
+  "direction",
+  "refund_linked",
+  "unchanged",
+  "question",
+  "no_suggestion",
+  "no_split",
+] as const;
 
-export type GroupSkipReason = (typeof groupSkipReasons)[number];
+export type BulkSkipReason = (typeof bulkSkipReasons)[number];
 
-export const skippedRowSchema = z.object({
+const skippedRowSchema = z.object({
   id: z.uuid(),
-  reason: z.enum(groupSkipReasons),
+  reason: z.enum(bulkSkipReasons),
 });
 
-export const inboxGroupApplySchema = z
-  .object({
-    accountId: z.uuid(),
-    transactionIds: z.array(z.uuid()).min(1).max(500),
-    categoryId: z.uuid().nullable(),
-    transferAccountId: z.uuid().nullable(),
-    merchantId: z.uuid().nullable(),
-    mortgage: z.boolean().optional(),
-  })
-  .refine((value) => (value.categoryId === null) !== (value.transferAccountId === null));
+/** The selected rows: one page of the list at most (decision 0051). */
+const selectedIds = z.array(z.uuid()).min(1).max(maxPageSize);
 
-export const inboxGroupApplyResultSchema = z.object({
-  applied: z.number().int().nonnegative(),
+export const approveSelectedSchema = z.object({
+  transactionIds: selectedIds,
+});
+
+export const approveResultSchema = z.object({
+  approved: z.number().int().nonnegative(),
+  skipped: z.array(skippedRowSchema),
+});
+
+/** "What is this?" of the bulk editor: a category, or a transfer from the account of the rows to another account. */
+const bulkWhatSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("category"), categoryId: z.uuid() }),
+  z.object({ kind: z.literal("transfer"), accountId: z.uuid(), transferAccountId: z.uuid() }),
+]);
+
+/**
+ * A bulk edit (decision 0051). A field that is not in the body does not change. `merchantId: null` removes the
+ * merchant. Tags are added and removed; the edit does not replace all tags of a row.
+ */
+export const bulkEditSchema = z
+  .object({
+    transactionIds: selectedIds,
+    what: bulkWhatSchema.optional(),
+    merchantId: z.uuid().nullable().optional(),
+    addTagIds: z.array(z.uuid()).max(100).optional(),
+    removeTagIds: z.array(z.uuid()).max(100).optional(),
+  })
+  .refine(
+    (value) =>
+      value.what !== undefined || value.merchantId !== undefined || (value.addTagIds?.length ?? 0) > 0 || (value.removeTagIds?.length ?? 0) > 0,
+    { message: "Change at least one field." },
+  );
+
+export const bulkEditResultSchema = z.object({
+  changed: z.number().int().nonnegative(),
   skipped: z.array(skippedRowSchema),
 });
 
 export type InboxDecision = z.infer<typeof inboxDecisionSchema>;
 export type ImportReviewResolve = z.infer<typeof importReviewResolveSchema>;
-export type InboxGroupApply = z.infer<typeof inboxGroupApplySchema>;
-export type GroupSkip = z.infer<typeof skippedRowSchema>;
+export type BulkEdit = z.infer<typeof bulkEditSchema>;
+export type BulkSkip = z.infer<typeof skippedRowSchema>;

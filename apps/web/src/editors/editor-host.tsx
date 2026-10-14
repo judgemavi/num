@@ -24,7 +24,7 @@ function reconcileKey(accountId: string) {
 
 /**
  * The editor that the URL shows. `edit` shows the editor of one record. `reconcile` on the page of an account shows
- * the reconcile editor of that account. Group mode and the other editors are not in the URL.
+ * the reconcile editor of that account. The bulk editor and the other editors are not in the URL.
  */
 function editorOfUrl(search: { edit?: string; reconcile?: boolean }, accountId: string | undefined) {
   const edit = parseEditParam(search.edit);

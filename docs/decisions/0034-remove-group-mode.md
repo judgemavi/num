@@ -1,6 +1,8 @@
 # 0034 — Remove the editor's group mode
 
 Status: accepted (owner, 2026-10-14)
+Changed in part by decision 0051 (2026-10-14): the editor still has no group mode, but a separate bulk editor opens from
+a row selection. `POST /api/transactions/group` is now `POST /api/transactions/bulk`.
 
 ## Context
 

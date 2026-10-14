@@ -10,12 +10,12 @@ import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { decideInboxItem } from "./inbox-decisions";
 import { acceptTransferPair } from "./suggestions";
-import { applyInboxGroup } from "./inbox-group";
+import { bulkEdit } from "./bulk-edit";
 import { importStatement } from "./imports";
 import { undoImportBatch } from "./import-undo";
 import { loadMatchBook } from "./match-book";
 import { listNeedsReview } from "./needs-review";
-import { approveFiltered } from "./review-approve";
+import { approveSelected } from "./review-approve";
 import { acceptLooksRight, createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const at = "2026-03-20T16:00:00.000Z";
@@ -193,14 +193,7 @@ function refundOf(db: Db, ids: Ids, date: string, amount: number, categoryId: st
     lines: [{ amount }],
     ...saved,
   });
-  applyInboxGroup(db, {
-    accountId: ids.cheque,
-    transactionIds: [row.id],
-    categoryId,
-    transferAccountId: null,
-    merchantId: null,
-    ...saved,
-  });
+  bulkEdit(db, asOf, { transactionIds: [row.id], what: { kind: "category", categoryId }, ...saved });
   return row;
 }
 
@@ -304,21 +297,18 @@ test("undo is blocked when the linked peer is reconciled", () => {
   });
 });
 
-test("a group answer does not auto-link rows of its own batch", () => {
+test("a bulk edit does not auto-link rows of its own batch", () => {
   withBook((db, ids) => {
     const dates = ["01/05", "01/12", "01/19", "01/26", "02/02"];
     statement(db, ids, ids.cheque, "out", dates.map((day) => `${day}/2026,CIBC PAYMENT,-50.00`));
     statement(db, ids, ids.savings, "in", dates.map((day) => `${day}/2026,PAYMENT RECEIVED,50.00`));
     const outs = rowsOf(db, -50_000).sort((a, b) => a.date.localeCompare(b.date));
-    const result = applyInboxGroup(db, {
-      accountId: ids.cheque,
+    const result = bulkEdit(db, asOf, {
       transactionIds: outs.map((row) => row.id),
-      categoryId: null,
-      transferAccountId: ids.savings,
-      merchantId: null,
+      what: { kind: "transfer", accountId: ids.cheque, transferAccountId: ids.savings },
       ...saved,
     });
-    expect(result.applied).toBe(5);
+    expect(result.changed).toBe(5);
     for (const row of outs) {
       const stored = getTransaction(db, row.id);
       expect(stored?.transferPeerId).not.toBeNull();
@@ -327,12 +317,13 @@ test("a group answer does not auto-link rows of its own batch", () => {
   });
 });
 
-test("Approve all Sure confirms an automatic pair as one transfer", () => {
+test("Approve confirms an automatic pair as one transfer", () => {
   withBook((db, ids) => {
     learnTransfer(db, ids, "MOVE TO SAVINGS");
     pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
-    const result = approveFiltered(db, asOf, { uncategorized: false, automatic: false }, "sure", 2, saved);
-    expect(result.count).toBe(2);
+    const selected = [...rowsOf(db, -50_000), ...rowsOf(db, 50_000)].map((row) => row.id);
+    const result = approveSelected(db, asOf, selected, saved);
+    expect(result).toEqual({ approved: 2, skipped: [] });
     expect(rowsOf(db, -50_000)[0]?.autoReason).toBeNull();
     expect(rowsOf(db, 50_000)[0]?.autoReason).toBeNull();
   });

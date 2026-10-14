@@ -100,8 +100,11 @@ export const MoneySection = withForm({
   },
 });
 
-/** The tags of the transaction: a picker that adds a tag, and a button for each tag that removes it. */
-export function TagsField({ tagIds, onTags }: { tagIds: string[]; onTags: (ids: string[]) => void }) {
+/**
+ * The tags of the transaction: a picker that adds a tag, and a button for each tag that removes it. The bulk editor
+ * uses it for "Add tags" (decision 0051).
+ */
+export function TagsField({ id = "txn-tag", label = "Tags", tagIds, onTags }: { id?: string; label?: string; tagIds: string[]; onTags: (ids: string[]) => void }) {
   const archiveTag = useArchiveTag();
   const tags = useTags();
   const [created, setCreated] = useState<typeof tags>([]);
@@ -110,9 +113,9 @@ export function TagsField({ tagIds, onTags }: { tagIds: string[]; onTags: (ids: 
   const options = allTags.filter((tag) => tag.archivedAt === null && !tagIds.includes(tag.id)).map((tag) => ({ id: tag.id, label: tag.name }));
   return (
     <Field>
-      <FieldLabel htmlFor="txn-tag">Tags</FieldLabel>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <ManagedPicker
-        id="txn-tag"
+        id={id}
         value={null}
         options={options}
         placeholder="Add a tag"
