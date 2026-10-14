@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { documents, type DocumentRow } from "@num/db";
 import { utcNow, type Document } from "@num/shared";
@@ -14,146 +13,92 @@ export type DocumentFile = {
   bytes: Uint8Array;
 };
 
-function cleanFilename(value: string) {
-  const base = value.split(/[/\\]/).pop()?.replace(/[\r\n"]/g, "").trim() ?? "";
-  return base.length > 0 ? base : "upload";
-}
-
-function cleanMimeType(value: string) {
-  const text = value.trim();
-  return text.length > 0 ? text : "application/octet-stream";
-}
-
-function sha256(bytes: Uint8Array) {
-  return createHash("sha256").update(bytes).digest("hex");
-}
-
-function storedFile(dataDir: string, hash: string) {
+/** The stored file of a document. The hash is unique, thus one file belongs to one document. */
+export function storedFile(dataDir: string, hash: string) {
   return join(dataDir, "uploads", hash);
 }
 
-function isHashConflict(error: unknown) {
-  const cause = error instanceof Error && error.cause instanceof Error ? error.cause.message : "";
-  const message = error instanceof Error ? error.message : "";
-  return `${message} ${cause}`.includes("documents.hash");
-}
-
-function findByHash(db: Db, hash: string): DocumentRow | undefined {
-  return db.select().from(documents).where(eq(documents.hash, hash)).get();
-}
-
-export function restoreDocument(db: Db, id: string, input: WriteInput): Document {
-  const row = db.select().from(documents).where(eq(documents.id, id)).get();
-  if (!row) {
-    throw new ServiceError("document_not_found", 404);
-  }
-  return restoreStoredDocument(db, row, input);
-}
-
-function restoreStoredDocument(db: Db, row: DocumentRow, input: WriteInput) {
-  const at = input.at ?? utcNow();
-  return write(db, { source: input.source, at }, (tx) => {
-    const current = tx.select().from(documents).where(eq(documents.id, row.id)).get();
-    if (!current) {
-      throw new ServiceError("document_not_found", 404);
-    }
-    if (current.deletedAt) {
-      tx.update(documents).set({ deletedAt: null }).where(eq(documents.id, current.id)).run();
-    }
-    const restored = { ...current, deletedAt: null };
-    tx.audit({
-      entity: "documents",
-      entityId: current.id,
-      action: "restore",
-      before: withoutId(current),
-      after: withoutId(restored),
-    });
-    return restored;
-  });
-}
-
-function sameDocument(db: Db, row: DocumentRow, input: WriteInput) {
-  if (row.deletedAt) {
-    return restoreStoredDocument(db, row, input);
-  }
-  return row;
-}
-
-export function uploadDocument(
-  db: Db,
-  dataDir: string,
-  input: WriteInput & { bytes: Uint8Array; filename: string; mimeType: string },
-): Document {
-  const hash = sha256(input.bytes);
-  const existing = findByHash(db, hash);
-  if (existing) {
-    return sameDocument(db, existing, input);
-  }
-
-  const row: DocumentRow = {
-    id: crypto.randomUUID(),
-    filename: cleanFilename(input.filename),
-    hash,
-    mimeType: cleanMimeType(input.mimeType),
-    storagePath: `uploads/${hash}`,
-    uploadedAt: input.at ?? utcNow(),
-    deletedAt: null,
-  };
-
+export function writeStoredFile(dataDir: string, hash: string, bytes: Uint8Array): void {
   mkdirSync(join(dataDir, "uploads"), { recursive: true });
-  writeFileSync(storedFile(dataDir, hash), input.bytes);
+  writeFileSync(storedFile(dataDir, hash), bytes);
+}
 
+/**
+ * The same file again after its document was erased (decision 0041): the file is stored again and the document
+ * loses its erased mark. The file is written first. If the write of the row fails, the file is removed again.
+ */
+export function restoreDocument(db: Db, dataDir: string, row: DocumentRow, bytes: Uint8Array, input: WriteInput): Document {
+  writeStoredFile(dataDir, row.hash, bytes);
   try {
-    write(db, { source: input.source, at: row.uploadedAt }, (tx) => {
-      tx.insert(documents).values(row).run();
-      tx.audit({
-        entity: "documents",
-        entityId: row.id,
-        action: "create",
-        before: null,
-        after: withoutId(row),
-      });
+    return write(db, { source: input.source, at: input.at ?? utcNow() }, (tx) => {
+      const current = tx.select().from(documents).where(eq(documents.id, row.id)).get();
+      if (!current) {
+        throw new ServiceError("document_not_found", 404);
+      }
+      const restored = { ...current, deletedAt: null };
+      tx.update(documents).set({ deletedAt: null }).where(eq(documents.id, current.id)).run();
+      tx.audit({ entity: "documents", entityId: current.id, action: "restore", before: withoutId(current), after: withoutId(restored) });
+      return restored;
     });
   } catch (error) {
-    const saved = findByHash(db, hash);
-    if (saved && isHashConflict(error)) {
-      return sameDocument(db, saved, input);
-    }
+    rmSync(storedFile(dataDir, row.hash), { force: true });
     throw error;
   }
-
-  return row;
 }
 
 export function readDocumentFile(db: Db, dataDir: string, id: string): DocumentFile {
   const row = db.select().from(documents).where(eq(documents.id, id)).get();
-  if (!row || row.deletedAt) {
+  const path = row ? storedFile(dataDir, row.hash) : null;
+  if (!row || row.deletedAt || !path || !existsSync(path)) {
     throw new ServiceError("document_not_found", 404);
   }
   return {
     filename: row.filename,
     mimeType: row.mimeType,
-    bytes: readFileSync(storedFile(dataDir, row.hash)),
+    bytes: readFileSync(path),
   };
 }
 
-export function deleteDocument(db: Db, id: string, input: WriteInput): Document {
+/**
+ * Erase the file of a document (decision 0041). The row stays with its filename, hash and upload time, and gets the
+ * erased mark `deletedAt`. The import batch and its transactions stay.
+ *
+ * The file moves to a side name inside the database transaction. If the transaction fails, the file moves back. After
+ * the commit, the side file is deleted. Thus the row and the file under its hash always agree.
+ */
+export function eraseDocument(db: Db, dataDir: string, id: string, input: WriteInput): Document {
   const at = input.at ?? utcNow();
-  return write(db, { source: input.source, at }, (tx) => {
-    const existing = tx.select().from(documents).where(eq(documents.id, id)).get();
-    if (!existing || existing.deletedAt) {
-      throw new ServiceError("document_not_found", 404);
-    }
-    const deletedAt = at;
-    tx.update(documents).set({ deletedAt }).where(eq(documents.id, id)).run();
-    const updated = { ...existing, deletedAt };
-    tx.audit({
-      entity: "documents",
-      entityId: id,
-      action: "delete",
-      before: withoutId(existing),
-      after: withoutId(updated),
+  // The stored file that the transaction moved to its side name. Empty when there was no file.
+  const moved: string[] = [];
+  let erased: Document;
+  try {
+    erased = write(db, { source: input.source, at }, (tx) => {
+      const existing = tx.select().from(documents).where(eq(documents.id, id)).get();
+      if (!existing || existing.deletedAt) {
+        throw new ServiceError("document_not_found", 404);
+      }
+      const updated = { ...existing, deletedAt: at };
+      tx.update(documents).set({ deletedAt: at }).where(eq(documents.id, id)).run();
+      tx.audit({ entity: "documents", entityId: id, action: "delete", before: withoutId(existing), after: withoutId(updated) });
+      const file = storedFile(dataDir, existing.hash);
+      if (existsSync(file)) {
+        renameSync(file, sideName(file));
+        moved.push(file);
+      }
+      return updated;
     });
-    return updated;
-  });
+  } catch (error) {
+    for (const file of moved) {
+      renameSync(sideName(file), file);
+    }
+    throw error;
+  }
+  for (const file of moved) {
+    rmSync(sideName(file), { force: true });
+  }
+  return erased;
+}
+
+function sideName(file: string) {
+  return `${file}.erased`;
 }

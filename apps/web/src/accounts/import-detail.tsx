@@ -10,6 +10,7 @@ import {
   formatImportDate,
   formatImportPeriod,
   formatStatementDate,
+  hasRemovableFile,
   importCountText,
   importError,
   importOutcomeLabel,
@@ -17,6 +18,7 @@ import {
   undoBlockLabel,
   unreadableLabel,
 } from "@/accounts/import-format";
+import { RemoveFileMenuItem } from "@/accounts/remove-file-item";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
 import { ListCard, ListRow, listName } from "@/components/list-card";
@@ -136,16 +138,20 @@ function ImportDetailPage() {
         title={filename}
         actions={
           <>
-            {item.documentId ? (
+            {item.documentDeletedAt ? <span className="text-sm text-muted-foreground">File removed</span> : null}
+            {item.documentId && !item.documentDeletedAt ? (
               <Button type="button" variant="secondary" asChild>
                 <a href={documentPath(item.documentId)}>Download file</a>
               </Button>
             ) : null}
-            {item.status === "undone" ? null : (
+            {item.status === "undone" && !hasRemovableFile(item) ? null : (
               <RowMenu label={`Actions for ${filename}`}>
-                <DropdownMenuItem className="min-h-11" onSelect={() => void undo(filename)}>
-                  Undo
-                </DropdownMenuItem>
+                {item.status === "undone" ? null : (
+                  <DropdownMenuItem className="min-h-11" onSelect={() => void undo(filename)}>
+                    Undo
+                  </DropdownMenuItem>
+                )}
+                <RemoveFileMenuItem item={item} />
               </RowMenu>
             )}
           </>

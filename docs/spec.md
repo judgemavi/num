@@ -95,13 +95,13 @@ The owner finds information about unknown merchants with Claude through MCP.
 - **Lists:** Filter, sort and page state is in the URL. The URL agrees 1:1 with the API query.
   Pagination is on the server (decision 0004).
 - **Rates:** Interest rates are integers in thousandths of a percent (`MilliPct`). Example: 6.875% = `6875`.
+  The user types a percent with a maximum of 3 decimal places.
 - **Changes:** A `PATCH` body has only the fields that change. A field that the body leaves out keeps its stored value.
   `null` clears a field that can be empty. The checks that use more than one field run on the stored record with the
   changes. A list field (for example the lines of a transaction) replaces the stored list (decision 0040).
-  The user types a percent with a maximum of 3 decimal places.
 - **IDs:** Use UUID text.
-- **Delete:** A delete removes the record (hard delete). The audit log keeps the record as it was (§11). Only documents
-  use a soft delete (§5.12). You can archive configuration records (recurring items, buckets).
+- **Delete:** A delete removes the record (hard delete). The audit log keeps the record as it was (§11). A document
+  keeps its record when the user removes its file (§5.12). You can archive configuration records (recurring items, buckets).
 - **Validation:** The app validates codes and values with the shared Zod schemas. The database enforces only foreign keys
   and unique indexes (no CHECK constraints).
 - **Audit:** Each change writes one `audit_log` row (§11).
@@ -354,7 +354,10 @@ A document is an original uploaded file.
 
 Fields: `filename`, `hash` (unique), `mimeType`, `storagePath`, `uploadedAt`.
 
-Keep documents permanently. Use only a soft delete.
+The user can remove the file of a document (decision 0041). The app deletes the stored file and keeps the record
+(`filename`, `hash`, `uploadedAt`) with the time of the removal in `deletedAt`, for the audit log. The import batch and
+its transactions stay. The download of a removed file answers 404, and the UI shows "File removed".
+There is no upload without an import: a file comes in through an import (§7.2).
 
 ### 5.13 Checkpoint
 
@@ -450,7 +453,8 @@ The user can create, edit and archive accounts.
 1. The user uploads a file (maximum 20 MB). The app stores it as a Document.
    If a document with the same hash has an active batch, show that batch. Do not import again. If its batch is undone,
    import the file again.
-   If that document is deleted, restore it (audited).
+   If the file of that document was removed, store the file again and clear `deletedAt` (audited). Then follow the
+   two rules above.
 2. The app selects the parser for the account:
    - **OFX/QFX parser.** It uses the bank transaction ID (`FITID`) as `bankId`. It reads the closing balance (`LEDGERBAL`).
    - **CSV parser with a column map.** The column map gives the columns for date, description, amount

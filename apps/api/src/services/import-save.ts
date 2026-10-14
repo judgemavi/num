@@ -1,10 +1,10 @@
-import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { rmSync } from "node:fs";
 import { accounts, documents, importBatches, importRows, transactionLines, transactions } from "@num/db";
 import { normalizePayee, storedPayee, type ColumnMap, type ImportBatch, type MatchResult, type UnreadableRow } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountAuditSnapshot } from "./account-snapshot";
+import { storedFile, writeStoredFile } from "./documents";
 import { countOutcomes, presentBatch } from "./import-read";
 import type { PlannedImportRow } from "./import-plan";
 import { labelFields, linkRecurring, mortgageSplitLines } from "./match-apply";
@@ -221,11 +221,6 @@ function saveFormat(
   });
 }
 
-function writeNewFile(dataDir: string, hash: string, bytes: Uint8Array): void {
-  mkdirSync(join(dataDir, "uploads"), { recursive: true });
-  writeFileSync(join(dataDir, "uploads", hash), bytes);
-}
-
 export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
   const dates = input.rows.map((row) => row.date).sort();
   const periodStart = dates[0];
@@ -233,11 +228,11 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
   if (!periodStart || !periodEnd) {
     throw new Error("A batch needs a statement row");
   }
-  if (input.newFile) {
-    if (!input.bytes) {
-      throw new Error("A new document needs file bytes");
-    }
-    writeNewFile(input.dataDir, input.document.hash, input.bytes);
+  if ((input.newFile || input.restoreDocument) && !input.bytes) {
+    throw new Error("A new or restored document needs file bytes");
+  }
+  if (input.bytes) {
+    writeStoredFile(input.dataDir, input.document.hash, input.bytes);
   }
   const batchId = crypto.randomUUID();
   try {
@@ -342,8 +337,8 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
       return presented;
     });
   } catch (error) {
-    if (input.newFile) {
-      unlinkSync(join(input.dataDir, "uploads", input.document.hash));
+    if (input.bytes) {
+      rmSync(storedFile(input.dataDir, input.document.hash), { force: true });
     }
     throw error;
   }

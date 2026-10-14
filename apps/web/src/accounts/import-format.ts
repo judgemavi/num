@@ -1,4 +1,4 @@
-import type { ImportCounts, ImportRowOutcome, ImportViewStatus, UnreadableReason, UndoBlockReason, ErrorCode } from "@num/shared";
+import type { ImportCounts, ImportRowOutcome, ImportViewStatus, UnreadableReason, UndoBlockReason, ErrorCode, ImportViewItem } from "@num/shared";
 
 const unreadableText: Record<UnreadableReason, string> = {
   date_unreadable: "The date could not be read.",
@@ -103,4 +103,9 @@ export function importError(code: ErrorCode | undefined): string {
     default:
       return "Something went wrong on the server. The server log has the details.";
   }
+}
+
+/** True when the import has a file that the person can remove. */
+export function hasRemovableFile(item: Pick<ImportViewItem, "documentId" | "documentDeletedAt">) {
+  return item.documentId !== null && item.documentDeletedAt === null;
 }

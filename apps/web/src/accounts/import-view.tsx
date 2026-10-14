@@ -3,7 +3,8 @@ import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { ImportFilterBar } from "@/accounts/import-filters";
 import { useImportSearch } from "@/accounts/use-import-search";
-import { formatImportDate, formatImportPeriod, importCountText, importStatusLabel } from "@/accounts/import-format";
+import { formatImportDate, formatImportPeriod, hasRemovableFile, importCountText, importStatusLabel } from "@/accounts/import-format";
+import { RemoveFileMenuItem } from "@/accounts/remove-file-item";
 import { activeAccountsQuery } from "@/api/accounts";
 import { importViewQuery } from "@/api/imports";
 import { Boundary } from "@/components/boundary";
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
+import { RowMenu } from "@/components/row-menu";
 import { useAccountLabels } from "@/editors/lookups";
 import { ListPager } from "@/lists/list-pager";
 import { useLastPage } from "@/lists/use-list-search";
@@ -83,9 +85,17 @@ function ImportListRow({ item }: { item: ImportViewItem }) {
         <small>
           {formatImportDate(item.createdAt)} · {accountName} · {formatImportPeriod(item.periodStart, item.periodEnd)}
         </small>
-        <small>{importCountText(item.counts)}</small>
+        <small>
+          {importCountText(item.counts)}
+          {item.documentDeletedAt ? " · File removed" : ""}
+        </small>
       </div>
       <Badge variant={statusVariant(item.status)}>{importStatusLabel(item.status)}</Badge>
+      {hasRemovableFile(item) ? (
+        <RowMenu label={`Actions for ${item.filename ?? "this import"}`}>
+          <RemoveFileMenuItem item={item} />
+        </RowMenu>
+      ) : null}
     </ListRow>
   );
 }

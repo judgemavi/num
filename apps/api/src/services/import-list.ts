@@ -95,6 +95,12 @@ function loadItems(db: Db, where: SQL | undefined, newest: boolean, window?: { l
       accountName: accounts.name,
       documentId: importBatches.documentId,
       filename: documents.filename,
+      documentDeletedAt: documents.deletedAt,
+      transactionCount: sql<number>`(
+        select count(*) from ${transactions}
+        inner join ${importRows} on ${importRows.id} = ${transactions.importRowId}
+        where ${importRows.batchId} = ${importBatches.id}
+      )`,
       periodStart: importBatches.periodStart,
       periodEnd: importBatches.periodEnd,
       createdAt: importBatches.createdAt,
@@ -115,6 +121,7 @@ function loadItems(db: Db, where: SQL | undefined, newest: boolean, window?: { l
   return batches.map(({ unreadableJson, ...batch }) => ({
     ...batch,
     filename: batch.filename ?? null,
+    documentDeletedAt: batch.documentDeletedAt ?? null,
     counts: { ...(byBatch.get(batch.id) ?? emptyCounts()), unreadable: unreadableJson.length },
   }));
 }

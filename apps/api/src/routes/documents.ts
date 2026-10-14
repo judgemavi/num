@@ -1,43 +1,13 @@
 import { documentSchema } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { bodyLimit } from "hono/body-limit";
 import type { Db } from "../db";
-import { deleteDocument, readDocumentFile, uploadDocument } from "../services/documents";
+import { eraseDocument, readDocumentFile } from "../services/documents";
 import { validationHook } from "../validation";
 import { errorResponse, idParams } from "./common";
 
-const maxUploadBytes = 20 * 1024 * 1024;
-
-const uploadRoute = createRoute({
-  operationId: "post_documents",
-  description: "Store a document file. This does not create transactions. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
-  method: "post",
-  path: "/api/documents",
-  request: {
-    body: {
-      required: true,
-      content: {
-        "multipart/form-data": {
-          schema: z.object({
-            file: z.instanceof(File).openapi({ type: "string", format: "binary" }),
-          }),
-        },
-      },
-    },
-  },
-  responses: {
-    200: {
-      description: "The stored document",
-      content: { "application/json": { schema: documentSchema } },
-    },
-    400: errorResponse,
-    413: errorResponse,
-  },
-});
-
 const downloadRoute = createRoute({
   operationId: "get_documents_id",
-  description: "Read documents. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read documents. This does not create, change or delete a record. An erased document answers 404. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/documents/{id}",
   request: { params: idParams },
@@ -54,15 +24,15 @@ const downloadRoute = createRoute({
   },
 });
 
-const deleteRoute = createRoute({
-  operationId: "post_documents_id_delete",
-  description: "Create or run documents (delete). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
-  method: "post",
-  path: "/api/documents/{id}/delete",
+const eraseRoute = createRoute({
+  operationId: "delete_documents_id",
+  description: "Erase the file of a document. The document record (filename, hash, upload time) stays with the erased time in deletedAt, for the audit log. The import and its transactions stay. A new import of the same file stores it again. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  method: "delete",
+  path: "/api/documents/{id}",
   request: { params: idParams },
   responses: {
     200: {
-      description: "The deleted document",
+      description: "The document record after the file is erased",
       content: { "application/json": { schema: documentSchema } },
     },
     404: errorResponse,
@@ -81,25 +51,7 @@ function responseBytes(bytes: Uint8Array) {
 }
 
 export function documentRoutes(db: Db, dataDir: string) {
-  const app = new OpenAPIHono({ defaultHook: validationHook });
-  app.use(
-    "/api/documents",
-    bodyLimit({
-      maxSize: maxUploadBytes,
-      onError: (c) => c.json({ code: "document_too_large" as const, params: {} }, 413),
-    }),
-  );
-  return app
-    .openapi(uploadRoute, async (c) => {
-      const { file } = c.req.valid("form");
-      const document = uploadDocument(db, dataDir, {
-        bytes: new Uint8Array(await file.arrayBuffer()),
-        filename: file.name,
-        mimeType: file.type,
-        source: "ui",
-      });
-      return c.json(document, 200);
-    })
+  return new OpenAPIHono({ defaultHook: validationHook })
     .openapi(downloadRoute, (c) => {
       const { id } = c.req.valid("param");
       const file = readDocumentFile(db, dataDir, id);
@@ -108,9 +60,9 @@ export function documentRoutes(db: Db, dataDir: string) {
         "Content-Disposition": contentDisposition(file.filename),
       });
     })
-    .openapi(deleteRoute, (c) => {
+    .openapi(eraseRoute, (c) => {
       const { id } = c.req.valid("param");
-      return c.json(deleteDocument(db, id, { source: "ui" }), 200);
+      return c.json(eraseDocument(db, dataDir, id, { source: "ui" }), 200);
     });
 }
 

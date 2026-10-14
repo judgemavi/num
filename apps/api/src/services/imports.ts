@@ -188,7 +188,7 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
       .find((batch) => batch.undoneAt === null);
     if (existing) {
       if (stored.deletedAt) {
-        restoreDocument(db, stored.id, { source: input.source, at });
+        restoreDocument(db, dataDir, stored, input.bytes, { source: input.source, at });
       }
       return { kind: "batch", alreadyImported: true, openingSuggestion: null, ...presentBatch(db, existing) };
     }
@@ -268,7 +268,8 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     at,
     accountId: account.id,
     dataDir,
-    bytes: stored ? null : input.bytes,
+    // A new file, or the same file again after its document was erased (decision 0041).
+    bytes: stored && !stored.deletedAt ? null : input.bytes,
     document: stored
       ? { ...stored, filename: stored.filename }
       : { ...document, filename },
