@@ -42,11 +42,9 @@ export function applyLinkedPlan(
     leadMilli: 1000,
     reason: "recurring" as const,
     sourceId: plan.id,
-    sourceName: plan.name,
     categoryId: mortgage ? null : plan.categoryId,
     merchantId: plan.merchantId,
     transferAccountId: mortgage ? plan.transferAccountId : null,
-    learnedCount: null,
     mortgage,
     signals: [],
   };

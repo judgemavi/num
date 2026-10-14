@@ -56,7 +56,7 @@ test("a payee does not match itself", () => {
 test("the brand family needs 2 or more learned payees that agree", () => {
   const family = (payee: string, learned: string[], labels: Record<string, string> = {}) =>
     familyMatch(buildPayeeIndex(learned), payee, (name) => labels[name] ?? "same");
-  expect(family("PRESTO DUNDAS STN", ["PRESTO SHEPPARD STN", "PRESTO KING STN"])?.word).toBe("PRESTO");
+  expect(family("PRESTO DUNDAS STN", ["PRESTO SHEPPARD STN", "PRESTO KING STN"])).toEqual(["PRESTO KING STN", "PRESTO SHEPPARD STN"]);
   expect(family("PRESTO DUNDAS STN", ["PRESTO KING STN"])).toBeNull();
   expect(family("PRESTO DUNDAS STN", ["PRESTO SHEPPARD STN", "PRESTO KING STN", "PRESTO LOAD"], { "PRESTO LOAD": "other" })).toBeNull();
   expect(family("COSTCO BUSINESS CENTRE", ["COSTCO WHOLESALE", "COSTCO GAS"], { "COSTCO WHOLESALE": "food", "COSTCO GAS": "fuel" })).toBeNull();

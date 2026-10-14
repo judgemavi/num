@@ -1,6 +1,7 @@
 # 0025 — Learn a mortgage payment, and a simpler split editor
 
 Status: approved (owner, 2026-10-12)
+Changed by decision 0037 (2026-10-14): the UI shows the level only, not the reason text.
 
 ## Context
 

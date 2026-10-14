@@ -74,11 +74,9 @@ test("two labels of one payee with separate bands each win in their band", () =>
   const subscription = score(rows, -999);
   expect(subscription.categoryId).toBe("subscriptions");
   expect(subscription.reason).toBe("learned_amount");
-  expect(subscription.learnedCount).toBe(4);
   const purchase = score(rows, -8000);
   expect(purchase.categoryId).toBe("shopping");
   expect(purchase.reason).toBe("learned_amount");
-  expect(purchase.learnedCount).toBe(5);
 });
 
 test("payee + amount and payee for one candidate give the higher value, not the combined value", () => {
@@ -88,7 +86,6 @@ test("payee + amount and payee for one candidate give the higher value, not the 
   expect(result.confidence).toBeCloseTo(0.85, 10);
   expect(result.confidenceMilli).toBe(850);
   expect(result.reason).toBe("learned_amount");
-  expect(result.learnedCount).toBe(1);
   expect(score(rows, -150000).confidenceMilli).toBe(808);
 });
 

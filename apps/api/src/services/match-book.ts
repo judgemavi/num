@@ -60,8 +60,6 @@ function directionOf(amount: number): Direction {
   return amount < 0 ? "out" : "in";
 }
 
-type LabelTop = Omit<FamilySignal, "word">;
-
 /** What the confirmed rows of one direction teach. Each map is keyed by the normalized payee. */
 type Side = {
   bands: Map<string, LearnedLabel[]>;
@@ -69,7 +67,7 @@ type Side = {
   /** Payee + amount scores, keyed by the payee and the labels whose band contains the amount. */
   amountLearned: Map<string, LearnedScore[]>;
   labels: Map<string, string>;
-  tops: Map<string, LabelTop>;
+  tops: Map<string, FamilySignal>;
   index: PayeeIndex;
   contained: Map<string, string | null>;
   families: Map<string, FamilySignal | null>;
@@ -103,11 +101,11 @@ function byPayee<T extends { payee: string }>(rows: readonly T[]): Map<string, T
 }
 
 /** A category label wins over a learned transfer. Learned transfers ignore the direction. */
-function buildSide(rows: readonly ConfirmRow[], transferTops: ReadonlyMap<string, LabelTop>): Side {
+function buildSide(rows: readonly ConfirmRow[], transferTops: ReadonlyMap<string, FamilySignal>): Side {
   const bands = new Map<string, LearnedLabel[]>();
   const payeeLearned = new Map<string, LearnedScore[]>();
   const labels = new Map<string, string>();
-  const tops = new Map<string, LabelTop>();
+  const tops = new Map<string, FamilySignal>();
   for (const [payee, list] of byPayee(rows)) {
     const scores = learnedConfidence(list);
     payeeLearned.set(payee, scores);
@@ -155,7 +153,7 @@ export function loadMatchBook(db: Reader): MatchBook {
       and l.transfer_account_id is not null
   `);
   const transfersByPayee = byPayee(transfers);
-  const transferTops = new Map<string, LabelTop>();
+  const transferTops = new Map<string, FamilySignal>();
   for (const [payee, list] of transfersByPayee) {
     const top = learnedConfidence(transferLearned(list))[0];
     if (top) {
@@ -203,10 +201,10 @@ function familyFor(side: Side, payee: string): FamilySignal | null {
   let found = side.families.get(payee);
   if (found === undefined) {
     const family = familyMatch(side.index, payee, (learned) => side.labels.get(learned) ?? null);
-    const tops = (family?.payees ?? []).map((name) => side.tops.get(name));
+    const tops = (family ?? []).map((name) => side.tops.get(name));
     const first = tops[0];
     const lowest = tops.reduce((low, top) => Math.min(low, top?.confidence ?? 0), 1);
-    found = family && first ? { ...first, word: family.word, confidence: lowest } : null;
+    found = family && first ? { ...first, confidence: lowest } : null;
     side.families.set(payee, found);
   }
   return found;
@@ -249,7 +247,6 @@ export function scorePayee(
     payeeScores: side.payeeLearned.get(input.payee) ?? [],
     similar: contained
       ? {
-          payee: contained,
           scores: side.payeeLearned.get(contained) ?? [],
           transferRows: book.transfersByPayee.get(contained) ?? [],
         }
@@ -346,7 +343,6 @@ export function recurringForRows(db: Reader, pending: readonly LinkTransaction[]
     const mortgage = plan.kind === "transfer" && plan.transferAccountId !== null && mortgages.has(plan.transferAccountId);
     hits.set(pair.transactionId, {
       planId: plan.id,
-      planName: plan.name,
       categoryId: mortgage ? null : plan.categoryId,
       merchantId: plan.merchantId,
       transferAccountId: plan.transferAccountId,

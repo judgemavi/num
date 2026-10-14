@@ -1,4 +1,4 @@
-import { accounts, categories, lineTags, merchants, recurringPlans, transactionLines, transactions } from "@num/db";
+import { accounts, categories, lineTags, merchants, transactionLines, transactions } from "@num/db";
 import type { TransactionFilter, TransactionListItem, TransactionListQuery, TransactionReview } from "@num/shared";
 import { and, asc, count, desc, eq, exists, gte, inArray, isNotNull, isNull, lte, notExists, or, sql, type SQL } from "drizzle-orm";
 import { alias, QueryBuilder, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
@@ -16,34 +16,12 @@ const sortColumns = {
 
 const subquery = new QueryBuilder();
 const purchase = alias(transactions, "purchase");
-const labelSource = alias(transactions, "label_source");
-const learned = alias(transactions, "learned");
-const learnedLine = alias(transactionLines, "learned_line");
 const onMerchant = eq(merchants.id, transactions.merchantId);
 
 /** One field of the purchase that a refund points to. */
 function purchaseField<T extends AnySQLiteColumn>(field: T) {
   return sql<T["_"]["data"] | null>`${subquery.select({ field }).from(purchase).where(eq(purchase.id, transactions.refundOfId))}`;
 }
-
-const planName = subquery.select({ name: recurringPlans.name }).from(recurringPlans).where(eq(recurringPlans.id, transactions.autoSourceId));
-const sourcePayee = subquery
-  .select({ payee: labelSource.payeeNormalized })
-  .from(labelSource)
-  .where(eq(labelSource.id, transactions.autoSourceId));
-const learnedRows = subquery
-  .select({ total: count() })
-  .from(learned)
-  .innerJoin(learnedLine, eq(learnedLine.transactionId, learned.id))
-  .where(
-    and(
-      isNull(learned.autoReason),
-      eq(learned.payeeNormalized, transactions.payeeNormalized),
-      sql`(${learned.amount} < 0) = (${transactions.amount} < 0)`,
-      isNotNull(learnedLine.categoryId),
-      isNull(learnedLine.transferAccountId),
-    ),
-  );
 
 const listColumns = {
   id: transactions.id,
@@ -60,12 +38,9 @@ const listColumns = {
   accountOpening: accounts.openingBalance,
   autoReason: transactions.autoReason,
   autoConfidence: transactions.autoConfidence,
-  autoSourceName: sql<string | null>`case when ${eq(transactions.autoReason, "recurring")} then ${planName} else ${sourcePayee} end`,
-  autoLearnedCount: sql<number | null>`case when ${isNull(transactions.autoReason)} then null else ${learnedRows} end`,
   refundOfKey: purchaseField(purchase.id),
   refundOfDate: purchaseField(purchase.date),
   refundOfAmount: purchaseField(purchase.amount),
-  refundOfPayee: purchaseField(purchase.payeeRaw),
   refundedAmount: refundedSum(transactions.id),
 };
 
@@ -185,22 +160,17 @@ function toItem(
   review: TransactionReview | null,
   runningBalance: number | null,
 ): TransactionListItem {
-  const { accountOpening, refundOfKey, refundOfDate, refundOfAmount, refundOfPayee, refundedAmount, ...rest } = row;
-  const { autoReason, autoConfidence, autoSourceName, autoLearnedCount, ...head } = rest;
+  const { accountOpening, refundOfKey, refundOfDate, refundOfAmount, refundedAmount, ...head } = row;
   return {
     ...head,
     runningBalance,
-    autoReason,
-    autoConfidence,
-    autoSourceName,
-    autoLearnedCount,
     refundOf:
-      refundOfKey === null || refundOfDate === null || refundOfAmount === null || refundOfPayee === null
+      refundOfKey === null || refundOfDate === null || refundOfAmount === null
         ? null
-        : { id: refundOfKey, date: refundOfDate, amount: refundOfAmount, payeeRaw: refundOfPayee },
+        : { id: refundOfKey, date: refundOfDate, amount: refundOfAmount },
     refundedAmount,
     lines,
-    review: review === null ? null : { ...review, learnedCount: review.learnedCount ?? autoLearnedCount },
+    review,
   };
 }
 

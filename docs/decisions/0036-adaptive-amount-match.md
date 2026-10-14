@@ -43,8 +43,7 @@ A **learned label** is one candidate (category + merchant) for one key. The key 
 6. **Integer compare.** The level compares `confidenceMilli` (0–1000) with the threshold in thousandths
    (Careful 950, Balanced 850, Eager 750, suggestion 600, Likely 750, lead 200). One answer at the same amount
    (850) is then automatic with Balanced, as the spec examples say.
-7. **Reasons.** `learned_amount`: "You chose this N times for this payee and amount". `learned_payee` does not change:
-   "You chose this N times for this payee".
+7. **Reasons.** Decision 0037 removes the reason text from the UI.
 
 Example: Pay from KYNDRYL CANADA PAY. Answers at 5,349.85 and 6,445.71. Band 5,296.35–6,510.17. width = 0.17,
 factor = 0.983. A new pay of 5,900.00 is in the band: 1 × 0.91 × 0.983 = 0.89, automatic with Balanced.
@@ -55,7 +54,7 @@ the Subscriptions band: Subscriptions. A new 80.00 is only in the Shopping band:
 
 ## Consequences
 
-- Spec §7.3 changes: the signals table (band, width factor, direction), the combining rule, the reasons and the
+- Spec §7.3 changes: the signals table (band, width factor, direction), the combining rule and the
   examples. With one answer: same amount = 0.85 (was 0.97 in the app), other amount = 0.81.
 - No schema change and no migration. The band comes from confirmed rows when the app loads the match data.
 - Labels that were automatic after one answer with Careful are suggestions after this change. Labels already applied

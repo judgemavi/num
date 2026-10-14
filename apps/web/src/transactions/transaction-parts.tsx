@@ -1,4 +1,4 @@
-import { choicesForDirection, defaultChoice, merchantForChoice, type AutoReason, type Transaction } from "@num/shared";
+import { choicesForDirection, defaultChoice, merchantForChoice } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { ChevronRight, Ellipsis } from "lucide-react";
 import { useState } from "react";
@@ -23,7 +23,6 @@ import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TagForm } from "@/settings/tag-form";
 import { decisionText, inboxError } from "@/review/format";
-import { automaticReasonText } from "@/transactions/format";
 import { AccountPicker } from "@/transactions/pickers";
 import { blankTransaction, quietChange } from "@/transactions/transaction-draft";
 
@@ -246,23 +245,5 @@ export function DecisionNotes({ transactionId }: { transactionId: string }) {
         </p>
       ) : null}
     </>
-  );
-}
-
-export function AutomaticReason({
-  transaction,
-}: {
-  transaction: Pick<Transaction, "autoReason" | "autoConfidence" | "autoSourceName" | "autoLearnedCount" | "refundOf"> & { autoReason: AutoReason };
-}) {
-  return (
-    <p className="text-sm text-muted-foreground">
-      {automaticReasonText({
-        reason: transaction.autoReason,
-        sourceName: transaction.autoSourceName,
-        learnedCount: transaction.autoLearnedCount,
-        purchaseDate: transaction.refundOf?.date ?? null,
-        purchasePayee: transaction.refundOf?.payeeRaw ?? null,
-      })}
-    </p>
   );
 }

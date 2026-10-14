@@ -31,7 +31,6 @@ export type LearnedScore = {
   categoryId: string;
   merchantId: string | null;
   confidence: number;
-  count: number;
   sourceId: string;
 };
 
@@ -39,7 +38,6 @@ export type MatchLevel = "automatic" | "suggestion" | "none";
 
 export type RecurringSignal = {
   planId: string;
-  planName: string;
   categoryId: string | null;
   merchantId: string | null;
   transferAccountId: string | null;
@@ -48,21 +46,18 @@ export type RecurringSignal = {
 
 /** A learned payee that the new payee contains with other words left (decision 0026). */
 export type SimilarPayee = {
-  payee: string;
   scores: readonly LearnedScore[];
   transferRows: readonly { id: string; date: string; transferAccountId: string }[];
 };
 
 /** Other learned payees with the same first word that all teach one answer (decision 0026, rule 7). */
 export type FamilySignal = {
-  word: string;
   categoryId: string | null;
   merchantId: string | null;
   transferAccountId: string | null;
   /** The lowest learned confidence of the payees in the family. */
   confidence: number;
   sourceId: string;
-  count: number;
 };
 
 export type ScoreInput = {
@@ -82,8 +77,6 @@ export type MatchSignal = {
   merchantId: string | null;
   transferAccountId: string | null;
   sourceId: string | null;
-  sourceName: string | null;
-  count: number;
 };
 
 export type MatchResult = {
@@ -93,18 +86,16 @@ export type MatchResult = {
   leadMilli: number;
   reason: AutoReason | null;
   sourceId: string | null;
-  sourceName: string | null;
   categoryId: string | null;
   merchantId: string | null;
   transferAccountId: string | null;
-  learnedCount: number | null;
   mortgage: boolean;
   signals: MatchSignal[];
 };
 
 type Candidate = {
   confidence: number;
-  /** The strongest signal. It gives the answer, the reason, the source and the count. */
+  /** The strongest signal. It gives the answer, the reason and the source. */
   top: MatchSignal;
   signals: MatchSignal[];
 };
@@ -116,11 +107,9 @@ const emptyMatch: MatchResult = {
   leadMilli: 0,
   reason: null,
   sourceId: null,
-  sourceName: null,
   categoryId: null,
   merchantId: null,
   transferAccountId: null,
-  learnedCount: null,
   mortgage: false,
   signals: [],
 };
@@ -168,7 +157,6 @@ export function learnedConfidence(rows: readonly LearnedRow[]): LearnedScore[] {
       categoryId: group.row.categoryId,
       merchantId: group.row.merchantId,
       confidence,
-      count,
       sourceId: group.row.id,
     });
   }
@@ -200,7 +188,6 @@ function pushLearned(
   scores: readonly LearnedScore[],
   reason: AutoReason,
   factor: number,
-  sourceName: string | null,
 ): void {
   for (const score of scores) {
     const confidence = score.confidence * factor;
@@ -214,8 +201,6 @@ function pushLearned(
       merchantId: score.merchantId,
       transferAccountId: null,
       sourceId: score.sourceId,
-      sourceName,
-      count: score.count,
     });
   }
 }
@@ -225,7 +210,6 @@ function pushTransfers(
   rows: ScoreInput["transferRows"],
   reason: AutoReason,
   factor: number,
-  sourceName: string | null,
 ): void {
   const learned = learnedConfidence(
     rows.map((row) => ({ id: row.id, date: row.date, categoryId: row.transferAccountId, merchantId: null })),
@@ -238,8 +222,6 @@ function pushTransfers(
       merchantId: null,
       transferAccountId: score.categoryId,
       sourceId: score.sourceId,
-      sourceName,
-      count: score.count,
     });
   }
 }
@@ -254,8 +236,6 @@ function collectSignals(input: ScoreInput) {
       merchantId: input.recurring.merchantId,
       transferAccountId: input.recurring.transferAccountId,
       sourceId: input.recurring.planId,
-      sourceName: input.recurring.planName,
-      count: 0,
     });
     return signals;
   }
@@ -267,8 +247,6 @@ function collectSignals(input: ScoreInput) {
       merchantId: input.recurring.merchantId,
       transferAccountId: null,
       sourceId: input.recurring.planId,
-      sourceName: input.recurring.planName,
-      count: 0,
     });
     return signals;
   }
@@ -280,15 +258,13 @@ function collectSignals(input: ScoreInput) {
       merchantId: null,
       transferAccountId: input.recurring.transferAccountId,
       sourceId: input.recurring.planId,
-      sourceName: input.recurring.planName,
-      count: 0,
     });
   }
-  pushLearned(signals, input.amountScores, "learned_amount", 1, null);
-  pushLearned(signals, input.payeeScores, "learned_payee", 0.95, null);
+  pushLearned(signals, input.amountScores, "learned_amount", 1);
+  pushLearned(signals, input.payeeScores, "learned_payee", 0.95);
   if (input.similar) {
-    pushLearned(signals, input.similar.scores, "similar", similarFactor, input.similar.payee);
-    pushTransfers(signals, input.similar.transferRows, "similar", similarFactor, input.similar.payee);
+    pushLearned(signals, input.similar.scores, "similar", similarFactor);
+    pushTransfers(signals, input.similar.transferRows, "similar", similarFactor);
   }
   if (input.family) {
     signals.push({
@@ -298,11 +274,9 @@ function collectSignals(input: ScoreInput) {
       merchantId: input.family.merchantId,
       transferAccountId: input.family.transferAccountId,
       sourceId: input.family.sourceId,
-      sourceName: input.family.word,
-      count: input.family.count,
     });
   }
-  pushTransfers(signals, input.transferRows, "learned_payee", 1, null);
+  pushTransfers(signals, input.transferRows, "learned_payee", 1);
   return signals;
 }
 
@@ -360,11 +334,9 @@ function resultFrom(candidate: Candidate, second: number | null, mode: Confidenc
     leadMilli,
     reason: top.reason,
     sourceId: top.sourceId,
-    sourceName: top.sourceName,
     categoryId: top.categoryId,
     merchantId: top.merchantId,
     transferAccountId: top.transferAccountId,
-    learnedCount: top.count > 0 ? top.count : null,
     mortgage,
     signals: candidate.signals,
   };

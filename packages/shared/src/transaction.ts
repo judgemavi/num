@@ -83,8 +83,6 @@ export const transactionSchema = z.object({
   autoReason: z.enum(autoReasons).nullable(),
   autoSourceId: z.uuid().nullable(),
   autoConfidence: z.number().int().min(0).max(1000).nullable(),
-  autoSourceName: z.string().nullable(),
-  autoLearnedCount: z.number().int().min(0).nullable(),
   refundOfId: z.uuid().nullable(),
   refundOf: z
     .object({
@@ -141,14 +139,11 @@ export const transactionListItemSchema = z.object({
   runningBalance: centsSchema.nullable(),
   autoReason: z.enum(autoReasons).nullable(),
   autoConfidence: z.number().int().min(0).max(1000).nullable(),
-  autoSourceName: z.string().nullable(),
-  autoLearnedCount: z.number().int().min(0).nullable(),
   refundOf: z
     .object({
       id: z.uuid(),
       date: isoDateSchema,
       amount: centsSchema,
-      payeeRaw: z.string(),
     })
     .nullable(),
   refundedAmount: centsSchema.nullable(),

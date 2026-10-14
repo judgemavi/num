@@ -21,30 +21,7 @@ const choiceLabel: Record<WhatChoice, string> = {
   split: "Split",
 };
 
-function reasonText(suggestion: Suggestion) {
-  switch (suggestion.reason) {
-    case "recurring":
-      return "Matches your recurring payment";
-    case "learned_amount":
-      return "You chose this for this payee and amount";
-    case "learned_payee":
-      return "You chose this for this payee";
-    case "similar":
-      return suggestion.sourceName ? `Same as ${suggestion.sourceName}` : "Same as a similar payee";
-    case "family":
-      return suggestion.sourceName ? `Same as other ${suggestion.sourceName} payees` : "Same as other payees of this brand";
-    case "refund_match":
-      return "Same payee and amount as a purchase";
-    case "refund_reversal":
-      return "Same amount and category as a purchase";
-    case "transfer_match":
-      return "Same amount moved between your accounts";
-    case "none":
-      return "";
-  }
-}
-
-/** The line under the merchant that tells what Num suggests and why. It shows only when a suggestion has a name to show. */
+/** The line under the merchant that tells what Num suggests and its level. It shows only when a suggestion has a name to show. */
 function SuggestionHint({ suggestion }: { suggestion: Suggestion }) {
   const merchant = useMerchantNames().get(suggestion.merchantId ?? "");
   const category = useCategoryNames().get(suggestion.categoryId ?? "");
@@ -55,9 +32,8 @@ function SuggestionHint({ suggestion }: { suggestion: Suggestion }) {
   if (suggestion.reason === "none" || parts.length === 0) {
     return null;
   }
-  const label = suggestion.level === "none" ? null : levelLabel(suggestion.level);
-  const text = `${parts.join(". ")}. ${reasonText(suggestion)}`;
-  return <FieldDescription role="status">{label ? `${label}. ${text}` : text}</FieldDescription>;
+  const text = `${parts.join(". ")}.`;
+  return <FieldDescription role="status">{suggestion.level === "none" ? text : `${levelLabel(suggestion.level)}. ${text}`}</FieldDescription>;
 }
 
 /** The choice of the transaction and its fields: the category, the transfer account, the lines and the merchant. */

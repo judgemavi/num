@@ -44,7 +44,6 @@ export const reviewRefundSchema = z.object({
 export const transactionReviewSchema = z.object({
   level: z.enum(reviewLevels),
   reason: z.enum(autoReasons).nullable(),
-  learnedCount: z.number().int().min(0).nullable(),
   question: z.enum(reviewQuestions),
   suggestion: suggestionSchema.nullable(),
   itemKey: z.string().nullable(),

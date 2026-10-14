@@ -345,7 +345,6 @@ test("a brand family suggests when 2 learned payees agree, and stops when they d
     const family = scorePayee(loaded, { payee: "PRESTO DUNDAS STN", amount: -400, recurring: null });
     expect(family.categoryId).toBe(transit.id);
     expect(family.reason).toBe("family");
-    expect(family.sourceName).toBe("PRESTO");
     expect(family.level).toBe("suggestion");
     expect(scorePayee(loaded, { payee: "COSTCO BUSINESS CENTRE", amount: -400, recurring: null }).level).toBe("none");
     learn(sample, "PRESTO LOAD", fuel.id);
@@ -390,7 +389,6 @@ test("a payee that contains a learned payee is a similar suggestion and never au
     const similar = scorePayee(loaded, { payee: "COSTCO WHOLESALE W535 TORONTO", amount: -400, recurring: null });
     expect(similar.categoryId).toBe(food.id);
     expect(similar.reason).toBe("similar");
-    expect(similar.sourceName).toBe("COSTCO WHOLESALE");
     expect(similar.level).toBe("suggestion");
     expect(scorePayee(loaded, { payee: "COSTCO", amount: -400, recurring: null }).level).toBe("none");
   } finally {

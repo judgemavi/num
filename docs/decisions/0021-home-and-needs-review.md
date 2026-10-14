@@ -4,6 +4,7 @@ Writing standard: ASD-STE100.
 
 Status: accepted
 Date: 2026-10-09
+Changed by decision 0037 (2026-10-14): the UI shows the level only, not the reason text.
 
 ## Context
 

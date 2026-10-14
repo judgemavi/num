@@ -30,7 +30,7 @@ If a screen or feature does not support one of these loops, do not add it.
 2. **Deterministic.** Use schedules, history, text similarity and arithmetic (confidence scores, §7.3). Do not use ML. The app does not call an LLM.
 3. **Money never changes by itself.** The app does not create, change or delete money (amounts, dates, accounts,
    transfers, splits) without a user action. Labels (category and merchant) can be automatic when the app is sure
-   (§7.3). An automatic label always shows its reason and is easy to correct. Example: "Learned from Mar 12".
+   (§7.3). An automatic label always shows its level (Sure) and is easy to correct (decision 0037).
 4. **Reversible.** The user can undo imports and funding.
    The user can restore archived accounts, categories, tags, merchants, recurring items and buckets.
    The audit log records each of these actions.
@@ -532,12 +532,9 @@ Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default,
 - less: no suggestion.
 The app compares confidence in thousandths (0–1000) with the thresholds (decision 0036).
 
-**Levels (decision 0021).** The UI never shows a percentage. It shows a level and a plain reason:
+**Levels (decision 0021).** The UI never shows a percentage. It shows only a level, not a reason (decision 0037):
 - **Sure:** automatic. **Likely:** a suggestion with confidence ≥ 0.75. **Maybe:** a suggestion below 0.75.
   No level: no suggestion.
-- Reasons: "Matches your Rent payment" (recurring), "You chose this N times for this payee and amount" (learned payee +
-  amount), "You chose this N times for this payee" (learned payee),
-  "Same as <learned payee>" (similar), "Same as other <first word> payees" (family).
 - Settings → Matching shows `autoConfidence` as "Label for me: only when very sure (careful) · when sure (balanced) ·
   more often (eager)".
 
@@ -546,7 +543,7 @@ The app compares confidence in thousandths (0–1000) with the thresholds (decis
   and after each user confirmation on the other uncategorized transactions whose confidence is now above the threshold.
   It keeps a merchant that the user set.
 - An automatic label stores `autoReason` (the strongest signal code), `autoConfidence` (0–1000) and `autoSourceId`.
-  The UI shows the level and the reason (see Levels).
+  The UI shows the level (see Levels). The reason code stays for the logic; the UI does not show it.
 - A confirmation clears `autoReason`. Other edits (notes, tags) are not confirmations.
 - When a transaction becomes a transfer or a split, the automatic fields are cleared.
 - Transfers are never automatic (evidence only preselects Transfer). Splits are never automatic, except the mortgage split

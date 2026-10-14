@@ -1,6 +1,7 @@
 # 0026 — Match a payee by containment, not by trigram similarity
 
 Status: approved (owner, 2026-10-12)
+Changed by decision 0037 (2026-10-14): the UI shows the level only, not the reason text.
 
 ## Context
 

@@ -83,7 +83,6 @@ function emptyReview(level: ReviewLevel, reason: TransactionReview["reason"]): T
   return {
     level,
     reason,
-    learnedCount: null,
     question: "categorize",
     suggestion: null,
     itemKey: null,
@@ -134,29 +133,26 @@ export function listNeedsReview(
   const bases = loadBases(db, ids);
   const byId = new Map(bases.map((row) => [row.id, row]));
   const book = loadMatchBook(db);
-  const scored = new Map<string, { suggestion: Suggestion; learnedCount: number | null }>();
+  const scored = new Map<string, Suggestion>();
   const hits: NeedsReviewHit[] = [];
   for (const row of bases) {
     const reason = row.autoReason;
     const automatic = reason !== null;
     let suggestion: Suggestion | null = null;
-    let learnedCount: number | null = null;
     if (!automatic && row.openLine) {
       const key = `${row.payee}\u0000${row.amount}`;
       let cached = scored.get(key);
       if (!cached) {
         const result = scorePayee(book, { payee: row.payee, amount: row.amount, recurring: null });
-        cached = { suggestion: suggestionFromMatch(result), learnedCount: result.learnedCount };
+        cached = suggestionFromMatch(result);
         scored.set(key, cached);
       }
-      if (cached.suggestion.categoryId || cached.suggestion.transferAccountId) {
-        suggestion = cached.suggestion;
-        learnedCount = cached.learnedCount;
+      if (cached.categoryId || cached.transferAccountId) {
+        suggestion = cached;
       }
       const mortgage = row.lineCount === 1 && !row.reconciled ? mortgageSuggestion(db, mortgageLearnedFor(book, row.payee), row) : null;
-      if (mortgage && (suggestion === null || mortgage.suggestion.confidence > suggestion.confidence)) {
-        suggestion = mortgage.suggestion;
-        learnedCount = mortgage.learnedCount;
+      if (mortgage && (suggestion === null || mortgage.confidence > suggestion.confidence)) {
+        suggestion = mortgage;
       }
     }
     const pair = pairById.get(row.id);
@@ -172,7 +168,6 @@ export function listNeedsReview(
       continue;
     }
     const review = emptyReview(level, reason);
-    review.learnedCount = learnedCount;
     if (pair) {
       const other = byId.get(pair.otherId);
       review.question = "transfer_pair";

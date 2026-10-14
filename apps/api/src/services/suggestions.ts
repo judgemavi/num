@@ -64,7 +64,7 @@ export function suggestForPayee(db: Db, accountId: string, rawPayee: string, amo
     return base;
   }
   const mortgage = mortgageSuggestion(db, mortgageLearnedFor(book, payee), { payee, accountId, date, amount });
-  return mortgage && mortgage.suggestion.confidence > base.confidence ? mortgage.suggestion : base;
+  return mortgage && mortgage.confidence > base.confidence ? mortgage : base;
 }
 
 export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[] } {

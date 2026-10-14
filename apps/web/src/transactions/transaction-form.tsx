@@ -3,6 +3,7 @@ import { useStore } from "@tanstack/react-form";
 import { useEffect } from "react";
 import { errorCode } from "@/api/client";
 import { useDeleteTransaction, useSaveTransaction } from "@/api/transactions";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FieldError } from "@/components/ui/field";
@@ -11,9 +12,9 @@ import { DialogBody } from "@/editors/form-chrome";
 import { useAccountLabels, useAccounts, useBookCurrency, useCategories } from "@/editors/lookups";
 import { useAppForm } from "@/forms/form-hook";
 import { formatMoney } from "@/money";
-import { formatDate, refundedText, transactionError } from "@/transactions/format";
+import { formatDate, levelLabel, refundedText, transactionError } from "@/transactions/format";
 import { mortgageSplitFill, useMortgageSplit } from "@/transactions/mortgage-split";
-import { AutomaticReason, DecisionNotes, DeleteMenu, MoneySection, MoreDetails } from "@/transactions/transaction-parts";
+import { DecisionNotes, DeleteMenu, MoneySection, MoreDetails } from "@/transactions/transaction-parts";
 import { alreadyChosen, quietChange, signedTotal, transactionValues, useSuggestion } from "@/transactions/transaction-draft";
 import { buildTransactionSave } from "@/transactions/transaction-submit";
 import { splitBlank, splitRemainder } from "@/transactions/what-choice";
@@ -154,7 +155,11 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
           {reconciled ? (
             <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, notes, category and tags can change.</p>
           ) : null}
-          {transaction?.autoReason ? <AutomaticReason transaction={{ ...transaction, autoReason: transaction.autoReason }} /> : null}
+          {transaction?.autoReason ? (
+            <div>
+              <Badge variant="neutral">{levelLabel("sure")}</Badge>
+            </div>
+          ) : null}
           {imported ? (
             <p className="text-sm">{summary}</p>
           ) : (

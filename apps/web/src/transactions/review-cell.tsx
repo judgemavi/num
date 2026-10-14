@@ -1,6 +1,6 @@
 import type { TransactionListItem } from "@num/shared";
 import { Badge } from "@/components/ui/badge";
-import { levelLabel, plainReason } from "@/transactions/format";
+import { levelLabel } from "@/transactions/format";
 import { useAccountLabels, useMerchantNames } from "@/editors/lookups";
 import { useTargetText } from "@/transactions/names";
 import { ReviewAnswers } from "@/transactions/review-answers";
@@ -44,19 +44,7 @@ function Proposal({ row }: { row: TransactionListItem }) {
   return <span>{`${suggestion.transferAccountId || !merchant ? label : `${label} · ${merchant}`}?`}</span>;
 }
 
-function reasonText(row: TransactionListItem) {
-  const review = row.review;
-  const suggestionReason = review?.suggestion?.reason;
-  return plainReason({
-    reason: review ? (review.reason ?? (suggestionReason && suggestionReason !== "none" ? suggestionReason : null)) : row.autoReason,
-    sourceName: review?.suggestion?.sourceName ?? row.autoSourceName,
-    learnedCount: review?.learnedCount ?? row.autoLearnedCount,
-    purchaseDate: row.refundOf?.date ?? null,
-    purchasePayee: row.refundOf?.payeeRaw ?? null,
-  });
-}
-
-/** The Review column. The level, the proposed answer, the question, the reason and the one-click answers. */
+/** The Review column. The level, the proposed answer, the question and the one-click answers. */
 export function ReviewCell({ row }: { row: TransactionListItem }) {
   const review = row.review;
   if (review === null && row.autoReason === null) {
@@ -65,7 +53,6 @@ export function ReviewCell({ row }: { row: TransactionListItem }) {
   const isQuestion = review !== null && review.question !== "categorize";
   const level = review ? review.level : "sure";
   const question = questionText(row);
-  const reason = reasonText(row);
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -73,7 +60,6 @@ export function ReviewCell({ row }: { row: TransactionListItem }) {
         <Proposal row={row} />
       </div>
       {question ? <div className="text-muted-foreground">{question}</div> : null}
-      {reason ? <div className="text-sm text-muted-foreground">{reason}</div> : null}
       <div className="mt-1 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
         <ReviewAnswers row={row} />
       </div>

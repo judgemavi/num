@@ -183,19 +183,19 @@ Order, top to bottom:
      direction; a line menu has "Money in on this line". A new line starts with what is left; with two lines, one amount
      sets the other. Under the lines: "+ Add a line" and "All assigned" or "$X left" with "Put it on the last line".
      Save is disabled until nothing is left.
-4. **Merchant** Combobox, with the suggestion and its reason. Hidden for Transfer.
+4. **Merchant** Combobox, with the suggestion and its level. Hidden for Transfer.
 6. **More details** (Collapsible, closed): notes, tags, bank text, "Cleared" checkbox. No "status" word in the UI.
 7. Footer: Save (primary). Delete goes in a More menu (shared confirm).
    There is one primary button, Save. When the transaction needs review, Save is the user's answer: with no change it
    confirms the automatic label or applies the suggestion shown in the form; with a change it saves and confirms.
-   The header shows only the level and the reason; no action buttons.
+   The header shows only the level; no action buttons.
 
 Needs review is the Transactions table with the Needs review filter on (decision 0021). There is no second list component.
 Columns: Date, Account, Payee, Category, Amount, Review (and Balance when one account is shown). There is no Status column.
 The Category column shows the category, "Transfer to <account>", or "Uncategorized", and the merchant below it.
 The Amount cell shows only the exceptions: a lock icon for a reconciled row (Tooltip: "Checked against your balance on <date>")
 and "Pending" for an open row (entered by hand, not yet on a statement). A cleared row shows nothing.
-When a row needs review, the Review column (right-most) shows the level (Sure, Likely, Maybe as a Badge, never a percentage), the proposed answer in plain words ("Groceries · Loblaws?" or "Transfer to TD Savings?"), the reason ("You chose this 4 times for this payee") and one-click answers ("Looks right" for Sure, "Yes" for a suggestion, the question answers for a transfer pair or a recurring question).
+When a row needs review, the Review column (right-most) shows the level (Sure, Likely, Maybe as a Badge, never a percentage), the proposed answer in plain words ("Groceries · Loblaws?" or "Transfer to TD Savings?") and one-click answers ("Looks right" for Sure, "Yes" for a suggestion, the question answers for a transfer pair or a recurring question).
 The whole row opens the editor. No "Other…" button, no dismiss, no queue mode.
 With the Needs review filter on, the table puts rows in groups by level: Sure, Likely, Maybe, Questions. Each group starts with a header row that shows the count and, for Sure and Likely, "Approve all N" (shared confirm).
 

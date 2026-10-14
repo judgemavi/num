@@ -126,7 +126,6 @@ test("a confirmed mortgage payment makes the other rows of the payee Likely, nev
     expect(review?.level).toBe("likely");
     expect(review?.suggestion?.mortgage).toBe(true);
     expect(review?.suggestion?.transferAccountId).toBe(sample.mortgage.id);
-    expect(review?.learnedCount).toBe(1);
     expect(getTransaction(sample.db, next.id)?.autoReason).toBeNull();
   } finally {
     sample.close();

@@ -17,7 +17,7 @@ const principalLine = alias(transactionLines, "principal_line");
 const interestLine = alias(transactionLines, "interest_line");
 
 /** What the user taught for one payee: the mortgage account, and how sure the teaching is. */
-export type MortgageLearned = { accountId: string; confidence: number; count: number; sourceId: string };
+export type MortgageLearned = { accountId: string; confidence: number; sourceId: string };
 
 /**
  * Confirmed mortgage payments: from the terms' payment account, exactly two lines (the transfer to the
@@ -68,7 +68,7 @@ export function loadMortgageLearned(db: Reader): Map<string, MortgageLearned> {
   for (const [payee, list] of byPayee) {
     const best = learnedConfidence(list)[0];
     if (best) {
-      found.set(payee, { accountId: best.categoryId, confidence: best.confidence, count: best.count, sourceId: best.sourceId });
+      found.set(payee, { accountId: best.categoryId, confidence: best.confidence, sourceId: best.sourceId });
     }
   }
   return found;
@@ -118,7 +118,7 @@ export function mortgageSuggestion(
   db: Reader,
   hit: MortgageHit | null,
   row: MortgageRow,
-): { suggestion: Suggestion; learnedCount: number } | null {
+): Suggestion | null {
   if (!hit || row.amount >= 0 || !mortgageLinesFor(db, hit.accountId, row.accountId, row.date, row.amount)) {
     return null;
   }
@@ -128,17 +128,13 @@ export function mortgageSuggestion(
     return null;
   }
   return {
-    learnedCount: hit.count,
-    suggestion: {
-      merchantId: null,
-      categoryId: null,
-      transferAccountId: hit.accountId,
-      reason: hit.similarTo ? "similar" : "learned_payee",
-      level,
-      sourceId: hit.sourceId,
-      sourceName: hit.similarTo,
-      confidence,
-      mortgage: true,
-    },
+    merchantId: null,
+    categoryId: null,
+    transferAccountId: hit.accountId,
+    reason: hit.similarTo ? "similar" : "learned_payee",
+    level,
+    sourceId: hit.sourceId,
+    confidence,
+    mortgage: true,
   };
 }

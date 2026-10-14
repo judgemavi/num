@@ -87,12 +87,12 @@ export function familyMatch(
   index: PayeeIndex,
   payee: string,
   labelOf: (learnedPayee: string) => string | null,
-): { word: string; payees: string[] } | null {
+): string[] | null {
   const word = wordsOf(payee)[0];
   if (word === undefined) {
     return null;
   }
   const payees = (index.get(word) ?? []).map((entry) => entry.payee).filter((name) => name !== payee);
   const labels = new Set(payees.map((name) => labelOf(name) ?? `\0${name}`));
-  return payees.length >= 2 && labels.size === 1 ? { word, payees: payees.sort() } : null;
+  return payees.length >= 2 && labels.size === 1 ? payees.sort() : null;
 }
