@@ -1,4 +1,4 @@
-import type { ImportCounts, ImportRowOutcome, ImportViewStatus, UnreadableReason, UndoBlockReason } from "@num/shared";
+import type { ImportCounts, ImportRowOutcome, ImportViewStatus, UnreadableReason, UndoBlockReason, ErrorCode } from "@num/shared";
 
 const unreadableText: Record<UnreadableReason, string> = {
   date_unreadable: "The date could not be read.",
@@ -82,7 +82,7 @@ export function formatStatementDate(iso: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(year, month - 1, day));
 }
 
-export function importError(code: string | undefined): string {
+export function importError(code: ErrorCode | undefined): string {
   switch (code) {
     case "account_not_found":
       return "Choose an account.";

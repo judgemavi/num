@@ -7,30 +7,25 @@ import { Input } from "@/components/ui/input";
 type NameFormProps = {
   title: string;
   description: string;
-  label: string;
+  /** The text of the save button. The owner of the write gives the text for each state of the write. */
   submitLabel: string;
-  savingLabel: string;
   initialName: string;
   inline?: boolean;
   idPrefix?: string;
   pending: boolean;
   error: string | null;
-  onClose: () => void;
   onSubmit: (name: string) => void;
 };
 
 export function NameForm({
   title,
   description,
-  label,
   submitLabel,
-  savingLabel,
   initialName,
   inline = false,
   idPrefix = "record-name",
   pending,
   error,
-  onClose,
   onSubmit,
 }: NameFormProps) {
   const [name, setName] = useState(initialName);
@@ -51,7 +46,7 @@ export function NameForm({
       <FormShell inline={inline} className="flex flex-col gap-4" onSubmit={submit}>
         <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
         <Field>
-          <FieldLabel htmlFor={idPrefix}>{label}</FieldLabel>
+          <FieldLabel htmlFor={idPrefix}>Name</FieldLabel>
           <Input
             id={idPrefix}
             value={name}
@@ -62,11 +57,9 @@ export function NameForm({
         {message ? <FieldError>{message}</FieldError> : null}
         </DialogBody>
         <FormActions inline={inline}>
-          <FormCancel inline={inline} onClose={onClose}>
-            Cancel
-          </FormCancel>
+          <FormCancel>Cancel</FormCancel>
           <Button type={inline ? "button" : "submit"} disabled={pending} onClick={inline ? submit : undefined}>
-            {pending ? savingLabel : submitLabel}
+            {submitLabel}
           </Button>
         </FormActions>
       </FormShell>

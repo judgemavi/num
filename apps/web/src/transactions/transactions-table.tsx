@@ -1,22 +1,24 @@
-import { accountClass, type Account, type Category, type Merchant, type ReviewCounts, type TransactionListItem, type TransactionListQuery } from "@num/shared";
+import { accountClass, type ReviewCounts, type ReviewLevel, type TransactionListItem, type TransactionListQuery } from "@num/shared";
+import { useIsMutating } from "@tanstack/react-query";
 import { Lock } from "lucide-react";
 import { Fragment } from "react";
-import { accountLabelOf, accountLabels } from "@/accounts/label";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEditors } from "@/editors/editor-api";
+import type { SortChoice } from "@/lists/list-search";
+import { useAccountLabels, useBookCurrency } from "@/editors/lookups";
 import { CategoryCell } from "@/transactions/category-cell";
-import type { Names } from "@/transactions/names";
 import { formatDate, levelLabel, refundOfText, refundedText } from "@/transactions/format";
 import { ReviewCell } from "@/transactions/review-cell";
 import { hasFilters } from "@/transactions/query";
-import type { ReviewActions } from "@/transactions/use-review-actions";
+import { useApproveAll } from "@/transactions/use-approve-all";
 
-type SortColumn = NonNullable<TransactionListQuery["sort"]>;
-type GroupKey = "sure" | "likely" | "maybe" | "questions";
+export type TransactionSort = SortChoice<NonNullable<TransactionListQuery["sort"]>>;
+/** The groups of the Needs review list: the levels that have a suggestion, and then the questions. */
+type GroupKey = Exclude<ReviewLevel, "none"> | "questions";
 
 const groupOrder: GroupKey[] = ["sure", "likely", "maybe", "questions"];
 
@@ -35,25 +37,20 @@ export type Selection = {
 };
 
 type Props = {
-  /** The review actions of the parent. The parent stays on the screen when the list loads again. */
-  actions: ReviewActions;
   search: TransactionListQuery;
   rows: TransactionListItem[];
   counts: ReviewCounts | null;
-  currency: string;
-  accounts: Account[];
-  categories: Category[];
-  merchants: Merchant[];
   showBalance: boolean;
   hideAccount?: boolean;
   selection?: Selection;
-  sortState: (column: SortColumn) => "ascending" | "descending" | "none";
-  onSort: (column: SortColumn) => void;
+  sort: TransactionSort;
+  onSort: (column: TransactionSort["sort"]) => void;
 };
 
-function SortHead({ column, label, props, className }: { column: SortColumn; label: string; props: Props; className?: string }) {
+function SortHead({ column, label, props, className }: { column: TransactionSort["sort"]; label: string; props: Props; className?: string }) {
+  const sorted = props.sort.sort !== column ? "none" : props.sort.dir === "asc" ? "ascending" : "descending";
   return (
-    <TableHead aria-sort={props.sortState(column)} className={className}>
+    <TableHead aria-sort={sorted} className={className}>
       <Button type="button" variant="ghost" size="sm" onClick={() => props.onSort(column)}>
         {label}
       </Button>
@@ -62,14 +59,12 @@ function SortHead({ column, label, props, className }: { column: SortColumn; lab
 }
 
 export function TransactionsTable(props: Props) {
-  const { actions, search, rows, counts, currency, accounts, categories, merchants, showBalance, hideAccount, selection } = props;
+  const { search, rows, counts, showBalance, hideAccount, selection } = props;
   const { openEditor } = useEditors();
-  const accountNames = accountLabels(accounts);
-  const names: Names = {
-    categories: new Map(categories.map((category) => [category.id, category.name])),
-    accounts: accountNames,
-    merchants: new Map(merchants.map((merchant) => [merchant.id, merchant.name])),
-  };
+  const currency = useBookCurrency();
+  const accountNames = useAccountLabels();
+  const approveAll = useApproveAll(search);
+  const writing = useIsMutating() > 0;
   const columns = 5 + (showBalance ? 1 : 0) + (hideAccount ? 0 : 1) + (selection ? 1 : 0) + 1;
   const selectable = selection ? rows.filter((row) => !row.reconciled) : [];
   const selectedOnPage = selection ? selectable.filter((row) => selection.ids.includes(row.id)) : [];
@@ -101,14 +96,14 @@ export function TransactionsTable(props: Props) {
           </TableCell>
         ) : null}
         <TableCell>{formatDate(row.date)}</TableCell>
-        {hideAccount ? null : <TableCell>{accountLabelOf(accountNames, row.accountId, row.accountName)}</TableCell>}
+        {hideAccount ? null : <TableCell>{accountNames.get(row.accountId) ?? row.accountName}</TableCell>}
         <TableCell>
           <div>{row.payeeRaw}</div>
           {row.refundOf ? <div className="text-muted-foreground">{refundOfText(currency, row.refundOf.date, row.refundOf.amount)}</div> : null}
           {row.refundedAmount ? <div className="text-muted-foreground">{refundedText(currency, row.refundedAmount)}</div> : null}
         </TableCell>
         <TableCell>
-          <CategoryCell row={row} names={names} />
+          <CategoryCell row={row} />
         </TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-2">
@@ -124,18 +119,18 @@ export function TransactionsTable(props: Props) {
             ) : row.status === "open" ? (
               <span className="text-sm text-muted-foreground">Pending</span>
             ) : null}
-            <Amount currency={currency} minor={row.amount} />
+            <Amount minor={row.amount} />
           </div>
         </TableCell>
         {showBalance ? (
           <TableCell className="text-right">
             {row.runningBalance === null ? null : (
-              <Amount currency={currency} minor={row.runningBalance} owed={accountClass(row.accountKind) === "liability"} />
+              <Amount minor={row.runningBalance} owed={accountClass(row.accountKind) === "liability"} />
             )}
           </TableCell>
         ) : null}
         <TableCell>
-          <ReviewCell row={row} currency={currency} names={names} actions={actions} />
+          <ReviewCell row={row} />
         </TableCell>
       </TableRow>
     );
@@ -156,7 +151,7 @@ export function TransactionsTable(props: Props) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">{`${title} · ${count}`}</span>
                 {key === "sure" || key === "likely" ? (
-                  <Button type="button" size="sm" disabled={actions.pending || count === 0} onClick={() => void actions.approve(key, count)}>
+                  <Button type="button" size="sm" disabled={writing || approveAll.busy || count === 0} onClick={() => void approveAll.approve(key, count)}>
                     {`Approve all ${count}`}
                   </Button>
                 ) : null}
@@ -171,7 +166,7 @@ export function TransactionsTable(props: Props) {
 
   return (
     <>
-      {actions.error ? <p role="alert">{actions.error}</p> : null}
+      {approveAll.message ? <p role="alert">{approveAll.message}</p> : null}
       <div className="overflow-hidden rounded-[16px] border border-border bg-card">
         <Table>
           <TableHeader>

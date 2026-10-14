@@ -1,29 +1,15 @@
-import type { InsightRow, Insights, InsightsSearch } from "@num/shared";
+import type { InsightRow, TransactionFilter } from "@num/shared";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useCategories, useGroups, useMerchants, useTags } from "@/editors/lookups";
+import { useCategoryNames, useGroupNames, useMerchantNames, useTagNames } from "@/editors/lookups";
 import { monthTitle } from "@/insights/format";
 import { sliceColors } from "@/insights/slice-colors";
 import { SpendDonut } from "@/insights/spend-donut";
 import { SpendList } from "@/insights/spend-list";
+import { useInsightsReport } from "@/insights/use-report";
 
-type BreakdownProps = {
-  currency: string;
-  data: Insights;
-  search: InsightsSearch;
-  patchSearch: (patch: Partial<InsightsSearch>) => void;
-};
-
-type TransactionFilter = {
-  categoryId?: string;
-  groupId?: string;
-  merchantId?: string;
-  tagId?: string;
-  uncategorized?: boolean;
-};
-
-function nameOf(names: Map<string, string>, row: InsightRow, none: string): string {
+function nameOf(names: Map<string, string>, row: InsightRow, none: string) {
   if (row.kind === "uncategorized") {
     return "Uncategorized";
   }
@@ -33,16 +19,17 @@ function nameOf(names: Map<string, string>, row: InsightRow, none: string): stri
   return names.get(row.id ?? "") ?? "Unknown";
 }
 
-function idOrNone(row: InsightRow): string | undefined {
+function idOrNone(row: InsightRow) {
   return row.kind === "none" ? "none" : (row.id ?? undefined);
 }
 
-export function InsightsBreakdown({ currency, data, search, patchSearch }: BreakdownProps) {
+export function InsightsBreakdown() {
   const navigate = useNavigate();
-  const groupNames = new Map((useGroups().data ?? []).map((item) => [item.id, item.name]));
-  const categoryNames = new Map((useCategories().data ?? []).map((item) => [item.id, item.name]));
-  const merchantNames = new Map((useMerchants().data ?? []).map((item) => [item.id, item.name]));
-  const tagNames = new Map((useTags().data ?? []).map((item) => [item.id, item.name]));
+  const { data, search, patchSearch } = useInsightsReport();
+  const groupNames = useGroupNames();
+  const categoryNames = useCategoryNames();
+  const merchantNames = useMerchantNames();
+  const tagNames = useTagNames();
   const group = search.group ?? null;
   const category = search.category ?? null;
   const groupLevel = group === null;
@@ -51,23 +38,9 @@ export function InsightsBreakdown({ currency, data, search, patchSearch }: Break
   const colors = sliceColors(data.donut);
   const categoryTitle = category ? (categoryNames.get(category) ?? "Category") : null;
 
-  function openTransactions(filter: TransactionFilter) {
-    void navigate({
-      to: "/transactions",
-      search: {
-        page: 1,
-        pageSize: 50,
-        uncategorized: filter.uncategorized ?? false,
-        automatic: false,
-        needsReview: false,
-        from: data.range.from,
-        to: data.range.to,
-        categoryId: filter.categoryId,
-        groupId: filter.groupId,
-        merchantId: filter.merchantId,
-        tagId: filter.tagId,
-      },
-    });
+  /** Open the transactions of the period of the report that match the filter. */
+  function openTransactions(filter: Partial<TransactionFilter>) {
+    void navigate({ to: "/transactions", search: { ...filter, from: data.range.from, to: data.range.to } });
   }
 
   function openDonutRow(row: InsightRow) {
@@ -107,7 +80,6 @@ export function InsightsBreakdown({ currency, data, search, patchSearch }: Break
     <>
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
         <SpendList
-          currency={currency}
           title={categoryTitle ?? (groupLevel ? "Spending by group" : groupTitle)}
           rows={data.rows}
           label={donutLabel}
@@ -124,8 +96,7 @@ export function InsightsBreakdown({ currency, data, search, patchSearch }: Break
           </CardHeader>
           <CardContent className="grid gap-3 px-5 pb-5">
             <SpendDonut
-              currency={currency}
-              rows={data.donut}
+                  rows={data.donut}
               colors={colors}
               label={donutLabel}
               centerLabel={groupLevel ? "Spending" : groupTitle}
@@ -146,14 +117,12 @@ export function InsightsBreakdown({ currency, data, search, patchSearch }: Break
       </div>
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <SpendList
-          currency={currency}
           title="Spending by merchant"
           rows={data.merchants}
           label={(row) => nameOf(merchantNames, row, "No merchant")}
           onOpen={(row) => openTransactions({ merchantId: idOrNone(row) })}
         />
         <SpendList
-          currency={currency}
           title="Spending by tag"
           rows={data.tags}
           label={(row) => nameOf(tagNames, row, "No tag")}

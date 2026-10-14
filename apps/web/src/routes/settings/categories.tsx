@@ -1,14 +1,11 @@
-import { categoryListQuerySchema, type CategoryListQuery } from "@num/shared";
+import { categoryListQuerySchema } from "@num/shared";
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
-import { withEdit } from "@/editors/page-search";
 import { CategoriesPage } from "@/settings/categories-page";
 
-type Search = CategoryListQuery & { edit?: string };
-
 export const Route = createFileRoute("/settings/categories")({
-  validateSearch: (search: Record<string, unknown>): Search => withEdit(categoryListQuerySchema, search),
+  validateSearch: categoryListQuerySchema,
   search: {
-    middlewares: [stripSearchParams<Search>({ page: 1, pageSize: 50, archived: false, edit: undefined })],
+    middlewares: [stripSearchParams({ page: 1, pageSize: 50, archived: false })],
   },
   component: CategoriesPage,
 });

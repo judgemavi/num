@@ -7,5 +7,3 @@ export const settingsAreas = [
   { to: "/settings/ai", label: "AI access" },
   { to: "/settings/backup", label: "Backup" },
 ] as const;
-
-export const listSearch = { page: 1, pageSize: 50, archived: false } as const;

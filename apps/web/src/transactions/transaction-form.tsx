@@ -5,79 +5,78 @@ import {
   fromMinorUnits,
   merchantForChoice,
   moneyDirection,
-  Temporal,
-  type MoneyDirection,
+  type Transaction,
   type WhatChoice,
 } from "@num/shared";
 import { useState, type FormEvent } from "react";
 import { errorCode } from "@/api/client";
-import { useUndoDecision } from "@/api/review";
+import { localAsOf } from "@/as-of";
+import { useDeleteTransaction, useSaveTransaction } from "@/api/transactions";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { FieldError } from "@/components/ui/field";
-import { accountLabel, accountOptionLabel } from "@/accounts/label";
+import { useAccountLabels, useAccounts, useBookCurrency, useCategories } from "@/editors/lookups";
 import { formatMoney } from "@/money";
-import { inboxError } from "@/review/format";
 import { formatDate, refundedText, transactionError } from "@/transactions/format";
-import { MortgageSplitWatch } from "@/transactions/mortgage-split-watch";
-import { AutomaticReason, DeleteMenu, MoneySection, MoreDetails, type TransactionFormProps } from "@/transactions/transaction-parts";
+import { mortgageSplitFill, useMortgageSplit } from "@/transactions/mortgage-split";
+import { AutomaticReason, DecisionNotes, DeleteMenu, MoneySection, MoreDetails } from "@/transactions/transaction-parts";
 import { alreadyChosen, choiceOf, linesOf, signedTotal, useApplySuggestion } from "@/transactions/transaction-draft";
 import { buildTransactionSave } from "@/transactions/transaction-submit";
-import { merchantOptionLists } from "@/transactions/merchant-options";
-import { splitBlank, splitRemainder, type SplitLine } from "@/transactions/what-choice";
+import { splitBlank, splitRemainder } from "@/transactions/what-choice";
 import { WhatIsThis } from "@/transactions/what-is-this";
 
-export function TransactionForm({
-  currency,
-  transaction,
-  amountLocked,
-  accounts,
-  categories,
-  tags,
-  merchants,
-  rawLine,
-  initialAccountId,
-  unreadableItemKey,
-  onClose,
-  onSaved,
-  save,
-  remove,
-  deleteKind = "plain",
-  decisions = [],
-}: TransactionFormProps) {
+type TransactionFormProps = {
+  transaction: Transaction | null;
+  /** True when this side of a transfer follows the other account. */
+  amountLocked: boolean;
+  rawLine?: string;
+  initialAccountId?: string;
+  unreadableItemKey?: string;
+  deleteKind?: "plain" | "mirror" | "linked";
+};
+
+export function TransactionForm({ transaction, amountLocked, rawLine, initialAccountId, unreadableItemKey, deleteKind = "plain" }: TransactionFormProps) {
+  const { close } = useEditorFrame();
+  const currency = useBookCurrency();
+  const accounts = useAccounts();
+  const categories = useCategories();
+  const accountLabels = useAccountLabels();
+  const save = useSaveTransaction();
+  const remove = useDeleteTransaction();
   const reconciled = transaction?.reconciled === true;
   const imported = transaction?.source === "import";
   const moneyLocked = reconciled || amountLocked || imported;
   const [accountId, setAccountId] = useState(
     transaction?.accountId ?? initialAccountId ?? accounts.find((item) => !item.archivedAt)?.id ?? "",
   );
-  const [date, setDate] = useState(transaction?.date ?? Temporal.Now.plainDateISO().toString());
-  const [direction, setDirection] = useState<MoneyDirection>(transaction ? moneyDirection(transaction.amount) : "out");
+  const [date, setDate] = useState(transaction?.date ?? localAsOf());
+  const [direction, setDirection] = useState(transaction ? moneyDirection(transaction.amount) : "out");
   const [amount, setAmount] = useState(transaction ? fromMinorUnits(currency, Math.abs(transaction.amount)) : "");
   const [payee, setPayee] = useState(transaction?.payeeRaw ?? "");
   const [notes, setNotes] = useState(transaction?.notes ?? "");
   const [cleared, setCleared] = useState(transaction?.status === "cleared");
-  const [merchantId, setMerchantId] = useState<string | null>(transaction?.merchantId ?? null);
-  const [refundOfId, setRefundOfId] = useState<string | null>(transaction?.refundOfId ?? null);
-  const [choice, setChoice] = useState<WhatChoice>(choiceOf(transaction, categories));
-  const [categoryId, setCategoryId] = useState<string | null>(transaction?.lines[0]?.categoryId ?? null);
-  const [transferAccountId, setTransferAccountId] = useState<string | null>(transaction?.lines[0]?.transferAccountId ?? null);
+  const [merchantId, setMerchantId] = useState(transaction?.merchantId ?? null);
+  const [refundOfId, setRefundOfId] = useState(transaction?.refundOfId ?? null);
+  const [choice, setChoice] = useState(choiceOf(transaction, categories));
+  const [categoryId, setCategoryId] = useState(transaction?.lines[0]?.categoryId ?? null);
+  const [transferAccountId, setTransferAccountId] = useState(transaction?.lines[0]?.transferAccountId ?? null);
   const [linesEdited, setLinesEdited] = useState(
     () => transaction !== null && (transaction.lines.length > 1 || transaction.lines.some((line) => line.categoryId !== null || line.transferAccountId !== null)),
   );
-  const [lines, setLines] = useState<SplitLine[]>(() =>
+  const [lines, setLines] = useState(() =>
     transaction && transaction.lines.length > 1
       ? linesOf(currency, transaction, fromMinorUnits(currency, Math.abs(transaction.amount)), moneyDirection(transaction.amount))
       : [],
   );
-  const [tagIds, setTagIds] = useState<string[]>(() => [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])]);
+  const [tagIds, setTagIds] = useState(() => [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])]);
+  const [splitFilled, setSplitFilled] = useState(false);
   const [more, setMore] = useState(false);
   const [touched, setTouched] = useState(alreadyChosen(transaction));
   const [invalid, setInvalid] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
-  const undo = useUndoDecision();
   const saving = save.isPending;
   const failure = save.error ?? remove.error;
   const error = invalid ?? (failure ? transactionError(errorCode(failure)) : null);
@@ -90,24 +89,35 @@ export function TransactionForm({
     direction,
     amount: hintAmount,
     touched,
-    categories,
     setChoice,
     setCategoryId,
     setTransferAccountId,
     setMerchantId,
   });
 
-  const accountName = accountLabel(accounts.find((item) => item.id === accountId) ?? { name: "Account" });
-  const accountOptions = accounts
-    .filter((account) => account.archivedAt === null || account.id === accountId)
-    .map((account) => ({ id: account.id, label: accountOptionLabel(account) }));
-  const transferOptions = accounts
-    .filter((account) => account.id !== accountId && (account.archivedAt === null || account.id === transferAccountId || lines.some((line) => line.transferAccountId === account.id)))
-    .map((account) => ({ id: account.id, label: accountOptionLabel(account) }));
-  const { merchantOptions, archivedMerchants } = merchantOptionLists(merchants, merchantId);
-  const archivedAccounts = accounts
-    .filter((account) => account.archivedAt !== null && account.id !== accountId)
-    .map((account) => ({ id: account.id, label: accountLabel(account) }));
+  // A mortgage payment from the payment account gets its two lines from the schedule, one time. The form fills them
+  // when the read of the schedule completes. This is a change of state during render, not an effect: the form shows
+  // the lines in the same render as the answer. After that, the person owns the lines.
+  const mortgageSplit = useMortgageSplit({
+    open: !reconciled && !linesEdited && !splitFilled,
+    choice,
+    direction,
+    fromAccountId: accountId,
+    toAccountId: transferAccountId,
+    date,
+  });
+  if (mortgageSplit && !splitFilled) {
+    const fill = mortgageSplitFill(currency, mortgageSplit, amount);
+    setSplitFilled(true);
+    setChoice("split");
+    setLines(fill.lines);
+    if (!transaction && fill.total !== null) {
+      setAmount(fill.total);
+    }
+    setNotice("Num put the principal and interest from the schedule in the lines. You can change the amounts.");
+  }
+
+  const accountName = accountLabels.get(accountId) ?? "Account";
   const totalMinor = hintAmount;
   const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, direction, lines) : null;
   const saveDisabled =
@@ -196,7 +206,7 @@ export function TransactionForm({
           setSavedId(result.id);
           return;
         }
-        onSaved(result.id);
+        close(result.id);
       },
     });
   }
@@ -211,19 +221,7 @@ export function TransactionForm({
         </DialogDescription>
       </DialogHeader>
       <DialogBody>
-      {decisions.map((row) => (
-        <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
-          <span>{row.text}</span>
-          <Button type="button" variant="outline" onClick={() => undo.mutate(row.itemKey)}>
-            Undo
-          </Button>
-        </p>
-      ))}
-      {undo.error ? (
-        <p role="alert" className="text-sm text-attn">
-          {inboxError(errorCode(undo.error))}
-        </p>
-      ) : null}
+      {transaction ? <DecisionNotes transactionId={transaction.id} /> : null}
       {rawLine ? (
         <p className="rounded-xl bg-sunken px-3 py-2 text-sm break-all">
           <span className="font-semibold">Statement line. </span>
@@ -253,8 +251,6 @@ export function TransactionForm({
           onAmount={setAmount}
           moneyLocked={moneyLocked}
           accountId={accountId}
-          accountOptions={accountOptions}
-          archivedAccounts={archivedAccounts}
           onAccount={(id) => {
             setAccountId(id);
             if (transferAccountId === id) {
@@ -266,25 +262,6 @@ export function TransactionForm({
           onDate={setDate}
         />
       )}
-      <MortgageSplitWatch
-        enabled={!reconciled && !linesEdited}
-        edited={linesEdited}
-        choice={choice}
-        fromAccountId={accountId}
-        toAccountId={transferAccountId}
-        date={date}
-        direction={direction}
-        currency={currency}
-        amount={amount}
-        onPrefill={(prefill) => {
-          setChoice("split");
-          setLines(prefill.lines);
-          if (!transaction && prefill.total !== null) {
-            setAmount(prefill.total);
-          }
-          setNotice("Num put the principal and interest from the schedule in the lines. You can change the amounts.");
-        }}
-      />
       <WhatIsThis
         idPrefix="txn"
         direction={direction}
@@ -310,13 +287,8 @@ export function TransactionForm({
           setLines(next);
         }}
         amountsLocked={reconciled || amountLocked}
-        currency={currency}
         totalMinor={totalMinor}
-        categories={categories}
-        accounts={transferOptions}
-        archivedAccounts={archivedAccounts}
-        merchants={merchantOptions}
-        archivedMerchants={archivedMerchants}
+        accountId={accountId}
         merchantId={merchantId}
         onMerchantId={(id) => {
           setTouched(true);
@@ -330,7 +302,7 @@ export function TransactionForm({
           setRefundOfId(id);
         }}
         linkedRefund={refundOfId !== null && transaction?.refundOf?.id === refundOfId ? transaction.refundOf : null}
-        asOf={date}
+        date={date}
       />
       {transaction?.refundedAmount ? <p className="text-sm text-muted-foreground">{refundedText(currency, transaction.refundedAmount)}</p> : null}
       <MoreDetails
@@ -338,7 +310,6 @@ export function TransactionForm({
         onOpenChange={setMore}
         notes={notes}
         onNotes={setNotes}
-        tags={tags}
         tagIds={tagIds}
         onTags={setTagIds}
         payee={payee}
@@ -358,13 +329,13 @@ export function TransactionForm({
             onDelete={() => {
               setInvalid(null);
               save.reset();
-              remove.mutate(transaction.id, { onSuccess: onClose });
+              remove.mutate(transaction, { onSuccess: () => close() });
             }}
           />
         ) : null}
         <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
         {savedId ? (
-          <Button type="button" onClick={() => onSaved(savedId)}>
+          <Button type="button" onClick={() => close(savedId)}>
             Done
           </Button>
         ) : (

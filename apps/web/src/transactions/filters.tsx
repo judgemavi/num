@@ -1,98 +1,51 @@
-import type { Account, Category, CategoryGroup, Merchant, Tag, TransactionListQuery } from "@num/shared";
-import { useEffect, useState } from "react";
 import { accountLabel } from "@/accounts/label";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
-import { sortChoice } from "@/components/sort-choice";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { DateField } from "@/components/date-field";
 import { Switch } from "@/components/ui/switch";
+import { useAccounts, useCategories, useGroups, useMerchants, useTags } from "@/editors/lookups";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { formatDate } from "@/transactions/format";
-
-type TransactionFilterBarProps = {
-  search: TransactionListQuery;
-  accounts: Account[];
-  categories: Category[];
-  groups: CategoryGroup[];
-  merchants: Merchant[];
-  tags: Tag[];
-  onChange: (patch: Partial<TransactionListQuery>) => void;
-};
-
-type Draft = {
-  accountId?: string;
-  categoryId?: string;
-  groupId?: string;
-  merchantId?: string;
-  tagId?: string;
-  from?: string;
-  to?: string;
-  uncategorized: boolean;
-  automatic: boolean;
-};
+import { useTransactionSearch } from "@/transactions/use-transaction-list";
+import { SortSelect } from "@/lists/sort-select";
+import { useFilterDraft, useSearchText } from "@/lists/use-list-search";
 
 const sortOptions = [
-  { value: "date:desc", label: "Date, newest" },
-  { value: "date:asc", label: "Date, oldest" },
-  { value: "amount:desc", label: "Amount, high to low" },
-  { value: "amount:asc", label: "Amount, low to high" },
-  { value: "payeeRaw:asc", label: "Payee, A to Z" },
-  { value: "payeeRaw:desc", label: "Payee, Z to A" },
-];
+  { sort: "date", dir: "desc", label: "Date, newest" },
+  { sort: "date", dir: "asc", label: "Date, oldest" },
+  { sort: "amount", dir: "desc", label: "Amount, high to low" },
+  { sort: "amount", dir: "asc", label: "Amount, low to high" },
+  { sort: "payeeRaw", dir: "asc", label: "Payee, A to Z" },
+  { sort: "payeeRaw", dir: "desc", label: "Payee, Z to A" },
+] as const;
+
+/** The filters of the panel with no choice. */
+const noFilters = {
+  accountId: undefined,
+  categoryId: undefined,
+  groupId: undefined,
+  merchantId: undefined,
+  tagId: undefined,
+  from: undefined,
+  to: undefined,
+  uncategorized: false,
+  automatic: false,
+};
 
 function namedOptions(items: { id: string; name: string; archivedAt?: string | null }[]) {
   return items.filter((item) => !item.archivedAt).map((item) => ({ id: item.id, label: accountLabel(item) }));
 }
 
-function draftFrom(search: TransactionListQuery): Draft {
-  return {
-    accountId: search.accountId,
-    categoryId: search.categoryId,
-    groupId: search.groupId,
-    merchantId: search.merchantId,
-    tagId: search.tagId,
-    from: search.from,
-    to: search.to,
-    uncategorized: search.uncategorized,
-    automatic: search.automatic,
-  };
-}
-
-function applySort(value: string): Partial<TransactionListQuery> {
-  const [column, dir] = value.split(":");
-  if (column === "date" && dir === "desc") {
-    return { sort: undefined, dir: undefined };
-  }
-  if (column !== "date" && column !== "amount" && column !== "payeeRaw") {
-    return {};
-  }
-  if (dir !== "asc" && dir !== "desc") {
-    return {};
-  }
-  return { sort: column, dir };
-}
-
-export function TransactionFilterBar({ search, accounts, categories, groups, merchants, tags, onChange }: TransactionFilterBarProps) {
-  const [text, setText] = useState(search.q ?? "");
-  const [seenQuery, setSeenQuery] = useState(search.q);
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(search));
-
-  if (search.q !== seenQuery) {
-    setSeenQuery(search.q);
-    setText(search.q ?? "");
-  }
-
-  useEffect(() => {
-    const next = text.trim();
-    const current = search.q ?? "";
-    if (next === current) {
-      return;
-    }
-    const handle = window.setTimeout(() => {
-      onChange({ q: next.length === 0 ? undefined : next });
-    }, 300);
-    return () => window.clearTimeout(handle);
-  }, [onChange, search.q, text]);
+/** The filter bar of the Transactions list. It reads the filters from the URL and changes them there. */
+export function TransactionFilterBar() {
+  const { search, sort, patch, setSort } = useTransactionSearch();
+  const accounts = useAccounts();
+  const categories = useCategories();
+  const groups = useGroups();
+  const merchants = useMerchants().filter((merchant) => !merchant.archivedAt);
+  const tags = useTags();
+  const box = useSearchText(search.q, (q) => patch({ q }));
+  const { draft, changes, change, reset } = useFilterDraft(search);
 
   function nameOf(items: { id: string; name: string }[], id: string | undefined) {
     return items.find((item) => item.id === id)?.name;
@@ -102,100 +55,66 @@ export function TransactionFilterBar({ search, accounts, categories, groups, mer
   const selectedAccount = accounts.find((account) => account.id === search.accountId);
   const accountName = selectedAccount ? accountLabel(selectedAccount) : undefined;
   if (search.accountId && accountName) {
-    badges.push({ key: "account", label: `Account: ${accountName}`, onRemove: () => onChange({ accountId: undefined }) });
+    badges.push({ key: "account", label: `Account: ${accountName}`, onRemove: () => patch({ accountId: undefined }) });
   }
   const categoryName = nameOf(categories, search.categoryId);
   if (search.categoryId && categoryName) {
-    badges.push({ key: "category", label: `Category: ${categoryName}`, onRemove: () => onChange({ categoryId: undefined }) });
+    badges.push({ key: "category", label: `Category: ${categoryName}`, onRemove: () => patch({ categoryId: undefined }) });
   }
   if (search.groupId === "none") {
-    badges.push({ key: "group", label: "Group: No group", onRemove: () => onChange({ groupId: undefined }) });
+    badges.push({ key: "group", label: "Group: No group", onRemove: () => patch({ groupId: undefined }) });
   } else if (search.groupId) {
-    badges.push({ key: "group", label: `Group: ${nameOf(groups, search.groupId) ?? "Group"}`, onRemove: () => onChange({ groupId: undefined }) });
+    badges.push({ key: "group", label: `Group: ${nameOf(groups, search.groupId) ?? "Group"}`, onRemove: () => patch({ groupId: undefined }) });
   }
   if (search.merchantId === "none") {
-    badges.push({ key: "merchant", label: "Merchant: No merchant", onRemove: () => onChange({ merchantId: undefined }) });
+    badges.push({ key: "merchant", label: "Merchant: No merchant", onRemove: () => patch({ merchantId: undefined }) });
   } else {
     const merchantName = nameOf(merchants, search.merchantId);
     if (search.merchantId && merchantName) {
-      badges.push({ key: "merchant", label: `Merchant: ${merchantName}`, onRemove: () => onChange({ merchantId: undefined }) });
+      badges.push({ key: "merchant", label: `Merchant: ${merchantName}`, onRemove: () => patch({ merchantId: undefined }) });
     }
   }
   if (search.tagId === "none") {
-    badges.push({ key: "tag", label: "Tag: No tag", onRemove: () => onChange({ tagId: undefined }) });
+    badges.push({ key: "tag", label: "Tag: No tag", onRemove: () => patch({ tagId: undefined }) });
   } else {
     const tagName = nameOf(tags, search.tagId);
     if (search.tagId && tagName) {
-      badges.push({ key: "tag", label: `Tag: ${tagName}`, onRemove: () => onChange({ tagId: undefined }) });
+      badges.push({ key: "tag", label: `Tag: ${tagName}`, onRemove: () => patch({ tagId: undefined }) });
     }
   }
   if (search.from) {
-    badges.push({ key: "from", label: `From: ${formatDate(search.from)}`, onRemove: () => onChange({ from: undefined }) });
+    badges.push({ key: "from", label: `From: ${formatDate(search.from)}`, onRemove: () => patch({ from: undefined }) });
   }
   if (search.to) {
-    badges.push({ key: "to", label: `To: ${formatDate(search.to)}`, onRemove: () => onChange({ to: undefined }) });
+    badges.push({ key: "to", label: `To: ${formatDate(search.to)}`, onRemove: () => patch({ to: undefined }) });
   }
   if (search.uncategorized) {
-    badges.push({ key: "uncategorized", label: "Uncategorized", onRemove: () => onChange({ uncategorized: false }) });
+    badges.push({ key: "uncategorized", label: "Uncategorized", onRemove: () => patch({ uncategorized: false }) });
   }
   if (search.automatic) {
-    badges.push({ key: "automatic", label: "Automatic", onRemove: () => onChange({ automatic: false }) });
-  }
-
-  function applyDraft() {
-    onChange({
-      accountId: draft.accountId,
-      categoryId: draft.categoryId,
-      groupId: draft.groupId,
-      merchantId: draft.merchantId,
-      tagId: draft.tagId,
-      from: draft.from,
-      to: draft.to,
-      uncategorized: draft.uncategorized,
-      automatic: draft.automatic,
-    });
-  }
-
-  function clearFilters() {
-    onChange({
-      accountId: undefined,
-      categoryId: undefined,
-      groupId: undefined,
-      merchantId: undefined,
-      tagId: undefined,
-      from: undefined,
-      to: undefined,
-      uncategorized: false,
-      automatic: false,
-    });
+    badges.push({ key: "automatic", label: "Automatic", onRemove: () => patch({ automatic: false }) });
   }
 
   return (
     <FilterBar
       search={{
         id: "transaction-search",
-        value: text,
+        value: box.text,
         placeholder: "Payee, notes or merchant",
         label: "Search",
-        onChange: setText,
+        onChange: box.change,
       }}
       activeCount={badges.length}
       badges={badges}
       onOpenChange={(open) => {
         if (open) {
-          setDraft(draftFrom(search));
+          reset();
         }
       }}
-      onApply={applyDraft}
-      onClear={() => setDraft({ uncategorized: false, automatic: false })}
-      onClearAll={clearFilters}
-      sort={{
-        id: "transaction-sort",
-        label: "Sort",
-        value: sortChoice(search.sort, search.dir, "date", "desc"),
-        options: sortOptions,
-        onChange: (value) => onChange(applySort(value)),
-      }}
+      onApply={() => patch(changes)}
+      onClear={() => change(noFilters)}
+      onClearAll={() => patch(noFilters)}
+      sort={<SortSelect id="transaction-sort" label="Sort" value={sort} options={sortOptions} onChange={setSort} />}
       fields={
         <>
           <Field>
@@ -206,7 +125,7 @@ export function TransactionFilterBar({ search, accounts, categories, groups, mer
               options={namedOptions(accounts)}
               placeholder="Any account"
               emptyLabel="Any account"
-              onChange={(accountId) => setDraft({ ...draft, accountId: accountId ?? undefined })}
+              onChange={(accountId) => change({ accountId: accountId ?? undefined })}
             />
           </Field>
           <Field>
@@ -217,7 +136,7 @@ export function TransactionFilterBar({ search, accounts, categories, groups, mer
               options={namedOptions(categories)}
               placeholder="Any category"
               emptyLabel="Any category"
-              onChange={(categoryId) => setDraft({ ...draft, categoryId: categoryId ?? undefined })}
+              onChange={(categoryId) => change({ categoryId: categoryId ?? undefined })}
             />
           </Field>
           <Field>
@@ -228,7 +147,7 @@ export function TransactionFilterBar({ search, accounts, categories, groups, mer
               options={[{ id: "none", label: "No group" }, ...groups.map((group) => ({ id: group.id, label: group.name }))]}
               placeholder="Any group"
               emptyLabel="Any group"
-              onChange={(groupId) => setDraft({ ...draft, groupId: groupId ?? undefined })}
+              onChange={(groupId) => change({ groupId: groupId ?? undefined })}
             />
           </Field>
           <Field>
@@ -239,7 +158,7 @@ export function TransactionFilterBar({ search, accounts, categories, groups, mer
               options={[{ id: "none", label: "No merchant" }, ...merchants.map((merchant) => ({ id: merchant.id, label: merchant.name }))]}
               placeholder="Any merchant"
               emptyLabel="Any merchant"
-              onChange={(merchantId) => setDraft({ ...draft, merchantId: merchantId ?? undefined })}
+              onChange={(merchantId) => change({ merchantId: merchantId ?? undefined })}
             />
           </Field>
           <Field>
@@ -250,7 +169,7 @@ export function TransactionFilterBar({ search, accounts, categories, groups, mer
               options={[{ id: "none", label: "No tag" }, ...namedOptions(tags)]}
               placeholder="Any tag"
               emptyLabel="Any tag"
-              onChange={(tagId) => setDraft({ ...draft, tagId: tagId ?? undefined })}
+              onChange={(tagId) => change({ tagId: tagId ?? undefined })}
             />
           </Field>
           <Field>
@@ -258,7 +177,7 @@ export function TransactionFilterBar({ search, accounts, categories, groups, mer
             <DateField
               id="filter-from"
               value={draft.from ?? ""}
-              onChange={(value) => setDraft({ ...draft, from: value || undefined })}
+              onChange={(value) => change({ from: value || undefined })}
             />
           </Field>
           <Field>
@@ -266,14 +185,14 @@ export function TransactionFilterBar({ search, accounts, categories, groups, mer
             <DateField
               id="filter-to"
               value={draft.to ?? ""}
-              onChange={(value) => setDraft({ ...draft, to: value || undefined })}
+              onChange={(value) => change({ to: value || undefined })}
             />
           </Field>
           <Field orientation="horizontal">
             <Switch
               id="filter-uncategorized"
               checked={draft.uncategorized}
-              onCheckedChange={(pressed) => setDraft({ ...draft, uncategorized: pressed })}
+              onCheckedChange={(pressed) => change({ uncategorized: pressed })}
             />
             <FieldLabel htmlFor="filter-uncategorized">Uncategorized only</FieldLabel>
           </Field>
@@ -281,7 +200,7 @@ export function TransactionFilterBar({ search, accounts, categories, groups, mer
             <Switch
               id="filter-automatic"
               checked={draft.automatic}
-              onCheckedChange={(pressed) => setDraft({ ...draft, automatic: pressed })}
+              onCheckedChange={(pressed) => change({ automatic: pressed })}
             />
             <FieldLabel htmlFor="filter-automatic">Automatic</FieldLabel>
           </Field>

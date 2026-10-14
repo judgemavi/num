@@ -1,20 +1,23 @@
-import type { ImportViewItem, ImportViewQuery, ImportViewStatus } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import type { ImportViewItem } from "@num/shared";
+import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useCallback, useEffect } from "react";
 import { ImportFilterBar } from "@/accounts/import-filters";
-import { accountLabelOf, accountLabels } from "@/accounts/label";
+import { useImportSearch } from "@/accounts/use-import-search";
 import { formatImportDate, formatImportPeriod, importCountText, importStatusLabel } from "@/accounts/import-format";
 import { activeAccountsQuery } from "@/api/accounts";
 import { importViewQuery } from "@/api/imports";
+import { Boundary } from "@/components/boundary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
+import { useAccountLabels } from "@/editors/lookups";
+import { ListPager } from "@/lists/list-pager";
+import { useLastPage } from "@/lists/use-list-search";
 
 const importsRoute = getRouteApi("/accounts_/imports");
 
-function statusVariant(status: ImportViewStatus): "neutral" | "attention" | "positive" {
+function statusVariant(status: ImportViewItem["status"]) {
   if (status === "needs_you") {
     return "attention";
   }
@@ -25,52 +28,23 @@ function statusVariant(status: ImportViewStatus): "neutral" | "attention" | "pos
 }
 
 export function ImportViewScreen() {
-  const search = importsRoute.useSearch();
-  const navigate = importsRoute.useNavigate();
-
-  const accounts = useQuery(activeAccountsQuery());
-  const imports = useQuery(importViewQuery(search));
-
-  const changeFilters = useCallback(
-    (patch: Partial<ImportViewQuery>) => {
-      void navigate({ search: { ...search, ...patch, page: 1 } });
-    },
-    [navigate, search],
+  return (
+    <Boundary loading="Loading imports." failed="The imports did not load.">
+      <ImportViewPage />
+    </Boundary>
   );
+}
 
-  useEffect(() => {
-    if (!imports.data) {
-      return;
-    }
-    const lastPage = Math.max(1, Math.ceil(imports.data.total / imports.data.pageSize));
-    if (search.page > lastPage) {
-      void navigate({ search: { ...search, page: lastPage }, replace: true });
-    }
-  }, [imports.data, navigate, search]);
+function ImportViewPage() {
+  const list = useImportSearch();
+  // The list on the screen stays while the list for a new filter or a new page loads.
+  const { search, shown } = list;
+  // The filter bar reads the active accounts. That read starts here, together with the read of the list.
+  usePrefetchQuery(activeAccountsQuery());
+  const { data: page } = useSuspenseQuery(importViewQuery(shown));
 
-  if (imports.isPending || accounts.isPending) {
-    return <p className="text-muted-foreground">Loading imports.</p>;
-  }
-  if (imports.isError || accounts.isError || !imports.data || !accounts.data) {
-    return (
-      <div className="grid gap-3">
-        <p>The imports did not load.</p>
-        <Button
-          type="button"
-          onClick={() => {
-            void imports.refetch();
-            void accounts.refetch();
-          }}
-        >
-          Try again
-        </Button>
-      </div>
-    );
-  }
+  const lastPage = useLastPage(list, page);
 
-  const page = imports.data;
-  const accountNames = accountLabels(accounts.data.items);
-  const lastPage = Math.max(1, Math.ceil(page.total / page.pageSize));
   const filtered = Boolean(search.accountId || search.status || search.from || search.to);
 
   return (
@@ -80,56 +54,28 @@ export function ImportViewScreen() {
         title="Imports"
         actions={
           <Button type="button" variant="secondary" asChild>
-            <Link to="/accounts" search={{ page: 1, pageSize: 50, archived: false }}>
+            <Link to="/accounts">
               Accounts
             </Link>
           </Button>
         }
       />
-      <ImportFilterBar search={search} accounts={accounts.data.items} onChange={changeFilters} />
+      <ImportFilterBar />
       <ListCard label="Imports">
         {page.items.length === 0 ? (
           <p className="px-5 py-4 text-muted-foreground">{filtered ? "No imports match." : "No imports yet."}</p>
         ) : (
-          page.items.map((item) => (
-            <ImportListRow
-              key={item.id}
-              item={item}
-              accountName={accountLabelOf(accountNames, item.accountId, item.accountName)}
-            />
-          ))
+          page.items.map((item) => <ImportListRow key={item.id} item={item} />)
         )}
       </ListCard>
-      {page.total > page.pageSize ? (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={search.page <= 1}
-            onClick={() => {
-              void navigate({ search: { ...search, page: search.page - 1 } });
-            }}
-          >
-            Previous
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={search.page >= lastPage}
-            onClick={() => {
-              void navigate({ search: { ...search, page: search.page + 1 } });
-            }}
-          >
-            Next
-          </Button>
-        </div>
-      ) : null}
+      <ListPager page={search.page} lastPage={lastPage} onPage={list.setPage} />
     </>
   );
 }
 
-function ImportListRow({ item, accountName }: { item: ImportViewItem; accountName: string }) {
+function ImportListRow({ item }: { item: ImportViewItem }) {
   const navigate = importsRoute.useNavigate();
+  const accountName = useAccountLabels().get(item.accountId) ?? item.accountName;
   return (
     <ListRow onOpen={() => void navigate({ to: "/accounts/imports/$importId", params: { importId: item.id } })}>
       <div className={listName}>

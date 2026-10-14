@@ -1,6 +1,8 @@
-import type { InboxDecisionCode, InboxGroupApply, TransactionFilter } from "@num/shared";
+import type { approveLevels, InboxDecisionCode, InboxGroupApply, Plan, Suggestion, TransactionFilter } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, errorCode, unwrap } from "@/api/client";
+import { linkOccurrence, savePlan } from "@/api/recurring";
+import { linkRefund, looksRight } from "@/api/transactions";
 
 export function reviewSummaryQuery(asOf: string) {
   return queryOptions({
@@ -12,21 +14,21 @@ export function reviewSummaryQuery(asOf: string) {
   });
 }
 
-/** The saved answers to Needs review items. The query waits until `enabled` is true. */
-export function inboxDecisionsQuery(enabled = true) {
+/** The saved answers to Needs review items. */
+export function inboxDecisionsQuery() {
   return queryOptions({
     queryKey: ["inbox-decisions"],
-    enabled,
     queryFn: async () => (await unwrap(api.review.decisions.$get())).items,
   });
 }
 
+function decideItem({ asOf, itemKey, decision }: { asOf: string; itemKey: string; decision: InboxDecisionCode }) {
+  return unwrap(api.review.decisions.$post({ query: { asOf }, json: { itemKey, decision } }));
+}
+
 /** Record the answer to a Needs review item. */
 export function useDecideItem() {
-  return useMutation({
-    mutationFn: ({ asOf, itemKey, decision }: { asOf: string; itemKey: string; decision: InboxDecisionCode }) =>
-      unwrap(api.review.decisions.$post({ query: { asOf }, json: { itemKey, decision } })),
-  });
+  return useMutation({ mutationFn: decideItem });
 }
 
 export function useUndoDecision() {
@@ -35,22 +37,96 @@ export function useUndoDecision() {
   });
 }
 
-/** Accept two transactions as the two sides of one transfer. */
-export function useAcceptPair() {
-  return useMutation({
-    mutationFn: ({ asOf, leftId, rightId }: { asOf: string; leftId: string; rightId: string }) =>
-      unwrap(api["transfer-pairs"].$post({ query: { asOf }, json: { leftId, rightId } })),
-  });
+function applyGroup(body: InboxGroupApply) {
+  return unwrap(api.transactions.group.$post({ json: body }));
 }
 
 /** Give one answer to a group of transactions of one account. */
 export function useApplyGroup() {
+  return useMutation({ mutationFn: applyGroup });
+}
+
+/**
+ * A one-click answer to a row of the Transactions table.
+ * - `looksRight`: confirm the automatic label.
+ * - `acceptPair`: the two transactions are the two sides of one transfer.
+ * - `decide`: record the answer to a question.
+ * - `linkRefund`: the transaction is a refund of the purchase.
+ * - `planAmount`: the plan gets the new expected amount. The other fields stay the same.
+ * - `linkOccurrence`: the transaction is the payment of the occurrence.
+ * - `applySuggestion`: give the transaction the suggested category, transfer or mortgage payment.
+ */
+export type ReviewAnswer =
+  | { kind: "looksRight"; id: string }
+  | { kind: "acceptPair"; asOf: string; leftId: string; rightId: string }
+  | { kind: "decide"; asOf: string; itemKey: string; decision: InboxDecisionCode }
+  | { kind: "linkRefund"; refundId: string; purchaseId: string }
+  | { kind: "planAmount"; plan: Plan; expectedAmount: number }
+  | { kind: "linkOccurrence"; planId: string; dueDate: string; transactionId: string }
+  | { kind: "applySuggestion"; accountId: string; transactionId: string; suggestion: Suggestion };
+
+function answerReview(answer: ReviewAnswer) {
+  switch (answer.kind) {
+    case "looksRight":
+      return looksRight(answer.id);
+    case "acceptPair":
+      return unwrap(api["transfer-pairs"].$post({ query: { asOf: answer.asOf }, json: { leftId: answer.leftId, rightId: answer.rightId } }));
+    case "decide":
+      return decideItem(answer);
+    case "linkRefund":
+      return linkRefund(answer);
+    case "planAmount": {
+      const { plan, expectedAmount } = answer;
+      return savePlan({
+        id: plan.id,
+        body: {
+          name: plan.name,
+          kind: plan.kind,
+          accountId: plan.accountId,
+          expectedAmount,
+          tolerance: plan.tolerance,
+          amountMode: plan.amountMode,
+          categoryId: plan.categoryId,
+          transferAccountId: plan.transferAccountId,
+          merchantId: plan.merchantId,
+          startDate: plan.startDate,
+          freq: plan.freq,
+          interval: plan.interval,
+          monthDay: plan.monthDay,
+          businessDayShift: plan.businessDayShift,
+          endDate: plan.endDate,
+          active: plan.active,
+          fundsBuckets: plan.fundsBuckets,
+        },
+      });
+    }
+    case "linkOccurrence":
+      return linkOccurrence(answer);
+    case "applySuggestion": {
+      const { suggestion } = answer;
+      return applyGroup({
+        accountId: answer.accountId,
+        transactionIds: [answer.transactionId],
+        excludedIds: [],
+        categoryId: suggestion.transferAccountId ? null : suggestion.categoryId,
+        transferAccountId: suggestion.transferAccountId,
+        merchantId: suggestion.transferAccountId ? null : suggestion.merchantId,
+        mortgage: suggestion.mortgage,
+      });
+    }
+  }
+}
+
+/** Save a one-click answer. One mutation for all answers gives the row one saving state and one error. */
+export function useAnswerReview() {
   return useMutation({
-    mutationFn: (body: InboxGroupApply) => unwrap(api.transactions.group.$post({ json: body })),
+    mutationFn: async (answer: ReviewAnswer) => {
+      await answerReview(answer);
+    },
   });
 }
 
-export type ApproveLevel = "sure" | "likely";
+export type ApproveLevel = (typeof approveLevels)[number];
 
 type ApproveInput = { asOf: string; filter: TransactionFilter; level: ApproveLevel; count: number };
 

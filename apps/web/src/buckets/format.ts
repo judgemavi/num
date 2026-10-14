@@ -50,10 +50,6 @@ export function formatDate(iso: string): string {
   });
 }
 
-export function today(): string {
-  return Temporal.Now.plainDateISO().toString();
-}
-
 export function bucketDetail(bucket: Bucket, currency: string): string {
   if (bucket.kind === "spending") {
     return `${formatMoney(currency, bucket.refillTo ?? 0)} a month`;

@@ -58,7 +58,7 @@ export function draftIsBlank(draft: MortgageDraft): boolean {
   );
 }
 
-function readPayment(currency: string, text: string): number {
+function readPayment(currency: string, text: string) {
   try {
     const minor = toMinorUnits(currency, text.trim());
     if (minor < 1) {
@@ -73,7 +73,7 @@ function readPayment(currency: string, text: string): number {
   }
 }
 
-function readRate(text: string): number {
+function readRate(text: string) {
   try {
     return percentToMilliPct(text);
   } catch {
@@ -81,7 +81,7 @@ function readRate(text: string): number {
   }
 }
 
-function readMonths(text: string): number {
+function readMonths(text: string) {
   if (!/^\d+$/.test(text.trim())) {
     throw new Error("Enter the months left as a whole number.");
   }

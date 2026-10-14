@@ -1,20 +1,20 @@
 import { toMinorUnits, type Bucket, type BucketEventKind } from "@num/shared";
 import { useState, type FormEvent } from "react";
 import { useAddBucketEvent } from "@/api/buckets";
-import { requestError, today } from "@/buckets/format";
+import { localAsOf } from "@/as-of";
+import { requestError } from "@/buckets/format";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
+import { useBookCurrency } from "@/editors/lookups";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 
 type AssignMoneyProps = {
-  currency: string;
   bucket: Bucket;
   kind: Extract<BucketEventKind, "fund" | "release">;
-  onClose: () => void;
-  onSaved: () => void;
 };
 
 const copy = {
@@ -30,9 +30,11 @@ const copy = {
   },
 } as const;
 
-export function AssignMoney({ currency, bucket, kind, onSaved }: AssignMoneyProps) {
+export function AssignMoney({ bucket, kind }: AssignMoneyProps) {
+  const { close } = useEditorFrame();
+  const currency = useBookCurrency();
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(today());
+  const [date, setDate] = useState(localAsOf());
   const [note, setNote] = useState("");
   const [invalid, setInvalid] = useState<string | null>(null);
   const save = useAddBucketEvent();
@@ -54,8 +56,8 @@ export function AssignMoney({ currency, bucket, kind, onSaved }: AssignMoneyProp
     }
     setInvalid(null);
     save.mutate(
-      { bucketId: bucket.id, asOf: today(), body: { kind, amount: minor, date, note: note.trim() === "" ? null : note.trim() } },
-      { onSuccess: onSaved },
+      { bucketId: bucket.id, asOf: localAsOf(), body: { kind, amount: minor, date, note: note.trim() === "" ? null : note.trim() } },
+      { onSuccess: () => close("ok") },
     );
   }
 

@@ -1,23 +1,11 @@
-import {
-  categoryKindForChoice,
-  choicesForDirection,
-  merchantNameFromPayee,
-  type Category,
-  type CategoryKind,
-  type MoneyDirection,
-  type Suggestion,
-  type WhatChoice,
-} from "@num/shared";
-import { useArchiveAccount } from "@/api/accounts";
-import { useArchiveCategory } from "@/api/categories";
-import { useArchiveMerchant } from "@/api/merchants";
-import { InlineAccount, InlineCategory, InlineMerchant } from "@/editors/inline-records";
-import { ManagedPicker } from "@/editors/managed-picker";
+import { categoryKindForChoice, choicesForDirection, type MoneyDirection, type Suggestion, type WhatChoice } from "@num/shared";
+import { choiceIn } from "@/components/choice";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
+import { useAccountLabels, useBookCurrency, useCategoryNames, useMerchantNames } from "@/editors/lookups";
 import { formatMoney } from "@/money";
-import { type Option, type OptionGroup } from "@/transactions/option-combobox";
+import { AccountPicker, CategoryPicker, MerchantPicker } from "@/transactions/pickers";
 import { SplitLineRow } from "@/transactions/split-line-row";
 import { RefundOfField } from "@/transactions/refund-of-field";
 import { levelLabel } from "@/transactions/format";
@@ -48,13 +36,9 @@ type WhatIsThisProps = {
   lines: SplitLine[];
   onLines: (lines: SplitLine[]) => void;
   amountsLocked: boolean;
-  currency: string;
   totalMinor: number | null;
-  categories: Category[];
-  accounts: Option[];
-  archivedAccounts?: Option[];
-  merchants: Option[];
-  archivedMerchants?: Option[];
+  /** The account of the transaction. A transfer goes to a different account. */
+  accountId: string;
   merchantId: string | null;
   onMerchantId: (id: string | null) => void;
   payee: string;
@@ -62,11 +46,11 @@ type WhatIsThisProps = {
   refundOfId?: string | null;
   onRefundOf?: (id: string | null) => void;
   linkedRefund?: { id: string; date: string; amount: number; payeeRaw: string } | null;
-  asOf?: string;
-  depth?: number;
+  /** The date of the transaction. The purchases that a refund can link to are the purchases before this date. */
+  date?: string;
 };
 
-function reasonText(suggestion: Suggestion): string {
+function reasonText(suggestion: Suggestion) {
   switch (suggestion.reason) {
     case "recurring":
       return "Matches your recurring payment";
@@ -88,46 +72,23 @@ function reasonText(suggestion: Suggestion): string {
   }
 }
 
-function named(categories: Category[], kind: CategoryKind, selected: string | null): Option[] {
-  return categories
-    .filter((category) => category.kind === kind && (category.archivedAt === null || category.id === selected))
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .map((category) => ({ id: category.id, label: category.archivedAt ? `${category.name} (archived)` : category.name }));
-}
-
-function categoryGroups(categories: Category[], choice: WhatChoice, selected: string | null): { options: Option[]; groups?: OptionGroup[] } {
-  if (choice === "split") {
-    return {
-      options: [],
-      groups: [
-        { label: "Spending", options: named(categories, "expense", selected) },
-        { label: "Income", options: named(categories, "income", selected) },
-      ],
-    };
-  }
-  const kind = categoryKindForChoice(choice);
-  return { options: kind ? named(categories, kind, selected) : [] };
-}
-
-function suggestionText(suggestion: Suggestion, merchants: Option[], categories: Category[], accounts: Option[]): string | null {
-  if (suggestion.reason === "none") {
-    return null;
-  }
-  const merchant = merchants.find((item) => item.id === suggestion.merchantId)?.label;
-  const category = categories.find((item) => item.id === suggestion.categoryId)?.name;
-  const account = accounts.find((item) => item.id === suggestion.transferAccountId)?.label;
+/** The line under the merchant that tells what Num suggests and why. It shows only when a suggestion has a name to show. */
+function SuggestionHint({ suggestion }: { suggestion: Suggestion }) {
+  const merchant = useMerchantNames().get(suggestion.merchantId ?? "");
+  const category = useCategoryNames().get(suggestion.categoryId ?? "");
+  const account = useAccountLabels().get(suggestion.transferAccountId ?? "");
   const parts = [merchant ? `Merchant: ${merchant}` : null, category ? `Category: ${category}` : null, account ? `Transfer: ${account}` : null].filter(
     (part): part is string => part !== null,
   );
-  if (parts.length === 0) {
+  if (suggestion.reason === "none" || parts.length === 0) {
     return null;
   }
   const label = suggestion.level === "none" ? null : levelLabel(suggestion.level);
   const text = `${parts.join(". ")}. ${reasonText(suggestion)}`;
-  return label ? `${label}. ${text}` : text;
+  return <FieldDescription role="status">{label ? `${label}. ${text}` : text}</FieldDescription>;
 }
 
-function splitStatus(currency: string, totalMinor: number | null, left: number | null, lines: SplitLine[]): string {
+function splitStatus(currency: string, totalMinor: number | null, left: number | null, lines: SplitLine[]) {
   if (totalMinor === null) {
     return "Enter the amount.";
   }
@@ -157,13 +118,8 @@ export function WhatIsThis({
   lines,
   onLines,
   amountsLocked,
-  currency,
   totalMinor,
-  categories,
-  accounts,
-  archivedAccounts = [],
-  merchants,
-  archivedMerchants = [],
+  accountId,
   merchantId,
   onMerchantId,
   payee,
@@ -171,31 +127,14 @@ export function WhatIsThis({
   refundOfId = null,
   onRefundOf,
   linkedRefund = null,
-  asOf = "",
-  depth = 0,
+  date = "",
 }: WhatIsThisProps) {
-  const archiveAccount = useArchiveAccount();
-  const archiveCategory = useArchiveCategory();
-  const archiveMerchant = useArchiveMerchant();
+  const currency = useBookCurrency();
   const transferLabel = direction === "out" ? "To account" : "From account";
   const choices = choicesForDirection(direction, groupMode);
-  const categoryList = categoryGroups(categories, choice, categoryId);
   const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, direction, lines) : choice === "split" ? null : 0;
   const lastLineRest = choice === "split" && totalMinor !== null ? restOnLastLine(currency, totalMinor, direction, lines) : null;
-  const hint = suggestion && choice !== "transfer" ? suggestionText(suggestion, merchants, categories, accounts) : null;
-  const suggestedMerchant = merchantNameFromPayee(payee);
   const categoryKind = categoryKindForChoice(choice);
-  const archivedCategoryOptions = categories
-    .filter((category) => category.archivedAt !== null && (choice === "split" || category.kind === categoryKind))
-    .map((category) => ({ id: category.id, label: category.name }));
-
-  function restoreCategory(id: string, onPicked: (id: string) => void) {
-    archiveCategory.mutate({ id, restore: true }, { onSuccess: (restored) => onPicked(restored.id) });
-  }
-
-  function restoreAccount(id: string, onPicked: (id: string) => void) {
-    archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => onPicked(restored.id) });
-  }
 
   function updateLine(key: string, patch: Partial<SplitLine>) {
     onLines(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
@@ -212,8 +151,9 @@ export function WhatIsThis({
           value={choices.includes(choice) ? choice : ""}
           disabled={choiceLocked}
           onValueChange={(value) => {
-            if (choices.includes(value as WhatChoice)) {
-              onChoice(value as WhatChoice);
+            const next = choiceIn(choices, value);
+            if (next) {
+              onChoice(next);
             }
           }}
         >
@@ -224,57 +164,42 @@ export function WhatIsThis({
           ))}
         </ToggleGroup>
       </Field>
-      {choice === "refund" && onRefundOf && asOf.length > 0 ? (
+      {choice === "refund" && onRefundOf && date.length > 0 ? (
         <RefundOfField
           id={`${idPrefix}-refund-of`}
-          asOf={asOf}
+          date={date}
           payee={payee}
-          categoryName={categories.find((item) => item.id === categoryId)?.name ?? null}
-          merchantName={merchants.find((item) => item.id === merchantId)?.label ?? null}
+          categoryId={categoryId}
+          merchantId={merchantId}
           value={refundOfId}
-          currency={currency}
           linked={linkedRefund}
           onChange={onRefundOf}
           onCategory={onCategoryId}
           onMerchant={onMerchantId}
         />
       ) : null}
-      {choice === "spending" || choice === "income" || (choice === "refund" && refundOfId === null) ? (
+      {categoryKind !== null && (choice !== "refund" || refundOfId === null) ? (
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-category`}>Category</FieldLabel>
-          <ManagedPicker
+          <CategoryPicker
             id={`${idPrefix}-category`}
             value={categoryId}
-            options={categoryList.options}
-            placeholder="Choose a category"
-            emptyLabel={allowEmptyCategory ? "No category" : undefined}
+            kind={categoryKind}
+            allowEmpty={allowEmptyCategory}
             disabled={categoryLocked}
-            noun="category"
-            depth={depth}
-            archived={archivedCategoryOptions}
-            onRestore={(id) => restoreCategory(id, onCategoryId)}
             onChange={onCategoryId}
-            renderForm={(name, finish) => (
-              <InlineCategory name={name} kind={categoryKind ?? "expense"} depth={depth + 1} onDone={finish} />
-            )}
           />
         </Field>
       ) : null}
       {choice === "transfer" ? (
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-transfer`}>{transferLabel}</FieldLabel>
-          <ManagedPicker
+          <AccountPicker
             id={`${idPrefix}-transfer`}
             value={transferAccountId}
-            options={accounts}
-            placeholder="Choose an account"
+            exceptId={accountId}
             disabled={transferLocked}
-            noun="account"
-            depth={depth}
-            archived={archivedAccounts}
-            onRestore={(id) => restoreAccount(id, onTransferAccountId)}
             onChange={onTransferAccountId}
-            renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
           />
         </Field>
       ) : null}
@@ -287,19 +212,13 @@ export function WhatIsThis({
               index={index}
               direction={direction}
               line={line}
-              categoryGroups={categoryGroups(categories, "split", line.categoryId).groups ?? []}
-              accounts={accounts}
-              archivedCategories={archivedCategoryOptions}
-              archivedAccounts={archivedAccounts}
+              accountId={accountId}
               categoryLocked={categoryLocked}
               transferLocked={transferLocked}
               amountsLocked={amountsLocked}
-              depth={depth}
               onChange={(patch) => updateLine(line.key, patch)}
               onAmount={(text) => onLines(editLineAmount(currency, totalMinor, direction, lines, line.key, text))}
               onRemove={lines.length > 1 && !amountsLocked ? () => onLines(lines.filter((item) => item.key !== line.key)) : null}
-              onRestoreCategory={(id) => restoreCategory(id, (restored) => updateLine(line.key, { categoryId: restored, transferAccountId: null }))}
-              onRestoreAccount={(id) => restoreAccount(id, (restored) => updateLine(line.key, { transferAccountId: restored, categoryId: null }))}
             />
           ))}
           {!amountsLocked ? (
@@ -320,21 +239,8 @@ export function WhatIsThis({
       {choice === "transfer" || (choice === "refund" && refundOfId !== null) ? null : (
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-merchant`}>Merchant</FieldLabel>
-          <ManagedPicker
-            id={`${idPrefix}-merchant`}
-            value={merchantId}
-            options={merchants}
-            placeholder="No merchant"
-            emptyLabel="No merchant"
-            noun="merchant"
-            depth={depth}
-            suggestedName={suggestedMerchant}
-            archived={archivedMerchants}
-            onRestore={(id) => archiveMerchant.mutate({ id, restore: true }, { onSuccess: (restored) => onMerchantId(restored.id) })}
-            onChange={onMerchantId}
-            renderForm={(name, finish) => <InlineMerchant name={name} depth={depth + 1} onDone={finish} />}
-          />
-          {hint ? <FieldDescription role="status">{hint}</FieldDescription> : null}
+          <MerchantPicker id={`${idPrefix}-merchant`} value={merchantId} payee={payee} onChange={onMerchantId} />
+          {suggestion ? <SuggestionHint suggestion={suggestion} /> : null}
         </Field>
       )}
     </div>

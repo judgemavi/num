@@ -1,4 +1,4 @@
-import type { ErrorCode } from "@num/shared";
+import type { CategoryKind, ErrorCode } from "@num/shared";
 
 export function categoryError(code: ErrorCode | undefined): string {
   switch (code) {
@@ -64,6 +64,6 @@ export function merchantError(code: ErrorCode | undefined): string {
   }
 }
 
-export function kindLabel(kind: "income" | "expense"): string {
+export function kindLabel(kind: CategoryKind): string {
   return kind === "income" ? "Income" : "Expense";
 }

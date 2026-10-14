@@ -22,7 +22,7 @@ export function lineDirection(direction: MoneyDirection, line: SplitLine): Money
 }
 
 /** The signed amount of a line. Null when the text is not a valid amount. A blank line counts as zero. */
-function lineSigned(currency: string, direction: MoneyDirection, line: SplitLine): number | null {
+function lineSigned(currency: string, direction: MoneyDirection, line: SplitLine) {
   const text = line.amount.trim();
   if (text.length === 0) {
     return 0;
@@ -53,7 +53,7 @@ export function splitRemainder(currency: string, totalMinor: number, direction: 
 }
 
 /** The amount text that makes `signed` on this line, or "" when the line cannot hold it. */
-function textFor(currency: string, direction: MoneyDirection, line: SplitLine, signed: number): string {
+function textFor(currency: string, direction: MoneyDirection, line: SplitLine, signed: number) {
   const magnitude = signed * signedAmount(lineDirection(direction, line), 1);
   return magnitude > 0 ? fromMinorUnits(currency, magnitude) : "";
 }

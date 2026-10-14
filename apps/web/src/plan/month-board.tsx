@@ -1,5 +1,8 @@
 import { Temporal, type MonthPlan } from "@num/shared";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
+import { monthPlanQuery } from "@/api/plan";
+import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
 import { PaycheckSplitIllustration } from "@/components/illustrations";
 import { hueColor } from "@/components/hue";
@@ -8,39 +11,39 @@ import { SplitBar } from "@/components/split-bar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEditors } from "@/editors/editor-api";
+import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
 
 const billColor = hueColor.sky.glyph;
 const bucketColor = hueColor.lilac.glyph;
 const saveColor = "#2B7A4E";
 
-function shortDate(iso: string): string {
+function shortDate(iso: string) {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric" });
 }
 
-function longDate(iso: string): string {
+function longDate(iso: string) {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "long", day: "numeric", year: "numeric" });
 }
 
-function countLabel(count: number, one: string, many: string): string {
+function countLabel(count: number, one: string, many: string) {
   return `${count} ${count === 1 ? one : many}`;
 }
 
 function FlowStep({
   label,
-  currency,
   planned,
   actual,
   compare,
   tone,
 }: {
   label: string;
-  currency: string;
   planned: number;
   actual: number;
   compare: boolean;
   tone?: string;
 }) {
+  const currency = useBookCurrency();
   return (
     <div>
       <span className="block text-[13px] font-semibold text-muted-foreground">{label}</span>
@@ -52,7 +55,8 @@ function FlowStep({
   );
 }
 
-export function MonthFlow({ plan, currency }: { plan: MonthPlan; currency: string }) {
+export function MonthFlow({ plan }: { plan: MonthPlan }) {
+  const currency = useBookCurrency();
   const left = plan.leftToSave.planned;
   const bills = plan.bills.items.length;
   const buckets = plan.funding.items.length;
@@ -61,15 +65,15 @@ export function MonthFlow({ plan, currency }: { plan: MonthPlan; currency: strin
       <CardContent className="grid items-center gap-6 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:p-6">
         <div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <FlowStep label="Income" currency={currency} planned={plan.income.planned} actual={plan.income.actual} compare={plan.compareActual} />
+            <FlowStep label="Income" planned={plan.income.planned} actual={plan.income.actual} compare={plan.compareActual} />
             <ArrowRight className="text-muted-foreground" strokeWidth={1.8} aria-hidden="true" />
-            <FlowStep label="Bills" currency={currency} planned={plan.bills.planned} actual={plan.bills.actual} compare={plan.compareActual} />
+            <FlowStep label="Bills" planned={plan.bills.planned} actual={plan.bills.actual} compare={plan.compareActual} />
             <ArrowRight className="text-muted-foreground" strokeWidth={1.8} aria-hidden="true" />
-            <FlowStep label="Bucket funding" currency={currency} planned={plan.funding.planned} actual={plan.funding.actual} compare={plan.compareActual} />
+            <FlowStep label="Bucket funding" planned={plan.funding.planned} actual={plan.funding.actual} compare={plan.compareActual} />
             <ArrowRight className="text-muted-foreground" strokeWidth={1.8} aria-hidden="true" />
             <FlowStep
               label="Left to save"
-              currency={currency}
+             
               planned={left}
               actual={plan.leftToSave.actual}
               compare={plan.compareActual}
@@ -80,9 +84,9 @@ export function MonthFlow({ plan, currency }: { plan: MonthPlan; currency: strin
             <SplitBar
               label={`Of income: bills ${formatMoney(currency, plan.bills.planned)}, bucket funding ${formatMoney(currency, plan.funding.planned)}, left to save ${formatMoney(currency, left)}`}
               segments={[
-                { key: "bills", label: countLabel(bills, "bill", "bills"), color: billColor, value: plan.bills.planned, amount: <Amount currency={currency} minor={plan.bills.planned} /> },
-                { key: "buckets", label: countLabel(buckets, "bucket", "buckets"), color: bucketColor, value: plan.funding.planned, amount: <Amount currency={currency} minor={plan.funding.planned} /> },
-                { key: "save", label: "Left to save", color: saveColor, value: Math.max(0, left), amount: <Amount currency={currency} minor={left} /> },
+                { key: "bills", label: countLabel(bills, "bill", "bills"), color: billColor, value: plan.bills.planned, amount: <Amount minor={plan.bills.planned} /> },
+                { key: "buckets", label: countLabel(buckets, "bucket", "buckets"), color: bucketColor, value: plan.funding.planned, amount: <Amount minor={plan.funding.planned} /> },
+                { key: "save", label: "Left to save", color: saveColor, value: Math.max(0, left), amount: <Amount minor={left} /> },
               ]}
             />
           </div>
@@ -93,9 +97,10 @@ export function MonthFlow({ plan, currency }: { plan: MonthPlan; currency: strin
   );
 }
 
-export function GoalFeasibility({ plan, currency }: { plan: MonthPlan; currency: string }) {
+/** The check that the goals and the sinking funds fit in a paycheck. It reads the plan of this month. */
+export function GoalFeasibility() {
   const { openEditor } = useEditors();
-  const item = plan.feasibility;
+  const item = useSuspenseQuery(monthPlanQuery(localAsOf())).data.feasibility;
   if (!item || (item.shortfall === 0 && item.buckets.length === 0)) {
     return null;
   }
@@ -106,11 +111,11 @@ export function GoalFeasibility({ plan, currency }: { plan: MonthPlan; currency:
       </CardHeader>
       <CardContent className="grid gap-3 px-0 pb-5">
         <p className="px-5">
-          Each paycheck is <Amount currency={currency} minor={item.expectedPaycheck} />. Bills take <Amount currency={currency} minor={item.billsEach} />. Spending refills take <Amount currency={currency} minor={item.refillsEach} />. <Amount currency={currency} minor={item.surplus} /> is left for goals and sinking funds.
+          Each paycheck is <Amount minor={item.expectedPaycheck} />. Bills take <Amount minor={item.billsEach} />. Spending refills take <Amount minor={item.refillsEach} />. <Amount minor={item.surplus} /> is left for goals and sinking funds.
         </p>
         {item.shortfall > 0 ? (
           <p className="px-5 font-semibold text-attn">
-            Goals and sinking funds need <Amount currency={currency} minor={item.need} className="text-attn" /> each paycheck. That is <Amount currency={currency} minor={item.shortfall} className="text-attn" /> short. Cut <Amount currency={currency} minor={item.shortfall} className="text-attn" /> from other buckets each paycheck.
+            Goals and sinking funds need <Amount minor={item.need} className="text-attn" /> each paycheck. That is <Amount minor={item.shortfall} className="text-attn" /> short. Cut <Amount minor={item.shortfall} className="text-attn" /> from other buckets each paycheck.
           </p>
         ) : (
           <p className="px-5">These amounts fit in the paycheck.</p>
@@ -122,7 +127,7 @@ export function GoalFeasibility({ plan, currency }: { plan: MonthPlan; currency:
               {bucket.laterDate ? <small>A date of {longDate(bucket.laterDate)} fits.</small> : null}
             </span>
             <span className={listAmt}>
-              <Amount currency={currency} minor={bucket.perPaycheck} />
+              <Amount minor={bucket.perPaycheck} />
               <small>each paycheck</small>
             </span>
           </ListRow>
@@ -132,7 +137,8 @@ export function GoalFeasibility({ plan, currency }: { plan: MonthPlan; currency:
   );
 }
 
-export function MonthDetails({ plan, currency }: { plan: MonthPlan; currency: string }) {
+export function MonthDetails({ plan }: { plan: MonthPlan }) {
+  const currency = useBookCurrency();
   const { openEditor } = useEditors();
   return (
     <>
@@ -147,7 +153,7 @@ export function MonthDetails({ plan, currency }: { plan: MonthPlan; currency: st
                 {plan.compareActual && item.actual !== null ? <Badge variant="positive">Paid</Badge> : null}
               </span>
               <span className={listAmt}>
-                <Amount currency={currency} minor={item.planned} />
+                <Amount minor={item.planned} />
                 {plan.compareActual && item.actual !== null && item.actual !== item.planned ? (
                   <small>Actual {formatMoney(currency, item.actual)}</small>
                 ) : null}
@@ -173,7 +179,7 @@ export function MonthDetails({ plan, currency }: { plan: MonthPlan; currency: st
                 )}
               </span>
               <span className={listAmt}>
-                <Amount currency={currency} minor={item.planned} />
+                <Amount minor={item.planned} />
                 {plan.compareActual ? <small>Actual {formatMoney(currency, item.actual)}</small> : null}
               </span>
             </ListRow>

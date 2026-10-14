@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { editOnly } from "@/editors/page-search";
+import { startHomeReads } from "@/home/home-reads";
 import { HomeScreen } from "@/home/home-screen";
 
 export const Route = createFileRoute("/")({
-  validateSearch: editOnly,
+  loader: ({ context }) => startHomeReads(context.queryClient),
   component: HomeScreen,
 });

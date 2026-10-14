@@ -1,19 +1,11 @@
 import { Temporal, type InsightFlow, type InsightTimeline, type InsightTimelineMonth } from "@num/shared";
 import { useState } from "react";
+import { localAsOf } from "@/as-of";
+import { useBookCurrency, useCategoryNames } from "@/editors/lookups";
 import { monthTitle } from "@/insights/format";
 import { chart, flowTotal, forecastPoints, shortDay, shortMonth, timelineScale } from "@/insights/timeline-scale";
+import { useInsightsReport } from "@/insights/use-report";
 import { formatMoney } from "@/money";
-
-type TimelineChartProps = {
-  currency: string;
-  asOf: string;
-  /** True when the period ends on asOf. Only then the chart shows the Today marker. */
-  current: boolean;
-  timeline: InsightTimeline;
-  categoryName: string | null;
-  selectedMonth: string | null;
-  onSelectMonth: (month: string) => void;
-};
 
 type Scale = ReturnType<typeof timelineScale>;
 
@@ -22,7 +14,7 @@ const barKinds: { key: keyof InsightFlow; label: string; fill: string; stroke: s
   { key: "spending", label: "Spending", fill: "fill-chart-2", stroke: "stroke-chart-2" },
 ];
 
-function positive(value: number | undefined): number {
+function positive(value: number | undefined) {
   return value !== undefined && value > 0 ? value : 0;
 }
 
@@ -60,7 +52,7 @@ function MonthBars({ item, position, scale, kinds, partial }: BarsProps) {
   );
 }
 
-function flowText(currency: string, label: string, actual: number | undefined, planned: number | undefined, end: string | null): string {
+function flowText(currency: string, label: string, actual: number | undefined, planned: number | undefined, end: string | null) {
   const parts: string[] = [];
   if (actual !== undefined) {
     parts.push(formatMoney(currency, actual));
@@ -72,11 +64,11 @@ function flowText(currency: string, label: string, actual: number | undefined, p
 }
 
 /** `end` is the last forecast day when the forecast stops inside this month. */
-function monthText(currency: string, item: InsightTimelineMonth, kinds: typeof barKinds, end: string | null): string[] {
+function monthText(currency: string, item: InsightTimelineMonth, kinds: typeof barKinds, end: string | null) {
   return kinds.map((kind) => flowText(currency, kind.label, item.actual?.[kind.key], item.forecast?.[kind.key], end));
 }
 
-function partialEnd(timeline: InsightTimeline): string | null {
+function partialEnd(timeline: InsightTimeline) {
   const last = timeline.forecast?.dates.at(-1);
   if (!last) {
     return null;
@@ -85,7 +77,8 @@ function partialEnd(timeline: InsightTimeline): string | null {
   return day.day < day.daysInMonth ? last : null;
 }
 
-function Axes({ currency, scale, months }: { currency: string; scale: Scale; months: InsightTimelineMonth[] }) {
+function Axes({ scale, months }: { scale: Scale; months: InsightTimelineMonth[] }) {
+  const currency = useBookCurrency();
   const step = Math.ceil(months.length / 12);
   return (
     <>
@@ -115,7 +108,8 @@ function Axes({ currency, scale, months }: { currency: string; scale: Scale; mon
   );
 }
 
-function BalanceLines({ currency, scale, timeline }: { currency: string; scale: Scale; timeline: InsightTimeline }) {
+function BalanceLines({ scale, timeline }: { scale: Scale; timeline: InsightTimeline }) {
+  const currency = useBookCurrency();
   const forecast = timeline.forecast;
   const lowX = forecast ? scale.dateX(forecast.lowest.date) : null;
   const lowY = forecast ? scale.balanceY(forecast.lowest.amount) : 0;
@@ -173,13 +167,21 @@ function Legend({ kinds, balance }: { kinds: typeof barKinds; balance: boolean }
   );
 }
 
-export function TimelineChart({ currency, asOf, current, timeline, categoryName, selectedMonth, onSelectMonth }: TimelineChartProps) {
+/** The timeline of the report: income, spending and the balance for each month. It shows the Today marker only when the period ends today. */
+export function TimelineChart() {
+  const currency = useBookCurrency();
+  const { data, search, patchSearch } = useInsightsReport();
+  const categoryName = useCategoryNames().get(search.category ?? "");
   const [hover, setHover] = useState<number | null>(null);
+  const asOf = localAsOf();
+  const timeline = data.timeline;
+  const selectedMonth = search.month ?? null;
+  const onSelectMonth = (month: string) => patchSearch({ month: search.month === month ? undefined : month });
   const scale = timelineScale(timeline);
   const kinds = timeline.categoryId
     ? [{ key: "spending" as const, label: categoryName ?? "Spending", fill: "fill-chart-2", stroke: "stroke-chart-2" }]
     : barKinds;
-  const todayX = current ? scale.dateX(asOf) : null;
+  const todayX = data.to === asOf ? scale.dateX(asOf) : null;
   const end = partialEnd(timeline);
   const endOf = (month: string) => (end !== null && end.startsWith(month) ? end : null);
   const hovered = hover === null ? null : timeline.months[hover];
@@ -192,7 +194,7 @@ export function TimelineChart({ currency, asOf, current, timeline, categoryName,
         role="group"
         aria-label={`Timeline by month. Highest monthly spending ${formatMoney(currency, peak)}. Select a month to see its spending.`}
       >
-        <Axes currency={currency} scale={scale} months={timeline.months} />
+        <Axes scale={scale} months={timeline.months} />
         {timeline.months.map((item, position) => {
           const selectable = item.actual !== null;
           const selected = item.month === selectedMonth;
@@ -227,7 +229,7 @@ export function TimelineChart({ currency, asOf, current, timeline, categoryName,
           );
         })}
         <g className="pointer-events-none">
-          <BalanceLines currency={currency} scale={scale} timeline={timeline} />
+          <BalanceLines scale={scale} timeline={timeline} />
           {todayX !== null ? (
             <>
               <line x1={todayX} x2={todayX} y1={chart.top - 6} y2={scale.bottom} className="stroke-muted-foreground" strokeDasharray="3 4" />

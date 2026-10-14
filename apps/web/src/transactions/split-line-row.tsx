@@ -1,12 +1,16 @@
 import type { MoneyDirection } from "@num/shared";
 import { Ellipsis, X } from "lucide-react";
-import { InlineCategory } from "@/editors/inline-records";
+import { accountLabel, accountOptionLabel } from "@/accounts/label";
+import { useArchiveAccount } from "@/api/accounts";
+import { useArchiveCategory } from "@/api/categories";
+import { useAccounts, useCategories } from "@/editors/lookups";
 import { ManagedPicker } from "@/editors/managed-picker";
+import { CategoryForm } from "@/settings/category-form";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { type Option, type OptionGroup } from "@/transactions/option-combobox";
+import { categoryOptions } from "@/transactions/picker-options";
 import { lineDirection, type SplitLine } from "@/transactions/what-choice";
 
 const categoryPrefix = "category:";
@@ -17,22 +21,17 @@ type SplitLineRowProps = {
   index: number;
   direction: MoneyDirection;
   line: SplitLine;
-  categoryGroups: OptionGroup[];
-  accounts: Option[];
-  archivedCategories: Option[];
-  archivedAccounts: Option[];
+  /** The account of the transaction. A transfer line goes to a different account. */
+  accountId: string;
   categoryLocked: boolean;
   transferLocked: boolean;
   amountsLocked: boolean;
-  depth: number;
   onChange: (patch: Partial<SplitLine>) => void;
   onAmount: (text: string) => void;
   onRemove: (() => void) | null;
-  onRestoreCategory: (id: string) => void;
-  onRestoreAccount: (id: string) => void;
 };
 
-function pickerValue(line: SplitLine): string | null {
+function pickerValue(line: SplitLine) {
   if (line.categoryId) {
     return `${categoryPrefix}${line.categoryId}`;
   }
@@ -44,31 +43,39 @@ export function SplitLineRow({
   index,
   direction,
   line,
-  categoryGroups,
-  accounts,
-  archivedCategories,
-  archivedAccounts,
+  accountId,
   categoryLocked,
   transferLocked,
   amountsLocked,
-  depth,
   onChange,
   onAmount,
   onRemove,
-  onRestoreCategory,
-  onRestoreAccount,
 }: SplitLineRowProps) {
+  const categories = useCategories();
+  const accounts = useAccounts().filter((account) => account.id !== accountId);
+  const archiveCategory = useArchiveCategory();
+  const archiveAccount = useArchiveAccount();
   const isTransfer = line.transferAccountId !== null;
   const transferFrozen = transferLocked || amountsLocked;
   const allowTransfer = !transferFrozen || isTransfer;
   const disabled = isTransfer ? transferFrozen : line.categoryId ? categoryLocked : categoryLocked && !allowTransfer;
-  const groups: OptionGroup[] = [
-    ...(isTransfer && transferFrozen ? [] : categoryGroups.map((group) => ({ label: group.label, options: group.options.map((item) => ({ id: `${categoryPrefix}${item.id}`, label: item.label })) }))),
-    ...(allowTransfer ? [{ label: "Transfer", options: accounts.map((item) => ({ id: `${accountPrefix}${item.id}`, label: `Transfer to ${item.label}` })) }] : []),
+  const categoryGroup = (label: string, kind: "expense" | "income") => ({
+    label,
+    options: categoryOptions(categories, kind, line.categoryId).map((item) => ({ id: `${categoryPrefix}${item.id}`, label: item.label })),
+  });
+  const transferGroup = {
+    label: "Transfer",
+    options: accounts
+      .filter((account) => account.archivedAt === null || account.id === line.transferAccountId)
+      .map((account) => ({ id: `${accountPrefix}${account.id}`, label: `Transfer to ${accountOptionLabel(account)}` })),
+  };
+  const groups = [
+    ...(isTransfer && transferFrozen ? [] : [categoryGroup("Spending", "expense"), categoryGroup("Income", "income")]),
+    ...(allowTransfer ? [transferGroup] : []),
   ];
   const archived = [
-    ...archivedCategories.map((item) => ({ id: `${categoryPrefix}${item.id}`, label: item.label })),
-    ...(allowTransfer ? archivedAccounts.map((item) => ({ id: `${accountPrefix}${item.id}`, label: item.label })) : []),
+    ...categories.filter((category) => category.archivedAt !== null).map((category) => ({ id: `${categoryPrefix}${category.id}`, label: category.name })),
+    ...(allowTransfer ? accounts.filter((account) => account.archivedAt !== null).map((account) => ({ id: `${accountPrefix}${account.id}`, label: accountLabel(account) })) : []),
   ];
 
   function change(id: string | null) {
@@ -83,9 +90,15 @@ export function SplitLineRow({
 
   function restore(id: string) {
     if (id.startsWith(accountPrefix)) {
-      onRestoreAccount(id.slice(accountPrefix.length));
+      archiveAccount.mutate(
+        { id: id.slice(accountPrefix.length), restore: true },
+        { onSuccess: (restored) => onChange({ transferAccountId: restored.id, categoryId: null }) },
+      );
     } else {
-      onRestoreCategory(id.slice(categoryPrefix.length));
+      archiveCategory.mutate(
+        { id: id.slice(categoryPrefix.length), restore: true },
+        { onSuccess: (restored) => onChange({ categoryId: restored.id, transferAccountId: null }) },
+      );
     }
   }
 
@@ -104,11 +117,11 @@ export function SplitLineRow({
           emptyLabel="No category"
           disabled={disabled}
           noun="category"
-          depth={depth}
           archived={archived}
           onRestore={restore}
           onChange={change}
-          renderForm={(name, finish) => <InlineCategory name={name} kind="expense" depth={depth + 1} onDone={(saved) => finish(saved === null ? null : `${categoryPrefix}${saved}`)} />}
+          createdId={(savedId) => `${categoryPrefix}${savedId}`}
+          renderForm={(name) => <CategoryForm inline depth={1} category={null} initialName={name} initialKind="expense" />}
         />
       </Field>
       <div className="ml-auto flex items-center gap-1">

@@ -3,19 +3,15 @@ import {
   defaultChoice,
   merchantForChoice,
   moneyDirection,
-  type Account,
-  type Category,
-  type Merchant,
   type Transaction,
-  type WhatChoice,
 } from "@num/shared";
-import { useQueries } from "@tanstack/react-query";
+import { useSuspenseQueries } from "@tanstack/react-query";
 import { useState } from "react";
 import { errorCode } from "@/api/client";
 import { useApplyGroup } from "@/api/review";
 import { transactionQuery } from "@/api/transactions";
-import { accountLabel } from "@/accounts/label";
-import { LoadError, LoadingLine } from "@/editors/load-state";
+import { useEditorFrame } from "@/editors/editor-api";
+import { useBookCurrency } from "@/editors/lookups";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,47 +21,20 @@ import { formatMoney as formatDisplayMoney } from "@/money";
 import { transactionError } from "@/transactions/format";
 import { WhatIsThis } from "@/transactions/what-is-this";
 
-type GroupEditorProps = {
-  ids: string[];
-  currency: string;
-  accounts: Account[];
-  categories: Category[];
-  merchants: Merchant[];
-  onSaved: (id: string) => void;
-};
-
-export function GroupEditor({ ids, currency, accounts, categories, merchants, onSaved }: GroupEditorProps) {
-  const loaded = useQueries({ queries: ids.map((id) => transactionQuery(id)) });
-  const transactions = loaded.flatMap((query) => (query.data ? [query.data] : []));
-  const pending = loaded.some((query) => query.isPending);
-  const failed = loaded.some((query) => query.isError);
-  if (pending) {
-    return <LoadingLine label="Loading the transactions." />;
-  }
-  if (failed || transactions.length !== ids.length) {
-    return <LoadError label="The transactions did not load." onRetry={() => loaded.forEach((query) => void query.refetch())} />;
-  }
-  return <GroupForm currency={currency} transactions={transactions} accounts={accounts} categories={categories} merchants={merchants} onSaved={onSaved} />;
+export function GroupEditor({ ids }: { ids: string[] }) {
+  const transactions = useSuspenseQueries({
+    queries: ids.map((id) => transactionQuery(id)),
+    combine: (results) => results.map((result) => result.data),
+  });
+  return <GroupForm transactions={transactions} />;
 }
 
-function GroupForm({
-  currency,
-  transactions,
-  accounts,
-  categories,
-  merchants,
-  onSaved,
-}: {
-  currency: string;
-  transactions: Transaction[];
-  accounts: Account[];
-  categories: Category[];
-  merchants: Merchant[];
-  onSaved: (id: string) => void;
-}) {
+function GroupForm({ transactions }: { transactions: Transaction[] }) {
+  const { close } = useEditorFrame();
+  const currency = useBookCurrency();
   const direction = transactions.filter((item) => item.amount > 0).length > transactions.filter((item) => item.amount < 0).length ? "in" : "out";
   const [excluded, setExcluded] = useState<string[]>([]);
-  const [choice, setChoice] = useState<WhatChoice>(defaultChoice(direction));
+  const [choice, setChoice] = useState(defaultChoice(direction));
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [transferAccountId, setTransferAccountId] = useState<string | null>(null);
   const [merchantId, setMerchantId] = useState<string | null>(null);
@@ -80,16 +49,6 @@ function GroupForm({
   const shownTotal = sameSign ? Math.abs(total) : total;
   const payee = transactions[0]?.payeeRaw ?? "";
   const accountId = included[0]?.accountId ?? transactions[0]?.accountId ?? "";
-  const transferOptions = accounts
-    .filter((account) => account.id !== accountId && account.archivedAt === null)
-    .map((account) => ({ id: account.id, label: accountLabel(account) }));
-  const archivedAccounts = accounts
-    .filter((account) => account.archivedAt !== null && account.id !== accountId)
-    .map((account) => ({ id: account.id, label: accountLabel(account) }));
-  const merchantOptions = merchants
-    .filter((merchant) => merchant.archivedAt === null || merchant.id === merchantId)
-    .map((merchant) => ({ id: merchant.id, label: merchant.name }));
-  const archivedMerchants = merchants.filter((merchant) => merchant.archivedAt).map((merchant) => ({ id: merchant.id, label: merchant.name }));
   const saveDisabled = saving || included.length === 0 || (choice === "transfer" && !transferAccountId);
 
   function save() {
@@ -113,7 +72,7 @@ function GroupForm({
       {
         onSuccess: (result) => {
           if (result.skipped.length === 0) {
-            onSaved(included[0]?.id ?? "");
+            close(included[0]?.id ?? "");
           }
         },
       },
@@ -170,13 +129,8 @@ function GroupForm({
         lines={[]}
         onLines={() => undefined}
         amountsLocked
-        currency={currency}
         totalMinor={total}
-        categories={categories}
-        accounts={transferOptions}
-        archivedAccounts={archivedAccounts}
-        merchants={merchantOptions}
-        archivedMerchants={archivedMerchants}
+        accountId={accountId}
         merchantId={merchantId}
         onMerchantId={setMerchantId}
         payee={payee}
@@ -192,7 +146,7 @@ function GroupForm({
           </Button>
         </DialogClose>
         {notice ? (
-          <Button type="button" onClick={() => onSaved(included[0]?.id ?? "")}>
+          <Button type="button" onClick={() => close(included[0]?.id ?? "")}>
             Done
           </Button>
         ) : (

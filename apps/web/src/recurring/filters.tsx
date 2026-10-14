@@ -1,133 +1,90 @@
-import type { Account, PlanKind, PlanListQuery } from "@num/shared";
-import { useEffect, useState } from "react";
 import { accountLabel } from "@/accounts/label";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
-import { sortChoice } from "@/components/sort-choice";
+import { ChoiceSelect } from "@/components/choice-select";
+import { SortSelect } from "@/lists/sort-select";
+import { useFilterDraft, useSearchText } from "@/lists/use-list-search";
+import { usePlanSearch } from "@/recurring/use-plan-search";
+import { useAccountLabels, useAccounts } from "@/editors/lookups";
 import { kindLabel } from "@/recurring/format";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
-type PlanFiltersProps = {
-  search: PlanListQuery;
-  accounts: Account[];
-  onChange: (patch: Partial<PlanListQuery>) => void;
-};
-
-type Draft = {
-  kind?: PlanKind;
-  accountId?: string;
-  archived: boolean;
-};
-
 const sortOptions = [
-  { value: "name:asc", label: "Name" },
-  { value: "name:desc", label: "Name, Z to A" },
-  { value: "startDate:asc", label: "Start date" },
-  { value: "startDate:desc", label: "Start date, newest" },
-];
+  { sort: "name", dir: "asc", label: "Name" },
+  { sort: "name", dir: "desc", label: "Name, Z to A" },
+  { sort: "startDate", dir: "asc", label: "Start date" },
+  { sort: "startDate", dir: "desc", label: "Start date, newest" },
+] as const;
 
-function draftFrom(search: PlanListQuery): Draft {
-  return { kind: search.kind, accountId: search.accountId, archived: search.archived };
-}
+const kindOptions = [
+  { value: "any", label: "Any kind" },
+  { value: "income", label: "Income" },
+  { value: "bill", label: "Bill" },
+  { value: "transfer", label: "Transfer" },
+] as const;
 
-function applySort(value: string): Partial<PlanListQuery> {
-  if (value === "name:asc") {
-    return { sort: undefined, dir: undefined };
-  }
-  const [column, dir] = value.split(":");
-  if ((column !== "name" && column !== "startDate") || (dir !== "asc" && dir !== "desc")) {
-    return {};
-  }
-  return { sort: column, dir };
-}
+/** The filters of the panel with no choice. */
+const noFilters = { kind: undefined, accountId: undefined, archived: false };
 
-export function PlanFilters({ search, accounts, onChange }: PlanFiltersProps) {
-  const [text, setText] = useState(search.q ?? "");
-  const [seenQuery, setSeenQuery] = useState(search.q);
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(search));
+/** The filter bar of the Recurring list. It reads the filters from the URL and changes them there. */
+export function PlanFilters() {
+  const { search, sort, patch, setSort } = usePlanSearch();
+  const accounts = useAccounts();
+  const accountLabels = useAccountLabels();
+  const box = useSearchText(search.q, (q) => patch({ q }));
+  const { draft, changes, change, reset } = useFilterDraft(search);
 
-  if (search.q !== seenQuery) {
-    setSeenQuery(search.q);
-    setText(search.q ?? "");
-  }
-
-  useEffect(() => {
-    const next = text.trim();
-    if (next === (search.q ?? "")) {
-      return;
-    }
-    const handle = window.setTimeout(() => {
-      onChange({ q: next.length === 0 ? undefined : next });
-    }, 300);
-    return () => window.clearTimeout(handle);
-  }, [onChange, search.q, text]);
-
-  const selectedAccount = accounts.find((account) => account.id === search.accountId);
-  const accountName = selectedAccount ? accountLabel(selectedAccount) : undefined;
+  const accountName = search.accountId ? accountLabels.get(search.accountId) : undefined;
   const badges: FilterBadge[] = [];
   if (search.kind) {
-    badges.push({ key: "kind", label: `Kind: ${kindLabel(search.kind)}`, onRemove: () => onChange({ kind: undefined }) });
+    badges.push({ key: "kind", label: `Kind: ${kindLabel(search.kind)}`, onRemove: () => patch({ kind: undefined }) });
   }
   if (search.accountId && accountName) {
     badges.push({
       key: "account",
       label: `Account: ${accountName}`,
-      onRemove: () => onChange({ accountId: undefined }),
+      onRemove: () => patch({ accountId: undefined }),
     });
   }
   if (search.archived) {
-    badges.push({ key: "archived", label: "Archived", onRemove: () => onChange({ archived: false }) });
+    badges.push({ key: "archived", label: "Archived", onRemove: () => patch({ archived: false }) });
   }
 
   return (
     <FilterBar
       search={{
         id: "plan-search",
-        value: text,
+        value: box.text,
         placeholder: "Search recurring",
         label: "Search recurring",
-        onChange: setText,
+        onChange: box.change,
       }}
       activeCount={badges.length}
       badges={badges}
       onOpenChange={(open) => {
         if (open) {
-          setDraft(draftFrom(search));
+          reset();
         }
       }}
-      onApply={() => onChange({ kind: draft.kind, accountId: draft.accountId, archived: draft.archived })}
-      onClear={() => setDraft({ archived: false })}
+      onApply={() => patch(changes)}
+      onClear={() => change(noFilters)}
       onClearAll={() => {
-        setText("");
-        onChange({ q: undefined, kind: undefined, accountId: undefined, archived: false });
+        box.clear();
+        patch({ q: undefined, ...noFilters });
       }}
-      sort={{
-        id: "plan-sort",
-        label: "Sort recurring",
-        value: sortChoice(search.sort, search.dir, "name", "asc"),
-        options: sortOptions,
-        onChange: (value) => onChange(applySort(value)),
-      }}
+      sort={<SortSelect id="plan-sort" label="Sort recurring" value={sort} options={sortOptions} onChange={setSort} />}
       fields={
         <>
           <Field>
             <FieldLabel htmlFor="plan-kind">Kind</FieldLabel>
-            <Select
+            <ChoiceSelect
+              id="plan-kind"
+              className="w-full"
               value={draft.kind ?? "any"}
-              onValueChange={(value) => setDraft({ ...draft, kind: value === "any" ? undefined : (value as PlanKind) })}
-            >
-              <SelectTrigger id="plan-kind" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Any kind</SelectItem>
-                <SelectItem value="income">Income</SelectItem>
-                <SelectItem value="bill">Bill</SelectItem>
-                <SelectItem value="transfer">Transfer</SelectItem>
-              </SelectContent>
-            </Select>
+              options={kindOptions}
+              onValueChange={(kind) => change({ kind: kind === "any" ? undefined : kind })}
+            />
           </Field>
           <Field>
             <FieldLabel htmlFor="plan-account">Account</FieldLabel>
@@ -137,11 +94,11 @@ export function PlanFilters({ search, accounts, onChange }: PlanFiltersProps) {
               options={accounts.filter((item) => !item.archivedAt).map((item) => ({ id: item.id, label: accountLabel(item) }))}
               placeholder="Any account"
               emptyLabel="Any account"
-              onChange={(accountId) => setDraft({ ...draft, accountId: accountId ?? undefined })}
+              onChange={(accountId) => change({ accountId: accountId ?? undefined })}
             />
           </Field>
           <Field orientation="horizontal">
-            <Switch id="plan-archived" checked={draft.archived} onCheckedChange={(archived) => setDraft({ ...draft, archived })} />
+            <Switch id="plan-archived" checked={draft.archived} onCheckedChange={(archived) => change({ archived })} />
             <FieldLabel htmlFor="plan-archived">Show archived</FieldLabel>
           </Field>
         </>

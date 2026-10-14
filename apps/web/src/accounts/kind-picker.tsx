@@ -1,4 +1,5 @@
 import { accountKinds, type AccountKind } from "@num/shared";
+import { choiceIn } from "@/components/choice";
 import { ChoiceCard } from "@/components/choice-card";
 import { Reveal } from "@/components/reveal";
 import { FieldLegend, FieldSet } from "@/components/ui/field";
@@ -32,7 +33,7 @@ function allowedSet(allowed: readonly AccountKind[]) {
   return new Set(allowed);
 }
 
-function radioValue(kind: AccountKind): string {
+function radioValue(kind: AccountKind) {
   if (kind === "loan" || kind === "mortgage") {
     return "borrow";
   }
@@ -56,8 +57,9 @@ export function KindPicker({ kind, allowed, onChange }: KindPickerProps) {
       onChange("loan");
       return;
     }
-    if ((accountKinds as readonly string[]).includes(value)) {
-      onChange(value as AccountKind);
+    const next = choiceIn(accountKinds, value);
+    if (next) {
+      onChange(next);
     }
   }
 

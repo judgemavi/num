@@ -13,7 +13,7 @@ type SetupScreenProps = {
   onAlreadyComplete: () => void;
 };
 
-function messageFor(code: ErrorCode | undefined): string {
+function messageFor(code: ErrorCode | undefined) {
   switch (code) {
     case "setup_already_complete":
       return "Setup is already complete.";

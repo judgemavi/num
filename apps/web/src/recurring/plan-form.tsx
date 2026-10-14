@@ -1,22 +1,21 @@
 import {
   fromMinorUnits,
   planCreateSchema,
+  planKinds,
   toMinorUnits,
-  type Account,
-  type AmountMode,
-  type BusinessDayShift,
-  type Category,
-  type Merchant,
   type Plan,
   type PlanCreate,
-  type PlanFrequency,
   type PlanKind,
   type PlanProposal,
 } from "@num/shared";
 import { ChevronRight } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { amountForForm, amountFromForm, kindLabel, planError, recurringTitle } from "@/recurring/format";
-import { InlineAccount, InlineCategory, InlineMerchant } from "@/editors/inline-records";
+import { useEditorFrame } from "@/editors/editor-api";
+import { useAccounts, useBookCurrency, useCategories, useMerchants } from "@/editors/lookups";
+import { AccountForm } from "@/accounts/account-form";
+import { CategoryForm } from "@/settings/category-form";
+import { MerchantForm } from "@/settings/merchant-form";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { errorCode } from "@/api/client";
 import { useSavePlan } from "@/api/recurring";
@@ -25,31 +24,28 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { accountLabel } from "@/accounts/label";
+import { ChoiceSelect } from "@/components/choice-select";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
+const kindOptions = planKinds.map((kind) => ({ value: kind, label: kindLabel(kind) }));
+
 export type PlanSeed = PlanProposal & { name: string; kind: PlanKind };
 export type PlanDraft = Plan | PlanSeed | "new";
 
 type PlanFormProps = {
-  currency: string;
   draft: PlanDraft;
-  accounts: Account[];
-  categories: Category[];
-  merchants: Merchant[];
   initialKind?: PlanKind;
-  onClose: () => void;
-  onSaved: (id: string) => void;
 };
 
 function isPlan(draft: PlanDraft): draft is Plan {
   return draft !== "new" && "id" in draft;
 }
 
-function monthValue(day: number | null | undefined): string {
+function monthValue(day: number | null | undefined) {
   if (day === -1) {
     return "last";
   }
@@ -59,23 +55,28 @@ function monthValue(day: number | null | undefined): string {
   return String(day);
 }
 
-export function PlanForm({ currency, draft, accounts, categories, merchants, initialKind, onSaved }: PlanFormProps) {
+export function PlanForm({ draft, initialKind }: PlanFormProps) {
+  const { close } = useEditorFrame();
+  const currency = useBookCurrency();
+  const accounts = useAccounts();
+  const categories = useCategories();
+  const merchants = useMerchants();
   const current = isPlan(draft) ? draft : null;
   const seed = draft === "new" ? null : draft;
   const [name, setName] = useState(seed && "name" in seed ? seed.name : "");
-  const [kind, setKind] = useState<PlanKind>(seed && "kind" in seed ? seed.kind : (initialKind ?? "bill"));
-  const [accountId, setAccountId] = useState<string | null>(seed?.accountId ?? null);
-  const [transferAccountId, setTransferAccountId] = useState<string | null>(current?.transferAccountId ?? null);
-  const [categoryId, setCategoryId] = useState<string | null>(current?.categoryId ?? null);
-  const [merchantId, setMerchantId] = useState<string | null>(seed && "merchantId" in seed ? seed.merchantId : null);
+  const [kind, setKind] = useState(seed && "kind" in seed ? seed.kind : (initialKind ?? "bill"));
+  const [accountId, setAccountId] = useState(seed?.accountId ?? null);
+  const [transferAccountId, setTransferAccountId] = useState(current?.transferAccountId ?? null);
+  const [categoryId, setCategoryId] = useState(current?.categoryId ?? null);
+  const [merchantId, setMerchantId] = useState(seed && "merchantId" in seed ? seed.merchantId : null);
   const [amount, setAmount] = useState(seed ? amountForForm(currency, "kind" in seed ? seed.kind : "bill", seed.expectedAmount) : "");
   const [tolerance, setTolerance] = useState(seed ? fromMinorUnits(currency, seed.tolerance) : "0");
-  const [amountMode, setAmountMode] = useState<AmountMode>(seed?.amountMode ?? "fixed");
+  const [amountMode, setAmountMode] = useState(seed?.amountMode ?? "fixed");
   const [startDate, setStartDate] = useState(seed?.startDate ?? "");
-  const [freq, setFreq] = useState<PlanFrequency>(seed?.freq ?? "monthly");
+  const [freq, setFreq] = useState(seed?.freq ?? "monthly");
   const [interval, setInterval] = useState(String(seed?.interval ?? 1));
   const [monthDay, setMonthDay] = useState(monthValue(seed?.monthDay));
-  const [shift, setShift] = useState<BusinessDayShift>(current?.businessDayShift ?? "none");
+  const [shift, setShift] = useState(current?.businessDayShift ?? "none");
   const [endDate, setEndDate] = useState(current?.endDate ?? "");
   const [active, setActive] = useState(current?.active ?? true);
   const [fundsBuckets, setFundsBuckets] = useState(current?.fundsBuckets ?? false);
@@ -89,7 +90,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
     .filter((item) => !item.archivedAt && item.kind === (kind === "income" ? "income" : "expense"))
     .map((item) => ({ id: item.id, label: item.name }));
 
-  function errorText(): string | null {
+  function errorText() {
     if (invalid) {
       return invalid;
     }
@@ -145,7 +146,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
       setInvalid("Check the details and try again.");
       return;
     }
-    save.mutate({ id: current?.id ?? null, body: parsed.data }, { onSuccess: (saved) => onSaved(saved.id) });
+    save.mutate({ id: current?.id ?? null, body: parsed.data }, { onSuccess: (saved) => close(saved.id) });
   }
 
   const error = errorText();
@@ -166,18 +167,12 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
         </Field>
         <Field>
           <FieldLabel htmlFor="plan-kind-field">Kind</FieldLabel>
-          <Select value={kind} onValueChange={(value) => setKind(value as PlanKind)}>
-            <SelectTrigger id="plan-kind-field" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(["income", "bill", "transfer"] as const).map((item) => (
-                <SelectItem key={item} value={item}>
-                  {kindLabel(item)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ChoiceSelect
+            id="plan-kind-field" className="w-full"
+            value={kind}
+            options={kindOptions}
+            onValueChange={setKind}
+          />
         </Field>
         <Field>
           <FieldLabel htmlFor="plan-account-field">Account</FieldLabel>
@@ -189,7 +184,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
             noun="account"
             archived={accounts.filter((item) => item.archivedAt).map((item) => ({ id: item.id, label: accountLabel(item) }))}
             onChange={setAccountId}
-            renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
+            renderForm={(name) => <AccountForm inline account={null} initialName={name} />}
           />
         </Field>
         {kind === "transfer" ? (
@@ -202,7 +197,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
               placeholder="Choose an account"
               noun="account"
               onChange={setTransferAccountId}
-              renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
+              renderForm={(name) => <AccountForm inline account={null} initialName={name} />}
             />
           </Field>
         ) : null}
@@ -215,15 +210,15 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
         </Field>
         <Field>
           <FieldLabel htmlFor="plan-mode">Amount changes</FieldLabel>
-          <Select value={amountMode} onValueChange={(value) => setAmountMode(value as AmountMode)}>
-            <SelectTrigger id="plan-mode" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="fixed">Same amount each time</SelectItem>
-              <SelectItem value="variable">Amount changes each time</SelectItem>
-            </SelectContent>
-          </Select>
+          <ChoiceSelect
+            id="plan-mode" className="w-full"
+            value={amountMode}
+            options={[
+              { value: "fixed", label: "Same amount each time" },
+              { value: "variable", label: "Amount changes each time" },
+            ]}
+            onValueChange={setAmountMode}
+          />
         </Field>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field>
@@ -238,16 +233,16 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
         </div>
         <Field>
           <FieldLabel htmlFor="plan-freq">Repeats</FieldLabel>
-          <Select value={freq} onValueChange={(value) => setFreq(value as PlanFrequency)}>
-            <SelectTrigger id="plan-freq" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-              <SelectItem value="yearly">Yearly</SelectItem>
-            </SelectContent>
-          </Select>
+          <ChoiceSelect
+            id="plan-freq" className="w-full"
+            value={freq}
+            options={[
+              { value: "weekly", label: "Weekly" },
+              { value: "monthly", label: "Monthly" },
+              { value: "yearly", label: "Yearly" },
+            ]}
+            onValueChange={setFreq}
+          />
         </Field>
         {freq === "weekly" ? null : (
           <Field>
@@ -289,8 +284,8 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
                   emptyLabel="No category"
                   noun="category"
                   onChange={setCategoryId}
-                  renderForm={(name, finish) => (
-                    <InlineCategory name={name} kind={kind === "income" ? "income" : "expense"} depth={1} onDone={finish} />
+                  renderForm={(name) => (
+                    <CategoryForm inline depth={1} category={null} initialName={name} initialKind={kind === "income" ? "income" : "expense"} />
                   )}
                 />
               </Field>
@@ -306,7 +301,7 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
                 noun="merchant"
                 archived={merchants.filter((item) => item.archivedAt).map((item) => ({ id: item.id, label: item.name }))}
                 onChange={setMerchantId}
-                renderForm={(name, finish) => <InlineMerchant name={name} depth={1} onDone={finish} />}
+                renderForm={(name) => <MerchantForm inline depth={1} merchant={null} initialName={name} />}
               />
             </Field>
             <Field>
@@ -316,16 +311,16 @@ export function PlanForm({ currency, draft, accounts, categories, merchants, ini
             </Field>
             <Field>
               <FieldLabel htmlFor="plan-shift">Weekend</FieldLabel>
-              <Select value={shift} onValueChange={(value) => setShift(value as BusinessDayShift)}>
-                <SelectTrigger id="plan-shift" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Keep the date</SelectItem>
-                  <SelectItem value="next">Move to the next weekday</SelectItem>
-                  <SelectItem value="previous">Move to the previous weekday</SelectItem>
-                </SelectContent>
-              </Select>
+              <ChoiceSelect
+                id="plan-shift" className="w-full"
+                value={shift}
+                options={[
+                  { value: "none", label: "Keep the date" },
+                  { value: "next", label: "Move to the next weekday" },
+                  { value: "previous", label: "Move to the previous weekday" },
+                ]}
+                onValueChange={setShift}
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="plan-end">Ends</FieldLabel>

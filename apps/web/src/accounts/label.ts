@@ -19,11 +19,3 @@ export function accountOptionLabel(account: NamedAccount & { archivedAt?: string
   const label = accountLabel(account);
   return account.archivedAt ? `${label} (archived)` : label;
 }
-
-export function accountLabels(accounts: (NamedAccount & { id: string })[]): Map<string, string> {
-  return new Map(accounts.map((account) => [account.id, accountLabel(account)]));
-}
-
-export function accountLabelOf(labels: Map<string, string>, id: string, fallback: string): string {
-  return labels.get(id) ?? fallback;
-}

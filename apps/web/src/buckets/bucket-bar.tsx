@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { hueColor, type Hue } from "@/components/hue";
 import { Progress } from "@/components/ui/progress";
 
@@ -10,7 +9,7 @@ export function BucketBar({ hue, balance, target, label }: { hue: Hue; balance: 
       value={over ? 0 : percent}
       aria-label={label}
       className={over ? "bg-attn-soft" : "bg-sunken"}
-      style={{ "--progress-fill": hueColor[hue].glyph } as CSSProperties}
+      style={{ "--progress-fill": hueColor[hue].glyph }}
     />
   );
 }

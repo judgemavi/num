@@ -1,6 +1,6 @@
 import { accountClass, netWorthOf } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
-import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Upload } from "lucide-react";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
@@ -11,7 +11,10 @@ import { groupAccounts, groupHue, groupLabel } from "@/accounts/groups";
 import { accountListQuery, useArchiveAccount } from "@/api/accounts";
 import { errorCode } from "@/api/client";
 import { Amount } from "@/components/amount";
+import { Boundary } from "@/components/boundary";
 import { AccountFilterBar } from "@/accounts/filters";
+import { useAccountSearch } from "@/accounts/use-account-search";
+import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { Button } from "@/components/ui/button";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { IconTile } from "@/components/icon-tile";
@@ -25,39 +28,24 @@ import { SidePanel } from "@/components/side-panel";
 import { SplitBar } from "@/components/split-bar";
 import { hueColor } from "@/components/hue";
 
-const accountsRoute = getRouteApi("/accounts");
-
 export function AccountsScreen() {
-  const search = accountsRoute.useSearch();
-  const navigate = accountsRoute.useNavigate();
+  return (
+    <Boundary loading="Loading accounts." failed="The accounts did not load.">
+      <AccountsPage />
+    </Boundary>
+  );
+}
+
+function AccountsPage() {
+  const { search, shown } = useAccountSearch();
   const openAccount = useNavigate();
-  const { openEditor, confirm } = useEditors();
-  const currency = useBookCurrency();
-  const accounts = useQuery(accountListQuery({ archived: search.archived, sort: search.sort, dir: search.dir }));
+  const { openEditor } = useEditors();
+  const bookCurrency = useBookCurrency();
+  // The list on the screen stays while the list for a new filter or a new sort order loads.
+  const { data: accounts } = useSuspenseQuery(accountListQuery(shown));
   const archive = useArchiveAccount();
 
-  if (currency.isPending || accounts.isPending) {
-    return <p className="text-muted-foreground">Loading accounts.</p>;
-  }
-  if (currency.isError || accounts.isError || !currency.data) {
-    return (
-      <div className="grid content-start gap-5">
-        <p>The accounts did not load.</p>
-        <Button
-          type="button"
-          onClick={() => {
-            void currency.refetch();
-            void accounts.refetch();
-          }}
-        >
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
-  const bookCurrency = currency.data;
-  const rows = accounts.data?.items ?? [];
+  const rows = accounts.items;
   const groups = groupAccounts(rows);
   const worth = netWorthOf(rows);
   const cards = rows.filter((account) => account.kind === "credit_card");
@@ -70,7 +58,7 @@ export function AccountsScreen() {
         actions={
           <>
             <Button type="button" variant="secondary" asChild>
-              <Link to="/accounts/imports" search={{ page: 1, pageSize: 50 }}>
+              <Link to="/accounts/imports">
                 Imports
               </Link>
             </Button>
@@ -89,24 +77,19 @@ export function AccountsScreen() {
           </>
         }
       />
-      <AccountFilterBar
-        search={search}
-        onChange={(patch) => {
-          void navigate({ search: { ...search, ...patch, page: 1 } });
-        }}
-      />
+      <AccountFilterBar />
       <SummaryStrip
         tint="accounts"
         label={search.archived ? "Archived balances" : "Net worth"}
-        amount={<Amount currency={bookCurrency} minor={worth.net} owed hero />}
+        amount={<Amount minor={worth.net} owed hero />}
         hint={search.archived ? "These accounts are not in the active list." : "What you have, minus what you owe."}
         facts={
           <>
             <Fact label="What you have">
-              <Amount currency={bookCurrency} minor={worth.have} className="text-lg" />
+              <Amount minor={worth.have} className="text-lg" />
             </Fact>
             <Fact label="What you owe">
-              <Amount currency={bookCurrency} minor={worth.owe} className="text-lg" />
+              <Amount minor={worth.owe} className="text-lg" />
             </Fact>
           </>
         }
@@ -114,8 +97,8 @@ export function AccountsScreen() {
           <SplitBar
             label={`You have ${formatMoney(bookCurrency, worth.have)} and owe ${formatMoney(bookCurrency, worth.owe)}`}
             segments={[
-              { key: "have", label: "What you have", color: "var(--primary)", value: Math.max(0, worth.have), amount: <Amount currency={bookCurrency} minor={worth.have} /> },
-              { key: "owe", label: "What you owe", color: hueColor.sky.glyph, value: worth.owe, amount: <Amount currency={bookCurrency} minor={worth.owe} /> },
+              { key: "have", label: "What you have", color: "var(--primary)", value: Math.max(0, worth.have), amount: <Amount minor={worth.have} /> },
+              { key: "owe", label: "What you owe", color: hueColor.sky.glyph, value: worth.owe, amount: <Amount minor={worth.owe} /> },
             ]}
           />
         }
@@ -135,7 +118,7 @@ export function AccountsScreen() {
               <div key={group.id}>
                 <ListGroup
                   label={groupLabel[group.id]}
-                  aside={<Amount currency={bookCurrency} minor={group.total} owed={group.id === "loans"} />}
+                  aside={<Amount minor={group.total} owed={group.id === "loans"} />}
                 />
                 {group.items.map((account) => {
                   const detail = accountDetail(account);
@@ -146,7 +129,6 @@ export function AccountsScreen() {
                         void openAccount({
                           to: "/accounts/$accountId",
                           params: { accountId: account.id },
-                          search: { page: 1, reconcile: false },
                         });
                       }}
                     >
@@ -160,7 +142,7 @@ export function AccountsScreen() {
                         {account.archivedAt ? <Badge variant="attention">Archived</Badge> : kindLabel(account.kind)}
                       </div>
                       <div className="ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-                        <Amount currency={bookCurrency} minor={account.balance} owed={accountClass(account.kind) === "liability"} />
+                        <Amount minor={account.balance} owed={accountClass(account.kind) === "liability"} />
                         {detail ? <small>{detail}</small> : null}
                       </div>
                       <RowMenu label={`Actions for ${accountLabel(account)}`}>
@@ -176,33 +158,25 @@ export function AccountsScreen() {
                             void openAccount({
                               to: "/accounts/$accountId",
                               params: { accountId: account.id },
-                              search: { page: 1, reconcile: true },
+                              search: { reconcile: true },
                             });
                           }}
                         >
                           Reconcile
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="min-h-11"
-                          onSelect={() => {
-                            const restore = account.archivedAt !== null;
-                            void confirm({
-                              title: restore ? "Restore this account?" : "Archive this account?",
-                              description: restore
-                                ? `Restore ${accountLabel(account)}. It returns to the active list.`
-                                : account.balance !== 0
-                                  ? `${accountLabel(account)} has a balance of ${formatBalance(bookCurrency, account.kind, account.balance)}. Archive it only if you mean to.`
-                                  : `Archive ${accountLabel(account)}. It leaves the active list.`,
-                              confirmLabel: restore ? "Restore account" : "Archive account",
-                            }).then((ok) => {
-                              if (ok) {
-                                archive.mutate({ id: account.id, restore });
-                              }
-                            });
-                          }}
-                        >
-                          {account.archivedAt ? "Restore" : "Archive"}
-                        </DropdownMenuItem>
+                        <ArchiveMenuItem
+                          archived={account.archivedAt !== null}
+                          question={(restore) => ({
+                            title: restore ? "Restore this account?" : "Archive this account?",
+                            description: restore
+                              ? `Restore ${accountLabel(account)}. It returns to the active list.`
+                              : account.balance !== 0
+                                ? `${accountLabel(account)} has a balance of ${formatBalance(bookCurrency, account.kind, account.balance)}. Archive it only if you mean to.`
+                                : `Archive ${accountLabel(account)}. It leaves the active list.`,
+                            confirmLabel: restore ? "Restore account" : "Archive account",
+                          })}
+                          onConfirm={(restore) => archive.mutate({ id: account.id, restore })}
+                        />
                       </RowMenu>
                     </ListRow>
                   );
@@ -223,7 +197,7 @@ export function AccountsScreen() {
                     <small>{account.paymentPolicy === "full" ? "Pays the full statement" : ""}</small>
                   </div>
                   <div className="ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-                    <Amount currency={bookCurrency} minor={account.balance} owed />
+                    <Amount minor={account.balance} owed />
                   </div>
                 </ListRow>
               ))}

@@ -26,6 +26,8 @@ Status: approved (owner, 2026-10-13)
 3. One global rule invalidates all queries after each successful mutation. No code invalidates a query by its key.
    Reason: most reads are derived from many entities, thus a list for each mutation goes stale easily. The API is
    local, thus the extra reads are cheap.
+   The rule does not wait for the new data (changed by decision 0033). The mutation ends when the write succeeds.
+   The active queries load again in the background.
 4. The routes stay `@hono/zod-openapi` definitions (`createRoute` and `.openapi(...)`). Each route file builds its
    routes as one chain and returns the app. `app.ts` mounts the route files as one chain. Thus the type of the app has
    all routes. The OpenAPI document and the MCP tools do not change.
@@ -46,8 +48,11 @@ Status: approved (owner, 2026-10-13)
 - The conversion is done folder by folder. The first folder is `settings`. Until the last folder is done, the
   unconverted folders use `apiRequest` and invalidate queries by key.
 - `apps/web/src/request.ts` is removed when the last caller is converted.
-- After a successful write, the mutation stays pending until the active queries have new data. A form closes after
-  that.
-- A callback that is given to `mutate(...)` runs only if the component that called `useMutation` is on the screen when
-  the refetch ends. Thus the mutation is in a component that no query state can remove: the editor that selects
-  between the loading line and the form, or the screen that owns the list.
+- After a successful write, the mutation ends immediately. A form closes at that time. For a short time, a list can
+  show the old data.
+- The component that does a write calls its own mutation hook. A callback that is given to `mutate(...)` runs when the
+  write succeeds, before the new data arrives.
+- When a row must not accept a second click before the new data arrives, the row uses the state of its mutation and
+  the fetch state of the list (`useIsFetching`).
+- An editor shows the loading line only for the first load. A background read does not remove a form that is on the
+  screen.

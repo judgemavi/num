@@ -11,20 +11,18 @@ export function activePlansQuery() {
   });
 }
 
-/** The Recurring screen list. It reads up to 200 plans on one page. The list waits until `enabled` is true. */
-export function planListQuery(search: PlanListQuery, enabled: boolean) {
+/** The Recurring screen list. It reads up to 200 plans on one page. */
+export function planListQuery(search: PlanListQuery) {
   return queryOptions({
     queryKey: ["plans", search],
-    enabled,
     queryFn: () => unwrap(api.recurring.$get({ query: { ...search, pageSize: fullPage } })),
   });
 }
 
-export function planQuery(id: string | null) {
+export function planQuery(id: string) {
   return queryOptions({
     queryKey: ["plan", id],
-    enabled: id !== null,
-    queryFn: () => unwrap(api.recurring[":id"].$get({ param: { id: id ?? "" } })),
+    queryFn: () => unwrap(api.recurring[":id"].$get({ param: { id } })),
   });
 }
 
@@ -39,10 +37,9 @@ export function recurringSyncQuery(asOf: string) {
   });
 }
 
-export function recurringSignalsQuery(asOf: string, enabled: boolean) {
+export function recurringSignalsQuery(asOf: string) {
   return queryOptions({
     queryKey: ["recurring-signals", asOf],
-    enabled,
     queryFn: () => unwrap(api.recurring.signals.$get({ query: { asOf } })),
   });
 }
@@ -55,11 +52,12 @@ export function occurrencesQuery(planId: string, asOf: string) {
 }
 
 /** Create a plan (`id` is null) or change a plan. */
+export function savePlan({ id, body }: { id: string | null; body: PlanCreate }) {
+  return unwrap(id ? api.recurring[":id"].$patch({ param: { id }, json: body }) : api.recurring.$post({ json: body }));
+}
+
 export function useSavePlan() {
-  return useMutation({
-    mutationFn: ({ id, body }: { id: string | null; body: PlanCreate }) =>
-      unwrap(id ? api.recurring[":id"].$patch({ param: { id }, json: body }) : api.recurring.$post({ json: body })),
-  });
+  return useMutation({ mutationFn: savePlan });
 }
 
 export function useArchivePlan() {
@@ -71,11 +69,12 @@ export function useArchivePlan() {
 
 type OccurrenceRef = { planId: string; dueDate: string };
 
+export function linkOccurrence({ planId, dueDate, transactionId }: OccurrenceRef & { transactionId: string }) {
+  return unwrap(api.recurring[":id"].occurrences[":dueDate"].link.$post({ param: { id: planId, dueDate }, json: { transactionId } }));
+}
+
 export function useLinkOccurrence() {
-  return useMutation({
-    mutationFn: ({ planId, dueDate, transactionId }: OccurrenceRef & { transactionId: string }) =>
-      unwrap(api.recurring[":id"].occurrences[":dueDate"].link.$post({ param: { id: planId, dueDate }, json: { transactionId } })),
-  });
+  return useMutation({ mutationFn: linkOccurrence });
 }
 
 export function useUnlinkOccurrence() {

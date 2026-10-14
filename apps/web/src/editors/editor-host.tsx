@@ -1,5 +1,5 @@
-import { useRouter, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useParams, useRouter, useRouterState, useSearch } from "@tanstack/react-router";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,267 +11,180 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { EditorBody } from "@/editors/editor-body";
-import { formatEditParam, parseEditParam, type EditTarget } from "@/editors/edit-url";
-import { createEditorStack, type EditorFrame } from "@/editors/editor-stack";
-import { isRecordKind, type EditorInput, type EditorKind } from "@/editors/editor-types";
-import { EditorContext, type ConfirmOptions, type HostApi } from "@/editors/editor-api";
+import { formatEditParam, isRecordEditorKind, parseEditParam, type RecordEditorKind } from "@/editors/edit-url";
+import { EditorContext, EditorFrameContext } from "@/editors/editor-api";
+import { EditorBody } from "@/editors/editor-registry";
+import { createEditorStore } from "@/editors/editor-store";
+import type { EditorFrame, EditorInput, EditorKind } from "@/editors/editor-types";
 
-export type { ConfirmOptions };
-
-type FrameMeta = {
-  trackUrl: boolean;
-  pushed: boolean;
-  editValue: string | null;
-};
-
-type ConfirmState = ConfirmOptions & { resolve: (value: boolean) => void };
-
-const stack = createEditorStack();
-const meta = new Map<number, FrameMeta>();
-const pending = new Map<number, Promise<string | null>>();
-function editValueOf(kind: EditorKind, props: EditorInput[EditorKind]): string | null {
-  if (!isRecordKind(kind) || !("id" in props)) {
-    return null;
-  }
-  if (kind === "transaction") {
-    const transaction = props as EditorInput["transaction"];
-    if ((transaction.groupIds?.length ?? 0) > 0) {
-      return null;
-    }
-  }
-  return formatEditParam(kind, props.id);
+/** The name of the reconcile editor of an account in the URL state of the host. The `edit` value never has this text. */
+function reconcileKey(accountId: string) {
+  return `reconcile:${accountId}`;
 }
 
-function panelClass(kind: string): string | undefined {
+/**
+ * The editor that the URL shows. `edit` shows the editor of one record. `reconcile` on the page of an account shows
+ * the reconcile editor of that account. Group mode and the other editors are not in the URL.
+ */
+function editorOfUrl(search: { edit?: string; reconcile?: boolean }, accountId: string | undefined) {
+  const edit = parseEditParam(search.edit);
+  if (edit) {
+    return { key: formatEditParam(edit.kind, edit.id), frame: frameOf<RecordEditorKind>(edit.kind, { id: edit.id }) };
+  }
+  if (search.reconcile && accountId) {
+    return { key: reconcileKey(accountId), frame: frameOf("reconcile", { accountId }) };
+  }
+  return null;
+}
+
+/** The key of an editor in the URL. Null when the URL does not show this editor. `pageAccountId` is the account of the page. */
+function urlKeyOf(frame: EditorFrame, pageAccountId: string | undefined) {
+  if (frame.kind === "reconcile") {
+    return frame.input.accountId === pageAccountId ? reconcileKey(pageAccountId) : null;
+  }
+  if (!isRecordEditorKind(frame.kind) || !("id" in frame.input)) {
+    return null;
+  }
+  if ("groupIds" in frame.input && (frame.input.groupIds?.length ?? 0) > 0) {
+    return null;
+  }
+  return formatEditParam(frame.kind, frame.input.id);
+}
+
+function frameOf<K extends EditorKind>(kind: K, input: EditorInput[K]): EditorFrame<K> {
+  return { kind, input };
+}
+
+function panelClass(kind: EditorKind) {
   if (kind === "import") {
     return "max-h-[min(44rem,calc(100%-2rem))] w-[min(52rem,calc(100%-2rem))] max-w-[52rem]";
   }
   return undefined;
 }
 
-function FrameSlot({
-  active,
-  className,
-  onDismiss,
-  children,
-}: {
-  active: boolean;
-  className?: string;
-  onDismiss: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <Dialog open={active} onOpenChange={(open) => { if (!open) onDismiss(); }}>
-      <DialogContent forceMount className={active ? className : "invisible pointer-events-none"}>
-        {children}
-      </DialogContent>
-    </Dialog>
-  );
+/** The open editor, the open confirmation, and the functions that keep the URL and the open editor the same. */
+function createHost(router: ReturnType<typeof useRouter>) {
+  const store = createEditorStore();
+  let lastPath = router.state.location.pathname;
+
+  /** Show one editor in the URL, or no editor. */
+  function writeUrl(shown: { frame: EditorFrame; key: string } | null, replace: boolean) {
+    // A value that is `undefined` is not in the URL.
+    const reconcile = shown?.frame.kind === "reconcile";
+    const search = { edit: shown && !reconcile ? shown.key : undefined, reconcile: reconcile ? true : undefined };
+    void router.navigate({ to: ".", replace, search: (prev) => ({ ...prev, ...search }) });
+  }
+
+  /** Close an editor and remove it from the URL. */
+  function close(key: number, result: string | null) {
+    const closed = store.close(key, result);
+    if (!closed || closed.editValue === null) {
+      return;
+    }
+    if (closed.pushed) {
+      router.history.back();
+    } else {
+      writeUrl(null, true);
+    }
+  }
+
+  return {
+    store,
+    close,
+    /** Make the open editor agree with the URL. The person used Back or Forward, or opened a link. */
+    followUrl(wanted: ReturnType<typeof editorOfUrl>, pathname: string) {
+      const pathnameChanged = lastPath !== pathname;
+      lastPath = pathname;
+      const open = store.snapshot().editor;
+      if (open && open.editValue === null && !pathnameChanged) {
+        return;
+      }
+      if (open && open.editValue !== null && open.editValue === wanted?.key) {
+        return;
+      }
+      if (open) {
+        store.close(open.key, null);
+      }
+      if (wanted) {
+        void store.open(wanted.frame, { editValue: wanted.key, pushed: false });
+      }
+    },
+    api: {
+      openEditor<K extends EditorKind>(kind: K, input: EditorInput[K]) {
+        const open = store.snapshot().editor;
+        const hadUrl = open !== null && open.editValue !== null;
+        // The type argument makes the frame of one kind a member of the union of all frames.
+        const frame = frameOf<EditorKind>(kind, input);
+        const page = router.matchRoute({ to: "/accounts/$accountId" });
+        const editValue = urlKeyOf(frame, page ? page.accountId : undefined);
+        const done = store.open(frame, { editValue, pushed: editValue !== null && !hadUrl });
+        if (editValue) {
+          writeUrl({ frame, key: editValue }, hadUrl);
+        } else if (hadUrl) {
+          writeUrl(null, true);
+        }
+        return done;
+      },
+      confirm: store.ask,
+    },
+  };
 }
 
 export function EditorHost({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const searchStr = useRouterState({ select: (state) => state.location.searchStr });
-  const frames = useSyncExternalStore(stack.subscribe, () => stack.frames, () => stack.frames);
-  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
-  const suppress = useRef(0);
-  const pathRef = useRef<string | null>(null);
-  const confirmRef = useRef<ConfirmState | null>(null);
-  const apiRef = useRef<HostApi | null>(null);
-  const reconcileRef = useRef<(edit: EditTarget | null, pathnameChanged: boolean) => void>(() => {});
-  const stableApi = useState<HostApi>(() => ({
-    openEditor: (kind, props) => apiRef.current?.openEditor(kind, props) ?? Promise.resolve(null),
-    confirm: (options) => apiRef.current?.confirm(options) ?? Promise.resolve(false),
-    dismissKind: (kind) => apiRef.current?.dismissKind(kind),
-  }))[0];
+  const edit = useSearch({ strict: false, select: (search) => search.edit });
+  const reconcile = useSearch({ strict: false, select: (search) => search.reconcile });
+  const accountId = useParams({ strict: false, select: (params) => params.accountId });
+  const [host] = useState(() => createHost(router));
+  const { editor, confirm } = useSyncExternalStore(host.store.subscribe, host.store.snapshot);
 
-  function writeEdit(edit: string | undefined, replace: boolean) {
-    suppress.current += 1;
-    void router.navigate({
-      replace,
-      search: ((prev: Record<string, unknown>) => {
-        const next = { ...prev };
-        if (edit) {
-          next.edit = edit;
-        } else {
-          delete next.edit;
-        }
-        return next;
-      }) as never,
-    });
-  }
-
-  function closeFrame(key: number, result: string | null) {
-    meta.delete(key);
-    pending.delete(key);
-    stack.complete(key, result);
-  }
-
-  function openFromHistory(target: EditTarget) {
-    const props = { id: target.id } as EditorInput[typeof target.kind];
-    const opened = stack.open(target.kind, props);
-    pending.set(opened.key, opened.done);
-    meta.set(opened.key, { trackUrl: true, pushed: false, editValue: formatEditParam(target.kind, target.id) });
-  }
-
-  function reconcile(edit: EditTarget | null, pathnameChanged: boolean) {
-    if (pathnameChanged) {
-      while (stack.frames.length > 0) {
-        const top = stack.frames[stack.frames.length - 1];
-        if (!top || meta.get(top.key)?.trackUrl) {
-          break;
-        }
-        closeFrame(top.key, null);
-      }
-    }
-    const wanted = edit ? formatEditParam(edit.kind, edit.id) : null;
-    while (stack.frames.length > 0) {
-      const top = stack.frames[stack.frames.length - 1];
-      if (!top) {
-        break;
-      }
-      const info = meta.get(top.key);
-      if (!info?.trackUrl) {
-        return;
-      }
-      if (info.editValue === wanted) {
-        return;
-      }
-      closeFrame(top.key, null);
-    }
-    if (edit && wanted && !stack.frames.some((frame) => meta.get(frame.key)?.editValue === wanted)) {
-      openFromHistory(edit);
-    }
-  }
-
-  function closeUser(key: number, result: string | null) {
-    const info = meta.get(key);
-    closeFrame(key, result);
-    if (!info?.trackUrl) {
-      return;
-    }
-    if (info.pushed) {
-      suppress.current += 1;
-      router.history.back();
-      return;
-    }
-    const parent = [...stack.frames].reverse().find((frame) => meta.get(frame.key)?.trackUrl);
-    writeEdit(parent ? (meta.get(parent.key)?.editValue ?? undefined) : undefined, true);
-  }
-
-  const api: HostApi = {
-    openEditor(kind, props) {
-      if (kind === "reconcile") {
-        const existing = stack.frames.find((frame) => frame.kind === "reconcile");
-        const again = existing ? pending.get(existing.key) : undefined;
-        if (again) {
-          return again;
-        }
-      }
-      const previous = stack.frames.map((frame) => ({ key: frame.key, info: meta.get(frame.key) }));
-      for (const frame of previous) {
-        closeFrame(frame.key, null);
-      }
-      const hadUrl = previous.some((frame) => frame.info?.trackUrl);
-      const editValue = editValueOf(kind, props);
-      const opened = stack.open(kind, props);
-      pending.set(opened.key, opened.done);
-      meta.set(opened.key, { trackUrl: editValue !== null, pushed: editValue !== null && !hadUrl, editValue });
-      if (editValue) {
-        writeEdit(editValue, hadUrl);
-      } else if (hadUrl) {
-        writeEdit(undefined, true);
-      }
-      return opened.done;
-    },
-    confirm(options) {
-      confirmRef.current?.resolve(false);
-      return new Promise((resolve) => {
-        setConfirmState({ ...options, resolve });
-      });
-    },
-    dismissKind(kind) {
-      for (const frame of [...stack.frames]) {
-        if (frame.kind === kind) {
-          closeUser(frame.key, null);
-        }
-      }
-    },
-  };
-
+  // The router is the source of the URL. The store of the host is not a part of React. This effect makes them agree.
   useEffect(() => {
-    apiRef.current = api;
-    confirmRef.current = confirmState;
-    reconcileRef.current = reconcile;
-  });
+    host.followUrl(editorOfUrl({ edit, reconcile }, accountId), pathname);
+  }, [host, pathname, edit, reconcile, accountId]);
 
-  useEffect(() => {
-    const pathnameChanged = pathRef.current !== null && pathRef.current !== pathname;
-    pathRef.current = pathname;
-    if (suppress.current > 0) {
-      suppress.current -= 1;
-      return;
-    }
-    reconcileRef.current(parseEditParam(new URLSearchParams(searchStr).get("edit")), pathnameChanged);
-  }, [pathname, searchStr]);
-
-  const description = confirmState?.description;
+  const description = confirm?.description;
 
   return (
-    <EditorContext.Provider value={stableApi}>
+    <EditorContext value={host.api}>
       {children}
-      {frames.length > 0 ? (
-        <HostedFrame
-          frame={frames[frames.length - 1] as EditorFrame}
-          active
-          onFinish={(result) => {
-            const frame = frames[frames.length - 1];
-            if (frame) {
-              closeUser(frame.key, result);
+      {editor ? (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              host.close(editor.key, null);
             }
           }}
-        />
+        >
+          <DialogContent className={panelClass(editor.frame.kind)}>
+            <EditorFrameContext key={editor.key} value={{ close: (result = null) => host.close(editor.key, result) }}>
+              <EditorBody {...editor.frame} />
+            </EditorFrameContext>
+          </DialogContent>
+        </Dialog>
       ) : null}
       <AlertDialog
-        open={confirmState !== null}
+        open={confirm !== null}
         onOpenChange={(open) => {
           if (!open) {
-            confirmState?.resolve(false);
-            setConfirmState(null);
+            host.store.answer(false);
           }
         }}
       >
         <AlertDialogContent className="z-[70]">
           <AlertDialogHeader>
-            <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
+            <AlertDialogTitle>{confirm?.title}</AlertDialogTitle>
             {typeof description === "string" ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}
           </AlertDialogHeader>
           {description && typeof description !== "string" ? <div className="text-sm text-muted-foreground">{description}</div> : null}
           <AlertDialogFooter>
-            {confirmState?.hideCancel ? null : <AlertDialogCancel>{confirmState?.cancelLabel ?? "Cancel"}</AlertDialogCancel>}
-            <AlertDialogAction
-              onClick={() => {
-                confirmState?.resolve(true);
-                setConfirmState(null);
-              }}
-            >
-              {confirmState?.confirmLabel ?? "Confirm"}
-            </AlertDialogAction>
+            {confirm?.hideCancel ? null : <AlertDialogCancel>{confirm?.cancelLabel ?? "Cancel"}</AlertDialogCancel>}
+            <AlertDialogAction onClick={() => host.store.answer(true)}>{confirm?.confirmLabel ?? "Confirm"}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </EditorContext.Provider>
-  );
-}
-
-function HostedFrame({ frame, active, onFinish }: { frame: EditorFrame; active: boolean; onFinish: (result: string | null) => void }) {
-  const kind = frame.kind as EditorKind;
-  const props = frame.props as EditorInput[EditorKind];
-  return (
-    <FrameSlot active={active} className={panelClass(frame.kind)} onDismiss={() => onFinish(null)}>
-      <EditorBody kind={kind} props={props} onClose={() => onFinish(null)} onSaved={(id) => onFinish(id)} />
-    </FrameSlot>
+    </EditorContext>
   );
 }

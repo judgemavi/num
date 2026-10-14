@@ -1,43 +1,27 @@
 import type { BucketCover, BucketCreate, BucketEventCreate, BucketListQuery, BucketWrite } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
-import { activeAndArchived, allPages, fullPage } from "@/api/pages";
+import { activeAndArchived, allPages, fullPage, type ListFilters } from "@/api/pages";
 
-type BucketSearch = Partial<Pick<BucketListQuery, "archived" | "sort" | "dir">>;
-
-function loadBuckets(search: BucketSearch) {
-  return allPages((page) => unwrap(api.buckets.$get({ query: { archived: search.archived, sort: search.sort, dir: search.dir, page, pageSize: fullPage } })));
-}
-
-/** The Buckets screen list. It reads all pages. */
-export function bucketListQuery(search: BucketListQuery) {
+/** The Buckets list. It reads all pages. The key has only the values that the request uses. */
+export function bucketListQuery({ archived, sort, dir }: ListFilters<BucketListQuery>) {
+  const filters = { archived, sort, dir };
   return queryOptions({
-    queryKey: ["buckets", search],
-    queryFn: () => loadBuckets(search),
+    queryKey: ["buckets", filters],
+    queryFn: () => allPages((page) => unwrap(api.buckets.$get({ query: { ...filters, page, pageSize: fullPage } }))),
   });
 }
 
+/** The buckets that are not archived, in name order. */
 export function activeBucketsQuery() {
-  return queryOptions({
-    queryKey: ["buckets", "editor"],
-    queryFn: () => loadBuckets({ archived: false, sort: "name", dir: "asc" }),
-  });
-}
-
-/** The active buckets that can cover an overspent bucket. The list waits until `enabled` is true. */
-export function coverSourcesQuery(enabled: boolean) {
-  return queryOptions({
-    queryKey: ["buckets", "cover-sources"],
-    enabled,
-    queryFn: () => loadBuckets({ archived: false }),
-  });
+  return bucketListQuery({ archived: false, sort: "name", dir: "asc" });
 }
 
 /** The active buckets and the archived buckets. The Bucket editor uses them to find the categories that are in a bucket. */
 export function bucketOptionsQuery() {
   return queryOptions({
     queryKey: ["buckets", "category-map"],
-    queryFn: () => activeAndArchived(loadBuckets),
+    queryFn: ({ client }) => activeAndArchived((archived) => client.fetchQuery(bucketListQuery({ archived }))),
   });
 }
 
@@ -55,11 +39,10 @@ export function bucketEventsQuery() {
   });
 }
 
-export function bucketQuery(id: string | null) {
+export function bucketQuery(id: string) {
   return queryOptions({
     queryKey: ["bucket", id],
-    enabled: id !== null,
-    queryFn: () => unwrap(api.buckets[":id"].$get({ param: { id: id ?? "" } })),
+    queryFn: () => unwrap(api.buckets[":id"].$get({ param: { id } })),
   });
 }
 

@@ -1,16 +1,13 @@
-import { planProposalKey, type Merchant, type PlanCreate, type PlanProposal, type RecurringSignals } from "@num/shared";
-import { useSavePlan } from "@/api/recurring";
+import { planProposalKey, type PlanCreate, type PlanProposal } from "@num/shared";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { recurringSignalsQuery, useSavePlan } from "@/api/recurring";
 import { useDecideItem } from "@/api/review";
 import { localAsOf } from "@/as-of";
+import { useMerchantNames } from "@/editors/lookups";
 import { repeatLabel } from "@/review/format";
 import { formatDate } from "@/transactions/format";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
-
-type DetectedListProps = {
-  signals: RecurringSignals;
-  merchants: Merchant[];
-};
 
 function proposedPlan(item: PlanProposal, name: string): PlanCreate {
   return {
@@ -34,13 +31,15 @@ function proposedPlan(item: PlanProposal, name: string): PlanCreate {
   };
 }
 
-export function ReviewList({ signals, merchants }: DetectedListProps) {
+/** The plans that the app detected. The screen reads the same signals, thus this read does not start a request. */
+export function ReviewList() {
   const asOf = localAsOf();
+  const { data: signals } = useSuspenseQuery(recurringSignalsQuery(asOf));
+  const merchantName = useMerchantNames();
   const create = useSavePlan();
   const decide = useDecideItem();
   const pending = create.isPending || decide.isPending;
   const error = create.isError ? "The plan was not created." : decide.isError ? "That answer did not save." : null;
-  const merchantName = new Map(merchants.map((merchant) => [merchant.id, merchant.name]));
   if (signals.proposals.length === 0) {
     return null;
   }

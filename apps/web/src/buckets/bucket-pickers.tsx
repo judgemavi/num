@@ -1,7 +1,8 @@
 import { bucketColors, bucketIcons, type BucketColor, type BucketIcon } from "@num/shared";
 import { colorLabel, iconLabel } from "@/buckets/format";
 import { BucketGlyph } from "@/buckets/icons";
-import { hueColor, type Hue } from "@/components/hue";
+import { choiceIn } from "@/components/choice";
+import { hueColor } from "@/components/hue";
 import { IconTile } from "@/components/icon-tile";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -25,8 +26,9 @@ export function BucketPickers({ color, icon, suggest, onColor, onIcon }: BucketP
           aria-label="Colour"
           className="flex-wrap"
           onValueChange={(value) => {
-            if ((bucketColors as readonly string[]).includes(value)) {
-              onColor(value as BucketColor);
+            const next = choiceIn(bucketColors, value);
+            if (next) {
+              onColor(next);
             }
           }}
         >
@@ -53,8 +55,9 @@ export function BucketPickers({ color, icon, suggest, onColor, onIcon }: BucketP
           aria-label="Icon"
           className="flex-wrap"
           onValueChange={(value) => {
-            if ((bucketIcons as readonly string[]).includes(value)) {
-              onIcon(value as BucketIcon);
+            const next = choiceIn(bucketIcons, value);
+            if (next) {
+              onIcon(next);
             }
           }}
         >
@@ -65,7 +68,7 @@ export function BucketPickers({ color, icon, suggest, onColor, onIcon }: BucketP
               aria-label={iconLabel(item)}
               className="size-11 rounded-[10px] p-0 data-[state=on]:ring-3 data-[state=on]:ring-primary"
             >
-              <IconTile hue={color as Hue}>
+              <IconTile hue={color}>
                 <BucketGlyph name={item} />
               </IconTile>
             </ToggleGroupItem>

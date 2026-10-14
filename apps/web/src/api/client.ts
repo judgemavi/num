@@ -6,7 +6,7 @@ import { hc, type ClientResponse } from "hono/client";
  * The typed client for all calls to the API. The types come from the API routes. No API code is in the bundle.
  *
  * Use `api` only in the files of this folder. A read is a `queryOptions` function. A write is a `useMutation` hook.
- * A component uses `useQuery(...)` and the mutation hook. It does not call `api` or `fetch`.
+ * A component uses `useSuspenseQuery(...)` inside a `Boundary`, and the mutation hook. It does not call `api` or `fetch`.
  *
  * Query keys:
  * - The first part is the resource name: plural for a collection (`"tags"`), singular for one record (`"tag"`).
@@ -15,6 +15,7 @@ import { hc, type ClientResponse } from "hono/client";
  * - A fixed view of a collection: `["tags", "options"]`.
  *
  * No code invalidates a query by its key. After each successful mutation, the rule in `main.tsx` invalidates all queries.
+ * The rule does not wait for the new data.
  */
 export const api = hc<AppType>("/").api;
 

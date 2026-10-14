@@ -15,6 +15,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { suggestionQuery, transferHintQuery } from "@/api/suggestions";
+import { useCategories } from "@/editors/lookups";
 import type { SplitLine } from "@/transactions/what-choice";
 
 export function readPositive(currency: string, text: string): number {
@@ -101,7 +102,6 @@ type ApplyChoice = {
   direction: MoneyDirection;
   amount: number | null;
   touched: boolean;
-  categories: Category[];
   setChoice: (choice: WhatChoice) => void;
   setCategoryId: (id: string | null) => void;
   setTransferAccountId: (id: string | null) => void;
@@ -109,6 +109,7 @@ type ApplyChoice = {
 };
 
 export function useApplySuggestion(input: ApplyChoice): Suggestion | null {
+  const categories = useCategories();
   const suggestion = useQuery(suggestionQuery(input));
   const transferHint = useQuery(transferHintQuery(input));
   const suggestionKey = [
@@ -123,7 +124,7 @@ export function useApplySuggestion(input: ApplyChoice): Suggestion | null {
   const hintReady = input.amount === null || input.amount === 0 || transferHint.isSuccess || transferHint.isError;
   if (!input.touched && suggestion.data && hintReady && suggestionKey !== seenSuggestion) {
     setSeenSuggestion(suggestionKey);
-    const categoryKind = input.categories.find((category) => category.id === suggestion.data?.categoryId)?.kind ?? null;
+    const categoryKind = categories.find((category) => category.id === suggestion.data?.categoryId)?.kind ?? null;
     const resolved = resolveEditorChoice({
       direction: input.direction,
       suggestion: suggestion.data,

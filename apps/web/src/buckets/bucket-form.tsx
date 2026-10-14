@@ -1,21 +1,18 @@
 import {
+  bucketKinds,
   bucketWriteSchema,
   fromMinorUnits,
   toMinorUnits,
   type Bucket,
-  type BucketColor,
-  type BucketIcon,
-  type BucketKind,
-  type Category,
-  type SinkingRepeat,
 } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { ChevronRight, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { BucketPickers } from "@/buckets/bucket-pickers";
-import { requestError, today } from "@/buckets/format";
+import { localAsOf } from "@/as-of";
+import { requestError } from "@/buckets/format";
 import { bucketOptionsQuery, useCreateBucket, useUpdateBucket } from "@/api/buckets";
-import { categoryOptionsQuery } from "@/api/categories";
+import { choiceIn } from "@/components/choice";
 import { ChoiceCard } from "@/components/choice-card";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -28,54 +25,51 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
+import { useActiveBuckets, useBookCurrency, useCategories, useCategoryNames } from "@/editors/lookups";
+import { ChoiceSelect } from "@/components/choice-select";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-
-type BucketFormProps = {
-  currency: string;
-  draft: Bucket | "new";
-  nextColor: BucketColor;
-  suggestedPriority: number;
-  onClose: () => void;
-  onSaved: (id: string) => void;
-};
 
 type GoalMode = "date" | "paycheck";
 
-function money(currency: string, minor: number | null): string {
+function money(currency: string, minor: number | null) {
   if (minor === null) {
     return "";
   }
   return fromMinorUnits(currency, minor);
 }
 
-function readMoney(currency: string, text: string): number {
+function readMoney(currency: string, text: string) {
   return toMinorUnits(currency, text.trim());
 }
 
-export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSaved }: BucketFormProps) {
+/** The form of a bucket. A new bucket gets the next colour of the rotation and the priority after the last active bucket. */
+export function BucketForm({ draft }: { draft: Bucket | "new" }) {
+  const { close } = useEditorFrame();
+  const currency = useBookCurrency();
+  const board = useActiveBuckets();
   const current = draft === "new" ? null : draft;
   const [name, setName] = useState(current?.name ?? "");
-  const [kind, setKind] = useState<BucketKind>(current?.kind ?? "spending");
-  const [color, setColor] = useState<BucketColor>(current?.color ?? nextColor);
-  const [icon, setIcon] = useState<BucketIcon>(current?.icon ?? "shopping-cart");
-  const [categoryIds, setCategoryIds] = useState<string[]>(current?.categoryIds ?? []);
-  const [startDate, setStartDate] = useState(current?.startDate ?? today());
+  const [kind, setKind] = useState(current?.kind ?? "spending");
+  const [color, setColor] = useState(current?.color ?? board.nextColor);
+  const [icon, setIcon] = useState(current?.icon ?? "shopping-cart");
+  const [categoryIds, setCategoryIds] = useState(current?.categoryIds ?? []);
+  const [startDate, setStartDate] = useState(current?.startDate ?? localAsOf());
   const [refillTo, setRefillTo] = useState(money(currency, current?.refillTo ?? null));
   const [amount, setAmount] = useState(money(currency, current?.amount ?? null));
   const [dueDate, setDueDate] = useState(current?.dueDate ?? "");
-  const [repeat, setRepeat] = useState<SinkingRepeat>(current?.repeat ?? "none");
+  const [repeat, setRepeat] = useState(current?.repeat ?? "none");
   const [target, setTarget] = useState(money(currency, current?.target ?? null));
   const [targetDate, setTargetDate] = useState(current?.targetDate ?? "");
   const [fixedAmount, setFixedAmount] = useState(money(currency, current?.fixedAmount ?? null));
   const [goalMode, setGoalMode] = useState<GoalMode>(current?.fixedAmount !== null && current?.fixedAmount !== undefined ? "paycheck" : "date");
-  const [priority, setPriority] = useState(String(current?.priority ?? suggestedPriority));
+  const [priority, setPriority] = useState(() => String(current?.priority ?? board.items.reduce((max, item) => Math.max(max, item.priority), 0) + 1));
   const [essential, setEssential] = useState(current?.essential ?? false);
   const [more, setMore] = useState(Boolean(current?.essential));
   const [invalid, setInvalid] = useState<string | null>(null);
@@ -85,18 +79,6 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
   const error = invalid ?? (failure ? requestError(failure, "The bucket did not save. Try again.") : null);
   const saving = create.isPending || update.isPending;
 
-  const categories = useQuery(categoryOptionsQuery());
-  const used = useQuery(bucketOptionsQuery());
-
-  const taken = new Set(
-    (used.data ?? [])
-      .filter((bucket) => bucket.id !== current?.id)
-      .flatMap((bucket) => bucket.categoryIds),
-  );
-  const expense = (categories.data ?? []).filter(
-    (category) => category.kind === "expense" && (!category.archivedAt || categoryIds.includes(category.id)),
-  );
-  const choices = expense.filter((category) => !taken.has(category.id) || categoryIds.includes(category.id));
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -130,11 +112,11 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
       return;
     }
     setInvalid(null);
-    const done = { onSuccess: (saved: { id: string }) => onSaved(saved.id) };
+    const done = { onSuccess: (saved: { id: string }) => close(saved.id) };
     if (current) {
       update.mutate({ id: current.id, body: parsed.data }, done);
     } else {
-      create.mutate({ asOf: today(), body: parsed.data }, done);
+      create.mutate({ asOf: localAsOf(), body: parsed.data }, done);
     }
   }
 
@@ -151,7 +133,16 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
       </Field>
       <Field>
         <FieldLabel>Kind</FieldLabel>
-        <RadioGroup value={kind} onValueChange={(value) => setKind(value as BucketKind)} className="grid gap-2">
+        <RadioGroup
+          value={kind}
+          className="grid gap-2"
+          onValueChange={(value) => {
+            const next = choiceIn(bucketKinds, value);
+            if (next) {
+              setKind(next);
+            }
+          }}
+        >
           <ChoiceCard value="spending" title="Spending" description="Filled up to an amount. What is left carries over." />
           <ChoiceCard value="sinking" title="Saving for a bill" description="Set aside an amount by a due date." />
           <ChoiceCard value="goal" title="Goal" description="Save toward a target." />
@@ -175,15 +166,15 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
           </Field>
           <Field>
             <FieldLabel htmlFor="bucket-repeat">Repeat</FieldLabel>
-            <Select value={repeat} onValueChange={(value) => setRepeat(value as SinkingRepeat)}>
-              <SelectTrigger id="bucket-repeat" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">One time</SelectItem>
-                <SelectItem value="yearly">Every year</SelectItem>
-              </SelectContent>
-            </Select>
+            <ChoiceSelect
+              id="bucket-repeat" className="w-full"
+              value={repeat}
+              options={[
+                { value: "none", label: "One time" },
+                { value: "yearly", label: "Every year" },
+              ]}
+              onValueChange={setRepeat}
+            />
           </Field>
         </>
       ) : null}
@@ -195,15 +186,15 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
           </Field>
           <Field>
             <FieldLabel htmlFor="bucket-goal-mode">How to save</FieldLabel>
-            <Select value={goalMode} onValueChange={(value) => setGoalMode(value as GoalMode)}>
-              <SelectTrigger id="bucket-goal-mode" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="date">By a date</SelectItem>
-                <SelectItem value="paycheck">A set amount each paycheck</SelectItem>
-              </SelectContent>
-            </Select>
+            <ChoiceSelect
+              id="bucket-goal-mode" className="w-full"
+              value={goalMode}
+              options={[
+                { value: "date", label: "By a date" },
+                { value: "paycheck", label: "A set amount each paycheck" },
+              ]}
+              onValueChange={setGoalMode}
+            />
           </Field>
           {goalMode === "date" ? (
             <Field>
@@ -219,11 +210,7 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
         </>
       ) : null}
       <BucketPickers color={color} icon={icon} suggest={current === null} onColor={setColor} onIcon={setIcon} />
-      <CategoryField
-        categories={choices}
-        selected={categoryIds}
-        onChange={setCategoryIds}
-      />
+      <CategoryField bucketId={current?.id ?? null} selected={categoryIds} onChange={setCategoryIds} />
       <Field>
         <FieldLabel htmlFor="bucket-start">Start date</FieldLabel>
         <DateField id="bucket-start" value={startDate} required onChange={setStartDate} />
@@ -262,18 +249,16 @@ export function BucketForm({ currency, draft, nextColor, suggestedPriority, onSa
   );
 }
 
-function CategoryField({
-  categories,
-  selected,
-  onChange,
-}: {
-  categories: Category[];
-  selected: string[];
-  onChange: (ids: string[]) => void;
-}) {
+/** The expense categories of the bucket. The field offers the active expense categories that are not in a different bucket. */
+function CategoryField({ bucketId, selected, onChange }: { bucketId: string | null; selected: string[]; onChange: (ids: string[]) => void }) {
   const [open, setOpen] = useState(false);
-  const names = new Map(categories.map((category) => [category.id, category.name]));
-  const remaining = categories.filter((category) => !selected.includes(category.id) && !category.archivedAt);
+  const categories = useCategories();
+  const names = useCategoryNames();
+  const { data: buckets } = useSuspenseQuery(bucketOptionsQuery());
+  const taken = new Set(buckets.filter((bucket) => bucket.id !== bucketId).flatMap((bucket) => bucket.categoryIds));
+  const remaining = categories.filter(
+    (category) => category.kind === "expense" && !category.archivedAt && !taken.has(category.id) && !selected.includes(category.id),
+  );
 
   return (
     <Field>

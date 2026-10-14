@@ -1,4 +1,5 @@
 import type { InsightRow } from "@num/shared";
+import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
 import { neutralTone, rowKey, type SliceColor } from "@/insights/slice-colors";
 
@@ -7,18 +8,17 @@ const outer = 104;
 const inner = 66;
 const center = size / 2;
 
-function point(radius: number, turn: number): string {
+function point(radius: number, turn: number) {
   const angle = turn * 2 * Math.PI - Math.PI / 2;
   return `${(center + radius * Math.cos(angle)).toFixed(2)} ${(center + radius * Math.sin(angle)).toFixed(2)}`;
 }
 
-function arc(start: number, end: number): string {
+function arc(start: number, end: number) {
   const large = end - start > 0.5 ? 1 : 0;
   return `M${point(outer, start)}A${outer} ${outer} 0 ${large} 1 ${point(outer, end)}L${point(inner, end)}A${inner} ${inner} 0 ${large} 0 ${point(inner, start)}Z`;
 }
 
 type SpendDonutProps = {
-  currency: string;
   rows: InsightRow[];
   colors: Map<string, SliceColor>;
   label: (row: InsightRow) => string;
@@ -28,7 +28,8 @@ type SpendDonutProps = {
   onSelect: (row: InsightRow) => void;
 };
 
-export function SpendDonut({ currency, rows, colors, label, centerLabel, selectedKey, canSelect, onSelect }: SpendDonutProps) {
+export function SpendDonut({ rows, colors, label, centerLabel, selectedKey, canSelect, onSelect }: SpendDonutProps) {
+  const currency = useBookCurrency();
   const slices = rows.filter((row) => row.amount > 0);
   const total = slices.reduce((sum, row) => sum + row.amount, 0);
   const starts = slices.map((_, position) => slices.slice(0, position).reduce((sum, row) => sum + row.amount, 0) / total);

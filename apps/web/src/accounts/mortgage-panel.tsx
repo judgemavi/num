@@ -1,12 +1,14 @@
 import { milliPctToPercent, Temporal, toMinorUnits } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { useDeferredValue, useState } from "react";
 import { mortgageViewQuery } from "@/api/mortgage";
 import { frequencyLabels } from "@/accounts/mortgage-format";
 import { MortgageSchedule } from "@/accounts/mortgage-schedule";
 import { useEditors } from "@/editors/editor-api";
+import { useBookCurrency } from "@/editors/lookups";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
+import { Boundary } from "@/components/boundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -14,34 +16,35 @@ import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/money";
 
-function formatDay(iso: string): string {
+function formatDay(iso: string) {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function MortgagePanel({ accountId, currency }: { accountId: string; currency: string }) {
+export function MortgagePanel({ accountId }: { accountId: string }) {
+  return (
+    <Boundary loading="Loading the mortgage." failed="The mortgage did not load.">
+      <MortgageView accountId={accountId} />
+    </Boundary>
+  );
+}
+
+function MortgageView({ accountId }: { accountId: string }) {
   const { openEditor } = useEditors();
-  const asOf = localAsOf();
+  const currency = useBookCurrency();
   const [extraText, setExtraText] = useState("");
   const [lumpText, setLumpText] = useState("");
   const [lumpDateText, setLumpDateText] = useState("");
-  const [extra, setExtra] = useState(0);
-  const [lumpSum, setLumpSum] = useState(0);
-  const [lumpDate, setLumpDate] = useState("");
+  const [effect, setEffect] = useState({ extra: 0, lumpSum: 0, lumpDate: "" });
   const [extraError, setExtraError] = useState<string | null>(null);
 
-  const view = useQuery(mortgageViewQuery(accountId, asOf, { extra, lumpSum, lumpDate }));
+  // The schedule on the screen stays while the schedule with a new extra amount loads.
+  const { data: row } = useSuspenseQuery(mortgageViewQuery(accountId, localAsOf(), useDeferredValue(effect)));
 
   function openTerms() {
     void openEditor("account", { id: accountId });
   }
 
-  if (view.isPending) {
-    return <p className="text-muted-foreground">Loading the mortgage.</p>;
-  }
-  if (view.isError) {
-    return <p>The mortgage did not load.</p>;
-  }
-  if (!view.data) {
+  if (!row) {
     return (
       <Card>
         <CardHeader className="px-5 pt-5 pb-0">
@@ -54,10 +57,9 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
     );
   }
 
-  const row = view.data;
   const rate = `${milliPctToPercent(row.rateMilliPct)}%`;
 
-  function readExtra(text: string): number | null {
+  function readExtra(text: string) {
     if (text.trim().length === 0) {
       return 0;
     }
@@ -85,9 +87,7 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
       setExtraError("Enter the one-time extra and its date.");
       return;
     }
-    setExtra(perPayment);
-    setLumpSum(once);
-    setLumpDate(lumpDateText);
+    setEffect({ extra: perPayment, lumpSum: once, lumpDate: lumpDateText });
   }
 
   return (
@@ -100,7 +100,7 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
       </CardHeader>
       <CardContent className="grid gap-4 px-5 pt-4 pb-5">
         <p className="text-sm">
-          Balance <Amount currency={currency} minor={row.balance} owed />
+          Balance <Amount minor={row.balance} owed />
           <span className="text-muted-foreground"> · {rate} · {frequencyLabels[row.paymentFrequency]}</span>
         </p>
         {row.payoffDate ? (
@@ -113,7 +113,7 @@ export function MortgagePanel({ accountId, currency }: { accountId: string; curr
         ) : (
           <p className="text-sm">This payment does not pay off the loan.</p>
         )}
-        <MortgageSchedule currency={currency} asOf={asOf} payments={row.payments} actuals={row.actualPayments} />
+        <MortgageSchedule payments={row.payments} actuals={row.actualPayments} />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="mortgage-extra">Extra on each payment</FieldLabel>

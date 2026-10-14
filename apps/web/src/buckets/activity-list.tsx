@@ -1,19 +1,16 @@
-import type { Bucket, BucketEvent } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import type { BucketEvent } from "@num/shared";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { bucketEventsQuery, useUndoBucketEvent } from "@/api/buckets";
 import { errorCode } from "@/api/client";
 import { bucketError, formatDate } from "@/buckets/format";
+import { useBucketBoard } from "@/buckets/use-board";
 import { useEditors } from "@/editors/editor-api";
+import { useBucketNames } from "@/editors/lookups";
 import { Amount } from "@/components/amount";
+import { Boundary } from "@/components/boundary";
 import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
-import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-
-type ActivityListProps = {
-  currency: string;
-  buckets: Bucket[];
-};
 
 const kindLabel = {
   fund: "Fund",
@@ -21,9 +18,21 @@ const kindLabel = {
   release: "Release",
 } as const;
 
-export function ActivityList({ currency, buckets }: ActivityListProps) {
+export function ActivityList() {
+  return (
+    <Boundary loading="Loading activity." failed="The activity did not load.">
+      <Activity />
+    </Boundary>
+  );
+}
+
+function Activity() {
   const { confirm } = useEditors();
-  const events = useQuery(bucketEventsQuery());
+  // The active buckets and the buckets of the list on the screen have a name here. The archived list adds the archived buckets.
+  const activeNames = useBucketNames();
+  const shown = useBucketBoard().board.items;
+  const nameOf = (id: string) => activeNames.get(id) ?? shown.find((bucket) => bucket.id === id)?.name ?? "Bucket";
+  const { data: events } = useSuspenseQuery(bucketEventsQuery());
   const undoEvent = useUndoBucketEvent();
 
   async function undo(event: BucketEvent) {
@@ -37,22 +46,6 @@ export function ActivityList({ currency, buckets }: ActivityListProps) {
     }
   }
 
-  if (events.isPending) {
-    return <p className="text-muted-foreground">Loading activity.</p>;
-  }
-  if (events.isError || !events.data) {
-    return (
-      <div className="grid gap-3">
-        <p>The activity did not load.</p>
-        <Button type="button" onClick={() => void events.refetch()}>
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
-  const names = new Map(buckets.map((bucket) => [bucket.id, bucket.name]));
-
   return (
     <>
       {undoEvent.error ? (
@@ -61,12 +54,12 @@ export function ActivityList({ currency, buckets }: ActivityListProps) {
         </p>
       ) : null}
       <ListCard label="Activity">
-        {events.data.length === 0 ? (
+        {events.length === 0 ? (
           <p className="px-5 py-5 text-muted-foreground">No activity yet.</p>
         ) : (
-          events.data.map((event) => {
-            const from = names.get(event.bucketId) ?? "Bucket";
-            const to = event.otherBucketId ? (names.get(event.otherBucketId) ?? "Bucket") : null;
+          events.map((event) => {
+            const from = nameOf(event.bucketId);
+            const to = event.otherBucketId ? nameOf(event.otherBucketId) : null;
             const detail =
               event.kind === "move" && to ? `${from} to ${to} · ${formatDate(event.date)}` : `${from} · ${formatDate(event.date)}`;
             return (
@@ -79,7 +72,7 @@ export function ActivityList({ currency, buckets }: ActivityListProps) {
                   </small>
                 </div>
                 <div className={listAmt}>
-                  <Amount currency={currency} minor={event.amount} />
+                  <Amount minor={event.amount} />
                 </div>
                 {event.fundingRunId ? null : (
                   <RowMenu label={`Actions for ${kindLabel[event.kind]}`}>

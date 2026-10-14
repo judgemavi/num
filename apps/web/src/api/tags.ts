@@ -1,33 +1,28 @@
 import type { TagListQuery } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
-import { activeAndArchived, allPages, fullPage } from "@/api/pages";
+import { activeAndArchived, allPages, fullPage, type ListFilters } from "@/api/pages";
 
-type TagSearch = Partial<Pick<TagListQuery, "archived" | "sort" | "dir">>;
-
-function loadTags(search: TagSearch) {
-  return allPages((page) => unwrap(api.tags.$get({ query: { archived: search.archived, sort: search.sort, dir: search.dir, page, pageSize: fullPage } })));
-}
-
-export function tagListQuery(search: TagSearch) {
+/** The Tags list. It reads all pages. The key has only the values that the request uses. */
+export function tagListQuery({ archived, sort, dir }: ListFilters<TagListQuery>) {
+  const filters = { archived, sort, dir };
   return queryOptions({
-    queryKey: ["tags", search],
-    queryFn: () => loadTags(search),
+    queryKey: ["tags", filters],
+    queryFn: () => allPages((page) => unwrap(api.tags.$get({ query: { ...filters, page, pageSize: fullPage } }))),
   });
 }
 
 export function tagOptionsQuery() {
   return queryOptions({
     queryKey: ["tags", "options"],
-    queryFn: () => activeAndArchived(loadTags),
+    queryFn: ({ client }) => activeAndArchived((archived) => client.fetchQuery(tagListQuery({ archived }))),
   });
 }
 
-export function tagQuery(id: string | null) {
+export function tagQuery(id: string) {
   return queryOptions({
     queryKey: ["tag", id],
-    enabled: id !== null,
-    queryFn: () => unwrap(api.tags[":id"].$get({ param: { id: id ?? "" } })),
+    queryFn: () => unwrap(api.tags[":id"].$get({ param: { id } })),
   });
 }
 

@@ -32,11 +32,11 @@ type SubmitInput = {
 
 type BuildResult = { ok: true; save: TransactionSave } | { ok: false; error: string };
 
-function sameTags(a: string[], b: string[]): boolean {
+function sameTags(a: string[], b: string[]) {
   return a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 }
 
-function unchanged(existing: Transaction, body: TransactionWrite): boolean {
+function unchanged(existing: Transaction, body: TransactionWrite) {
   if (
     existing.accountId !== body.accountId ||
     existing.date !== body.date ||
@@ -62,7 +62,7 @@ function unchanged(existing: Transaction, body: TransactionWrite): boolean {
   });
 }
 
-function hasOpenLine(lines: readonly { categoryId?: string | null; transferAccountId?: string | null }[]): boolean {
+function hasOpenLine(lines: readonly { categoryId?: string | null; transferAccountId?: string | null }[]) {
   return lines.some((line) => !line.categoryId && !line.transferAccountId);
 }
 

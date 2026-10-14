@@ -1,12 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Ellipsis, type LucideIcon } from "lucide-react";
+import { reviewSummaryQuery } from "@/api/review";
 import { setupStatusQuery } from "@/api/setup";
+import { localAsOf } from "@/as-of";
+import { Boundary } from "@/components/boundary";
 import { EditorHost } from "@/editors/editor-host";
-import { useReviewSummary } from "@/editors/lookups";
+import { useStartSharedLists } from "@/editors/lookups";
 import { moreNav, phoneMoreNav, primaryNav, settingsNav, type NavPath } from "@/nav";
 import { SetupScreen } from "@/setup-screen";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -107,7 +109,7 @@ function AppSidebar({ pathname, reviewCount }: { pathname: string; reviewCount?:
   );
 }
 
-function sidebarDefaultOpen(): boolean {
+function sidebarDefaultOpen() {
   const prefix = "sidebar_state=";
   const found = document.cookie.split("; ").find((part) => part.startsWith(prefix));
   if (!found) {
@@ -185,7 +187,9 @@ function PhoneTabs({ pathname, reviewCount }: { pathname: string; reviewCount?: 
 
 function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const review = useReviewSummary();
+  useStartSharedLists();
+  // The count is a detail of the navigation. The navigation shows before the count is known, with no badge.
+  const review = useQuery(reviewSummaryQuery(localAsOf()));
   return (
     <SidebarProvider defaultOpen={sidebarDefaultOpen()} className="h-svh overflow-hidden bg-background">
       <AppSidebar pathname={pathname} reviewCount={review.data?.total} />
@@ -199,22 +203,8 @@ function AppShell() {
   );
 }
 
-export function RootLayout() {
-  const setup = useQuery(setupStatusQuery());
-
-  if (setup.isPending) {
-    return <p className="mx-auto grid min-h-svh content-center px-4 text-muted-foreground">Loading setup.</p>;
-  }
-  if (setup.isError) {
-    return (
-      <div className="mx-auto grid min-h-svh w-full max-w-xl content-center gap-3 px-4">
-        <p>The setup status did not load.</p>
-        <Button type="button" onClick={() => void setup.refetch()}>
-          Try again
-        </Button>
-      </div>
-    );
-  }
+function Book() {
+  const setup = useSuspenseQuery(setupStatusQuery());
   if (!setup.data.complete) {
     return <SetupScreen onAlreadyComplete={() => void setup.refetch()} />;
   }
@@ -222,5 +212,13 @@ export function RootLayout() {
     <EditorHost>
       <AppShell />
     </EditorHost>
+  );
+}
+
+export function RootLayout() {
+  return (
+    <Boundary look="screen" loading="Loading setup." failed="The setup status did not load.">
+      <Book />
+    </Boundary>
   );
 }

@@ -1,24 +1,19 @@
-import type { Checkpoint } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { accountClass, type Checkpoint } from "@num/shared";
+import { useSuspenseQueries } from "@tanstack/react-query";
+import { accountQuery } from "@/api/accounts";
 import { checkpointListQuery, useUnlockCheckpoint } from "@/api/checkpoints";
 import { errorCode } from "@/api/client";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
+import { Boundary } from "@/components/boundary";
 import { ListCard, ListRow } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { formatDate } from "@/transactions/format";
 
-type CheckpointHistoryProps = {
-  accountId: string;
-  currency: string;
-  owed: boolean;
-};
-
-export function CheckpointHistory({ accountId, currency, owed }: CheckpointHistoryProps) {
+export function CheckpointHistory({ accountId }: { accountId: string }) {
   const { confirm } = useEditors();
-  const checkpoints = useQuery(checkpointListQuery(accountId));
   const unlockCheckpoint = useUnlockCheckpoint();
   const error = !unlockCheckpoint.error
     ? null
@@ -40,30 +35,9 @@ export function CheckpointHistory({ accountId, currency, owed }: CheckpointHisto
   return (
     <>
       <ListCard label="Checkpoints" title="Checkpoints">
-        {checkpoints.isPending ? <p className="px-5 py-5 text-muted-foreground">Loading checkpoints.</p> : null}
-        {checkpoints.isError ? <p className="px-5 py-5">The checkpoints did not load.</p> : null}
-        {checkpoints.data && checkpoints.data.length === 0 ? (
-          <p className="px-5 py-5 text-muted-foreground">No checkpoints yet.</p>
-        ) : null}
-        {checkpoints.data?.map((item) => (
-          <ListRow key={item.id} simple>
-            <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-              {formatDate(item.date)}
-              <small>Statement balance</small>
-            </div>
-            {item.unlockedAt ? <Badge variant="neutral">Unlocked</Badge> : null}
-            <div className="ml-auto text-right">
-              <Amount currency={currency} minor={item.statementBalance} owed={owed} />
-            </div>
-            {item.unlockedAt ? null : (
-              <RowMenu label={`Actions for the checkpoint on ${formatDate(item.date)}`}>
-                <DropdownMenuItem className="min-h-11" onSelect={() => void unlock(item)}>
-                  Unlock
-                </DropdownMenuItem>
-              </RowMenu>
-            )}
-          </ListRow>
-        ))}
+        <Boundary look="rows" loading="Loading checkpoints." failed="The checkpoints did not load.">
+          <CheckpointRows accountId={accountId} onUnlock={(item) => void unlock(item)} />
+        </Boundary>
       </ListCard>
       {error ? (
         <p role="alert" className="text-sm text-attn">
@@ -72,4 +46,32 @@ export function CheckpointHistory({ accountId, currency, owed }: CheckpointHisto
       ) : null}
     </>
   );
+}
+
+function CheckpointRows({ accountId, onUnlock }: { accountId: string; onUnlock: (item: Checkpoint) => void }) {
+  // The route starts the two reads together.
+  const [{ data: account }, { data: checkpoints }] = useSuspenseQueries({ queries: [accountQuery(accountId), checkpointListQuery(accountId)] });
+  const owed = accountClass(account.kind) === "liability";
+  if (checkpoints.length === 0) {
+    return <p className="px-5 py-5 text-muted-foreground">No checkpoints yet.</p>;
+  }
+  return checkpoints.map((item) => (
+    <ListRow key={item.id} simple>
+      <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
+        {formatDate(item.date)}
+        <small>Statement balance</small>
+      </div>
+      {item.unlockedAt ? <Badge variant="neutral">Unlocked</Badge> : null}
+      <div className="ml-auto text-right">
+        <Amount minor={item.statementBalance} owed={owed} />
+      </div>
+      {item.unlockedAt ? null : (
+        <RowMenu label={`Actions for the checkpoint on ${formatDate(item.date)}`}>
+          <DropdownMenuItem className="min-h-11" onSelect={() => onUnlock(item)}>
+            Unlock
+          </DropdownMenuItem>
+        </RowMenu>
+      )}
+    </ListRow>
+  ));
 }

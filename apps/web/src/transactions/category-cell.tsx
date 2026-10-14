@@ -1,18 +1,12 @@
 import type { TransactionListItem } from "@num/shared";
-import { targetText, type Names } from "@/transactions/names";
-
-function currentText(row: TransactionListItem, names: Names): string {
-  if (row.lines.length > 1) {
-    return "Split";
-  }
-  return targetText(row.lines[0] ?? { categoryId: null, transferAccountId: null }, names);
-}
+import { useTargetText } from "@/transactions/names";
 
 /** The Category column. The label and the merchant. */
-export function CategoryCell({ row, names }: { row: TransactionListItem; names: Names }) {
+export function CategoryCell({ row }: { row: TransactionListItem }) {
+  const targetText = useTargetText();
   return (
     <>
-      <div>{currentText(row, names)}</div>
+      <div>{row.lines.length > 1 ? "Split" : targetText(row.lines[0] ?? { categoryId: null, transferAccountId: null })}</div>
       {row.merchantName ? <div className="text-muted-foreground">{row.merchantName}</div> : null}
     </>
   );

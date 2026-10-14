@@ -5,21 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 export type FilterBadge = {
   key: string;
   label: string;
   onRemove: () => void;
-};
-
-export type FilterSort = {
-  id: string;
-  label: string;
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (value: string) => void;
 };
 
 type FilterSearch = {
@@ -39,7 +30,8 @@ type FilterBarProps = {
   onApply: () => void;
   onClear: () => void;
   onClearAll: () => void;
-  sort?: FilterSort;
+  /** The sort control of the list. */
+  sort?: ReactNode;
 };
 
 function FiltersButton({ count, ...props }: { count: number } & ComponentProps<typeof Button>) {
@@ -61,23 +53,6 @@ function PanelActions({ onApply, onClear }: { onApply: () => void; onClear: () =
         Apply
       </Button>
     </div>
-  );
-}
-
-function SortControl({ sort }: { sort: FilterSort }) {
-  return (
-    <Select value={sort.value} onValueChange={sort.onChange}>
-      <SelectTrigger id={sort.id} aria-label={sort.label} className="w-44">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {sort.options.map((option) => (
-          <SelectItem key={option.value} value={option.value} className="min-h-11">
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
 
@@ -154,9 +129,7 @@ export function FilterBar({
           </Popover>
         )}
         {sort ? (
-          <div className="ml-auto shrink-0">
-            <SortControl sort={sort} />
-          </div>
+          <div className="ml-auto shrink-0">{sort}</div>
         ) : null}
       </div>
       {badges.length > 0 ? (

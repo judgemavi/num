@@ -1,7 +1,7 @@
-import type { CategoryKind, ImportBatch, PlanKind } from "@num/shared";
+import type { BucketEventKind, CategoryKind, ImportBatch, PlanKind } from "@num/shared";
 import type { PlanSeed } from "@/recurring/plan-form";
-import type { RecordEditorKind } from "@/editors/edit-url";
 
+/** The input of each editor. `openEditor(kind, input)` and the editor component of that kind use the same type. */
 export type EditorInput = {
   transaction: {
     id: string | null;
@@ -20,26 +20,19 @@ export type EditorInput = {
   import: { accountId: string | null };
   reconcile: { accountId: string };
   fundPaycheck: { incomeTransactionId?: string };
-  assignMoney: { bucketId: string; kind: "fund" | "release" };
+  assignMoney: { bucketId: string; kind: Extract<BucketEventKind, "fund" | "release"> };
   moveMoney: { fromId: string | null };
   importInfo: Pick<ImportBatch, "filename" | "counts" | "unreadable">;
   mergeMerchant: { merchantId: string };
-  skipNext: { planId: string; asOf: string };
+  skipNext: { planId: string };
   skipOccurrence: { planId: string; dueDate: string };
   linkOccurrence: { planId: string; accountId: string; dueDate: string };
 };
 
 export type EditorKind = keyof EditorInput;
 
-export function isRecordKind(kind: EditorKind): kind is RecordEditorKind {
-  return (
-    kind === "transaction" ||
-    kind === "account" ||
-    kind === "category" ||
-    kind === "group" ||
-    kind === "tag" ||
-    kind === "merchant" ||
-    kind === "bucket" ||
-    kind === "plan"
-  );
-}
+/**
+ * An editor to open: the kind and the input of that kind. With no type argument it is the union of all kinds, and a
+ * check of `kind` gives the type of `input`. With a generic kind it keeps the kind and the input together.
+ */
+export type EditorFrame<K extends EditorKind = EditorKind> = { [P in K]: { kind: P; input: EditorInput[P] } }[K];

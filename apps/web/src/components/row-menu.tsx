@@ -18,7 +18,10 @@ export function RowMenu({ label, children }: { label: string; children: ReactNod
           <Ellipsis strokeWidth={1.8} aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">{children}</DropdownMenuContent>
+      {/* React sends a click in the menu to the row also. The row must not open when the person chooses an action. */}
+      <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+        {children}
+      </DropdownMenuContent>
     </DropdownMenu>
   );
 }

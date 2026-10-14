@@ -1,7 +1,8 @@
-import type { ComponentProps, FormEvent, KeyboardEvent, ReactNode } from "react";
+import type { ComponentProps, KeyboardEvent, ReactNode } from "react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
-import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEditorFrame } from "@/editors/editor-api";
 
 export const dialogFrameClass = "flex min-h-0 flex-1 flex-col overflow-hidden";
 
@@ -42,20 +43,13 @@ export function FormActions({ inline = false, children }: { inline?: boolean; ch
   return <DialogFooter>{children}</DialogFooter>;
 }
 
-export function FormCancel({ inline = false, onClose, children }: { inline?: boolean; onClose: () => void; children: ReactNode }) {
-  if (inline) {
-    return (
-      <Button type="button" variant="outline" onClick={onClose}>
-        {children}
-      </Button>
-    );
-  }
+/** The Cancel button of a form. It closes the frame that shows the form: the dialog or the inline place. */
+export function FormCancel({ children }: { children: ReactNode }) {
+  const { close } = useEditorFrame();
   return (
-    <DialogClose asChild>
-      <Button type="button" variant="outline">
-        {children}
-      </Button>
-    </DialogClose>
+    <Button type="button" variant="outline" onClick={() => close()}>
+      {children}
+    </Button>
   );
 }
 
@@ -75,7 +69,7 @@ export function FormShell({
     return (
       <form
         className={dialogFrameClass}
-        onSubmit={(event: FormEvent) => {
+        onSubmit={(event) => {
           event.preventDefault();
           onSubmit();
         }}

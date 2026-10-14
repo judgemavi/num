@@ -18,12 +18,11 @@ export function fundingPaychecksQuery() {
   });
 }
 
-/** The proposed amounts for one paycheck. The query waits until a paycheck is selected and `enabled` is true. */
-export function fundingProposalQuery(incomeTransactionId: string | null, asOf: string, enabled: boolean) {
+/** The proposed amounts for one paycheck. */
+export function fundingProposalQuery(incomeTransactionId: string, asOf: string) {
   return queryOptions({
     queryKey: ["funding-proposal", incomeTransactionId, asOf],
-    enabled: incomeTransactionId !== null && enabled,
-    queryFn: () => unwrap(api.funding.proposal.$get({ query: { asOf, incomeTransactionId: incomeTransactionId ?? "" } })),
+    queryFn: () => unwrap(api.funding.proposal.$get({ query: { asOf, incomeTransactionId } })),
   });
 }
 

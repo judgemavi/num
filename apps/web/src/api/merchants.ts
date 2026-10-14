@@ -1,33 +1,28 @@
 import type { MerchantListQuery } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
-import { activeAndArchived, allPages, fullPage } from "@/api/pages";
+import { activeAndArchived, allPages, fullPage, type ListFilters } from "@/api/pages";
 
-type MerchantSearch = Partial<Pick<MerchantListQuery, "archived" | "sort" | "dir">>;
-
-function loadMerchants(search: MerchantSearch) {
-  return allPages((page) => unwrap(api.merchants.$get({ query: { archived: search.archived, sort: search.sort, dir: search.dir, page, pageSize: fullPage } })));
-}
-
-export function merchantListQuery(search: MerchantSearch) {
+/** The Merchants list. It reads all pages. The key has only the values that the request uses. */
+export function merchantListQuery({ archived, sort, dir }: ListFilters<MerchantListQuery>) {
+  const filters = { archived, sort, dir };
   return queryOptions({
-    queryKey: ["merchants", search],
-    queryFn: () => loadMerchants(search),
+    queryKey: ["merchants", filters],
+    queryFn: () => allPages((page) => unwrap(api.merchants.$get({ query: { ...filters, page, pageSize: fullPage } }))),
   });
 }
 
 export function merchantOptionsQuery() {
   return queryOptions({
     queryKey: ["merchants", "options"],
-    queryFn: () => activeAndArchived(loadMerchants),
+    queryFn: ({ client }) => activeAndArchived((archived) => client.fetchQuery(merchantListQuery({ archived }))),
   });
 }
 
-export function merchantQuery(id: string | null) {
+export function merchantQuery(id: string) {
   return queryOptions({
     queryKey: ["merchant", id],
-    enabled: id !== null,
-    queryFn: () => unwrap(api.merchants[":id"].$get({ param: { id: id ?? "" } })),
+    queryFn: () => unwrap(api.merchants[":id"].$get({ param: { id } })),
   });
 }
 

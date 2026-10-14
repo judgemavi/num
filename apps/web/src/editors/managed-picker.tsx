@@ -1,5 +1,7 @@
 import { canOfferInlineCreate, finishInlineCreate } from "@num/shared";
 import { useState, type ReactNode } from "react";
+import { Boundary } from "@/components/boundary";
+import { EditorFrameContext } from "@/editors/editor-api";
 import { OptionCombobox, type Option, type OptionGroup } from "@/transactions/option-combobox";
 
 type ManagedPickerProps = {
@@ -16,8 +18,11 @@ type ManagedPickerProps = {
   onRestore?: (id: string) => void;
   onChange: (id: string | null) => void;
   depth?: number;
-  preserveOrder?: boolean;
-  renderForm?: (name: string, finish: (savedId: string | null) => void) => ReactNode;
+  /** The form that creates a new option, with the typed text as the name. The form closes through `useEditorFrame()`. */
+  renderForm?: (name: string) => ReactNode;
+  /** The option id of a record that the form created. Use it when the option ids are not the record ids. */
+  createdId?: (savedId: string) => string;
+  onCreated?: (option: Option) => void;
 };
 
 export function ManagedPicker({
@@ -34,8 +39,9 @@ export function ManagedPicker({
   onRestore,
   onChange,
   depth = 0,
-  preserveOrder,
   renderForm,
+  createdId = (savedId) => savedId,
+  onCreated,
 }: ManagedPickerProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const [added, setAdded] = useState<Option[]>([]);
@@ -43,6 +49,17 @@ export function ManagedPicker({
   const merged = [...options, ...extras];
   const mergedGroups = groups?.map((group, index) => (index === 0 ? { ...group, options: [...group.options, ...extras] } : group));
   const offer = Boolean(renderForm) && canOfferInlineCreate(depth);
+
+  /** The inline form closed. A saved record becomes the selected option. */
+  function finishCreate(savedId: string | null = null) {
+    if (savedId !== null && draft !== null) {
+      const option = { id: createdId(savedId), label: draft.trim().length > 0 ? draft.trim() : `New ${noun}` };
+      setAdded((current) => [...current, option]);
+      onCreated?.(option);
+      onChange(finishInlineCreate(value, option.id).selectedId);
+    }
+    setDraft(null);
+  }
 
   return (
     <div className="grid gap-3">
@@ -54,7 +71,6 @@ export function ManagedPicker({
         placeholder={placeholder}
         emptyLabel={emptyLabel}
         disabled={disabled}
-        preserveOrder={preserveOrder}
         archived={archived}
         onRestore={onRestore}
         create={offer ? { noun, suggestedName, onCreate: (name) => setDraft(name) } : undefined}
@@ -62,15 +78,11 @@ export function ManagedPicker({
       />
       {draft !== null && renderForm ? (
         <section className="grid gap-3 rounded-xl border border-border bg-card p-4">
-          {renderForm(draft, (savedId) => {
-            const result = finishInlineCreate(value, savedId);
-            if (savedId !== null) {
-              const label = draft.trim().length > 0 ? draft.trim() : `New ${noun}`;
-              setAdded((current) => [...current, { id: savedId, label }]);
-              onChange(result.selectedId);
-            }
-            setDraft(null);
-          })}
+          <EditorFrameContext value={{ close: finishCreate }}>
+            <Boundary look="panel" loading={`Loading the ${noun} form.`} failed={`The ${noun} form did not load.`}>
+              {renderForm(draft)}
+            </Boundary>
+          </EditorFrameContext>
         </section>
       ) : null}
     </div>

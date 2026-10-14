@@ -19,7 +19,7 @@ type CurrencyComboboxProps = {
   onChange: (code: CurrencyCode) => void;
 };
 
-function currencyLabel(code: string, names: Intl.DisplayNames | null): string {
+function currencyLabel(code: string, names: Intl.DisplayNames | null) {
   const name = names?.of(code);
   if (!name || name.toUpperCase() === code) {
     return code;

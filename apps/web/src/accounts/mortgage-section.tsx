@@ -1,20 +1,20 @@
-import { mortgageFirstPaymentOffPeriod, type Account, type Category, type Compounding, type PaymentFrequency } from "@num/shared";
+import { compounding, mortgageFirstPaymentOffPeriod, paymentFrequencies, type Account, type Category } from "@num/shared";
 import { ChevronRight } from "lucide-react";
 import { useArchiveAccount } from "@/api/accounts";
 import { useArchiveCategory } from "@/api/categories";
+import { AccountForm } from "@/accounts/account-form";
 import { accountLabel } from "@/accounts/label";
 import { compoundingLabels, frequencyLabels } from "@/accounts/mortgage-format";
 import { draftIsBlank, firstPaymentNotAfterOpening, type MortgageDraft } from "@/accounts/mortgage-draft";
 import { DateField } from "@/components/date-field";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChoiceSelect } from "@/components/choice-select";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { InlineAccount, InlineCategory } from "@/editors/inline-records";
-import { LoadingLine } from "@/editors/load-state";
 import { useAccounts, useCategories } from "@/editors/lookups";
 import { ManagedPicker } from "@/editors/managed-picker";
+import { CategoryForm } from "@/settings/category-form";
 
 export const mortgageTermsHelp = "Add the terms to see the payment schedule and to split each payment into interest and principal.";
 export const openingDateHelp = "Use the date of the last payment before the first payment in Num. Use the amount owed after that payment.";
@@ -29,13 +29,8 @@ type SectionProps = {
   onClear: () => void;
 };
 
-function isCompounding(value: string): value is Compounding {
-  return value === "monthly" || value === "semiannual";
-}
-
-function isFrequency(value: string): value is PaymentFrequency {
-  return value === "weekly" || value === "biweekly" || value === "semimonthly" || value === "monthly";
-}
+const compoundingOptions = compounding.map((value) => ({ value, label: compoundingLabels[value] }));
+const frequencyOptions = paymentFrequencies.map((value) => ({ value, label: frequencyLabels[value] }));
 
 function accountOptions(accounts: Account[]) {
   return accounts.map((account) => ({ id: account.id, label: accountLabel(account) }));
@@ -50,20 +45,14 @@ export function MortgageSection({ accountId, openingDate, draft, onChange, onCle
   const archiveCategory = useArchiveCategory();
   const accounts = useAccounts();
   const categories = useCategories();
-  if (accounts.isPending || categories.isPending) {
-    return <LoadingLine label="Loading the mortgage terms." />;
-  }
-  if (accounts.isError || categories.isError || !accounts.data || !categories.data) {
-    return <p className="text-sm">The mortgage terms did not load.</p>;
-  }
   const change = (patch: Partial<MortgageDraft>) => onChange({ ...draft, ...patch });
   const keep = (id: string) => id === draft.paymentAccountId || id === draft.propertyAccountId;
-  const others = accounts.data.filter((account) => account.id !== accountId);
+  const others = accounts.filter((account) => account.id !== accountId);
   const open = others.filter((account) => account.archivedAt === null || keep(account.id));
   const archivedAccounts = others.filter((account) => account.archivedAt !== null);
   const properties = open.filter((account) => account.kind === "property");
   const archivedProperties = archivedAccounts.filter((account) => account.kind === "property");
-  const expense = categories.data.filter((category) => category.kind === "expense");
+  const expense = categories.filter((category) => category.kind === "expense");
   const interest = expense.filter((category) => category.archivedAt === null || category.id === draft.interestCategoryId);
   const archivedInterest = expense.filter((category) => category.archivedAt !== null);
   const beforeOpening = firstPaymentNotAfterOpening(openingDate, draft);
@@ -89,16 +78,12 @@ export function MortgageSection({ accountId, openingDate, draft, onChange, onCle
             </Field>
             <Field>
               <FieldLabel htmlFor="mortgage-compounding">Compounded</FieldLabel>
-              <Select value={draft.compounding} onValueChange={(value) => { if (isCompounding(value)) change({ compounding: value }); }}>
-                <SelectTrigger id="mortgage-compounding" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(compoundingLabels) as Compounding[]).map((item) => (
-                    <SelectItem key={item} value={item}>{compoundingLabels[item]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ChoiceSelect
+                id="mortgage-compounding" className="w-full"
+                value={draft.compounding}
+                options={compoundingOptions}
+                onValueChange={(compounding) => change({ compounding })}
+              />
             </Field>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -108,16 +93,12 @@ export function MortgageSection({ accountId, openingDate, draft, onChange, onCle
             </Field>
             <Field>
               <FieldLabel htmlFor="mortgage-frequency">How often</FieldLabel>
-              <Select value={draft.frequency} onValueChange={(value) => { if (isFrequency(value)) change({ frequency: value }); }}>
-                <SelectTrigger id="mortgage-frequency" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(frequencyLabels) as PaymentFrequency[]).map((item) => (
-                    <SelectItem key={item} value={item}>{frequencyLabels[item]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ChoiceSelect
+                id="mortgage-frequency" className="w-full"
+                value={draft.frequency}
+                options={frequencyOptions}
+                onValueChange={(frequency) => change({ frequency })}
+              />
             </Field>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -147,7 +128,7 @@ export function MortgageSection({ accountId, openingDate, draft, onChange, onCle
               archived={accountOptions(archivedAccounts)}
               onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => change({ paymentAccountId: restored.id }) })}
               onChange={(id) => change({ paymentAccountId: id })}
-              renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
+              renderForm={(name) => <AccountForm inline account={null} initialName={name} />}
             />
           </Field>
           <Field>
@@ -161,7 +142,7 @@ export function MortgageSection({ accountId, openingDate, draft, onChange, onCle
               archived={categoryOptions(archivedInterest)}
               onRestore={(id) => archiveCategory.mutate({ id, restore: true }, { onSuccess: (restored) => change({ interestCategoryId: restored.id }) })}
               onChange={(id) => change({ interestCategoryId: id })}
-              renderForm={(name, finish) => <InlineCategory name={name} kind="expense" depth={1} onDone={finish} />}
+              renderForm={(name) => <CategoryForm inline depth={1} category={null} initialName={name} initialKind="expense" />}
             />
           </Field>
           <Field>
@@ -176,7 +157,7 @@ export function MortgageSection({ accountId, openingDate, draft, onChange, onCle
               archived={accountOptions(archivedProperties)}
               onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => change({ propertyAccountId: restored.id }) })}
               onChange={(id) => change({ propertyAccountId: id })}
-              renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
+              renderForm={(name) => <AccountForm inline account={null} initialName={name} />}
             />
           </Field>
           {draftIsBlank(draft) ? null : (

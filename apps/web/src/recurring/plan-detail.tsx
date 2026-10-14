@@ -1,12 +1,15 @@
 import type { Occurrence, Plan } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQueries } from "@tanstack/react-query";
+import { useDeferredValue } from "react";
 import { errorCode } from "@/api/client";
 import { occurrencesQuery, useRestoreOccurrence, useUnlinkOccurrence } from "@/api/recurring";
 import { inboxDecisionsQuery, useUndoDecision } from "@/api/review";
+import { localAsOf } from "@/as-of";
 import { useEditors } from "@/editors/editor-api";
 import { decisionText, inboxError } from "@/review/format";
 import { formatDate, planError } from "@/recurring/format";
 import { Amount } from "@/components/amount";
+import { Boundary } from "@/components/boundary";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ListCard, ListGroup, ListRow, listName } from "@/components/list-card";
@@ -15,12 +18,9 @@ import { SidePanel } from "@/components/side-panel";
 
 type PlanDetailProps = {
   plan: Plan;
-  currency: string;
-  asOf: string;
-  onEdit: () => void;
 };
 
-function statusText(item: Occurrence): string | null {
+function statusText(item: Occurrence) {
   if (item.status === "linked") {
     return "Linked";
   }
@@ -36,10 +36,20 @@ function statusText(item: Occurrence): string | null {
   return null;
 }
 
-export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
+export function PlanDetail(props: PlanDetailProps) {
+  return (
+    <Boundary loading="Loading occurrences." failed="The occurrences did not load.">
+      <PlanOccurrences {...props} />
+    </Boundary>
+  );
+}
+
+function PlanOccurrences({ plan: chosen }: PlanDetailProps) {
   const { openEditor } = useEditors();
-  const decisions = useQuery(inboxDecisionsQuery());
-  const occurrences = useQuery(occurrencesQuery(plan.id, asOf));
+  const asOf = localAsOf();
+  // The plan on the screen stays while the occurrences of a new plan load.
+  const plan = useDeferredValue(chosen);
+  const [{ data: decisions }, { data: occurrences }] = useSuspenseQueries({ queries: [inboxDecisionsQuery(), occurrencesQuery(plan.id, asOf)] });
   const unlink = useUnlinkOccurrence();
   const restore = useRestoreOccurrence();
   const undoDecision = useUndoDecision();
@@ -53,7 +63,7 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
     undoDecision.reset();
   }
 
-  const items = occurrences.data?.items ?? [];
+  const items = occurrences.items;
   const past = items.filter((item) => item.dueDate < asOf).slice(-8);
   const upcoming = items.filter((item) => item.dueDate >= asOf).slice(0, 8);
 
@@ -63,7 +73,7 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
     }
     return list.map((item) => {
       const keptKey = `recurring_changed:${plan.id}:${item.dueDate}`;
-      const kept = decisions.data?.some((row) => row.itemKey === keptKey && row.decision === "keep_plan_amount") ?? false;
+      const kept = decisions.some((row) => row.itemKey === keptKey && row.decision === "keep_plan_amount");
       const note = kept ? decisionText("keep_plan_amount") : statusText(item);
       return (
         <ListRow key={item.dueDate} simple>
@@ -73,7 +83,7 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
             {note ? <small>{note}</small> : null}
           </div>
           <div className="text-right">
-            <Amount currency={currency} minor={item.actualAmount ?? occurrences.data?.forecastAmount ?? plan.expectedAmount} />
+            <Amount minor={item.actualAmount ?? occurrences.forecastAmount} />
           </div>
           <RowMenu label={`Actions for ${formatDate(item.dueDate)}`}>
             {item.transactionId ? (
@@ -135,24 +145,20 @@ export function PlanDetail({ plan, currency, asOf, onEdit }: PlanDetailProps) {
         title={plan.name}
         text={plan.amountMode === "variable" ? "The amount changes each time. The forecast uses recent actuals." : "The amount stays the same."}
         action={
-          <Button type="button" variant="secondary" onClick={onEdit}>
+          <Button type="button" variant="secondary" onClick={() => void openEditor("plan", { id: plan.id })}>
             Edit recurring
           </Button>
         }
       >
-        {occurrences.data ? (
-          <div className="grid gap-1 text-sm">
-            <span className="text-muted-foreground">Forecast</span>
-            <Amount currency={currency} minor={occurrences.data.forecastAmount} />
-            {plan.amountMode === "variable" ? (
-              <span className="text-muted-foreground">
-                Safe amount <Amount currency={currency} minor={occurrences.data.safeAmount} />
-              </span>
-            ) : null}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">Loading occurrences.</p>
-        )}
+        <div className="grid gap-1 text-sm">
+          <span className="text-muted-foreground">Forecast</span>
+          <Amount minor={occurrences.forecastAmount} />
+          {plan.amountMode === "variable" ? (
+            <span className="text-muted-foreground">
+              Safe amount <Amount minor={occurrences.safeAmount} />
+            </span>
+          ) : null}
+        </div>
       </SidePanel>
       {error ? (
         <p role="alert" className="text-sm text-attn">

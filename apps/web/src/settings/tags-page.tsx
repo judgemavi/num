@@ -1,63 +1,37 @@
-import type { TagListQuery } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useState } from "react";
 import { errorCode } from "@/api/client";
 import { tagListQuery, useArchiveTag } from "@/api/tags";
-import { useEditors } from "@/editors/editor-api";
-import { FilterBar } from "@/components/filter-bar";
-import { sortChoice } from "@/components/sort-choice";
+import { ArchiveMenuItem } from "@/components/archive-menu-item";
+import { Boundary } from "@/components/boundary";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Switch } from "@/components/ui/switch";
+import { useEditors } from "@/editors/editor-api";
+import { ArchivedFilterBar } from "@/lists/archived-filter-bar";
+import { nameSortOptions } from "@/lists/list-search";
+import { useListSearch } from "@/lists/use-list-search";
 import { tagError } from "@/settings/format";
 import { SettingsBack } from "@/settings/settings-nav";
 
 const tagsRoute = getRouteApi("/settings/tags");
 
-const sortOptions = [
-  { value: "name:asc", label: "Name, A to Z" },
-  { value: "name:desc", label: "Name, Z to A" },
-];
-
-function applySort(value: string): Partial<TagListQuery> {
-  if (value === "name:asc") {
-    return { sort: undefined, dir: undefined };
-  }
-  return { sort: "name", dir: "desc" };
+export function TagsPage() {
+  return (
+    <Boundary loading="Loading tags." failed="The tags did not load.">
+      <Tags />
+    </Boundary>
+  );
 }
 
-export function TagsPage() {
-  const search = tagsRoute.useSearch();
-  const navigate = tagsRoute.useNavigate();
-  const { openEditor, confirm } = useEditors();
-  const [archived, setArchived] = useState(search.archived);
-  const tags = useQuery(tagListQuery({ archived: search.archived, sort: search.sort, dir: search.dir }));
+function Tags() {
+  const list = useListSearch(tagsRoute.useSearch(), tagsRoute.useNavigate(), { sort: "name", dir: "asc" });
+  const { openEditor } = useEditors();
+  // The list on the screen stays while the list for a new filter or a new sort order loads.
+  const { data: tags } = useSuspenseQuery(tagListQuery(list.shown));
   const archive = useArchiveTag();
-
-  function changeFilters(patch: Partial<TagListQuery>) {
-    void navigate({ search: { ...search, ...patch, page: 1 } });
-  }
-
-  if (tags.isPending) {
-    return <p className="text-muted-foreground">Loading tags.</p>;
-  }
-  if (tags.isError) {
-    return (
-      <div className="flex flex-col items-start gap-4">
-        <p>The tags did not load.</p>
-        <Button type="button" onClick={() => void tags.refetch()}>
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
-  const rows = tags.data?.items ?? [];
+  const rows = tags.items;
 
   return (
     <>
@@ -71,31 +45,7 @@ export function TagsPage() {
           </Button>
         }
       />
-      <FilterBar
-        activeCount={search.archived ? 1 : 0}
-        badges={search.archived ? [{ key: "archived", label: "Archived", onRemove: () => changeFilters({ archived: false }) }] : []}
-        onOpenChange={(open) => {
-          if (open) {
-            setArchived(search.archived);
-          }
-        }}
-        onApply={() => changeFilters({ archived })}
-        onClear={() => setArchived(false)}
-        onClearAll={() => changeFilters({ archived: false })}
-        sort={{
-          id: "tag-sort",
-          label: "Sort",
-          value: sortChoice(search.sort, search.dir, "name", "asc"),
-          options: sortOptions,
-          onChange: (value) => changeFilters(applySort(value)),
-        }}
-        fields={
-          <Field orientation="horizontal">
-            <Switch id="filter-archived-tags" checked={archived} onCheckedChange={setArchived} />
-            <FieldLabel htmlFor="filter-archived-tags">Show archived</FieldLabel>
-          </Field>
-        }
-      />
+      <ArchivedFilterBar list={list} switchId="filter-archived-tags" sortId="tag-sort" sortOptions={nameSortOptions} />
       {archive.error ? (
         <p role="alert" className="text-sm text-attn">
           {tagError(errorCode(archive.error))}
@@ -103,31 +53,21 @@ export function TagsPage() {
       ) : null}
       <ListCard label="Tags">
         {rows.length === 0 ? (
-          <p className="px-5 py-5 text-muted-foreground">{search.archived ? "No archived tags." : "No tags yet."}</p>
+          <p className="px-5 py-5 text-muted-foreground">{list.shown.archived ? "No archived tags." : "No tags yet."}</p>
         ) : (
           rows.map((tag) => (
             <ListRow key={tag.id} simple onOpen={() => void openEditor("tag", { id: tag.id })}>
               <div className={listName}>{tag.name}</div>
               <RowMenu label={`Actions for ${tag.name}`}>
-                <DropdownMenuItem
-                  className="min-h-11"
-                  onSelect={() => {
-                    const restore = tag.archivedAt !== null;
-                    void confirm({
-                      title: restore ? "Restore this tag?" : "Archive this tag?",
-                      description: restore
-                        ? `Restore ${tag.name}. It returns to the active list.`
-                        : `Archive ${tag.name}. It leaves the active list.`,
-                      confirmLabel: restore ? "Restore tag" : "Archive tag",
-                    }).then((ok) => {
-                      if (ok) {
-                        archive.mutate({ id: tag.id, restore });
-                      }
-                    });
-                  }}
-                >
-                  {tag.archivedAt ? "Restore" : "Archive"}
-                </DropdownMenuItem>
+                <ArchiveMenuItem
+                  archived={tag.archivedAt !== null}
+                  question={(restore) => ({
+                    title: restore ? "Restore this tag?" : "Archive this tag?",
+                    description: restore ? `Restore ${tag.name}. It returns to the active list.` : `Archive ${tag.name}. It leaves the active list.`,
+                    confirmLabel: restore ? "Restore tag" : "Archive tag",
+                  })}
+                  onConfirm={(restore) => archive.mutate({ id: tag.id, restore })}
+                />
               </RowMenu>
             </ListRow>
           ))

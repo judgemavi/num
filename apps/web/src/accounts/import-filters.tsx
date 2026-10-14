@@ -1,53 +1,37 @@
-import type { Account, ImportViewQuery, ImportViewStatus } from "@num/shared";
-import { useState } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { activeAccountsQuery } from "@/api/accounts";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
-import { sortChoice } from "@/components/sort-choice";
+import { ChoiceSelect } from "@/components/choice-select";
+import { SortSelect } from "@/lists/sort-select";
+import { useFilterDraft } from "@/lists/use-list-search";
+import { useImportSearch } from "@/accounts/use-import-search";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { DateField } from "@/components/date-field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { importStatusLabel } from "@/accounts/import-format";
 import { accountLabel } from "@/accounts/label";
 import { formatDate } from "@/transactions/format";
 import { OptionCombobox } from "@/transactions/option-combobox";
 
-type ImportFilterBarProps = {
-  search: ImportViewQuery;
-  accounts: Account[];
-  onChange: (patch: Partial<ImportViewQuery>) => void;
-};
-
-type Draft = {
-  accountId?: string;
-  status?: ImportViewStatus;
-  from?: string;
-  to?: string;
-};
-
-const anyStatus = "any";
-
 const sortOptions = [
-  { value: "date:desc", label: "Date, newest" },
-  { value: "date:asc", label: "Date, oldest" },
-];
+  { sort: "date", dir: "desc", label: "Date, newest" },
+  { sort: "date", dir: "asc", label: "Date, oldest" },
+] as const;
 
-function draftFrom(search: ImportViewQuery): Draft {
-  return {
-    accountId: search.accountId,
-    status: search.status,
-    from: search.from,
-    to: search.to,
-  };
-}
+const statusOptions = [
+  { value: "any", label: "Any status" },
+  { value: "imported", label: "Imported" },
+  { value: "undone", label: "Undone" },
+  { value: "needs_you", label: "Needs you" },
+] as const;
 
-function applySort(value: string): Partial<ImportViewQuery> {
-  if (value === "date:desc") {
-    return { sort: undefined, dir: undefined };
-  }
-  return { sort: "date", dir: "asc" };
-}
+/** The filters of the panel with no choice. */
+const noFilters = { accountId: undefined, status: undefined, from: undefined, to: undefined };
 
-export function ImportFilterBar({ search, accounts, onChange }: ImportFilterBarProps) {
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(search));
+/** The filter bar of the Imports list. It reads the filters from the URL and changes them there. */
+export function ImportFilterBar() {
+  const { search, sort, patch, setSort } = useImportSearch();
+  const { draft, changes, change, reset } = useFilterDraft(search);
+  const accounts = useSuspenseQuery(activeAccountsQuery()).data.items;
   const selectedAccount = accounts.find((account) => account.id === search.accountId);
   const accountName = selectedAccount ? accountLabel(selectedAccount) : undefined;
 
@@ -56,21 +40,21 @@ export function ImportFilterBar({ search, accounts, onChange }: ImportFilterBarP
     badges.push({
       key: "account",
       label: `Account: ${accountName}`,
-      onRemove: () => onChange({ accountId: undefined }),
+      onRemove: () => patch({ accountId: undefined }),
     });
   }
   if (search.status) {
     badges.push({
       key: "status",
       label: `Status: ${importStatusLabel(search.status)}`,
-      onRemove: () => onChange({ status: undefined }),
+      onRemove: () => patch({ status: undefined }),
     });
   }
   if (search.from) {
-    badges.push({ key: "from", label: `From: ${formatDate(search.from)}`, onRemove: () => onChange({ from: undefined }) });
+    badges.push({ key: "from", label: `From: ${formatDate(search.from)}`, onRemove: () => patch({ from: undefined }) });
   }
   if (search.to) {
-    badges.push({ key: "to", label: `To: ${formatDate(search.to)}`, onRemove: () => onChange({ to: undefined }) });
+    badges.push({ key: "to", label: `To: ${formatDate(search.to)}`, onRemove: () => patch({ to: undefined }) });
   }
 
   return (
@@ -79,19 +63,13 @@ export function ImportFilterBar({ search, accounts, onChange }: ImportFilterBarP
       badges={badges}
       onOpenChange={(open) => {
         if (open) {
-          setDraft(draftFrom(search));
+          reset();
         }
       }}
-      onApply={() => onChange(draft)}
-      onClear={() => setDraft({})}
-      onClearAll={() => onChange({ accountId: undefined, status: undefined, from: undefined, to: undefined })}
-      sort={{
-        id: "import-sort",
-        label: "Sort",
-        value: sortChoice(search.sort, search.dir, "date", "desc"),
-        options: sortOptions,
-        onChange: (value) => onChange(applySort(value)),
-      }}
+      onApply={() => patch(changes)}
+      onClear={() => change(noFilters)}
+      onClearAll={() => patch(noFilters)}
+      sort={<SortSelect id="import-sort" label="Sort" value={sort} options={sortOptions} onChange={setSort} />}
       fields={
         <>
           <Field>
@@ -102,37 +80,24 @@ export function ImportFilterBar({ search, accounts, onChange }: ImportFilterBarP
               options={accounts.map((account) => ({ id: account.id, label: accountLabel(account) }))}
               placeholder="Any account"
               emptyLabel="Any account"
-              onChange={(accountId) => setDraft({ ...draft, accountId: accountId ?? undefined })}
+              onChange={(accountId) => change({ accountId: accountId ?? undefined })}
             />
           </Field>
           <Field>
             <FieldLabel>Status</FieldLabel>
-            <Select
-              value={draft.status ?? anyStatus}
-              onValueChange={(value) =>
-                setDraft({
-                  ...draft,
-                  status: value === "imported" || value === "undone" || value === "needs_you" ? value : undefined,
-                })
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={anyStatus}>Any status</SelectItem>
-                <SelectItem value="imported">Imported</SelectItem>
-                <SelectItem value="undone">Undone</SelectItem>
-                <SelectItem value="needs_you">Needs you</SelectItem>
-              </SelectContent>
-            </Select>
+            <ChoiceSelect
+              className="w-full"
+              value={draft.status ?? "any"}
+              options={statusOptions}
+              onValueChange={(status) => change({ status: status === "any" ? undefined : status })}
+            />
           </Field>
           <Field>
             <FieldLabel htmlFor="import-filter-from">From</FieldLabel>
             <DateField
               id="import-filter-from"
               value={draft.from ?? ""}
-              onChange={(value) => setDraft({ ...draft, from: value || undefined })}
+              onChange={(value) => change({ from: value || undefined })}
             />
           </Field>
           <Field>
@@ -140,7 +105,7 @@ export function ImportFilterBar({ search, accounts, onChange }: ImportFilterBarP
             <DateField
               id="import-filter-to"
               value={draft.to ?? ""}
-              onChange={(value) => setDraft({ ...draft, to: value || undefined })}
+              onChange={(value) => change({ to: value || undefined })}
             />
           </Field>
         </>

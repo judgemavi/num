@@ -1,23 +1,21 @@
 import type { ImportBatch, ImportUndo } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { accountQuery } from "@/api/accounts";
 import { errorCode } from "@/api/client";
 import { accountImportsQuery, useUndoImport } from "@/api/imports";
 import { formatImportDate, formatStatementDate, importCountText, importError, undoBlockLabel } from "@/accounts/import-format";
+import { accountLabel } from "@/accounts/label";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
+import { Boundary } from "@/components/boundary";
 import { ListCard, ListRow } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
-type AccountImportsProps = {
-  accountId: string;
-  accountName: string;
-  currency: string;
-};
-
-export function AccountImports({ accountId, accountName, currency }: AccountImportsProps) {
-  const { openEditor, confirm } = useEditors();
-  const imports = useQuery(accountImportsQuery(accountId));
+/** The imports of one account. The parent reads the account first, thus the read of the account here does not wait. */
+export function AccountImports({ accountId }: { accountId: string }) {
+  const { confirm } = useEditors();
+  const { data: account } = useSuspenseQuery(accountQuery(accountId));
   const undoImport = useUndoImport();
   const error = undoImport.error ? importError(errorCode(undoImport.error)) : null;
 
@@ -52,7 +50,7 @@ export function AccountImports({ accountId, accountName, currency }: AccountImpo
                   {formatStatementDate(row.date)} · {row.payeeRaw || "No description"}
                 </p>
                 <p>
-                  <Amount currency={currency} minor={row.amount} /> · {undoBlockLabel(row.reason)}
+                  <Amount minor={row.amount} /> · {undoBlockLabel(row.reason)}
                 </p>
               </li>
             ))}
@@ -66,35 +64,10 @@ export function AccountImports({ accountId, accountName, currency }: AccountImpo
 
   return (
     <div className="grid gap-3">
-      <ListCard label={`Imports for ${accountName}`} title="Imports">
-        {imports.isPending ? <p className="px-5 py-4 text-muted-foreground">Loading imports.</p> : null}
-        {imports.isError ? <p className="px-5 py-4">The imports did not load.</p> : null}
-        {imports.data && imports.data.length === 0 ? (
-          <p className="px-5 py-4 text-muted-foreground">No imports yet.</p>
-        ) : null}
-        {imports.data?.map((item) => (
-          <ListRow
-            key={item.id}
-            simple
-            onOpen={() => void openEditor("importInfo", { filename: item.filename, counts: item.counts, unreadable: item.unreadable })}
-          >
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold">{formatImportDate(item.createdAt)}</p>
-              <p className="text-[13px] text-muted-foreground">
-                {item.filename ?? "Statement"}
-                {item.undoneAt ? " · Undone" : ""}
-              </p>
-            </div>
-            <p className="text-right text-[13px] text-muted-foreground">{importCountText(item.counts)}</p>
-            {item.undoneAt ? null : (
-              <RowMenu label={`Actions for the import on ${formatImportDate(item.createdAt)}`}>
-                <DropdownMenuItem className="min-h-11" onSelect={() => void undo(item)}>
-                  Undo
-                </DropdownMenuItem>
-              </RowMenu>
-            )}
-          </ListRow>
-        ))}
+      <ListCard label={`Imports for ${accountLabel(account)}`} title="Imports">
+        <Boundary look="rows" loading="Loading imports." failed="The imports did not load.">
+          <ImportRows accountId={accountId} onUndo={(item) => void undo(item)} />
+        </Boundary>
       </ListCard>
       {error ? (
         <p role="alert" className="text-sm text-attn">
@@ -103,4 +76,35 @@ export function AccountImports({ accountId, accountName, currency }: AccountImpo
       ) : null}
     </div>
   );
+}
+
+function ImportRows({ accountId, onUndo }: { accountId: string; onUndo: (item: ImportBatch) => void }) {
+  const { openEditor } = useEditors();
+  const { data: imports } = useSuspenseQuery(accountImportsQuery(accountId));
+  if (imports.length === 0) {
+    return <p className="px-5 py-4 text-muted-foreground">No imports yet.</p>;
+  }
+  return imports.map((item) => (
+    <ListRow
+      key={item.id}
+      simple
+      onOpen={() => void openEditor("importInfo", { filename: item.filename, counts: item.counts, unreadable: item.unreadable })}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">{formatImportDate(item.createdAt)}</p>
+        <p className="text-[13px] text-muted-foreground">
+          {item.filename ?? "Statement"}
+          {item.undoneAt ? " · Undone" : ""}
+        </p>
+      </div>
+      <p className="text-right text-[13px] text-muted-foreground">{importCountText(item.counts)}</p>
+      {item.undoneAt ? null : (
+        <RowMenu label={`Actions for the import on ${formatImportDate(item.createdAt)}`}>
+          <DropdownMenuItem className="min-h-11" onSelect={() => onUndo(item)}>
+            Undo
+          </DropdownMenuItem>
+        </RowMenu>
+      )}
+    </ListRow>
+  ));
 }

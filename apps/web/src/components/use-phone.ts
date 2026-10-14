@@ -1,16 +1,14 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const phoneQuery = "(max-width: 767px)";
 
+function subscribe(onChange: () => void) {
+  const media = window.matchMedia(phoneQuery);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+/** True when the window has the width of a phone. */
 export function usePhone() {
-  const [phone, setPhone] = useState(() => window.matchMedia(phoneQuery).matches);
-
-  useEffect(() => {
-    const media = window.matchMedia(phoneQuery);
-    const onChange = () => setPhone(media.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
-
-  return phone;
+  return useSyncExternalStore(subscribe, () => window.matchMedia(phoneQuery).matches);
 }

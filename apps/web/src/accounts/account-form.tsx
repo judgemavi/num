@@ -1,56 +1,52 @@
 import {
   accountClass,
-  accountCreateSchema,
   accountKinds,
-  accountUpdateSchema,
   allowsInterestRate,
   balanceFromEntry,
   entryFromBalance,
   defaultOnBudget,
   fromMinorUnits,
   milliPctToPercent,
+  paymentPolicies,
   percentToMilliPct,
-  Temporal,
   toMinorUnits,
   type Account,
   type AccountKind,
   type MortgageTerms,
-  type PaymentPolicy,
 } from "@num/shared";
 import { useState, type ReactNode } from "react";
 import { accountError, policyLabel } from "@/accounts/format";
-import { draftFromTerms, draftIsBlank, firstPaymentNotAfterOpening, termsFromDraft, type MortgageDraft } from "@/accounts/mortgage-draft";
+import { draftFromTerms, draftIsBlank, firstPaymentNotAfterOpening, termsFromDraft } from "@/accounts/mortgage-draft";
 import { MortgageSection, openingDateHelp } from "@/accounts/mortgage-section";
 import { KindPicker } from "@/accounts/kind-picker";
 import { sameClassKinds } from "@/accounts/groups";
-import type { useSaveAccount } from "@/api/accounts";
+import { useSaveAccount } from "@/api/accounts";
+import { localAsOf } from "@/as-of";
 import { errorCode } from "@/api/client";
+import { Boundary } from "@/components/boundary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
+import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
+import { useBookCurrency } from "@/editors/lookups";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChoiceSelect } from "@/components/choice-select";
 import { Switch } from "@/components/ui/switch";
 
 type AccountFormProps = {
   initialName?: string;
-  currency: string;
   account: Account | null;
   /** The saved terms of a mortgage account. Null when the account has none. */
   terms?: MortgageTerms | null;
   inline?: boolean;
   below?: ReactNode;
-  /** The save mutation of the parent. The parent stays on the screen until the save ends, thus `onSaved` always runs. */
-  save: ReturnType<typeof useSaveAccount>;
-  onClose: () => void;
-  onSaved: (id: string) => void;
 };
 
-function readAmount(currency: string, text: string, label: string): number {
+function readAmount(currency: string, text: string, label: string) {
   try {
     return toMinorUnits(currency, text.trim());
   } catch (error) {
@@ -61,7 +57,7 @@ function readAmount(currency: string, text: string, label: string): number {
   }
 }
 
-function readInterest(text: string): number | null {
+function readInterest(text: string) {
   if (text.trim().length === 0) {
     return null;
   }
@@ -75,28 +71,21 @@ function readInterest(text: string): number | null {
   }
 }
 
-function isKind(value: string): value is AccountKind {
-  return (accountKinds as readonly string[]).includes(value);
-}
+const policyOptions = paymentPolicies.map((value) => ({ value, label: policyLabel(value) }));
 
-function isPolicy(value: string): value is PaymentPolicy {
-  return value === "full" || value === "fixed" || value === "manual";
-}
-
-function localToday(): string {
-  return Temporal.Now.plainDateISO().toString();
-}
-
-export function AccountForm({ currency, account, terms = null, initialName, inline = false, below, save, onClose, onSaved }: AccountFormProps) {
+export function AccountForm({ account, terms = null, initialName, inline = false, below }: AccountFormProps) {
+  const { close } = useEditorFrame();
+  const currency = useBookCurrency();
+  const save = useSaveAccount();
   const [name, setName] = useState(account?.name ?? initialName ?? "");
   const [institution, setInstitution] = useState(account?.institution ?? "");
-  const [kind, setKind] = useState<AccountKind>(account?.kind ?? "chequing");
+  const [kind, setKind] = useState(account?.kind ?? "chequing");
   const [onBudget, setOnBudget] = useState(account?.onBudget ?? true);
-  const automaticDate = account?.automaticOpeningDate ?? localToday();
+  const automaticDate = account?.automaticOpeningDate ?? localAsOf();
   const [automatic, setAutomatic] = useState(account ? account.openingAutomatic : true);
   const [openingDate, setOpeningDate] = useState(account?.openingDate ?? automaticDate);
   const [openingBalance, setOpeningBalance] = useState(account ? fromMinorUnits(currency, entryFromBalance(account.kind, account.openingBalance)) : "");
-  const [paymentPolicy, setPaymentPolicy] = useState<PaymentPolicy | null>(account?.paymentPolicy ?? null);
+  const [paymentPolicy, setPaymentPolicy] = useState(account?.paymentPolicy ?? null);
   const [fixedPayment, setFixedPayment] = useState(
     account?.fixedPayment === null || account?.fixedPayment === undefined ? "" : fromMinorUnits(currency, account.fixedPayment),
   );
@@ -105,7 +94,7 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
       ? ""
       : milliPctToPercent(account.interestRateMilliPct),
   );
-  const [mortgage, setMortgage] = useState<MortgageDraft>(() => draftFromTerms(currency, terms));
+  const [mortgage, setMortgage] = useState(() => draftFromTerms(currency, terms));
   const [invalid, setInvalid] = useState<string | null>(null);
   const saving = save.isPending;
   const error = invalid ?? (save.error ? accountError(errorCode(save.error)) : null);
@@ -124,10 +113,7 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
     setOpeningDate(automaticDate);
   }
 
-  function changeKind(value: string) {
-    if (!isKind(value)) {
-      return;
-    }
+  function changeKind(value: AccountKind) {
     setKind(value);
     setOnBudget(defaultOnBudget(value));
     if (value !== "credit_card") {
@@ -139,18 +125,9 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
     }
   }
 
-  function saveInput(body: unknown) {
-    if (account) {
-      const parsed = accountUpdateSchema.safeParse(body);
-      return parsed.success ? { id: account.id, body: parsed.data } : null;
-    }
-    const parsed = accountCreateSchema.safeParse(body);
-    return parsed.success ? { id: null, body: parsed.data } : null;
-  }
-
   function onSubmit() {
     setInvalid(null);
-    let body: unknown;
+    let input;
     try {
       if (kind === "credit_card" && paymentPolicy === null) {
         setInvalid("Choose how you pay this card.");
@@ -178,7 +155,7 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
               paymentPolicy: null,
               fixedPayment: null,
             };
-      body = {
+      const body = {
         name,
         institution: institution.trim().length === 0 ? null : institution.trim(),
         kind,
@@ -196,17 +173,14 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
         ...card,
         ...(hasSection ? { mortgageTerms: termsFromDraft(currency, mortgage) } : {}),
       };
+      // The API checks the body. An answer with `invalid_body` shows "Check the account fields."
+      input = account ? { id: account.id, body } : { id: null, body };
     } catch (caught) {
       setInvalid(caught instanceof Error ? caught.message : "Check the account fields.");
       return;
     }
 
-    const input = saveInput(body);
-    if (!input) {
-      setInvalid("Check the account fields.");
-      return;
-    }
-    save.mutate(input, { onSuccess: (saved) => onSaved(saved.id) });
+    save.mutate(input, { onSuccess: (saved) => close(saved.id) });
   }
 
   return (
@@ -261,41 +235,33 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
           Leave the balance blank to start at 0. Num counts forward from this date.
         </p>
         {hasSection ? (
-          <MortgageSection
-            accountId={account?.id ?? null}
-            openingDate={openingDate}
-            draft={mortgage}
-            onChange={setMortgage}
-            onClear={() => setMortgage(draftFromTerms(currency, null))}
-          />
+          <Boundary look="panel" loading="Loading the mortgage terms." failed="The mortgage terms did not load.">
+            <MortgageSection
+              accountId={account?.id ?? null}
+              openingDate={openingDate}
+              draft={mortgage}
+              onChange={setMortgage}
+              onClear={() => setMortgage(draftFromTerms(currency, null))}
+            />
+          </Boundary>
         ) : null}
         {kind === "credit_card" ? (
           <>
             <Field>
               <FieldLabel htmlFor="payment-policy">How you pay</FieldLabel>
-              <Select
+              <ChoiceSelect
+                id="payment-policy"
+                className="w-full"
                 value={paymentPolicy ?? undefined}
+                placeholder="Choose how you pay"
+                options={policyOptions}
                 onValueChange={(value) => {
-                  if (!isPolicy(value)) {
-                    return;
-                  }
                   setPaymentPolicy(value);
                   if (value !== "fixed") {
                     setFixedPayment("");
                   }
                 }}
-              >
-                <SelectTrigger id="payment-policy" className="w-full">
-                  <SelectValue placeholder="Choose how you pay" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(["full", "fixed", "manual"] as const).map((policy) => (
-                    <SelectItem key={policy} value={policy}>
-                      {policyLabel(policy)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </Field>
             {paymentPolicy === "fixed" ? (
               <Field>
@@ -343,9 +309,7 @@ export function AccountForm({ currency, account, terms = null, initialName, inli
         {below}
         </DialogBody>
         <FormActions inline={inline}>
-          <FormCancel inline={inline} onClose={onClose}>
-            Cancel
-          </FormCancel>
+          <FormCancel>Cancel</FormCancel>
           <Button type={inline ? "button" : "submit"} disabled={saving} onClick={inline ? onSubmit : undefined}>
             {saving ? "Saving account" : account ? "Save account" : "Add account"}
           </Button>

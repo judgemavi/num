@@ -71,19 +71,67 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 - Calls from the web app to the API (decision 0032):
   - Use only the Hono RPC client (`api` in `apps/web/src/api/client.ts`). Do not call `fetch` in a component.
   - Put the query options and the mutation hooks in `apps/web/src/api/`, one file for each resource.
-  - A read is a `useQuery`. A write is a `useMutation`.
-  - Get the loading state and the error from the query or the mutation. Do not keep them in `useState`.
+  - A read is a `useSuspenseQuery` (or `useSuspenseQueries` for reads that start together). A write is a
+    `useMutation`. The data of a read is always defined. Do not write `isPending` or `isError` branches for a read,
+    and do not write a fallback value for data that is not loaded.
+  - A `Boundary` (`components/boundary.tsx`) shows the loading text and the error text with "Try again". Each screen
+    has one. The editor host has one. A card or a panel that loads by itself has its own.
+  - A component that reads data after a parent has read its data makes the reads wait in sequence. Start the read
+    earlier: `usePrefetchQuery` in the parent, or `prefetchQuery` in the loader of the route.
+  - A list keeps its rows on the screen while a new page, filter or sort order loads: read with
+    `useDeferredValue(search)`. Use the same method for a read that starts later from data in a form.
+  - Use `useQuery` with `skipToken` only for a read that follows the text that a person types in a form
+    (a suggestion). Do not use `enabled` with a placeholder id.
+  - Get the state and the error of a write from the mutation. Do not keep them in `useState`.
   - Do not call `invalidateQueries`. One rule in `main.tsx` invalidates all queries after each successful mutation.
+    The rule does not wait for the new data. A form closes when its write succeeds. The lists load again in the
+    background.
+    Exception: a mutation hook that deletes a record calls `removeQueries` for that record in its `mutationFn`.
+    Thus the rule does not read a record that is not in the book.
   - Do not parse a response body with Zod. The route gives its type.
-  - A callback in `mutate(...)` does not run if the component that called `useMutation` is removed before the
-    refetch ends. Call `useMutation` in a component that no query state can remove (example: `SingleEditor`).
+  - A component that does a write calls its own mutation hook. Do not pass a mutation as a prop.
+  - Do not stop a query to keep a form on the screen. An editor shows the loading line only for the first load.
+  - `main.tsx` sets the defaults of each read: no second request after an answer with an error code, one more
+    request after no answer, and data stays fresh for 30 seconds.
+- TypeScript and components (decision 0033):
+  - Types come from inference: Drizzle, Zod (`z.infer`), the Hono RPC client, `queryOptions` and the router.
+  - Do not declare a type that the compiler can infer.
+  - Do not use a cast (`as`) to get a type back. Correct the source of the type.
+  - A component that needs server data calls its own query. The query cache removes duplicate requests.
+  - A component that does a write calls its own mutation hook.
+  - Pass `children` or a slot to a component. Do not pass data through layers of components.
+  - Server data is not a prop. Do not pass the book currency, `asOf`, a shared list (accounts, categories, groups,
+    merchants, tags), a map of names or the result of a query to a component. The component that shows the value
+    reads it. A row can get its record from the list that makes the rows. A form can get the record that it changes.
+  - `Amount` reads the book currency. For a pure format function, get the currency with `useBookCurrency()`.
+  - Get today with `localAsOf()` (`as-of.ts`). Do not write a second function for today.
+  - Get a name from an id with the hooks in `editors/lookups.ts` (`useCategoryNames()` and the others). Do not make a
+    `Map` of names in a component.
+  - When more than one part of a screen shows the same read, each part calls the same hook for it
+    (`useInsightsReport()`). The screen starts the reads of its parts with `usePrefetchQuery`.
 - Use `Temporal.PlainDate` for calendar dates. Do not use `Date` for calendar dates.
 - Lists: one shared Zod query schema for the URL and the API. Follow decision 0004.
+  - A route gives its shared schema to `validateSearch`. The router infers the search types. Do not write a type or a
+    function for the search of a route. The root route validates `edit`.
+  - A link or a `navigate` call gives only the search values that are not the defaults.
+  - Each list has one hook that calls `useListSearch` (`lists/use-list-search.ts`) with the search and `navigate` of
+    its route and with its default sort order. The hook gives the list query (without `edit`), `patch`, the typed sort
+    functions and `setPage`. A filter bar and a sort control call the hook of their list. They do not get `search`
+    or `onChange` props.
+  - Use `useSearchText` for a search box, `useFilterDraft` for a filter panel, `useLastPage` with `ListPager` for the
+    pages, `SortSelect` for the sort control and `ArchiveMenuItem` for "Archive" and "Restore" in a row menu.
+  - The key of a list query has only the values that the request uses. `edit` is not in a key or in a request.
+- For a control with a fixed list of choices, use `ChoiceSelect` (`components/choice-select.tsx`) or `choiceIn`
+  (`components/choice.ts`). They give the type of the choices. Do not use a cast on the value of a control.
 
 ## Editors and dialogs
 
 - Follow `docs/design.md` §6b: one shared editor for each entity, one dialog host at the app root, `openEditor(...)`.
   Do not add a dialog inside a screen or a list row. Use the shared `confirm()`.
+- A form closes through `useEditorFrame()`: `close()` to cancel, `close(id)` after a save. The dialog host and the
+  inline place of a picker (`ManagedPicker`) each supply the frame. Do not pass `onClose` or `onSaved` props.
+- Each editor kind has one entry in `EditorInput` (`editors/editor-types.ts`) and one component in
+  `editors/editor-registry.tsx`. The input of the kind is the props of the component.
 
 ## Tests
 

@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
-import { listSearch, settingsAreas } from "@/settings/settings-areas";
+import { settingsAreas } from "@/settings/settings-areas";
 
 export function SettingsBack() {
   return (
@@ -21,11 +21,6 @@ export function SettingsSubnav() {
           <Link
             key={area.to}
             to={area.to}
-            search={
-              area.to === "/settings/categories" || area.to === "/settings/tags" || area.to === "/settings/merchants"
-                ? listSearch
-                : undefined
-            }
             aria-current={current ? "page" : undefined}
             className={`flex min-h-11 items-center rounded-xl px-3 font-semibold ${current ? "bg-primary-soft text-primary" : "hover:bg-sunken"}`}
           >

@@ -1,40 +1,32 @@
-import type { Plan } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQueries } from "@tanstack/react-query";
 import { useState } from "react";
 import { errorCode } from "@/api/client";
-import { occurrencesQuery, useSkipOccurrence } from "@/api/recurring";
+import { occurrencesQuery, planQuery, useSkipOccurrence } from "@/api/recurring";
+import { localAsOf } from "@/as-of";
 import { planError } from "@/recurring/format";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEditorFrame } from "@/editors/editor-api";
+import type { EditorInput } from "@/editors/editor-types";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-type SkipNextProps = {
-  plan: Plan;
-  reason: string;
-  asOf: string;
-  onReason: (value: string) => void;
-  onDone: () => void;
-};
-
-export function SkipNext({ plan, reason, asOf, onReason, onDone }: SkipNextProps) {
+export function SkipNext({ planId }: EditorInput["skipNext"]) {
+  const { close } = useEditorFrame();
+  const [reason, setReason] = useState("");
   const [nothingToSkip, setNothingToSkip] = useState(false);
-  const occurrences = useQuery(occurrencesQuery(plan.id, asOf));
+  const [{ data: plan }, { data: occurrences }] = useSuspenseQueries({ queries: [planQuery(planId), occurrencesQuery(planId, localAsOf())] });
   const skip = useSkipOccurrence();
-  const failure = occurrences.error ?? skip.error;
-  const error = nothingToSkip ? "There is no occurrence to skip." : failure ? planError(errorCode(failure)) : null;
+  const error = nothingToSkip ? "There is no occurrence to skip." : skip.error ? planError(errorCode(skip.error)) : null;
   return (
     <DialogForm
       onSubmit={(event) => {
         event.preventDefault();
-        if (!occurrences.data) {
-          return;
-        }
-        const next = occurrences.data.items.find((item) => item.status === "missed" || item.status === "open");
+        const next = occurrences.items.find((item) => item.status === "missed" || item.status === "open");
         setNothingToSkip(!next);
         if (next) {
-          skip.mutate({ planId: plan.id, dueDate: next.dueDate, reason: reason.trim() }, { onSuccess: onDone });
+          skip.mutate({ planId, dueDate: next.dueDate, reason: reason.trim() }, { onSuccess: () => close("ok") });
         }
       }}
     >
@@ -45,7 +37,7 @@ export function SkipNext({ plan, reason, asOf, onReason, onDone }: SkipNextProps
       <DialogBody>
         <Field>
           <FieldLabel htmlFor="skip-next-reason">Reason</FieldLabel>
-          <Input id="skip-next-reason" value={reason} onChange={(event) => onReason(event.target.value)} />
+          <Input id="skip-next-reason" value={reason} onChange={(event) => setReason(event.target.value)} />
         </Field>
         {error ? <FieldError>{error}</FieldError> : null}
       </DialogBody>
@@ -55,7 +47,7 @@ export function SkipNext({ plan, reason, asOf, onReason, onDone }: SkipNextProps
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" disabled={skip.isPending || occurrences.isPending || reason.trim().length === 0}>
+        <Button type="submit" disabled={skip.isPending || reason.trim().length === 0}>
           Skip
         </Button>
       </DialogFooter>

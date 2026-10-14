@@ -7,12 +7,12 @@ const plotHeight = chart.height - chart.top - chart.bottom;
 
 export type Point = { date: string; amount: number };
 
-function positive(value: number): number {
+function positive(value: number) {
   return value > 0 ? value : 0;
 }
 
 /** Rounds away from zero to two significant digits, so the axis labels are short. */
-function roundOut(value: number): number {
+function roundOut(value: number) {
   if (value === 0) {
     return 0;
   }
@@ -41,19 +41,19 @@ export function timelineScale(timeline: InsightTimeline) {
   const balanceTop = roundOut(high + pad);
   const balanceBottom = low < 0 ? roundOut(low - pad) : 0;
 
-  function bandX(month: number): number {
+  function bandX(month: number) {
     return chart.left + band * month;
   }
 
-  function barY(value: number): number {
+  function barY(value: number) {
     return chart.top + plotHeight * (1 - value / barTop);
   }
 
-  function balanceY(value: number): number {
+  function balanceY(value: number) {
     return chart.top + plotHeight * (1 - (value - balanceBottom) / Math.max(balanceTop - balanceBottom, 1));
   }
 
-  function dateX(date: string): number | null {
+  function dateX(date: string) {
     const month = index.get(date.slice(0, 7));
     if (month === undefined) {
       return null;
@@ -62,7 +62,7 @@ export function timelineScale(timeline: InsightTimeline) {
     return bandX(month) + (band * (day.day - 0.5)) / day.daysInMonth;
   }
 
-  function linePath(points: readonly Point[]): string {
+  function linePath(points: readonly Point[]) {
     let path = "";
     for (const point of points) {
       const x = dateX(point.date);

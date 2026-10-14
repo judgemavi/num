@@ -5,12 +5,11 @@ import {
   printedStatementBalance,
   storedStatementBalance,
   toMinorUnits,
-  type Account,
   type CheckpointCreate,
 } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQueries } from "@tanstack/react-query";
 import { useState } from "react";
-import { useSetOpeningBalance } from "@/api/accounts";
+import { accountQuery, useSetOpeningBalance } from "@/api/accounts";
 import { closingHintQuery, useCompareCheckpoint, useCreateCheckpoint } from "@/api/checkpoints";
 import { errorCode } from "@/api/client";
 import { Amount } from "@/components/amount";
@@ -22,41 +21,32 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useEditorFrame } from "@/editors/editor-api";
+import type { EditorInput } from "@/editors/editor-types";
+import { useBookCurrency } from "@/editors/lookups";
 import { DialogBody, DialogForm } from "@/editors/form-chrome";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { DateField } from "@/components/date-field";
 import { Input } from "@/components/ui/input";
 import { formatDate } from "@/transactions/format";
 
-type ReconcileDialogProps = {
-  account: Account;
-  currency: string;
-  onClose: () => void;
-};
-
-export function ReconcileDialog({ account, currency, onClose }: ReconcileDialogProps) {
-  const accountId = account.id;
+export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
+  const { close } = useEditorFrame();
+  const currency = useBookCurrency();
+  const [{ data: account }, { data: hint }] = useSuspenseQueries({ queries: [accountQuery(accountId), closingHintQuery(accountId)] });
   const kind = account.kind;
-  const [date, setDate] = useState("");
-  const [amount, setAmount] = useState("");
-  const [seeded, setSeeded] = useState(false);
+  // The form starts with the closing date and the closing balance of the last imported statement.
+  const closing = hint.closingDate !== null && hint.closingBalance !== null ? { date: hint.closingDate, balance: hint.closingBalance } : null;
+  const [date, setDate] = useState(closing?.date ?? "");
+  const [amount, setAmount] = useState(closing ? fromMinorUnits(currency, printedStatementBalance(kind, closing.balance)) : "");
   const [invalid, setInvalid] = useState(false);
   const check = useCompareCheckpoint();
   const create = useCreateCheckpoint();
   const opening = useSetOpeningBalance();
   const compare = check.data ?? null;
   const saving = check.isPending || create.isPending || opening.isPending;
-  const hint = useQuery(closingHintQuery(accountId));
 
-  if (!seeded && hint.data) {
-    if (hint.data.closingDate !== null && hint.data.closingBalance !== null) {
-      setDate(hint.data.closingDate);
-      setAmount(fromMinorUnits(currency, printedStatementBalance(kind, hint.data.closingBalance)));
-    }
-    setSeeded(true);
-  }
-
-  function parsedAmount(): number | null {
+  function parsedAmount() {
     try {
       return storedStatementBalance(kind, toMinorUnits(currency, amount.trim()));
     } catch {
@@ -97,7 +87,7 @@ export function ReconcileDialog({ account, currency, onClose }: ReconcileDialogP
     if (!payload || !compare?.balanced) {
       return;
     }
-    create.mutate({ accountId, body: payload }, { onSuccess: onClose, onError: () => check.reset() });
+    create.mutate({ accountId, body: payload }, { onSuccess: () => close(), onError: () => check.reset() });
   }
 
   function setOpening() {
@@ -108,7 +98,7 @@ export function ReconcileDialog({ account, currency, onClose }: ReconcileDialogP
     opening.mutate({ account, suggestion }, { onSuccess: checkBalance });
   }
 
-  function errorText(): string | null {
+  function errorText() {
     if (invalid) {
       return "Enter a statement date and balance.";
     }
@@ -185,8 +175,8 @@ export function ReconcileDialog({ account, currency, onClose }: ReconcileDialogP
         {compare && !compare.balanced ? (
           <div role="status" className="grid gap-3">
             <p className="text-sm">
-              The book is off by <Amount currency={currency} minor={compare.difference} />. The book balance is{" "}
-              <Amount currency={currency} minor={compare.calculatedBalance} owed={owed} />.
+              The book is off by <Amount minor={compare.difference} />. The book balance is{" "}
+              <Amount minor={compare.calculatedBalance} owed={owed} />.
             </p>
             {uncleared.length > 0 ? (
               <div>
@@ -194,7 +184,7 @@ export function ReconcileDialog({ account, currency, onClose }: ReconcileDialogP
                 <ul className="mt-1 grid gap-1 text-sm text-muted-foreground">
                   {uncleared.map((item) => (
                     <li key={item.id}>
-                      {item.payee} · {formatDate(item.date)} · <Amount currency={currency} minor={item.amount} />
+                      {item.payee} · {formatDate(item.date)} · <Amount minor={item.amount} />
                     </li>
                   ))}
                 </ul>

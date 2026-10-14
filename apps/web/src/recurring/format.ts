@@ -1,4 +1,4 @@
-import { fromMinorUnits, Temporal, type Plan, type PlanFrequency, type PlanKind } from "@num/shared";
+import { fromMinorUnits, Temporal, type Plan, type PlanFrequency, type PlanKind, type ErrorCode } from "@num/shared";
 
 const kindLabels: Record<PlanKind, string> = {
   income: "Income",
@@ -59,7 +59,7 @@ export function amountFromForm(kind: PlanKind, minor: number): number {
   return minor;
 }
 
-export function planError(code: string | undefined): string {
+export function planError(code: ErrorCode | undefined): string {
   switch (code) {
     case "plan_not_found":
       return "That recurring item is not in the book.";
@@ -94,5 +94,3 @@ export function planError(code: string | undefined): string {
       return "The change did not save. Try again.";
   }
 }
-
-export { localAsOf } from "@/as-of";

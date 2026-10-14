@@ -1,119 +1,66 @@
-import { useQuery } from "@tanstack/react-query";
-import { categoryQuery, groupQuery, useSaveGroup } from "@/api/categories";
-import { errorCode } from "@/api/client";
+import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { categoryQuery, groupQuery } from "@/api/categories";
 import { merchantQuery } from "@/api/merchants";
-import { tagQuery, useSaveTag } from "@/api/tags";
-import { LoadError, LoadingLine } from "@/editors/load-state";
-import { useGroups, useMerchants } from "@/editors/lookups";
+import { inboxDecisionsQuery } from "@/api/review";
+import { tagQuery } from "@/api/tags";
 import type { EditorInput } from "@/editors/editor-types";
 import { CategoryForm } from "@/settings/category-form";
-import { categoryError, tagError } from "@/settings/format";
+import { GroupForm } from "@/settings/group-form";
 import { MerchantForm } from "@/settings/merchant-form";
 import { MergeDialog } from "@/settings/merge-dialog";
-import { NameForm } from "@/settings/name-form";
+import { TagForm } from "@/settings/tag-form";
 
-type Finish = {
-  onClose: () => void;
-  onSaved: (id: string) => void;
-};
-
-export function CategoryRecord({ props, onClose, onSaved }: { props: EditorInput["category"] } & Finish) {
-  const groups = useGroups();
-  const category = useQuery(categoryQuery(props.id));
-  if (groups.isPending || (props.id && category.isPending)) {
-    return <LoadingLine label="Loading the category." />;
+export function CategoryEditor({ id, name, kind }: EditorInput["category"]) {
+  if (id === null) {
+    return <CategoryForm category={null} initialName={name} initialKind={kind} />;
   }
-  if (groups.isError || category.isError || !groups.data) {
-    return <LoadError label="The category did not load." onRetry={() => void category.refetch()} />;
-  }
-  return (
-    <CategoryForm
-      category={props.id ? (category.data ?? null) : null}
-      groups={groups.data}
-      initialName={props.name}
-      initialKind={props.kind}
-      onClose={onClose}
-      onSaved={onSaved}
-    />
-  );
+  return <SavedCategory id={id} />;
 }
 
-export function GroupRecord({ props, onClose, onSaved }: { props: EditorInput["group"] } & Finish) {
-  const group = useQuery(groupQuery(props.id));
-  const save = useSaveGroup();
-  if (props.id && group.isPending) {
-    return <LoadingLine label="Loading the group." />;
-  }
-  if (group.isError) {
-    return <LoadError label="The group did not load." onRetry={() => void group.refetch()} />;
-  }
-  return (
-    <NameForm
-      title={props.id ? "Rename group" : "New group"}
-      description="A group only organizes categories."
-      label="Name"
-      submitLabel={props.id ? "Save group" : "Add group"}
-      savingLabel="Saving group"
-      initialName={group.data?.name ?? props.name ?? ""}
-      pending={save.isPending}
-      error={save.error ? categoryError(errorCode(save.error)) : null}
-      onClose={onClose}
-      onSubmit={(name) => save.mutate({ id: props.id, name }, { onSuccess: (saved) => onSaved(saved.id) })}
-    />
-  );
+function SavedCategory({ id }: { id: string }) {
+  const { data: category } = useSuspenseQuery(categoryQuery(id));
+  return <CategoryForm category={category} />;
 }
 
-export function TagRecord({ props, onClose, onSaved }: { props: EditorInput["tag"] } & Finish) {
-  const tag = useQuery(tagQuery(props.id));
-  const save = useSaveTag();
-  if (props.id && tag.isPending) {
-    return <LoadingLine label="Loading the tag." />;
+export function GroupEditor({ id, name }: EditorInput["group"]) {
+  if (id === null) {
+    return <GroupForm id={null} initialName={name ?? ""} />;
   }
-  if (tag.isError) {
-    return <LoadError label="The tag did not load." onRetry={() => void tag.refetch()} />;
-  }
-  return (
-    <NameForm
-      title={props.id ? "Rename tag" : "New tag"}
-      description="Use a tag for a trip or a project."
-      label="Name"
-      submitLabel={props.id ? "Save tag" : "Add tag"}
-      savingLabel="Saving tag"
-      initialName={tag.data?.name ?? props.name ?? ""}
-      pending={save.isPending}
-      error={save.error ? tagError(errorCode(save.error)) : null}
-      onClose={onClose}
-      onSubmit={(name) => save.mutate({ id: props.id, name }, { onSuccess: (saved) => onSaved(saved.id) })}
-    />
-  );
+  return <SavedGroup id={id} />;
 }
 
-export function MerchantRecord({ props, onClose, onSaved }: { props: EditorInput["merchant"] } & Finish) {
-  const merchant = useQuery(merchantQuery(props.id));
-  if (props.id && merchant.isPending) {
-    return <LoadingLine label="Loading the merchant." />;
-  }
-  if (merchant.isError) {
-    return <LoadError label="The merchant did not load." onRetry={() => void merchant.refetch()} />;
-  }
-  return (
-    <MerchantForm
-      merchant={props.id ? (merchant.data ?? null) : null}
-      initialName={props.name}
-      onClose={onClose}
-      onSaved={onSaved}
-    />
-  );
+function SavedGroup({ id }: { id: string }) {
+  const { data: group } = useSuspenseQuery(groupQuery(id));
+  return <GroupForm id={id} initialName={group.name} />;
 }
 
-export function MergeEditor({ props, onSaved }: { props: EditorInput["mergeMerchant"]; onSaved: (id: string) => void }) {
-  const merchants = useMerchants();
-  const merchant = useQuery(merchantQuery(props.merchantId));
-  if (merchants.isPending || merchant.isPending) {
-    return <LoadingLine label="Loading the merchant." />;
+export function TagEditor({ id, name }: EditorInput["tag"]) {
+  if (id === null) {
+    return <TagForm id={null} initialName={name ?? ""} />;
   }
-  if (merchants.isError || merchant.isError || !merchants.data || !merchant.data) {
-    return <LoadError label="The merchant did not load." onRetry={() => void merchant.refetch()} />;
+  return <SavedTag id={id} />;
+}
+
+function SavedTag({ id }: { id: string }) {
+  const { data: tag } = useSuspenseQuery(tagQuery(id));
+  return <TagForm id={id} initialName={tag.name} />;
+}
+
+export function MerchantEditor({ id, name }: EditorInput["merchant"]) {
+  if (id === null) {
+    return <MerchantForm merchant={null} initialName={name} />;
   }
-  return <MergeDialog source={merchant.data} merchants={merchants.data} onMerged={() => onSaved("ok")} />;
+  return <SavedMerchant id={id} />;
+}
+
+function SavedMerchant({ id }: { id: string }) {
+  // The form shows the saved answers for the merchant. Their read starts here, thus it does not wait for the merchant.
+  usePrefetchQuery(inboxDecisionsQuery());
+  const { data: merchant } = useSuspenseQuery(merchantQuery(id));
+  return <MerchantForm merchant={merchant} />;
+}
+
+export function MergeEditor({ merchantId }: EditorInput["mergeMerchant"]) {
+  const { data: merchant } = useSuspenseQuery(merchantQuery(merchantId));
+  return <MergeDialog source={merchant} />;
 }

@@ -1,196 +1,77 @@
-import type { TransactionListQuery } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
+import { usePrefetchQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { useCallback, useEffect } from "react";
 import { localAsOf } from "@/as-of";
 import { transactionListQuery } from "@/api/transactions";
+import { Boundary } from "@/components/boundary";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
+import { ListPager } from "@/lists/list-pager";
+import { useLastPage } from "@/lists/use-list-search";
 import { TransactionFilterBar } from "@/transactions/filters";
 import { TransactionsTable } from "@/transactions/transactions-table";
-import { useReviewActions } from "@/transactions/use-review-actions";
+import { useTransactionPage, useTransactionSearch } from "@/transactions/use-transaction-list";
 import { useEditors } from "@/editors/editor-api";
-import { useAccounts, useBookCurrency, useCategories, useGroups, useMerchants, useTags } from "@/editors/lookups";
+import { useAccounts } from "@/editors/lookups";
 
-const transactionsRoute = getRouteApi("/transactions");
-
-type SortColumn = NonNullable<TransactionListQuery["sort"]>;
-
+/** The screen puts the parts in their places. Each part reads its own data. The filter bar shows new filters at once. */
 export function TransactionsScreen() {
-  const search = transactionsRoute.useSearch();
-  const groups = useGroups();
-  const navigate = transactionsRoute.useNavigate();
-  const { openEditor } = useEditors();
-
-  const currency = useBookCurrency();
-  const transactions = useQuery(transactionListQuery(search, localAsOf()));
-
-  const accounts = useAccounts();
-  const categories = useCategories();
-  const tags = useTags();
-  const merchants = useMerchants();
-  const actions = useReviewActions(search);
-
-  const changeFilters = useCallback(
-    (patch: Partial<TransactionListQuery>) => {
-      void navigate({ search: { ...search, ...patch, page: 1 } });
-    },
-    [navigate, search],
-  );
-
-  useEffect(() => {
-    if (!transactions.data) {
-      return;
-    }
-    const lastPage = Math.max(1, Math.ceil(transactions.data.total / transactions.data.pageSize));
-    if (search.page > lastPage) {
-      void navigate({ search: { ...search, page: lastPage }, replace: true });
-    }
-  }, [navigate, search, transactions.data]);
-
-  function sortBy(column: SortColumn) {
-    const current = search.sort ?? "date";
-    const currentDir = search.dir ?? (search.sort === undefined ? "desc" : "asc");
-    const nextDir = current === column ? (currentDir === "asc" ? "desc" : "asc") : column === "date" ? "desc" : "asc";
-    const isDefault = column === "date" && nextDir === "desc";
-    void navigate({
-      search: {
-        ...search,
-        sort: isDefault ? undefined : column,
-        dir: isDefault ? undefined : nextDir,
-        page: 1,
-      },
-    });
-  }
-
-  const pending =
-    currency.isPending || transactions.isPending || accounts.isPending || categories.isPending || tags.isPending || merchants.isPending;
-  if (pending) {
-    return <p className="text-muted-foreground">Loading transactions.</p>;
-  }
-  if (
-    currency.isError ||
-    transactions.isError ||
-    accounts.isError ||
-    categories.isError ||
-    tags.isError ||
-    merchants.isError ||
-    !currency.data ||
-    !transactions.data ||
-    !accounts.data ||
-    !categories.data ||
-    !tags.data ||
-    !merchants.data
-  ) {
-    return (
-      <div className="grid content-start gap-5">
-        <p>The transactions did not load.</p>
-        <Button
-          type="button"
-          onClick={() => {
-            void currency.refetch();
-            void transactions.refetch();
-            void accounts.refetch();
-            void categories.refetch();
-            void tags.refetch();
-            void merchants.refetch();
-          }}
-        >
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
-  const bookCurrency = currency.data;
-  const page = transactions.data;
-  const rows = page.items;
-  const lastPage = Math.max(1, Math.ceil(page.total / page.pageSize));
-  const selectedAccount = accounts.data.find((account) => account.id === search.accountId);
-  const showBalance =
-    selectedAccount !== undefined && selectedAccount.kind !== "investment" && selectedAccount.kind !== "property";
-  const sort = search.sort ?? "date";
-  const dir = search.dir ?? (search.sort === undefined ? "desc" : "asc");
-
-  function sortState(column: SortColumn): "ascending" | "descending" | "none" {
-    if (sort !== column) {
-      return "none";
-    }
-    return dir === "asc" ? "ascending" : "descending";
-  }
+  // The list does not need the lists of the filter bar. Its read starts here, thus it does not wait for them.
+  usePrefetchQuery(transactionListQuery(useTransactionSearch().shown, localAsOf()));
 
   return (
-    <>
-      <PageHeader
-        kicker={page.total === 1 ? "1 transaction" : `${page.total} transactions`}
-        title="Transactions"
-        actions={
-          <>
-            <Button
-              type="button"
-              variant={search.needsReview ? "default" : "secondary"}
-              onClick={() => {
-                void navigate({
-                  search: { ...search, needsReview: !search.needsReview, page: 1 },
-                });
-              }}
-            >
-              Needs review
-            </Button>
-            <Button type="button" disabled={accounts.data.every((account) => account.archivedAt)} onClick={() => void openEditor("transaction", { id: null })}>
-              <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
-              New transaction
-            </Button>
-          </>
-        }
-      />
-      <TransactionFilterBar
-        search={search}
-        accounts={accounts.data}
-        categories={categories.data}
-        groups={groups.data ?? []}
-        merchants={merchants.data.filter((merchant) => !merchant.archivedAt)}
-        tags={tags.data}
-        onChange={changeFilters}
-      />
-      <TransactionsTable
-        actions={actions}
-        search={search}
-        rows={rows}
-        counts={page.reviewCounts}
-        currency={bookCurrency}
-        accounts={accounts.data}
-        categories={categories.data}
-        merchants={merchants.data}
-        showBalance={showBalance}
-        sortState={sortState}
-        onSort={sortBy}
-      />
-      {page.total > page.pageSize ? (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={search.page <= 1}
-            onClick={() => {
-              void navigate({ search: { ...search, page: search.page - 1 } });
-            }}
-          >
-            Previous
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={search.page >= lastPage}
-            onClick={() => {
-              void navigate({ search: { ...search, page: search.page + 1 } });
-            }}
-          >
-            Next
-          </Button>
-        </div>
-      ) : null}
-    </>
+    <Boundary loading="Loading transactions." failed="The transactions did not load.">
+      <TransactionsHeader />
+      <TransactionFilterBar />
+      <TransactionList />
+      <Pager />
+    </Boundary>
   );
+}
+
+function TransactionsHeader() {
+  const { openEditor } = useEditors();
+  const accounts = useAccounts();
+  const { search, patch, page } = useTransactionPage();
+  return (
+    <PageHeader
+      kicker={page.total === 1 ? "1 transaction" : `${page.total} transactions`}
+      title="Transactions"
+      actions={
+        <>
+          <Button type="button" variant={search.needsReview ? "default" : "secondary"} onClick={() => patch({ needsReview: !search.needsReview })}>
+            Needs review
+          </Button>
+          <Button type="button" disabled={accounts.every((account) => account.archivedAt)} onClick={() => void openEditor("transaction", { id: null })}>
+            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
+            New transaction
+          </Button>
+        </>
+      }
+    />
+  );
+}
+
+/** The table of the page. The column headers change the sort order in the URL. */
+function TransactionList() {
+  const accounts = useAccounts();
+  const { shown, sort, sortBy, page } = useTransactionPage();
+  const selectedAccount = accounts.find((account) => account.id === shown.accountId);
+
+  return (
+    <TransactionsTable
+      search={shown}
+      rows={page.items}
+      counts={page.reviewCounts}
+      showBalance={selectedAccount !== undefined && selectedAccount.kind !== "investment" && selectedAccount.kind !== "property"}
+      sort={sort}
+      onSort={sortBy}
+    />
+  );
+}
+
+/** The Previous and Next buttons. A page number after the last page goes to the last page. */
+function Pager() {
+  const list = useTransactionPage();
+  const lastPage = useLastPage(list, list.page);
+  return <ListPager page={list.search.page} lastPage={lastPage} onPage={list.setPage} />;
 }

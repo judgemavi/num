@@ -1,11 +1,11 @@
-import { Temporal, type AutoReason } from "@num/shared";
+import { Temporal, type AutoReason, type ErrorCode, type ReviewLevel } from "@num/shared";
 import { formatMoney } from "@/money";
 
 export function formatDate(iso: string): string {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { dateStyle: "medium" });
 }
 
-export function levelLabel(level: "sure" | "likely" | "maybe" | "none"): string {
+export function levelLabel(level: ReviewLevel): string {
   if (level === "sure") {
     return "Sure";
   }
@@ -86,7 +86,7 @@ export function refundedText(currency: string, amount: number): string {
   return `Refunded ${formatMoney(currency, amount)}`;
 }
 
-export function transactionError(code: string | undefined): string {
+export function transactionError(code: ErrorCode | undefined): string {
   switch (code) {
     case "lines_sum_mismatch":
       return "The lines must add up to the amount.";

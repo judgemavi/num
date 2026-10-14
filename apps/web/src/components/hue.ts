@@ -1,6 +1,7 @@
-export const hueNames = ["sky", "mint", "lilac", "butter", "pink", "teal"] as const;
+import type { BucketColor } from "@num/shared";
 
-export type Hue = (typeof hueNames)[number];
+/** The identity colours of the design (`docs/design.md`). The colour of a bucket is one of them. */
+export type Hue = BucketColor;
 
 export const hueColor: Record<Hue, { fill: string; glyph: string }> = {
   sky: { fill: "#E1F0FA", glyph: "#1F6E9E" },
@@ -11,6 +12,7 @@ export const hueColor: Record<Hue, { fill: string; glyph: string }> = {
   teal: { fill: "#DDF3F1", glyph: "#11706A" },
 };
 
-export function hueVars(hue: Hue): Record<"--hb" | "--hf", string> {
+/** The colours of an icon tile, as CSS custom properties. */
+export function hueVars(hue: Hue) {
   return { "--hb": hueColor[hue].fill, "--hf": hueColor[hue].glyph };
 }

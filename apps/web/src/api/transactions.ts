@@ -1,6 +1,11 @@
-import type { TransactionCreate, TransactionListQuery, TransactionUpdate } from "@num/shared";
-import { queryOptions, useMutation } from "@tanstack/react-query";
+import type { Transaction, TransactionCreate, TransactionListQuery, TransactionUpdate } from "@num/shared";
+import { queryOptions, useIsFetching, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
+
+/** True while a page of the transaction list loads, the first time or again. */
+export function useTransactionListFetching() {
+  return useIsFetching({ queryKey: ["transactions"] }) > 0;
+}
 
 /** One page of the transaction list. The Needs review filter uses `asOf`. */
 export function transactionListQuery(search: TransactionListQuery, asOf: string) {
@@ -19,12 +24,10 @@ export function linkCandidatesQuery(accountId: string, dueDate: string) {
   });
 }
 
-/** One transaction. The query waits until it has an id and `enabled` is true. */
-export function transactionQuery(id: string | null, enabled = true) {
+export function transactionQuery(id: string) {
   return queryOptions({
     queryKey: ["transaction", id],
-    enabled: id !== null && enabled,
-    queryFn: () => unwrap(api.transactions[":id"].$get({ param: { id: id ?? "" } })),
+    queryFn: () => unwrap(api.transactions[":id"].$get({ param: { id } })),
   });
 }
 
@@ -37,13 +40,9 @@ export function refundPurchasesQuery(asOf: string, payee: string) {
   });
 }
 
-function looksRight(id: string) {
-  return unwrap(api.transactions[":id"]["looks-right"].$post({ param: { id } }));
-}
-
 /** Confirm the automatic label of a transaction. */
-export function useLooksRight() {
-  return useMutation({ mutationFn: looksRight });
+export function looksRight(id: string) {
+  return unwrap(api.transactions[":id"]["looks-right"].$post({ param: { id } }));
 }
 
 /**
@@ -75,16 +74,26 @@ export function useSaveTransaction() {
   });
 }
 
+/**
+ * Delete a transaction. The delete also removes the other side of a transfer that the app made.
+ * The reads of the two records leave the cache before the rule in `main.tsx` runs. Thus no read asks for a record
+ * that is not in the book.
+ */
 export function useDeleteTransaction() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => unwrap(api.transactions[":id"].$delete({ param: { id } })),
+    mutationFn: async ({ id, transferPeerId }: Pick<Transaction, "id" | "transferPeerId">) => {
+      const deleted = await unwrap(api.transactions[":id"].$delete({ param: { id } }));
+      queryClient.removeQueries({ queryKey: transactionQuery(id).queryKey });
+      if (transferPeerId) {
+        queryClient.removeQueries({ queryKey: transactionQuery(transferPeerId).queryKey });
+      }
+      return deleted;
+    },
   });
 }
 
 /** Link a refund to the purchase that it returns. */
-export function useLinkRefund() {
-  return useMutation({
-    mutationFn: ({ refundId, purchaseId }: { refundId: string; purchaseId: string }) =>
-      unwrap(api.transactions[":id"]["refund-of"].$post({ param: { id: refundId }, json: { purchaseId } })),
-  });
+export function linkRefund({ refundId, purchaseId }: { refundId: string; purchaseId: string }) {
+  return unwrap(api.transactions[":id"]["refund-of"].$post({ param: { id: refundId }, json: { purchaseId } }));
 }

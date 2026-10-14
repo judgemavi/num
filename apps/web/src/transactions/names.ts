@@ -1,17 +1,15 @@
-export type Names = {
-  categories: Map<string, string>;
-  accounts: Map<string, string>;
-  merchants: Map<string, string>;
-};
+import { useAccountLabels, useCategoryNames } from "@/editors/lookups";
 
 type Target = { categoryId: string | null; transferAccountId: string | null };
 
-export function targetText(target: Target, names: Names): string {
-  if (target.transferAccountId) {
-    return `Transfer to ${names.accounts.get(target.transferAccountId) ?? "another account"}`;
-  }
-  if (target.categoryId) {
-    return names.categories.get(target.categoryId) ?? "Uncategorized";
-  }
-  return "Uncategorized";
+/** Give the function that makes the text for the category or the transfer account of a line or a suggestion. */
+export function useTargetText() {
+  const accounts = useAccountLabels();
+  const categories = useCategoryNames();
+  return (target: Target) => {
+    if (target.transferAccountId) {
+      return `Transfer to ${accounts.get(target.transferAccountId) ?? "another account"}`;
+    }
+    return categories.get(target.categoryId ?? "") ?? "Uncategorized";
+  };
 }

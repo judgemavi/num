@@ -18,7 +18,7 @@ type DateFieldProps = {
   className?: string;
 };
 
-function toCalendarDate(value: string): Date | undefined {
+function toCalendarDate(value: string) {
   if (value.length === 0) {
     return undefined;
   }
@@ -30,11 +30,11 @@ function toCalendarDate(value: string): Date | undefined {
   }
 }
 
-function fromCalendarDate(date: Date): string {
+function fromCalendarDate(date: Date) {
   return Temporal.PlainDate.from({ year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() }).toString();
 }
 
-function showDate(date: Date): string {
+function showDate(date: Date) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
 }
 

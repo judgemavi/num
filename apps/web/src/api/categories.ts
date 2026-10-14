@@ -1,33 +1,28 @@
 import type { CategoryUpdate, CategoryListQuery } from "@num/shared";
-import { queryOptions, useMutation } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
-import { activeAndArchived, allPages, fullPage } from "@/api/pages";
+import { activeAndArchived, allPages, fullPage, type ListFilters } from "@/api/pages";
 
-type CategorySearch = Partial<Pick<CategoryListQuery, "archived" | "groupId" | "sort" | "dir">>;
-
-function loadCategories(search: CategorySearch) {
-  return allPages((page) => unwrap(api.categories.$get({ query: { archived: search.archived, groupId: search.groupId, sort: search.sort, dir: search.dir, page, pageSize: fullPage } })));
-}
-
-export function categoryListQuery(search: CategorySearch) {
+/** The Categories list. It reads all pages. The key has only the values that the request uses. */
+export function categoryListQuery({ archived, groupId, sort, dir }: ListFilters<CategoryListQuery>) {
+  const filters = { archived, groupId, sort, dir };
   return queryOptions({
-    queryKey: ["categories", search],
-    queryFn: () => loadCategories(search),
+    queryKey: ["categories", filters],
+    queryFn: () => allPages((page) => unwrap(api.categories.$get({ query: { ...filters, page, pageSize: fullPage } }))),
   });
 }
 
 export function categoryOptionsQuery() {
   return queryOptions({
     queryKey: ["categories", "options"],
-    queryFn: () => activeAndArchived(loadCategories),
+    queryFn: ({ client }) => activeAndArchived((archived) => client.fetchQuery(categoryListQuery({ archived }))),
   });
 }
 
-export function categoryQuery(id: string | null) {
+export function categoryQuery(id: string) {
   return queryOptions({
     queryKey: ["category", id],
-    enabled: id !== null,
-    queryFn: () => unwrap(api.categories[":id"].$get({ param: { id: id ?? "" } })),
+    queryFn: () => unwrap(api.categories[":id"].$get({ param: { id } })),
   });
 }
 
@@ -55,11 +50,10 @@ export function groupListQuery() {
   });
 }
 
-export function groupQuery(id: string | null) {
+export function groupQuery(id: string) {
   return queryOptions({
     queryKey: ["category-group", id],
-    enabled: id !== null,
-    queryFn: () => unwrap(api["category-groups"][":id"].$get({ param: { id: id ?? "" } })),
+    queryFn: () => unwrap(api["category-groups"][":id"].$get({ param: { id } })),
   });
 }
 
@@ -73,8 +67,14 @@ export function useSaveGroup() {
   });
 }
 
+/** Delete a group. The read of the group leaves the cache before the rule in `main.tsx` runs. */
 export function useDeleteGroup() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => unwrap(api["category-groups"][":id"].$delete({ param: { id } })),
+    mutationFn: async (id: string) => {
+      const deleted = await unwrap(api["category-groups"][":id"].$delete({ param: { id } }));
+      queryClient.removeQueries({ queryKey: groupQuery(id).queryKey });
+      return deleted;
+    },
   });
 }

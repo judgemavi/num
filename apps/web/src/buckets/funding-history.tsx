@@ -1,22 +1,26 @@
 import type { FundingRun } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { errorCode } from "@/api/client";
 import { fundingRunsQuery, useUndoFundingRun } from "@/api/funding";
 import { bucketError, formatDate } from "@/buckets/format";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
+import { Boundary } from "@/components/boundary";
 import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
-import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
-type FundingHistoryProps = {
-  currency: string;
-};
+export function FundingHistory() {
+  return (
+    <Boundary loading="Loading funding history." failed="The funding history did not load.">
+      <FundingRuns />
+    </Boundary>
+  );
+}
 
-export function FundingHistory({ currency }: FundingHistoryProps) {
+function FundingRuns() {
   const { confirm } = useEditors();
-  const runs = useQuery(fundingRunsQuery());
+  const { data: runs } = useSuspenseQuery(fundingRunsQuery());
   const undoRun = useUndoFundingRun();
 
   async function undo(run: FundingRun) {
@@ -30,20 +34,6 @@ export function FundingHistory({ currency }: FundingHistoryProps) {
     }
   }
 
-  if (runs.isPending) {
-    return <p className="text-muted-foreground">Loading funding history.</p>;
-  }
-  if (runs.isError || !runs.data) {
-    return (
-      <div className="grid gap-3">
-        <p>The funding history did not load.</p>
-        <Button type="button" onClick={() => void runs.refetch()}>
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <>
       {undoRun.error ? (
@@ -52,10 +42,10 @@ export function FundingHistory({ currency }: FundingHistoryProps) {
         </p>
       ) : null}
       <ListCard label="Funding history">
-        {runs.data.length === 0 ? (
+        {runs.length === 0 ? (
           <p className="px-5 py-5 text-muted-foreground">No paycheck has been funded.</p>
         ) : (
-          runs.data.map((run) => (
+          runs.map((run) => (
             <ListRow key={run.id} simple>
               <div className={listName}>
                 {run.payee || "Paycheck"}
@@ -65,7 +55,7 @@ export function FundingHistory({ currency }: FundingHistoryProps) {
                 </small>
               </div>
               <div className={listAmt}>
-                <Amount currency={currency} minor={run.total} />
+                <Amount minor={run.total} />
               </div>
               {run.undoneAt ? null : (
                 <RowMenu label={`Actions for ${run.payee || "paycheck"} funding`}>

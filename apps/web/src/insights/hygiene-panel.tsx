@@ -1,13 +1,16 @@
-import { reviewAgeDays, type Hygiene, type HygieneCheck } from "@num/shared";
+import { reviewAgeDays, type HygieneCheck } from "@num/shared";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { hygieneQuery } from "@/api/insights";
+import { localAsOf } from "@/as-of";
+import { useBookCurrency } from "@/editors/lookups";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { Badge } from "@/components/ui/badge";
 import { monthTitle, rateText, signedMoney } from "@/insights/format";
 import { formatMoney } from "@/money";
 
-const listSearch = { page: 1, pageSize: 50, archived: false } as const;
 
-function detail(check: HygieneCheck, currency: string): string {
+function detail(check: HygieneCheck, currency: string) {
   if (check.code === "emergency_fund") {
     const place = check.source === "goals" ? "essential goals" : "savings accounts";
     return `${formatMoney(currency, check.held)} in ${place} · ${check.months} months needs ${formatMoney(currency, check.need)}`;
@@ -98,42 +101,35 @@ const places: Record<HygieneCheck["code"], string> = {
   overspent: "Buckets",
 };
 
-export function HygienePanel({
-  currency,
-  hygiene,
-  pending,
-  failed,
-}: {
-  currency: string;
-  hygiene: Hygiene | undefined;
-  pending: boolean;
-  failed: boolean;
-}) {
+/** The hygiene checks of the book. The card reads its own data. */
+export function HygienePanel() {
   const go = useNavigate();
-  const failedCount = hygiene?.checks.filter((item) => !item.pass).length ?? 0;
+  const currency = useBookCurrency();
+  const { data: hygiene } = useSuspenseQuery(hygieneQuery(localAsOf()));
+  const failedCount = hygiene.checks.filter((item) => !item.pass).length;
 
   function open(check: HygieneCheck) {
     if (check.code === "emergency_fund" || check.code === "sinking_funds" || check.code === "overspent") {
-      void go({ to: "/buckets", search: listSearch });
+      void go({ to: "/buckets" });
       return;
     }
     if (check.code === "cards_paid") {
-      void go({ to: "/accounts", search: listSearch });
+      void go({ to: "/accounts" });
       return;
     }
     if (check.code === "imports_current") {
-      void go({ to: "/accounts/imports", search: { page: 1, pageSize: 50 } });
+      void go({ to: "/accounts/imports" });
       return;
     }
     if (check.code === "review") {
-      void go({ to: "/transactions", search: { page: 1, pageSize: 50, needsReview: true, uncategorized: false, automatic: false } });
+      void go({ to: "/transactions", search: { needsReview: true } });
       return;
     }
     if (check.code === "recurring") {
       if (check.changed === 0) {
         return;
       }
-      void go({ to: "/transactions", search: { page: 1, pageSize: 50, needsReview: true, uncategorized: false, automatic: false } });
+      void go({ to: "/transactions", search: { needsReview: true } });
       return;
     }
     const month = check.code === "savings_rate" ? check.months[0]?.month : undefined;
@@ -146,11 +142,9 @@ export function HygienePanel({
     <ListCard
       label="Hygiene"
       title="Hygiene"
-      actions={hygiene ? <Badge variant={failedCount === 0 ? "positive" : "count"}>{failedCount === 0 ? "Clear" : failedCount}</Badge> : null}
+      actions={<Badge variant={failedCount === 0 ? "positive" : "count"}>{failedCount === 0 ? "Clear" : failedCount}</Badge>}
     >
-      {pending ? <p className="px-5 py-4 text-sm text-muted-foreground">Loading hygiene.</p> : null}
-      {failed ? <p className="px-5 py-4 text-sm">Hygiene did not load.</p> : null}
-      {hygiene?.checks.map((check) => (
+      {hygiene.checks.map((check) => (
         <ListRow key={check.code} onOpen={() => open(check)}>
           <span className={listName}>
             {titles[check.code]}

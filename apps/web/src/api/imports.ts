@@ -39,21 +39,22 @@ type ImportFileInput = {
 };
 
 /** Import one statement file. The result is the import, a preview that needs a column map, or the unreadable rows. */
+export function importFile({ file, accountId, asOf, presetId, columnMap }: ImportFileInput) {
+  return unwrap(
+    api.imports.$post({
+      form: {
+        file,
+        accountId,
+        asOf,
+        ...(presetId ? { presetId } : {}),
+        ...(columnMap ? { columnMap: JSON.stringify(columnMap) } : {}),
+      },
+    }),
+  );
+}
+
 export function useImportFile() {
-  return useMutation({
-    mutationFn: ({ file, accountId, asOf, presetId, columnMap }: ImportFileInput) =>
-      unwrap(
-        api.imports.$post({
-          form: {
-            file,
-            accountId,
-            asOf,
-            ...(presetId ? { presetId } : {}),
-            ...(columnMap ? { columnMap: JSON.stringify(columnMap) } : {}),
-          },
-        }),
-      ),
-  });
+  return useMutation({ mutationFn: importFile });
 }
 
 /** Answer an import row that needs review: use an existing transaction or add a new one. */

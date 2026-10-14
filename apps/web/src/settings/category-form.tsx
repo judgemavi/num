@@ -1,65 +1,54 @@
 import {
   bucketWriteSchema,
-  categoryKinds,
   categoryUpdateSchema,
   type Category,
-  type CategoryGroup,
   type CategoryKind,
 } from "@num/shared";
 import { useState } from "react";
 import { useUpdateBucket } from "@/api/buckets";
-import { useSaveCategory, useSaveGroup } from "@/api/categories";
+import { useSaveCategory } from "@/api/categories";
 import { errorCode } from "@/api/client";
-import { useActiveBuckets } from "@/editors/lookups";
+import { useActiveBuckets, useGroups } from "@/editors/lookups";
+import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { categoryError } from "@/settings/format";
-import { NameForm } from "@/settings/name-form";
+import { GroupForm } from "@/settings/group-form";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ChoiceSelect } from "@/components/choice-select";
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const noGroup = "none";
 
 type CategoryFormProps = {
   category: Category | null;
-  groups: CategoryGroup[];
   initialName?: string;
   initialKind?: CategoryKind;
   inline?: boolean;
   depth?: number;
-  onClose: () => void;
-  onSaved: (id: string) => void;
 };
 
-function isKind(value: string): value is CategoryKind {
-  return (categoryKinds as readonly string[]).includes(value);
-}
-
-export function CategoryForm({ category, groups, initialName, initialKind, inline = false, depth = 0, onClose, onSaved }: CategoryFormProps) {
+export function CategoryForm({ category, initialName, initialKind, inline = false, depth = 0 }: CategoryFormProps) {
+  const { close } = useEditorFrame();
   const buckets = useActiveBuckets();
+  const groups = useGroups();
   const [name, setName] = useState(category?.name ?? initialName ?? "");
-  const [kind, setKind] = useState<CategoryKind>(category?.kind ?? initialKind ?? "expense");
+  const [kind, setKind] = useState(category?.kind ?? initialKind ?? "expense");
   const [groupId, setGroupId] = useState(category?.groupId ?? noGroup);
-  const [extraGroups, setExtraGroups] = useState<CategoryGroup[]>([]);
   const [essential, setEssential] = useState(category?.essential ?? false);
   const [bucketId, setBucketId] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
   const save = useSaveCategory();
-  const saveGroup = useSaveGroup();
   const addToBucket = useUpdateBucket();
   const pending = save.isPending || addToBucket.isPending;
   const fieldId = inline ? `category-${depth}` : "category";
   const expense = kind === "expense";
-  const groupOptions = [...groups, ...extraGroups.filter((group) => !groups.some((item) => item.id === group.id))].map((group) => ({
-    id: group.id,
-    label: group.name,
-  }));
+  const groupOptions = groups.map((group) => ({ id: group.id, label: group.name }));
 
-  function errorText(): string | null {
+  function errorText() {
     if (invalid) {
       return "Check the fields.";
     }
@@ -70,13 +59,13 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
   }
 
   function addCategoryToBucket(categoryId: string) {
-    const bucket = category || !bucketId ? undefined : buckets.data?.items.find((item) => item.id === bucketId);
+    const bucket = category || !bucketId ? undefined : buckets.items.find((item) => item.id === bucketId);
     const body = bucket ? bucketWriteSchema.safeParse({ ...bucket, categoryIds: [...bucket.categoryIds, categoryId] }) : undefined;
     if (!bucket || !body?.success) {
-      onSaved(categoryId);
+      close(categoryId);
       return;
     }
-    addToBucket.mutate({ id: bucket.id, body: body.data }, { onSettled: () => onSaved(categoryId) });
+    addToBucket.mutate({ id: bucket.id, body: body.data }, { onSettled: () => close(categoryId) });
   }
 
   function submit() {
@@ -111,26 +100,20 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
         </Field>
         <Field>
           <FieldLabel htmlFor={`${fieldId}-kind`}>Kind</FieldLabel>
-          <Select
+          <ChoiceSelect
+            id={`${fieldId}-kind`} className="w-full"
             value={kind}
-            onValueChange={(value) => {
-              if (!isKind(value)) {
-                return;
-              }
-              setKind(value);
-              if (value === "income") {
+            options={[
+              { value: "expense", label: "Expense" },
+              { value: "income", label: "Income" },
+            ]}
+            onValueChange={(next) => {
+              setKind(next);
+              if (next === "income") {
                 setEssential(false);
               }
             }}
-          >
-            <SelectTrigger id={`${fieldId}-kind`} className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="expense">Expense</SelectItem>
-              <SelectItem value="income">Income</SelectItem>
-            </SelectContent>
-          </Select>
+          />
         </Field>
         <Field>
           <FieldLabel htmlFor={`${fieldId}-group`}>Group</FieldLabel>
@@ -143,32 +126,7 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
             noun="group"
             depth={depth}
             onChange={(id) => setGroupId(id ?? noGroup)}
-            renderForm={(typed, finish) => (
-              <NameForm
-                inline
-                idPrefix={`${fieldId}-group-name`}
-                title="New group"
-                description="A group only organizes categories."
-                label="Name"
-                submitLabel="Add group"
-                savingLabel="Saving group"
-                initialName={typed}
-                pending={saveGroup.isPending}
-                error={saveGroup.error ? categoryError(errorCode(saveGroup.error)) : null}
-                onClose={() => finish(null)}
-                onSubmit={(groupName) =>
-                  saveGroup.mutate(
-                    { id: null, name: groupName },
-                    {
-                      onSuccess: (group) => {
-                        setExtraGroups((current) => [...current, group]);
-                        finish(group.id);
-                      },
-                    },
-                  )
-                }
-              />
-            )}
+            renderForm={(typed) => <GroupForm inline id={null} idPrefix={`${fieldId}-group-name`} initialName={typed} />}
           />
         </Field>
         {!category && expense ? (
@@ -177,7 +135,7 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
             <OptionCombobox
               id={`${fieldId}-bucket`}
               value={bucketId}
-              options={(buckets.data?.items ?? []).map((bucket) => ({ id: bucket.id, label: bucket.name }))}
+              options={buckets.items.map((bucket) => ({ id: bucket.id, label: bucket.name }))}
               placeholder="No bucket"
               emptyLabel="No bucket"
               onChange={setBucketId}
@@ -200,9 +158,7 @@ export function CategoryForm({ category, groups, initialName, initialKind, inlin
         {error ? <FieldError>{error}</FieldError> : null}
         </DialogBody>
         <FormActions inline={inline}>
-          <FormCancel inline={inline} onClose={onClose}>
-            Cancel
-          </FormCancel>
+          <FormCancel>Cancel</FormCancel>
           <Button type={inline ? "button" : "submit"} disabled={pending} onClick={inline ? submit : undefined}>
             {pending ? "Saving category" : "Save category"}
           </Button>

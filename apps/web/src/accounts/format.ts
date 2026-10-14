@@ -3,8 +3,7 @@ import {
   milliPctToPercent,
   type Account,
   type AccountKind,
-  type PaymentPolicy,
-} from "@num/shared";
+  type PaymentPolicy, type ErrorCode } from "@num/shared";
 import { formatMoney } from "@/money";
 
 const kindLabels: Record<AccountKind, string> = {
@@ -70,7 +69,7 @@ export function accountDetail(account: Account): string | null {
   return null;
 }
 
-export function accountError(code: string | undefined): string {
+export function accountError(code: ErrorCode | undefined): string {
   switch (code) {
     case "kind_class_mismatch":
       return "Choose a kind in the same group.";

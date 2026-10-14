@@ -1,27 +1,23 @@
-import type { TransactionListQuery } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { getRouteApi } from "@tanstack/react-router";
+import { useDeferredValue, useState } from "react";
+import { accountQuery } from "@/api/accounts";
 import { useMarkClearance } from "@/api/checkpoints";
 import { errorCode } from "@/api/client";
 import { transactionListQuery } from "@/api/transactions";
+import { Boundary } from "@/components/boundary";
 import { ListCard } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
-import { useAccounts, useCategories, useMerchants } from "@/editors/lookups";
 import { localAsOf } from "@/as-of";
-import { TransactionsTable } from "@/transactions/transactions-table";
-import { useReviewActions } from "@/transactions/use-review-actions";
+import { columnSort, lastPageOf, sortParams } from "@/lists/list-search";
+import { ListPager } from "@/lists/list-pager";
+import { TransactionsTable, type TransactionSort } from "@/transactions/transactions-table";
 
 const selectionLimit = 200;
 
-type SortColumn = NonNullable<TransactionListQuery["sort"]>;
+const accountRoute = getRouteApi("/accounts_/$accountId");
 
-type AccountTransactionsProps = {
-  accountId: string;
-  currency: string;
-  showBalance: boolean;
-  page: number;
-  onPage: (page: number) => void;
-};
+const defaultSort: TransactionSort = { sort: "date", dir: "desc" };
 
 function withLimit(current: string[], ids: string[], on: boolean): { next: string[]; capped: boolean } {
   if (!on) {
@@ -43,33 +39,49 @@ function withLimit(current: string[], ids: string[], on: boolean): { next: strin
   return { next, capped };
 }
 
-export function AccountTransactions({ accountId, currency, showBalance, page, onPage }: AccountTransactionsProps) {
+/** The transactions of the account of the page. The page number is in the URL. The sort order is local. */
+export function AccountTransactions() {
+  return (
+    <Boundary loading="Loading transactions." failed="The transactions did not load.">
+      <AccountActivity />
+    </Boundary>
+  );
+}
+
+function AccountActivity() {
+  const { accountId } = accountRoute.useParams();
+  const { page } = accountRoute.useSearch();
+  const navigate = accountRoute.useNavigate();
   const [selected, setSelected] = useState<string[]>([]);
   const [capped, setCapped] = useState(false);
   const clearance = useMarkClearance();
   const pending = clearance.isPending;
 
-  const [sort, setSort] = useState<SortColumn>("date");
-  const [dir, setDir] = useState<"asc" | "desc">("desc");
-  const accounts = useAccounts();
-  const categories = useCategories();
-  const merchants = useMerchants();
-  const search: TransactionListQuery = {
-    page,
+  const [sort, setSort] = useState(defaultSort);
+  // The page reads the account first, thus this read does not wait.
+  const { data: account } = useSuspenseQuery(accountQuery(accountId));
+  // The page on the screen stays while a new page or a new sort order loads.
+  const shownPage = useDeferredValue(page);
+  const shownSort = useDeferredValue(sort);
+  const search = {
+    page: shownPage,
     pageSize: 50,
     accountId,
     uncategorized: false,
     automatic: false,
     needsReview: false,
-    ...(sort === "date" && dir === "desc" ? {} : { sort, dir }),
+    ...sortParams(shownSort, defaultSort),
   };
 
-  const transactions = useQuery(transactionListQuery(search, localAsOf()));
-  const actions = useReviewActions(search);
+  const { data: transactions } = useSuspenseQuery(transactionListQuery(search, localAsOf()));
 
-  const rows = transactions.data?.items ?? [];
+  const rows = transactions.items;
   const selectable = rows.filter((row) => !row.reconciled);
-  const lastPage = transactions.data ? Math.max(1, Math.ceil(transactions.data.total / transactions.data.pageSize)) : 1;
+  const lastPage = lastPageOf(transactions.total, transactions.pageSize);
+
+  function setPage(next: number) {
+    void navigate({ search: (prev) => ({ ...prev, page: next }) });
+  }
 
   function applySelection(ids: string[], on: boolean) {
     const result = withLimit(selected, ids, on);
@@ -88,17 +100,9 @@ export function AccountTransactions({ accountId, currency, showBalance, page, on
     );
   }
 
-  function sortBy(column: SortColumn) {
-    setDir(sort === column ? (dir === "asc" ? "desc" : "asc") : column === "date" ? "desc" : "asc");
-    setSort(column);
-    onPage(1);
-  }
-
-  function sortState(column: SortColumn): "ascending" | "descending" | "none" {
-    if (sort !== column) {
-      return "none";
-    }
-    return dir === "asc" ? "ascending" : "descending";
+  function sortBy(column: TransactionSort["sort"]) {
+    setSort(columnSort(sort, column, defaultSort));
+    setPage(1);
   }
 
   function mark(status: "open" | "cleared") {
@@ -137,28 +141,20 @@ export function AccountTransactions({ accountId, currency, showBalance, page, on
         </>
       }
     >
-      {transactions.isPending ? <p className="px-5 py-5 text-muted-foreground">Loading transactions.</p> : null}
-      {transactions.isError ? <p className="px-5 py-5">The transactions did not load.</p> : null}
-      {transactions.data && rows.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="px-5 py-5 text-muted-foreground">No transactions in this account.</p>
-      ) : null}
-      {transactions.data && accounts.data && categories.data && merchants.data && rows.length > 0 ? (
+      ) : (
         <TransactionsTable
-          actions={actions}
           search={search}
           rows={rows}
           counts={null}
-          currency={currency}
-          accounts={accounts.data}
-          categories={categories.data}
-          merchants={merchants.data}
-          showBalance={showBalance}
+          showBalance={account.kind !== "investment" && account.kind !== "property"}
           hideAccount
           selection={{ ids: selected, onToggle: toggle, onTogglePage: togglePage }}
-          sortState={sortState}
+          sort={sort}
           onSort={sortBy}
         />
-      ) : null}
+      )}
       {capped || selected.length >= selectionLimit ? (
         <p role="status" className="px-5 py-3 text-sm text-muted-foreground">
           You can mark 200 transactions at a time.
@@ -169,16 +165,7 @@ export function AccountTransactions({ accountId, currency, showBalance, page, on
           {error}
         </p>
       ) : null}
-      {transactions.data && transactions.data.total > transactions.data.pageSize ? (
-        <div className="flex items-center justify-end gap-2 px-5 py-3">
-          <Button type="button" variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>
-            Previous
-          </Button>
-          <Button type="button" variant="outline" disabled={page >= lastPage} onClick={() => onPage(page + 1)}>
-            Next
-          </Button>
-        </div>
-      ) : null}
+      <ListPager page={page} lastPage={lastPage} onPage={setPage} className="flex items-center justify-end gap-2 px-5 py-3" />
     </ListCard>
   );
 }

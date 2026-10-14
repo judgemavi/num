@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { categoryOptionsQuery, groupListQuery, useDeleteGroup } from "@/api/categories";
+import { useDeleteGroup } from "@/api/categories";
 import { errorCode } from "@/api/client";
+import { Boundary } from "@/components/boundary";
 import { useEditors } from "@/editors/editor-api";
+import { useCategories, useGroups } from "@/editors/lookups";
 import { categoryError } from "@/settings/format";
 import { SettingsBack } from "@/settings/settings-nav";
 import { ListCard, ListRow, listName } from "@/components/list-card";
@@ -15,34 +16,21 @@ function countLabel(count: number) {
 }
 
 export function GroupsPage() {
+  return (
+    <Boundary loading="Loading groups." failed="The groups did not load.">
+      <Groups />
+    </Boundary>
+  );
+}
+
+function Groups() {
   const { openEditor, confirm } = useEditors();
-  const groups = useQuery(groupListQuery());
-  const categories = useQuery(categoryOptionsQuery());
+  const rows = useGroups();
+  const categories = useCategories();
   const deleteGroup = useDeleteGroup();
 
-  if (groups.isPending || categories.isPending) {
-    return <p className="text-muted-foreground">Loading groups.</p>;
-  }
-  if (groups.isError || categories.isError) {
-    return (
-      <div className="flex flex-col items-start gap-4">
-        <p>The groups did not load.</p>
-        <Button
-          type="button"
-          onClick={() => {
-            void groups.refetch();
-            void categories.refetch();
-          }}
-        >
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
-  const rows = groups.data ?? [];
   const counts = new Map<string, number>();
-  for (const category of categories.data ?? []) {
+  for (const category of categories) {
     if (!category.groupId) {
       continue;
     }

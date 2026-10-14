@@ -1,6 +1,6 @@
 import { minorUnitDigits } from "@num/shared";
 
-function minorToNumber(minor: number, digits: number): number {
+function minorToNumber(minor: number, digits: number) {
   const sign = minor < 0 ? -1 : 1;
   const text = Math.abs(minor).toString().padStart(digits + 1, "0");
   if (digits === 0) {
@@ -11,7 +11,7 @@ function minorToNumber(minor: number, digits: number): number {
   return sign * Number(`${whole}.${fraction}`);
 }
 
-function digitsFor(currency: string): number {
+function digitsFor(currency: string) {
   const digits = minorUnitDigits(currency);
   if (digits === undefined) {
     throw new Error("Unknown currency");

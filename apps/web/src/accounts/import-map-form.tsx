@@ -3,12 +3,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { DialogBody, DialogPanel } from "@/editors/form-chrome";
+import { ChoiceSelect } from "@/components/choice-select";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type ImportMapFormProps = {
   rows: string[][];
-  pending: boolean;
   onBack: () => void;
   onImport: (map: ColumnMap) => void;
 };
@@ -27,11 +27,11 @@ function headerValue(choice: HeaderChoice): ColumnMap["hasHeader"] {
   return "auto";
 }
 
-function columnCount(rows: string[][]): number {
+function columnCount(rows: string[][]) {
   return Math.max(1, ...rows.map((row) => row.length));
 }
 
-export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapFormProps) {
+export function ImportMapForm({ rows, onBack, onImport }: ImportMapFormProps) {
   const width = columnCount(rows);
   const [headerChoice, setHeaderChoice] = useState<HeaderChoice>("auto");
   const [date, setDate] = useState("0");
@@ -50,7 +50,7 @@ export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapForm
   const firstDate = statementDate(rows[0]?.[Number(date)] ?? "", dateOrder);
   const header = hasHeader === true || (hasHeader === "auto" && firstDate === null) ? rows[0] : undefined;
 
-  function label(index: number): string {
+  function label(index: number) {
     const name = header?.[index]?.trim() ?? "";
     return name.length > 0 ? `Column ${index + 1}: ${name}` : `Column ${index + 1}`;
   }
@@ -107,19 +107,16 @@ export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapForm
       </div>
       <Field>
         <FieldLabel>Header row</FieldLabel>
-        <Select
+        <ChoiceSelect
+          className="w-full"
           value={headerChoice}
-          onValueChange={(value) => setHeaderChoice(value === "yes" || value === "no" ? value : "auto")}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="auto">Detect the header</SelectItem>
-            <SelectItem value="yes">The first row is a header</SelectItem>
-            <SelectItem value="no">There is no header</SelectItem>
-          </SelectContent>
-        </Select>
+          options={[
+            { value: "auto", label: "Detect the header" },
+            { value: "yes", label: "The first row is a header" },
+            { value: "no", label: "There is no header" },
+          ]}
+          onValueChange={setHeaderChoice}
+        />
         <FieldDescription>A date in the first row is a transaction.</FieldDescription>
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -135,15 +132,15 @@ export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapForm
       </div>
       <Field>
         <FieldLabel>Amount</FieldLabel>
-        <Select value={amountMode} onValueChange={(value) => setAmountMode(value === "split" ? "split" : "amount")}>
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="amount">One amount column</SelectItem>
-            <SelectItem value="split">Separate debit and credit columns</SelectItem>
-          </SelectContent>
-        </Select>
+        <ChoiceSelect
+          className="w-full"
+          value={amountMode}
+          options={[
+            { value: "amount", label: "One amount column" },
+            { value: "split", label: "Separate debit and credit columns" },
+          ]}
+          onValueChange={setAmountMode}
+        />
       </Field>
       {amountMode === "amount" ? (
         <ColumnSelect id="import-amount" label="Amount column" value={amount} width={width} labelFor={label} onChange={setAmount} />
@@ -176,46 +173,40 @@ export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapForm
       <div className="grid gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel>Date order</FieldLabel>
-          <Select value={dateOrder} onValueChange={(value) => setDateOrder(value === "dmy" ? "dmy" : "mdy")}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="mdy">Month, then day</SelectItem>
-              <SelectItem value="dmy">Day, then month</SelectItem>
-            </SelectContent>
-          </Select>
+          <ChoiceSelect
+            className="w-full"
+            value={dateOrder}
+            options={[
+              { value: "mdy", label: "Month, then day" },
+              { value: "dmy", label: "Day, then month" },
+            ]}
+            onValueChange={setDateOrder}
+          />
         </Field>
         <Field>
           <FieldLabel>Decimal separator</FieldLabel>
-          <Select
+          <ChoiceSelect
+            className="w-full"
             value={decimalSeparator}
-            onValueChange={(value) => setDecimalSeparator(value === "," ? "," : ".")}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value=".">Point (.)</SelectItem>
-              <SelectItem value=",">Comma (,)</SelectItem>
-            </SelectContent>
-          </Select>
+            options={[
+              { value: ".", label: "Point (.)" },
+              { value: ",", label: "Comma (,)" },
+            ]}
+            onValueChange={setDecimalSeparator}
+          />
         </Field>
       </div>
       <Field>
         <FieldLabel>Sign</FieldLabel>
-        <Select
+        <ChoiceSelect
+          className="w-full"
           value={signConvention}
-          onValueChange={(value) => setSignConvention(value === "inverted" ? "inverted" : "account")}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="account">Use the sign in the file</SelectItem>
-            <SelectItem value="inverted">Flip the sign</SelectItem>
-          </SelectContent>
-        </Select>
+          options={[
+            { value: "account", label: "Use the sign in the file" },
+            { value: "inverted", label: "Flip the sign" },
+          ]}
+          onValueChange={setSignConvention}
+        />
         <FieldDescription>Flip the sign when the bank shows spending as a positive amount.</FieldDescription>
       </Field>
       {error ? (
@@ -225,11 +216,11 @@ export function ImportMapForm({ rows, pending, onBack, onImport }: ImportMapForm
       ) : null}
       </DialogBody>
       <DialogFooter>
-        <Button type="button" variant="secondary" onClick={onBack} disabled={pending}>
+        <Button type="button" variant="secondary" onClick={onBack}>
           Back
         </Button>
-        <Button type="button" onClick={submit} disabled={pending}>
-          {pending ? "Importing" : "Import"}
+        <Button type="button" onClick={submit}>
+          Import
         </Button>
       </DialogFooter>
     </DialogPanel>

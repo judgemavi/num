@@ -1,14 +1,11 @@
-import { bucketListQuerySchema, type BucketListQuery } from "@num/shared";
+import { bucketListQuerySchema } from "@num/shared";
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
 import { BucketsScreen } from "@/buckets/buckets-screen";
-import { withEdit } from "@/editors/page-search";
-
-type Search = BucketListQuery & { edit?: string };
 
 export const Route = createFileRoute("/buckets")({
-  validateSearch: (search: Record<string, unknown>): Search => withEdit(bucketListQuerySchema, search),
+  validateSearch: bucketListQuerySchema,
   search: {
-    middlewares: [stripSearchParams<Search>({ page: 1, pageSize: 50, archived: false, edit: undefined })],
+    middlewares: [stripSearchParams({ page: 1, pageSize: 50, archived: false })],
   },
   component: BucketsScreen,
 });

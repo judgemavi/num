@@ -1,11 +1,12 @@
-import type { Account, AutoReason, Category, Merchant, MoneyDirection, Tag, Transaction } from "@num/shared";
+import type { AutoReason, MoneyDirection, Transaction } from "@num/shared";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { ChevronRight, Ellipsis } from "lucide-react";
 import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
-import { useArchiveAccount } from "@/api/accounts";
+import { errorCode } from "@/api/client";
+import { inboxDecisionsQuery, useUndoDecision } from "@/api/review";
 import { useArchiveTag } from "@/api/tags";
-import type { useDeleteTransaction, useSaveTransaction } from "@/api/transactions";
-import { InlineAccount, InlineTag } from "@/editors/inline-records";
+import { useTags } from "@/editors/lookups";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,8 +23,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { TagForm } from "@/settings/tag-form";
+import { decisionText, inboxError } from "@/review/format";
 import { automaticReasonText } from "@/transactions/format";
-import { type Option } from "@/transactions/option-combobox";
+import { AccountPicker } from "@/transactions/pickers";
 
 export function MoneySection({
   direction,
@@ -32,8 +35,6 @@ export function MoneySection({
   onAmount,
   moneyLocked,
   accountId,
-  accountOptions,
-  archivedAccounts = [],
   onAccount,
   accountLocked,
   date,
@@ -45,14 +46,11 @@ export function MoneySection({
   onAmount: (amount: string) => void;
   moneyLocked: boolean;
   accountId: string;
-  accountOptions: Option[];
-  archivedAccounts?: Option[];
   onAccount: (id: string) => void;
   accountLocked: boolean;
   date: string;
   onDate: (date: string) => void;
 }) {
-  const archiveAccount = useArchiveAccount();
   return (
     <>
       <Field>
@@ -79,21 +77,15 @@ export function MoneySection({
       <div className="grid gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel htmlFor="txn-account">Account</FieldLabel>
-          <ManagedPicker
+          <AccountPicker
             id="txn-account"
             value={accountId || null}
-            options={accountOptions}
-            placeholder="Choose an account"
-            disabled={accountLocked || (accountOptions.length === 0 && archivedAccounts.length === 0)}
-            noun="account"
-            archived={archivedAccounts}
-            onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => onAccount(restored.id) })}
+            disabled={accountLocked}
             onChange={(id) => {
               if (id) {
                 onAccount(id);
               }
             }}
-            renderForm={(name, finish) => <InlineAccount name={name} onDone={finish} />}
           />
         </Field>
         <Field>
@@ -110,7 +102,6 @@ export function MoreDetails({
   onOpenChange,
   notes,
   onNotes,
-  tags,
   tagIds,
   onTags,
   payee,
@@ -124,7 +115,6 @@ export function MoreDetails({
   onOpenChange: (open: boolean) => void;
   notes: string;
   onNotes: (notes: string) => void;
-  tags: Tag[];
   tagIds: string[];
   onTags: (ids: string[]) => void;
   payee: string;
@@ -135,7 +125,8 @@ export function MoreDetails({
   clearedLocked: boolean;
 }) {
   const archiveTag = useArchiveTag();
-  const [created, setCreated] = useState<Tag[]>([]);
+  const tags = useTags();
+  const [created, setCreated] = useState<typeof tags>([]);
   const allTags = [...tags, ...created.filter((tag) => !tags.some((item) => item.id === tag.id))];
   const selected = allTags.filter((tag) => tagIds.includes(tag.id));
   const options = allTags
@@ -167,18 +158,8 @@ export function MoreDetails({
                 onTags([...tagIds, tagId]);
               }
             }}
-            renderForm={(name, finish) => (
-              <InlineTag
-                name={name}
-                idPrefix="inline-tag-name"
-                onDone={(id) => {
-                  if (id) {
-                    setCreated((current) => [...current, { id, name, archivedAt: null }]);
-                  }
-                  finish(id);
-                }}
-              />
-            )}
+            onCreated={(option) => setCreated((current) => [...current, { id: option.id, name: option.label, archivedAt: null }])}
+            renderForm={(name) => <TagForm inline id={null} idPrefix="inline-tag-name" initialName={name} />}
           />
           {selected.length > 0 ? (
             <div className="flex flex-wrap gap-2">
@@ -243,24 +224,37 @@ export function DeleteMenu({ kind, onDelete }: { kind: "plain" | "mirror" | "lin
   );
 }
 
-export type TransactionFormProps = {
-  currency: string;
-  transaction: Transaction | null;
-  amountLocked: boolean;
-  accounts: Account[];
-  categories: Category[];
-  tags: Tag[];
-  merchants: Merchant[];
-  rawLine?: string;
-  initialAccountId?: string;
-  unreadableItemKey?: string;
-  onClose: () => void;
-  onSaved: (id: string) => void;
-  save: ReturnType<typeof useSaveTransaction>;
-  remove: ReturnType<typeof useDeleteTransaction>;
-  deleteKind?: "plain" | "mirror" | "linked";
-  decisions?: { itemKey: string; text: string }[];
-};
+/** The answers that the person gave in Needs review for a transaction. Each answer has an Undo button. */
+export function DecisionNotes({ transactionId }: { transactionId: string }) {
+  const undo = useUndoDecision();
+  const { data: decisions } = useSuspenseQuery({
+    ...inboxDecisionsQuery(),
+    select: (rows) =>
+      rows.filter(
+        (row) =>
+          (row.decision === "not_transfer" && row.itemKey.split(":").includes(transactionId)) ||
+          (row.decision === "keep_unassigned" && row.itemKey === `paycheck_funding:${transactionId}`) ||
+          (row.decision === "keep_uncategorized" && row.itemKey === `uncategorized:${transactionId}`),
+      ),
+  });
+  return (
+    <>
+      {decisions.map((row) => (
+        <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
+          <span>{decisionText(row.decision)}</span>
+          <Button type="button" variant="outline" onClick={() => undo.mutate(row.itemKey)}>
+            Undo
+          </Button>
+        </p>
+      ))}
+      {undo.error ? (
+        <p role="alert" className="text-sm text-attn">
+          {inboxError(errorCode(undo.error))}
+        </p>
+      ) : null}
+    </>
+  );
+}
 
 export function AutomaticReason({
   transaction,

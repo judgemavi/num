@@ -1,18 +1,14 @@
-import { accountUpdateSchema, type Account, type AccountCreate, type AccountListQuery, type AccountUpdate, type OpeningSuggestion } from "@num/shared";
+import type { Account, AccountCreate, AccountListQuery, AccountUpdate, OpeningSuggestion } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
-import { activeAndArchived, allPages, fullPage } from "@/api/pages";
+import { activeAndArchived, allPages, fullPage, type ListFilters } from "@/api/pages";
 
-type AccountSearch = Partial<Pick<AccountListQuery, "archived" | "sort" | "dir">>;
-
-function loadAccounts(search: AccountSearch) {
-  return allPages((page) => unwrap(api.accounts.$get({ query: { archived: search.archived, sort: search.sort, dir: search.dir, page, pageSize: fullPage } })));
-}
-
-export function accountListQuery(search: AccountSearch) {
+/** The Accounts list. It reads all pages. The key has only the values that the request uses. */
+export function accountListQuery({ archived, sort, dir }: ListFilters<AccountListQuery>) {
+  const filters = { archived, sort, dir };
   return queryOptions({
-    queryKey: ["accounts", search],
-    queryFn: () => loadAccounts(search),
+    queryKey: ["accounts", filters],
+    queryFn: () => allPages((page) => unwrap(api.accounts.$get({ query: { ...filters, page, pageSize: fullPage } }))),
   });
 }
 
@@ -24,15 +20,14 @@ export function activeAccountsQuery() {
 export function accountOptionsQuery() {
   return queryOptions({
     queryKey: ["accounts", "options"],
-    queryFn: () => activeAndArchived(loadAccounts),
+    queryFn: ({ client }) => activeAndArchived((archived) => client.fetchQuery(accountListQuery({ archived }))),
   });
 }
 
-export function accountQuery(id: string | null) {
+export function accountQuery(id: string) {
   return queryOptions({
     queryKey: ["account", id],
-    enabled: id !== null,
-    queryFn: () => unwrap(api.accounts[":id"].$get({ param: { id: id ?? "" } })),
+    queryFn: () => unwrap(api.accounts[":id"].$get({ param: { id } })),
   });
 }
 
@@ -57,7 +52,7 @@ export function useArchiveAccount() {
 export function useSetOpeningBalance() {
   return useMutation({
     mutationFn: ({ account, suggestion }: { account: Account; suggestion: OpeningSuggestion }) => {
-      const body = accountUpdateSchema.parse({
+      const body: AccountUpdate = {
         name: account.name,
         institution: account.institution,
         kind: account.kind,
@@ -67,7 +62,7 @@ export function useSetOpeningBalance() {
         paymentPolicy: account.paymentPolicy,
         fixedPayment: account.fixedPayment,
         interestRateMilliPct: account.interestRateMilliPct,
-      });
+      };
       return unwrap(api.accounts[":id"].$patch({ param: { id: account.id }, json: body }));
     },
   });

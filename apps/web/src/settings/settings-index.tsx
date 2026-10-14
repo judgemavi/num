@@ -2,13 +2,13 @@ import { Navigate, useNavigate } from "@tanstack/react-router";
 import { usePhone } from "@/components/use-phone";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
-import { listSearch, settingsAreas } from "@/settings/settings-areas";
+import { settingsAreas } from "@/settings/settings-areas";
 
 export function SettingsIndex() {
   const phone = usePhone();
   const navigate = useNavigate();
   if (!phone) {
-    return <Navigate to="/settings/categories" search={listSearch} />;
+    return <Navigate to="/settings/categories" />;
   }
   return (
     <>
@@ -18,13 +18,7 @@ export function SettingsIndex() {
           <ListRow
             key={area.to}
             simple
-            onOpen={() => {
-              if (area.to === "/settings/categories" || area.to === "/settings/tags" || area.to === "/settings/merchants") {
-                void navigate({ to: area.to, search: listSearch });
-                return;
-              }
-              void navigate({ to: area.to });
-            }}
+            onOpen={() => void navigate({ to: area.to })}
           >
             <div className={listName}>{area.label}</div>
           </ListRow>

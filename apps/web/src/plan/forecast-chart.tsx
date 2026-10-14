@@ -1,5 +1,6 @@
 import { Temporal } from "@num/shared";
 import { useState } from "react";
+import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
 
 const width = 1000;
@@ -15,20 +16,19 @@ type ChartSeries = {
 };
 
 type ForecastChartProps = {
-  currency: string;
   dates: string[];
   label: string;
   series: ChartSeries[];
 };
 
-function shortDate(iso: string): string {
+function shortDate(iso: string) {
   if (iso.length === 7) {
     return Temporal.PlainDate.from(`${iso}-01`).toLocaleString(undefined, { month: "short", year: "2-digit" });
   }
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric" });
 }
 
-function stepPath(points: { x: number; y: number }[]): string {
+function stepPath(points: { x: number; y: number }[]) {
   const first = points[0];
   if (!first) {
     return "";
@@ -40,7 +40,8 @@ function stepPath(points: { x: number; y: number }[]): string {
   return path;
 }
 
-export function ForecastChart({ currency, dates, series: lines, label }: ForecastChartProps) {
+export function ForecastChart({ dates, series: lines, label }: ForecastChartProps) {
+  const currency = useBookCurrency();
   const [hover, setHover] = useState<number | null>(null);
   const values = lines.flatMap((line) => line.amounts);
   const peak = Math.max(...values, 0);

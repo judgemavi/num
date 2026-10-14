@@ -1,7 +1,7 @@
-import { Temporal, billReserveDays, type InboxDecisionCode, type PlanFrequency } from "@num/shared";
+import { Temporal, billReserveDays, type InboxDecisionCode, type PlanFrequency, type ErrorCode } from "@num/shared";
 import { formatMoney } from "@/money";
 
-function perDay(amount: number, days: number): number {
+function perDay(amount: number, days: number) {
   if (days <= 0) {
     return amount;
   }
@@ -53,7 +53,7 @@ export function decisionText(code: InboxDecisionCode): string {
   }
 }
 
-export function inboxError(code: string | undefined): string {
+export function inboxError(code: ErrorCode | undefined): string {
   switch (code) {
     case "import_match_invalid":
       return "That match is no longer available.";

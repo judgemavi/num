@@ -1,8 +1,7 @@
 import type { ImportDetailRow, ImportUndo } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { accountQuery } from "@/api/accounts";
 import { errorCode } from "@/api/client";
 import { documentPath } from "@/api/documents";
 import { importDetailQuery, useResolveImportRow, useUndoImport } from "@/api/imports";
@@ -18,8 +17,8 @@ import {
   undoBlockLabel,
   unreadableLabel,
 } from "@/accounts/import-format";
-import { accountLabel } from "@/accounts/label";
 import { Amount } from "@/components/amount";
+import { Boundary } from "@/components/boundary";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
@@ -27,17 +26,38 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useEditors } from "@/editors/editor-api";
-import { useBookCurrency } from "@/editors/lookups";
+import { useAccountLabels } from "@/editors/lookups";
 import { localAsOf } from "@/as-of";
 import { inboxError } from "@/review/format";
 
 const detailRoute = getRouteApi("/accounts_/imports_/$importId");
 
+/** The page of one import. A read that fails shows the reason and the way back to the list of imports. */
 export function ImportDetailScreen() {
+  return (
+    <Boundary
+      loading="Loading the import."
+      failed={({ error }) => (
+        <div className="grid gap-3">
+          <p>{importError(errorCode(error))}</p>
+          <Button type="button" variant="secondary" asChild>
+            <Link to="/accounts/imports">
+              Back to imports
+            </Link>
+          </Button>
+        </div>
+      )}
+    >
+      <ImportDetailPage />
+    </Boundary>
+  );
+}
+
+function ImportDetailPage() {
   const { importId } = detailRoute.useParams();
   const { openEditor, confirm } = useEditors();
-  const currency = useBookCurrency();
-  const detail = useQuery(importDetailQuery(importId));
+  const accountLabels = useAccountLabels();
+  const { data: detail } = useSuspenseQuery(importDetailQuery(importId));
   const undoImport = useUndoImport();
   const resolve = useResolveImportRow();
   const decide = useDecideItem();
@@ -56,13 +76,11 @@ export function ImportDetailScreen() {
 
   useEffect(() => {
     const id = window.location.hash.replace("#", "");
-    if (!id || !detail.data) {
+    if (!id) {
       return;
     }
     document.getElementById(id)?.scrollIntoView({ block: "center" });
-  }, [detail.data]);
-
-  const account = useQuery(accountQuery(detail.data?.item.accountId ?? null));
+  }, [detail]);
 
   async function undo(filename: string) {
     const ok = await confirm({
@@ -96,7 +114,7 @@ export function ImportDetailScreen() {
                   {formatStatementDate(row.date)} · {row.payeeRaw || "No description"}
                 </p>
                 <p>
-                  {currency.data ? <Amount currency={currency.data} minor={row.amount} /> : null} · {undoBlockLabel(row.reason)}
+                  <Amount minor={row.amount} /> · {undoBlockLabel(row.reason)}
                 </p>
               </li>
             ))}
@@ -108,29 +126,13 @@ export function ImportDetailScreen() {
     });
   }
 
-  if (detail.isPending) {
-    return <p className="text-muted-foreground">Loading the import.</p>;
-  }
-  if (detail.isError || !detail.data) {
-    return (
-      <div className="grid gap-3">
-        <p>{importError(errorCode(detail.error))}</p>
-        <Button type="button" variant="secondary" asChild>
-          <Link to="/accounts/imports" search={{ page: 1, pageSize: 50 }}>
-            Back to imports
-          </Link>
-        </Button>
-      </div>
-    );
-  }
-
-  const item = detail.data.item;
+  const item = detail.item;
   const filename = item.filename ?? "Statement";
 
   return (
     <>
       <PageHeader
-        kicker={`${account.data ? accountLabel(account.data) : item.accountName} · ${formatImportDate(item.createdAt)}`}
+        kicker={`${accountLabels.get(item.accountId) ?? item.accountName} · ${formatImportDate(item.createdAt)}`}
         title={filename}
         actions={
           <>
@@ -150,7 +152,7 @@ export function ImportDetailScreen() {
         }
       />
       <p className="text-sm text-muted-foreground">
-        <Link to="/accounts/imports" search={{ page: 1, pageSize: 50 }} className="font-semibold text-primary">
+        <Link to="/accounts/imports" className="font-semibold text-primary">
           Imports
         </Link>
         {" · "}
@@ -166,15 +168,13 @@ export function ImportDetailScreen() {
         </p>
       ) : null}
       <ListCard label="Rows in this file" title="Rows">
-        {detail.data.rows.length === 0 && detail.data.unreadable.length === 0 ? (
+        {detail.rows.length === 0 && detail.unreadable.length === 0 ? (
           <p className="px-5 py-4 text-muted-foreground">This file has no rows.</p>
         ) : null}
-        {detail.data.rows.map((row) => (
+        {detail.rows.map((row) => (
           <DetailRow
             key={row.id}
             row={row}
-            onOpenTransaction={(id) => void openEditor("transaction", { id })}
-            currency={currency.data}
             onMatch={(transactionId) => {
               clearErrors();
               resolve.mutate({ rowId: row.id, body: { decision: "match", transactionId } });
@@ -185,7 +185,7 @@ export function ImportDetailScreen() {
             }}
           />
         ))}
-        {detail.data.unreadable.map((row) => (
+        {detail.unreadable.map((row) => (
           <ListRow key={`line-${row.line}`}>
             <div className={listName}>
               <p>Line {row.line}</p>
@@ -211,7 +211,7 @@ export function ImportDetailScreen() {
                     void openEditor("transaction", {
                       id: null,
                       rawLine: row.raw,
-                      initialAccountId: detail.data?.item.accountId,
+                      initialAccountId: item.accountId,
                       unreadableItemKey: `import_unreadable:${importId}:${row.line}`,
                     })
                   }>
@@ -236,19 +236,7 @@ export function ImportDetailScreen() {
   );
 }
 
-function DetailRow({
-  row,
-  currency,
-  onOpenTransaction,
-  onMatch,
-  onAddNew,
-}: {
-  row: ImportDetailRow;
-  currency: string | undefined;
-  onOpenTransaction: (id: string) => void;
-  onMatch: (transactionId: string) => void;
-  onAddNew: () => void;
-}) {
+function DetailRow({ row, onMatch, onAddNew }: { row: ImportDetailRow; onMatch: (transactionId: string) => void; onAddNew: () => void }) {
   return (
     <ListRow>
       <div id={`import-row-${row.id}`} className={listName}>
@@ -256,7 +244,7 @@ function DetailRow({
         <small>
           {formatStatementDate(row.date)} · {importOutcomeLabel(row.outcome)}
         </small>
-        <RowLinks row={row} onOpenTransaction={onOpenTransaction} />
+        <RowLinks row={row} />
       </div>
       {row.outcome === "needs_review" ? (
         <span className="flex flex-wrap gap-2">
@@ -270,15 +258,17 @@ function DetailRow({
           </Button>
         </span>
       ) : null}
-      {currency ? <Amount currency={currency} minor={row.amount} /> : null}
+      <Amount minor={row.amount} />
     </ListRow>
   );
 }
 
-function RowLinks({ row, onOpenTransaction }: { row: ImportDetailRow; onOpenTransaction: (id: string) => void }) {
-  if (row.transactionId) {
+function RowLinks({ row }: { row: ImportDetailRow }) {
+  const { openEditor } = useEditors();
+  const transactionId = row.transactionId;
+  if (transactionId) {
     return (
-      <button type="button" className="min-h-11 text-left font-semibold text-primary" onClick={() => onOpenTransaction(row.transactionId!)}>
+      <button type="button" className="min-h-11 text-left font-semibold text-primary" onClick={() => void openEditor("transaction", { id: transactionId })}>
         Open transaction
       </button>
     );

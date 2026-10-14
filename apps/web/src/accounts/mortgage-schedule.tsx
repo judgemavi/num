@@ -7,12 +7,14 @@ import {
 } from "@num/shared";
 import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
+import { localAsOf } from "@/as-of";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ListCard, ListRow, listName } from "@/components/list-card";
+import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
 
-function formatDay(iso: string): string {
+function formatDay(iso: string) {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
@@ -25,9 +27,9 @@ function Cell({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function ScheduleRow({ item, currency, asOf }: { item: MortgageScheduleMatch; currency: string; asOf: string }) {
+function ScheduleRow({ item, past }: { item: MortgageScheduleMatch; past: boolean }) {
+  const currency = useBookCurrency();
   const row = item.scheduled;
-  const past = item.date <= asOf;
   return (
     <ListRow>
       <div className={listName}>
@@ -49,17 +51,8 @@ function ScheduleRow({ item, currency, asOf }: { item: MortgageScheduleMatch; cu
   );
 }
 
-export function MortgageSchedule({
-  currency,
-  asOf,
-  payments,
-  actuals,
-}: {
-  currency: string;
-  asOf: string;
-  payments: ScheduledMortgagePayment[];
-  actuals: MortgageActualPayment[];
-}) {
+export function MortgageSchedule({ payments, actuals }: { payments: ScheduledMortgagePayment[]; actuals: MortgageActualPayment[] }) {
+  const asOf = localAsOf();
   const rows = matchMortgageActuals(payments, actuals, asOf);
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No payments remain.</p>;
@@ -88,7 +81,7 @@ export function MortgageSchedule({
           >
             <CollapsibleContent>
               {items.map((item) => (
-                <ScheduleRow key={item.actual && item.scheduled === null ? item.actual.id : item.date} item={item} currency={currency} asOf={asOf} />
+                <ScheduleRow key={item.actual && item.scheduled === null ? item.actual.id : item.date} item={item} past={item.date <= asOf} />
               ))}
             </CollapsibleContent>
           </ListCard>

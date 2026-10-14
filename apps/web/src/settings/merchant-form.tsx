@@ -1,9 +1,10 @@
 import type { Merchant } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { errorCode } from "@/api/client";
 import { useSaveMerchant } from "@/api/merchants";
 import { inboxDecisionsQuery, useUndoDecision } from "@/api/review";
+import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
 import { decisionText, inboxError } from "@/review/format";
 import { Button } from "@/components/ui/button";
@@ -16,39 +17,18 @@ type MerchantFormProps = {
   initialName?: string;
   inline?: boolean;
   depth?: number;
-  onClose: () => void;
-  onSaved: (id: string) => void;
 };
 
-export function MerchantForm({ merchant, initialName, inline = false, depth = 0, onClose, onSaved }: MerchantFormProps) {
-  const [name, setName] = useState(merchant?.name ?? initialName ?? "");
-  const [nameMissing, setNameMissing] = useState(false);
-  const save = useSaveMerchant();
+/** The "not recurring" answers that the person gave for a merchant. Each answer has an Undo button. */
+function NotRecurringNotes({ merchantId }: { merchantId: string }) {
   const undo = useUndoDecision();
-  const decisions = useQuery({
+  const { data: decisions } = useSuspenseQuery({
     ...inboxDecisionsQuery(),
-    enabled: merchant !== null,
-    select: (rows) => rows.filter((row) => row.decision === "not_recurring" && merchant !== null && row.itemKey.includes(`:${merchant.id}:`)),
+    select: (rows) => rows.filter((row) => row.decision === "not_recurring" && row.itemKey.includes(`:${merchantId}:`)),
   });
-  const error = nameMissing ? "Enter a name." : save.error ? merchantError(errorCode(save.error)) : null;
-
-  function submit() {
-    const trimmed = name.trim();
-    setNameMissing(trimmed.length === 0);
-    if (trimmed.length > 0) {
-      save.mutate({ id: merchant?.id ?? null, name: trimmed }, { onSuccess: (saved) => onSaved(saved.id) });
-    }
-  }
-
   return (
-    <FormShell inline={inline} className="grid gap-4" onSubmit={submit}>
-      <FormHeading
-        inline={inline}
-        title={merchant ? "Edit merchant" : "New merchant"}
-        description="A merchant groups the transactions of one business."
-      />
-      <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
-      {(decisions.data ?? []).map((row) => (
+    <>
+      {decisions.map((row) => (
         <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
           <span>{decisionText(row.decision)}</span>
           <Button type="button" variant="outline" onClick={() => undo.mutate(row.itemKey)}>
@@ -61,6 +41,34 @@ export function MerchantForm({ merchant, initialName, inline = false, depth = 0,
           {inboxError(errorCode(undo.error) ?? "internal_error")}
         </p>
       ) : null}
+    </>
+  );
+}
+
+export function MerchantForm({ merchant, initialName, inline = false, depth = 0 }: MerchantFormProps) {
+  const { close } = useEditorFrame();
+  const [name, setName] = useState(merchant?.name ?? initialName ?? "");
+  const [nameMissing, setNameMissing] = useState(false);
+  const save = useSaveMerchant();
+  const error = nameMissing ? "Enter a name." : save.error ? merchantError(errorCode(save.error)) : null;
+
+  function submit() {
+    const trimmed = name.trim();
+    setNameMissing(trimmed.length === 0);
+    if (trimmed.length > 0) {
+      save.mutate({ id: merchant?.id ?? null, name: trimmed }, { onSuccess: (saved) => close(saved.id) });
+    }
+  }
+
+  return (
+    <FormShell inline={inline} className="grid gap-4" onSubmit={submit}>
+      <FormHeading
+        inline={inline}
+        title={merchant ? "Edit merchant" : "New merchant"}
+        description="A merchant groups the transactions of one business."
+      />
+      <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
+      {merchant ? <NotRecurringNotes merchantId={merchant.id} /> : null}
       <Field data-invalid={error !== null || undefined}>
         <FieldLabel htmlFor={inline ? `merchant-${depth}-name` : "merchant-name"}>Name</FieldLabel>
         <Input id={inline ? `merchant-${depth}-name` : "merchant-name"} value={name} onChange={(event) => setName(event.target.value)} />
@@ -68,9 +76,7 @@ export function MerchantForm({ merchant, initialName, inline = false, depth = 0,
       {error ? <FieldError>{error}</FieldError> : null}
       </DialogBody>
       <FormActions inline={inline}>
-        <FormCancel inline={inline} onClose={onClose}>
-          Cancel
-        </FormCancel>
+        <FormCancel>Cancel</FormCancel>
         <Button type={inline ? "button" : "submit"} disabled={save.isPending} onClick={inline ? submit : undefined}>
           {save.isPending ? "Saving" : merchant ? "Save merchant" : "Add merchant"}
         </Button>

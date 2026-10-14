@@ -1,8 +1,8 @@
 import { accountClass } from "@num/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { accountQuery } from "@/api/accounts";
+import { errorCode } from "@/api/client";
 import { AccountImports } from "@/accounts/account-imports";
 import { MortgagePanel } from "@/accounts/mortgage-panel";
 import { AccountTransactions } from "@/accounts/account-transactions";
@@ -10,54 +10,46 @@ import { CheckpointHistory } from "@/accounts/checkpoint-history";
 import { accountDetail, kindLabel } from "@/accounts/format";
 import { accountLabel } from "@/accounts/label";
 import { useEditors } from "@/editors/editor-api";
-import { useBookCurrency } from "@/editors/lookups";
 import { Amount } from "@/components/amount";
+import { Boundary } from "@/components/boundary";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 
 const accountRoute = getRouteApi("/accounts_/$accountId");
 
+/**
+ * The page of one account. `reconcile` in the URL opens the reconcile editor: the editor host reads it.
+ * When the API says that it has no such account, the page shows the way back to the list.
+ */
 export function AccountScreen() {
-  const { accountId } = accountRoute.useParams();
-  const search = accountRoute.useSearch();
-  const navigate = accountRoute.useNavigate();
-  const { openEditor, dismissKind } = useEditors();
-
-  const currency = useBookCurrency();
-  const account = useQuery(accountQuery(accountId));
-
-  useEffect(() => {
-    if (!search.reconcile) {
-      dismissKind("reconcile");
-      return;
-    }
-    void openEditor("reconcile", { accountId }).then(() => {
-      if (new URLSearchParams(window.location.search).get("reconcile") === "true") {
-        void navigate({ search: { ...search, reconcile: false } });
+  return (
+    <Boundary
+      loading="Loading account."
+      failed={({ error }) =>
+        errorCode(error) === undefined ? (
+          "The account did not load."
+        ) : (
+          <div className="grid gap-3">
+            <p>That account is not in the book.</p>
+            <Link to="/accounts" className="min-h-11 font-semibold text-primary">
+              Accounts
+            </Link>
+          </div>
+        )
       }
-    });
-  }, [search.reconcile, accountId, dismissKind, openEditor, navigate, search]);
+    >
+      <AccountPage />
+    </Boundary>
+  );
+}
 
-  if (currency.isPending || account.isPending) {
-    return <p className="text-muted-foreground">Loading account.</p>;
-  }
-  if (currency.isError || !currency.data) {
-    return <p>The account did not load.</p>;
-  }
-  if (account.isError || !account.data) {
-    return (
-      <div className="grid gap-3">
-        <p>That account is not in the book.</p>
-        <Link to="/accounts" search={{ page: 1, pageSize: 50, archived: false }} className="min-h-11 font-semibold text-primary">
-          Accounts
-        </Link>
-      </div>
-    );
-  }
+function AccountPage() {
+  const { accountId } = accountRoute.useParams();
+  const { openEditor } = useEditors();
 
-  const row = account.data;
+  const { data: row } = useSuspenseQuery(accountQuery(accountId));
+
   const detail = accountDetail(row);
-  const bookCurrency = currency.data;
 
   return (
     <>
@@ -69,39 +61,26 @@ export function AccountScreen() {
             <Button type="button" variant="outline" onClick={() => void openEditor("account", { id: accountId })}>
               Edit
             </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                void navigate({ search: { ...search, reconcile: true } });
-              }}
-            >
+            <Button type="button" onClick={() => void openEditor("reconcile", { accountId })}>
               Reconcile
             </Button>
           </>
         }
       />
       <p className="text-sm">
-        <Link to="/accounts" search={{ page: 1, pageSize: 50, archived: false }} className="font-semibold text-primary">
+        <Link to="/accounts" className="font-semibold text-primary">
           Accounts
         </Link>
         {detail ? <span className="text-muted-foreground"> · {detail}</span> : null}
       </p>
       <p className="text-sm text-muted-foreground">
-        Balance <Amount currency={bookCurrency} minor={row.balance} owed={accountClass(row.kind) === "liability"} />
+        Balance <Amount minor={row.balance} owed={accountClass(row.kind) === "liability"} />
       </p>
       <div className="grid items-start gap-5">
-        {row.kind === "mortgage" ? <MortgagePanel accountId={row.id} currency={bookCurrency} /> : null}
-        <AccountTransactions
-          accountId={row.id}
-          currency={bookCurrency}
-          showBalance={row.kind !== "investment" && row.kind !== "property"}
-          page={search.page}
-          onPage={(page) => {
-            void navigate({ search: { ...search, page } });
-          }}
-        />
-        <CheckpointHistory accountId={row.id} currency={bookCurrency} owed={accountClass(row.kind) === "liability"} />
-        <AccountImports accountId={row.id} accountName={accountLabel(row)} currency={bookCurrency} />
+        {row.kind === "mortgage" ? <MortgagePanel accountId={row.id} /> : null}
+        <AccountTransactions />
+        <CheckpointHistory accountId={row.id} />
+        <AccountImports accountId={row.id} />
       </div>
     </>
   );

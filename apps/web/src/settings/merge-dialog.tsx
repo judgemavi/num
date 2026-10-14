@@ -4,18 +4,16 @@ import { errorCode } from "@/api/client";
 import { useMergeMerchant } from "@/api/merchants";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEditorFrame } from "@/editors/editor-api";
+import { useMerchants } from "@/editors/lookups";
 import { DialogBody, DialogPanel } from "@/editors/form-chrome";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { merchantError } from "@/settings/format";
 
-type MergeDialogProps = {
-  source: Merchant;
-  merchants: Merchant[];
-  onMerged: () => void;
-};
-
-export function MergeDialog({ source, merchants, onMerged }: MergeDialogProps) {
+export function MergeDialog({ source }: { source: Merchant }) {
+  const { close } = useEditorFrame();
+  const merchants = useMerchants();
   const [targetId, setTargetId] = useState<string | null>(null);
   const [targetMissing, setTargetMissing] = useState(false);
   const merge = useMergeMerchant();
@@ -25,7 +23,7 @@ export function MergeDialog({ source, merchants, onMerged }: MergeDialogProps) {
   function submit() {
     setTargetMissing(!targetId);
     if (targetId) {
-      merge.mutate({ id: source.id, targetId }, { onSuccess: onMerged });
+      merge.mutate({ id: source.id, targetId }, { onSuccess: () => close("ok") });
     }
   }
 
