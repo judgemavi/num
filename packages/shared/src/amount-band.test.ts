@@ -1,18 +1,21 @@
 import { expect, test } from "bun:test";
 import { bandContains, fitLabels, labelScores, learnedLabels, widthFactor, type BandRow } from "./amount-band";
-import { learnedConfidence, scoreMatch } from "./matching";
+import { learnedConfidence, scoreMatch, type RecurringSignal } from "./matching";
 
 function row(id: string, date: string, categoryId: string, amount: number): BandRow {
   return { id, date, categoryId, merchantId: null, amount };
 }
 
-function score(rows: readonly BandRow[], amount: number) {
+function score(rows: readonly BandRow[], amount: number, recurring: RecurringSignal | null = null) {
+  const labels = learnedLabels(rows);
+  const fit = fitLabels(labels, amount);
   return scoreMatch({
-    recurring: null,
-    amountScores: labelScores(fitLabels(learnedLabels(rows), amount)),
+    recurring,
+    amountScores: labelScores(fit),
     payeeScores: learnedConfidence(rows),
     similar: null,
     transferRows: [],
+    outsideBands: labels.length > 0 && fit.length === 0,
   });
 }
 
@@ -57,12 +60,47 @@ test("the width factor is 1 at width 0, 0.975 at 0.25 and 0.95 from 0.5", () => 
   expect(widthFactor(0, 0)).toBe(1);
 });
 
-test("an amount outside all bands uses only the payee signal", () => {
+test("an amount outside all bands uses only the payee signal and is not automatic", () => {
   const rows = [row("a", "2026-01-01", "pay", 5349850), row("b", "2026-01-31", "pay", 6445710)];
   expect(fitLabels(learnedLabels(rows), 7000000)).toEqual([]);
   const result = score(rows, 7000000);
   expect(result.reason).toBe("learned_payee");
   expect(result.confidence).toBeCloseTo(0.91 * 0.95, 10);
+  expect(result.level).toBe("suggestion");
+  expect(score(rows, 6000000).level).toBe("automatic");
+});
+
+test("an amount outside all bands of many confirmations is a suggestion, not automatic (decision 0043)", () => {
+  const rent = ["01", "02", "03", "04", "05", "06", "07"].map((month) => row(`r${month}`, `2026-${month}-01`, "rent", -2550000));
+  for (const amount of [-15000, -1500000, -2000000]) {
+    const result = score(rent, amount);
+    expect(result.categoryId).toBe("rent");
+    expect(result.confidenceMilli).toBeGreaterThanOrEqual(850);
+    expect(result.level).toBe("suggestion");
+  }
+  expect(score(rent, -2550000).level).toBe("automatic");
+});
+
+test("a key with no learned labels does not change", () => {
+  const result = score([], -15000);
+  expect(result.level).toBe("none");
+  const transfer = scoreMatch({
+    recurring: null,
+    amountScores: [],
+    payeeScores: [],
+    similar: null,
+    transferRows: [{ id: "t", date: "2026-01-01", transferAccountId: "savings" }],
+    outsideBands: false,
+  });
+  expect(transfer.transferAccountId).toBe("savings");
+  expect(transfer.level).toBe("suggestion");
+});
+
+test("a recurring link is automatic when no band contains the amount", () => {
+  const rows = [row("a", "2026-01-01", "rent", -2550000), row("b", "2026-02-01", "rent", -2550000)];
+  const recurring = { planId: "plan", categoryId: "rent", merchantId: null, transferAccountId: null, mortgage: false };
+  const result = score(rows, -2000000, recurring);
+  expect(result.reason).toBe("recurring");
   expect(result.level).toBe("automatic");
 });
 

@@ -224,7 +224,8 @@ export function scorePayee(
   const side = book.sides[directionOf(input.amount)];
   const contained = containedFor(side, input.payee);
   const family = contained ? null : familyFor(side, input.payee);
-  const fit = fitLabels(side.bands.get(input.payee) ?? [], input.amount);
+  const bands = side.bands.get(input.payee) ?? [];
+  const fit = fitLabels(bands, input.amount);
   const fitKey = `${input.payee}\0${fit.map((label) => label.key).join("\0")}`;
   let amountScores = side.amountLearned.get(fitKey);
   if (!amountScores) {
@@ -243,6 +244,7 @@ export function scorePayee(
       : null,
     family,
     transferRows: book.transfersByPayee.get(input.payee) ?? [],
+    outsideBands: bands.length > 0 && fit.length === 0,
   });
 }
 

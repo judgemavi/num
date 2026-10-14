@@ -1,6 +1,6 @@
 import { accounts, occurrenceLinks, transactionLines, transactions } from "@num/db";
 import { utcNow, type MatchResult } from "@num/shared";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { mortgageLinesFor } from "./mortgage-learned";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { linkRefundIfSure } from "./refund-auto";
@@ -151,7 +151,10 @@ function applyRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
   linkRefundIfSure(tx, row.id);
 }
 
-/** Rows of these payees that have one line with no category and no transfer. */
+/** Automatic labels that a confirmation scores again (decision 0043). */
+const learnedReasons = ["learned_amount", "learned_payee"] as const;
+
+/** Rows of these payees with one line and no transfer: uncategorized, or labelled by a learned signal. */
 function openRows(tx: WriteTx, payees: string[]) {
   return tx
     .select({
@@ -159,7 +162,11 @@ function openRows(tx: WriteTx, payees: string[]) {
       amount: transactions.amount,
       payee: transactions.payeeNormalized,
       merchantId: transactions.merchantId,
+      autoReason: transactions.autoReason,
+      autoSourceId: transactions.autoSourceId,
+      autoConfidence: transactions.autoConfidence,
       lineId: transactionLines.id,
+      categoryId: transactionLines.categoryId,
     })
     .from(transactions)
     .innerJoin(transactionLines, eq(transactionLines.transactionId, transactions.id))
@@ -167,7 +174,7 @@ function openRows(tx: WriteTx, payees: string[]) {
       and(
         eq(transactions.mirror, literal(0)),
         inArray(transactions.payeeNormalized, payees),
-        isNull(transactionLines.categoryId),
+        or(isNull(transactionLines.categoryId), inArray(transactions.autoReason, learnedReasons)),
         isNull(transactionLines.transferAccountId),
         isOnlyLine,
       ),
@@ -175,7 +182,37 @@ function openRows(tx: WriteTx, payees: string[]) {
     .all();
 }
 
-/** Labels uncategorized rows for these payees. */
+/** The same label keeps its category with the new values. A result that is not automatic removes the category. */
+function rescoreRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
+  const fields = labelFields(result, row.merchantId);
+  const label = fields && "categoryId" in fields ? fields : null;
+  if (label && label.categoryId !== row.categoryId) {
+    applyRow(tx, row, result);
+    return;
+  }
+  const auto = label
+    ? { autoReason: label.autoReason, autoSourceId: label.autoSourceId, autoConfidence: label.autoConfidence }
+    : { autoReason: null, autoSourceId: null, autoConfidence: null };
+  if (
+    label &&
+    auto.autoReason === row.autoReason &&
+    auto.autoSourceId === row.autoSourceId &&
+    auto.autoConfidence === row.autoConfidence
+  ) {
+    return;
+  }
+  const before = readTransaction(tx, row.id);
+  tx.update(transactions).set(auto).where(eq(transactions.id, row.id)).run();
+  if (!label) {
+    tx.update(transactionLines).set({ categoryId: null }).where(eq(transactionLines.id, row.lineId)).run();
+  }
+  auditTransaction(tx, row.id, "label", before, readTransaction(tx, row.id));
+}
+
+/**
+ * Labels uncategorized rows for these payees, and scores again their automatic labels from learning (decision 0043).
+ * Confirmed rows and other automatic reasons do not change.
+ */
 export function spreadSureLabels(tx: WriteTx, payees: readonly string[], except: ReadonlySet<string>): void {
   const wanted = new Set(payees.filter((payee) => payee.length > 0));
   if (wanted.size === 0) {
@@ -185,9 +222,10 @@ export function spreadSureLabels(tx: WriteTx, payees: readonly string[], except:
   const rows = openRows(tx, [...wanted]).filter((row) => !except.has(row.id));
   for (const row of rows) {
     const result = scorePayee(book, { payee: row.payee, amount: row.amount, recurring: null });
-    if (result.level !== "automatic") {
-      continue;
+    if (row.categoryId !== null) {
+      rescoreRow(tx, row, result);
+    } else if (result.level === "automatic") {
+      applyRow(tx, row, result);
     }
-    applyRow(tx, row, result);
   }
 }

@@ -545,6 +545,8 @@ It applies on every link: automatic link on import, and a manual link in the UI.
 
 Decision with the fixed threshold 0.85 (decision 0039):
 - confidence ≥ 0.85 and a clear lead: **automatic** (the label is applied; it still needs review).
+  Exception (decision 0043): when the key has learned labels and no band contains the amount, the result is not
+  automatic.
 - confidence ≥ 0.60: **suggestion** (preselected, not applied).
 - less: no suggestion.
 The app compares confidence in thousandths (0–1000) with the thresholds (decision 0036).
@@ -557,6 +559,10 @@ The app compares confidence in thousandths (0–1000) with the thresholds (decis
 - The app sets category and merchant automatically on import (only the rows of that import, so undo removes them all),
   and after each user confirmation on the other uncategorized transactions whose confidence is now above the threshold.
   It keeps a merchant that the user set.
+- After each user confirmation, the app also scores again the unconfirmed automatic labels from learning
+  (`learned_amount`, `learned_payee`) of the same payees (decision 0043). The same label stays with the new values.
+  A different automatic label replaces it. A result that is not automatic removes the category and the automatic
+  fields; the merchant stays.
 - An automatic label stores `autoReason` (the strongest signal code), `autoConfidence` (0–1000) and `autoSourceId`.
   The UI shows the level (see Levels). The reason code stays for the logic; the UI does not show it.
 - A confirmation clears `autoReason`. Other edits (notes, tags) are not confirmations.

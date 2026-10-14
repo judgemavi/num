@@ -62,6 +62,8 @@ export type ScoreInput = {
   similar: SimilarPayee | null;
   family?: FamilySignal | null;
   transferRows: readonly { id: string; date: string; transferAccountId: string }[];
+  /** The key has learned labels and no band contains the amount. The result is then not automatic (decision 0043). */
+  outsideBands: boolean;
 };
 
 export type MatchSignal = {
@@ -315,14 +317,15 @@ function groupCandidates(signals: readonly MatchSignal[]): Candidate[] {
     .sort((left, right) => right.confidence - left.confidence);
 }
 
-function resultFrom(candidate: Candidate, second: number | null, mortgage: boolean): MatchResult {
+function resultFrom(candidate: Candidate, second: number | null, mortgage: boolean, outsideBands: boolean): MatchResult {
   const { top } = candidate;
   const milli = confidenceMilli(candidate.confidence);
   const leadMilli = second === null ? 1000 : milli - confidenceMilli(second);
   const transfer = top.transferAccountId !== null && top.categoryId === null;
   const similar = candidate.signals.some((signal) => signal.reason === "similar" || signal.reason === "family");
+  const guarded = outsideBands && candidate.signals.every((signal) => signal.reason !== "recurring");
   return {
-    level: mortgage ? "automatic" : matchLevel(milli, leadMilli, transfer || similar),
+    level: mortgage ? "automatic" : matchLevel(milli, leadMilli, transfer || similar || guarded),
     confidence: candidate.confidence,
     confidenceMilli: milli,
     leadMilli,
@@ -344,5 +347,5 @@ export function scoreMatch(input: ScoreInput): MatchResult {
     return emptyMatch;
   }
   const mortgage = input.recurring?.mortgage === true;
-  return resultFrom(best, candidates[1]?.confidence ?? null, mortgage);
+  return resultFrom(best, candidates[1]?.confidence ?? null, mortgage, input.outsideBands);
 }
