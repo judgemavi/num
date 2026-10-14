@@ -14,19 +14,16 @@ const fileInputSchema = z.union([
   }),
 ]);
 
-export function shapeOf(schema: z.ZodType | undefined): Record<string, z.ZodType> {
-  if (!schema || !("shape" in schema)) {
-    return {};
-  }
-  return (schema as { shape: Record<string, z.ZodType> }).shape;
+export function isZodSchema(value: unknown): value is z.ZodType {
+  return value instanceof z.ZodType;
 }
 
-function unionOptions(schema: z.ZodType | undefined) {
-  if (!schema || !("options" in schema)) {
-    return [];
-  }
-  const options = (schema as { options?: z.ZodType[] }).options;
-  return Array.isArray(options) ? options : [];
+export function shapeOf(schema: z.ZodType | undefined): Record<string, z.ZodType> {
+  return schema instanceof z.ZodObject ? schema.shape : {};
+}
+
+function unionOptions(schema: z.ZodType | undefined): z.ZodType[] {
+  return schema instanceof z.ZodUnion ? schema.options.filter(isZodSchema) : [];
 }
 
 export function fieldSchema(schema: z.ZodType | undefined, key: string): z.ZodType | undefined {
@@ -57,9 +54,9 @@ export function fieldKeys(schema: z.ZodType | undefined): string[] {
   return [...keys];
 }
 
+/** `z.instanceof(File)` is a custom schema. */
 export function isFileSchema(schema: z.ZodType): boolean {
-  const type = (schema as { def?: { type?: string } }).def?.type;
-  return type === "instanceof" || type === "file" || type === "custom";
+  return schema instanceof z.ZodCustom || schema instanceof z.ZodFile;
 }
 
 function fileFrom(value: unknown) {

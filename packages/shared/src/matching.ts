@@ -2,16 +2,11 @@ export const autoReasons = ["recurring", "learned_amount", "learned_payee", "sim
 
 export type AutoReason = (typeof autoReasons)[number];
 
-export const confidenceModes = ["careful", "balanced", "eager"] as const;
-
-export type ConfidenceMode = (typeof confidenceModes)[number];
-
-/** Thresholds in thousandths. The level compares them with `confidenceMilli` (decision 0036). */
-export const confidenceThresholds: Record<ConfidenceMode, number> = {
-  careful: 950,
-  balanced: 850,
-  eager: 750,
-};
+/**
+ * A suggestion at or above this confidence, in thousandths, is an automatic label (decision 0039). The level compares
+ * it with `confidenceMilli` (decision 0036).
+ */
+const automaticThreshold = 850;
 
 export const suggestionFloor = 600;
 export const likelyMinimum = 750;
@@ -61,7 +56,6 @@ export type FamilySignal = {
 };
 
 export type ScoreInput = {
-  mode: ConfidenceMode;
   recurring: RecurringSignal | null;
   amountScores: readonly LearnedScore[];
   payeeScores: readonly LearnedScore[];
@@ -173,14 +167,14 @@ export function confidenceMilli(confidence: number): number {
 }
 
 /** Confidence and lead are in thousandths. */
-export function matchLevel(confidence: number, lead: number, mode: ConfidenceMode, suggestionOnly: boolean): MatchLevel {
+export function matchLevel(confidence: number, lead: number, suggestionOnly: boolean): MatchLevel {
   if (confidence < suggestionFloor) {
     return "none";
   }
   if (suggestionOnly || lead < leadMinimum) {
     return "suggestion";
   }
-  return confidence >= confidenceThresholds[mode] ? "automatic" : "suggestion";
+  return confidence >= automaticThreshold ? "automatic" : "suggestion";
 }
 
 function pushLearned(
@@ -321,14 +315,14 @@ function groupCandidates(signals: readonly MatchSignal[]): Candidate[] {
     .sort((left, right) => right.confidence - left.confidence);
 }
 
-function resultFrom(candidate: Candidate, second: number | null, mode: ConfidenceMode, mortgage: boolean): MatchResult {
+function resultFrom(candidate: Candidate, second: number | null, mortgage: boolean): MatchResult {
   const { top } = candidate;
   const milli = confidenceMilli(candidate.confidence);
   const leadMilli = second === null ? 1000 : milli - confidenceMilli(second);
   const transfer = top.transferAccountId !== null && top.categoryId === null;
   const similar = candidate.signals.some((signal) => signal.reason === "similar" || signal.reason === "family");
   return {
-    level: mortgage ? "automatic" : matchLevel(milli, leadMilli, mode, transfer || similar),
+    level: mortgage ? "automatic" : matchLevel(milli, leadMilli, transfer || similar),
     confidence: candidate.confidence,
     confidenceMilli: milli,
     leadMilli,
@@ -350,5 +344,5 @@ export function scoreMatch(input: ScoreInput): MatchResult {
     return emptyMatch;
   }
   const mortgage = input.recurring?.mortgage === true;
-  return resultFrom(best, candidates[1]?.confidence ?? null, input.mode, mortgage);
+  return resultFrom(best, candidates[1]?.confidence ?? null, mortgage);
 }

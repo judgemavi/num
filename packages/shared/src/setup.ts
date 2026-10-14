@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { currencyCodeSchema } from "./currency";
-import { confidenceModes } from "./matching";
 
 export const categorySets = ["default", "none"] as const;
 
@@ -21,10 +20,6 @@ export const setupResultSchema = setupRequestSchema;
 
 export const currencyUpdateSchema = z.object({
   currency: currencyCodeSchema,
-});
-
-export const matchingSettingSchema = z.object({
-  autoConfidence: z.enum(confidenceModes),
 });
 
 export const aiAccessSettingSchema = z.object({

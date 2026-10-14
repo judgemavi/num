@@ -4,7 +4,6 @@ export const settingsAreas = [
   { to: "/settings/tags", label: "Tags" },
   { to: "/settings/merchants", label: "Merchants" },
   { to: "/settings/currency", label: "Currency" },
-  { to: "/settings/matching", label: "Matching" },
   { to: "/settings/ai", label: "AI access" },
   { to: "/settings/backup", label: "Backup" },
 ] as const;

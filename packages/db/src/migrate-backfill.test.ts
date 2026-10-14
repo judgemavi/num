@@ -10,15 +10,16 @@ import { migrateDatabase } from "./index";
 import { fillSortKeys } from "./sort-keys";
 
 const migrations = join(import.meta.dir, "..", "migrations");
-const last = "0008_sort_keys_and_account_created_at";
+const backfill = "0008_sort_keys_and_account_created_at";
 
-/** A database that has all migrations before the last one. */
-function databaseBeforeLast(dir: string) {
+/** A database that has all migrations before the backfill migration. */
+function databaseBeforeBackfill(dir: string) {
   const old = join(dir, "old");
   mkdirSync(join(old, "meta"), { recursive: true });
   const journal = JSON.parse(readFileSync(join(migrations, "meta", "_journal.json"), "utf8")) as { entries: { tag: string }[] };
-  const kept = journal.entries.filter((entry) => entry.tag !== last);
-  expect(kept.length).toBe(journal.entries.length - 1);
+  const index = journal.entries.findIndex((entry) => entry.tag === backfill);
+  expect(index).toBeGreaterThan(0);
+  const kept = journal.entries.slice(0, index);
   writeFileSync(join(old, "meta", "_journal.json"), JSON.stringify({ ...journal, entries: kept }));
   for (const entry of kept) {
     cpSync(join(migrations, `${entry.tag}.sql`), join(old, `${entry.tag}.sql`));
@@ -34,9 +35,9 @@ function addAccount(sqlite: Database, id: string, openingDate: string | null) {
     .run(id, openingDate);
 }
 
-test("the last migration fills the creation time of each account and the sort keys", () => {
+test("the backfill migration fills the creation time of each account and the sort keys", () => {
   const dir = mkdtempSync(join(tmpdir(), "num-db-backfill-"));
-  const sqlite = databaseBeforeLast(dir);
+  const sqlite = databaseBeforeBackfill(dir);
   try {
     addAccount(sqlite, "audited", "2026-01-01");
     addAccount(sqlite, "from-transaction", null);

@@ -6,13 +6,13 @@ import { aiCanWrite } from "../services/ai-access";
 import { withMcpAudit } from "../services/write";
 import type { McpRoute } from "./catalog";
 import { routeRequest } from "./inputs";
-import { toolResult } from "./result";
+import { isRecord, toolResult } from "./result";
 
-function errorResult(code: string, params: Record<string, string> = {}): CallToolResult {
+function errorResult(code: string, params: Record<string, unknown> = {}): CallToolResult {
   return { ...toolResult({ code, params }), isError: true };
 }
 
-async function responseBody(response: Response) {
+async function responseBody(response: Response): Promise<unknown> {
   const type = response.headers.get("content-type") ?? "";
   if (type.includes("application/json")) {
     return response.json();
@@ -27,14 +27,12 @@ async function responseBody(response: Response) {
 async function toolBody(response: Response): Promise<CallToolResult> {
   const body = await responseBody(response);
   if (response.status >= 400) {
-    if (typeof body === "object" && body !== null && "code" in body) {
-      const error = body as { code?: unknown; params?: unknown };
-      const params = typeof error.params === "object" && error.params !== null ? (error.params as Record<string, string>) : {};
-      return errorResult(typeof error.code === "string" ? error.code : "internal_error", params);
+    if (isRecord(body) && typeof body.code === "string") {
+      return errorResult(body.code, isRecord(body.params) ? body.params : {});
     }
     return errorResult("internal_error");
   }
-  return toolResult(typeof body === "object" && body !== null ? (body as Record<string, unknown>) : { value: body });
+  return toolResult(isRecord(body) ? body : { value: body });
 }
 
 export async function callMcpTool(

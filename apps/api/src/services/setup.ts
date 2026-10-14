@@ -1,10 +1,9 @@
 import { categories, categoryGroups, settings } from "@num/db";
-import { foldName, currencyDigits, type CategorySet, type ConfidenceMode, type CurrencyCode } from "@num/shared";
+import { foldName, currencyDigits, type CategorySet, type CurrencyCode } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { defaultCategoryGroups } from "./default-categories";
-import { confidenceMode } from "./match-book";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 const settingDefaults = [
@@ -12,7 +11,6 @@ const settingDefaults = [
   ["emergencyFundMonths", "3"],
   ["staleImportDays", "10"],
   ["recurringGraceDays", "3"],
-  ["autoConfidence", "balanced"],
 ] as const;
 
 type SetupInput = {
@@ -152,34 +150,4 @@ export function changeCurrency(db: Db, input: CurrencyInput): { currency: Curren
     });
   });
   return { currency };
-}
-
-export function matchingSetting(db: Db): { autoConfidence: ConfidenceMode } {
-  return { autoConfidence: confidenceMode(db) };
-}
-
-export function changeMatching(db: Db, input: { autoConfidence: ConfidenceMode; source: AuditSource; at?: string }): { autoConfidence: ConfidenceMode } {
-  const current = db.select().from(settings).where(eq(settings.key, "currency")).get();
-  if (!current) {
-    throw new ServiceError("setup_required", 409);
-  }
-  write(db, { source: input.source, at: input.at }, (tx) => {
-    const row = tx.select().from(settings).where(eq(settings.key, "autoConfidence")).get();
-    if (!row) {
-      insertSetting(tx, "autoConfidence", input.autoConfidence);
-      return;
-    }
-    if (row.value === input.autoConfidence) {
-      return;
-    }
-    tx.update(settings).set({ value: input.autoConfidence }).where(eq(settings.key, "autoConfidence")).run();
-    tx.audit({
-      entity: "settings",
-      entityId: "autoConfidence",
-      action: "update",
-      before: { value: row.value },
-      after: { value: input.autoConfidence },
-    });
-  });
-  return { autoConfidence: input.autoConfidence };
 }

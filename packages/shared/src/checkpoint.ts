@@ -68,13 +68,15 @@ export const checkpointCompareSchema = z.object({
   openingSuggestion: openingSuggestionSchema.nullable(),
 });
 
-export const checkpointListSchema = z.object({
-  items: z.array(checkpointSchema),
-});
-
 export const closingHintSchema = z.object({
   closingDate: isoDateSchema.nullable(),
   closingBalance: amountSchema.nullable(),
+});
+
+/** The checkpoints of an account and the closing balance of the last imported statement (decision 0039). */
+export const checkpointListSchema = z.object({
+  items: z.array(checkpointSchema),
+  closing: closingHintSchema,
 });
 
 export const clearanceSchema = z.object({

@@ -4,8 +4,8 @@ import { z } from "zod";
 import type { Db } from "../db";
 import { aiCanWrite } from "../services/ai-access";
 import { callMcpTool } from "./execute";
-import { fieldKeys, isFileSchema, shapeOf } from "./inputs";
-import { publishedSchema } from "./result";
+import { fieldKeys, isFileSchema, isZodSchema, shapeOf } from "./inputs";
+import { isRecord, publishedSchema } from "./result";
 
 const moneyText = "Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.";
 
@@ -38,67 +38,41 @@ export type McpRoute = {
   multipart: boolean;
 };
 
-type RouteConfig = {
-  method: string;
-  path: string;
-  operationId?: string;
-  description?: string;
-  request?: {
-    params?: z.ZodType;
-    query?: z.ZodType;
-    body?: { content?: Record<string, { schema?: z.ZodType }> };
-  };
-};
-
 const methods = new Set(["get", "post", "put", "patch", "delete"]);
 
-type ZodDef = {
-  shape?: Record<string, z.ZodType>;
-  innerType?: z.ZodType;
-  element?: z.ZodType;
-  options?: z.ZodType[];
-  in?: z.ZodType;
-  out?: z.ZodType;
-};
+type RouteConfig = Parameters<OpenAPIHono["openAPIRegistry"]["registerPath"]>[0];
 
-function schemaHasAmount(schema: z.ZodType, seen: WeakSet<object>) {
+/** The schemas inside a schema: the fields of an object, the item of an array, the options of a union and the wrapped schema. */
+function innerSchemas(schema: z.ZodType): z.ZodType[] {
+  if (schema instanceof z.ZodObject) {
+    return Object.values(schema.shape);
+  }
+  if (schema instanceof z.ZodArray) {
+    return [schema.element].filter(isZodSchema);
+  }
+  if (schema instanceof z.ZodUnion) {
+    return schema.options.filter(isZodSchema);
+  }
+  if (schema instanceof z.ZodPipe) {
+    return [schema.in, schema.out].filter(isZodSchema);
+  }
+  const def = schema.def;
+  return "innerType" in def && isZodSchema(def.innerType) ? [def.innerType] : [];
+}
+
+function schemaHasAmount(schema: z.ZodType, seen: WeakSet<object>): boolean {
   if (seen.has(schema)) {
     return false;
   }
   seen.add(schema);
-  const meta = (schema as { meta?: () => { money?: boolean } }).meta?.();
-  if (meta?.money === true) {
+  if (schema.meta()?.money === true) {
     return true;
   }
-  const def = (schema as { def?: ZodDef }).def;
-  if (!def) {
-    return false;
-  }
-  if (def.shape) {
-    for (const value of Object.values(def.shape)) {
-      if (schemaHasAmount(value, seen)) {
-        return true;
-      }
-    }
-  }
-  if (def.innerType && schemaHasAmount(def.innerType, seen)) {
-    return true;
-  }
-  if (def.element && schemaHasAmount(def.element, seen)) {
-    return true;
-  }
-  if (def.in && schemaHasAmount(def.in, seen)) {
-    return true;
-  }
-  if (def.out && schemaHasAmount(def.out, seen)) {
-    return true;
-  }
-  for (const option of def.options ?? []) {
-    if (schemaHasAmount(option, seen)) {
-      return true;
-    }
-  }
-  return false;
+  return innerSchemas(schema).some((inner) => schemaHasAmount(inner, seen));
+}
+
+function zodSchemaOf(media: unknown): z.ZodType | undefined {
+  return isRecord(media) && isZodSchema(media.schema) ? media.schema : undefined;
 }
 
 function routeSchemas(route: RouteConfig, body: z.ZodType | undefined) {
@@ -112,13 +86,9 @@ function routeSchemas(route: RouteConfig, body: z.ZodType | undefined) {
   if (body) {
     schemas.push(body);
   }
-  const responses = (route as { responses?: Record<string, { content?: Record<string, { schema?: z.ZodType }> }> }).responses ?? {};
-  for (const response of Object.values(responses)) {
-    for (const content of Object.values(response.content ?? {})) {
-      if (content.schema) {
-        schemas.push(content.schema);
-      }
-    }
+  for (const response of Object.values(route.responses)) {
+    const content = "content" in response ? Object.values(response.content ?? {}) : [];
+    schemas.push(...content.map(zodSchemaOf).filter(isZodSchema));
   }
   return schemas;
 }
@@ -133,15 +103,13 @@ function isMethod(value: string): value is McpRoute["method"] {
 }
 
 function bodyOf(route: RouteConfig): { schema?: z.ZodType; multipart: boolean } {
-  const content = route.request?.body?.content;
-  if (!content) {
-    return { multipart: false };
+  for (const [type, media] of Object.entries(route.request?.body?.content ?? {})) {
+    const schema = zodSchemaOf(media);
+    if (schema) {
+      return { schema, multipart: type.includes("multipart") || type.includes("form-data") };
+    }
   }
-  const entry = Object.entries(content).find(([, value]) => value.schema);
-  if (!entry) {
-    return { multipart: false };
-  }
-  return { schema: entry[1].schema, multipart: entry[0].includes("multipart") || entry[0].includes("form-data") };
+  return { multipart: false };
 }
 
 export function isDestructive(method: string, path: string): boolean {
@@ -168,7 +136,7 @@ export function mcpRoutes(app: OpenAPIHono): McpRoute[] {
     if (definition.type !== "route") {
       continue;
     }
-    const route = definition.route as RouteConfig;
+    const route = definition.route;
     if (!isMethod(route.method)) {
       throw new Error(`MCP method is not supported for ${route.path}`);
     }
@@ -211,19 +179,23 @@ function addFields(fields: Record<string, z.ZodType>, schema: z.ZodType | undefi
 
 function unionSchema(route: McpRoute, extra: Record<string, z.ZodType>): z.ZodType | undefined {
   const body = route.body;
-  if (!body || fieldKeys(body).length === 0 || Object.keys(shapeOf(body)).length > 0) {
+  if (!(body instanceof z.ZodUnion) || fieldKeys(body).length === 0) {
     return undefined;
   }
-  const options = "options" in body ? (body as { options?: z.ZodType[] }).options : undefined;
-  if (!options || options.some((option) => Object.keys(shapeOf(option)).length === 0)) {
-    throw new Error(`MCP body schema for ${route.operationId} must be an object`);
+  const branches = body.options.map((option) => {
+    if (!(option instanceof z.ZodObject)) {
+      throw new Error(`MCP body schema for ${route.operationId} must be an object`);
+    }
+    return option.extend(extra);
+  });
+  const [first, ...rest] = branches;
+  if (!first) {
+    throw new Error(`MCP body schema for ${route.operationId} has no options`);
   }
-  const branches = options.map((option) => (option as z.ZodObject).extend(extra));
-  const discriminator = (body as { def?: { discriminator?: unknown } }).def?.discriminator;
-  if (typeof discriminator === "string" && branches.length >= 2) {
-    return z.discriminatedUnion(discriminator, branches as [z.ZodObject, z.ZodObject, ...z.ZodObject[]]);
+  if (body instanceof z.ZodDiscriminatedUnion) {
+    return z.discriminatedUnion(body.def.discriminator, [first, ...rest]);
   }
-  return z.union(branches as unknown as [z.ZodType, z.ZodType, ...z.ZodType[]]);
+  return z.union(branches);
 }
 
 function inputSchema(route: McpRoute) {
@@ -264,7 +236,7 @@ export function registerGeneratedTools(server: McpServer, app: OpenAPIHono, db: 
           openWorldHint: false,
         },
       },
-      async (args) => callMcpTool(app, db, route, args as Record<string, unknown>),
+      async (args) => callMcpTool(app, db, route, args),
     );
   }
 }

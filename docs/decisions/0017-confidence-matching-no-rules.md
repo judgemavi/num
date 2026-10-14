@@ -18,6 +18,7 @@ the user to maintain patterns. The owner wants the app to learn and to show how 
 - Learned confidence uses recency-weighted agreement and the number of confirmations. Signals for the same candidate
   combine (1 − Π(1 − c)). The best candidate must lead by 0.2.
 - Setting `autoConfidence`: Careful 0.95, Balanced 0.85 (default), Eager 0.75. Above it: automatic. From 0.60: suggestion.
+  (Replaced by 0039: the threshold is fixed at 0.85.)
 - Linking to a recurring item labels the transaction with the item's category and merchant. A recurring mortgage item
   splits the payment by the schedule.
 - The UI shows the confidence and the reasons.

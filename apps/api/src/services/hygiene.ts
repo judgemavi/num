@@ -13,7 +13,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listAccounts } from "./accounts";
 import { listBuckets, listOverspent } from "./buckets";
-import { cardLedger } from "./card-statements";
+import { cardLedger } from "./card-ledger";
 import { lastCompleteMonths } from "./complete-months";
 import { monthlyBills } from "./funding-book";
 import { importFreshness, settingNumber } from "./book-settings";

@@ -2,18 +2,11 @@ import type { CheckpointCreate, Clearance } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 
+/** The checkpoints of an account and the closing date and the closing balance of the last imported statement. */
 export function checkpointListQuery(accountId: string) {
   return queryOptions({
     queryKey: ["checkpoints", accountId],
-    queryFn: async () => (await unwrap(api.accounts[":id"].checkpoints.$get({ param: { id: accountId } }))).items,
-  });
-}
-
-/** The closing date and the closing balance of the last imported statement. */
-export function closingHintQuery(accountId: string) {
-  return queryOptions({
-    queryKey: ["closing", accountId],
-    queryFn: () => unwrap(api.accounts[":id"].closing.$get({ param: { id: accountId } })),
+    queryFn: () => unwrap(api.accounts[":id"].checkpoints.$get({ param: { id: accountId } })),
   });
 }
 

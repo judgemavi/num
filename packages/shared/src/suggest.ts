@@ -32,10 +32,6 @@ export const transferPairSchema = z.object({
   rightId: z.uuid(),
 });
 
-export const transferPairListSchema = z.object({
-  items: z.array(transferPairSchema),
-});
-
 export type Suggestion = z.infer<typeof suggestionSchema>;
 export type TransferPair = z.infer<typeof transferPairSchema>;
 

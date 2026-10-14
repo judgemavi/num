@@ -1,14 +1,13 @@
 import { expect, test } from "bun:test";
 import { bandContains, fitLabels, labelScores, learnedLabels, widthFactor, type BandRow } from "./amount-band";
-import { learnedConfidence, scoreMatch, type ConfidenceMode } from "./matching";
+import { learnedConfidence, scoreMatch } from "./matching";
 
 function row(id: string, date: string, categoryId: string, amount: number): BandRow {
   return { id, date, categoryId, merchantId: null, amount };
 }
 
-function score(rows: readonly BandRow[], amount: number, mode: ConfidenceMode = "balanced") {
+function score(rows: readonly BandRow[], amount: number) {
   return scoreMatch({
-    mode,
     recurring: null,
     amountScores: labelScores(fitLabels(learnedLabels(rows), amount)),
     payeeScores: learnedConfidence(rows),
@@ -89,8 +88,8 @@ test("payee + amount and payee for one candidate give the higher value, not the 
   expect(score(rows, -1500000).confidenceMilli).toBe(808);
 });
 
-test("one answer at the same amount is automatic with Balanced and a suggestion with Careful", () => {
+test("one answer at the same amount is automatic at the fixed threshold (850)", () => {
   const rows = [row("a", "2026-01-01", "rent", -2000000)];
-  expect(score(rows, -2000000, "balanced").level).toBe("automatic");
-  expect(score(rows, -2000000, "careful").level).toBe("suggestion");
+  expect(score(rows, -2000000).level).toBe("automatic");
+  expect(score(rows, -1500000).level).toBe("suggestion");
 });

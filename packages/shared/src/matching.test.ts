@@ -16,7 +16,6 @@ function row(id: string, date: string, categoryId: string, merchantId: string | 
 
 function score(patch: Partial<ScoreInput>) {
   return scoreMatch({
-    mode: "balanced",
     recurring: null,
     amountScores: [],
     payeeScores: [],
@@ -52,26 +51,21 @@ test("a conflict splits the weight and does not make an automatic label", () => 
   expect(scores).toHaveLength(2);
   expect(scores[0]?.categoryId).toBe("gifts");
   expect(scores[0]?.confidence).toBeCloseTo((1 / 1.5) * (1 - 0.15 * 0.6), 10);
-  const result = score({ amountScores: scores, payeeScores: scores, mode: "balanced" });
+  const result = score({ amountScores: scores, payeeScores: scores });
   expect(result.level).not.toBe("automatic");
 });
 
 test("signals for one candidate combine and a small lead stays a suggestion", () => {
   expect(combineConfidence([0.5, 0.5])).toBeCloseTo(1 - 0.5 * 0.5, 10);
-  expect(matchLevel(950, 200, "careful", false)).toBe("automatic");
-  expect(matchLevel(949, 200, "careful", false)).toBe("suggestion");
-  expect(matchLevel(850, 200, "balanced", false)).toBe("automatic");
-  expect(matchLevel(849, 200, "balanced", false)).toBe("suggestion");
-  expect(matchLevel(750, 200, "eager", false)).toBe("automatic");
-  expect(matchLevel(749, 200, "eager", false)).toBe("suggestion");
-  expect(matchLevel(599, 1000, "eager", false)).toBe("none");
-  expect(matchLevel(990, 199, "eager", false)).toBe("suggestion");
-  expect(matchLevel(990, 1000, "careful", true)).toBe("suggestion");
+  expect(matchLevel(850, 200, false)).toBe("automatic");
+  expect(matchLevel(849, 200, false)).toBe("suggestion");
+  expect(matchLevel(599, 1000, false)).toBe("none");
+  expect(matchLevel(990, 199, false)).toBe("suggestion");
+  expect(matchLevel(990, 1000, true)).toBe("suggestion");
 });
 
 test("a recurring category label is automatic and a transfer is not", () => {
   const labeled = score({
-    mode: "careful",
     recurring: {
       planId: "plan",
       categoryId: "rent",
@@ -103,7 +97,6 @@ test("a recurring category label is automatic and a transfer is not", () => {
 
 test("a recurring mortgage item is an automatic split", () => {
   const result = score({
-    mode: "careful",
     recurring: {
       planId: "plan",
       categoryId: null,
@@ -126,8 +119,8 @@ test("the same e-transfer payee follows the amount, not the other amounts", () =
   ];
   const other = [row("g1", "2026-03-15", "gifts"), row("g2", "2026-02-15", "gifts"), row("g3", "2026-01-15", "gifts")];
   const payeeScores = learnedConfidence([...rent, ...other]);
-  const rentPayment = score({ amountScores: learnedConfidence(rent), payeeScores, mode: "balanced" });
-  const otherPayment = score({ amountScores: learnedConfidence(other), payeeScores, mode: "balanced" });
+  const rentPayment = score({ amountScores: learnedConfidence(rent), payeeScores });
+  const otherPayment = score({ amountScores: learnedConfidence(other), payeeScores });
   expect(rentPayment.categoryId).toBe("rent");
   expect(rentPayment.level).toBe("automatic");
   expect(otherPayment.categoryId).toBe("gifts");
@@ -139,27 +132,27 @@ test("confidence millis stay inside 0 to 1000", () => {
   expect(confidenceMilli(-1)).toBe(0);
 });
 
-test("a similar payee is never automatic, even when eager and combined with a merchant default", () => {
+test("a similar payee is never automatic, even when combined with a merchant default", () => {
   const scores = learnedConfidence([row("a", "2026-01-01", "fares"), row("b", "2026-01-02", "fares"), row("c", "2026-01-03", "fares")]);
   const similar = { scores, transferRows: [] };
-  const alone = score({ similar, mode: "eager" });
+  const alone = score({ similar });
   expect(alone.reason).toBe("similar");
   expect(alone.confidence).toBeCloseTo((scores[0]?.confidence ?? 0) * 0.9, 10);
   expect(alone.level).toBe("suggestion");
   const merchant = { id: "m", name: "Presto", categoryId: "fares" };
-  const combined = score({ similar, merchant, mode: "eager" });
+  const combined = score({ similar, merchant });
   expect(combined.confidence).toBeGreaterThan(0.75);
   expect(combined.level).toBe("suggestion");
 });
 
 test("a brand family suggestion uses the lowest confidence times 0.85 and is never automatic", () => {
   const family = { categoryId: "transit", merchantId: null, transferAccountId: null, confidence: 0.91, sourceId: "a" };
-  const alone = score({ family, mode: "eager" });
+  const alone = score({ family });
   expect(alone.reason).toBe("family");
   expect(alone.confidence).toBeCloseTo(0.91 * 0.85, 10);
   expect(alone.level).toBe("suggestion");
   const merchant = { id: "m", name: "Presto", categoryId: "transit" };
-  const combined = score({ family, merchant, mode: "eager" });
+  const combined = score({ family, merchant });
   expect(combined.confidence).toBeGreaterThan(0.75);
   expect(combined.level).toBe("suggestion");
 });
@@ -170,7 +163,7 @@ test("a learned transfer payee gives a transfer suggestion that is never automat
     { id: "b", date: "2026-01-02", transferAccountId: "visa" },
     { id: "c", date: "2026-01-03", transferAccountId: "visa" },
   ];
-  const result = score({ similar: { scores: [], transferRows }, mode: "eager" });
+  const result = score({ similar: { scores: [], transferRows } });
   expect(result.transferAccountId).toBe("visa");
   expect(result.reason).toBe("similar");
   expect(result.level).toBe("suggestion");

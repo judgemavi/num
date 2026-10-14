@@ -7,17 +7,13 @@ export const defaultCardDueDays = 21;
 
 export const cardStatementCodes = ["statement", "estimated"] as const;
 
-export const cardStatementSchema = z.object({
+const cardStatementSchema = z.object({
   code: z.enum(cardStatementCodes),
   date: isoDateSchema,
   dueDate: isoDateSchema,
 });
 
-export const cardStatementListSchema = z.object({
-  items: z.array(cardStatementSchema),
-});
-
-export type CardStatement = z.infer<typeof cardStatementSchema>;
+type CardStatement = z.infer<typeof cardStatementSchema>;
 
 function daysBetween(from: string, to: string) {
   return Temporal.PlainDate.from(from).until(Temporal.PlainDate.from(to), { largestUnit: "day" }).days;

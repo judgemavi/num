@@ -1,7 +1,6 @@
 import {
   aiAccessSettingSchema,
   currencyUpdateSchema,
-  matchingSettingSchema,
   setupRequestSchema,
   setupResultSchema,
   setupStatusSchema,
@@ -9,7 +8,7 @@ import {
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { aiCanWrite, changeAiAccess } from "../services/ai-access";
-import { bookCurrency, changeCurrency, changeMatching, matchingSetting, runSetup, setupStatus } from "../services/setup";
+import { bookCurrency, changeCurrency, runSetup, setupStatus } from "../services/setup";
 import { validationHook } from "../validation";
 import { errorResponse } from "./common";
 
@@ -106,21 +105,6 @@ const currencyRoute = createRoute({
   },
 });
 
-const matchingReadRoute = createRoute({
-  method: "get",
-  path: "/api/settings/matching",
-  operationId: "get_settings_matching",
-  description:
-    "Read when labels become automatic. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
-  responses: {
-    200: {
-      description: "When labels become automatic",
-      content: { "application/json": { schema: matchingSettingSchema } },
-    },
-    409: errorResponse,
-  },
-});
-
 const aiReadRoute = createRoute({
   method: "get",
   path: "/api/settings/ai",
@@ -154,24 +138,6 @@ const aiRoute = createRoute({
   },
 });
 
-const matchingRoute = createRoute({
-  operationId: "patch_settings_matching",
-  description: "Change when labels become automatic. This does not change transactions or categories. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
-  method: "patch",
-  path: "/api/settings/matching",
-  request: {
-    body: { required: true, content: { "application/json": { schema: matchingSettingSchema } } },
-  },
-  responses: {
-    200: {
-      description: "When labels become automatic",
-      content: { "application/json": { schema: matchingSettingSchema } },
-    },
-    400: errorResponse,
-    409: errorResponse,
-  },
-});
-
 export function setupRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook })
     .openapi(setupStatusRoute, (c) => c.json(setupStatus(db), 200))
@@ -183,11 +149,6 @@ export function setupRoutes(db: Db) {
     .openapi(currencyRoute, (c) => {
       const body = c.req.valid("json");
       return c.json(changeCurrency(db, { currency: body.currency, source: "ui" }), 200);
-    })
-    .openapi(matchingReadRoute, (c) => c.json(matchingSetting(db), 200))
-    .openapi(matchingRoute, (c) => {
-      const body = c.req.valid("json");
-      return c.json(changeMatching(db, { autoConfidence: body.autoConfidence, source: "ui" }), 200);
     })
     .openapi(aiReadRoute, (c) => c.json({ aiCanWrite: aiCanWrite(db) }, 200))
     .openapi(aiRoute, (c) => {

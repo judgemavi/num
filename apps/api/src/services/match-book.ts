@@ -4,7 +4,6 @@ import {
   buildPayeeIndex,
   containedMatch,
   familyMatch,
-  confidenceModes,
   fitLabels,
   learnedConfidence,
   labelScores,
@@ -14,7 +13,6 @@ import {
   occurrenceDates,
   scoreMatch,
   similarFactor,
-  type ConfidenceMode,
   type LearnedLabel,
   type LearnedRow,
   type LearnedScore,
@@ -74,18 +72,12 @@ type Side = {
 };
 
 export type MatchBook = {
-  mode: ConfidenceMode;
   sides: Record<Direction, Side>;
   transfersByPayee: Map<string, TransferRow[]>;
   mortgageLearned: Map<string, MortgageLearned>;
   mortgageIndex: PayeeIndex;
   mortgageContained: Map<string, MortgageHit | null>;
 };
-
-export function confidenceMode(db: Reader): ConfidenceMode {
-  const row = db.select({ value: settings.value }).from(settings).where(eq(settings.key, "autoConfidence")).get();
-  return confidenceModes.find((mode) => mode === row?.value) ?? "balanced";
-}
 
 function byPayee<T extends { payee: string }>(rows: readonly T[]): Map<string, T[]> {
   const groups = new Map<string, T[]>();
@@ -167,7 +159,6 @@ export function loadMatchBook(db: Reader): MatchBook {
   }
   const mortgageLearned = loadMortgageLearned(db);
   return {
-    mode: confidenceMode(db),
     sides: { out: buildSide(out, transferTops), in: buildSide(incoming, transferTops) },
     transfersByPayee,
     mortgageLearned,
@@ -241,7 +232,6 @@ export function scorePayee(
     side.amountLearned.set(fitKey, amountScores);
   }
   return scoreMatch({
-    mode: book.mode,
     recurring: input.recurring,
     amountScores,
     payeeScores: side.payeeLearned.get(input.payee) ?? [],

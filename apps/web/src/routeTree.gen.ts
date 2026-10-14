@@ -24,7 +24,6 @@ import { Route as SettingsBackupRouteImport } from './routes/settings/backup'
 import { Route as SettingsCategoriesRouteImport } from './routes/settings/categories'
 import { Route as SettingsCurrencyRouteImport } from './routes/settings/currency'
 import { Route as SettingsGroupsRouteImport } from './routes/settings/groups'
-import { Route as SettingsMatchingRouteImport } from './routes/settings/matching'
 import { Route as SettingsMerchantsRouteImport } from './routes/settings/merchants'
 import { Route as SettingsTagsRouteImport } from './routes/settings/tags'
 import { Route as AccountsImportsImportIdRouteImport } from './routes/accounts_.imports_.$importId'
@@ -104,11 +103,6 @@ const SettingsGroupsRoute = SettingsGroupsRouteImport.update({
   path: '/groups',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsMatchingRoute = SettingsMatchingRouteImport.update({
-  id: '/matching',
-  path: '/matching',
-  getParentRoute: () => SettingsRoute,
-} as any)
 const SettingsMerchantsRoute = SettingsMerchantsRouteImport.update({
   id: '/merchants',
   path: '/merchants',
@@ -140,7 +134,6 @@ export interface FileRoutesByFullPath {
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/currency': typeof SettingsCurrencyRoute
   '/settings/groups': typeof SettingsGroupsRoute
-  '/settings/matching': typeof SettingsMatchingRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
   '/settings/': typeof SettingsIndexRoute
@@ -160,7 +153,6 @@ export interface FileRoutesByTo {
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/currency': typeof SettingsCurrencyRoute
   '/settings/groups': typeof SettingsGroupsRoute
-  '/settings/matching': typeof SettingsMatchingRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
   '/settings': typeof SettingsIndexRoute
@@ -182,7 +174,6 @@ export interface FileRoutesById {
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/currency': typeof SettingsCurrencyRoute
   '/settings/groups': typeof SettingsGroupsRoute
-  '/settings/matching': typeof SettingsMatchingRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
   '/settings/': typeof SettingsIndexRoute
@@ -205,7 +196,6 @@ export interface FileRouteTypes {
     | '/settings/categories'
     | '/settings/currency'
     | '/settings/groups'
-    | '/settings/matching'
     | '/settings/merchants'
     | '/settings/tags'
     | '/settings/'
@@ -225,7 +215,6 @@ export interface FileRouteTypes {
     | '/settings/categories'
     | '/settings/currency'
     | '/settings/groups'
-    | '/settings/matching'
     | '/settings/merchants'
     | '/settings/tags'
     | '/settings'
@@ -246,7 +235,6 @@ export interface FileRouteTypes {
     | '/settings/categories'
     | '/settings/currency'
     | '/settings/groups'
-    | '/settings/matching'
     | '/settings/merchants'
     | '/settings/tags'
     | '/settings/'
@@ -373,13 +361,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsGroupsRouteImport
       parentRoute: typeof SettingsRoute
     }
-    '/settings/matching': {
-      id: '/settings/matching'
-      path: '/matching'
-      fullPath: '/settings/matching'
-      preLoaderRoute: typeof SettingsMatchingRouteImport
-      parentRoute: typeof SettingsRoute
-    }
     '/settings/merchants': {
       id: '/settings/merchants'
       path: '/merchants'
@@ -410,7 +391,6 @@ interface SettingsRouteChildren {
   SettingsCategoriesRoute: typeof SettingsCategoriesRoute
   SettingsCurrencyRoute: typeof SettingsCurrencyRoute
   SettingsGroupsRoute: typeof SettingsGroupsRoute
-  SettingsMatchingRoute: typeof SettingsMatchingRoute
   SettingsMerchantsRoute: typeof SettingsMerchantsRoute
   SettingsTagsRoute: typeof SettingsTagsRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -422,7 +402,6 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsCategoriesRoute: SettingsCategoriesRoute,
   SettingsCurrencyRoute: SettingsCurrencyRoute,
   SettingsGroupsRoute: SettingsGroupsRoute,
-  SettingsMatchingRoute: SettingsMatchingRoute,
   SettingsMerchantsRoute: SettingsMerchantsRoute,
   SettingsTagsRoute: SettingsTagsRoute,
   SettingsIndexRoute: SettingsIndexRoute,

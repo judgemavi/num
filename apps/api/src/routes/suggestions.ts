@@ -5,12 +5,11 @@ import {
   transferHintQuerySchema,
   transferHintSchema,
   transferPairAcceptSchema,
-  transferPairListSchema,
   transferPairSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { acceptTransferPair, listTransferPairs, suggestForPayee, transferHint } from "../services/suggestions";
+import { acceptTransferPair, suggestForPayee, transferHint } from "../services/suggestions";
 import { validationHook } from "../validation";
 import { errorResponse } from "./common";
 
@@ -24,18 +23,6 @@ const suggestRoute = createRoute({
     200: { description: "A merchant and category suggestion", content: { "application/json": { schema: suggestionSchema } } },
     400: errorResponse,
     404: errorResponse,
-  },
-});
-
-const transfersRoute = createRoute({
-  operationId: "get_transfer_pairs",
-  description: "Read transfer pairs. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
-  method: "get",
-  path: "/api/transfer-pairs",
-  request: { query: asOfQuerySchema },
-  responses: {
-    200: { description: "Possible transfer pairs", content: { "application/json": { schema: transferPairListSchema } } },
-    400: errorResponse,
   },
 });
 
@@ -79,7 +66,6 @@ export function suggestionRoutes(db: Db) {
       const query = c.req.valid("query");
       return c.json(suggestForPayee(db, query.accountId, query.payee, query.amount, query.date), 200);
     })
-    .openapi(transfersRoute, (c) => c.json(listTransferPairs(db, c.req.valid("query").asOf), 200))
     .openapi(pairRoute, (c) => {
       const body = c.req.valid("json");
       return c.json(acceptTransferPair(db, c.req.valid("query").asOf, body.leftId, body.rightId, { source: "ui" }), 200);

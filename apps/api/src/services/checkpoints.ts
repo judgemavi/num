@@ -120,7 +120,7 @@ export function createCheckpoint(
   });
 }
 
-export function listCheckpoints(db: Db, accountId: string): { items: Checkpoint[] } {
+export function listCheckpoints(db: Db, accountId: string): { items: Checkpoint[]; closing: ClosingHint } {
   requireAccount(db, accountId);
   const items = db
     .select()
@@ -128,7 +128,7 @@ export function listCheckpoints(db: Db, accountId: string): { items: Checkpoint[
     .where(eq(checkpoints.accountId, accountId))
     .orderBy(desc(checkpoints.date), desc(checkpoints.id))
     .all();
-  return { items };
+  return { items, closing: latestClosing(db, accountId) };
 }
 
 export function unlockCheckpoint(db: Db, accountId: string, checkpointId: string, input: WriteInput): Checkpoint {
@@ -155,8 +155,7 @@ export function unlockCheckpoint(db: Db, accountId: string, checkpointId: string
   });
 }
 
-export function latestClosing(db: Db, accountId: string): ClosingHint {
-  requireAccount(db, accountId);
+function latestClosing(db: Db, accountId: string): ClosingHint {
   const rows = db
     .select({
       closingDate: importBatches.closingDate,

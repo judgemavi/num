@@ -50,7 +50,9 @@ export function CheckpointHistory({ accountId }: { accountId: string }) {
 
 function CheckpointRows({ accountId, onUnlock }: { accountId: string; onUnlock: (item: Checkpoint) => void }) {
   // The route starts the two reads together.
-  const [{ data: account }, { data: checkpoints }] = useSuspenseQueries({ queries: [accountQuery(accountId), checkpointListQuery(accountId)] });
+  const [{ data: account }, { data: { items: checkpoints } }] = useSuspenseQueries({
+    queries: [accountQuery(accountId), checkpointListQuery(accountId)],
+  });
   const owed = accountClass(account.kind) === "liability";
   if (checkpoints.length === 0) {
     return <p className="px-5 py-5 text-muted-foreground">No checkpoints yet.</p>;

@@ -11,7 +11,7 @@ import {
 import { useQuery, useSuspenseQueries } from "@tanstack/react-query";
 import { useState } from "react";
 import { accountQuery, useSetOpeningBalance } from "@/api/accounts";
-import { checkpointCompareQuery, closingHintQuery, useCreateCheckpoint } from "@/api/checkpoints";
+import { checkpointCompareQuery, checkpointListQuery, useCreateCheckpoint } from "@/api/checkpoints";
 import { errorCode } from "@/api/client";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,9 @@ function checkpointOf(currency: string, kind: Account["kind"], value: { date: st
 export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
   const { close } = useEditorFrame();
   const currency = useBookCurrency();
-  const [{ data: account }, { data: hint }] = useSuspenseQueries({ queries: [accountQuery(accountId), closingHintQuery(accountId)] });
+  const [{ data: account }, { data: { closing: hint } }] = useSuspenseQueries({
+    queries: [accountQuery(accountId), checkpointListQuery(accountId)],
+  });
   const kind = account.kind;
   // The values that the person sent with "Check". The compare read runs for them. An edit of a value clears them.
   const [checked, setChecked] = useState<CheckpointCreate | null>(null);

@@ -361,7 +361,9 @@ Checkpoint fields: `accountId`, `date`, `statementBalance`, `createdAt`, `unlock
 - A checkpoint of a `credit_card` account is a statement: its date and balance.
 - Due date of a statement = statement date + the median number of days between earlier statements and the next card
   payment (a transfer into the card account). It needs 2 or more examples; otherwise use 21 days.
-- Future statement dates are estimated as one month after the last statement. The UI labels them "estimated".
+- Future statement dates are estimated as one month after the last statement. The forecast and the hygiene checks use
+  the statements and the due dates. The API does not have a separate list of statements, and the UI does not show one
+  (decision 0039).
 
 ### 5.14 (Removed)
 
@@ -407,7 +409,6 @@ The forecast snapshot is removed. A read never writes.
 | `staleImportDays` | 10 | Hygiene check |
 | `recurringGraceDays` | 3 | Date window for recurring links |
 | `aiCanWrite` | false | MCP write tools are listed only when true (§12) |
-| `autoConfidence` | `balanced` | `careful` (0.95), `balanced` (0.85) or `eager` (0.75): when labels become automatic |
 
 ## 6. Calculated values
 
@@ -533,8 +534,8 @@ otherwise it is a suggestion only.
 Exception: a recurring link is the user's own intent. It always labels (automatic), and other signals do not compete with it.
 It applies on every link: automatic link on import, and a manual link in the UI.
 
-Decision with the setting `autoConfidence` (Careful 0.95, Balanced 0.85 default, Eager 0.75):
-- confidence ≥ `autoConfidence` and a clear lead: **automatic** (the label is applied; it still needs review).
+Decision with the fixed threshold 0.85 (decision 0039):
+- confidence ≥ 0.85 and a clear lead: **automatic** (the label is applied; it still needs review).
 - confidence ≥ 0.60: **suggestion** (preselected, not applied).
 - less: no suggestion.
 The app compares confidence in thousandths (0–1000) with the thresholds (decision 0036).
@@ -542,8 +543,6 @@ The app compares confidence in thousandths (0–1000) with the thresholds (decis
 **Levels (decision 0021).** The UI never shows a percentage. It shows only a level, not a reason (decision 0037):
 - **Sure:** automatic. **Likely:** a suggestion with confidence ≥ 0.75. **Maybe:** a suggestion below 0.75.
   No level: no suggestion.
-- Settings → Matching shows `autoConfidence` as "Label for me: only when very sure (careful) · when sure (balanced) ·
-  more often (eager)".
 
 **Automatic labels.**
 - The app sets category and merchant automatically on import (only the rows of that import, so undo removes them all),
@@ -808,6 +807,6 @@ There are 7 screens (decision 0021).
 | Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups, categories), merchants, tags, net worth, mortgage. Decision 0030. |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
 | Recurring | Plans, occurrences, links, skips, Detected (new plan suggestions) |
-| Settings | Subpages: Groups, Categories, Tags, Merchants, Currency (decision 0038), Matching (`autoConfidence`), AI access, Backup. |
+| Settings | Subpages: Groups, Categories, Tags, Merchants, Currency (decision 0038), AI access, Backup. |
 
 The first-run setup screen (§7.0) is not one of the 7 screens. It shows only one time.

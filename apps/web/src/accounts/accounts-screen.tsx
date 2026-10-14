@@ -187,7 +187,7 @@ function AccountsPage() {
         </ListCard>
         <div className="grid content-start gap-5">
           {cards.length === 0 ? (
-            <SidePanel title="Card statements" text="Add a credit card to see what you owe and the due day." />
+            <SidePanel title="Card statements" text="Add a credit card to see what you owe." />
           ) : (
             <ListCard label="Card statements" title="Card statements">
               {cards.map((account) => (

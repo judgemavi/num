@@ -64,6 +64,13 @@
       "when": 1791983159232,
       "tag": "0008_sort_keys_and_account_created_at",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791988319357,
+      "tag": "0009_remove_auto_confidence_setting",
+      "breakpoints": true
     }
   ]
 }

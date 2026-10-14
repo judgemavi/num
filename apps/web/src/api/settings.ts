@@ -1,4 +1,4 @@
-import type { ConfidenceMode, CurrencyCode } from "@num/shared";
+import type { CurrencyCode } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 
@@ -13,19 +13,6 @@ export function bookCurrencyQuery() {
 export function useSaveBookCurrency() {
   return useMutation({
     mutationFn: (currency: CurrencyCode) => unwrap(api.settings.currency.$patch({ json: { currency } })),
-  });
-}
-
-export function matchingSettingQuery() {
-  return queryOptions({
-    queryKey: ["matching-setting"],
-    queryFn: () => unwrap(api.settings.matching.$get()),
-  });
-}
-
-export function useSaveMatchingSetting() {
-  return useMutation({
-    mutationFn: (autoConfidence: ConfidenceMode) => unwrap(api.settings.matching.$patch({ json: { autoConfidence } })),
   });
 }
 

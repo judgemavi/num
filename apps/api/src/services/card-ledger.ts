@@ -1,19 +1,8 @@
 import { accounts, checkpoints, transactions } from "@num/db";
-import { cardStatements, type CardStatement } from "@num/shared";
 import { and, eq, gt, isNotNull, isNull, or } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { hasTransferLine, literal } from "./transaction-sql";
-
-export function listCardStatements(db: Db, accountId: string): { items: CardStatement[] } {
-  const ledger = cardLedger(db, accountId);
-  return {
-    items: cardStatements({
-      statements: ledger.statements,
-      paymentDates: ledger.payments.map((row) => row.date),
-    }),
-  };
-}
 
 export function cardLedger(db: Db, accountId: string): {
   statements: { date: string; balance: number; createdAt: string }[];
