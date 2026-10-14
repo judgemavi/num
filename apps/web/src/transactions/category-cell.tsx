@@ -11,7 +11,7 @@ function labelText(row: TransactionListItem, targetText: ReturnType<typeof useTa
   if (row.autoReason !== null && line.categoryId === null && line.transferAccountId === null) {
     return "No category";
   }
-  return targetText(line);
+  return targetText(line, row.amount);
 }
 
 /** The Category column. The label and the merchant. */
@@ -34,7 +34,7 @@ export function ProposedCategoryCell({ row }: { row: TransactionListItem }) {
   const merchants = useMerchantNames();
   const review = row.review;
   if (review?.question === "transfer_pair" && review.transfer) {
-    return <div>{targetText({ categoryId: null, transferAccountId: review.transfer.otherAccountId })}</div>;
+    return <div>{targetText({ categoryId: null, transferAccountId: review.transfer.otherAccountId }, row.amount)}</div>;
   }
   const suggestion = review?.question === "categorize" ? review.suggestion : null;
   if (!suggestion) {
@@ -43,7 +43,7 @@ export function ProposedCategoryCell({ row }: { row: TransactionListItem }) {
   const merchant = merchants.get(suggestion.merchantId ?? "");
   return (
     <>
-      <div>{suggestion.keep ? "No category" : targetText(suggestion)}</div>
+      <div>{suggestion.keep ? "No category" : targetText(suggestion, row.amount)}</div>
       {merchant ? <div className="text-muted-foreground">{merchant}</div> : null}
     </>
   );

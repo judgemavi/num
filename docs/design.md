@@ -214,7 +214,7 @@ checkbox selects the row; a click on another part of the row opens the editor. S
 header checkbox selects all rows of the page. The checkbox of a loan payment is disabled, with the Tooltip "Loan
 payments are changed one at a time." (decision 0053) With a selection, the ActionBar (§6) shows "N selected", "Edit…" (primary) and "Clear". On `/transactions/review` it
 also shows "Approve · N" (outline) before "Edit…". Approve has no confirm.
-The Category column shows the category, "Transfer to <account>", "Loan payment", or "Uncategorized", and the merchant
+The Category column shows the category, "Transfer to <account>" (money out) or "Transfer from <account>" (money in), "Loan payment", or "Uncategorized", and the merchant
 below it.
 The Amount cell shows only the exceptions: a lock icon for a reconciled row (Tooltip: "Checked against your balance on <date>")
 and "Pending" for an open row (entered by hand in an account that gets imports, not yet on a statement; decision 0052).
@@ -224,7 +224,7 @@ percentage) for a row with a suggestion or an automatic label, and "Needs review
 suggestion. On `/transactions/review` the column is "Confidence" (decision 0048): the level, "Question" for a question,
 and nothing for a row with no suggestion. The Confidence header is a sort button, as Date, Payee and Amount are
 (decision 0049). There, the Category column shows the proposed label and merchant of a
-suggestion (the same text as a stored label; the level tells that it is a proposal) and "Transfer to <account>" for a
+suggestion (the same text as a stored label; the level tells that it is a proposal) and "Transfer to <account>" or "Transfer from <account>" for a
 possible transfer. A row has no buttons. The whole row opens the editor. No dismiss, no queue mode.
 The table has no group rows. The page header of `/transactions/review` has no "Approve all" buttons.
 
