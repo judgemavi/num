@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "bun run --filter './apps/*' dev",
+    "dev": "bun run --parallel --filter './apps/*' dev",
     "dev:api": "bun run --filter api dev",
     "dev:web": "bun run --filter web dev"
   }
