@@ -1,8 +1,5 @@
 import type { MoneyDirection } from "@num/shared";
 import { fromMinorUnits, signedAmount, toMinorUnits } from "@num/shared";
-import type { WhatChoice } from "@num/shared";
-
-export type { WhatChoice };
 
 /** `opposite` is true when the line goes the other way than the transaction. `edited` is true once the user typed the amount. */
 export type SplitLine = {

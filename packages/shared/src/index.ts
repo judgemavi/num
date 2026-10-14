@@ -222,7 +222,7 @@ export {
 } from "./import-batch";
 export { documentSchema, type Document } from "./document";
 export { errorCodes, errorSchema, type ErrorBody, type ErrorCode } from "./error";
-export { listQuerySchema, pagedResponseSchema, sortDirections } from "./list";
+export { listQuerySchema, pagedResponseSchema, searchWithDefaults, sortDirections } from "./list";
 export {
   merchantCreateSchema,
   merchantListQuerySchema,
@@ -535,7 +535,6 @@ export {
   transactionListItemSchema,
   transactionListQuerySchema,
   transactionListSchema,
-  transactionSaveResultSchema,
   transactionSchema,
   transactionUpdateSchema,
   transactionWriteSchema,

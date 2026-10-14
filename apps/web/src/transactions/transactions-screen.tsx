@@ -13,7 +13,11 @@ import { useTransactionPage, useTransactionSearch } from "@/transactions/use-tra
 import { useEditors } from "@/editors/editor-api";
 import { useAccounts } from "@/editors/lookups";
 
-/** The screen puts the parts in their places. Each part reads its own data. The filter bar shows new filters at once. */
+/**
+ * The screen puts the parts in their places. Each part reads its own data. The filter bar shows new filters at once.
+ * The rows and the count load in their own boundaries. Thus a read of the rows never removes the filter bar, and the
+ * search box keeps the focus while the rows load.
+ */
 export function TransactionsScreen() {
   // The list does not need the lists of the filter bar. Its read starts here, thus it does not wait for them.
   usePrefetchQuery(transactionListQuery(useTransactionSearch().shown, localAsOf()));
@@ -22,19 +26,31 @@ export function TransactionsScreen() {
     <Boundary loading="Loading transactions." failed="The transactions did not load.">
       <TransactionsHeader />
       <TransactionFilterBar />
-      <TransactionList />
-      <Pager />
+      <Boundary loading="Loading transactions." failed="The transactions did not load.">
+        <TransactionList />
+        <Pager />
+      </Boundary>
     </Boundary>
   );
+}
+
+/** The number of transactions for the filters. */
+function TransactionCount() {
+  const { page } = useTransactionPage();
+  return page.total === 1 ? "1 transaction" : `${page.total} transactions`;
 }
 
 function TransactionsHeader() {
   const { openEditor } = useEditors();
   const accounts = useAccounts();
-  const { search, patch, page } = useTransactionPage();
+  const { search, patch } = useTransactionSearch();
   return (
     <PageHeader
-      kicker={page.total === 1 ? "1 transaction" : `${page.total} transactions`}
+      kicker={
+        <Boundary loading={null} failed={() => null}>
+          <TransactionCount />
+        </Boundary>
+      }
       title="Transactions"
       actions={
         <>

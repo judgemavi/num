@@ -137,7 +137,6 @@ export const inboxGroupApplySchema = z
   .object({
     accountId: z.uuid(),
     transactionIds: z.array(z.uuid()).min(1).max(500),
-    excludedIds: z.array(z.uuid()).max(500),
     categoryId: z.uuid().nullable(),
     transferAccountId: z.uuid().nullable(),
     merchantId: z.uuid().nullable(),

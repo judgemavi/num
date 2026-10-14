@@ -199,7 +199,6 @@ function refundOf(db: Db, ids: Ids, date: string, amount: number, categoryId: st
   applyInboxGroup(db, {
     accountId: ids.cheque,
     transactionIds: [row.id],
-    excludedIds: [],
     categoryId,
     transferAccountId: null,
     merchantId: null,
@@ -309,7 +308,7 @@ test("undo is blocked when the linked peer is reconciled", () => {
   });
 });
 
-test("a group answer does not auto-link rows of its own batch or excluded rows", () => {
+test("a group answer does not auto-link rows of its own batch", () => {
   withBook((db, ids) => {
     const dates = ["01/05", "01/12", "01/19", "01/26", "02/02"];
     statement(db, ids, ids.cheque, "out", dates.map((day) => `${day}/2026,CIBC PAYMENT,-50.00`));
@@ -318,19 +317,17 @@ test("a group answer does not auto-link rows of its own batch or excluded rows",
     const result = applyInboxGroup(db, {
       accountId: ids.cheque,
       transactionIds: outs.map((row) => row.id),
-      excludedIds: [outs[4]?.id ?? ""],
       categoryId: null,
       transferAccountId: ids.savings,
       merchantId: null,
       ...saved,
     });
-    expect(result.applied).toBe(4);
-    for (const row of outs.slice(0, 4)) {
+    expect(result.applied).toBe(5);
+    for (const row of outs) {
       const stored = getTransaction(db, row.id);
       expect(stored?.transferPeerId).not.toBeNull();
       expect(stored?.autoReason).toBeNull();
     }
-    expect(getTransaction(db, outs[4]?.id ?? "")?.transferPeerId).toBeNull();
   });
 });
 

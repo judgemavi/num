@@ -3,7 +3,12 @@ import { Ellipsis, X } from "lucide-react";
 import { accountLabel, accountOptionLabel } from "@/accounts/label";
 import { useArchiveAccount } from "@/api/accounts";
 import { useArchiveCategory } from "@/api/categories";
-import { useAccounts, useCategories } from "@/editors/lookups";
+import { useStore } from "@tanstack/react-form";
+import { useAccounts, useBookCurrency, useCategories } from "@/editors/lookups";
+import { withForm } from "@/forms/form-hook";
+import { fieldValue } from "@/forms/form-values";
+import { formatMoney } from "@/money";
+import { blankTransaction } from "@/transactions/transaction-draft";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { CategoryForm } from "@/settings/category-form";
 import { Button } from "@/components/ui/button";
@@ -11,13 +16,12 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { categoryOptions } from "@/transactions/picker-options";
-import { lineDirection, type SplitLine } from "@/transactions/what-choice";
+import { addedLine, editLineAmount, lineDirection, restOnLastLine, splitBlank, splitRemainder, type SplitLine } from "@/transactions/what-choice";
 
 const categoryPrefix = "category:";
 const accountPrefix = "account:";
 
 type SplitLineRowProps = {
-  idPrefix: string;
   index: number;
   direction: MoneyDirection;
   line: SplitLine;
@@ -38,8 +42,7 @@ function pickerValue(line: SplitLine) {
   return line.transferAccountId ? `${accountPrefix}${line.transferAccountId}` : null;
 }
 
-export function SplitLineRow({
-  idPrefix,
+function SplitLineRow({
   index,
   direction,
   line,
@@ -105,11 +108,11 @@ export function SplitLineRow({
   return (
     <div className="flex flex-wrap items-end gap-x-2 gap-y-2">
       <Field className="basis-full sm:min-w-48 sm:flex-1 sm:basis-0">
-        <FieldLabel className={index === 0 ? undefined : "sr-only"} htmlFor={`${idPrefix}-line-${index}-target`}>
+        <FieldLabel className={index === 0 ? undefined : "sr-only"} htmlFor={`txn-line-${index}-target`}>
           Category or account
         </FieldLabel>
         <ManagedPicker
-          id={`${idPrefix}-line-${index}-target`}
+          id={`txn-line-${index}-target`}
           value={pickerValue(line)}
           options={[]}
           groups={groups}
@@ -131,11 +134,11 @@ export function SplitLineRow({
           </span>
         ) : null}
         <Field className="w-32">
-          <FieldLabel className="sr-only" htmlFor={`${idPrefix}-line-${index}-amount`}>
+          <FieldLabel className="sr-only" htmlFor={`txn-line-${index}-amount`}>
             {`Amount of line ${index + 1}${line.opposite ? (direction === "out" ? ", money in" : ", money out") : ""}`}
           </FieldLabel>
           <Input
-            id={`${idPrefix}-line-${index}-amount`}
+            id={`txn-line-${index}-amount`}
             className="text-right"
             inputMode="decimal"
             value={line.amount}
@@ -168,3 +171,72 @@ export function SplitLineRow({
     </div>
   );
 }
+
+function splitStatus(currency: string, totalMinor: number | null, left: number | null, lines: SplitLine[]) {
+  if (totalMinor === null) {
+    return "Enter the amount.";
+  }
+  if (left === null) {
+    return "Enter a positive amount on each line.";
+  }
+  if (left === 0) {
+    return splitBlank(lines) ? "Enter an amount on each line." : "All assigned";
+  }
+  return left > 0 ? `${formatMoney(currency, left)} left` : `${formatMoney(currency, -left)} too much`;
+}
+
+/**
+ * The lines of a split: a row for each line, "+ Add a line", and what is left. With two lines, one amount sets the
+ * other. A new line starts with what is left.
+ */
+export const SplitLines = withForm({
+  defaultValues: blankTransaction,
+  props: { totalMinor: fieldValue<number | null>(null), categoryLocked: false, transferLocked: false, amountsLocked: false },
+  render: function SplitLinesRender({ form, totalMinor, categoryLocked, transferLocked, amountsLocked }) {
+    const currency = useBookCurrency();
+    const direction = useStore(form.store, (state) => state.values.direction);
+    const accountId = useStore(form.store, (state) => state.values.accountId);
+    return (
+      <form.Field name="lines">
+        {(field) => {
+          const lines = field.state.value;
+          const change = field.handleChange;
+          const left = totalMinor === null ? null : splitRemainder(currency, totalMinor, direction, lines);
+          const lastLineRest = totalMinor === null ? null : restOnLastLine(currency, totalMinor, direction, lines);
+          return (
+            <div className="grid gap-3">
+              {lines.map((line, index) => (
+                <SplitLineRow
+                  key={line.key}
+                  index={index}
+                  direction={direction}
+                  line={line}
+                  accountId={accountId}
+                  categoryLocked={categoryLocked}
+                  transferLocked={transferLocked}
+                  amountsLocked={amountsLocked}
+                  onChange={(patch) => change(lines.map((item) => (item.key === line.key ? { ...item, ...patch } : item)))}
+                  onAmount={(text) => change(editLineAmount(currency, totalMinor, direction, lines, line.key, text))}
+                  onRemove={lines.length > 1 && !amountsLocked ? () => change(lines.filter((item) => item.key !== line.key)) : null}
+                />
+              ))}
+              {!amountsLocked ? (
+                <Button type="button" variant="ghost" className="justify-start" onClick={() => change([...lines, addedLine(currency, totalMinor, direction, lines)])}>
+                  + Add a line
+                </Button>
+              ) : null}
+              <div className="flex flex-wrap items-center justify-between gap-2" role="status">
+                <p className="text-sm font-semibold">{splitStatus(currency, totalMinor, left, lines)}</p>
+                {!amountsLocked && left !== null && left !== 0 && lastLineRest !== null ? (
+                  <Button type="button" variant="outline" size="sm" onClick={() => change(lastLineRest)}>
+                    Put it on the last line
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          );
+        }}
+      </form.Field>
+    );
+  },
+});

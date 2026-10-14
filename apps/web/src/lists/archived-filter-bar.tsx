@@ -1,7 +1,5 @@
-import { useState } from "react";
 import { FilterBar } from "@/components/filter-bar";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Switch } from "@/components/ui/switch";
+import { useAppForm } from "@/forms/form-hook";
 import type { SortChoice } from "@/lists/list-search";
 import { SortSelect } from "@/lists/sort-select";
 
@@ -22,7 +20,11 @@ type ArchivedFilterBarProps<Column extends string> = {
 /** The filter bar of a list that has one filter, "Show archived", and a sort control. */
 export function ArchivedFilterBar<Column extends string>({ list, switchId, sortId, sortLabel = "Sort", sortOptions }: ArchivedFilterBarProps<Column>) {
   const shown = list.search.archived;
-  const [archived, setArchived] = useState(shown);
+  // The panel keeps the change of the person until the person applies it.
+  const panel = useAppForm({
+    defaultValues: { archived: shown },
+    onSubmit: ({ value }) => list.patch(value),
+  });
 
   return (
     <FilterBar
@@ -30,19 +32,14 @@ export function ArchivedFilterBar<Column extends string>({ list, switchId, sortI
       badges={shown ? [{ key: "archived", label: "Archived", onRemove: () => list.patch({ archived: false }) }] : []}
       onOpenChange={(open) => {
         if (open) {
-          setArchived(shown);
+          panel.reset();
         }
       }}
-      onApply={() => list.patch({ archived })}
-      onClear={() => setArchived(false)}
+      onApply={() => void panel.handleSubmit()}
+      onClear={() => panel.reset({ archived: false }, { keepDefaultValues: true })}
       onClearAll={() => list.patch({ archived: false })}
       sort={<SortSelect id={sortId} label={sortLabel} value={list.sort} options={sortOptions} onChange={list.setSort} />}
-      fields={
-        <Field orientation="horizontal">
-          <Switch id={switchId} checked={archived} onCheckedChange={setArchived} />
-          <FieldLabel htmlFor={switchId}>Show archived</FieldLabel>
-        </Field>
-      }
+      fields={<panel.AppField name="archived">{(field) => <field.SwitchField id={switchId} label="Show archived" />}</panel.AppField>}
     />
   );
 }

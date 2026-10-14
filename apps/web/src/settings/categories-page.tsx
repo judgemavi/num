@@ -12,11 +12,9 @@ import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { useAppForm } from "@/forms/form-hook";
 import { SortSelect } from "@/lists/sort-select";
-import { useFilterDraft, useListSearch } from "@/lists/use-list-search";
+import { useListSearch } from "@/lists/use-list-search";
 import { categoryError } from "@/settings/format";
 import { SettingsBack } from "@/settings/settings-nav";
 
@@ -31,7 +29,12 @@ const sortOptions = [
 ] as const;
 
 /** The filters of the panel with no choice. */
-const noFilters = { groupId: undefined, archived: false };
+const noFilters = { groupId: anyGroup, archived: false };
+
+/** The filters for the URL. No choice is not in the URL. */
+function urlFilters(value: typeof noFilters) {
+  return { groupId: value.groupId === anyGroup ? undefined : value.groupId, archived: value.archived };
+}
 
 export function CategoriesPage() {
   return (
@@ -44,7 +47,11 @@ export function CategoriesPage() {
 function Categories() {
   const { search, shown, sort, patch, setSort } = useListSearch(categoriesRoute.useSearch(), categoriesRoute.useNavigate(), { sort: "name", dir: "asc" });
   const { openEditor } = useEditors();
-  const { draft, changes, change, reset } = useFilterDraft(search);
+  // The panel keeps the changes of the person until the person applies them.
+  const panel = useAppForm({
+    defaultValues: { groupId: search.groupId ?? anyGroup, archived: search.archived },
+    onSubmit: ({ value }) => patch(urlFilters(value)),
+  });
   const groupRows = useGroups();
   const groupName = useGroupNames();
   // The list on the screen stays while the list for a new filter or a new sort order loads.
@@ -75,44 +82,29 @@ function Categories() {
         ]}
         onOpenChange={(open) => {
           if (open) {
-            reset();
+            panel.reset();
           }
         }}
-        onApply={() => patch(changes)}
-        onClear={() => change(noFilters)}
-        onClearAll={() => patch(noFilters)}
+        onApply={() => void panel.handleSubmit()}
+        onClear={() => panel.reset(noFilters, { keepDefaultValues: true })}
+        onClearAll={() => patch(urlFilters(noFilters))}
         sort={<SortSelect id="category-sort" label="Sort" value={sort} options={sortOptions} onChange={setSort} />}
         fields={
           <>
-            <Field>
-              <FieldLabel htmlFor="filter-group">Group</FieldLabel>
-              <Select value={draft.groupId ?? anyGroup} onValueChange={(group) => change({ groupId: group === anyGroup ? undefined : group })}>
-                <SelectTrigger id="filter-group" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={anyGroup} className="min-h-11">
-                    Any group
-                  </SelectItem>
-                  <SelectItem value="none" className="min-h-11">
-                    No group
-                  </SelectItem>
-                  {groupRows.map((group) => (
-                    <SelectItem key={group.id} value={group.id} className="min-h-11">
-                      {group.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field orientation="horizontal">
-              <Switch
-                id="filter-archived-categories"
-                checked={draft.archived}
-                onCheckedChange={(archived) => change({ archived })}
-              />
-              <FieldLabel htmlFor="filter-archived-categories">Show archived</FieldLabel>
-            </Field>
+            <panel.AppField name="groupId">
+              {(field) => (
+                <field.SelectField
+                  id="filter-group"
+                  label="Group"
+                  options={[
+                    { value: anyGroup, label: "Any group" },
+                    { value: "none", label: "No group" },
+                    ...groupRows.map((group) => ({ value: group.id, label: group.name })),
+                  ]}
+                />
+              )}
+            </panel.AppField>
+            <panel.AppField name="archived">{(field) => <field.SwitchField id="filter-archived-categories" label="Show archived" />}</panel.AppField>
           </>
         }
       />

@@ -1,63 +1,69 @@
 import type { Merchant } from "@num/shared";
-import { useState } from "react";
 import { errorCode } from "@/api/client";
 import { useMergeMerchant } from "@/api/merchants";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEditorFrame } from "@/editors/editor-api";
 import { useMerchants } from "@/editors/lookups";
-import { DialogBody, DialogPanel } from "@/editors/form-chrome";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { OptionCombobox } from "@/transactions/option-combobox";
+import { DialogBody } from "@/editors/form-chrome";
+import { useAppForm } from "@/forms/form-hook";
+import { fieldValue } from "@/forms/form-values";
 import { merchantError } from "@/settings/format";
 
 export function MergeDialog({ source }: { source: Merchant }) {
   const { close } = useEditorFrame();
   const merchants = useMerchants();
-  const [targetId, setTargetId] = useState<string | null>(null);
-  const [targetMissing, setTargetMissing] = useState(false);
   const merge = useMergeMerchant();
-  const error = targetMissing ? "Choose the merchant that remains." : merge.error ? merchantError(errorCode(merge.error)) : null;
   const options = merchants.filter((merchant) => merchant.id !== source.id && merchant.archivedAt === null);
-
-  function submit() {
-    setTargetMissing(!targetId);
-    if (targetId) {
-      merge.mutate({ id: source.id, targetId }, { onSuccess: () => close("ok") });
-    }
-  }
+  const form = useAppForm({
+    defaultValues: { targetId: fieldValue<string | null>(null) },
+    validators: {
+      onSubmit: ({ value }) => (value.targetId ? undefined : "Choose the merchant that remains."),
+    },
+    onSubmit: async ({ value, formApi }) => {
+      if (!value.targetId) {
+        return;
+      }
+      try {
+        await merge.mutateAsync({ id: source.id, targetId: value.targetId });
+        close("ok");
+      } catch (error) {
+        formApi.setErrorMap({ onSubmit: { form: merchantError(errorCode(error)), fields: {} } });
+      }
+    },
+  });
 
   return (
-    <DialogPanel>
-      <DialogHeader>
-        <DialogTitle>Merge this merchant?</DialogTitle>
-        <DialogDescription>
-          Move transactions and recurring items from {source.name} to the merchant you choose. {source.name} is then archived.
-        </DialogDescription>
-      </DialogHeader>
-      <DialogBody>
-      <Field data-invalid={error !== null || undefined}>
-        <FieldLabel htmlFor="merge-target">Merchant that remains</FieldLabel>
-        <OptionCombobox
-          id="merge-target"
-          value={targetId}
-          options={options.map((merchant) => ({ id: merchant.id, label: merchant.name }))}
-          placeholder="Choose a merchant"
-          onChange={setTargetId}
-        />
-      </Field>
-      {error ? <FieldError>{error}</FieldError> : null}
-      </DialogBody>
-      <DialogFooter>
-        <DialogClose asChild>
-          <Button type="button" variant="outline">
-            Cancel
-          </Button>
-        </DialogClose>
-        <Button type="button" disabled={merge.isPending} onClick={submit}>
-          {merge.isPending ? "Merging" : "Merge merchants"}
-        </Button>
-      </DialogFooter>
-    </DialogPanel>
+    <form.AppForm>
+      <form.FormShell>
+        <DialogHeader>
+          <DialogTitle>Merge this merchant?</DialogTitle>
+          <DialogDescription>
+            Move transactions and recurring items from {source.name} to the merchant you choose. {source.name} is then archived.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody>
+          <form.AppField name="targetId">
+            {(field) => (
+              <field.ComboboxField
+                id="merge-target"
+                label="Merchant that remains"
+                options={options.map((merchant) => ({ id: merchant.id, label: merchant.name }))}
+                placeholder="Choose a merchant"
+              />
+            )}
+          </form.AppField>
+          <form.FormError />
+        </DialogBody>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <form.SubmitButton saving="Merging">Merge merchants</form.SubmitButton>
+        </DialogFooter>
+      </form.FormShell>
+    </form.AppForm>
   );
 }

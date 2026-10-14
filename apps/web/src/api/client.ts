@@ -43,6 +43,6 @@ export async function unwrap<R extends ClientResponse<unknown, number, string>>(
 }
 
 /** The error code of a failed query or mutation. A failure with no API error body has no code. */
-export function errorCode(error: Error | null): ErrorCode | undefined {
+export function errorCode(error: unknown): ErrorCode | undefined {
   return error instanceof ApiError ? error.code : undefined;
 }

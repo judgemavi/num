@@ -5,6 +5,7 @@ import {
   printedStatementBalance,
   storedStatementBalance,
   toMinorUnits,
+  type Account,
   type CheckpointCreate,
 } from "@num/shared";
 import { useQuery, useSuspenseQueries } from "@tanstack/react-query";
@@ -24,96 +25,66 @@ import {
 import { useEditorFrame } from "@/editors/editor-api";
 import type { EditorInput } from "@/editors/editor-types";
 import { useBookCurrency } from "@/editors/lookups";
-import { DialogBody, DialogForm } from "@/editors/form-chrome";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { DateField } from "@/components/date-field";
-import { Input } from "@/components/ui/input";
+import { DialogBody } from "@/editors/form-chrome";
+import { FieldError } from "@/components/ui/field";
+import { useAppForm } from "@/forms/form-hook";
 import { formatDate } from "@/transactions/format";
+
+/** The checkpoint of the form values. Null when the date or the balance is not valid. */
+function checkpointOf(currency: string, kind: Account["kind"], value: { date: string; amount: string }) {
+  let statementBalance;
+  try {
+    statementBalance = storedStatementBalance(kind, toMinorUnits(currency, value.amount.trim()));
+  } catch {
+    return null;
+  }
+  const parsed = checkpointCreateSchema.safeParse({ date: value.date, statementBalance });
+  return parsed.success ? parsed.data : null;
+}
 
 export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
   const { close } = useEditorFrame();
   const currency = useBookCurrency();
   const [{ data: account }, { data: hint }] = useSuspenseQueries({ queries: [accountQuery(accountId), closingHintQuery(accountId)] });
   const kind = account.kind;
-  // The form starts with the closing date and the closing balance of the last imported statement.
-  const closing = hint.closingDate !== null && hint.closingBalance !== null ? { date: hint.closingDate, balance: hint.closingBalance } : null;
-  const [date, setDate] = useState(closing?.date ?? "");
-  const [amount, setAmount] = useState(closing ? fromMinorUnits(currency, printedStatementBalance(kind, closing.balance)) : "");
-  const [invalid, setInvalid] = useState(false);
-  // The values that the user sent with "Check". The compare read runs for them. An edit of a value clears them.
+  // The values that the person sent with "Check". The compare read runs for them. An edit of a value clears them.
   const [checked, setChecked] = useState<CheckpointCreate | null>(null);
   const check = useQuery({ ...checkpointCompareQuery(accountId, checked ?? { date: "", statementBalance: 0 }), enabled: checked !== null });
   const create = useCreateCheckpoint();
   const opening = useSetOpeningBalance();
   const compare = checked ? (check.data ?? null) : null;
-  const saving = check.isFetching || create.isPending || opening.isPending;
-
-  function parsedAmount() {
-    try {
-      return storedStatementBalance(kind, toMinorUnits(currency, amount.trim()));
-    } catch {
-      return null;
-    }
-  }
-
-  function body(): CheckpointCreate | null {
-    const statementBalance = parsedAmount();
-    const parsed = checkpointCreateSchema.safeParse({
-      date,
-      statementBalance: statementBalance ?? 0,
-    });
-    if (statementBalance === null || !parsed.success) {
-      return null;
-    }
-    return parsed.data;
-  }
-
-  /** Remove the result and the error of each request. A new step starts with no old message. */
-  function clearRequests() {
-    create.reset();
-    opening.reset();
-  }
-
-  function checkBalance() {
-    const payload = body();
-    clearRequests();
-    setInvalid(!payload);
-    setChecked(payload);
-  }
-
-  function saveCheckpoint() {
-    const payload = body();
-    if (!payload || !compare?.balanced) {
-      return;
-    }
-    create.mutate({ accountId, body: payload }, { onSuccess: () => close(), onError: () => setChecked(null) });
-  }
-
-  function setOpening() {
-    const suggestion = compare?.openingSuggestion;
-    if (!suggestion) {
-      return;
-    }
-    opening.mutate({ accountId, suggestion });
-  }
-
-  function errorText() {
-    if (invalid) {
-      return "Enter a statement date and balance.";
-    }
-    if (checked && check.isError) {
-      return "The balances did not load. Try again.";
-    }
-    if (opening.isError) {
-      return "The opening balance did not save.";
-    }
-    if (create.error) {
-      return errorCode(create.error) === "checkpoint_unbalanced" ? "The balances changed. Check them again." : "The checkpoint did not save. Try again.";
-    }
-    return null;
-  }
-
-  const error = errorText();
+  const form = useAppForm({
+    // The form starts with the closing date and the closing balance of the last imported statement.
+    defaultValues: {
+      date: hint.closingDate ?? "",
+      amount: hint.closingBalance === null ? "" : fromMinorUnits(currency, printedStatementBalance(kind, hint.closingBalance)),
+    },
+    validators: {
+      onSubmit: ({ value }) => (checkpointOf(currency, kind, value) ? undefined : "Enter a statement date and balance."),
+    },
+    onSubmit: async ({ value, formApi }) => {
+      const body = checkpointOf(currency, kind, value);
+      opening.reset();
+      if (!body || !compare?.balanced) {
+        setChecked(body);
+        return;
+      }
+      try {
+        await create.mutateAsync({ accountId, body });
+        close();
+      } catch (error) {
+        setChecked(null);
+        formApi.setErrorMap({
+          onSubmit: {
+            form: errorCode(error) === "checkpoint_unbalanced" ? "The balances changed. Check them again." : "The checkpoint did not save. Try again.",
+            fields: {},
+          },
+        });
+      }
+    },
+  });
+  const uncheck = { onChange: () => setChecked(null) };
+  const busy = check.isFetching || opening.isPending;
 
   const owed = accountClass(kind) === "liability";
   const help = compare && !compare.balanced ? compare.help : [];
@@ -122,50 +93,26 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
   const gaps = help.flatMap((item) => (item.code === "gap" ? [item] : []));
 
   return (
-    <>
+    <form.AppForm>
       <DialogHeader>
         <DialogTitle>Reconcile</DialogTitle>
         <DialogDescription>Enter the statement date and the balance on that date.</DialogDescription>
       </DialogHeader>
-      <DialogForm
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (compare?.balanced) {
-            saveCheckpoint();
-            return;
-          }
-          checkBalance();
-        }}
-      >
+      <form.FormShell>
         <DialogBody>
-        <Field>
-          <FieldLabel htmlFor="statement-date">Statement date</FieldLabel>
-          <DateField
-            id="statement-date"
-            value={date}
-            required
-            onChange={(value) => {
-              setDate(value);
-              setChecked(null);
-            }}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="statement-balance">{owed ? "Amount you owed" : "Statement balance"}</FieldLabel>
-          <Input
-            id="statement-balance"
-            inputMode="decimal"
-            value={amount}
-            required
-            onChange={(event) => {
-              setAmount(event.target.value);
-              setChecked(null);
-            }}
-          />
-          <FieldDescription>
-            {owed ? "Enter the amount on the statement. Example: 12.50" : "Example: 12.50"}
-          </FieldDescription>
-        </Field>
+        <form.AppField name="date" listeners={uncheck}>
+          {(field) => <field.DateInputField id="statement-date" label="Statement date" required />}
+        </form.AppField>
+        <form.AppField name="amount" listeners={uncheck}>
+          {(field) => (
+            <field.MoneyField
+              id="statement-balance"
+              label={owed ? "Amount you owed" : "Statement balance"}
+              required
+              description={owed ? "Enter the amount on the statement. Example: 12.50" : "Example: 12.50"}
+            />
+          )}
+        </form.AppField>
         {compare?.balanced ? (
           <p role="status" className="text-sm font-semibold text-pos">
             Balanced. The book matches this statement.
@@ -218,13 +165,25 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
               <p className="text-sm text-muted-foreground">No uncleared transactions, duplicates, or gaps were found.</p>
             ) : null}
             {compare.openingSuggestion ? (
-              <Button type="button" variant="outline" disabled={saving} onClick={setOpening}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  const suggestion = compare.openingSuggestion;
+                  if (suggestion) {
+                    opening.mutate({ accountId, suggestion });
+                  }
+                }}
+              >
                 Set the opening balance so this statement balances
               </Button>
             ) : null}
           </div>
         ) : null}
-        {error ? <FieldError>{error}</FieldError> : null}
+        {checked && check.isError ? <FieldError>The balances did not load. Try again.</FieldError> : null}
+        {opening.isError ? <FieldError>The opening balance did not save.</FieldError> : null}
+        <form.FormError />
         </DialogBody>
         <DialogFooter>
           <DialogClose asChild>
@@ -232,17 +191,9 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
               Cancel
             </Button>
           </DialogClose>
-          {compare?.balanced ? (
-            <Button type="submit" disabled={saving}>
-              Save checkpoint
-            </Button>
-          ) : (
-            <Button type="submit" disabled={saving}>
-              Check
-            </Button>
-          )}
+          <form.SubmitButton disabled={busy}>{compare?.balanced ? "Save checkpoint" : "Check"}</form.SubmitButton>
         </DialogFooter>
-      </DialogForm>
-    </>
+      </form.FormShell>
+    </form.AppForm>
   );
 }

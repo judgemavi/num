@@ -14,7 +14,6 @@ import { importPresetsQuery, useImportFile } from "@/api/imports";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { useEditorFrame } from "@/editors/editor-api";
 import type { EditorInput } from "@/editors/editor-types";
 import { DialogBody, DialogPanel } from "@/editors/form-chrome";
 
@@ -22,7 +21,6 @@ import { DialogBody, DialogPanel } from "@/editors/form-chrome";
 type MapQuestion = { key: string; name: string; rows: string[][]; answer: (map: ColumnMap | null) => void };
 
 export function ImportForm({ accountId }: EditorInput["import"]) {
-  const { close } = useEditorFrame();
   // The read of the account and the reads of the two lists start together.
   usePrefetchQuery(activeAccountsQuery());
   usePrefetchQuery(importPresetsQuery());
@@ -132,9 +130,7 @@ export function ImportForm({ accountId }: EditorInput["import"]) {
       dispatch({ type: "batchStopped" });
       return;
     }
-    if (result.rows.some((row) => row.phase === "done")) {
-      close("ok");
-    }
+    // The editor stays open with the summary: the counts, "View import" and the opening balance of each file.
     dispatch({ type: "batchFinished" });
   }
 

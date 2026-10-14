@@ -15,14 +15,8 @@ export const insightRowKinds = ["item", "none", "uncategorized"] as const;
 
 export type InsightRowKind = (typeof insightRowKinds)[number];
 
-// The router reads `window=6` in the URL as the number 6.
-const windowQuery = z.preprocess(
-  (value: InsightWindow | number | "" | undefined) => (typeof value === "number" ? String(value) : value),
-  optionalQuery(z.enum(insightWindows)),
-);
-
 const insightsSearchFields = z.object({
-  window: windowQuery,
+  window: optionalQuery(z.enum(insightWindows)),
   from: queryDate,
   to: queryDate,
   month: optionalQuery(z.string().refine(isMonthKey)),
@@ -33,7 +27,7 @@ const insightsSearchFields = z.object({
 function checkPeriod(value: { window?: InsightWindow; from?: string; to?: string }, context: z.RefinementCtx) {
   const custom = value.window === "custom";
   if (custom && (value.from === undefined || value.to === undefined)) {
-    context.addIssue({ code: "custom", message: "A custom period needs from and to", path: ["from"] });
+    context.addIssue({ code: "custom", message: "A custom period needs from and to", path: ["window"] });
   }
   if (!custom && (value.from !== undefined || value.to !== undefined)) {
     context.addIssue({ code: "custom", message: "From and to are only for a custom period", path: ["window"] });

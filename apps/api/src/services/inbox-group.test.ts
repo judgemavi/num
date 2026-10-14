@@ -50,7 +50,7 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
   });
 }
 
-test("excluded rows stay unchanged, and a failure writes nothing", () => {
+test("only the rows of the group change, and a failure writes nothing", () => {
   const sample = book();
   try {
     const cash = createAccount(sample.db, {
@@ -64,13 +64,11 @@ test("excluded rows stay unchanged, and a failure writes nothing", () => {
     const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
     const kept = pay(sample.db, cash.id, "2026-03-01", -400, "Blue Bottle");
     const other = pay(sample.db, cash.id, "2026-03-02", -420, "SQ *BLUE BOTTLE");
-    const excluded = pay(sample.db, cash.id, "2026-03-03", -430, "blue bottle");
     const applyAt = "2026-10-08T17:00:00Z";
     expect(() =>
       applyInboxGroup(sample.db, {
         accountId: cash.id,
-        transactionIds: [kept.id, excluded.id],
-        excludedIds: [excluded.id],
+        transactionIds: [kept.id],
         categoryId: missingCategory,
         transferAccountId: null,
         merchantId: null,
@@ -80,13 +78,11 @@ test("excluded rows stay unchanged, and a failure writes nothing", () => {
     ).toThrow();
     expect(getTransaction(sample.db, kept.id)?.lines[0]?.categoryId).toBeNull();
     expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBeNull();
-    expect(getTransaction(sample.db, excluded.id)?.lines[0]?.categoryId).toBeNull();
     expect(sample.db.select().from(auditLog).where(eq(auditLog.at, applyAt)).all()).toHaveLength(0);
 
     const result = applyInboxGroup(sample.db, {
       accountId: cash.id,
-      transactionIds: [kept.id, excluded.id],
-      excludedIds: [excluded.id],
+      transactionIds: [kept.id],
       categoryId: food.id,
       transferAccountId: null,
       merchantId: null,
@@ -96,7 +92,6 @@ test("excluded rows stay unchanged, and a failure writes nothing", () => {
     expect(result.applied).toBe(1);
     expect(getTransaction(sample.db, kept.id)?.lines[0]?.categoryId).toBe(food.id);
     expect(getTransaction(sample.db, other.id)?.lines[0]?.categoryId).toBeNull();
-    expect(getTransaction(sample.db, excluded.id)?.lines[0]?.categoryId).toBeNull();
   } finally {
     sample.close();
   }
@@ -133,7 +128,6 @@ test("a categorized row, a split and a reconciled transfer are skipped", () => {
     const result = applyInboxGroup(sample.db, {
       accountId: cash.id,
       transactionIds: [open.id, done.id, split.id, locked.id],
-      excludedIds: [],
       categoryId: null,
       transferAccountId: savings.id,
       merchantId: null,
@@ -165,18 +159,17 @@ test("a group in which each row is skipped returns the skips and writes nothing"
     const applyAt = "2026-10-08T19:00:00Z";
     const group = { accountId: cash.id, categoryId: food.id, transferAccountId: null, merchantId: null, source: "ui" as const, at: applyAt };
 
-    expect(applyInboxGroup(sample.db, { ...group, transactionIds: [done.id, split.id], excludedIds: [] })).toEqual({
+    expect(applyInboxGroup(sample.db, { ...group, transactionIds: [done.id, split.id] })).toEqual({
       applied: 0,
       skipped: [
         { id: done.id, reason: "categorized" },
         { id: split.id, reason: "split" },
       ],
     });
-    expect(applyInboxGroup(sample.db, { ...group, transactionIds: [open.id], excludedIds: [open.id] })).toEqual({ applied: 0, skipped: [] });
     expect(getTransaction(sample.db, open.id)?.lines[0]?.categoryId).toBeNull();
     expect(sample.db.select().from(auditLog).where(eq(auditLog.at, applyAt)).all()).toHaveLength(0);
 
-    const mixed = applyInboxGroup(sample.db, { ...group, transactionIds: [done.id, open.id], excludedIds: [] });
+    const mixed = applyInboxGroup(sample.db, { ...group, transactionIds: [done.id, open.id] });
     expect(mixed).toEqual({ applied: 1, skipped: [{ id: done.id, reason: "categorized" }] });
     expect(getTransaction(sample.db, open.id)?.lines[0]?.categoryId).toBe(food.id);
   } finally {
@@ -209,7 +202,6 @@ test("a group keeps an existing merchant and a transfer clears it on PATCH", () 
     applyInboxGroup(sample.db, {
       accountId: cash.id,
       transactionIds: [row.id],
-      excludedIds: [],
       categoryId: food.id,
       transferAccountId: null,
       merchantId: null,

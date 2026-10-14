@@ -1,4 +1,4 @@
-import { Temporal, type Bucket, type BucketColor, type BucketIcon, type ErrorCode } from "@num/shared";
+import { Temporal, toMinorUnits, type Bucket, type BucketColor, type BucketIcon, type ErrorCode } from "@num/shared";
 import { errorCode } from "@/api/client";
 import { formatMoney } from "@/money";
 
@@ -151,7 +151,18 @@ export function bucketError(code: ErrorCode | undefined): string {
 }
 
 /** The message for a write that failed. `noAnswer` is the message when the API gave no error code. */
-export function requestError(error: Error, noAnswer: string): string {
+export function requestError(error: unknown, noAnswer: string): string {
   const code = errorCode(error);
   return code ? bucketError(code) : noAnswer;
+}
+
+/** The amount of money to move, in minor units. The text of the error when the text is not an amount greater than zero. */
+export function moveAmount(currency: string, text: string): { minor: number } | { error: string } {
+  let minor = 0;
+  try {
+    minor = toMinorUnits(currency, text.trim());
+  } catch {
+    return { error: "Enter the amount as a number." };
+  }
+  return minor < 1 ? { error: "Enter an amount greater than zero." } : { minor };
 }

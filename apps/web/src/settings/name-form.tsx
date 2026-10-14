@@ -1,68 +1,39 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { DialogBody, FormActions, FormCancel, FormHeading, FormShell } from "@/editors/form-chrome";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { DialogBody, FormActions, FormCancel, FormHeading } from "@/editors/form-chrome";
+import { withForm } from "@/forms/form-hook";
 
-type NameFormProps = {
-  title: string;
-  description: string;
-  /** The text of the save button. The owner of the write gives the text for each state of the write. */
-  submitLabel: string;
-  initialName: string;
-  inline?: boolean;
-  idPrefix?: string;
-  pending: boolean;
-  error: string | null;
-  onSubmit: (name: string) => void;
-};
-
-export function NameForm({
-  title,
-  description,
-  submitLabel,
-  initialName,
-  inline = false,
-  idPrefix = "record-name",
-  pending,
-  error,
-  onSubmit,
-}: NameFormProps) {
-  const [name, setName] = useState(initialName);
-  const [nameMissing, setNameMissing] = useState(false);
-  const message = nameMissing ? "Enter a name." : error;
-
-  function submit() {
-    const trimmed = name.trim();
-    setNameMissing(trimmed.length === 0);
-    if (trimmed.length > 0) {
-      onSubmit(trimmed);
-    }
-  }
-
-  return (
-    <>
-      <FormHeading inline={inline} title={title} description={description} />
-      <FormShell inline={inline} className="flex flex-col gap-4" onSubmit={submit}>
-        <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
-        <Field>
-          <FieldLabel htmlFor={idPrefix}>Name</FieldLabel>
-          <Input
-            id={idPrefix}
-            value={name}
-            autoComplete="off"
-            onChange={(event) => setName(event.target.value)}
-          />
-        </Field>
-        {message ? <FieldError>{message}</FieldError> : null}
-        </DialogBody>
-        <FormActions inline={inline}>
-          <FormCancel>Cancel</FormCancel>
-          <Button type={inline ? "button" : "submit"} disabled={pending} onClick={inline ? submit : undefined}>
-            {submitLabel}
-          </Button>
-        </FormActions>
-      </FormShell>
-    </>
-  );
-}
+/**
+ * The fields of a form that has only a name: a group, a tag or a merchant. The owner of the form gives the validators
+ * and the write. `children` shows above the name.
+ */
+export const NameFields = withForm({
+  defaultValues: { name: "" },
+  props: {
+    title: "",
+    description: "",
+    /** The text of the save button, and its text while the form saves. */
+    submitLabel: "",
+    saving: "",
+    inline: false,
+    idPrefix: "record-name",
+  },
+  render: function NameFieldsRender({ form, title, description, submitLabel, saving, inline, idPrefix, children }) {
+    return (
+      <form.AppForm>
+        <FormHeading inline={inline} title={title} description={description} />
+        <form.FormShell inline={inline} className={inline ? "flex flex-col gap-4" : undefined}>
+          <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
+            {children}
+            <form.AppField name="name">{(field) => <field.TextField id={idPrefix} label="Name" autoComplete="off" />}</form.AppField>
+            <form.FormError invalid="Enter a name." />
+          </DialogBody>
+          <FormActions inline={inline}>
+            <FormCancel>Cancel</FormCancel>
+            <form.SubmitButton inline={inline} saving={saving}>
+              {submitLabel}
+            </form.SubmitButton>
+          </FormActions>
+        </form.FormShell>
+      </form.AppForm>
+    );
+  },
+});

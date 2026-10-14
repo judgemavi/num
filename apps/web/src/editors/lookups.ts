@@ -101,11 +101,6 @@ export function useAccountLabels() {
   return useSuspenseQuery({ ...accountOptionsQuery(), select: labelsById }).data;
 }
 
-/** The name of each active recurring plan, by id. */
-export function usePlanNames() {
-  return useSuspenseQuery({ ...activePlansQuery(), select: (plans) => namesById(plans.items) }).data;
-}
-
 /** The name of each active bucket, by id. */
 export function useBucketNames() {
   return useSuspenseQuery({ ...activeBucketsQuery(), select: (board) => namesById(board.items) }).data;

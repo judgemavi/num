@@ -1,11 +1,10 @@
 import { columnMapSchema, statementDate, type ColumnMap, type DateOrder, type DecimalSeparator, type SignConvention } from "@num/shared";
-import { useState } from "react";
+import { useStore } from "@tanstack/react-form";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { DialogBody, DialogPanel } from "@/editors/form-chrome";
-import { ChoiceSelect } from "@/components/choice-select";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAppForm } from "@/forms/form-hook";
+import { fieldValue } from "@/forms/form-values";
 
 type ImportMapFormProps = {
   rows: string[][];
@@ -15,7 +14,33 @@ type ImportMapFormProps = {
 
 const none = "none";
 
-type HeaderChoice = "auto" | "yes" | "no";
+const headerOptions = [
+  { value: "auto", label: "Detect the header" },
+  { value: "yes", label: "The first row is a header" },
+  { value: "no", label: "There is no header" },
+] as const;
+
+type HeaderChoice = (typeof headerOptions)[number]["value"];
+
+const amountModeOptions = [
+  { value: "amount", label: "One amount column" },
+  { value: "split", label: "Separate debit and credit columns" },
+] as const;
+
+const dateOrderOptions = [
+  { value: "mdy", label: "Month, then day" },
+  { value: "dmy", label: "Day, then month" },
+] as const;
+
+const decimalOptions = [
+  { value: ".", label: "Point (.)" },
+  { value: ",", label: "Comma (,)" },
+] as const;
+
+const signOptions = [
+  { value: "account", label: "Use the sign in the file" },
+  { value: "inverted", label: "Flip the sign" },
+] as const;
 
 function headerValue(choice: HeaderChoice): ColumnMap["hasHeader"] {
   if (choice === "yes") {
@@ -31,21 +56,55 @@ function columnCount(rows: string[][]) {
   return Math.max(1, ...rows.map((row) => row.length));
 }
 
+/** The start values of the column map: the first columns, in the usual order of a bank file. */
+function mapValues(width: number) {
+  return {
+    headerChoice: fieldValue<HeaderChoice>("auto"),
+    date: "0",
+    description: width > 1 ? "1" : "0",
+    amountMode: fieldValue<(typeof amountModeOptions)[number]["value"]>("amount"),
+    amount: width > 2 ? "2" : "0",
+    debit: width > 2 ? "2" : "0",
+    credit: width > 3 ? "3" : "0",
+    balance: none,
+    bankId: none,
+    dateOrder: fieldValue<DateOrder>("mdy"),
+    signConvention: fieldValue<SignConvention>("account"),
+    decimalSeparator: fieldValue<DecimalSeparator>("."),
+  };
+}
+
+function columnMap(value: ReturnType<typeof mapValues>) {
+  return columnMapSchema.safeParse({
+    hasHeader: headerValue(value.headerChoice),
+    date: Number(value.date),
+    description: Number(value.description),
+    amount: value.amountMode === "amount" ? Number(value.amount) : null,
+    debit: value.amountMode === "split" ? Number(value.debit) : null,
+    credit: value.amountMode === "split" ? Number(value.credit) : null,
+    balance: value.balance === none ? null : Number(value.balance),
+    bankId: value.bankId === none ? null : Number(value.bankId),
+    dateOrder: value.dateOrder,
+    signConvention: value.signConvention,
+    decimalSeparator: value.decimalSeparator,
+  });
+}
+
 export function ImportMapForm({ rows, onBack, onImport }: ImportMapFormProps) {
   const width = columnCount(rows);
-  const [headerChoice, setHeaderChoice] = useState<HeaderChoice>("auto");
-  const [date, setDate] = useState("0");
-  const [description, setDescription] = useState(width > 1 ? "1" : "0");
-  const [amountMode, setAmountMode] = useState<"amount" | "split">("amount");
-  const [amount, setAmount] = useState(width > 2 ? "2" : "0");
-  const [debit, setDebit] = useState(width > 2 ? "2" : "0");
-  const [credit, setCredit] = useState(width > 3 ? "3" : "0");
-  const [balance, setBalance] = useState(none);
-  const [bankId, setBankId] = useState(none);
-  const [dateOrder, setDateOrder] = useState<DateOrder>("mdy");
-  const [signConvention, setSignConvention] = useState<SignConvention>("account");
-  const [decimalSeparator, setDecimalSeparator] = useState<DecimalSeparator>(".");
-  const [error, setError] = useState<string | null>(null);
+  const form = useAppForm({
+    defaultValues: mapValues(width),
+    validators: {
+      onSubmit: ({ value }) => (columnMap(value).success ? undefined : "Choose a date, a description, and an amount."),
+    },
+    onSubmit: ({ value }) => {
+      const map = columnMap(value);
+      if (map.success) {
+        onImport(map.data);
+      }
+    },
+  });
+  const { headerChoice, date, dateOrder, amountMode } = useStore(form.store, (state) => state.values);
   const hasHeader = headerValue(headerChoice);
   const firstDate = statementDate(rows[0]?.[Number(date)] ?? "", dateOrder);
   const header = hasHeader === true || (hasHeader === "auto" && firstDate === null) ? rows[0] : undefined;
@@ -55,211 +114,84 @@ export function ImportMapForm({ rows, onBack, onImport }: ImportMapFormProps) {
     return name.length > 0 ? `Column ${index + 1}: ${name}` : `Column ${index + 1}`;
   }
 
-  function submit() {
-    const map = {
-      hasHeader: headerValue(headerChoice),
-      date: Number(date),
-      description: Number(description),
-      amount: amountMode === "amount" ? Number(amount) : null,
-      debit: amountMode === "split" ? Number(debit) : null,
-      credit: amountMode === "split" ? Number(credit) : null,
-      balance: balance === none ? null : Number(balance),
-      bankId: bankId === none ? null : Number(bankId),
-      dateOrder,
-      signConvention,
-      decimalSeparator,
-    };
-    const parsed = columnMapSchema.safeParse(map);
-    if (!parsed.success) {
-      setError("Choose a date, a description, and an amount.");
-      return;
-    }
-    setError(null);
-    onImport(parsed.data);
-  }
+  const columns = Array.from({ length: width }, (_, index) => ({ value: String(index), label: label(index) }));
+  const optionalColumns = [{ value: none, label: "None" }, ...columns];
 
   return (
-    <DialogPanel>
-      <DialogBody>
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="w-full min-w-[28rem] text-left text-sm">
-          <thead>
-            <tr className="border-b text-muted-foreground">
-              {Array.from({ length: width }, (_, index) => (
-                <th key={index} className="px-3 py-2 font-semibold">
-                  {label(index)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-b last:border-b-0">
-                {Array.from({ length: width }, (_, index) => (
-                  <td key={index} className="px-3 py-2">
-                    {row[index] ?? ""}
-                  </td>
+    <form.AppForm>
+      <DialogPanel>
+        <DialogBody>
+          <div className="overflow-x-auto rounded-xl border">
+            <table className="w-full min-w-[28rem] text-left text-sm">
+              <thead>
+                <tr className="border-b text-muted-foreground">
+                  {columns.map((column) => (
+                    <th key={column.value} className="px-3 py-2 font-semibold">
+                      {column.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, rowIndex) => (
+                  <tr key={rowIndex} className="border-b last:border-b-0">
+                    {Array.from({ length: width }, (_, index) => (
+                      <td key={index} className="px-3 py-2">
+                        {row[index] ?? ""}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <Field>
-        <FieldLabel>Header row</FieldLabel>
-        <ChoiceSelect
-          className="w-full"
-          value={headerChoice}
-          options={[
-            { value: "auto", label: "Detect the header" },
-            { value: "yes", label: "The first row is a header" },
-            { value: "no", label: "There is no header" },
-          ]}
-          onValueChange={setHeaderChoice}
-        />
-        <FieldDescription>A date in the first row is a transaction.</FieldDescription>
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <ColumnSelect id="import-date" label="Date" value={date} width={width} labelFor={label} onChange={setDate} />
-        <ColumnSelect
-          id="import-description"
-          label="Description"
-          value={description}
-          width={width}
-          labelFor={label}
-          onChange={setDescription}
-        />
-      </div>
-      <Field>
-        <FieldLabel>Amount</FieldLabel>
-        <ChoiceSelect
-          className="w-full"
-          value={amountMode}
-          options={[
-            { value: "amount", label: "One amount column" },
-            { value: "split", label: "Separate debit and credit columns" },
-          ]}
-          onValueChange={setAmountMode}
-        />
-      </Field>
-      {amountMode === "amount" ? (
-        <ColumnSelect id="import-amount" label="Amount column" value={amount} width={width} labelFor={label} onChange={setAmount} />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <ColumnSelect id="import-debit" label="Debit" value={debit} width={width} labelFor={label} onChange={setDebit} />
-          <ColumnSelect id="import-credit" label="Credit" value={credit} width={width} labelFor={label} onChange={setCredit} />
-        </div>
-      )}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <ColumnSelect
-          id="import-balance"
-          label="Balance"
-          value={balance}
-          width={width}
-          labelFor={label}
-          onChange={setBalance}
-          optional
-        />
-        <ColumnSelect
-          id="import-bank"
-          label="Bank ID"
-          value={bankId}
-          width={width}
-          labelFor={label}
-          onChange={setBankId}
-          optional
-        />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldLabel>Date order</FieldLabel>
-          <ChoiceSelect
-            className="w-full"
-            value={dateOrder}
-            options={[
-              { value: "mdy", label: "Month, then day" },
-              { value: "dmy", label: "Day, then month" },
-            ]}
-            onValueChange={setDateOrder}
-          />
-        </Field>
-        <Field>
-          <FieldLabel>Decimal separator</FieldLabel>
-          <ChoiceSelect
-            className="w-full"
-            value={decimalSeparator}
-            options={[
-              { value: ".", label: "Point (.)" },
-              { value: ",", label: "Comma (,)" },
-            ]}
-            onValueChange={setDecimalSeparator}
-          />
-        </Field>
-      </div>
-      <Field>
-        <FieldLabel>Sign</FieldLabel>
-        <ChoiceSelect
-          className="w-full"
-          value={signConvention}
-          options={[
-            { value: "account", label: "Use the sign in the file" },
-            { value: "inverted", label: "Flip the sign" },
-          ]}
-          onValueChange={setSignConvention}
-        />
-        <FieldDescription>Flip the sign when the bank shows spending as a positive amount.</FieldDescription>
-      </Field>
-      {error ? (
-        <p role="alert" className="text-sm text-attn">
-          {error}
-        </p>
-      ) : null}
-      </DialogBody>
-      <DialogFooter>
-        <Button type="button" variant="secondary" onClick={onBack}>
-          Back
-        </Button>
-        <Button type="button" onClick={submit}>
-          Import
-        </Button>
-      </DialogFooter>
-    </DialogPanel>
-  );
-}
-
-function ColumnSelect({
-  id,
-  label,
-  value,
-  width,
-  labelFor,
-  onChange,
-  optional = false,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  width: number;
-  labelFor: (index: number) => string;
-  onChange: (value: string) => void;
-  optional?: boolean;
-}) {
-  return (
-    <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger id={id} className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {optional ? <SelectItem value={none}>None</SelectItem> : null}
-          {Array.from({ length: width }, (_, index) => (
-            <SelectItem key={index} value={String(index)}>
-              {labelFor(index)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </Field>
+              </tbody>
+            </table>
+          </div>
+          <form.AppField name="headerChoice">
+            {(field) => (
+              <field.SelectField id="import-header" label="Header row" options={headerOptions} description="A date in the first row is a transaction." />
+            )}
+          </form.AppField>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <form.AppField name="date">{(field) => <field.SelectField id="import-date" label="Date" options={columns} />}</form.AppField>
+            <form.AppField name="description">{(field) => <field.SelectField id="import-description" label="Description" options={columns} />}</form.AppField>
+          </div>
+          <form.AppField name="amountMode">{(field) => <field.SelectField id="import-amount-mode" label="Amount" options={amountModeOptions} />}</form.AppField>
+          {amountMode === "amount" ? (
+            <form.AppField name="amount">{(field) => <field.SelectField id="import-amount" label="Amount column" options={columns} />}</form.AppField>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <form.AppField name="debit">{(field) => <field.SelectField id="import-debit" label="Debit" options={columns} />}</form.AppField>
+              <form.AppField name="credit">{(field) => <field.SelectField id="import-credit" label="Credit" options={columns} />}</form.AppField>
+            </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <form.AppField name="balance">{(field) => <field.SelectField id="import-balance" label="Balance" options={optionalColumns} />}</form.AppField>
+            <form.AppField name="bankId">{(field) => <field.SelectField id="import-bank" label="Bank ID" options={optionalColumns} />}</form.AppField>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <form.AppField name="dateOrder">{(field) => <field.SelectField id="import-date-order" label="Date order" options={dateOrderOptions} />}</form.AppField>
+            <form.AppField name="decimalSeparator">
+              {(field) => <field.SelectField id="import-decimal" label="Decimal separator" options={decimalOptions} />}
+            </form.AppField>
+          </div>
+          <form.AppField name="signConvention">
+            {(field) => (
+              <field.SelectField
+                id="import-sign"
+                label="Sign"
+                options={signOptions}
+                description="Flip the sign when the bank shows spending as a positive amount."
+              />
+            )}
+          </form.AppField>
+          <form.FormError />
+        </DialogBody>
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={onBack}>
+            Back
+          </Button>
+          <form.SubmitButton inline>Import</form.SubmitButton>
+        </DialogFooter>
+      </DialogPanel>
+    </form.AppForm>
   );
 }

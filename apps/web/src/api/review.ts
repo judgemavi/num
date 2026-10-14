@@ -107,7 +107,6 @@ function answerReview(answer: ReviewAnswer) {
       return applyGroup({
         accountId: answer.accountId,
         transactionIds: [answer.transactionId],
-        excludedIds: [],
         categoryId: suggestion.transferAccountId ? null : suggestion.categoryId,
         transferAccountId: suggestion.transferAccountId,
         merchantId: suggestion.transferAccountId ? null : suggestion.merchantId,

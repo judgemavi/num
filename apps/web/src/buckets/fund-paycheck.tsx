@@ -1,6 +1,6 @@
 import { fromMinorUnits, toMinorUnits, type FundingProposal } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useDeferredValue, useState, type FormEvent, type ReactNode } from "react";
+import { useDeferredValue, useState, type ReactNode } from "react";
 import { errorCode } from "@/api/client";
 import { fundingPaychecksQuery, fundingProposalQuery, useFundPaycheck } from "@/api/funding";
 import { localAsOf } from "@/as-of";
@@ -11,10 +11,10 @@ import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEditorFrame } from "@/editors/editor-api";
 import type { EditorInput } from "@/editors/editor-types";
-import { DialogBody, DialogForm, DialogPanel } from "@/editors/form-chrome";
+import { DialogBody, DialogPanel } from "@/editors/form-chrome";
+import { useAppForm } from "@/forms/form-hook";
 import { useBookCurrency } from "@/editors/lookups";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function FundPaycheck({ incomeTransactionId }: EditorInput["fundPaycheck"]) {
@@ -94,89 +94,83 @@ function Proposal({ leading, incomeTransactionId }: { leading: ReactNode; income
   );
 }
 
+/** The amounts of a proposal. An empty amount or zero leaves the bucket out. */
+function fundingLines(currency: string, proposal: FundingProposal, amounts: Record<string, string>) {
+  const lines = [];
+  let sum = 0;
+  for (const line of proposal.lines) {
+    const text = amounts[line.bucketId]?.trim() ?? "";
+    if (text === "") {
+      continue;
+    }
+    let minor = 0;
+    try {
+      minor = toMinorUnits(currency, text);
+    } catch {
+      return { error: "Enter each amount as a number." };
+    }
+    if (minor < 0) {
+      return { error: "Enter an amount of zero or more." };
+    }
+    if (minor > 0) {
+      lines.push({ bucketId: line.bucketId, amount: minor });
+      sum += minor;
+    }
+  }
+  if (lines.length === 0) {
+    return { error: "Enter an amount for at least one bucket." };
+  }
+  return sum > proposal.limit ? { error: "That is more than this paycheck can assign." } : { lines };
+}
+
 function ProposalForm({ leading, proposal }: { leading: ReactNode; proposal: FundingProposal }) {
   const { close } = useEditorFrame();
   const currency = useBookCurrency();
   const fund = useFundPaycheck();
-  const [amounts, setAmounts] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {};
-    for (const line of proposal.lines) {
-      initial[line.bucketId] = fromMinorUnits(currency, line.amount);
-    }
-    return initial;
-  });
-  const [invalid, setInvalid] = useState<string | null>(null);
-  const error = invalid ?? (fund.error ? requestError(fund.error, "The paycheck was not funded. Try again.") : null);
-
-  function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    const lines = [];
-    let sum = 0;
-    for (const line of proposal.lines) {
-      const text = amounts[line.bucketId]?.trim() ?? "";
-      if (text === "") {
-        continue;
+  const form = useAppForm({
+    defaultValues: { amounts: Object.fromEntries(proposal.lines.map((line) => [line.bucketId, fromMinorUnits(currency, line.amount)])) },
+    validators: {
+      onSubmit: ({ value }) => fundingLines(currency, proposal, value.amounts).error,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      const { lines } = fundingLines(currency, proposal, value.amounts);
+      if (!lines) {
+        return;
       }
-      let minor = 0;
       try {
-        minor = toMinorUnits(currency, text);
-      } catch {
-        setInvalid("Enter each amount as a number.");
-        return;
+        await fund.mutateAsync({ asOf: localAsOf(), body: { incomeTransactionId: proposal.incomeTransactionId, lines } });
+        close("ok");
+      } catch (error) {
+        formApi.setErrorMap({ onSubmit: { form: requestError(error, "The paycheck was not funded. Try again."), fields: {} } });
       }
-      if (minor < 0) {
-        setInvalid("Enter an amount of zero or more.");
-        return;
-      }
-      if (minor === 0) {
-        continue;
-      }
-      lines.push({ bucketId: line.bucketId, amount: minor });
-      sum += minor;
-    }
-    if (lines.length === 0) {
-      setInvalid("Enter an amount for at least one bucket.");
-      return;
-    }
-    if (sum > proposal.limit) {
-      setInvalid("That is more than this paycheck can assign.");
-      return;
-    }
-    setInvalid(null);
-    fund.mutate({ asOf: localAsOf(), body: { incomeTransactionId: proposal.incomeTransactionId, lines } }, { onSuccess: () => close("ok") });
-  }
+    },
+  });
 
   return (
-    <DialogForm onSubmit={onSubmit}>
-      <DialogBody>
-      {leading}
-      <p className="text-sm text-muted-foreground">
-        {proposal.payee} · {formatDate(proposal.date)}. Assign up to <Amount minor={proposal.limit} />. That is the smaller of the paycheck and Unassigned.
-      </p>
-      {proposal.lines.length === 0 ? <p>Nothing to assign. The buckets are full, or Unassigned is zero.</p> : null}
-      {proposal.lines.map((line) => (
-        <Field key={line.bucketId}>
-          <FieldLabel htmlFor={`fund-${line.bucketId}`}>{line.name}</FieldLabel>
-          <Input
-            id={`fund-${line.bucketId}`}
-            inputMode="decimal"
-            value={amounts[line.bucketId] ?? ""}
-            onChange={(event) => setAmounts((current) => ({ ...current, [line.bucketId]: event.target.value }))}
-          />
-        </Field>
-      ))}
-      {error ? <FieldError>{error}</FieldError> : null}
-      </DialogBody>
-      <DialogFooter>
-        <DialogClose asChild>
-          <Button type="button" variant="outline">
-            Cancel
-          </Button>
-        </DialogClose>
-        <Button type="submit" disabled={fund.isPending || proposal.lines.length === 0}>
-          Fund this paycheck
-        </Button>
-      </DialogFooter>
-    </DialogForm>
+    <form.AppForm>
+      <form.FormShell>
+        <DialogBody>
+          {leading}
+          <p className="text-sm text-muted-foreground">
+            {proposal.payee} · {formatDate(proposal.date)}. Assign up to <Amount minor={proposal.limit} />. That is the smaller of the paycheck and Unassigned.
+          </p>
+          {proposal.lines.length === 0 ? <p>Nothing to assign. The buckets are full, or Unassigned is zero.</p> : null}
+          {proposal.lines.map((line) => (
+            <form.AppField key={line.bucketId} name={`amounts.${line.bucketId}`}>
+              {(field) => <field.MoneyField id={`fund-${line.bucketId}`} label={line.name} />}
+            </form.AppField>
+          ))}
+          <form.FormError />
+        </DialogBody>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <form.SubmitButton disabled={proposal.lines.length === 0}>Fund this paycheck</form.SubmitButton>
+        </DialogFooter>
+      </form.FormShell>
+    </form.AppForm>
   );
 }

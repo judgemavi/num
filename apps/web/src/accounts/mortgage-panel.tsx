@@ -11,10 +11,35 @@ import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { DateField } from "@/components/date-field";
-import { Input } from "@/components/ui/input";
+import { useAppForm } from "@/forms/form-hook";
 import { formatMoney } from "@/money";
+
+function readAmount(currency: string, text: string) {
+  if (text.trim().length === 0) {
+    return 0;
+  }
+  try {
+    return toMinorUnits(currency, text.trim());
+  } catch {
+    return null;
+  }
+}
+
+/** The extra amounts of the form for the schedule, or the text of the error. */
+function readExtra(currency: string, value: { extra: string; lump: string; lumpDate: string }) {
+  const extra = readAmount(currency, value.extra);
+  const lumpSum = readAmount(currency, value.lump);
+  if (extra === null || lumpSum === null) {
+    return { error: "Enter the extra amount as a number." };
+  }
+  if (extra < 0 || lumpSum < 0) {
+    return { error: "Enter the extra amount as a positive number." };
+  }
+  if ((lumpSum > 0) !== (value.lumpDate.length > 0)) {
+    return { error: "Enter the one-time extra and its date." };
+  }
+  return { effect: { extra, lumpSum, lumpDate: value.lumpDate } };
+}
 
 function formatDay(iso: string) {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -31,11 +56,23 @@ export function MortgagePanel({ accountId }: { accountId: string }) {
 function MortgageView({ accountId }: { accountId: string }) {
   const { openEditor } = useEditors();
   const currency = useBookCurrency();
-  const [extraText, setExtraText] = useState("");
-  const [lumpText, setLumpText] = useState("");
-  const [lumpDateText, setLumpDateText] = useState("");
+  // The extra amounts of the schedule on the screen. The form gives new amounts when the person asks for the effect.
   const [effect, setEffect] = useState({ extra: 0, lumpSum: 0, lumpDate: "" });
-  const [extraError, setExtraError] = useState<string | null>(null);
+  const form = useAppForm({
+    defaultValues: { extra: "", lump: "", lumpDate: "" },
+    validators: {
+      onSubmit: ({ value }) => {
+        const extra = readExtra(currency, value);
+        return extra.error;
+      },
+    },
+    onSubmit: ({ value }) => {
+      const extra = readExtra(currency, value);
+      if (extra.effect) {
+        setEffect(extra.effect);
+      }
+    },
+  });
 
   // The schedule on the screen stays while the schedule with a new extra amount loads.
   const { data: row } = useSuspenseQuery(mortgageViewQuery(accountId, localAsOf(), useDeferredValue(effect)));
@@ -58,37 +95,6 @@ function MortgageView({ accountId }: { accountId: string }) {
   }
 
   const rate = `${milliPctToPercent(row.rateMilliPct)}%`;
-
-  function readExtra(text: string) {
-    if (text.trim().length === 0) {
-      return 0;
-    }
-    try {
-      const minor = toMinorUnits(currency, text.trim());
-      if (minor < 0) {
-        setExtraError("Enter the extra amount as a positive number.");
-        return null;
-      }
-      return minor;
-    } catch {
-      setExtraError("Enter the extra amount as a number.");
-      return null;
-    }
-  }
-
-  function showExtra() {
-    setExtraError(null);
-    const perPayment = readExtra(extraText);
-    const once = readExtra(lumpText);
-    if (perPayment === null || once === null) {
-      return;
-    }
-    if ((once > 0 && lumpDateText.length === 0) || (once === 0 && lumpDateText.length > 0)) {
-      setExtraError("Enter the one-time extra and its date.");
-      return;
-    }
-    setEffect({ extra: perPayment, lumpSum: once, lumpDate: lumpDateText });
-  }
 
   return (
     <Card>
@@ -114,22 +120,17 @@ function MortgageView({ accountId }: { accountId: string }) {
           <p className="text-sm">This payment does not pay off the loan.</p>
         )}
         <MortgageSchedule payments={row.payments} actuals={row.actualPayments} />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="mortgage-extra">Extra on each payment</FieldLabel>
-            <Input id="mortgage-extra" inputMode="decimal" autoComplete="off" value={extraText} onChange={(event) => setExtraText(event.target.value)} />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="mortgage-lump">One-time extra</FieldLabel>
-            <Input id="mortgage-lump" inputMode="decimal" autoComplete="off" value={lumpText} onChange={(event) => setLumpText(event.target.value)} />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="mortgage-lump-date">Date of the one-time extra</FieldLabel>
-            <DateField id="mortgage-lump-date" value={lumpDateText} onChange={setLumpDateText} />
-          </Field>
-          <Button type="button" variant="outline" className="self-end" onClick={showExtra}>Show the effect</Button>
-        </div>
-        {extraError ? <p className="text-sm">{extraError}</p> : null}
+        <form.AppForm>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <form.AppField name="extra">{(field) => <field.MoneyField id="mortgage-extra" label="Extra on each payment" />}</form.AppField>
+            <form.AppField name="lump">{(field) => <field.MoneyField id="mortgage-lump" label="One-time extra" />}</form.AppField>
+            <form.AppField name="lumpDate">{(field) => <field.DateInputField id="mortgage-lump-date" label="Date of the one-time extra" />}</form.AppField>
+            <Button type="button" variant="outline" className="self-end" onClick={() => void form.handleSubmit()}>
+              Show the effect
+            </Button>
+          </div>
+          <form.FormError />
+        </form.AppForm>
         {row.extra ? (
           <p className="text-sm" role="status">
             {row.extra.payoffDate ? `New payoff date ${formatDay(row.extra.payoffDate)}.` : "The loan does not pay off with this extra amount."}

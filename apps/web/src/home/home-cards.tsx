@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEditors } from "@/editors/editor-api";
-import { useBookCurrency, useCategoryNames, usePlanNames } from "@/editors/lookups";
+import { useActivePlans, useBookCurrency, useCategoryNames } from "@/editors/lookups";
 import { homeInsights } from "@/home/home-reads";
 import { signedMoney } from "@/insights/format";
 import { formatMoney } from "@/money";
@@ -151,27 +151,36 @@ export function PaychecksCard() {
 /** The recurring payments that did not arrive. The card shows only when there is one. */
 export function MissedPaymentsCard() {
   const { openEditor } = useEditors();
-  const planNames = usePlanNames();
+  const plans = useActivePlans().items;
   const { data: signals } = useSuspenseQuery(recurringSignalsQuery(localAsOf()));
   if (signals.missed.length === 0) {
     return null;
   }
   return (
     <ListCard label="Missed payments" title="Missed payments">
-      {signals.missed.map((item) => (
+      {signals.missed.map((item) => {
+        const plan = plans.find((row) => row.id === item.planId);
+        return (
         <ListRow key={`${item.planId}-${item.dueDate}`}>
           <span className={listName}>
-            {planNames.get(item.planId) ?? "Recurring payment"}
+            {plan?.name ?? "Recurring payment"}
             <small>Missed · due {formatDate(item.dueDate)}</small>
           </span>
-          <Button type="button" variant="ghost" onClick={() => void openEditor("plan", { id: item.planId })}>
-            Link a transaction
-          </Button>
+          {plan ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => void openEditor("linkOccurrence", { planId: plan.id, accountId: plan.accountId, dueDate: item.dueDate })}
+            >
+              Link a transaction
+            </Button>
+          ) : null}
           <Button type="button" variant="ghost" onClick={() => void openEditor("skipOccurrence", { planId: item.planId, dueDate: item.dueDate })}>
             Skip
           </Button>
         </ListRow>
-      ))}
+        );
+      })}
     </ListCard>
   );
 }

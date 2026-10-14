@@ -1,4 +1,4 @@
-import { accountActivityQuerySchema } from "@num/shared";
+import { accountActivityQuerySchema, searchWithDefaults } from "@num/shared";
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
 import { AccountScreen } from "@/accounts/account-screen";
 import { accountQuery } from "@/api/accounts";
@@ -6,7 +6,7 @@ import { checkpointListQuery } from "@/api/checkpoints";
 import { accountImportsQuery } from "@/api/imports";
 
 export const Route = createFileRoute("/accounts_/$accountId")({
-  validateSearch: accountActivityQuerySchema,
+  validateSearch: searchWithDefaults(accountActivityQuerySchema),
   search: {
     middlewares: [stripSearchParams({ page: 1, reconcile: false })],
   },

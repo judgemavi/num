@@ -145,7 +145,6 @@ test("Yes writes the split for the date and amount of each row", () => {
       const result = applyInboxGroup(sample.db, {
         accountId: sample.account.id,
         transactionIds: [row.id],
-        excludedIds: [],
         categoryId: null,
         transferAccountId: suggestion?.transferAccountId ?? null,
         merchantId: null,

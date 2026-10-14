@@ -137,9 +137,7 @@ function skipsOfIdleGroup(db: Db, targets: readonly string[], patch: Patch) {
 
 export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { applied: number; skipped: GroupSkip[] } {
   const at = input.at ?? utcNow();
-  const excluded = new Set(input.excludedIds);
-  const groupIds = [...new Set(input.transactionIds)];
-  const targets = groupIds.filter((id) => !excluded.has(id));
+  const targets = [...new Set(input.transactionIds)];
   // A group in which each row is skipped changes nothing. It has no write and no audit entry.
   const idle = skipsOfIdleGroup(db, targets, input);
   if (idle) {
@@ -158,7 +156,7 @@ export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { 
         confirmed.push(id);
       }
     }
-    spreadAfterConfirmations(tx, confirmed, excluded, new Set(groupIds));
+    spreadAfterConfirmations(tx, confirmed, new Set(), new Set(targets));
   });
   return { applied, skipped };
 }

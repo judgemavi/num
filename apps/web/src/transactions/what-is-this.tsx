@@ -1,15 +1,17 @@
-import { categoryKindForChoice, choicesForDirection, type MoneyDirection, type Suggestion, type WhatChoice } from "@num/shared";
+import { categoryKindForChoice, choicesForDirection, merchantForChoice, type Suggestion, type Transaction, type WhatChoice } from "@num/shared";
+import { useStore } from "@tanstack/react-form";
 import { choiceIn } from "@/components/choice";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Button } from "@/components/ui/button";
-import { useAccountLabels, useBookCurrency, useCategoryNames, useMerchantNames } from "@/editors/lookups";
-import { formatMoney } from "@/money";
+import { useAccountLabels, useBookCurrency, useCategories, useCategoryNames, useMerchantNames } from "@/editors/lookups";
+import { withForm } from "@/forms/form-hook";
+import { fieldValue } from "@/forms/form-values";
 import { AccountPicker, CategoryPicker, MerchantPicker } from "@/transactions/pickers";
-import { SplitLineRow } from "@/transactions/split-line-row";
+import { SplitLines } from "@/transactions/split-line-row";
 import { RefundOfField } from "@/transactions/refund-of-field";
 import { levelLabel } from "@/transactions/format";
-import { addedLine, editLineAmount, restOnLastLine, splitBlank, splitRemainder, type SplitLine } from "@/transactions/what-choice";
+import { blankTransaction, quietChange, signedTotal, useSuggestion } from "@/transactions/transaction-draft";
+import type { SplitLine } from "@/transactions/what-choice";
 
 const choiceLabel: Record<WhatChoice, string> = {
   spending: "Spending",
@@ -17,36 +19,6 @@ const choiceLabel: Record<WhatChoice, string> = {
   refund: "Refund",
   transfer: "Transfer",
   split: "Split",
-};
-
-type WhatIsThisProps = {
-  idPrefix: string;
-  direction: MoneyDirection;
-  choice: WhatChoice;
-  onChoice: (choice: WhatChoice) => void;
-  choiceLocked: boolean;
-  categoryId: string | null;
-  onCategoryId: (id: string | null) => void;
-  categoryLocked: boolean;
-  allowEmptyCategory: boolean;
-  transferAccountId: string | null;
-  onTransferAccountId: (id: string | null) => void;
-  transferLocked: boolean;
-  lines: SplitLine[];
-  onLines: (lines: SplitLine[]) => void;
-  amountsLocked: boolean;
-  totalMinor: number | null;
-  /** The account of the transaction. A transfer goes to a different account. */
-  accountId: string;
-  merchantId: string | null;
-  onMerchantId: (id: string | null) => void;
-  payee: string;
-  suggestion: Suggestion | null;
-  refundOfId?: string | null;
-  onRefundOf?: (id: string | null) => void;
-  linkedRefund?: { id: string; date: string; amount: number; payeeRaw: string } | null;
-  /** The date of the transaction. The purchases that a refund can link to are the purchases before this date. */
-  date?: string;
 };
 
 function reasonText(suggestion: Suggestion) {
@@ -87,160 +59,120 @@ function SuggestionHint({ suggestion }: { suggestion: Suggestion }) {
   return <FieldDescription role="status">{label ? `${label}. ${text}` : text}</FieldDescription>;
 }
 
-function splitStatus(currency: string, totalMinor: number | null, left: number | null, lines: SplitLine[]) {
-  if (totalMinor === null) {
-    return "Enter the amount.";
-  }
-  if (left === null) {
-    return "Enter a positive amount on each line.";
-  }
-  if (left === 0) {
-    return splitBlank(lines) ? "Enter an amount on each line." : "All assigned";
-  }
-  return left > 0 ? `${formatMoney(currency, left)} left` : `${formatMoney(currency, -left)} too much`;
-}
+/** The choice of the transaction and its fields: the category, the transfer account, the lines and the merchant. */
+export const WhatIsThis = withForm({
+  defaultValues: blankTransaction,
+  props: {
+    choiceLocked: false,
+    categoryLocked: false,
+    transferLocked: false,
+    amountsLocked: false,
+    /** The amount of an imported transaction. Null when the person enters the amount. */
+    importedAmount: fieldValue<number | null>(null),
+    /** The purchase that the saved refund links to. */
+    linkedRefund: fieldValue<Transaction["refundOf"]>(null),
+  },
+  render: function WhatIsThisRender({ form, choiceLocked, categoryLocked, transferLocked, amountsLocked, importedAmount, linkedRefund }) {
+    const currency = useBookCurrency();
+    const categories = useCategories();
+    const values = useStore(form.store, (state) => state.values);
+    const { direction, choice, refundOfId, accountId } = values;
+    const totalMinor = signedTotal(currency, importedAmount, values.amount, direction);
+    const { suggestion } = useSuggestion({ accountId, payee: values.payee, date: values.date, direction, amount: totalMinor });
+    const choices = choicesForDirection(direction);
+    const categoryKind = categoryKindForChoice(choice);
 
-export function WhatIsThis({
-  idPrefix,
-  direction,
-  choice,
-  onChoice,
-  choiceLocked,
-  categoryId,
-  onCategoryId,
-  categoryLocked,
-  allowEmptyCategory,
-  transferAccountId,
-  onTransferAccountId,
-  transferLocked,
-  lines,
-  onLines,
-  amountsLocked,
-  totalMinor,
-  accountId,
-  merchantId,
-  onMerchantId,
-  payee,
-  suggestion,
-  refundOfId = null,
-  onRefundOf,
-  linkedRefund = null,
-  date = "",
-}: WhatIsThisProps) {
-  const currency = useBookCurrency();
-  const transferLabel = direction === "out" ? "To account" : "From account";
-  const choices = choicesForDirection(direction);
-  const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, direction, lines) : choice === "split" ? null : 0;
-  const lastLineRest = choice === "split" && totalMinor !== null ? restOnLastLine(currency, totalMinor, direction, lines) : null;
-  const categoryKind = categoryKindForChoice(choice);
-
-  function updateLine(key: string, patch: Partial<SplitLine>) {
-    onLines(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
-  }
-
-  return (
-    <div className="grid gap-4">
-      <Field>
-        <FieldLabel>What is this?</FieldLabel>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          spacing={2}
-          value={choices.includes(choice) ? choice : ""}
-          disabled={choiceLocked}
-          onValueChange={(value) => {
-            const next = choiceIn(choices, value);
-            if (next) {
-              onChoice(next);
-            }
+    return (
+      <div className="grid gap-4">
+        <form.Field
+          name="choice"
+          listeners={{
+            // A new choice keeps only the fields that fit it. Split starts with two lines.
+            onChange: ({ value: next, fieldApi }) => {
+              const draft = fieldApi.form;
+              draft.setFieldValue("merchantId", (current) => merchantForChoice(next, current), quietChange);
+              if (next !== "refund") {
+                draft.setFieldValue("refundOfId", null, quietChange);
+              }
+              const kind = categories.find((category) => category.id === draft.getFieldValue("categoryId"))?.kind ?? null;
+              if (next !== "transfer" && next !== "split" && kind && kind !== categoryKindForChoice(next)) {
+                draft.setFieldValue("categoryId", null, quietChange);
+              }
+              if (next === "split" && draft.getFieldValue("lines").length < 2) {
+                draft.setFieldValue("lines", firstLines(draft.getFieldValue("amount"), draft.getFieldValue("categoryId")), quietChange);
+              }
+            },
           }}
         >
-          {choices.map((item) => (
-            <ToggleGroupItem key={item} value={item}>
-              {choiceLabel[item]}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </Field>
-      {choice === "refund" && onRefundOf && date.length > 0 ? (
-        <RefundOfField
-          id={`${idPrefix}-refund-of`}
-          date={date}
-          payee={payee}
-          categoryId={categoryId}
-          merchantId={merchantId}
-          value={refundOfId}
-          linked={linkedRefund}
-          onChange={onRefundOf}
-          onCategory={onCategoryId}
-          onMerchant={onMerchantId}
-        />
-      ) : null}
-      {categoryKind !== null && (choice !== "refund" || refundOfId === null) ? (
-        <Field>
-          <FieldLabel htmlFor={`${idPrefix}-category`}>Category</FieldLabel>
-          <CategoryPicker
-            id={`${idPrefix}-category`}
-            value={categoryId}
-            kind={categoryKind}
-            allowEmpty={allowEmptyCategory}
-            disabled={categoryLocked}
-            onChange={onCategoryId}
-          />
-        </Field>
-      ) : null}
-      {choice === "transfer" ? (
-        <Field>
-          <FieldLabel htmlFor={`${idPrefix}-transfer`}>{transferLabel}</FieldLabel>
-          <AccountPicker
-            id={`${idPrefix}-transfer`}
-            value={transferAccountId}
-            exceptId={accountId}
-            disabled={transferLocked}
-            onChange={onTransferAccountId}
-          />
-        </Field>
-      ) : null}
-      {choice === "split" ? (
-        <div className="grid gap-3">
-          {lines.map((line, index) => (
-            <SplitLineRow
-              key={line.key}
-              idPrefix={idPrefix}
-              index={index}
-              direction={direction}
-              line={line}
-              accountId={accountId}
-              categoryLocked={categoryLocked}
-              transferLocked={transferLocked}
-              amountsLocked={amountsLocked}
-              onChange={(patch) => updateLine(line.key, patch)}
-              onAmount={(text) => onLines(editLineAmount(currency, totalMinor, direction, lines, line.key, text))}
-              onRemove={lines.length > 1 && !amountsLocked ? () => onLines(lines.filter((item) => item.key !== line.key)) : null}
-            />
-          ))}
-          {!amountsLocked ? (
-            <Button type="button" variant="ghost" className="justify-start" onClick={() => onLines([...lines, addedLine(currency, totalMinor, direction, lines)])}>
-              + Add a line
-            </Button>
-          ) : null}
-          <div className="flex flex-wrap items-center justify-between gap-2" role="status">
-            <p className="text-sm font-semibold">{splitStatus(currency, totalMinor, left, lines)}</p>
-            {!amountsLocked && totalMinor !== null && left !== null && left !== 0 && lastLineRest !== null ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => onLines(lastLineRest)}>
-                Put it on the last line
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-      {choice === "transfer" || (choice === "refund" && refundOfId !== null) ? null : (
-        <Field>
-          <FieldLabel htmlFor={`${idPrefix}-merchant`}>Merchant</FieldLabel>
-          <MerchantPicker id={`${idPrefix}-merchant`} value={merchantId} payee={payee} onChange={onMerchantId} />
-          {suggestion ? <SuggestionHint suggestion={suggestion} /> : null}
-        </Field>
-      )}
-    </div>
-  );
+          {(field) => (
+            <Field>
+              <FieldLabel>What is this?</FieldLabel>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                spacing={2}
+                value={choices.includes(field.state.value) ? field.state.value : ""}
+                disabled={choiceLocked}
+                onValueChange={(value) => {
+                  const next = choiceIn(choices, value);
+                  if (next) {
+                    field.handleChange(next);
+                  }
+                }}
+              >
+                {choices.map((item) => (
+                  <ToggleGroupItem key={item} value={item}>
+                    {choiceLabel[item]}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </Field>
+          )}
+        </form.Field>
+        {choice === "refund" && values.date.length > 0 ? <RefundOfField form={form} linked={linkedRefund} /> : null}
+        {categoryKind !== null && (choice !== "refund" || refundOfId === null) ? (
+          <form.Field name="categoryId">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="txn-category">Category</FieldLabel>
+                <CategoryPicker id="txn-category" value={field.state.value} kind={categoryKind} allowEmpty disabled={categoryLocked} onChange={field.handleChange} />
+              </Field>
+            )}
+          </form.Field>
+        ) : null}
+        {choice === "transfer" ? (
+          <form.Field name="transferAccountId">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="txn-transfer">{direction === "out" ? "To account" : "From account"}</FieldLabel>
+                <AccountPicker id="txn-transfer" value={field.state.value} exceptId={accountId} disabled={transferLocked} onChange={field.handleChange} />
+              </Field>
+            )}
+          </form.Field>
+        ) : null}
+        {choice === "split" ? (
+          <SplitLines form={form} totalMinor={totalMinor} categoryLocked={categoryLocked} transferLocked={transferLocked} amountsLocked={amountsLocked} />
+        ) : null}
+        {choice === "transfer" || (choice === "refund" && refundOfId !== null) ? null : (
+          <form.Field name="merchantId">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="txn-merchant">Merchant</FieldLabel>
+                <MerchantPicker id="txn-merchant" value={field.state.value} payee={values.payee} onChange={field.handleChange} />
+                {suggestion ? <SuggestionHint suggestion={suggestion} /> : null}
+              </Field>
+            )}
+          </form.Field>
+        )}
+      </div>
+    );
+  },
+});
+
+/** The two lines of a new split: the first line has the amount and the category, the second line is empty. */
+function firstLines(amount: string, categoryId: string | null): SplitLine[] {
+  return [
+    { key: crypto.randomUUID(), amount, opposite: false, edited: false, categoryId, transferAccountId: null },
+    { key: crypto.randomUUID(), amount: "", opposite: false, edited: false, categoryId: null, transferAccountId: null },
+  ];
 }

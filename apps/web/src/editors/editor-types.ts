@@ -1,5 +1,5 @@
 import type { BucketEventKind, CategoryKind, ImportBatch, PlanKind } from "@num/shared";
-import type { PlanSeed } from "@/recurring/plan-form";
+import type { PlanSeed } from "@/recurring/plan-values";
 
 /** The input of each editor. `openEditor(kind, input)` and the editor component of that kind use the same type. */
 export type EditorInput = {

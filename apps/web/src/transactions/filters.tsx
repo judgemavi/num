@@ -1,14 +1,13 @@
+import type { TransactionListQuery } from "@num/shared";
 import { accountLabel } from "@/accounts/label";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { DateField } from "@/components/date-field";
-import { Switch } from "@/components/ui/switch";
 import { useAccounts, useCategories, useGroups, useMerchants, useTags } from "@/editors/lookups";
-import { OptionCombobox } from "@/transactions/option-combobox";
 import { formatDate } from "@/transactions/format";
 import { useTransactionSearch } from "@/transactions/use-transaction-list";
 import { SortSelect } from "@/lists/sort-select";
-import { useFilterDraft, useSearchText } from "@/lists/use-list-search";
+import { SearchBox } from "@/lists/search-box";
+import { useAppForm } from "@/forms/form-hook";
+import { fieldValue } from "@/forms/form-values";
 
 const sortOptions = [
   { sort: "date", dir: "desc", label: "Date, newest" },
@@ -19,18 +18,48 @@ const sortOptions = [
   { sort: "payeeRaw", dir: "desc", label: "Payee, Z to A" },
 ] as const;
 
-/** The filters of the panel with no choice. */
+/** The filters of the panel with no choice. The controls use null and "" for no choice. */
 const noFilters = {
-  accountId: undefined,
-  categoryId: undefined,
-  groupId: undefined,
-  merchantId: undefined,
-  tagId: undefined,
-  from: undefined,
-  to: undefined,
+  accountId: fieldValue<string | null>(null),
+  categoryId: fieldValue<string | null>(null),
+  groupId: fieldValue<string | null>(null),
+  merchantId: fieldValue<string | null>(null),
+  tagId: fieldValue<string | null>(null),
+  from: "",
+  to: "",
   uncategorized: false,
   automatic: false,
 };
+
+/** The values of the filter panel for the filters in the URL. */
+function panelValues(search: TransactionListQuery) {
+  return {
+    accountId: search.accountId ?? null,
+    categoryId: search.categoryId ?? null,
+    groupId: search.groupId ?? null,
+    merchantId: search.merchantId ?? null,
+    tagId: search.tagId ?? null,
+    from: search.from ?? "",
+    to: search.to ?? "",
+    uncategorized: search.uncategorized,
+    automatic: search.automatic,
+  };
+}
+
+/** The filters for the URL. No choice is not in the URL. */
+function urlFilters(value: typeof noFilters) {
+  return {
+    accountId: value.accountId ?? undefined,
+    categoryId: value.categoryId ?? undefined,
+    groupId: value.groupId ?? undefined,
+    merchantId: value.merchantId ?? undefined,
+    tagId: value.tagId ?? undefined,
+    from: value.from || undefined,
+    to: value.to || undefined,
+    uncategorized: value.uncategorized,
+    automatic: value.automatic,
+  };
+}
 
 function namedOptions(items: { id: string; name: string; archivedAt?: string | null }[]) {
   return items.filter((item) => !item.archivedAt).map((item) => ({ id: item.id, label: accountLabel(item) }));
@@ -44,8 +73,11 @@ export function TransactionFilterBar() {
   const groups = useGroups();
   const merchants = useMerchants().filter((merchant) => !merchant.archivedAt);
   const tags = useTags();
-  const box = useSearchText(search.q, (q) => patch({ q }));
-  const { draft, changes, change, reset } = useFilterDraft(search);
+  // The panel keeps the changes of the person until the person applies them.
+  const panel = useAppForm({
+    defaultValues: panelValues(search),
+    onSubmit: ({ value }) => patch(urlFilters(value)),
+  });
 
   function nameOf(items: { id: string; name: string }[], id: string | undefined) {
     return items.find((item) => item.id === id)?.name;
@@ -97,113 +129,65 @@ export function TransactionFilterBar() {
 
   return (
     <FilterBar
-      search={{
-        id: "transaction-search",
-        value: box.text,
-        placeholder: "Payee, notes or merchant",
-        label: "Search",
-        onChange: box.change,
-      }}
+      search={<SearchBox id="transaction-search" placeholder="Payee, notes or merchant" label="Search" query={search.q} onQuery={(q) => patch({ q })} />}
       activeCount={badges.length}
       badges={badges}
       onOpenChange={(open) => {
         if (open) {
-          reset();
+          panel.reset();
         }
       }}
-      onApply={() => patch(changes)}
-      onClear={() => change(noFilters)}
-      onClearAll={() => patch(noFilters)}
+      onApply={() => void panel.handleSubmit()}
+      onClear={() => panel.reset(noFilters, { keepDefaultValues: true })}
+      onClearAll={() => patch(urlFilters(noFilters))}
       sort={<SortSelect id="transaction-sort" label="Sort" value={sort} options={sortOptions} onChange={setSort} />}
       fields={
         <>
-          <Field>
-            <FieldLabel htmlFor="filter-account">Account</FieldLabel>
-            <OptionCombobox
-              id="filter-account"
-              value={draft.accountId ?? null}
-              options={namedOptions(accounts)}
-              placeholder="Any account"
-              emptyLabel="Any account"
-              onChange={(accountId) => change({ accountId: accountId ?? undefined })}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="filter-category">Category</FieldLabel>
-            <OptionCombobox
-              id="filter-category"
-              value={draft.categoryId ?? null}
-              options={namedOptions(categories)}
-              placeholder="Any category"
-              emptyLabel="Any category"
-              onChange={(categoryId) => change({ categoryId: categoryId ?? undefined })}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="filter-group">Group</FieldLabel>
-            <OptionCombobox
-              id="filter-group"
-              value={draft.groupId ?? null}
-              options={[{ id: "none", label: "No group" }, ...groups.map((group) => ({ id: group.id, label: group.name }))]}
-              placeholder="Any group"
-              emptyLabel="Any group"
-              onChange={(groupId) => change({ groupId: groupId ?? undefined })}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="filter-merchant">Merchant</FieldLabel>
-            <OptionCombobox
-              id="filter-merchant"
-              value={draft.merchantId ?? null}
-              options={[{ id: "none", label: "No merchant" }, ...merchants.map((merchant) => ({ id: merchant.id, label: merchant.name }))]}
-              placeholder="Any merchant"
-              emptyLabel="Any merchant"
-              onChange={(merchantId) => change({ merchantId: merchantId ?? undefined })}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="filter-tag">Tag</FieldLabel>
-            <OptionCombobox
-              id="filter-tag"
-              value={draft.tagId ?? null}
-              options={[{ id: "none", label: "No tag" }, ...namedOptions(tags)]}
-              placeholder="Any tag"
-              emptyLabel="Any tag"
-              onChange={(tagId) => change({ tagId: tagId ?? undefined })}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="filter-from">From</FieldLabel>
-            <DateField
-              id="filter-from"
-              value={draft.from ?? ""}
-              onChange={(value) => change({ from: value || undefined })}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="filter-to">To</FieldLabel>
-            <DateField
-              id="filter-to"
-              value={draft.to ?? ""}
-              onChange={(value) => change({ to: value || undefined })}
-            />
-          </Field>
-          <Field orientation="horizontal">
-            <Switch
-              id="filter-uncategorized"
-              checked={draft.uncategorized}
-              onCheckedChange={(pressed) => change({ uncategorized: pressed })}
-            />
-            <FieldLabel htmlFor="filter-uncategorized">Uncategorized only</FieldLabel>
-          </Field>
-          <Field orientation="horizontal">
-            <Switch
-              id="filter-automatic"
-              checked={draft.automatic}
-              onCheckedChange={(pressed) => change({ automatic: pressed })}
-            />
-            <FieldLabel htmlFor="filter-automatic">Automatic</FieldLabel>
-          </Field>
+          <panel.AppField name="accountId">
+            {(field) => <field.ComboboxField id="filter-account" label="Account" options={namedOptions(accounts)} placeholder="Any account" emptyLabel="Any account" />}
+          </panel.AppField>
+          <panel.AppField name="categoryId">
+            {(field) => (
+              <field.ComboboxField id="filter-category" label="Category" options={namedOptions(categories)} placeholder="Any category" emptyLabel="Any category" />
+            )}
+          </panel.AppField>
+          <panel.AppField name="groupId">
+            {(field) => (
+              <field.ComboboxField
+                id="filter-group"
+                label="Group"
+                options={[{ id: "none", label: "No group" }, ...groups.map((group) => ({ id: group.id, label: group.name }))]}
+                placeholder="Any group"
+                emptyLabel="Any group"
+              />
+            )}
+          </panel.AppField>
+          <panel.AppField name="merchantId">
+            {(field) => (
+              <field.ComboboxField
+                id="filter-merchant"
+                label="Merchant"
+                options={[{ id: "none", label: "No merchant" }, ...merchants.map((merchant) => ({ id: merchant.id, label: merchant.name }))]}
+                placeholder="Any merchant"
+                emptyLabel="Any merchant"
+              />
+            )}
+          </panel.AppField>
+          <panel.AppField name="tagId">
+            {(field) => (
+              <field.ComboboxField
+                id="filter-tag"
+                label="Tag"
+                options={[{ id: "none", label: "No tag" }, ...namedOptions(tags)]}
+                placeholder="Any tag"
+                emptyLabel="Any tag"
+              />
+            )}
+          </panel.AppField>
+          <panel.AppField name="from">{(field) => <field.DateInputField id="filter-from" label="From" />}</panel.AppField>
+          <panel.AppField name="to">{(field) => <field.DateInputField id="filter-to" label="To" />}</panel.AppField>
+          <panel.AppField name="uncategorized">{(field) => <field.SwitchField id="filter-uncategorized" label="Uncategorized only" />}</panel.AppField>
+          <panel.AppField name="automatic">{(field) => <field.SwitchField id="filter-automatic" label="Automatic" />}</panel.AppField>
         </>
       }
     />

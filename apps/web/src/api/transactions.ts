@@ -60,16 +60,15 @@ export function useSaveTransaction() {
   return useMutation({
     mutationFn: async (save: TransactionSave) => {
       if (save.kind === "confirm") {
-        const confirmed = await looksRight(save.id);
-        return { id: confirmed.id, skipped: 0, applied: 0 };
+        return looksRight(save.id);
       }
       const saved = await unwrap(
         save.kind === "create" ? api.transactions.$post({ json: save.body }) : api.transactions[":id"].$patch({ param: { id: save.id }, json: save.body }),
       );
       if (save.kind === "update" && save.confirmLabel && saved.autoReason !== null) {
-        await looksRight(saved.id);
+        return looksRight(saved.id);
       }
-      return { id: saved.id, skipped: saved.skipped?.length ?? 0, applied: saved.applied ?? 0 };
+      return saved;
     },
   });
 }

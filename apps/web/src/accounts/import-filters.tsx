@@ -1,16 +1,13 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { activeAccountsQuery } from "@/api/accounts";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
-import { ChoiceSelect } from "@/components/choice-select";
 import { SortSelect } from "@/lists/sort-select";
-import { useFilterDraft } from "@/lists/use-list-search";
+import { useAppForm } from "@/forms/form-hook";
+import { fieldValue } from "@/forms/form-values";
 import { useImportSearch } from "@/accounts/use-import-search";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { DateField } from "@/components/date-field";
 import { importStatusLabel } from "@/accounts/import-format";
 import { accountLabel } from "@/accounts/label";
 import { formatDate } from "@/transactions/format";
-import { OptionCombobox } from "@/transactions/option-combobox";
 
 const sortOptions = [
   { sort: "date", dir: "desc", label: "Date, newest" },
@@ -24,13 +21,32 @@ const statusOptions = [
   { value: "needs_you", label: "Needs you" },
 ] as const;
 
-/** The filters of the panel with no choice. */
-const noFilters = { accountId: undefined, status: undefined, from: undefined, to: undefined };
+/** The filters of the panel with no choice. The controls use null, "any" and "" for no choice. */
+const noFilters = {
+  accountId: fieldValue<string | null>(null),
+  status: fieldValue<(typeof statusOptions)[number]["value"]>("any"),
+  from: "",
+  to: "",
+};
+
+/** The filters for the URL. No choice is not in the URL. */
+function urlFilters(value: typeof noFilters) {
+  return {
+    accountId: value.accountId ?? undefined,
+    status: value.status === "any" ? undefined : value.status,
+    from: value.from || undefined,
+    to: value.to || undefined,
+  };
+}
 
 /** The filter bar of the Imports list. It reads the filters from the URL and changes them there. */
 export function ImportFilterBar() {
   const { search, sort, patch, setSort } = useImportSearch();
-  const { draft, changes, change, reset } = useFilterDraft(search);
+  // The panel keeps the changes of the person until the person applies them.
+  const panel = useAppForm({
+    defaultValues: { accountId: search.accountId ?? null, status: search.status ?? noFilters.status, from: search.from ?? "", to: search.to ?? "" },
+    onSubmit: ({ value }) => patch(urlFilters(value)),
+  });
   const accounts = useSuspenseQuery(activeAccountsQuery()).data.items;
   const selectedAccount = accounts.find((account) => account.id === search.accountId);
   const accountName = selectedAccount ? accountLabel(selectedAccount) : undefined;
@@ -63,51 +79,29 @@ export function ImportFilterBar() {
       badges={badges}
       onOpenChange={(open) => {
         if (open) {
-          reset();
+          panel.reset();
         }
       }}
-      onApply={() => patch(changes)}
-      onClear={() => change(noFilters)}
-      onClearAll={() => patch(noFilters)}
+      onApply={() => void panel.handleSubmit()}
+      onClear={() => panel.reset(noFilters, { keepDefaultValues: true })}
+      onClearAll={() => patch(urlFilters(noFilters))}
       sort={<SortSelect id="import-sort" label="Sort" value={sort} options={sortOptions} onChange={setSort} />}
       fields={
         <>
-          <Field>
-            <FieldLabel htmlFor="import-filter-account">Account</FieldLabel>
-            <OptionCombobox
-              id="import-filter-account"
-              value={draft.accountId ?? null}
-              options={accounts.map((account) => ({ id: account.id, label: accountLabel(account) }))}
-              placeholder="Any account"
-              emptyLabel="Any account"
-              onChange={(accountId) => change({ accountId: accountId ?? undefined })}
-            />
-          </Field>
-          <Field>
-            <FieldLabel>Status</FieldLabel>
-            <ChoiceSelect
-              className="w-full"
-              value={draft.status ?? "any"}
-              options={statusOptions}
-              onValueChange={(status) => change({ status: status === "any" ? undefined : status })}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="import-filter-from">From</FieldLabel>
-            <DateField
-              id="import-filter-from"
-              value={draft.from ?? ""}
-              onChange={(value) => change({ from: value || undefined })}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="import-filter-to">To</FieldLabel>
-            <DateField
-              id="import-filter-to"
-              value={draft.to ?? ""}
-              onChange={(value) => change({ to: value || undefined })}
-            />
-          </Field>
+          <panel.AppField name="accountId">
+            {(field) => (
+              <field.ComboboxField
+                id="import-filter-account"
+                label="Account"
+                options={accounts.map((account) => ({ id: account.id, label: accountLabel(account) }))}
+                placeholder="Any account"
+                emptyLabel="Any account"
+              />
+            )}
+          </panel.AppField>
+          <panel.AppField name="status">{(field) => <field.SelectField id="import-filter-status" label="Status" options={statusOptions} />}</panel.AppField>
+          <panel.AppField name="from">{(field) => <field.DateInputField id="import-filter-from" label="From" />}</panel.AppField>
+          <panel.AppField name="to">{(field) => <field.DateInputField id="import-filter-to" label="To" />}</panel.AppField>
         </>
       }
     />

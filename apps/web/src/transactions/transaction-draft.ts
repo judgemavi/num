@@ -1,4 +1,5 @@
 import {
+  choiceForCategory,
   fromMinorUnits,
   merchantForChoice,
   moneyDirection,
@@ -7,16 +8,17 @@ import {
   toMinorUnits,
   type Category,
   type MoneyDirection,
-  type Suggestion,
   type Transaction,
-  type WhatChoice,
-  choiceForCategory,
 } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo } from "react";
 import { suggestionQuery, transferHintQuery } from "@/api/suggestions";
+import { localAsOf } from "@/as-of";
 import { useCategories } from "@/editors/lookups";
 import type { SplitLine } from "@/transactions/what-choice";
+
+/** A change that the form makes, not the person. It does not mark the field as changed and does not start the listeners. */
+export const quietChange = { dontUpdateMeta: true, dontRunListeners: true };
 
 export function readPositive(currency: string, text: string): number {
   let minor: number;
@@ -34,7 +36,7 @@ export function readPositive(currency: string, text: string): number {
   return minor;
 }
 
-export function choiceOf(transaction: Transaction | null, categories: Category[]): WhatChoice {
+function choiceOf(transaction: Transaction | null, categories: Category[]) {
   if (!transaction) {
     return "spending";
   }
@@ -49,6 +51,7 @@ export function choiceOf(transaction: Transaction | null, categories: Category[]
   return choiceForCategory(moneyDirection(transaction.amount), kind);
 }
 
+/** True when the saved transaction has a category, a transfer or lines. Then the form does not apply a suggestion. */
 export function alreadyChosen(transaction: Transaction | null): boolean {
   if (!transaction) {
     return false;
@@ -56,34 +59,52 @@ export function alreadyChosen(transaction: Transaction | null): boolean {
   return transaction.lines.length > 1 || transaction.lines.some((line) => line.categoryId !== null || line.transferAccountId !== null);
 }
 
-export function linesOf(currency: string, transaction: Transaction | null, amountText: string, direction: MoneyDirection): SplitLine[] {
-  if (transaction && transaction.lines.length > 1) {
-    return transaction.lines.map((line) => ({
-      key: line.id,
-      amount: fromMinorUnits(currency, Math.abs(line.amount)),
-      opposite: moneyDirection(line.amount) !== direction,
-      edited: true,
-      categoryId: line.categoryId,
-      transferAccountId: line.transferAccountId,
-    }));
-  }
-  const first = transaction?.lines[0];
-  return [
-    {
-      key: first?.id ?? crypto.randomUUID(),
-      amount: amountText,
-      opposite: false,
-      edited: false,
-      categoryId: first?.categoryId ?? null,
-      transferAccountId: null,
-    },
-    { key: crypto.randomUUID(), amount: "", opposite: false, edited: false, categoryId: null, transferAccountId: null },
-  ];
+function linesOf(currency: string, transaction: Transaction): SplitLine[] {
+  const direction = moneyDirection(transaction.amount);
+  return transaction.lines.map((line) => ({
+    key: line.id,
+    amount: fromMinorUnits(currency, Math.abs(line.amount)),
+    opposite: moneyDirection(line.amount) !== direction,
+    edited: true,
+    categoryId: line.categoryId,
+    transferAccountId: line.transferAccountId,
+  }));
 }
 
-export function signedTotal(currency: string, imported: boolean, transaction: Transaction | null, amount: string, direction: MoneyDirection): number | null {
-  if (imported && transaction) {
-    return transaction.amount;
+/**
+ * The start values of the Transaction form. A saved transaction gives its values. A new transaction starts on
+ * `accountId` with today's date.
+ */
+export function transactionValues(currency: string, categories: Category[], transaction: Transaction | null, accountId: string) {
+  return {
+    accountId: transaction?.accountId ?? accountId,
+    date: transaction?.date ?? localAsOf(),
+    direction: transaction ? moneyDirection(transaction.amount) : "out",
+    amount: transaction ? fromMinorUnits(currency, Math.abs(transaction.amount)) : "",
+    payee: transaction?.payeeRaw ?? "",
+    notes: transaction?.notes ?? "",
+    cleared: transaction?.status === "cleared",
+    merchantId: transaction ? transaction.merchantId : null,
+    refundOfId: transaction ? transaction.refundOfId : null,
+    choice: choiceOf(transaction, categories),
+    categoryId: transaction?.lines[0]?.categoryId ?? null,
+    transferAccountId: transaction?.lines[0]?.transferAccountId ?? null,
+    lines: transaction && transaction.lines.length > 1 ? linesOf(currency, transaction) : [],
+    tagIds: [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])],
+    /** True after the form put the lines of a mortgage payment from the schedule. The form does it one time. */
+    mortgageFilled: false,
+  };
+}
+
+export type TransactionValues = ReturnType<typeof transactionValues>;
+
+/** The values of a new transaction. A form part made with `withForm` gets the type of the form values from them. */
+export const blankTransaction = transactionValues("", [], null, "");
+
+/** The signed amount of the form. An imported transaction keeps its amount. Null when the amount is not valid. */
+export function signedTotal(currency: string, importedAmount: number | null, amount: string, direction: MoneyDirection): number | null {
+  if (importedAmount !== null) {
+    return importedAmount;
   }
   if (amount.trim().length === 0) {
     return null;
@@ -95,47 +116,37 @@ export function signedTotal(currency: string, imported: boolean, transaction: Tr
   }
 }
 
-type ApplyChoice = {
+type SuggestionInput = {
   accountId: string;
   payee: string;
   date: string;
   direction: MoneyDirection;
   amount: number | null;
-  touched: boolean;
-  setChoice: (choice: WhatChoice) => void;
-  setCategoryId: (id: string | null) => void;
-  setTransferAccountId: (id: string | null) => void;
-  setMerchantId: (id: string | null) => void;
 };
 
-export function useApplySuggestion(input: ApplyChoice): Suggestion | null {
+/**
+ * The suggestion for the form, and the choice that it gives. `choice` is null until the reads that the choice needs
+ * complete. It is the same object until the suggestion, the transfer hint or the direction changes.
+ */
+export function useSuggestion(input: SuggestionInput) {
   const categories = useCategories();
-  const suggestion = useQuery(suggestionQuery(input));
+  const { data: suggestion = null } = useQuery(suggestionQuery(input));
   const transferHint = useQuery(transferHintQuery(input));
-  const suggestionKey = [
-    suggestion.data?.reason ?? "",
-    suggestion.data?.transferAccountId ?? "",
-    suggestion.data?.categoryId ?? "",
-    suggestion.data?.merchantId ?? "",
-    transferHint.data?.accountId ?? "",
-    input.direction,
-  ].join("|");
-  const [seenSuggestion, setSeenSuggestion] = useState<string | null>(null);
   const hintReady = input.amount === null || input.amount === 0 || transferHint.isSuccess || transferHint.isError;
-  if (!input.touched && suggestion.data && hintReady && suggestionKey !== seenSuggestion) {
-    setSeenSuggestion(suggestionKey);
-    const categoryKind = categories.find((category) => category.id === suggestion.data?.categoryId)?.kind ?? null;
+  const oppositeAccountId = transferHint.data?.accountId ?? null;
+  const { direction } = input;
+  const choice = useMemo(() => {
+    if (!suggestion || !hintReady) {
+      return null;
+    }
     const resolved = resolveEditorChoice({
-      direction: input.direction,
-      suggestion: suggestion.data,
-      categoryKind,
-      transferAccountFromRule: suggestion.data.transferAccountId,
-      oppositeAccountId: transferHint.data?.accountId ?? null,
+      direction,
+      suggestion,
+      categoryKind: categories.find((category) => category.id === suggestion.categoryId)?.kind ?? null,
+      transferAccountFromRule: suggestion.transferAccountId,
+      oppositeAccountId,
     });
-    input.setChoice(resolved.choice);
-    input.setCategoryId(resolved.categoryId);
-    input.setTransferAccountId(resolved.transferAccountId);
-    input.setMerchantId(merchantForChoice(resolved.choice, resolved.merchantId));
-  }
-  return suggestion.data ?? null;
+    return { ...resolved, merchantId: merchantForChoice(resolved.choice, resolved.merchantId) };
+  }, [suggestion, hintReady, direction, categories, oppositeAccountId]);
+  return { suggestion, choice };
 }

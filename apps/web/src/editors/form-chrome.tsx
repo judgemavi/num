@@ -1,4 +1,4 @@
-import type { ComponentProps, KeyboardEvent, ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,10 +9,6 @@ export const dialogFrameClass = "flex min-h-0 flex-1 flex-col overflow-hidden";
 /** Scrolls between a fixed header and a fixed footer. */
 export function DialogBody({ className, ...props }: ComponentProps<"div">) {
   return <div data-slot="dialog-body" className={cn("grid min-h-0 flex-1 gap-4 overflow-y-auto px-6 py-4", className)} {...props} />;
-}
-
-export function DialogForm({ className, ...props }: ComponentProps<"form">) {
-  return <form className={cn(dialogFrameClass, className)} {...props} />;
 }
 
 export function DialogPanel({ className, ...props }: ComponentProps<"div">) {
@@ -50,51 +46,5 @@ export function FormCancel({ children }: { children: ReactNode }) {
     <Button type="button" variant="outline" onClick={() => close()}>
       {children}
     </Button>
-  );
-}
-
-/** Inline create sits inside another form. A nested form submits the parent in React 19. */
-export function FormShell({
-  inline = false,
-  className,
-  onSubmit,
-  children,
-}: {
-  inline?: boolean;
-  className?: string;
-  onSubmit: () => void;
-  children: ReactNode;
-}) {
-  if (!inline) {
-    return (
-      <form
-        className={dialogFrameClass}
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit();
-        }}
-      >
-        {children}
-      </form>
-    );
-  }
-  return (
-    <div
-      className={className}
-      onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
-        if (event.key !== "Enter" || event.nativeEvent.isComposing) {
-          return;
-        }
-        const target = event.target;
-        if (!(target instanceof HTMLElement) || target.tagName === "TEXTAREA" || target.tagName === "BUTTON") {
-          return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-        onSubmit();
-      }}
-    >
-      {children}
-    </div>
   );
 }

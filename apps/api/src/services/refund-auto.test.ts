@@ -51,7 +51,6 @@ function approved(db: Db, ids: { account: string; food: string }, date: string, 
   applyInboxGroup(db, {
     accountId: ids.account,
     transactionIds: [refund.id],
-    excludedIds: [],
     categoryId: ids.food,
     transferAccountId: null,
     merchantId: null,

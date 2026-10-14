@@ -111,16 +111,33 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
     (`useInsightsReport()`). The screen starts the reads of its parts with `usePrefetchQuery`.
 - Use `Temporal.PlainDate` for calendar dates. Do not use `Date` for calendar dates.
 - Lists: one shared Zod query schema for the URL and the API. Follow decision 0004.
-  - A route gives its shared schema to `validateSearch`. The router infers the search types. Do not write a type or a
-    function for the search of a route. The root route validates `edit`.
+  - A route gives its shared schema to `validateSearch` through `searchWithDefaults(...)`. A value in the URL that is
+    not valid then goes back to its default. The API uses the schema itself and answers 400. The router infers the
+    search types. Do not write a type or a function for the search of a route. The root route validates `edit`.
+  - The router reads and writes the URL with `lists/search-params.ts`: a number is text in the URL.
   - A link or a `navigate` call gives only the search values that are not the defaults.
   - Each list has one hook that calls `useListSearch` (`lists/use-list-search.ts`) with the search and `navigate` of
     its route and with its default sort order. The hook gives the list query (without `edit`), `patch`, the typed sort
     functions and `setPage`. A filter bar and a sort control call the hook of their list. They do not get `search`
     or `onChange` props.
-  - Use `useSearchText` for a search box, `useFilterDraft` for a filter panel, `useLastPage` with `ListPager` for the
+  - Use `SearchBox` for a search box, a TanStack form for a filter panel, `useLastPage` with `ListPager` for the
     pages, `SortSelect` for the sort control and `ArchiveMenuItem` for "Archive" and "Restore" in a row menu.
   - The key of a list query has only the values that the request uses. `edit` is not in a key or in a request.
+- Forms (decision 0035):
+  - Each form uses `useAppForm` (`forms/form-hook.ts`). Do not keep the value of a field in `useState`.
+  - Use the field components (`field.TextField`, `field.MoneyField`, `field.SelectField` and the others) in
+    `form.AppField`. For a picker, use `form.Field` and give `field.state.value` and `field.handleChange` to it.
+  - Put `form.FormShell`, `form.SubmitButton` and `form.FormError` inside `form.AppForm`.
+  - Make a part of a form in its own component with `withForm`. Do not pass values and change handlers as props.
+  - The start values come from the record that the form changes. The form infers the type of its values from them.
+    Use `fieldValue<T>(...)` when a start value is narrower than the field.
+  - Check the values in `validators.onSubmit` and return the text of the error. Call `mutateAsync` in `onSubmit`.
+    Give the error of the write to the form with `formApi.setErrorMap({ onSubmit: { form: text, fields: {} } })`.
+    The `validators.onSubmit` of the form clears that error when the person submits again. Thus each form that
+    writes has one.
+  - A change that follows a change of a field goes in the `listeners` of that field. A change that the form makes
+    (a suggestion, a fill from the schedule) does not mark the field as changed.
+  - Keep `useState` only for state of the screen: open or closed, the selected row, the hover.
 - For a control with a fixed list of choices, use `ChoiceSelect` (`components/choice-select.tsx`) or `choiceIn`
   (`components/choice.ts`). They give the type of the choices. Do not use a cast on the value of a control.
 

@@ -7,7 +7,6 @@ import {
   transactionCreateSchema,
   transactionListApiQuerySchema,
   transactionListSchema,
-  skippedRowSchema,
   transactionSchema,
   transactionWriteSchema,
 } from "@num/shared";
@@ -22,11 +21,6 @@ import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction,
 import { validationHook } from "../validation";
 import { errorResponse, idParams } from "./common";
 
-const transactionSaveSchema = transactionSchema.extend({
-  applied: z.number().int().nonnegative().optional(),
-  skipped: z.array(skippedRowSchema).optional(),
-});
-
 const transactionResponse = {
   description: "The transaction and its lines",
   content: {
@@ -40,7 +34,7 @@ const transactionSaveResponse = {
   description: "The saved transaction",
   content: {
     "application/json": {
-      schema: transactionSaveSchema,
+      schema: transactionSchema,
     },
   },
 } as const;

@@ -1,4 +1,4 @@
-import type { AutoReason, MoneyDirection, Transaction } from "@num/shared";
+import { choicesForDirection, defaultChoice, merchantForChoice, type AutoReason, type Transaction } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { ChevronRight, Ellipsis } from "lucide-react";
 import { useState } from "react";
@@ -9,7 +9,6 @@ import { useArchiveTag } from "@/api/tags";
 import { useTags } from "@/editors/lookups";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
@@ -17,177 +16,171 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { DateField } from "@/components/date-field";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { withForm } from "@/forms/form-hook";
+import { useStore } from "@tanstack/react-form";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TagForm } from "@/settings/tag-form";
 import { decisionText, inboxError } from "@/review/format";
 import { automaticReasonText } from "@/transactions/format";
 import { AccountPicker } from "@/transactions/pickers";
+import { blankTransaction, quietChange } from "@/transactions/transaction-draft";
 
-export function MoneySection({
-  direction,
-  onDirection,
-  amount,
-  onAmount,
-  moneyLocked,
-  accountId,
-  onAccount,
-  accountLocked,
-  date,
-  onDate,
-}: {
-  direction: MoneyDirection;
-  onDirection: (direction: MoneyDirection) => void;
-  amount: string;
-  onAmount: (amount: string) => void;
-  moneyLocked: boolean;
-  accountId: string;
-  onAccount: (id: string) => void;
-  accountLocked: boolean;
-  date: string;
-  onDate: (date: string) => void;
-}) {
-  return (
-    <>
-      <Field>
-        <FieldLabel>Direction</FieldLabel>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          value={direction}
-          disabled={moneyLocked}
-          onValueChange={(value) => {
-            if (value === "out" || value === "in") {
-              onDirection(value);
-            }
+/** Money out or in, the amount, the account and the date of a transaction that the person enters by hand. */
+export const MoneySection = withForm({
+  defaultValues: blankTransaction,
+  props: { moneyLocked: false, accountLocked: false },
+  render: function MoneySectionRender({ form, moneyLocked, accountLocked }) {
+    return (
+      <>
+        <form.Field
+          name="direction"
+          listeners={{
+            // The choice must be one of the choices of the direction.
+            onChange: ({ value, fieldApi }) => {
+              if (!choicesForDirection(value).includes(fieldApi.form.getFieldValue("choice"))) {
+                const next = defaultChoice(value);
+                fieldApi.form.setFieldValue("choice", next, quietChange);
+                fieldApi.form.setFieldValue("categoryId", null, quietChange);
+                fieldApi.form.setFieldValue("merchantId", (current) => merchantForChoice(next, current), quietChange);
+              }
+            },
           }}
         >
-          <ToggleGroupItem value="out">Money out</ToggleGroupItem>
-          <ToggleGroupItem value="in">Money in</ToggleGroupItem>
-        </ToggleGroup>
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="txn-amount">Amount</FieldLabel>
-        <Input id="txn-amount" inputMode="decimal" value={amount} disabled={moneyLocked} onChange={(event) => onAmount(event.target.value)} />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor="txn-account">Account</FieldLabel>
-          <AccountPicker
-            id="txn-account"
-            value={accountId || null}
-            disabled={accountLocked}
-            onChange={(id) => {
-              if (id) {
-                onAccount(id);
-              }
+          {(field) => (
+            <Field>
+              <FieldLabel>Direction</FieldLabel>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={field.state.value}
+                disabled={moneyLocked}
+                onValueChange={(value) => {
+                  if (value === "out" || value === "in") {
+                    field.handleChange(value);
+                  }
+                }}
+              >
+                <ToggleGroupItem value="out">Money out</ToggleGroupItem>
+                <ToggleGroupItem value="in">Money in</ToggleGroupItem>
+              </ToggleGroup>
+            </Field>
+          )}
+        </form.Field>
+        <form.AppField name="amount">{(field) => <field.MoneyField id="txn-amount" label="Amount" disabled={moneyLocked} />}</form.AppField>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <form.Field
+            name="accountId"
+            listeners={{
+              // A transfer goes to a different account.
+              onChange: ({ value, fieldApi }) => {
+                if (fieldApi.form.getFieldValue("transferAccountId") === value) {
+                  fieldApi.form.setFieldValue("transferAccountId", null, quietChange);
+                }
+              },
             }}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="txn-date">Date</FieldLabel>
-          <DateField id="txn-date" value={date} disabled={accountLocked} onChange={onDate} required />
-        </Field>
-      </div>
-    </>
-  );
-}
+          >
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="txn-account">Account</FieldLabel>
+                <AccountPicker
+                  id="txn-account"
+                  value={field.state.value || null}
+                  disabled={accountLocked}
+                  onChange={(id) => {
+                    if (id) {
+                      field.handleChange(id);
+                    }
+                  }}
+                />
+              </Field>
+            )}
+          </form.Field>
+          <form.AppField name="date">{(field) => <field.DateInputField id="txn-date" label="Date" disabled={accountLocked} required />}</form.AppField>
+        </div>
+      </>
+    );
+  },
+});
 
-export function MoreDetails({
-  open,
-  onOpenChange,
-  notes,
-  onNotes,
-  tagIds,
-  onTags,
-  payee,
-  onPayee,
-  payeeLocked,
-  cleared,
-  onCleared,
-  clearedLocked,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  notes: string;
-  onNotes: (notes: string) => void;
-  tagIds: string[];
-  onTags: (ids: string[]) => void;
-  payee: string;
-  onPayee: (payee: string) => void;
-  payeeLocked: boolean;
-  cleared: boolean;
-  onCleared: (cleared: boolean) => void;
-  clearedLocked: boolean;
-}) {
+/**
+ * Notes, tags, the bank text and "Cleared". The section is closed until the person opens it. It opens by itself when
+ * a save stops because the bank text is empty.
+ */
+export const MoreDetails = withForm({
+  defaultValues: blankTransaction,
+  props: { payeeLocked: false, clearedLocked: false },
+  render: function MoreDetailsRender({ form, payeeLocked, clearedLocked }) {
+    const [open, setOpen] = useState(false);
+    const needsPayee = useStore(form.store, (state) => state.submissionAttempts > 0 && state.values.payee.trim().length === 0);
+    // A change of state during render: the section opens in the same render as the error, and stays open.
+    if (needsPayee && !open) {
+      setOpen(true);
+    }
+    return (
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary">
+          <ChevronRight className={`size-4 transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true" />
+          More details
+        </CollapsibleTrigger>
+        <CollapsibleContent className="grid gap-4 pt-3">
+          <form.AppField name="notes">{(field) => <field.TextareaField id="txn-notes" label="Notes" />}</form.AppField>
+          <form.Field name="tagIds">{(field) => <TagsField tagIds={field.state.value} onTags={field.handleChange} />}</form.Field>
+          <form.AppField name="payee">
+            {(field) => (
+              <field.TextField
+                id="txn-payee"
+                label="Bank text"
+                disabled={payeeLocked}
+                description={payeeLocked ? "The bank text stays as it was imported." : undefined}
+              />
+            )}
+          </form.AppField>
+          <form.AppField name="cleared">{(field) => <field.CheckboxField id="txn-cleared" label="Cleared" disabled={clearedLocked} />}</form.AppField>
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  },
+});
+
+/** The tags of the transaction: a picker that adds a tag, and a button for each tag that removes it. */
+function TagsField({ tagIds, onTags }: { tagIds: string[]; onTags: (ids: string[]) => void }) {
   const archiveTag = useArchiveTag();
   const tags = useTags();
   const [created, setCreated] = useState<typeof tags>([]);
   const allTags = [...tags, ...created.filter((tag) => !tags.some((item) => item.id === tag.id))];
   const selected = allTags.filter((tag) => tagIds.includes(tag.id));
-  const options = allTags
-    .filter((tag) => tag.archivedAt === null && !tagIds.includes(tag.id))
-    .map((tag) => ({ id: tag.id, label: tag.name }));
+  const options = allTags.filter((tag) => tag.archivedAt === null && !tagIds.includes(tag.id)).map((tag) => ({ id: tag.id, label: tag.name }));
   return (
-    <Collapsible open={open} onOpenChange={onOpenChange}>
-      <CollapsibleTrigger className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary">
-        <ChevronRight className={`size-4 transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true" />
-        More details
-      </CollapsibleTrigger>
-      <CollapsibleContent className="grid gap-4 pt-3">
-        <Field>
-          <FieldLabel htmlFor="txn-notes">Notes</FieldLabel>
-          <Textarea id="txn-notes" value={notes} onChange={(event) => onNotes(event.target.value)} />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="txn-tag">Tags</FieldLabel>
-          <ManagedPicker
-            id="txn-tag"
-            value={null}
-            options={options}
-            placeholder="Add a tag"
-            noun="tag"
-            archived={allTags.filter((tag) => tag.archivedAt).map((tag) => ({ id: tag.id, label: tag.name }))}
-            onRestore={(id) => archiveTag.mutate({ id, restore: true }, { onSuccess: (restored) => onTags([...tagIds, restored.id]) })}
-            onChange={(tagId) => {
-              if (tagId) {
-                onTags([...tagIds, tagId]);
-              }
-            }}
-            onCreated={(option) => setCreated((current) => [...current, { id: option.id, name: option.label, archivedAt: null }])}
-            renderForm={(name) => <TagForm inline id={null} idPrefix="inline-tag-name" initialName={name} />}
-          />
-          {selected.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {selected.map((tag) => (
-                <Toggle
-                  key={tag.id}
-                  variant="outline"
-                  pressed
-                  aria-label={`Remove ${tag.name}`}
-                  onPressedChange={() => onTags(tagIds.filter((id) => id !== tag.id))}
-                >
-                  {tag.name}
-                </Toggle>
-              ))}
-            </div>
-          ) : null}
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="txn-payee">Bank text</FieldLabel>
-          <Input id="txn-payee" value={payee} disabled={payeeLocked} onChange={(event) => onPayee(event.target.value)} />
-          {payeeLocked ? <FieldDescription>The bank text stays as it was imported.</FieldDescription> : null}
-        </Field>
-        <Field orientation="horizontal">
-          <Checkbox id="txn-cleared" checked={cleared} disabled={clearedLocked} onCheckedChange={(value) => onCleared(value === true)} />
-          <FieldLabel htmlFor="txn-cleared">Cleared</FieldLabel>
-        </Field>
-      </CollapsibleContent>
-    </Collapsible>
+    <Field>
+      <FieldLabel htmlFor="txn-tag">Tags</FieldLabel>
+      <ManagedPicker
+        id="txn-tag"
+        value={null}
+        options={options}
+        placeholder="Add a tag"
+        noun="tag"
+        archived={allTags.filter((tag) => tag.archivedAt).map((tag) => ({ id: tag.id, label: tag.name }))}
+        onRestore={(id) => archiveTag.mutate({ id, restore: true }, { onSuccess: (restored) => onTags([...tagIds, restored.id]) })}
+        onChange={(tagId) => {
+          if (tagId) {
+            onTags([...tagIds, tagId]);
+          }
+        }}
+        onCreated={(option) => setCreated((current) => [...current, { id: option.id, name: option.label, archivedAt: null }])}
+        renderForm={(name) => <TagForm inline id={null} idPrefix="inline-tag-name" initialName={name} />}
+      />
+      {selected.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {selected.map((tag) => (
+            <Toggle key={tag.id} variant="outline" pressed aria-label={`Remove ${tag.name}`} onPressedChange={() => onTags(tagIds.filter((id) => id !== tag.id))}>
+              {tag.name}
+            </Toggle>
+          ))}
+        </div>
+      ) : null}
+    </Field>
   );
 }
 

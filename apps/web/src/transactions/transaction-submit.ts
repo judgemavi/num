@@ -5,28 +5,15 @@ import {
   transactionWriteSchema,
   type Transaction,
   type TransactionUpdate as TransactionWrite,
-  type WhatChoice,
 } from "@num/shared";
 import type { TransactionSave } from "@/api/transactions";
-import { readPositive } from "@/transactions/transaction-draft";
-import { lineDirection, type SplitLine } from "@/transactions/what-choice";
+import { readPositive, type TransactionValues } from "@/transactions/transaction-draft";
+import { lineDirection } from "@/transactions/what-choice";
 
-type SubmitInput = {
+type SubmitInput = TransactionValues & {
   currency: string;
   transaction: Transaction | null;
-  accountId: string;
-  date: string;
   totalMinor: number;
-  payee: string;
-  notes: string;
-  cleared: boolean;
-  merchantId: string | null;
-  choice: WhatChoice;
-  categoryId: string | null;
-  transferAccountId: string | null;
-  lines: SplitLine[];
-  tagIds: string[];
-  refundOfId: string | null;
   unreadableItemKey?: string;
 };
 

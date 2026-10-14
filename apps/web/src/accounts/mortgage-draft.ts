@@ -4,27 +4,12 @@ import {
   mortgageTermsWriteSchema,
   percentToMilliPct,
   toMinorUnits,
-  type Compounding,
   type MortgageTerms,
   type MortgageTermsWrite,
-  type PaymentFrequency,
 } from "@num/shared";
 
 /** The mortgage terms as the form holds them: text for the fields the user types. */
-export type MortgageDraft = {
-  rate: string;
-  compounding: Compounding;
-  payment: string;
-  frequency: PaymentFrequency;
-  firstPaymentDate: string;
-  termEnd: string;
-  months: string;
-  paymentAccountId: string | null;
-  interestCategoryId: string | null;
-  propertyAccountId: string | null;
-};
-
-export function draftFromTerms(currency: string, terms: MortgageTerms | null): MortgageDraft {
+export function draftFromTerms(currency: string, terms: MortgageTerms | null) {
   return {
     rate: terms ? milliPctToPercent(terms.rateMilliPct) : "",
     compounding: terms?.compounding ?? "semiannual",
@@ -38,6 +23,8 @@ export function draftFromTerms(currency: string, terms: MortgageTerms | null): M
     propertyAccountId: terms?.propertyAccountId ?? null,
   };
 }
+
+export type MortgageDraft = ReturnType<typeof draftFromTerms>;
 
 /** True when the first payment is on or before the opening date. The terms cannot be saved then. */
 export function firstPaymentNotAfterOpening(openingDate: string, draft: MortgageDraft): boolean {

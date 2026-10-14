@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ApiError } from "@/api/client";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { parseSearch, stringifySearch } from "@/lists/search-params";
 import { routeTree } from "./routeTree.gen";
 import "./index.css";
 
@@ -33,6 +34,8 @@ const queryClient: QueryClient = new QueryClient({
 const router = createRouter({
   routeTree,
   context: { queryClient },
+  parseSearch,
+  stringifySearch,
 });
 
 declare module "@tanstack/react-router" {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { accountKinds } from "./account";
 import { isoDateSchema } from "./date";
-import { approveLevels, skippedRowSchema } from "./review";
+import { approveLevels } from "./review";
 import { listQuerySchema, pagedResponseSchema, queryDate, queryFlag, queryId, queryIdOrNone, queryText } from "./list";
 import { autoReasons } from "./matching";
 import { centsSchema } from "./money";
@@ -96,11 +96,6 @@ export const transactionSchema = z.object({
     .nullable(),
   refundedAmount: centsSchema.nullable(),
   lines: z.array(transactionLineSchema),
-});
-
-export const transactionSaveResultSchema = transactionSchema.extend({
-  applied: z.number().int().nonnegative().optional(),
-  skipped: z.array(skippedRowSchema).optional(),
 });
 
 export const transactionSortColumns = ["date", "amount", "payeeRaw"] as const;

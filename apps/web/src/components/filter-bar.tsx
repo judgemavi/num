@@ -1,9 +1,8 @@
-import { Search, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useState, type ComponentProps, type ReactNode } from "react";
 import { usePhone } from "@/components/use-phone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
@@ -13,16 +12,9 @@ export type FilterBadge = {
   onRemove: () => void;
 };
 
-type FilterSearch = {
-  id: string;
-  value: string;
-  placeholder: string;
-  label: string;
-  onChange: (value: string) => void;
-};
-
 type FilterBarProps = {
-  search?: FilterSearch;
+  /** The search box of the list. */
+  search?: ReactNode;
   activeCount: number;
   badges: FilterBadge[];
   fields: ReactNode;
@@ -83,20 +75,7 @@ export function FilterBar({
   return (
     <div className="grid gap-3">
       <div className="flex min-w-0 flex-nowrap items-center gap-2">
-        {search ? (
-          <InputGroup className="h-11 max-w-80 min-w-0 flex-1 rounded-xl">
-            <InputGroupAddon>
-              <Search size={18} aria-hidden="true" />
-            </InputGroupAddon>
-            <InputGroupInput
-              id={search.id}
-              value={search.value}
-              placeholder={search.placeholder}
-              aria-label={search.label}
-              onChange={(event) => search.onChange(event.target.value)}
-            />
-          </InputGroup>
-        ) : null}
+        {search}
         {phone ? (
           <Sheet open={open} onOpenChange={changeOpen}>
             <SheetTrigger asChild>

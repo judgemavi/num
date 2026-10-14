@@ -1,120 +1,85 @@
-import { toMinorUnits } from "@num/shared";
-import { useState, type FormEvent } from "react";
 import { useAddBucketEvent } from "@/api/buckets";
 import { localAsOf } from "@/as-of";
-import { requestError } from "@/buckets/format";
+import { moveAmount, requestError } from "@/buckets/format";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEditorFrame } from "@/editors/editor-api";
 import type { EditorInput } from "@/editors/editor-types";
-import { DialogBody, DialogForm } from "@/editors/form-chrome";
+import { DialogBody } from "@/editors/form-chrome";
+import { useAppForm } from "@/forms/form-hook";
 import { useActiveBuckets, useBookCurrency } from "@/editors/lookups";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { DateField } from "@/components/date-field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 /** Move money from one active bucket to another. `fromId` is the bucket that the person started from. */
 export function MoveMoney({ fromId }: EditorInput["moveMoney"]) {
   const { close } = useEditorFrame();
   const currency = useBookCurrency();
   const active = useActiveBuckets().items;
-  const [from, setFrom] = useState(fromId ?? active[0]?.id ?? "");
-  const [to, setTo] = useState(active.find((bucket) => bucket.id !== (fromId ?? active[0]?.id))?.id ?? "");
-  const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(localAsOf());
-  const [note, setNote] = useState("");
-  const [invalid, setInvalid] = useState<string | null>(null);
   const save = useAddBucketEvent();
-  const error = invalid ?? (save.error ? requestError(save.error, "The money did not move. Try again.") : null);
-
-  function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (!from || !to || from === to) {
-      setInvalid("Choose two different buckets.");
-      return;
-    }
-    let minor = 0;
-    try {
-      minor = toMinorUnits(currency, amount.trim());
-    } catch {
-      setInvalid("Enter the amount as a number.");
-      return;
-    }
-    if (minor < 1) {
-      setInvalid("Enter an amount greater than zero.");
-      return;
-    }
-    setInvalid(null);
-    save.mutate(
-      { bucketId: from, asOf: localAsOf(), body: { kind: "move", amount: minor, date, otherBucketId: to, note: note.trim() === "" ? null : note.trim() } },
-      { onSuccess: () => close("ok") },
-    );
-  }
+  const startFrom = fromId ?? active[0]?.id ?? "";
+  const form = useAppForm({
+    defaultValues: { from: startFrom, to: active.find((bucket) => bucket.id !== startFrom)?.id ?? "", amount: "", date: localAsOf(), note: "" },
+    validators: {
+      onSubmit: ({ value }) => {
+        if (!value.from || !value.to || value.from === value.to) {
+          return "Choose two different buckets.";
+        }
+        const amount = moveAmount(currency, value.amount);
+        return "error" in amount ? amount.error : undefined;
+      },
+    },
+    onSubmit: async ({ value, formApi }) => {
+      const amount = moveAmount(currency, value.amount);
+      if ("error" in amount) {
+        return;
+      }
+      try {
+        await save.mutateAsync({
+          bucketId: value.from,
+          asOf: localAsOf(),
+          body: { kind: "move", amount: amount.minor, date: value.date, otherBucketId: value.to, note: value.note.trim() === "" ? null : value.note.trim() },
+        });
+        close("ok");
+      } catch (error) {
+        formApi.setErrorMap({ onSubmit: { form: requestError(error, "The money did not move. Try again."), fields: {} } });
+      }
+    },
+  });
+  const options = active.map((bucket) => ({ value: bucket.id, label: bucket.name }));
 
   return (
-    <DialogForm onSubmit={onSubmit}>
-      <DialogHeader>
-        <DialogTitle>Move money</DialogTitle>
-        <DialogDescription>Move money from one bucket to another. This does not move money between accounts.</DialogDescription>
-      </DialogHeader>
-      <DialogBody>
-      <Field>
-        <FieldLabel htmlFor="move-from">From</FieldLabel>
-        <Select value={from || undefined} onValueChange={setFrom}>
-          <SelectTrigger id="move-from" className="w-full">
-            <SelectValue placeholder="Choose a bucket" />
-          </SelectTrigger>
-          <SelectContent>
-            {active.map((bucket) => (
-              <SelectItem key={bucket.id} value={bucket.id}>
-                {bucket.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="move-to">To</FieldLabel>
-        <Select value={to || undefined} onValueChange={setTo}>
-          <SelectTrigger id="move-to" className="w-full">
-            <SelectValue placeholder="Choose a bucket" />
-          </SelectTrigger>
-          <SelectContent>
-            {active
-              .filter((bucket) => bucket.id !== from)
-              .map((bucket) => (
-                <SelectItem key={bucket.id} value={bucket.id}>
-                  {bucket.name}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="move-amount">Amount</FieldLabel>
-        <Input id="move-amount" inputMode="decimal" value={amount} required onChange={(event) => setAmount(event.target.value)} />
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="move-date">Date</FieldLabel>
-        <DateField id="move-date" value={date} required onChange={setDate} />
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="move-note">Note</FieldLabel>
-        <Input id="move-note" value={note} onChange={(event) => setNote(event.target.value)} />
-      </Field>
-      {error ? <FieldError>{error}</FieldError> : null}
-      </DialogBody>
-      <DialogFooter>
-        <DialogClose asChild>
-          <Button type="button" variant="outline">
-            Cancel
-          </Button>
-        </DialogClose>
-        <Button type="submit" disabled={save.isPending}>
-          Move
-        </Button>
-      </DialogFooter>
-    </DialogForm>
+    <form.AppForm>
+      <form.FormShell>
+        <DialogHeader>
+          <DialogTitle>Move money</DialogTitle>
+          <DialogDescription>Move money from one bucket to another. This does not move money between accounts.</DialogDescription>
+        </DialogHeader>
+        <DialogBody>
+          <form.AppField name="from">
+            {(field) => <field.SelectField id="move-from" label="From" options={options} placeholder="Choose a bucket" />}
+          </form.AppField>
+          <form.Subscribe selector={(state) => state.values.from}>
+            {(from) => (
+              <form.AppField name="to">
+                {(field) => (
+                  <field.SelectField id="move-to" label="To" options={options.filter((option) => option.value !== from)} placeholder="Choose a bucket" />
+                )}
+              </form.AppField>
+            )}
+          </form.Subscribe>
+          <form.AppField name="amount">{(field) => <field.MoneyField id="move-amount" label="Amount" required />}</form.AppField>
+          <form.AppField name="date">{(field) => <field.DateInputField id="move-date" label="Date" required />}</form.AppField>
+          <form.AppField name="note">{(field) => <field.TextField id="move-note" label="Note" />}</form.AppField>
+          <form.FormError />
+        </DialogBody>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <form.SubmitButton>Move</form.SubmitButton>
+        </DialogFooter>
+      </form.FormShell>
+    </form.AppForm>
   );
 }

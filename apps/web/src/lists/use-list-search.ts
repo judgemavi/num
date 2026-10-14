@@ -1,6 +1,6 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo } from "react";
 import { pageQuery } from "@/editors/page-search";
-import { columnSort, lastPageOf, queryText, searchDelayMs, sortOf, sortParams, type SortChoice } from "@/lists/list-search";
+import { columnSort, lastPageOf, sortOf, sortParams, type SortChoice } from "@/lists/list-search";
 
 /**
  * The list query in the URL of a route, and the functions that change it (decision 0004). Give it the search and the
@@ -68,56 +68,4 @@ export function useLastPage(
     }
   }, [settled, page, lastPage, setPage]);
   return lastPage;
-}
-
-/**
- * The text of a search box. The text on the screen is local while the person types. The URL changes when the person
- * stops for 300 ms. When the URL changes for another reason (Back, Forward, a link), the box shows the text of the URL.
- */
-export function useSearchText(query: string | undefined, onQuery: (query: string | undefined) => void) {
-  const [text, setText] = useState(query ?? "");
-  const [seen, setSeen] = useState(query);
-  const timer = useRef<number | undefined>(undefined);
-
-  if (query !== seen) {
-    setSeen(query);
-    if (query !== queryText(text)) {
-      setText(query ?? "");
-    }
-  }
-
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-
-  return {
-    text,
-    change(next: string) {
-      setText(next);
-      window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => {
-        if (queryText(next) !== query) {
-          onQuery(queryText(next));
-        }
-      }, searchDelayMs);
-    },
-    /** Remove the text and stop a change that waits. */
-    clear() {
-      window.clearTimeout(timer.current);
-      setText("");
-    },
-  };
-}
-
-/**
- * The filters of an open filter panel. The panel keeps the changes of the person until the person applies them.
- * `draft` is the list query with the changes. `changes` has only the values that the person changed.
- */
-export function useFilterDraft<Search>(search: Search) {
-  const [changes, setChanges] = useState<Partial<Search>>({});
-  return {
-    draft: { ...search, ...changes },
-    changes,
-    change: (patch: Partial<Search>) => setChanges({ ...changes, ...patch }),
-    /** Remove the changes. The panel calls this when it opens. */
-    reset: () => setChanges({}),
-  };
 }
