@@ -1,6 +1,7 @@
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
 import { Component, Suspense, type ReactNode } from "react";
+import { Loading } from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { LoadError, LoadingLine } from "@/editors/load-state";
 
@@ -40,7 +41,7 @@ class Catch extends Component<CatchProps, { error: Error | null }> {
 /** The look of the loading text and of the error text: on the full screen, on a page, in the rows of a list card, in a panel, or in a dialog. */
 const looks = {
   screen: {
-    loading: (label: string) => <p className="mx-auto grid min-h-svh content-center px-4 text-muted-foreground">{label}</p>,
+    loading: (label: string) => <Loading label={label} className="mx-auto min-h-svh justify-center px-4" />,
     failed: (label: string, retry: () => void) => (
       <div className="mx-auto grid min-h-svh w-full max-w-xl content-center gap-3 px-4">
         <p role="alert">{label}</p>
@@ -51,7 +52,7 @@ const looks = {
     ),
   },
   page: {
-    loading: (label: string) => <p className="text-muted-foreground">{label}</p>,
+    loading: (label: string) => <Loading label={label} />,
     failed: (label: string, retry: () => void) => (
       <div className="grid content-start gap-5">
         <p role="alert">{label}</p>
@@ -62,7 +63,7 @@ const looks = {
     ),
   },
   rows: {
-    loading: (label: string) => <p className="px-5 py-5 text-muted-foreground">{label}</p>,
+    loading: (label: string) => <Loading label={label} className="px-5 py-5" />,
     failed: (label: string, retry: () => void) => (
       <div className="grid justify-items-start gap-3 px-5 py-5">
         <p role="alert">{label}</p>
@@ -73,7 +74,7 @@ const looks = {
     ),
   },
   panel: {
-    loading: (label: string) => <p className="text-sm text-muted-foreground">{label}</p>,
+    loading: (label: string) => <Loading label={label} className="text-sm" />,
     failed: (label: string, retry: () => void) => (
       <div className="grid gap-3">
         <p role="alert" className="text-sm">

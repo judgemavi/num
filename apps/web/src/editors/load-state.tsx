@@ -1,3 +1,4 @@
+import { Loading } from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody } from "@/editors/form-chrome";
@@ -10,7 +11,7 @@ export function LoadingLine({ label }: { label: string }) {
         <DialogDescription className="sr-only">{label}</DialogDescription>
       </DialogHeader>
       <DialogBody>
-        <p className="text-muted-foreground">{label}</p>
+        <Loading label={label} />
       </DialogBody>
     </>
   );
