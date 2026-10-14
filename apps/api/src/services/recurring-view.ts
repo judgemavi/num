@@ -15,6 +15,7 @@ import {
   type OpenOccurrence,
   type PlanProposal,
   type RecurringSignals,
+  type UpcomingList,
 } from "@num/shared";
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import type { Db } from "../db";
@@ -229,6 +230,21 @@ export function listOccurrences(db: Db, planId: string, asOf: string) {
     };
   });
   return { forecastAmount: amounts.forecast, safeAmount: amounts.safe, items };
+}
+
+const upcomingDays = 30;
+
+/** The occurrences of all active plans from `asOf` to 30 days later, by date (decision 0055). */
+export function listUpcoming(db: Db, asOf: string): UpcomingList {
+  const until = Temporal.PlainDate.from(asOf).add({ days: upcomingDays }).toString();
+  const items = activePlans(db).flatMap((row) => {
+    const list = listOccurrences(db, row.id, asOf);
+    return list.items
+      .filter((item) => item.dueDate >= asOf && item.dueDate <= until)
+      .map((item) => ({ ...item, planId: row.id, accountId: row.accountId, forecastAmount: list.forecastAmount }));
+  });
+  items.sort((left, right) => (left.dueDate !== right.dueDate ? (left.dueDate < right.dueDate ? -1 : 1) : left.planId < right.planId ? -1 : 1));
+  return { items };
 }
 
 function openOccurrences(rows: RecurringPlanRow[], links: OccurrenceLinkRow[], asOf: string, grace: number) {

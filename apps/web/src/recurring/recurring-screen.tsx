@@ -1,14 +1,13 @@
-import { useSuspenseQueries, useSuspenseQuery } from "@tanstack/react-query";
+import { usePrefetchQuery, useSuspenseQueries, useSuspenseQuery } from "@tanstack/react-query";
 import { Plus, Repeat } from "lucide-react";
-import { useState } from "react";
 import { PlanFilters } from "@/recurring/filters";
 import { usePlanSearch } from "@/recurring/use-plan-search";
 import { kindLabel, scheduleLabel } from "@/recurring/format";
-import { PlanDetail } from "@/recurring/plan-detail";
+import { UpcomingOccurrences } from "@/recurring/upcoming-list";
 import { useEditors } from "@/editors/editor-api";
 import { ReviewList } from "@/recurring/review-list";
 import { localAsOf } from "@/as-of";
-import { planListQuery, recurringSignalsQuery, recurringSyncQuery, useArchivePlan } from "@/api/recurring";
+import { planListQuery, recurringSignalsQuery, recurringSyncQuery, upcomingQuery, useArchivePlan } from "@/api/recurring";
 import { Amount } from "@/components/amount";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { Boundary } from "@/components/boundary";
@@ -35,17 +34,17 @@ export function RecurringScreen() {
 function RecurringPage() {
   const { shown } = usePlanSearch();
   const { openEditor } = useEditors();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const asOf = localAsOf();
   // The sync links the transactions that match an occurrence. The plans and the signals are read after the sync.
   useSuspenseQuery(recurringSyncQuery(asOf));
+  usePrefetchQuery(upcomingQuery(asOf));
   // The list on the screen stays while the list for a new filter loads.
   const [{ data: plans }, { data: signals }] = useSuspenseQueries({ queries: [planListQuery(shown), recurringSignalsQuery(asOf)] });
   const archive = useArchivePlan();
 
   const rows = plans.items;
-  const selected = rows.find((plan) => plan.id === selectedId) ?? rows[0] ?? null;
+  const changed = new Set(signals.changed.map((item) => item.planId));
   const grouped = (["income", "bill", "transfer"] as const)
     .map((kind) => ({ kind, items: rows.filter((plan) => plan.kind === kind) }))
     .filter((group) => group.items.length > 0);
@@ -105,10 +104,7 @@ function RecurringPage() {
                   {group.items.map((plan) => (
                     <ListRow
                       key={plan.id}
-                      onOpen={() => {
-                        setSelectedId(plan.id);
-                        void openEditor("plan", { id: plan.id });
-                      }}
+                      onOpen={() => void openEditor("plan", { id: plan.id })}
                     >
                       <IconTile hue={hues[plan.kind]}>
                         <Repeat strokeWidth={1.8} />
@@ -119,6 +115,7 @@ function RecurringPage() {
                       </div>
                       {!plan.active ? <Badge variant="neutral">Paused</Badge> : null}
                       {plan.archivedAt ? <Badge variant="neutral">Archived</Badge> : null}
+                      {changed.has(plan.id) ? <Badge variant="attention">Amount changed</Badge> : null}
                       <Amount value={plan.expectedAmount} />
                       <RowMenu label={`Actions for ${plan.name}`}>
                         <ArchiveMenuItem
@@ -134,10 +131,7 @@ function RecurringPage() {
                         />
                         <DropdownMenuItem
                           className="min-h-11"
-                          onSelect={() => {
-                            setSelectedId(plan.id);
-                            void openEditor("skipNext", { planId: plan.id });
-                          }}
+                          onSelect={() => void openEditor("skipNext", { planId: plan.id })}
                         >
                           Skip next
                         </DropdownMenuItem>
@@ -149,11 +143,7 @@ function RecurringPage() {
             )}
           </ListCard>
         </div>
-        {selected ? (
-          <PlanDetail plan={selected} />
-        ) : (
-          <p className="text-sm text-muted-foreground">Add a recurring payment or recurring income to see its dates.</p>
-        )}
+        <UpcomingOccurrences />
       </div>
     </>
   );

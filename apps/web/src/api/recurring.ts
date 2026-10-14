@@ -46,6 +46,14 @@ export function recurringSignalsQuery(asOf: string) {
   });
 }
 
+/** The occurrences of all active plans in the next 30 days (decision 0055). */
+export function upcomingQuery(asOf: string) {
+  return queryOptions({
+    queryKey: ["upcoming-occurrences", asOf],
+    queryFn: () => unwrap(api.recurring.upcoming.$get({ query: { asOf } })),
+  });
+}
+
 export function occurrencesQuery(planId: string, asOf: string) {
   return queryOptions({
     queryKey: ["occurrences", planId, asOf],

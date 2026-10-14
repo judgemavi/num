@@ -11,7 +11,7 @@ import { createCategory } from "./categories";
 import { createTransaction } from "./transactions";
 import { createPlan } from "./recurring-plans";
 import { linkOccurrence } from "./recurring-links";
-import { autoLink, listOccurrences, recurringSignals } from "./recurring-view";
+import { autoLink, listOccurrences, listUpcoming, recurringSignals } from "./recurring-view";
 
 const at = "2026-10-07T16:00:00Z";
 
@@ -300,6 +300,57 @@ test("a payment with no merchant is detected by its category until a plan with t
       at,
     });
     expect(recurringSignals(db, "2026-10-14").proposals).toEqual([]);
+  } finally {
+    close();
+  }
+});
+
+test("upcoming has the occurrences of all active plans in the next 30 days, by date", () => {
+  const { db, close } = tempDatabase();
+  try {
+    const chequing = account(db);
+    const monthly = bill(db, chequing.id);
+    const weekly = createPlan(db, {
+      name: "Pay",
+      kind: "income",
+      accountId: chequing.id,
+      expectedAmount: 50000,
+      tolerance: 0,
+      amountMode: "fixed",
+      startDate: "2026-01-02",
+      freq: "weekly",
+      interval: 2,
+      monthDay: null,
+      businessDayShift: "none",
+      active: true,
+      fundsBuckets: false,
+      source: "ui",
+      at,
+    });
+    createPlan(db, {
+      name: "Paused",
+      kind: "bill",
+      accountId: chequing.id,
+      expectedAmount: -1000,
+      tolerance: 0,
+      amountMode: "fixed",
+      startDate: "2026-01-20",
+      freq: "monthly",
+      interval: 1,
+      monthDay: 20,
+      businessDayShift: "none",
+      active: false,
+      fundsBuckets: false,
+      source: "ui",
+      at,
+    });
+    const items = listUpcoming(db, "2026-03-10").items;
+    expect(items.map((item) => [item.planId, item.dueDate])).toEqual([
+      [weekly.id, "2026-03-13"],
+      [monthly.id, "2026-03-15"],
+      [weekly.id, "2026-03-27"],
+    ]);
+    expect(items.find((item) => item.planId === monthly.id)?.forecastAmount).toBe(-10000);
   } finally {
     close();
   }

@@ -57,11 +57,12 @@ export function ReviewList() {
         return (
           <ListRow key={itemKey}>
             <div className={listName}>
-              {name ?? <Amount value={item.expectedAmount} />}
+              {name ?? "No merchant"}
               <small>
                 {repeatLabel(item.freq, item.interval)} from {formatDate(item.startDate)}
               </small>
             </div>
+            <Amount value={item.expectedAmount} />
             <Button
               type="button"
               disabled={pending}

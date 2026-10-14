@@ -673,8 +673,8 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
   and an amount within the tolerance.
   - One candidate: the app links it automatically.
   - More than one candidate: the transaction needs review.
-- **Changed amount.** If a linked amount is outside the tolerance, the Recurring plan screen shows it
-  (decision 0047). Example: "Netflix $16.99 → $19.99. Update the plan?"
+- **Changed amount.** If a linked amount is outside the tolerance, the Recurring screen shows "Amount changed" on the
+  plan row (decisions 0047, 0055). The person opens the plan and updates the amount.
 - **Missed.** If an occurrence is older than the grace period, has no link and is not skipped, Home shows it (This month).
 - **Detection.** Recurring → "Detected" suggests a new plan (Home shows a count) when a group of transactions in one
   account has:
@@ -686,8 +686,8 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
     of its category. With no category, it goes in the group of its exact amount (decision 0054).
 - **Time windows** (they keep the work small and Home calm):
   - Link candidates: occurrences from the later of `startDate` and `asOf` − 13 months.
-  - Missed: only occurrences in the last 35 days. Older unlinked occurrences show in the plan history.
-    The user can skip them, but Home does not show them.
+  - Missed: only occurrences in the last 35 days. Home does not show older unlinked occurrences. The app has no
+    list of past occurrences (decision 0055).
   - Detection: only transactions from the last 18 months. Look only for the most recent run of regular
     transactions for each merchant (the run that ends at the merchant's latest transaction).
   - Read only the transactions inside these windows from the database. Do not load all transactions.
@@ -877,7 +877,7 @@ There are 7 screens (decision 0021).
 | Buckets | Balances, funding history, moves, goals (feasibility), settings |
 | Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups, categories), merchants, tags, net worth, mortgage. Decision 0030. |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
-| Recurring | Plans, occurrences, links, skips, Detected (new plan suggestions) |
+| Recurring | Plans, Upcoming (occurrences of all plans in the next 30 days, decision 0055), links, skips, Detected (new plan suggestions) |
 | Settings | Subpages: Groups, Categories, Tags, Merchants, Currency (decision 0038), AI access, Backup. |
 
 The first-run setup screen (§7.0) is not one of the 7 screens. It shows only one time.

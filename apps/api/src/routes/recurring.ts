@@ -11,12 +11,13 @@ import {
   planSchema,
   planUpdateSchema,
   recurringSignalsSchema,
+  upcomingListSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { archivePlan, createPlan, getPlan, listPlans, restorePlan, updatePlan } from "../services/recurring-plans";
 import { linkOccurrence, restoreSkip, skipOccurrence, unlinkOccurrence } from "../services/recurring-links";
-import { autoLink, listOccurrences, recurringSignals } from "../services/recurring-view";
+import { autoLink, listOccurrences, listUpcoming, recurringSignals } from "../services/recurring-view";
 import { validationHook } from "../validation";
 import { errorResponse, idParams } from "./common";
 
@@ -189,6 +190,18 @@ const signalsRoute = createRoute({
   },
 });
 
+const upcomingRoute = createRoute({
+  operationId: "list_upcoming_occurrences",
+  description: "Read recurring plans (the occurrences of all active plans in the next 30 days). This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  method: "get",
+  path: "/api/recurring/upcoming",
+  request: { query: asOfQuery },
+  responses: {
+    200: { description: "Upcoming occurrences", content: { "application/json": { schema: upcomingListSchema } } },
+    400: errorResponse,
+  },
+});
+
 const readRoute = createRoute({
   operationId: "get_recurring_id",
   description: "Read recurring plans. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
@@ -205,6 +218,7 @@ export function recurringRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook })
     .openapi(listRoute, (c) => c.json(listPlans(db, c.req.valid("query")), 200))
     .openapi(signalsRoute, (c) => c.json(recurringSignals(db, c.req.valid("query").asOf), 200))
+    .openapi(upcomingRoute, (c) => c.json(listUpcoming(db, c.req.valid("query").asOf), 200))
     .openapi(readRoute, (c) => c.json(getPlan(db, c.req.valid("param").id), 200))
     .openapi(autoLinkRoute, (c) => c.json(autoLink(db, c.req.valid("query").asOf, { source: "ui" }), 200))
     .openapi(createRouteDef, (c) => c.json(createPlan(db, { ...c.req.valid("json"), source: "ui" }), 200))

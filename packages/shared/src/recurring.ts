@@ -119,6 +119,11 @@ export const occurrenceListSchema = z.object({
   items: z.array(occurrenceSchema),
 });
 
+/** The occurrences of all active plans in the next 30 days, by date (decision 0055). */
+export const upcomingListSchema = z.object({
+  items: z.array(occurrenceSchema.extend({ planId: z.uuid(), accountId: z.uuid(), forecastAmount: amountSchema })),
+});
+
 export const occurrenceLinkSchema = z.object({
   id: z.uuid(),
   planId: z.uuid(),
@@ -194,6 +199,7 @@ export type Occurrence = z.infer<typeof occurrenceSchema>;
 export type OccurrenceLink = z.infer<typeof occurrenceLinkSchema>;
 export type OccurrenceStatus = (typeof occurrenceStatuses)[number];
 export type OccurrenceList = z.infer<typeof occurrenceListSchema>;
+export type UpcomingList = z.infer<typeof upcomingListSchema>;
 export type ChangedOccurrence = z.infer<typeof changedOccurrenceSchema>;
 export type MissedOccurrence = z.infer<typeof missedOccurrenceSchema>;
 export type RecurringSignals = z.infer<typeof recurringSignalsSchema>;
