@@ -58,19 +58,15 @@ export function ReviewCard() {
       <CardHeader className="flex flex-row items-center justify-between px-5 pt-5">
         <CardTitle className="text-base font-bold">{review.total === 0 ? "Nothing needs review" : `${review.total} need review`}</CardTitle>
         <Button type="button" variant="secondary" asChild>
-          <Link to="/transactions" search={{ needsReview: true }}>
-            Transactions
-          </Link>
+          <Link to="/transactions/review">Needs review</Link>
         </Button>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2 px-5 pb-5">
-        {counts
-          ? reviewLevels.map((level) => (
-              <Badge key={level} variant={counts[level] > 0 && level !== "none" ? "attention" : "neutral"}>
-                {level === "questions" ? "Questions" : levelLabel(level)} {counts[level]}
-              </Badge>
-            ))
-          : null}
+        {reviewLevels.map((level) => (
+          <Badge key={level} variant={counts[level] > 0 && level !== "none" ? "attention" : "neutral"}>
+            {level === "questions" ? "Questions" : levelLabel(level)} {counts[level]}
+          </Badge>
+        ))}
       </CardContent>
     </Card>
   );

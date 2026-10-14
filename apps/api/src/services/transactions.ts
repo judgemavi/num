@@ -18,7 +18,8 @@ import {
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
 import { linkAutomatic } from "./auto-link";
 import { recordRefundNo } from "./refund-auto";
-import { linkLearnedTransfers, recordPairNo } from "./transfer-auto";
+import { linkLearnedTransfers, linkTransferPair, recordPairNo } from "./transfer-auto";
+import { acceptedPeer, pairIsOpen, recordSaveAnswer } from "./transaction-answer";
 import { assertRefundLink, withRefundPurchase } from "./refund-link";
 import { spreadSureLabels } from "./match-apply";
 import { transactionReconciled } from "./reconciled";
@@ -257,17 +258,41 @@ function storedBody(txn: Transaction): TransactionWrite {
 }
 
 /**
+ * The save accepts the proposed pair (decision 0047): the two transactions become the two sides of one transfer, as
+ * "accept the pair" does. The other fields of the save then apply to the linked transaction.
+ */
+function acceptPairOnSave(tx: WriteTx, id: string, otherId: string, input: TransactionUpdate, at: string): Transaction {
+  linkTransferPair(tx, id, otherId, at);
+  const linked = storedBody(readTransaction(tx, id));
+  const body = mergedWrite(transactionWriteSchema, linked, input);
+  if (JSON.stringify(body) !== JSON.stringify(transactionWriteSchema.parse(linked))) {
+    applyTransactionUpdate(tx, id, body, at);
+  }
+  linkLearnedTransfers(tx, [id, otherId], new Set([id, otherId]));
+  return readTransaction(tx, id);
+}
+
+/**
  * A PATCH: a field that the patch leaves out keeps its stored value. `lines` replaces all the lines.
  * The checks that use more than one field (the lines and the amount, a transfer and a merchant) run on the result.
+ * `answer` is the Needs review question that the editor showed: the saved fields answer it in the same write.
  */
 export function updateTransaction(db: Db, id: string, input: TransactionUpdate & WriteInput): Transaction {
   // Only the amounts in the patch. A stored amount is not checked again (decision 0040).
   requireWholeAmounts(db, [input.amount, ...(input.lines ?? []).map((line) => line.amount)]);
   const at = input.at ?? utcNow();
+  const { answer } = input;
+  const pairOpen = answer?.question === "transfer_pair" && pairIsOpen(db, answer.asOf, id, answer.otherId);
   return write(db, { source: input.source, at }, (tx) => {
     const before = readTransaction(tx, id);
     const wasTransfer = before.lines.some((line) => line.transferAccountId !== null);
     const body = mergedWrite(transactionWriteSchema, storedBody(before), input);
+    if (answer?.question === "transfer_pair" && acceptedPeer(tx, body, answer.otherId)) {
+      if (!pairOpen) {
+        throw new ServiceError("transfer_pair_not_found", 404);
+      }
+      return acceptPairOnSave(tx, id, answer.otherId, input, at);
+    }
     const updated = applyTransactionUpdate(tx, id, body, at);
     if (!wasTransfer || (before.autoReason !== null && updated.autoReason === null)) {
       linkLearnedTransfers(tx, [id], new Set([id]));
@@ -278,6 +303,10 @@ export function updateTransaction(db: Db, id: string, input: TransactionUpdate &
       if (updated.autoReason === null && teachesLabel(tx, updated)) {
         spreadSureLabels(tx, [updated.payeeNormalized], new Set([id]));
       }
+    }
+    if (answer) {
+      recordSaveAnswer(tx, updated, answer, at);
+      return readTransaction(tx, id);
     }
     return updated;
   });

@@ -195,16 +195,22 @@ Order, top to bottom:
 7. Footer: Save (primary). Delete goes in a More menu (shared confirm).
    There is one primary button, Save. When the transaction needs review, Save is the user's answer: with no change it
    confirms the automatic label or applies the suggestion shown in the form; with a change it saves and confirms.
+   A question is a field filled with the proposed answer (decision 0047): Transfer to the other account of a pair,
+   the candidate purchases first in "Refund of…", and "Payment for…" (Combobox, starts empty) for a recurring payment.
    The header shows only the level; no action buttons.
 
-Needs review is the Transactions table with the Needs review filter on (decision 0021). There is no second list component.
-Columns: Date, Account, Payee, Category, Amount, Review (and Balance when one account is shown). There is no Status column.
+Needs review is its own route with the same table (decision 0047): `/transactions` shows all transactions and
+`/transactions/review` shows only the transactions that need review. There is no second list component. Both pages show
+two tabs (links) in the page header: "All" and "Needs review · N". A tab link does not keep the search and the filters.
+Columns: Date, Account, Payee, Category, Amount, Status (and Balance when one account is shown).
 The Category column shows the category, "Transfer to <account>", or "Uncategorized", and the merchant below it.
 The Amount cell shows only the exceptions: a lock icon for a reconciled row (Tooltip: "Checked against your balance on <date>")
 and "Pending" for an open row (entered by hand, not yet on a statement). A cleared row shows nothing.
-When a row needs review, the Review column (right-most) shows the level (Sure, Likely, Maybe as a Badge, never a percentage), the proposed answer in plain words ("Groceries · Loblaws?" or "Transfer to TD Savings?") and one-click answers ("Looks right" for Sure, "Yes" for a suggestion, the question answers for a transfer pair or a recurring question).
-The whole row opens the editor. No "Other…" button, no dismiss, no queue mode.
-With the Needs review filter on, the table puts rows in groups by level: Sure, Likely, Maybe, Questions. Each group starts with a header row that shows the count and, for Sure and Likely, "Approve all N" (shared confirm).
+The Status column (right-most) shows a Badge only when the row needs review: the level (Sure, Likely, Maybe, never a
+percentage) for a row with a suggestion or an automatic label, and "Needs review" for a row with a question or no
+suggestion. A row has no buttons. The whole row opens the editor. No dismiss, no queue mode.
+The table has no group rows. The page header of `/transactions/review` has "Approve all Sure · N" and
+"Approve all Likely · N" (shared confirm) for the rows that match the filters.
 
 ## 6b. Shared editors and the dialog host
 

@@ -17,7 +17,6 @@ import { cardLedger } from "./card-ledger";
 import { lastCompleteMonths } from "./complete-months";
 import { monthlyBills } from "./funding-book";
 import { importFreshness, settingNumber } from "./book-settings";
-import { decidedKeys } from "./decision-keys";
 import { spendTotals } from "./insights-spend";
 import { loadLedgerLines } from "./ledger-lines";
 import { loadReviewState, type ReviewState } from "./needs-review";
@@ -185,12 +184,10 @@ function savingsRate(db: Db, asOf: string) {
   return { code: "savings_rate" as const, pass: rows.every((item) => item.savings >= 0), months: rows };
 }
 
-function recurring(db: Db, state: ReviewState) {
-  const hidden = decidedKeys(db, "recurring_changed");
-  const signals = state.signals;
-  const changed = signals.changed.filter((item) => !hidden.has(`recurring_changed:${item.planId}:${item.dueDate}`)).length;
-  const missed = signals.missed.length;
-  return { code: "recurring" as const, pass: changed === 0 && missed === 0, changed, missed };
+/** Missed payments. A changed amount is answered on the Recurring screen, not here (decision 0047). */
+function recurring(state: ReviewState) {
+  const missed = state.signals.missed.length;
+  return { code: "recurring" as const, pass: missed === 0, missed };
 }
 
 function overspent(db: Db) {
@@ -211,7 +208,7 @@ export function readHygiene(db: Db, asOf: string): Hygiene {
       reviewAge(state, asOf),
       sinkingFunds(db),
       savingsRate(db, asOf),
-      recurring(db, state),
+      recurring(state),
       overspent(db),
     ],
   };

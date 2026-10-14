@@ -8,25 +8,21 @@ import { isUtcTimestamp } from "./time";
 
 const itemKey = z.string().trim().min(1).max(500);
 
-export const reviewQuestions = ["transfer_pair", "recurring_ambiguous", "recurring_changed", "refund_purchase", "categorize"] as const;
+export const reviewQuestions = ["transfer_pair", "recurring_ambiguous", "refund_purchase", "categorize"] as const;
 
 export type ReviewQuestion = (typeof reviewQuestions)[number];
 
 export const reviewTransferSchema = z.object({
   otherId: z.uuid(),
+  otherAccountId: z.uuid(),
   otherPayee: z.string(),
   otherAmount: amountSchema,
   otherDate: isoDateSchema,
-  itemKey: z.string(),
 });
 
 export const reviewRecurringSchema = z.object({
   planId: z.uuid(),
   dueDate: isoDateSchema,
-  expectedAmount: amountSchema.nullable(),
-  actualAmount: amountSchema.nullable(),
-  itemKey: z.string(),
-  transactionIds: z.array(z.uuid()),
 });
 
 export const reviewRefundSchema = z.object({

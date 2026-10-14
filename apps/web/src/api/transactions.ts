@@ -8,12 +8,24 @@ export function useTransactionListFetching() {
   return useIsFetching({ queryKey: ["transactions"] }) > 0;
 }
 
-/** One page of the transaction list. The Needs review filter uses `asOf`. */
-export function transactionListQuery(search: TransactionListQuery, asOf: string) {
-  const reviewDate = search.needsReview ? asOf : null;
+/**
+ * One page of the transaction list. Each row that needs review on `asOf` has its review. With `review`, the page has
+ * only the rows that need review (decision 0047), and the counts of their levels on all pages.
+ */
+export function transactionListQuery(search: TransactionListQuery, asOf: string, review = false) {
+  const query = { ...search, asOf };
   return queryOptions({
-    queryKey: ["transactions", search, reviewDate],
-    queryFn: () => unwrap(api.transactions.$get({ query: { ...search, asOf: reviewDate ?? undefined } })),
+    queryKey: ["transactions", review ? "review" : "all", search, asOf],
+    queryFn: async () =>
+      review ? unwrap(api.transactions.review.$get({ query })) : { ...(await unwrap(api.transactions.$get({ query }))), reviewCounts: null },
+  });
+}
+
+/** The review of one transaction: the question and the proposed answer that the editor shows. Null when it needs none. */
+export function transactionReviewQuery(id: string, asOf: string) {
+  return queryOptions({
+    queryKey: ["transaction", id, "review", asOf],
+    queryFn: async () => (await unwrap(api.transactions[":id"].review.$get({ param: { id }, query: { asOf } }))).review,
   });
 }
 
@@ -93,9 +105,4 @@ export function useDeleteTransaction() {
       return deleted;
     },
   });
-}
-
-/** Link a refund to the purchase that it returns. */
-export function linkRefund({ refundId, purchaseId }: { refundId: string; purchaseId: string }) {
-  return unwrap(api.transactions[":id"]["refund-of"].$post({ param: { id: refundId }, json: { purchaseId } }));
 }

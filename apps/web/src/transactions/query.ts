@@ -11,8 +11,7 @@ export function hasFilters(search: TransactionListQuery): boolean {
       search.from ||
       search.to ||
       search.uncategorized ||
-      search.automatic ||
-      search.needsReview,
+      search.automatic,
   );
 }
 

@@ -7,10 +7,10 @@ const transactionSearch = searchWithDefaults(transactionListQuerySchema);
 const insightsSearch = searchWithDefaults(insightsSearchSchema);
 
 test("a value that is not valid goes back to its default, and the other values stay", () => {
-  const search = transactionSearch.parse({ page: "abc", q: "coffee", needsReview: true });
+  const search = transactionSearch.parse({ page: "abc", q: "coffee", uncategorized: true });
   expect(search.page).toBe(1);
   expect(search.q).toBe("coffee");
-  expect(search.needsReview).toBe(true);
+  expect(search.uncategorized).toBe(true);
 });
 
 test("a custom period with no dates goes back to the default period and keeps the selection", () => {

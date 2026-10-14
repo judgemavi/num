@@ -1,4 +1,12 @@
-import { categoryKindForChoice, choicesForDirection, merchantForChoice, type Suggestion, type Transaction, type WhatChoice } from "@num/shared";
+import {
+  categoryKindForChoice,
+  choicesForDirection,
+  merchantForChoice,
+  type Suggestion,
+  type Transaction,
+  type TransactionReview,
+  type WhatChoice,
+} from "@num/shared";
 import { useStore } from "@tanstack/react-form";
 import { choiceIn } from "@/components/choice";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -9,7 +17,7 @@ import { fieldValue } from "@/forms/form-values";
 import { AccountPicker, CategoryPicker, MerchantPicker } from "@/transactions/pickers";
 import { SplitLines } from "@/transactions/split-line-row";
 import { RefundOfField } from "@/transactions/refund-of-field";
-import { levelLabel } from "@/transactions/format";
+import { levelLabel, refundPurchaseLabel } from "@/transactions/format";
 import { blankTransaction, quietChange, signedTotal, useSuggestion } from "@/transactions/transaction-draft";
 import type { SplitLine } from "@/transactions/what-choice";
 
@@ -49,13 +57,26 @@ export const WhatIsThis = withForm({
     categoryLocked: false,
     transferLocked: false,
     amountsLocked: false,
-    /** The amount of an imported transaction. Null when the person enters the amount. */
     /** The stored amount while the amount is unchanged, or the amount of an imported transaction. */
     storedAmount: fieldValue<number | null>(null),
     /** The purchase that the saved refund links to. */
     linkedRefund: fieldValue<Transaction["refundOf"]>(null),
+    /** The proposed transfer pair: the other transaction (decision 0047). */
+    pair: fieldValue<TransactionReview["transfer"]>(null),
+    /** The candidate purchases of the question "Refund of which purchase?". */
+    refundCandidates: fieldValue<NonNullable<TransactionReview["refund"]>["purchases"]>([]),
   },
-  render: function WhatIsThisRender({ form, choiceLocked, categoryLocked, transferLocked, amountsLocked, storedAmount, linkedRefund }) {
+  render: function WhatIsThisRender({
+    form,
+    choiceLocked,
+    categoryLocked,
+    transferLocked,
+    amountsLocked,
+    storedAmount,
+    linkedRefund,
+    pair,
+    refundCandidates,
+  }) {
     const currency = useBookCurrency();
     const categories = useCategories();
     const values = useStore(form.store, (state) => state.values);
@@ -112,7 +133,7 @@ export const WhatIsThis = withForm({
             </Field>
           )}
         </form.Field>
-        {choice === "refund" && values.date.length > 0 ? <RefundOfField form={form} linked={linkedRefund} /> : null}
+        {choice === "refund" && values.date.length > 0 ? <RefundOfField form={form} linked={linkedRefund} candidates={refundCandidates} /> : null}
         {categoryKind !== null && (choice !== "refund" || refundOfId === null) ? (
           <form.Field name="categoryId">
             {(field) => (
@@ -129,6 +150,9 @@ export const WhatIsThis = withForm({
               <Field>
                 <FieldLabel htmlFor="txn-transfer">{direction === "out" ? "To account" : "From account"}</FieldLabel>
                 <AccountPicker id="txn-transfer" value={field.state.value} exceptId={accountId} disabled={transferLocked} onChange={field.handleChange} />
+                {pair && field.state.value === pair.otherAccountId ? (
+                  <FieldDescription>{`Links to ${refundPurchaseLabel(currency, pair.otherPayee, pair.otherDate, pair.otherAmount)}.`}</FieldDescription>
+                ) : null}
               </Field>
             )}
           </form.Field>

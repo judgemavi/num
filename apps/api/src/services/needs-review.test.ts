@@ -132,18 +132,17 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
     expect(listNeedsReview(db, asOf).find((hit) => hit.id === none.id)?.review.level).toBe("none");
     expect(questions.get(left.id)).toBe("transfer_pair");
     expect(questions.get(right.id)).toBe("transfer_pair");
-    expect(questions.get(changedPay.id)).toBe("recurring_changed");
+    // A changed amount is not a question in Needs review (decision 0047). The link gives the row the label of the plan.
+    expect(questions.get(changedPay.id)).toBe("categorize");
     expect(questions.get(phoneA.id)).toBe("recurring_ambiguous");
     expect(questions.get(phoneB.id)).toBe("recurring_ambiguous");
     expect(questions.has(quiet.id)).toBe(false);
     expect(questions.has(confirmed.id)).toBe(false);
 
     decideInboxItem(db, asOf, pairKey, "not_transfer", saved);
-    decideInboxItem(db, asOf, `recurring_changed:${changedPlan.id}:2026-03-15`, "keep_plan_amount", saved);
     const after = new Map(listNeedsReview(db, asOf).map((hit) => [hit.id, hit.review.question]));
     expect(after.has(left.id)).toBe(false);
     expect(after.has(right.id)).toBe(false);
-    expect(after.get(changedPay.id)).not.toBe("recurring_changed");
     expect(after.get(phoneA.id)).toBe("recurring_ambiguous");
   });
 });

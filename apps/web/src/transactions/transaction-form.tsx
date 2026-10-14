@@ -1,7 +1,8 @@
-import { amountText, moneyDirection, type MoneyDirection, type Transaction } from "@num/shared";
+import { amountText, moneyDirection, type MoneyDirection, type Transaction, type TransactionReview } from "@num/shared";
 import { useStore } from "@tanstack/react-form";
 import { useEffect } from "react";
 import { errorCode } from "@/api/client";
+import { localAsOf } from "@/as-of";
 import { useDeleteTransaction, useSaveTransaction } from "@/api/transactions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,13 +15,16 @@ import { formatMoney } from "@/money";
 import { formatDate, levelLabel, refundedText, transactionError } from "@/transactions/format";
 import { mortgageSplitFill, useMortgageSplit } from "@/transactions/mortgage-split";
 import { DecisionNotes, DeleteMenu, MoneySection, MoreDetails } from "@/transactions/transaction-parts";
-import { alreadyChosen, quietChange, signedTotal, transactionValues, useSuggestion } from "@/transactions/transaction-draft";
-import { buildTransactionSave } from "@/transactions/transaction-submit";
+import { PaymentForField } from "@/transactions/payment-for-field";
+import { alreadyChosen, answerFilled, quietChange, signedTotal, transactionValues, useSuggestion } from "@/transactions/transaction-draft";
+import { buildTransactionSave, reviewAnswer } from "@/transactions/transaction-submit";
 import { splitBlank, splitRemainder } from "@/transactions/what-choice";
 import { WhatIsThis } from "@/transactions/what-is-this";
 
 type TransactionFormProps = {
   transaction: Transaction | null;
+  /** The Needs review question of the saved transaction. Its fields start with the proposed answer (decision 0047). */
+  review?: TransactionReview | null;
   /** True when this side of a transfer follows the other account. */
   amountLocked: boolean;
   rawLine?: string;
@@ -34,7 +38,15 @@ const choiceFields = ["choice", "categoryId", "transferAccountId", "merchantId",
 
 const mortgageNotice = "Num put the principal and interest from the schedule in the lines. You can change the amounts.";
 
-export function TransactionForm({ transaction, amountLocked, rawLine, initialAccountId, unreadableItemKey, deleteKind = "plain" }: TransactionFormProps) {
+export function TransactionForm({
+  transaction,
+  review = null,
+  amountLocked,
+  rawLine,
+  initialAccountId,
+  unreadableItemKey,
+  deleteKind = "plain",
+}: TransactionFormProps) {
   const { close } = useEditorFrame();
   const currency = useBookCurrency();
   const accounts = useAccounts();
@@ -49,8 +61,10 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
   const storedTotal = (value: { amount: string; direction: MoneyDirection }) =>
     transaction && (imported || (value.amount === startAmount && value.direction === moneyDirection(transaction.amount))) ? transaction.amount : null;
 
+  const answerOf = (paymentFor: string | null) => reviewAnswer(review, paymentFor, localAsOf());
+
   const form = useAppForm({
-    defaultValues: transactionValues(categories, transaction, initialAccountId ?? accounts.find((item) => !item.archivedAt)?.id ?? ""),
+    defaultValues: transactionValues(categories, transaction, initialAccountId ?? accounts.find((item) => !item.archivedAt)?.id ?? "", review),
     validators: {
       onSubmit: ({ value }) => {
         const total = signedTotal(currency, storedTotal(value), value.amount, value.direction);
@@ -69,13 +83,16 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
         if (value.choice === "split" && (splitRemainder(currency, total, value.direction, value.lines) !== 0 || splitBlank(value.lines))) {
           return "Assign the whole amount.";
         }
-        const built = buildTransactionSave({ ...value, currency, transaction, totalMilli: total, unreadableItemKey });
+        const built = buildTransactionSave({ ...value, currency, transaction, totalMilli: total, unreadableItemKey, answer: answerOf(value.paymentFor) });
         return built.ok ? undefined : built.error;
       },
     },
     onSubmit: async ({ value, formApi }) => {
       const total = signedTotal(currency, storedTotal(value), value.amount, value.direction);
-      const built = total === null ? null : buildTransactionSave({ ...value, currency, transaction, totalMilli: total, unreadableItemKey });
+      const built =
+        total === null
+          ? null
+          : buildTransactionSave({ ...value, currency, transaction, totalMilli: total, unreadableItemKey, answer: answerOf(value.paymentFor) });
       if (!built?.ok) {
         return;
       }
@@ -93,7 +110,10 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
   });
 
   const values = useStore(form.store, (state) => state.values);
-  const touched = useStore(form.store, (state) => alreadyChosen(transaction) || choiceFields.some((name) => state.fieldMeta[name]?.isTouched));
+  const touched = useStore(
+    form.store,
+    (state) => alreadyChosen(transaction) || answerFilled(review) || choiceFields.some((name) => state.fieldMeta[name]?.isTouched),
+  );
   const linesEdited = useStore(form.store, (state) => alreadyChosen(transaction) || state.fieldMeta.lines?.isTouched === true);
   const totalMilli = signedTotal(currency, storedTotal(values), values.amount, values.direction);
   const suggested = useSuggestion({ accountId: values.accountId, payee: values.payee, date: values.date, direction: values.direction, amount: totalMilli });
@@ -179,7 +199,10 @@ export function TransactionForm({ transaction, amountLocked, rawLine, initialAcc
             amountsLocked={reconciled || amountLocked}
             storedAmount={storedTotal(values)}
             linkedRefund={values.refundOfId !== null && transaction?.refundOf?.id === values.refundOfId ? transaction.refundOf : null}
+            pair={review?.question === "transfer_pair" ? review.transfer : null}
+            refundCandidates={review?.question === "refund_purchase" ? (review.refund?.purchases ?? []) : []}
           />
+          {review?.question === "recurring_ambiguous" && review.recurring ? <PaymentForField form={form} occurrence={review.recurring} /> : null}
           {transaction?.refundedAmount ? <p className="text-sm text-muted-foreground">{refundedText(currency, transaction.refundedAmount)}</p> : null}
           <MoreDetails form={form} payeeLocked={imported} clearedLocked={reconciled} />
           {values.mortgageFilled ? <p role="status">{mortgageNotice}</p> : null}

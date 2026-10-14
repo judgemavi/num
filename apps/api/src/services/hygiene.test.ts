@@ -362,18 +362,18 @@ test("the savings rate does not count months before the first transaction", () =
   });
 });
 
-test("recurring passes when nothing is changed or missed", () => {
+test("recurring passes when nothing is missed", () => {
   withBook((db) => {
     const cash = account(db, "chequing", "Cash", 0);
     bill(db, cash.id, null, "monthly");
-    expect(check(db, "2026-01-10", "recurring")).toMatchObject({ pass: true, changed: 0, missed: 0 });
+    expect(check(db, "2026-01-10", "recurring")).toMatchObject({ pass: true, missed: 0 });
   });
 });
 test("recurring fails when a payment was missed", () => {
   withBook((db) => {
     const cash = account(db, "chequing", "Cash", 0);
     bill(db, cash.id, null, "monthly");
-    expect(check(db, "2026-02-20", "recurring")).toMatchObject({ pass: false, changed: 0, missed: 1 });
+    expect(check(db, "2026-02-20", "recurring")).toMatchObject({ pass: false, missed: 1 });
   });
 });
 

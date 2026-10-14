@@ -9,7 +9,6 @@ import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { createCheckpoint } from "./checkpoints";
 import { readHygiene } from "./hygiene";
-import { decideInboxItem } from "./inbox-decisions";
 import { linkOccurrence } from "./recurring-links";
 import { createPlan } from "./recurring-plans";
 import { createTransaction } from "./transactions";
@@ -79,16 +78,12 @@ function changedPlan(db: Db) {
     ...saved,
   });
   linkOccurrence(db, plan.id, "2026-01-15", paid.id, saved);
-  return plan;
 }
 
-test("a changed amount fails the recurring check until keep_plan_amount", () => {
+test("a changed amount does not fail the recurring check (decision 0047)", () => {
   withBook((db) => {
-    const plan = changedPlan(db);
-    const asOf = "2026-01-20";
-    expect(check(db, asOf, "recurring")).toMatchObject({ pass: false, changed: 1, missed: 0 });
-    decideInboxItem(db, asOf, `recurring_changed:${plan.id}:2026-01-15`, "keep_plan_amount", saved);
-    expect(check(db, asOf, "recurring")).toMatchObject({ pass: true, changed: 0, missed: 0 });
+    changedPlan(db);
+    expect(check(db, "2026-01-20", "recurring")).toMatchObject({ pass: true, missed: 0 });
   });
 });
 

@@ -13,6 +13,7 @@ import { importStatement } from "./imports";
 import { openUnreadableKeys } from "./book-settings";
 import { openFundingPaychecks } from "./funding-paychecks";
 import { decideInboxItem, undoInboxDecision } from "./inbox-decisions";
+import { decidedKeys } from "./decision-keys";
 import { listNeedsReview } from "./needs-review";
 import { recurringSignals } from "./recurring-view";
 import { createMerchant } from "./merchants";
@@ -80,6 +81,11 @@ function hasKey(db: Db, asOfDate: string, itemKey: string): boolean {
   }
   const signals = recurringSignals(db, asOfDate);
   if (signals.missed.some((item) => `recurring_missed:${item.planId}:${item.dueDate}` === itemKey)) {
+    return true;
+  }
+  // The Recurring screen shows a changed amount until its decision (decision 0047).
+  const changed = signals.changed.some((item) => `recurring_changed:${item.planId}:${item.dueDate}` === itemKey);
+  if (changed && !decidedKeys(db).has(itemKey)) {
     return true;
   }
   if (signals.proposals.some((item) => planProposalKey(item) === itemKey)) {

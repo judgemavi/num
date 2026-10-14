@@ -1,7 +1,5 @@
-import { accountClass, type ReviewCounts, type ReviewLevel, type TransactionListItem, type TransactionListQuery } from "@num/shared";
-import { useIsMutating } from "@tanstack/react-query";
+import { accountClass, type TransactionListItem, type TransactionListQuery } from "@num/shared";
 import { Lock } from "lucide-react";
-import { Fragment } from "react";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -11,24 +9,10 @@ import { useEditors } from "@/editors/editor-api";
 import type { SortChoice } from "@/lists/list-search";
 import { useAccountLabels, useBookCurrency } from "@/editors/lookups";
 import { CategoryCell } from "@/transactions/category-cell";
-import { formatDate, levelLabel, refundOfText, refundedText } from "@/transactions/format";
-import { ReviewCell } from "@/transactions/review-cell";
-import { hasFilters } from "@/transactions/query";
-import { useApproveAll } from "@/transactions/use-approve-all";
+import { formatDate, refundOfText, refundedText } from "@/transactions/format";
+import { ReviewStatus } from "@/transactions/review-status";
 
 export type TransactionSort = SortChoice<NonNullable<TransactionListQuery["sort"]>>;
-/** The groups of the Needs review list: the levels that have a suggestion, and then the questions. */
-type GroupKey = Exclude<ReviewLevel, "none"> | "questions";
-
-const groupOrder: GroupKey[] = ["sure", "likely", "maybe", "questions"];
-
-function groupOf(item: TransactionListItem): GroupKey {
-  const review = item.review;
-  if (review && review.question === "categorize" && review.level !== "none") {
-    return review.level;
-  }
-  return "questions";
-}
 
 export type Selection = {
   ids: string[];
@@ -37,9 +21,9 @@ export type Selection = {
 };
 
 type Props = {
-  search: TransactionListQuery;
   rows: TransactionListItem[];
-  counts: ReviewCounts | null;
+  /** The text of the table when it has no rows. */
+  empty: string;
   showBalance: boolean;
   hideAccount?: boolean;
   selection?: Selection;
@@ -59,16 +43,13 @@ function SortHead({ column, label, props, className }: { column: TransactionSort
 }
 
 export function TransactionsTable(props: Props) {
-  const { search, rows, counts, showBalance, hideAccount, selection } = props;
+  const { rows, empty, showBalance, hideAccount, selection } = props;
   const { openEditor } = useEditors();
   const currency = useBookCurrency();
   const accountNames = useAccountLabels();
-  const approveAll = useApproveAll(search);
-  const writing = useIsMutating() > 0;
   const columns = 5 + (showBalance ? 1 : 0) + (hideAccount ? 0 : 1) + (selection ? 1 : 0) + 1;
   const selectable = selection ? rows.filter((row) => !row.reconciled) : [];
   const selectedOnPage = selection ? selectable.filter((row) => selection.ids.includes(row.id)) : [];
-  const grouped = search.needsReview === true && counts !== null;
 
   function renderRow(row: TransactionListItem) {
     const open = () => void openEditor("transaction", { id: row.id });
@@ -130,81 +111,48 @@ export function TransactionsTable(props: Props) {
           </TableCell>
         ) : null}
         <TableCell>
-          <ReviewCell row={row} />
+          <ReviewStatus review={row.review} />
         </TableCell>
       </TableRow>
     );
   }
 
-  function renderGroups() {
-    return groupOrder.map((key) => {
-      const group = rows.filter((row) => groupOf(row) === key);
-      if (group.length === 0 || counts === null) {
-        return null;
-      }
-      const title = key === "questions" ? "Questions" : levelLabel(key);
-      const count = key === "questions" ? counts.questions + counts.none : counts[key];
-      return (
-        <Fragment key={key}>
-          <TableRow className="bg-muted/50 hover:bg-muted/50">
-            <TableCell colSpan={columns}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium">{`${title} · ${count}`}</span>
-                {key === "sure" || key === "likely" ? (
-                  <Button type="button" size="sm" disabled={writing || approveAll.busy || count === 0} onClick={() => void approveAll.approve(key, count)}>
-                    {`Approve all ${count}`}
-                  </Button>
-                ) : null}
-              </div>
-            </TableCell>
-          </TableRow>
-          {group.map(renderRow)}
-        </Fragment>
-      );
-    });
-  }
-
   return (
-    <>
-      {approveAll.message ? <p role="alert">{approveAll.message}</p> : null}
-      <div className="overflow-hidden rounded-[16px] border border-border bg-card">
-        <Table>
-          <TableHeader>
+    <div className="overflow-hidden rounded-[16px] border border-border bg-card">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {selection ? (
+              <TableHead>
+                <Checkbox
+                  aria-label="Select transactions on this page"
+                  disabled={selectable.length === 0}
+                  checked={selectedOnPage.length === 0 ? false : selectedOnPage.length === selectable.length ? true : "indeterminate"}
+                  onCheckedChange={(value) => selection.onTogglePage(value === true)}
+                />
+              </TableHead>
+            ) : null}
+            <SortHead column="date" label="Date" props={props} />
+            {hideAccount ? null : <TableHead>Account</TableHead>}
+            <SortHead column="payeeRaw" label="Payee" props={props} />
+            <TableHead>Category</TableHead>
+            <SortHead column="amount" label="Amount" props={props} className="text-right" />
+            {showBalance ? <TableHead className="text-right">Balance</TableHead> : null}
+            <TableHead>Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 ? (
             <TableRow>
-              {selection ? (
-                <TableHead>
-                  <Checkbox
-                    aria-label="Select transactions on this page"
-                    disabled={selectable.length === 0}
-                    checked={selectedOnPage.length === 0 ? false : selectedOnPage.length === selectable.length ? true : "indeterminate"}
-                    onCheckedChange={(value) => selection.onTogglePage(value === true)}
-                  />
-                </TableHead>
-              ) : null}
-              <SortHead column="date" label="Date" props={props} />
-              {hideAccount ? null : <TableHead>Account</TableHead>}
-              <SortHead column="payeeRaw" label="Payee" props={props} />
-              <TableHead>Category</TableHead>
-              <SortHead column="amount" label="Amount" props={props} className="text-right" />
-              {showBalance ? <TableHead className="text-right">Balance</TableHead> : null}
-              <TableHead>Review</TableHead>
+              <TableCell colSpan={columns} className="text-muted-foreground">
+                {empty}
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns} className="text-muted-foreground">
-                  {search.needsReview ? "Nothing needs review." : hasFilters(search) ? "No transactions match." : "No transactions yet."}
-                </TableCell>
-              </TableRow>
-            ) : grouped ? (
-              renderGroups()
-            ) : (
-              rows.map(renderRow)
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    </>
+          ) : (
+            rows.map(renderRow)
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

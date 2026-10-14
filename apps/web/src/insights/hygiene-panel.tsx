@@ -64,14 +64,10 @@ function detail(check: HygieneCheck, currency: string) {
     return check.months.map((item) => `${monthTitle(item.month)} ${rateText(item.savingsRateMilliPct)}`).join(" · ");
   }
   if (check.code === "recurring") {
-    if (check.changed === 0 && check.missed === 0) {
-      return "No changed or missed payments.";
+    if (check.missed === 0) {
+      return "No missed payments.";
     }
-    const parts = [
-      check.changed > 0 ? `${check.changed} changed ${check.changed === 1 ? "amount" : "amounts"} in Needs review` : null,
-      check.missed > 0 ? `${check.missed} missed ${check.missed === 1 ? "payment" : "payments"} under This month on Home` : null,
-    ];
-    return `${parts.filter((part) => part !== null).join(" · ")}.`;
+    return `${check.missed} missed ${check.missed === 1 ? "payment" : "payments"} under This month on Home.`;
   }
   if (check.count === 0) {
     return "No bucket is below zero.";
@@ -97,7 +93,7 @@ const places: Record<HygieneCheck["code"], string> = {
   review: "Review",
   sinking_funds: "Buckets",
   savings_rate: "Insights",
-  recurring: "Needs review and Home",
+  recurring: "Home",
   overspent: "Buckets",
 };
 
@@ -122,14 +118,11 @@ export function HygienePanel() {
       return;
     }
     if (check.code === "review") {
-      void go({ to: "/transactions", search: { needsReview: true } });
+      void go({ to: "/transactions/review" });
       return;
     }
     if (check.code === "recurring") {
-      if (check.changed === 0) {
-        return;
-      }
-      void go({ to: "/transactions", search: { needsReview: true } });
+      void go({ to: "/" });
       return;
     }
     const month = check.code === "savings_rate" ? check.months[0]?.month : undefined;

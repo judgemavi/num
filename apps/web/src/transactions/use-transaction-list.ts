@@ -1,14 +1,21 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { getRouteApi } from "@tanstack/react-router";
+import { getRouteApi, useMatch } from "@tanstack/react-router";
 import { transactionListQuery } from "@/api/transactions";
 import { localAsOf } from "@/as-of";
 import { useListSearch } from "@/lists/use-list-search";
 
-const transactionsRoute = getRouteApi("/transactions");
+const allRoute = getRouteApi("/transactions");
+const reviewRoute = getRouteApi("/transactions_/review");
 
-/** The filters, the sort order and the page of the Transactions list in the URL. */
+/** True on the Needs review page. The two pages show the same table (decision 0047). */
+export function useOnReview() {
+  return useMatch({ from: "/transactions_/review", shouldThrow: false }) !== undefined;
+}
+
+/** The filters, the sort order and the page of the Transactions list of the page in the URL. */
 export function useTransactionSearch() {
-  return useListSearch(transactionsRoute.useSearch(), transactionsRoute.useNavigate(), { sort: "date", dir: "desc" });
+  const route = useOnReview() ? reviewRoute : allRoute;
+  return useListSearch(route.useSearch(), route.useNavigate(), { sort: "date", dir: "desc" });
 }
 
 /**
@@ -17,5 +24,5 @@ export function useTransactionSearch() {
  */
 export function useTransactionPage() {
   const list = useTransactionSearch();
-  return { ...list, page: useSuspenseQuery(transactionListQuery(list.shown, localAsOf())).data };
+  return { ...list, page: useSuspenseQuery(transactionListQuery(list.shown, localAsOf(), useOnReview())).data };
 }

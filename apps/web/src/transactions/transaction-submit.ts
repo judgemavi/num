@@ -4,7 +4,9 @@ import {
   moneyDirection,
   signedAmount,
   transactionWriteSchema,
+  type ReviewAnswer,
   type Transaction,
+  type TransactionReview,
   type TransactionWrite,
 } from "@num/shared";
 import type { TransactionSave } from "@/api/transactions";
@@ -17,6 +19,8 @@ type SubmitInput = TransactionValues & {
   transaction: Transaction | null;
   totalMilli: number;
   unreadableItemKey?: string;
+  /** The answer to the Needs review question that the form showed. */
+  answer?: ReviewAnswer;
 };
 
 /** `save` is null when the person changed nothing: the form closes without a write. */
@@ -41,6 +45,26 @@ function storedBody(existing: Transaction): TransactionWrite {
     })),
     refundOfId: existing.refundOfId,
   };
+}
+
+/**
+ * The answer that the save gives to the question of the transaction (decision 0047). The saved fields give the answer:
+ * the server accepts the pair, links the purchase, or records the "no". A payment is an answer only when the person
+ * chose it.
+ */
+export function reviewAnswer(review: TransactionReview | null, paymentFor: string | null, asOf: string): ReviewAnswer | undefined {
+  switch (review?.question) {
+    case "transfer_pair":
+      return review.transfer ? { question: "transfer_pair", otherId: review.transfer.otherId, asOf } : undefined;
+    case "refund_purchase":
+      return { question: "refund_purchase" };
+    case "recurring_ambiguous":
+      return review.recurring && paymentFor !== null
+        ? { question: "recurring_ambiguous", planId: review.recurring.planId, dueDate: review.recurring.dueDate }
+        : undefined;
+    default:
+      return undefined;
+  }
 }
 
 function hasOpenLine(lines: readonly { categoryId?: string | null; transferAccountId?: string | null }[]) {
@@ -107,8 +131,9 @@ export function buildTransactionSave(input: SubmitInput): BuildResult {
   // Decisions 0024, 0045: a save with no category keeps the row when it needed review or had an automatic label.
   const keep = (labelled || hasOpenLine(existing.lines)) && hasOpenLine(parsed.data.lines);
   const patch = editPatch(parsed.data, storedBody(existing));
-  if (!patch && !keep) {
+  const { answer } = input;
+  if (!patch && !keep && !answer) {
     return { ok: true, save: labelled ? { kind: "confirm", id: existing.id } : null };
   }
-  return { ok: true, save: { kind: "update", id: existing.id, body: { ...patch, keepUncategorized: keep }, confirmLabel: labelled } };
+  return { ok: true, save: { kind: "update", id: existing.id, body: { ...patch, keepUncategorized: keep, answer }, confirmLabel: labelled } };
 }

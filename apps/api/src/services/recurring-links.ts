@@ -33,6 +33,57 @@ function existingLink(tx: WriteTx, planId: string, dueDate: string): OccurrenceL
     .get();
 }
 
+/**
+ * Link the transaction to the occurrence: the payment of the plan on the due date. Part of a write. With `label`, the
+ * transaction gets the label of the plan. A save from the editor links without it: the fields of the form are the answer.
+ */
+export function addOccurrenceLink(
+  tx: WriteTx,
+  planId: string,
+  dueDate: string,
+  transactionId: string,
+  at: string,
+  label: boolean,
+): OccurrenceLink {
+  const plan = requireWritablePlan(tx, planId);
+  requireDueDate(plan, dueDate);
+  if (existingLink(tx, planId, dueDate)) {
+    throw new ServiceError("occurrence_taken", 409);
+  }
+  const txn = tx.select().from(transactions).where(eq(transactions.id, transactionId)).get();
+  if (!txn) {
+    throw new ServiceError("transaction_not_found", 404);
+  }
+  if (txn.accountId !== plan.accountId) {
+    throw new ServiceError("plan_fields_invalid", 400, { field: "transactionId" });
+  }
+  const used = tx.select().from(occurrenceLinks).where(eq(occurrenceLinks.transactionId, transactionId)).get();
+  if (used) {
+    throw new ServiceError("transaction_already_linked", 409);
+  }
+  const row: OccurrenceLinkRow = {
+    id: crypto.randomUUID(),
+    planId,
+    dueDate,
+    transactionId,
+    skipped: false,
+    reason: null,
+  };
+  tx.insert(occurrenceLinks).values(row).run();
+  tx.audit({
+    entity: "occurrence_links",
+    entityId: row.id,
+    action: "link",
+    before: null,
+    after: withoutId(row),
+  });
+  if (label) {
+    applyLinkedPlan(tx, plan, transactionId, true);
+  }
+  tx.update(transactions).set({ editedAt: at }).where(eq(transactions.id, transactionId)).run();
+  return row;
+}
+
 export function linkOccurrence(
   db: Db,
   planId: string,
@@ -40,43 +91,8 @@ export function linkOccurrence(
   transactionId: string,
   input: WriteInput,
 ): OccurrenceLink {
-  return write(db, { source: input.source, at: input.at }, (tx) => {
-    const plan = requireWritablePlan(tx, planId);
-    requireDueDate(plan, dueDate);
-    if (existingLink(tx, planId, dueDate)) {
-      throw new ServiceError("occurrence_taken", 409);
-    }
-    const txn = tx.select().from(transactions).where(eq(transactions.id, transactionId)).get();
-    if (!txn) {
-      throw new ServiceError("transaction_not_found", 404);
-    }
-    if (txn.accountId !== plan.accountId) {
-      throw new ServiceError("plan_fields_invalid", 400, { field: "transactionId" });
-    }
-    const used = tx.select().from(occurrenceLinks).where(eq(occurrenceLinks.transactionId, transactionId)).get();
-    if (used) {
-      throw new ServiceError("transaction_already_linked", 409);
-    }
-    const row: OccurrenceLinkRow = {
-      id: crypto.randomUUID(),
-      planId,
-      dueDate,
-      transactionId,
-      skipped: false,
-      reason: null,
-    };
-    tx.insert(occurrenceLinks).values(row).run();
-    tx.audit({
-      entity: "occurrence_links",
-      entityId: row.id,
-      action: "link",
-      before: null,
-      after: withoutId(row),
-    });
-    applyLinkedPlan(tx, plan, transactionId, true);
-    tx.update(transactions).set({ editedAt: input.at ?? utcNow() }).where(eq(transactions.id, transactionId)).run();
-    return row;
-  });
+  const at = input.at ?? utcNow();
+  return write(db, { source: input.source, at }, (tx) => addOccurrenceLink(tx, planId, dueDate, transactionId, at, true));
 }
 
 export function unlinkOccurrence(db: Db, planId: string, dueDate: string, input: WriteInput): OccurrenceLink {

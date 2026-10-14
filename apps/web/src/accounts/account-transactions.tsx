@@ -68,7 +68,6 @@ function AccountActivity() {
     accountId,
     uncategorized: false,
     automatic: false,
-    needsReview: false,
     ...sortParams(shownSort, defaultSort),
   };
 
@@ -139,9 +138,8 @@ function AccountActivity() {
         <p className="px-5 py-5 text-muted-foreground">No transactions in this account.</p>
       ) : (
         <TransactionsTable
-          search={search}
           rows={rows}
-          counts={null}
+          empty="No transactions in this account."
           showBalance={account.kind !== "investment" && account.kind !== "property"}
           hideAccount
           selection={{ ids: selected, onToggle: toggle, onTogglePage: togglePage }}

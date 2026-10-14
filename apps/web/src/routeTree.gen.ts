@@ -26,6 +26,7 @@ import { Route as SettingsCurrencyRouteImport } from './routes/settings/currency
 import { Route as SettingsGroupsRouteImport } from './routes/settings/groups'
 import { Route as SettingsMerchantsRouteImport } from './routes/settings/merchants'
 import { Route as SettingsTagsRouteImport } from './routes/settings/tags'
+import { Route as TransactionsReviewRouteImport } from './routes/transactions_.review'
 import { Route as AccountsImportsImportIdRouteImport } from './routes/accounts_.imports_.$importId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -113,6 +114,11 @@ const SettingsTagsRoute = SettingsTagsRouteImport.update({
   path: '/tags',
   getParentRoute: () => SettingsRoute,
 } as any)
+const TransactionsReviewRoute = TransactionsReviewRouteImport.update({
+  id: '/transactions_/review',
+  path: '/transactions/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AccountsImportsImportIdRoute = AccountsImportsImportIdRouteImport.update({
   id: '/accounts_/imports_/$importId',
   path: '/accounts/imports/$importId',
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/settings/groups': typeof SettingsGroupsRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
+  '/transactions/review': typeof TransactionsReviewRoute
   '/settings/': typeof SettingsIndexRoute
   '/accounts/imports/$importId': typeof AccountsImportsImportIdRoute
 }
@@ -155,6 +162,7 @@ export interface FileRoutesByTo {
   '/settings/groups': typeof SettingsGroupsRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
+  '/transactions/review': typeof TransactionsReviewRoute
   '/settings': typeof SettingsIndexRoute
   '/accounts/imports/$importId': typeof AccountsImportsImportIdRoute
 }
@@ -176,6 +184,7 @@ export interface FileRoutesById {
   '/settings/groups': typeof SettingsGroupsRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/tags': typeof SettingsTagsRoute
+  '/transactions_/review': typeof TransactionsReviewRoute
   '/settings/': typeof SettingsIndexRoute
   '/accounts_/imports_/$importId': typeof AccountsImportsImportIdRoute
 }
@@ -198,6 +207,7 @@ export interface FileRouteTypes {
     | '/settings/groups'
     | '/settings/merchants'
     | '/settings/tags'
+    | '/transactions/review'
     | '/settings/'
     | '/accounts/imports/$importId'
   fileRoutesByTo: FileRoutesByTo
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/settings/groups'
     | '/settings/merchants'
     | '/settings/tags'
+    | '/transactions/review'
     | '/settings'
     | '/accounts/imports/$importId'
   id:
@@ -237,6 +248,7 @@ export interface FileRouteTypes {
     | '/settings/groups'
     | '/settings/merchants'
     | '/settings/tags'
+    | '/transactions_/review'
     | '/settings/'
     | '/accounts_/imports_/$importId'
   fileRoutesById: FileRoutesById
@@ -251,6 +263,7 @@ export interface RootRouteChildren {
   TransactionsRoute: typeof TransactionsRoute
   AccountsAccountIdRoute: typeof AccountsAccountIdRoute
   AccountsImportsRoute: typeof AccountsImportsRoute
+  TransactionsReviewRoute: typeof TransactionsReviewRoute
   AccountsImportsImportIdRoute: typeof AccountsImportsImportIdRoute
 }
 
@@ -375,6 +388,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsTagsRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/transactions_/review': {
+      id: '/transactions_/review'
+      path: '/transactions/review'
+      fullPath: '/transactions/review'
+      preLoaderRoute: typeof TransactionsReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/accounts_/imports_/$importId': {
       id: '/accounts_/imports_/$importId'
       path: '/accounts/imports/$importId'
@@ -421,6 +441,7 @@ const rootRouteChildren: RootRouteChildren = {
   TransactionsRoute: TransactionsRoute,
   AccountsAccountIdRoute: AccountsAccountIdRoute,
   AccountsImportsRoute: AccountsImportsRoute,
+  TransactionsReviewRoute: TransactionsReviewRoute,
   AccountsImportsImportIdRoute: AccountsImportsImportIdRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { accountKinds } from "./account";
-import { isoDateSchema } from "./date";
+import { asOfQuerySchema, isoDateSchema } from "./date";
 import { approveLevels } from "./review";
 import { listQuerySchema, pagedResponseSchema, queryDate, queryFlag, queryId, queryIdOrNone, queryText } from "./list";
 import { autoReasons } from "./matching";
@@ -61,11 +61,25 @@ export const transactionCreateSchema = transactionWriteSchema.extend({
 });
 
 /**
+ * The Needs review question that the editor showed with the transaction (decision 0047). The saved fields give the
+ * answer:
+ * - `transfer_pair`: one transfer line to the account of `otherId` accepts the pair. Other lines record `not_transfer`.
+ * - `refund_purchase`: a refund with a purchase links it. No purchase records `not_linked`.
+ * - `recurring_ambiguous`: the transaction is the payment of the occurrence. Send it only when the person chose it.
+ */
+export const reviewAnswerSchema = z.discriminatedUnion("question", [
+  z.object({ question: z.literal("transfer_pair"), otherId: z.uuid(), asOf: isoDateSchema }),
+  z.object({ question: z.literal("refund_purchase") }),
+  z.object({ question: z.literal("recurring_ambiguous"), planId: z.uuid(), dueDate: isoDateSchema }),
+]);
+
+/**
  * A PATCH body: only the fields that change. `lines` replaces all the lines. `keepUncategorized` records the answer
- * "keep uncategorized" (decision 0024); it is not a field.
+ * "keep uncategorized" (decision 0024) and `answer` gives the answer to a Needs review question; they are not fields.
  */
 export const transactionUpdateSchema = transactionWriteSchema.partial().extend({
   keepUncategorized: z.boolean().optional(),
+  answer: reviewAnswerSchema.optional(),
 });
 
 export const transactionSchema = z.object({
@@ -114,13 +128,15 @@ export const transactionFilterSchema = z.object({
   automatic: queryFlag,
 });
 
-export const transactionListQuerySchema = listQuerySchema(transactionSortColumns)
-  .extend(transactionFilterSchema.shape)
-  .extend({ needsReview: queryFlag });
+export const transactionListQuerySchema = listQuerySchema(transactionSortColumns).extend(transactionFilterSchema.shape);
 
+/** With `asOf`, each row that needs review has its review. */
 export const transactionListApiQuerySchema = transactionListQuerySchema.extend({
   asOf: queryDate,
 });
+
+/** The Needs review list: the same filters, sort order and pages as the transaction list (decision 0047). */
+export const transactionReviewQuerySchema = transactionListQuerySchema.extend(asOfQuerySchema.shape);
 
 export const approveLevelSchema = transactionFilterSchema.extend({
   level: z.enum(approveLevels),
@@ -154,8 +170,16 @@ export const transactionListItemSchema = z.object({
   review: transactionReviewSchema.nullable(),
 });
 
-export const transactionListSchema = pagedResponseSchema(transactionListItemSchema).extend({
-  reviewCounts: reviewCountSchema.nullable(),
+export const transactionListSchema = pagedResponseSchema(transactionListItemSchema);
+
+/** The counts are for all rows that need review and match the filters, on every page. */
+export const transactionReviewListSchema = transactionListSchema.extend({
+  reviewCounts: reviewCountSchema,
+});
+
+/** The review of one transaction. Null when it does not need review. */
+export const transactionReviewReadSchema = z.object({
+  review: transactionReviewSchema.nullable(),
 });
 
 export type TransactionFilter = z.output<typeof transactionFilterSchema>;
@@ -163,6 +187,7 @@ export type TransactionLineInput = z.infer<typeof transactionLineInputSchema>;
 export type TransactionLine = z.infer<typeof transactionLineSchema>;
 export type TransactionCreate = z.infer<typeof transactionCreateSchema>;
 export type TransactionUpdate = z.infer<typeof transactionUpdateSchema>;
+export type ReviewAnswer = z.infer<typeof reviewAnswerSchema>;
 export type TransactionWrite = z.infer<typeof transactionWriteSchema>;
 export type Transaction = z.infer<typeof transactionSchema>;
 export type TransactionListQuery = z.output<typeof transactionListQuerySchema>;

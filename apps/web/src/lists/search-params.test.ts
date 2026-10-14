@@ -7,7 +7,7 @@ test("a number is text in the URL, with no quotes", () => {
 });
 
 test("flags read back as booleans, and text that looks like a flag keeps its quotes", () => {
-  expect(parseSearch(stringifySearch({ needsReview: true, q: "true" }))).toEqual({ needsReview: true, q: "true" });
+  expect(parseSearch(stringifySearch({ uncategorized: true, q: "true" }))).toEqual({ uncategorized: true, q: "true" });
 });
 
 test("text reads back as the same text", () => {

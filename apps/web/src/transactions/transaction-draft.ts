@@ -9,12 +9,14 @@ import {
   type Category,
   type MoneyDirection,
   type Transaction,
+  type TransactionReview,
 } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { suggestionQuery, transferHintQuery } from "@/api/suggestions";
 import { localAsOf } from "@/as-of";
 import { useCategories } from "@/editors/lookups";
+import { fieldValue } from "@/forms/form-values";
 import type { SplitLine } from "@/transactions/what-choice";
 import { decimalsError } from "@/money";
 
@@ -71,9 +73,13 @@ function linesOf(transaction: Transaction): SplitLine[] {
 
 /**
  * The start values of the Transaction form. A saved transaction gives its values. A new transaction starts on
- * `accountId` with today's date.
+ * `accountId` with today's date. The question of a transaction that needs review fills its proposed answer
+ * (decision 0047): a transfer pair gives Transfer to the account of the other transaction, and a refund gives the first
+ * candidate purchase. "Payment for…" starts empty, because more than one transaction can be that payment.
  */
-export function transactionValues(categories: Category[], transaction: Transaction | null, accountId: string) {
+export function transactionValues(categories: Category[], transaction: Transaction | null, accountId: string, review: TransactionReview | null = null) {
+  const pair = review?.question === "transfer_pair" ? review.transfer : null;
+  const purchase = review?.question === "refund_purchase" ? (review.refund?.purchases[0] ?? null) : null;
   return {
     accountId: transaction?.accountId ?? accountId,
     date: transaction?.date ?? localAsOf(),
@@ -82,16 +88,23 @@ export function transactionValues(categories: Category[], transaction: Transacti
     payee: transaction?.payeeRaw ?? "",
     notes: transaction?.notes ?? "",
     cleared: transaction?.status === "cleared",
-    merchantId: transaction ? transaction.merchantId : null,
-    refundOfId: transaction ? transaction.refundOfId : null,
-    choice: choiceOf(transaction, categories),
-    categoryId: transaction?.lines[0]?.categoryId ?? null,
-    transferAccountId: transaction?.lines[0]?.transferAccountId ?? null,
-    lines: transaction && transaction.lines.length > 1 ? linesOf(transaction) : [],
+    merchantId: transaction && !pair ? transaction.merchantId : null,
+    refundOfId: purchase ? purchase.id : transaction ? transaction.refundOfId : null,
+    choice: pair ? "transfer" : purchase ? "refund" : choiceOf(transaction, categories),
+    categoryId: pair ? null : (transaction?.lines[0]?.categoryId ?? null),
+    transferAccountId: pair ? pair.otherAccountId : (transaction?.lines[0]?.transferAccountId ?? null),
+    lines: transaction && !pair && transaction.lines.length > 1 ? linesOf(transaction) : [],
     tagIds: [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])],
     /** True after the form put the lines of a mortgage payment from the schedule. The form does it one time. */
     mortgageFilled: false,
+    /** The occurrence that the transaction pays: "planId:dueDate". Only for the question "Which payment is this?". */
+    paymentFor: fieldValue<string | null>(null),
   };
+}
+
+/** True when the start values are the proposed answer to a question. Then the form does not apply a suggestion. */
+export function answerFilled(review: TransactionReview | null): boolean {
+  return review?.question === "transfer_pair" || (review?.question === "refund_purchase" && (review.refund?.purchases.length ?? 0) > 0);
 }
 
 export type TransactionValues = ReturnType<typeof transactionValues>;

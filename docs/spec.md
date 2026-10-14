@@ -598,17 +598,27 @@ The app compares confidence in thousandths (0–1000) with the thresholds (decis
    both groups with labels (this also covers returned income).
 The best candidate (§7.3) preselects the choice: a category, or a learned transfer.
 
-**Needs review (decision 0021).** A transaction needs review when it has an automatic label, a suggestion, no category,
-or an open question (possible transfer, more than one recurring candidate, changed recurring amount,
-refund of which purchase).
-Transactions has a "Needs review" view (a server filter) with one row for each transaction. The row shows the question,
-the level and one-click answers. The whole row opens the transaction editor (a chevron at the right shows this).
-- **Approve by level:** the view groups its rows by level (Sure, Likely, Maybe, Questions) with counts.
-  Questions holds the open questions and the rows with no suggestion.
-  "Approve all Sure" and "Approve all Likely" apply each row's label or suggestion as a confirmation (shared confirm
-  with the count; audited; one write). Maybe and Questions are answered one row at a time.
+**Needs review (decisions 0021, 0047).** A transaction needs review when it has an automatic label, a suggestion,
+no category, or an open question (possible transfer, more than one recurring candidate, refund of which purchase).
+A changed recurring amount is not in Needs review: the Recurring plan screen shows it (§7.4).
+Needs review is its own page, `/transactions/review`, with the same table, columns, sort order and pages as
+`/transactions`. The page has only the transactions that need review. Both pages show two tabs: "All" and
+"Needs review · N".
+- **Status column:** a row that needs review shows its level (Sure, Likely, Maybe) when it has a suggestion or an
+  automatic label, and "Needs review" when it has a question or no suggestion. Other rows show nothing.
+- **Answer in the editor:** a row has no buttons. A click on the row opens the transaction editor, and Save is the
+  answer. A question is a field of the editor, filled with the proposed answer:
+  - Possible transfer: "What is this?" is Transfer, with the other account and its matched transaction. Save as a
+    transfer links the pair. Save as another choice records `not_transfer`.
+  - Refund of which purchase: "Refund of…" shows the candidate purchases first. Save with a purchase links it.
+    Save with "No purchase" records `not_linked`.
+  - More than one recurring candidate: "Payment for…" shows the plan and the due date. It starts empty. Save with the
+    payment links the transaction to it.
+- **Approve by level:** the page header of Needs review has "Approve all Sure · N" and "Approve all Likely · N" for
+  the rows that match the filters. They apply each row's label or suggestion as a confirmation (shared confirm with
+  the count; audited; one write). Other rows are answered one row at a time in the editor.
 - An approval is a confirmation (it counts for learning).
-- Home shows the count and links to the view.
+- Home shows the count and links to Needs review.
 The editor has no group mode (decision 0034). The user answers a group of rows with "Approve all Sure" and "Approve all Likely".
 
 **Create on the spot.** Every picker of user-managed things shows "+ Create new <thing>" as its first option (decision 0018).
@@ -617,7 +627,7 @@ Save creates the record, selects it and closes the section. A merchant name is s
 ("SQ *BLUE BOTTLE 0423" → "Blue Bottle").
 
 **Transfer detection.** An imported row can have an opposite amount to an unlinked row in a different on-budget account,
-within ±3 days. Then the transaction needs review with a transfer pair question. The user accepts with one click.
+within ±3 days. Then the transaction needs review with a transfer pair question. The user answers in the editor (decision 0047).
 If exactly one pair exists and its payee is a learned transfer, the app links the pair automatically (Sure; decision 0023).
 Look only at unlinked, not deleted transactions from the last 90 days. Each transaction is in a maximum of one pair.
 
@@ -628,8 +638,8 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
   and an amount within the tolerance.
   - One candidate: the app links it automatically.
   - More than one candidate: the transaction needs review.
-- **Changed amount.** If a linked amount is outside the tolerance, the transaction needs review.
-  Example: "Netflix $16.99 → $19.99. Update the plan?"
+- **Changed amount.** If a linked amount is outside the tolerance, the Recurring plan screen shows it
+  (decision 0047). Example: "Netflix $16.99 → $19.99. Update the plan?"
 - **Missed.** If an occurrence is older than the grace period, has no link and is not skipped, Home shows it (This month).
 - **Detection.** Recurring → "Detected" suggests a new plan (Home shows a count) when a merchant has:
   - 3 or more transactions.
@@ -747,7 +757,7 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 | Review | No transaction has needed review for more than 7 days |
 | Sinking funds | Each yearly `bill` plan has a sinking bucket for its category |
 | Savings rate | The savings rate of the last 3 complete months (§8) is 0% or more. Show the percentage. |
-| Recurring | There are no changed or missed occurrences |
+| Recurring | There are no missed occurrences (decision 0047) |
 | Overspent | No bucket has a negative balance |
 
 ## 11. Audit and undo
@@ -821,8 +831,8 @@ There are 7 screens (decision 0021).
 
 | Screen | Contents |
 |---|---|
-| Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Transactions → Needs review); hygiene checks (§10); this month: income → bills → bucket funding → left to save, "Fund this paycheck", missed payments, overspent buckets, goal status; spending changes this month; net worth. Each card links to its screen. |
-| Transactions | Search and filter, Needs review view (§7.3), detail and edit, lines, tags, transfers |
+| Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); hygiene checks (§10); this month: income → bills → bucket funding → left to save, "Fund this paycheck", missed payments, overspent buckets, goal status; spending changes this month; net worth. Each card links to its screen. |
+| Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column, detail and edit, lines, tags, transfers |
 | Buckets | Balances, funding history, moves, goals (feasibility), settings |
 | Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups, categories), merchants, tags, net worth, mortgage. Decision 0030. |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |

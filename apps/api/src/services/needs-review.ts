@@ -9,7 +9,7 @@ import {
   type TransactionReview,
 } from "@num/shared";
 import { transactions } from "@num/db";
-import { inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { keepKey } from "./decision-keep";
@@ -30,8 +30,6 @@ export type NeedsReviewHit = {
   merchantId: string | null;
   review: TransactionReview;
 };
-
-const levelOrder: Record<ReviewLevel, number> = { sure: 0, likely: 1, maybe: 2, none: 3 };
 
 export function requireAsOf(asOf: string) {
   if (!isIsoDate(asOf)) {
@@ -92,16 +90,21 @@ function emptyReview(level: ReviewLevel, reason: TransactionReview["reason"]): T
   };
 }
 
+/**
+ * The rows that need review. `signals` and `pairs` are the review sources when the caller has them already.
+ * `only` limits the rows to these ids: the review sources stay the same, but only these rows get a score.
+ */
 export function listNeedsReview(
   db: Db,
   asOf: string,
-  known?: { signals: RecurringSignals; pairs: { leftId: string; rightId: string }[] },
+  scope: { signals?: RecurringSignals; pairs?: { leftId: string; rightId: string }[]; only?: readonly string[] } = {},
 ): NeedsReviewHit[] {
   requireAsOf(asOf);
   const hidden = decidedKeys(db);
-  const signals = known?.signals ?? recurringSignals(db, asOf);
-  const pairs = (known?.pairs ?? listTransferPairs(db, asOf).items).filter((pair) => !hidden.has(pairKey(pair.leftId, pair.rightId)));
-  const changed = signals.changed.filter((item) => !hidden.has(`recurring_changed:${item.planId}:${item.dueDate}`));
+  const only = scope.only ? new Set(scope.only) : null;
+  const wanted = (id: string) => only === null || only.has(id);
+  const signals = scope.signals ?? recurringSignals(db, asOf);
+  const pairs = (scope.pairs ?? listTransferPairs(db, asOf).items).filter((pair) => !hidden.has(pairKey(pair.leftId, pair.rightId)));
   const pairById = new Map<string, { otherId: string; itemKey: string }>();
   for (const pair of pairs) {
     const itemKey = pairKey(pair.leftId, pair.rightId);
@@ -116,22 +119,17 @@ export function listNeedsReview(
       }
     }
   }
-  const changedById = new Map(changed.map((item) => [item.transactionId, item]));
   const refundById = refundQuestions(db, hidden);
-  const openIds = db
-    .select({ id: transactions.id })
-    .from(transactions)
-    .where(or(isNotNull(transactions.autoReason), hasOpenLine(transactions.id)))
-    .all();
-  const ids = [
-    ...openIds.map((row) => row.id),
-    ...pairById.keys(),
-    ...ambiguousById.keys(),
-    ...changedById.keys(),
-    ...refundById.keys(),
-  ];
+  const open = or(isNotNull(transactions.autoReason), hasOpenLine(transactions.id));
+  const openRows = (where: SQL | undefined) => db.select({ id: transactions.id }).from(transactions).where(where).all();
+  const openIds = only ? chunks([...only], 400).flatMap((group) => openRows(and(inArray(transactions.id, group), open))) : openRows(open);
+  const ids = [...openIds.map((row) => row.id), ...pairById.keys(), ...ambiguousById.keys(), ...refundById.keys()].filter(wanted);
+  const otherIds = ids.flatMap((id) => {
+    const pair = pairById.get(id);
+    return pair ? [pair.otherId] : [];
+  });
+  const others = new Map(loadBases(db, otherIds).map((row) => [row.id, row]));
   const bases = loadBases(db, ids);
-  const byId = new Map(bases.map((row) => [row.id, row]));
   const book = loadMatchBook(db);
   const scored = new Map<string, Suggestion>();
   const hits: NeedsReviewHit[] = [];
@@ -157,10 +155,8 @@ export function listNeedsReview(
     }
     const pair = pairById.get(row.id);
     const ambiguous = ambiguousById.get(row.id);
-    const amountChanged = changedById.get(row.id);
     const refundAsk = refundById.get(row.id);
-    const asksQuestion =
-      pair !== undefined || ambiguous !== undefined || amountChanged !== undefined || refundAsk !== undefined;
+    const asksQuestion = pair !== undefined || ambiguous !== undefined || refundAsk !== undefined;
     const level = asksQuestion ? "none" : rowLevel(row, automatic, suggestion);
     const kept = row.openLine && hidden.has(keepKey(row.id));
     const needs = automatic || (row.openLine && !kept) || asksQuestion;
@@ -169,38 +165,23 @@ export function listNeedsReview(
     }
     const review = emptyReview(level, reason);
     if (pair) {
-      const other = byId.get(pair.otherId);
+      const other = others.get(pair.otherId);
+      if (!other) {
+        throw new Error("The other side of the pair is missing");
+      }
       review.question = "transfer_pair";
       review.itemKey = pair.itemKey;
       review.transfer = {
-        otherId: pair.otherId,
-        otherPayee: other?.payeeRaw ?? "",
-        otherAmount: other?.amount ?? 0,
-        otherDate: other?.date ?? row.date,
-        itemKey: pair.itemKey,
+        otherId: other.id,
+        otherAccountId: other.accountId,
+        otherPayee: other.payeeRaw,
+        otherAmount: other.amount,
+        otherDate: other.date,
       };
     } else if (ambiguous) {
       review.question = "recurring_ambiguous";
       review.itemKey = `recurring_ambiguous:${ambiguous.planId}:${ambiguous.dueDate}`;
-      review.recurring = {
-        planId: ambiguous.planId,
-        dueDate: ambiguous.dueDate,
-        expectedAmount: null,
-        actualAmount: null,
-        itemKey: review.itemKey,
-        transactionIds: ambiguous.transactionIds,
-      };
-    } else if (amountChanged) {
-      review.question = "recurring_changed";
-      review.itemKey = `recurring_changed:${amountChanged.planId}:${amountChanged.dueDate}`;
-      review.recurring = {
-        planId: amountChanged.planId,
-        dueDate: amountChanged.dueDate,
-        expectedAmount: amountChanged.expectedAmount,
-        actualAmount: amountChanged.actualAmount,
-        itemKey: review.itemKey,
-        transactionIds: [amountChanged.transactionId],
-      };
+      review.recurring = { planId: ambiguous.planId, dueDate: ambiguous.dueDate };
     } else if (refundAsk) {
       review.question = "refund_purchase";
       review.itemKey = refundAsk.itemKey;
@@ -212,16 +193,6 @@ export function listNeedsReview(
     }
     hits.push({ id: row.id, date: row.date, accountId: row.accountId, merchantId: row.merchantId, review });
   }
-  hits.sort((left, right) => {
-    const levelDelta = levelOrder[left.review.level] - levelOrder[right.review.level];
-    if (levelDelta !== 0) {
-      return levelDelta;
-    }
-    if (left.date !== right.date) {
-      return left.date < right.date ? 1 : -1;
-    }
-    return left.id < right.id ? -1 : 1;
-  });
   return hits;
 }
 

@@ -82,7 +82,6 @@ const savingsRateCheckSchema = z.object({
 const recurringCheckSchema = z.object({
   code: z.literal("recurring"),
   pass: z.boolean(),
-  changed: nonNegative,
   missed: nonNegative,
 });
 

@@ -71,6 +71,15 @@ export function transactionError(code: ErrorCode | undefined): string {
       return "That transaction is not in the book.";
     case "refund_link_invalid":
       return "Choose a recent purchase for this refund.";
+    case "transfer_pair_not_found":
+      return "That transfer match is no longer available. Choose the account again.";
+    case "occurrence_taken":
+    case "occurrence_not_found":
+    case "plan_not_found":
+    case "plan_archived":
+      return "That payment is no longer open.";
+    case "transaction_already_linked":
+      return "This transaction is already the payment of a recurring item.";
     case "invalid_body":
       return "Check the transaction fields.";
     default:

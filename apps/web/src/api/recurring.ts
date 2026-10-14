@@ -54,7 +54,7 @@ export function occurrencesQuery(planId: string, asOf: string) {
 }
 
 /** Create a plan (`id` is null) or change the fields of a plan that are in the patch. */
-export function savePlan(input: { id: null; body: PlanCreate } | { id: string; body: PlanUpdate }) {
+function savePlan(input: { id: null; body: PlanCreate } | { id: string; body: PlanUpdate }) {
   return unwrap(input.id === null ? api.recurring.$post({ json: input.body }) : api.recurring[":id"].$patch({ param: { id: input.id }, json: input.body }));
 }
 
@@ -75,7 +75,7 @@ export function useArchivePlan() {
 
 type OccurrenceRef = { planId: string; dueDate: string };
 
-export function linkOccurrence({ planId, dueDate, transactionId }: OccurrenceRef & { transactionId: string }) {
+function linkOccurrence({ planId, dueDate, transactionId }: OccurrenceRef & { transactionId: string }) {
   return unwrap(api.recurring[":id"].occurrences[":dueDate"].link.$post({ param: { id: planId, dueDate }, json: { transactionId } }));
 }
 

@@ -3,9 +3,8 @@ import type { TransactionFilter, TransactionListItem, TransactionListQuery, Tran
 import { and, asc, count, desc, eq, exists, gte, inArray, isNotNull, isNull, lte, notExists, or, sql, type SQL } from "drizzle-orm";
 import { alias, QueryBuilder, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { Db } from "../db";
-import { ServiceError } from "../service-error";
 import { linesForIds } from "./transaction-list-lines";
-import { chunks, listNeedsReview, reviewCounts, type NeedsReviewHit } from "./needs-review";
+import { listNeedsReview, reviewCounts, type NeedsReviewHit } from "./needs-review";
 import { hasOpenLine, isReconciled, refundedSum } from "./transaction-sql";
 
 const sortColumns = {
@@ -215,58 +214,30 @@ function runningBalances(db: Db, accountId: string, rows: readonly ListRow[]) {
   return balances;
 }
 
-function pageHits(hits: readonly NeedsReviewHit[], query: TransactionListQuery) {
-  const offset = (query.page - 1) * query.pageSize;
-  return hits.slice(offset, offset + query.pageSize);
+/** The rows whose id is in the list. One parameter: a JSON array that SQLite reads with `json_each`. */
+function idIn(ids: readonly string[]) {
+  return inArray(transactions.id, sql`(select value from json_each(${JSON.stringify(ids)}))`);
 }
 
-function rowsForIds(db: Db, ids: readonly string[]) {
-  if (ids.length === 0) {
-    return [];
-  }
-  return selectRows(db).where(inArray(transactions.id, [...ids])).all();
-}
-
-/** Needs review rows that also match the other filters. Bulk approval uses the same set. */
+/** Needs review rows that also match the other filters. Bulk approval and the review list use the same set. */
 export function filteredReviewHits(db: Db, filter: TransactionFilter, asOf: string): NeedsReviewHit[] {
   const hits = listNeedsReview(db, asOf);
   const where = filters(filter);
-  if (where === undefined) {
+  if (where === undefined || hits.length === 0) {
     return hits;
   }
+  const ids = db.select({ id: transactions.id }).from(transactions).$dynamic();
   const matching = new Set(
-    chunks(hits.map((hit) => hit.id), 400).flatMap((group) => {
-      const ids = db.select({ id: transactions.id }).from(transactions).$dynamic();
-      return (filter.q ? ids.leftJoin(merchants, onMerchant) : ids)
-        .where(and(inArray(transactions.id, group), where))
-        .all()
-        .map((row) => row.id);
-    }),
+    (filter.q ? ids.leftJoin(merchants, onMerchant) : ids)
+      .where(and(idIn(hits.map((hit) => hit.id)), where))
+      .all()
+      .map((row) => row.id),
   );
   return hits.filter((hit) => matching.has(hit.id));
 }
 
-export function listTransactions(db: Db, query: TransactionListQuery & { asOf?: string }) {
-  if (query.needsReview) {
-    if (!query.asOf) {
-      throw new ServiceError("as_of_invalid", 400, { asOf: "" });
-    }
-    const hits = filteredReviewHits(db, query, query.asOf);
-    const page = pageHits(hits, query);
-    const byId = new Map(rowsForIds(db, page.map((hit) => hit.id)).map((row) => [row.id, row]));
-    const lines = linesForIds(db, page.map((hit) => hit.id));
-    return {
-      items: page.flatMap((hit) => {
-        const row = byId.get(hit.id);
-        return row ? [toItem(row, lines.get(hit.id) ?? [], hit.review, null)] : [];
-      }),
-      page: query.page,
-      pageSize: query.pageSize,
-      total: hits.length,
-      reviewCounts: reviewCounts(hits),
-    };
-  }
-  const where = filters(query);
+/** One page of rows for the condition, in the sort order of the query, with the running balance of one account. */
+function readPage(db: Db, query: TransactionListQuery, where: SQL | undefined, review: (ids: string[]) => Map<string, TransactionReview>) {
   const counted = db.select({ total: count() }).from(transactions).$dynamic();
   const total = (query.q ? counted.leftJoin(merchants, onMerchant) : counted).where(where).get()?.total ?? 0;
   const rows = selectRows(db)
@@ -275,17 +246,40 @@ export function listTransactions(db: Db, query: TransactionListQuery & { asOf?: 
     .limit(query.pageSize)
     .offset((query.page - 1) * query.pageSize)
     .all();
+  const ids = rows.map((row) => row.id);
   const balances =
     query.accountId && usesTransactionBalance(db, query.accountId) ? runningBalances(db, query.accountId, rows) : null;
-  const lines = linesForIds(
-    db,
-    rows.map((row) => row.id),
-  );
+  const lines = linesForIds(db, ids);
+  const reviews = review(ids);
   return {
-    items: rows.map((row) => toItem(row, lines.get(row.id) ?? [], null, balances?.get(row.id) ?? null)),
+    items: rows.map((row) => toItem(row, lines.get(row.id) ?? [], reviews.get(row.id) ?? null, balances?.get(row.id) ?? null)),
     page: query.page,
     pageSize: query.pageSize,
     total,
-    reviewCounts: null,
   };
+}
+
+function reviewMap(hits: readonly NeedsReviewHit[]) {
+  return new Map(hits.map((hit) => [hit.id, hit.review]));
+}
+
+/** A page of transactions. With `asOf`, each row that needs review has its review: only the rows of the page get a score. */
+export function listTransactions(db: Db, query: TransactionListQuery & { asOf?: string }) {
+  const { asOf } = query;
+  return readPage(db, query, filters(query), (ids) =>
+    asOf && ids.length > 0 ? reviewMap(listNeedsReview(db, asOf, { only: ids })) : new Map(),
+  );
+}
+
+/** A page of the transactions that need review (decision 0047). The same filters, sort order and pages as the list. */
+export function listReviewTransactions(db: Db, query: TransactionListQuery & { asOf: string }) {
+  const hits = filteredReviewHits(db, query, query.asOf);
+  const reviews = reviewMap(hits);
+  const where = hits.length === 0 ? sql`0` : idIn(hits.map((hit) => hit.id));
+  return { ...readPage(db, query, where, () => reviews), reviewCounts: reviewCounts(hits) };
+}
+
+/** The review of one transaction: the question and the proposed answer that the editor shows. */
+export function transactionReview(db: Db, id: string, asOf: string) {
+  return { review: listNeedsReview(db, asOf, { only: [id] })[0]?.review ?? null };
 }

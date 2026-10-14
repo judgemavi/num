@@ -7,6 +7,9 @@ import {
   transactionCreateSchema,
   transactionListApiQuerySchema,
   transactionListSchema,
+  transactionReviewListSchema,
+  transactionReviewQuerySchema,
+  transactionReviewReadSchema,
   transactionSchema,
   transactionUpdateSchema,
 } from "@num/shared";
@@ -14,7 +17,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { approveFiltered } from "../services/review-approve";
-import { listTransactions } from "../services/transaction-list";
+import { listReviewTransactions, listTransactions, transactionReview } from "../services/transaction-list";
 import { linkRefundToPurchase } from "../services/refund-answer";
 import { listRefundPurchases } from "../services/refund-link";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "../services/transactions";
@@ -75,7 +78,7 @@ const approveRoute = createRoute({
 
 const listRoute = createRoute({
   operationId: "search_transactions",
-  description: "Read transactions. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive. The needsReview filter needs asOf (an ISO date).",
+  description: "Read transactions. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive. With asOf (an ISO date), each row that needs review has its review.",
   method: "get",
   path: "/api/transactions",
   request: {
@@ -89,6 +92,36 @@ const listRoute = createRoute({
           schema: transactionListSchema,
         },
       },
+    },
+    400: errorResponse,
+  },
+});
+
+const reviewListRoute = createRoute({
+  operationId: "search_transactions_review",
+  description: "Read the transactions that need review, with the same filters, sort order and pages as search_transactions. Each row has its review. The counts are for all pages. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  method: "get",
+  path: "/api/transactions/review",
+  request: { query: transactionReviewQuerySchema },
+  responses: {
+    200: {
+      description: "One page of the transactions that need review",
+      content: { "application/json": { schema: transactionReviewListSchema } },
+    },
+    400: errorResponse,
+  },
+});
+
+const reviewReadRoute = createRoute({
+  operationId: "get_transactions_id_review",
+  description: "Read the review of one transaction: its level, its question and the proposed answer. Null when it does not need review. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  method: "get",
+  path: "/api/transactions/{id}/review",
+  request: { params: idParams, query: asOfQuerySchema },
+  responses: {
+    200: {
+      description: "The review of the transaction",
+      content: { "application/json": { schema: transactionReviewReadSchema } },
     },
     400: errorResponse,
   },
@@ -165,7 +198,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_transactions_id",
-  description: "Change transactions. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. lines replaces all the lines: when you change the amount, send the lines too. The API checks the fields together on the stored transaction with your changes. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Change transactions. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. lines replaces all the lines: when you change the amount, send the lines too. The API checks the fields together on the stored transaction with your changes. answer gives the answer to the Needs review question of the transaction (from get_transactions_id_review): for transfer_pair, one transfer line to the account of otherId links the two transactions, and other lines record not_transfer; for refund_purchase, no refundOfId records not_linked; recurring_ambiguous links the transaction to the occurrence. Other records do not change. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/transactions/{id}",
   request: {
@@ -215,6 +248,8 @@ export function transactionRoutes(db: Db) {
     })
     .openapi(refundPurchasesRoute, (c) => c.json({ items: listRefundPurchases(db, c.req.valid("query")) }, 200))
     .openapi(listRoute, (c) => c.json(listTransactions(db, c.req.valid("query")), 200))
+    .openapi(reviewListRoute, (c) => c.json(listReviewTransactions(db, c.req.valid("query")), 200))
+    .openapi(reviewReadRoute, (c) => c.json(transactionReview(db, c.req.valid("param").id, c.req.valid("query").asOf), 200))
     .openapi(readRoute, (c) => {
       const { id } = c.req.valid("param");
       const record = getTransaction(db, id);
