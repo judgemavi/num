@@ -8,7 +8,7 @@ import {
   transactionListApiQuerySchema,
   transactionListSchema,
   transactionSchema,
-  transactionWriteSchema,
+  transactionUpdateSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
@@ -165,7 +165,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_transactions_id",
-  description: "Change transactions. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Change transactions. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. lines replaces all the lines: when you change the amount, send the lines too. The API checks the fields together on the stored transaction with your changes. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/transactions/{id}",
   request: {
@@ -174,7 +174,7 @@ const updateRoute = createRoute({
       required: true,
       content: {
         "application/json": {
-          schema: transactionWriteSchema,
+          schema: transactionUpdateSchema,
         },
       },
     },

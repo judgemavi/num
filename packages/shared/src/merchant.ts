@@ -14,9 +14,7 @@ export const merchantCreateSchema = z.object({
   name: nameSchema,
 });
 
-export const merchantUpdateSchema = z.object({
-  name: nameSchema,
-});
+export const merchantUpdateSchema = merchantCreateSchema.partial();
 
 export const merchantMergeSchema = z.object({
   targetId: z.uuid(),

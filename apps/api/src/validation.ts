@@ -5,7 +5,7 @@ import type { ZodError } from "zod";
 type Target = keyof ValidationTargets;
 type Query = Record<string, string | undefined>;
 
-function fieldParams(error: ZodError): Record<string, string> {
+export function fieldParams(error: ZodError): Record<string, string> {
   const field = error.issues[0]?.path[0];
   if (typeof field !== "string" || field.length === 0) {
     return {};

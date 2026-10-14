@@ -1,5 +1,6 @@
 import {
   aiAccessSettingSchema,
+  aiAccessUpdateSchema,
   currencyUpdateSchema,
   setupRequestSchema,
   setupResultSchema,
@@ -124,9 +125,9 @@ const aiRoute = createRoute({
   path: "/api/settings/ai",
   operationId: "patch_ai_access",
   description:
-    "Allow or block AI changes to the books. This changes only that setting. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+    "Allow or block AI changes to the books. Send only the fields that change. This changes only that setting. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   request: {
-    body: { required: true, content: { "application/json": { schema: aiAccessSettingSchema } } },
+    body: { required: true, content: { "application/json": { schema: aiAccessUpdateSchema } } },
   },
   responses: {
     200: {
@@ -153,7 +154,7 @@ export function setupRoutes(db: Db) {
     .openapi(aiReadRoute, (c) => c.json({ aiCanWrite: aiCanWrite(db) }, 200))
     .openapi(aiRoute, (c) => {
       const body = c.req.valid("json");
-      return c.json(changeAiAccess(db, { aiCanWrite: body.aiCanWrite, source: "ui" }), 200);
+      return c.json(changeAiAccess(db, { ...body, source: "ui" }), 200);
     });
 }
 

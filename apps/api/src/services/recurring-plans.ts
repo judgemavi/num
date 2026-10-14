@@ -1,6 +1,7 @@
 import { accounts, categories, merchants, recurringPlans, type RecurringPlanRow } from "@num/db";
 import {
   foldName,
+  planCreateSchema,
   Temporal,
   utcNow,
   type Plan,
@@ -12,7 +13,8 @@ import {
 import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { keepOmitted, withoutId, write, type WriteTx, type WriteInput } from "./write";
+import { mergedWrite } from "./patch";
+import { withoutId, write, type WriteTx, type WriteInput } from "./write";
 import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 import { requireWholeAmounts } from "./book-step";
 
@@ -161,21 +163,15 @@ export function createPlan(db: Db, input: PlanCreate & WriteInput): Plan {
   return row;
 }
 
-/** A field that the update leaves out keeps its stored value. An explicit null clears a field that can be empty. */
+/**
+ * A PATCH: a field that the patch leaves out keeps its stored value. An explicit null clears a field that can be empty.
+ * The checks that use more than one field run on the stored plan with the patch.
+ */
 export function updatePlan(db: Db, id: string, input: PlanUpdate & WriteInput): Plan {
   requireWholeAmounts(db, [input.expectedAmount, input.tolerance]);
   return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = requirePlan(tx, id);
-    const value = fieldsOf({
-      ...input,
-      categoryId: keepOmitted(input.categoryId, existing.categoryId),
-      transferAccountId: keepOmitted(input.transferAccountId, existing.transferAccountId),
-      merchantId: keepOmitted(input.merchantId, existing.merchantId),
-      monthDay: keepOmitted(input.monthDay, existing.monthDay),
-      endDate: keepOmitted(input.endDate, existing.endDate),
-      active: keepOmitted(input.active, existing.active),
-      fundsBuckets: keepOmitted(input.fundsBuckets, existing.fundsBuckets),
-    });
+    const value = fieldsOf(mergedWrite(planCreateSchema, existing, input));
     assertRefs(tx, value);
     const next = { ...value, archivedAt: existing.archivedAt };
     tx.update(recurringPlans).set({ ...value, sortKey: foldName(value.name) }).where(eq(recurringPlans.id, id)).run();

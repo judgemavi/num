@@ -1,6 +1,7 @@
 import { merchants, type MerchantRow } from "@num/db";
 import {
   foldName,
+  merchantCreateSchema,
   utcNow,
   type Merchant,
   type MerchantCreate,
@@ -11,6 +12,7 @@ import { eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { byName, pagedOf, totalOf, windowOf } from "./list-sql";
+import { mergedWrite } from "./patch";
 import { withoutId, write, type Reader, type WriteTx, type WriteInput } from "./write";
 
 /** The stored row has the sort key. The API shows the fields of the schema only. */
@@ -70,7 +72,7 @@ export function updateMerchant(db: Db, id: string, input: MerchantUpdate & Write
   return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = getMerchant(tx, id);
     const next = {
-      name: input.name.trim(),
+      name: mergedWrite(merchantCreateSchema, existing, input).name,
       archivedAt: existing.archivedAt,
     };
     assertName(tx, next.name, id);

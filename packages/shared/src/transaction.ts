@@ -53,17 +53,20 @@ const transactionFields = {
   refundOfId: z.uuid().nullable().optional(),
 };
 
-export const transactionCreateSchema = z.object({
-  ...transactionFields,
+/** All the fields of a transaction write. The API checks a merged PATCH with it. */
+export const transactionWriteSchema = z.object(transactionFields);
+
+export const transactionCreateSchema = transactionWriteSchema.extend({
   unreadableItemKey: z.string().trim().min(1).max(500).optional(),
 });
 
-export const transactionUpdateSchema = z.object({
-  ...transactionFields,
+/**
+ * A PATCH body: only the fields that change. `lines` replaces all the lines. `keepUncategorized` records the answer
+ * "keep uncategorized" (decision 0024); it is not a field.
+ */
+export const transactionUpdateSchema = transactionWriteSchema.partial().extend({
   keepUncategorized: z.boolean().optional(),
 });
-
-export const transactionWriteSchema = transactionUpdateSchema;
 
 export const transactionSchema = z.object({
   id: z.uuid(),
@@ -160,6 +163,7 @@ export type TransactionLineInput = z.infer<typeof transactionLineInputSchema>;
 export type TransactionLine = z.infer<typeof transactionLineSchema>;
 export type TransactionCreate = z.infer<typeof transactionCreateSchema>;
 export type TransactionUpdate = z.infer<typeof transactionUpdateSchema>;
+export type TransactionWrite = z.infer<typeof transactionWriteSchema>;
 export type Transaction = z.infer<typeof transactionSchema>;
 export type TransactionListQuery = z.output<typeof transactionListQuerySchema>;
 export type TransactionListItem = z.infer<typeof transactionListItemSchema>;

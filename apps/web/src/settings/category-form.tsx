@@ -1,4 +1,4 @@
-import { bucketWriteSchema, categoryUpdateSchema, type Category, type CategoryKind } from "@num/shared";
+import { bucketWriteSchema, categoryCreateSchema, type Category, type CategoryKind } from "@num/shared";
 import { useUpdateBucket } from "@/api/buckets";
 import { useSaveCategory } from "@/api/categories";
 import { errorCode } from "@/api/client";
@@ -44,7 +44,7 @@ export function CategoryForm({ category, initialName, initialKind, inline = fals
       bucketId: fieldValue<string | null>(null),
     },
     validators: {
-      onSubmit: ({ value }) => (categoryUpdateSchema.safeParse(value).success ? undefined : "Check the fields."),
+      onSubmit: ({ value }) => (categoryCreateSchema.safeParse(value).success ? undefined : "Check the fields."),
     },
     onSubmit: async ({ value, formApi }) => {
       let saved;

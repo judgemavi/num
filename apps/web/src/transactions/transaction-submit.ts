@@ -4,7 +4,7 @@ import {
   signedAmount,
   transactionWriteSchema,
   type Transaction,
-  type TransactionUpdate as TransactionWrite,
+  type TransactionWrite,
 } from "@num/shared";
 import type { TransactionSave } from "@/api/transactions";
 import { readPositive, type TransactionValues } from "@/transactions/transaction-draft";

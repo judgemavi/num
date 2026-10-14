@@ -1,5 +1,6 @@
 import { bucketCategories, buckets, categories, type BucketRow } from "@num/db";
 import {
+  bucketWriteSchema,
   foldName,
   isIsoDate,
   kindFieldsValid,
@@ -8,6 +9,7 @@ import {
   type Bucket,
   type BucketCreate,
   type BucketListQuery,
+  type BucketUpdate,
   type BucketWrite,
   type OverspentBucket,
 } from "@num/shared";
@@ -15,6 +17,7 @@ import { eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
+import { mergedWrite } from "./patch";
 import { withoutId, write, type WriteTx, type WriteInput, type Reader } from "./write";
 import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 import { requireWholeAmounts } from "./book-step";
@@ -194,8 +197,9 @@ export function createBucket(db: Db, input: BucketCreate & WriteInput & { asOf: 
   });
 }
 
-export function updateBucket(db: Db, id: string, input: BucketWrite & WriteInput): Bucket {
-  assertKindFields(input);
+/** A PATCH: a field that the patch leaves out keeps its stored value. The kind fields are checked on the result. */
+export function updateBucket(db: Db, id: string, input: BucketUpdate & WriteInput): Bucket {
+  // Only the amounts in the patch. A stored amount is not checked again (decision 0040).
   requireWholeAmounts(db, [input.refillTo, input.amount, input.target, input.fixedAmount]);
   return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = withoutSortKey(tx.select().from(buckets).where(eq(buckets.id, id)).get());
@@ -203,9 +207,10 @@ export function updateBucket(db: Db, id: string, input: BucketWrite & WriteInput
       throw new ServiceError("bucket_not_found", 404);
     }
     const beforeIds = categoryIdsFor(tx, id);
-    const row = rowValues(id, input, existing.archivedAt);
+    const next = mergedWrite(bucketWriteSchema, { ...existing, categoryIds: beforeIds }, input);
+    const row = rowValues(id, next, existing.archivedAt);
     tx.update(buckets).set({ ...withoutId(row), sortKey: foldName(row.name) }).where(eq(buckets.id, id)).run();
-    const categoryIds = replaceCategories(tx, id, input.categoryIds);
+    const categoryIds = replaceCategories(tx, id, next.categoryIds);
     tx.audit({
       entity: "buckets",
       entityId: id,

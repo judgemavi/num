@@ -64,7 +64,7 @@ const createGroupRoute = createRoute({
 
 const updateGroupRoute = createRoute({
   operationId: "patch_category_groups_id",
-  description: "Change category groups. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Change category groups. Send only the fields that change. A field that you leave out keeps its value. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/category-groups/{id}",
   request: {
@@ -139,7 +139,7 @@ const createCategoryRoute = createRoute({
 
 const updateCategoryRoute = createRoute({
   operationId: "patch_categories_id",
-  description: "Change categories. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Change categories. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. The API checks the fields together on the stored record with your changes. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/categories/{id}",
   request: {

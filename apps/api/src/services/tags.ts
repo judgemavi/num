@@ -1,8 +1,9 @@
 import { tags } from "@num/db";
-import { foldName, utcNow, type Tag, type TagCreate, type TagListQuery, type TagUpdate } from "@num/shared";
+import { foldName, tagCreateSchema, utcNow, type Tag, type TagCreate, type TagListQuery, type TagUpdate } from "@num/shared";
 import { eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { mergedWrite } from "./patch";
 import { withoutId, write, type WriteTx, type WriteInput } from "./write";
 import { byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 
@@ -55,7 +56,7 @@ export function updateTag(db: Db, id: string, input: TagUpdate & WriteInput): Ta
     if (!existing) {
       throw new ServiceError("tag_not_found", 404);
     }
-    const name = input.name.trim();
+    const { name } = mergedWrite(tagCreateSchema, existing, input);
     assertTagName(tx, name, id);
     const next = { name, archivedAt: existing.archivedAt };
     tx.update(tags).set({ name, sortKey: foldName(name) }).where(eq(tags.id, id)).run();

@@ -9,13 +9,17 @@ export function aiCanWrite(db: Db): boolean {
   return row?.value === "true";
 }
 
+/** A PATCH: a setting that the patch leaves out keeps its value. */
 export function changeAiAccess(
   db: Db,
-  input: { aiCanWrite: boolean; source: AuditSource; at?: string },
+  input: { aiCanWrite?: boolean; source: AuditSource; at?: string },
 ): { aiCanWrite: boolean } {
   const ready = db.select().from(settings).where(eq(settings.key, "currency")).get();
   if (!ready) {
     throw new ServiceError("setup_required", 409);
+  }
+  if (input.aiCanWrite === undefined) {
+    return { aiCanWrite: aiCanWrite(db) };
   }
   const next = input.aiCanWrite ? "true" : "false";
   const current = db.select().from(settings).where(eq(settings.key, "aiCanWrite")).get();

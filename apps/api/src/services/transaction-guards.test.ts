@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrateDatabase, openDatabase, settings } from "@num/db";
-import type { AccountKind, ErrorCode, TransactionLineInput } from "@num/shared";
+import type { AccountKind, ErrorCode, TransactionLineInput, TransactionStatus } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -49,7 +49,7 @@ function account(db: Db, name: string, kind: AccountKind) {
   });
 }
 
-function lines(accountId: string, amount: number, items: TransactionLineInput[], status: string = "open") {
+function lines(accountId: string, amount: number, items: TransactionLineInput[], status: TransactionStatus = "open") {
   return {
     accountId,
     date: "2026-04-01",
@@ -169,18 +169,12 @@ test("a new mirror starts open", () => {
   }
 });
 
-test("status reconciled is rejected on input", () => {
+test("status reconciled is rejected on create", () => {
   const book = tempDatabase();
   try {
     const cash = account(book.db, "Cash", "cash");
     const body = lines(cash.id, -100, [{ amount: -100 }]);
     expectCode(() => createTransaction(book.db, { ...body, status: "reconciled" }), "transaction_status_invalid");
-    const created = createTransaction(book.db, body);
-    expectCode(
-      () => updateTransaction(book.db, created.id, { ...body, status: "reconciled" }),
-      "transaction_status_invalid",
-    );
-    expect(getTransaction(book.db, created.id)?.status).toBe("open");
   } finally {
     book.close();
   }

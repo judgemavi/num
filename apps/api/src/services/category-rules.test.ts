@@ -95,18 +95,11 @@ test("only an expense category can be essential", () => {
     );
     const pay = createCategory(book.db, { name: "Pay", kind: "income", source: "ui", at });
     expect(pay.essential).toBe(false);
-    expectCode(
-      () =>
-        updateCategory(book.db, pay.id, {
-          name: "Pay",
-          kind: "income",
-          groupId: null,
-          essential: true,
-          source: "ui",
-          at,
-        }),
-      "essential_expense_only",
-    );
+    // A patch is checked on the stored category with the patch.
+    expectCode(() => updateCategory(book.db, pay.id, { essential: true, source: "ui", at }), "invalid_body");
+    const food = createCategory(book.db, { name: "Food", kind: "expense", essential: true, source: "ui", at });
+    expectCode(() => updateCategory(book.db, food.id, { kind: "income", source: "ui", at }), "invalid_body");
+    expect(updateCategory(book.db, food.id, { name: "Groceries", source: "ui", at })).toMatchObject({ name: "Groceries", essential: true });
   } finally {
     book.close();
   }

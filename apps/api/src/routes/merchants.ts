@@ -41,7 +41,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_merchants_id",
-  description: "Change merchants. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Change merchants. Send only the fields that change. A field that you leave out keeps its value. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/merchants/{id}",
   request: {

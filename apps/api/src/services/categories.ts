@@ -1,5 +1,7 @@
 import { bucketCategories, categories, categoryGroups, transactionLines } from "@num/db";
 import {
+  categoryCreateSchema,
+  categoryGroupCreateSchema,
   foldName,
   utcNow,
   type Category,
@@ -14,6 +16,7 @@ import {
 import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { mergedWrite } from "./patch";
 import { withoutId, write, type WriteTx, type WriteInput } from "./write";
 import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 
@@ -118,7 +121,7 @@ export function updateCategoryGroup(
     if (!existing) {
       throw new ServiceError("group_not_found", 404);
     }
-    const next = { name: input.name.trim() };
+    const next = mergedWrite(categoryGroupCreateSchema, existing, input);
     assertGroupName(tx, next.name, id);
     tx.update(categoryGroups).set({ name: next.name, sortKey: foldName(next.name) }).where(eq(categoryGroups.id, id)).run();
     tx.audit({
@@ -204,18 +207,18 @@ export function updateCategory(db: Db, id: string, input: CategoryUpdate & Write
     if (!existing) {
       throw new ServiceError("category_not_found", 404);
     }
-    assertKindChange(tx, id, existing.kind, input.kind);
-    assertEssential(input.kind, input.essential);
-    assertGroup(tx, input.groupId);
-    const name = input.name.trim();
-    assertCategoryName(tx, name, id);
+    const merged = mergedWrite(categoryCreateSchema, existing, input);
     const next = {
-      name,
-      kind: input.kind,
-      groupId: input.groupId,
-      essential: input.essential,
+      name: merged.name,
+      kind: merged.kind,
+      groupId: merged.groupId ?? null,
+      essential: merged.essential ?? false,
       archivedAt: existing.archivedAt,
     };
+    assertKindChange(tx, id, existing.kind, next.kind);
+    assertEssential(next.kind, next.essential);
+    assertGroup(tx, next.groupId);
+    assertCategoryName(tx, next.name, id);
     tx.update(categories)
       .set({ name: next.name, sortKey: foldName(next.name), kind: next.kind, groupId: next.groupId, essential: next.essential })
       .where(eq(categories.id, id))

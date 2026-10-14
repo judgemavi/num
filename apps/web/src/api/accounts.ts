@@ -48,10 +48,12 @@ export function useArchiveAccount() {
   });
 }
 
-/** Set the opening date and the opening balance of an account from a suggestion. The other fields stay the same. */
+/** Set the opening date and the opening balance of an account from a suggestion. The patch has only these two fields. */
 export function useSetOpeningBalance() {
   return useMutation({
     mutationFn: ({ accountId, suggestion }: { accountId: string; suggestion: OpeningSuggestion }) =>
-      unwrap(api.accounts[":id"].opening.$post({ param: { id: accountId }, json: suggestion })),
+      unwrap(
+        api.accounts[":id"].$patch({ param: { id: accountId }, json: { openingBalance: suggestion.amount, openingDate: suggestion.date } }),
+      ),
   });
 }

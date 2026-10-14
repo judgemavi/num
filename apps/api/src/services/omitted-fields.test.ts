@@ -5,7 +5,8 @@ import { migrateDatabase, openDatabase, settings } from "@num/db";
 import { expect, test } from "bun:test";
 import { planCreateSchema, planUpdateSchema } from "@num/shared";
 import { createDb, type Db } from "../db";
-import { applyOpeningSuggestion, createAccount, updateAccount } from "./accounts";
+import { createAccount, updateAccount } from "./accounts";
+import { createBucket, updateBucket } from "./buckets";
 import { createCategory } from "./categories";
 import { createMerchant } from "./merchants";
 import { createPlan, updatePlan } from "./recurring-plans";
@@ -59,15 +60,19 @@ test("an account update keeps the fields that it leaves out and clears the field
   });
 });
 
-test("a kind that has no interest rate does not keep the stored rate", () => {
+test("a kind change must clear a stored rate that the new kind does not allow", () => {
   withBook((db) => {
     const account = createAccount(db, { name: "Rainy day", kind: "savings", interestRateMilliPct: 2_500, ...saved });
-    const changed = updateAccount(db, account.id, { name: "Everyday", kind: "chequing", onBudget: true, ...saved });
+    expect(() => updateAccount(db, account.id, { kind: "chequing", ...saved })).toThrow(
+      expect.objectContaining({ code: "invalid_body", params: { field: "interestRateMilliPct" } }),
+    );
+    const changed = updateAccount(db, account.id, { kind: "chequing", interestRateMilliPct: null, ...saved });
+    expect(changed.kind).toBe("chequing");
     expect(changed.interestRateMilliPct).toBeNull();
   });
 });
 
-test("a card keeps the two card fields only when the update leaves out the two", () => {
+test("the card fields are checked together on the stored card with the patch", () => {
   withBook((db) => {
     const card = createAccount(db, {
       name: "Card",
@@ -77,19 +82,25 @@ test("a card keeps the two card fields only when the update leaves out the two",
       fixedPayment: 5000,
       ...saved,
     });
-    const body = { name: "Card", kind: "credit_card" as const, onBudget: true, ...saved };
 
-    const kept = updateAccount(db, card.id, body);
-    expect(kept.paymentPolicy).toBe("fixed");
-    expect(kept.fixedPayment).toBe(5000);
+    const renamed = updateAccount(db, card.id, { name: "Visa", ...saved });
+    expect(renamed.paymentPolicy).toBe("fixed");
+    expect(renamed.fixedPayment).toBe(5000);
 
-    const full = updateAccount(db, card.id, { ...body, paymentPolicy: "full" });
+    expect(updateAccount(db, card.id, { fixedPayment: 7000, ...saved }).paymentPolicy).toBe("fixed");
+    expect(() => updateAccount(db, card.id, { paymentPolicy: "full", ...saved })).toThrow(
+      expect.objectContaining({ code: "invalid_body", params: { field: "fixedPayment" } }),
+    );
+    const full = updateAccount(db, card.id, { paymentPolicy: "full", fixedPayment: null, ...saved });
     expect(full.paymentPolicy).toBe("full");
     expect(full.fixedPayment).toBeNull();
+    expect(() => updateAccount(db, card.id, { paymentPolicy: "fixed", ...saved })).toThrow(
+      expect.objectContaining({ code: "invalid_body", params: { field: "fixedPayment" } }),
+    );
   });
 });
 
-test("an opening suggestion changes only the opening date and the opening balance", () => {
+test("a patch with the opening date and the opening balance changes only these fields", () => {
   withBook((db) => {
     const card = createAccount(db, {
       name: "Card",
@@ -101,7 +112,7 @@ test("an opening suggestion changes only the opening date and the opening balanc
       fixedPayment: 5000,
       ...saved,
     });
-    const after = applyOpeningSuggestion(db, card.id, { date: "2025-12-01", amount: -30_000, ...saved });
+    const after = updateAccount(db, card.id, { openingDate: "2025-12-01", openingBalance: -30_000, ...saved });
     expect(after).toEqual({ ...card, openingDate: "2025-12-01", openingBalance: -30_000, balance: -30_000 });
   });
 });
@@ -169,12 +180,15 @@ test("a plan update keeps `active` and `fundsBuckets` when it leaves them out", 
     const paused = updatePlan(db, plan.id, { ...omitted, active: false, fundsBuckets: true, ...saved });
     expect(paused.active).toBe(false);
     expect(paused.fundsBuckets).toBe(true);
-    // A plan that is not income cannot fund buckets, also when the update leaves the field out.
-    expect(updatePlan(db, plan.id, { ...omitted, kind: "bill", expectedAmount: -10_000, ...saved }).fundsBuckets).toBe(false);
+    // A plan that is not income cannot fund buckets. The check uses the stored value when the patch leaves it out.
+    expect(() => updatePlan(db, plan.id, { kind: "bill", expectedAmount: -10_000, ...saved })).toThrow(
+      expect.objectContaining({ code: "invalid_body", params: { field: "fundsBuckets" } }),
+    );
+    expect(updatePlan(db, plan.id, { kind: "bill", expectedAmount: -10_000, fundsBuckets: false, ...saved }).kind).toBe("bill");
   });
 });
 
-test("a plan that changes to weekly does not keep the stored month day", () => {
+test("a plan patch is checked with the stored fields that it leaves out", () => {
   withBook((db) => {
     const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
     const body = {
@@ -192,7 +206,17 @@ test("a plan that changes to weekly does not keep the stored month day", () => {
       ...saved,
     };
     const plan = createPlan(db, { ...body, freq: "monthly", monthDay: 15 });
-    expect(updatePlan(db, plan.id, { ...body, freq: "weekly" }).monthDay).toBeNull();
+    expect(() => updatePlan(db, plan.id, { freq: "weekly", ...saved })).toThrow(
+      expect.objectContaining({ code: "invalid_body", params: { field: "monthDay" } }),
+    );
+    expect(updatePlan(db, plan.id, { freq: "weekly", monthDay: null, ...saved }).monthDay).toBeNull();
+    expect(() => updatePlan(db, plan.id, { endDate: "2025-12-31", ...saved })).toThrow(
+      expect.objectContaining({ code: "invalid_body", params: { field: "endDate" } }),
+    );
+    expect(() => updatePlan(db, plan.id, { kind: "transfer", transferAccountId: account.id, ...saved })).toThrow(
+      expect.objectContaining({ code: "invalid_body", params: { field: "transferAccountId" } }),
+    );
+    expect(updatePlan(db, plan.id, { name: "Stream 2", ...saved })).toEqual({ ...plan, name: "Stream 2", freq: "weekly", monthDay: null });
   });
 });
 
@@ -219,5 +243,59 @@ test("a transaction update keeps the merchant and the note that it leaves out an
     const cleared = updateTransaction(db, created.id, { ...body, merchantId: null, notes: null });
     expect(cleared.merchantId).toBeNull();
     expect(cleared.notes).toBeNull();
+  });
+});
+
+test("a transaction patch keeps the lines that it leaves out and checks the amount with the stored lines", () => {
+  withBook((db) => {
+    const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
+    const category = createCategory(db, { name: "Example food", kind: "expense", ...saved });
+    const created = createTransaction(db, {
+      accountId: account.id,
+      date: "2026-03-01",
+      amount: -5000,
+      payeeRaw: "Example shop",
+      status: "open",
+      lines: [{ amount: -5000, categoryId: category.id }],
+      ...saved,
+    });
+
+    const noted = updateTransaction(db, created.id, { notes: "weekly", ...saved });
+    expect(noted.notes).toBe("weekly");
+    expect(noted.lines.map((line) => [line.amount, line.categoryId])).toEqual([[-5000, category.id]]);
+
+    expect(() => updateTransaction(db, created.id, { amount: -7000, ...saved })).toThrow();
+    const changed = updateTransaction(db, created.id, { amount: -7000, lines: [{ amount: -7000, categoryId: category.id }], ...saved });
+    expect(changed.amount).toBe(-7000);
+    expect(changed.notes).toBe("weekly");
+  });
+});
+
+test("a bucket patch is checked with the stored kind fields", () => {
+  withBook((db) => {
+    const bucket = createBucket(db, {
+      name: "Groceries",
+      kind: "spending",
+      priority: 1,
+      essential: true,
+      color: "mint",
+      icon: "shopping-cart",
+      categoryIds: [],
+      refillTo: 400_000,
+      amount: null,
+      dueDate: null,
+      repeat: null,
+      target: null,
+      targetDate: null,
+      fixedAmount: null,
+      asOf: "2026-03-01",
+      ...saved,
+    });
+    expect(updateBucket(db, bucket.id, { refillTo: 500_000, ...saved })).toMatchObject({ name: "Groceries", refillTo: 500_000 });
+    expect(() => updateBucket(db, bucket.id, { kind: "goal", ...saved })).toThrow(
+      expect.objectContaining({ code: "invalid_body", params: { field: "kind" } }),
+    );
+    const goal = updateBucket(db, bucket.id, { kind: "goal", refillTo: null, target: 1_000_000, fixedAmount: 50_000, ...saved });
+    expect(goal).toMatchObject({ kind: "goal", target: 1_000_000, refillTo: null, essential: true });
   });
 });

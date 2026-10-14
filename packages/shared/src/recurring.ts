@@ -36,7 +36,7 @@ const createFields = z.object({
   fundsBuckets: z.boolean().default(false),
 });
 
-/** A field that the update leaves out keeps its stored value. Thus `active` and `fundsBuckets` have no default here. */
+/** The fields of a stored plan. `active` and `fundsBuckets` have no default here. */
 const updateFields = z.object({
   ...planFields,
   active: z.boolean().optional(),
@@ -66,7 +66,8 @@ function planRules(value: z.infer<typeof updateFields>, context: z.RefinementCtx
 }
 
 export const planCreateSchema = createFields.superRefine(planRules);
-export const planUpdateSchema = updateFields.superRefine(planRules);
+/** A PATCH body: only the fields that change. The API checks the fields together on the stored plan with the patch. */
+export const planUpdateSchema = updateFields.partial();
 
 export const planSchema = z.object({
   id: z.uuid(),

@@ -21,9 +21,7 @@ export const categoryGroupCreateSchema = z.object({
   name: nameSchema,
 });
 
-export const categoryGroupUpdateSchema = z.object({
-  name: nameSchema,
-});
+export const categoryGroupUpdateSchema = categoryGroupCreateSchema.partial();
 
 export const categoryGroupDeleteSchema = z.object({
   ok: z.literal(true),
@@ -38,23 +36,19 @@ export const categorySchema = z.object({
   archivedAt: z.string().refine(isUtcTimestamp).nullable(),
 });
 
-export const categoryCreateSchema = z
-  .object({
-    name: nameSchema,
-    kind: z.enum(categoryKinds),
-    groupId: z.uuid().nullable().optional(),
-    essential: z.boolean().optional(),
-  })
-  .refine((value) => value.kind === "expense" || value.essential !== true, { path: ["essential"] });
+const categoryFields = z.object({
+  name: nameSchema,
+  kind: z.enum(categoryKinds),
+  groupId: z.uuid().nullable().optional(),
+  essential: z.boolean().optional(),
+});
 
-export const categoryUpdateSchema = z
-  .object({
-    name: nameSchema,
-    kind: z.enum(categoryKinds),
-    groupId: z.uuid().nullable(),
-    essential: z.boolean(),
-  })
-  .refine((value) => value.kind === "expense" || value.essential !== true, { path: ["essential"] });
+export const categoryCreateSchema = categoryFields.refine((value) => value.kind === "expense" || value.essential !== true, {
+  path: ["essential"],
+});
+
+/** A PATCH body: only the fields that change. The API checks the fields together on the stored category with the patch. */
+export const categoryUpdateSchema = categoryFields.partial();
 
 export const categoryListQuerySchema = listQuerySchema(["name", "kind"]).extend({
   ...archivedQuery,
@@ -73,9 +67,7 @@ export const tagCreateSchema = z.object({
   name: nameSchema,
 });
 
-export const tagUpdateSchema = z.object({
-  name: nameSchema,
-});
+export const tagUpdateSchema = tagCreateSchema.partial();
 
 export const tagListQuerySchema = listQuerySchema(["name"]).extend(archivedQuery);
 

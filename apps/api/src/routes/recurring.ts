@@ -51,7 +51,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_recurring_id",
-  description: "Change recurring plans. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Change recurring plans. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. The API checks the fields together on the stored record with your changes. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/recurring/{id}",
   request: {

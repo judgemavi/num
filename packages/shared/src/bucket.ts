@@ -108,7 +108,12 @@ export function kindFieldsValid(value: {
   );
 }
 
-export const bucketWriteSchema = z.object(bucketFields).refine(kindFieldsValid, { path: ["kind"] });
+const bucketWriteFields = z.object(bucketFields);
+
+export const bucketWriteSchema = bucketWriteFields.refine(kindFieldsValid, { path: ["kind"] });
+
+/** A PATCH body: only the fields that change. The API checks the kind fields on the stored bucket with the patch. */
+export const bucketUpdateSchema = bucketWriteFields.partial();
 
 // A new bucket can leave out startDate. Then the bucket starts on asOf (decision 0029).
 export const bucketCreateSchema = z
@@ -181,6 +186,7 @@ export function nextBucketColor(count: number): BucketColor {
 
 export type Bucket = z.infer<typeof bucketSchema>;
 export type BucketWrite = z.infer<typeof bucketWriteSchema>;
+export type BucketUpdate = z.infer<typeof bucketUpdateSchema>;
 export type BucketCreate = z.infer<typeof bucketCreateSchema>;
 export type BucketListQuery = z.output<typeof bucketListQuerySchema>;
 export type BucketEvent = z.infer<typeof bucketEventSchema>;

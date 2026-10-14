@@ -25,3 +25,6 @@ export const currencyUpdateSchema = z.object({
 export const aiAccessSettingSchema = z.object({
   aiCanWrite: z.boolean(),
 });
+
+/** A PATCH body: only the fields that change. */
+export const aiAccessUpdateSchema = aiAccessSettingSchema.partial();

@@ -5,11 +5,10 @@ import {
   accountSchema,
   accountUpdateSchema,
   archiveAccountSchema,
-  openingSuggestionSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { applyOpeningSuggestion, archiveAccount, createAccount, getAccount, listAccounts, restoreAccount, updateAccount } from "../services/accounts";
+import { archiveAccount, createAccount, getAccount, listAccounts, restoreAccount, updateAccount } from "../services/accounts";
 import { validationHook } from "../validation";
 import { errorResponse, idParams } from "./common";
 
@@ -64,7 +63,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_accounts_id",
-  description: "Change accounts. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive. For a mortgage, the same call saves the mortgage terms (mortgageTerms). null removes the terms. Terms need an opening date and make it fixed.",
+  description: "Change accounts. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. The API checks the fields together on the stored account with your changes. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive. For a mortgage, the same call saves the mortgage terms (mortgageTerms). null removes the terms. Terms need an opening date and make it fixed: to change the opening date or the opening balance of a mortgage with terms, send the terms too.",
   method: "patch",
   path: "/api/accounts/{id}",
   request: {
@@ -162,36 +161,6 @@ const archiveRoute = createRoute({
   },
 });
 
-const openingRoute = createRoute({
-  operationId: "post_accounts_id_opening",
-  description: "Create or run accounts (opening). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
-  method: "post",
-  path: "/api/accounts/{id}/opening",
-  request: {
-    params: idParams,
-    body: {
-      required: true,
-      content: {
-        "application/json": {
-          schema: openingSuggestionSchema,
-        },
-      },
-    },
-  },
-  responses: {
-    200: {
-      description: "The account after the opening balance is set",
-      content: {
-        "application/json": {
-          schema: accountSchema,
-        },
-      },
-    },
-    400: errorResponse,
-    404: errorResponse,
-  },
-});
-
 export function accountRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook })
     .openapi(listRoute, (c) => c.json(listAccounts(db, c.req.valid("query")), 200))
@@ -216,11 +185,6 @@ export function accountRoutes(db: Db) {
     .openapi(restoreRoute, (c) => {
       const { id } = c.req.valid("param");
       return c.json(restoreAccount(db, id, { source: "ui" }), 200);
-    })
-    .openapi(openingRoute, (c) => {
-      const { id } = c.req.valid("param");
-      const body = c.req.valid("json");
-      return c.json(applyOpeningSuggestion(db, id, { amount: body.amount, date: body.date, source: "ui" }), 200);
     });
 }
 

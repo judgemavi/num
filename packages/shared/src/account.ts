@@ -140,19 +140,15 @@ function cardAndRateOk(
   }
 }
 
-export const accountCreateSchema = z
-  .object({
-    ...accountFields,
-    onBudget: z.boolean().optional(),
-  })
-  .superRefine(cardAndRateOk);
+const accountWriteFields = z.object({
+  ...accountFields,
+  onBudget: z.boolean().optional(),
+});
 
-export const accountUpdateSchema = z
-  .object({
-    ...accountFields,
-    onBudget: z.boolean(),
-  })
-  .superRefine(cardAndRateOk);
+export const accountCreateSchema = accountWriteFields.superRefine(cardAndRateOk);
+
+/** A PATCH body: only the fields that change. The API checks the fields together on the stored account with the patch. */
+export const accountUpdateSchema = accountWriteFields.partial();
 
 export const archiveAccountSchema = z.object({
   confirm: z.boolean().default(false),

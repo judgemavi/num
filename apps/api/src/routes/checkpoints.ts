@@ -30,7 +30,7 @@ const checkpointParams = z.object({
 
 const listRoute = createRoute({
   operationId: "get_accounts_id_checkpoints",
-  description: "Read the checkpoints of an account and the closing date and balance of the last imported statement (null when no import has them). This does not create, change or delete a record. Amounts are integer minor units. Money that enters the account is positive.",
+  description: "Read the checkpoints of an account and the closing date and balance of the last imported statement (null when no import has them). This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/accounts/{id}/checkpoints",
   request: { params: accountParams },

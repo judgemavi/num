@@ -8,7 +8,7 @@ import {
   bucketListQuerySchema,
   bucketListSchema,
   bucketSchema,
-  bucketWriteSchema,
+  bucketUpdateSchema,
   overspentListSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
@@ -86,12 +86,12 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_buckets_id",
-  description: "Change buckets. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Change buckets. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. The API checks the fields together on the stored record with your changes. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/buckets/{id}",
   request: {
     params: idParams,
-    body: { required: true, content: { "application/json": { schema: bucketWriteSchema } } },
+    body: { required: true, content: { "application/json": { schema: bucketUpdateSchema } } },
   },
   responses: {
     200: {

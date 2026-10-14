@@ -95,7 +95,8 @@ function checkedBody(currency: string, value: AccountValues, hasSection: boolean
     interestRateMilliPct: allowsInterestRate(value.kind) ? readInterest(value.interestRate) : null,
     paymentPolicy: card ? value.paymentPolicy : null,
     fixedPayment: card && value.paymentPolicy === "fixed" ? readAmount(currency, value.fixedPayment, "the fixed payment") : null,
-    ...(hasSection ? { mortgageTerms: termsFromDraft(currency, value.mortgage) } : {}),
+    // A kind that is not a mortgage has no terms. The inline form has no terms section: a mortgage keeps its terms.
+    ...(hasSection ? { mortgageTerms: termsFromDraft(currency, value.mortgage) } : value.kind === "mortgage" ? {} : { mortgageTerms: null }),
   };
 }
 

@@ -1,5 +1,5 @@
 import { transactions, type TransactionRow } from "@num/db";
-import { utcNow, type Transaction } from "@num/shared";
+import { transactionWriteSchema, utcNow, type Transaction, type TransactionUpdate, type TransactionWrite } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -27,6 +27,7 @@ import { removeTransaction } from "./transaction-erase";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
 import { isUncategorized, recordKeep } from "./decision-keep";
 import { clearUnreadableLine } from "./unreadable-line";
+import { mergedWrite } from "./patch";
 import { keepOmitted, write, type AuditSource, type WriteTx, type WriteInput, type Reader } from "./write";
 import { requireWholeAmounts } from "./book-step";
 
@@ -244,17 +245,34 @@ export function spreadAfterConfirmations(
   linkLearnedTransfers(tx, ids, new Set([...batch, ...ids, ...alsoExcept]));
 }
 
-export function updateTransaction(
-  db: Db,
-  id: string,
-  input: TransactionBody & WriteInput & { keepUncategorized?: boolean },
-): Transaction {
-  requireWholeAmounts(db, [input.amount, ...input.lines.map((line) => line.amount)]);
+/** The stored transaction as a write body. A PATCH merges its fields into it. */
+function storedBody(txn: Transaction): TransactionWrite {
+  return {
+    accountId: txn.accountId,
+    date: txn.date,
+    amount: txn.amount,
+    merchantId: txn.merchantId,
+    notes: txn.notes,
+    payeeRaw: txn.payeeRaw,
+    status: txn.status,
+    lines: txn.lines.map(({ amount, memo, categoryId, transferAccountId, tagIds }) => ({ amount, memo, categoryId, transferAccountId, tagIds })),
+    refundOfId: txn.refundOfId,
+  };
+}
+
+/**
+ * A PATCH: a field that the patch leaves out keeps its stored value. `lines` replaces all the lines.
+ * The checks that use more than one field (the lines and the amount, a transfer and a merchant) run on the result.
+ */
+export function updateTransaction(db: Db, id: string, input: TransactionUpdate & WriteInput): Transaction {
+  // Only the amounts in the patch. A stored amount is not checked again (decision 0040).
+  requireWholeAmounts(db, [input.amount, ...(input.lines ?? []).map((line) => line.amount)]);
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
     const before = readTransaction(tx, id);
     const wasTransfer = before.lines.some((line) => line.transferAccountId !== null);
-    const updated = applyTransactionUpdate(tx, id, input, at);
+    const body = mergedWrite(transactionWriteSchema, storedBody(before), input);
+    const updated = applyTransactionUpdate(tx, id, body, at);
     if (!wasTransfer || (before.autoReason !== null && updated.autoReason === null)) {
       linkLearnedTransfers(tx, [id], new Set([id]));
     }

@@ -1,4 +1,4 @@
-import type { CategoryUpdate, CategoryListQuery } from "@num/shared";
+import type { CategoryCreate, CategoryListQuery } from "@num/shared";
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { activeAndArchived, allPages, fullPage, type ListFilters } from "@/api/pages";
@@ -29,7 +29,7 @@ export function categoryQuery(id: string) {
 /** Create a category (`id` is null) or change a category. */
 export function useSaveCategory() {
   return useMutation({
-    mutationFn: ({ id, body }: { id: string | null; body: CategoryUpdate }) =>
+    mutationFn: ({ id, body }: { id: string | null; body: CategoryCreate }) =>
       unwrap(id ? api.categories[":id"].$patch({ param: { id }, json: body }) : api.categories.$post({ json: body })),
   });
 }

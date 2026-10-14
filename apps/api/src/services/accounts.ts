@@ -1,6 +1,6 @@
 import { accounts, type AccountRow } from "@num/db";
 import {
-  allowsInterestRate,
+  accountCreateSchema,
   defaultOnBudget,
   foldName,
   type Account,
@@ -15,9 +15,10 @@ import { ServiceError } from "../service-error";
 import { balanceOf, balancesOf } from "./account-balance";
 import { assertCanArchive, assertSameClass, cardFields, interestRate } from "./account-rules";
 import { accountAuditSnapshot } from "./account-snapshot";
-import { hasTerms, resolveTerms, saveTerms } from "./mortgage-terms";
-import { automaticOpening, automaticOpenings, effectiveOpeningDate, type AutomaticOpening } from "./opening-date";
-import { keepOmitted, write, type WriteInput } from "./write";
+import { readTerms, resolveTerms, saveTerms } from "./mortgage-terms";
+import { automaticOpening, automaticOpenings, type AutomaticOpening } from "./opening-date";
+import { mergedWrite } from "./patch";
+import { write, type WriteInput } from "./write";
 import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 import { requireWholeAmounts } from "./book-step";
 
@@ -102,7 +103,10 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
   return toAccount(row, row.openingBalance, automaticOpening(db, id));
 }
 
-/** A field that the update leaves out keeps its stored value. An explicit null clears a field that can be empty. */
+/**
+ * A PATCH: a field that the patch leaves out keeps its stored value. An explicit null clears a field that can be empty.
+ * The checks that use more than one field run on the stored account with the patch.
+ */
 export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteInput): Account {
   requireWholeAmounts(db, [input.openingBalance, input.fixedPayment, input.mortgageTerms?.paymentAmount]);
   const at = input.at ?? utcNow();
@@ -111,28 +115,28 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
     if (!existing) {
       throw new ServiceError("account_not_found", 404);
     }
-    assertSameClass(existing.kind, input.kind);
-    // The two card fields go together. A card keeps them when the update leaves out the two.
-    const keepsCard = input.kind === "credit_card" && input.paymentPolicy === undefined && input.fixedPayment === undefined;
-    const card = cardFields(input.kind, keepsCard ? existing : input);
-    const keepsRate = input.interestRateMilliPct === undefined && allowsInterestRate(input.kind);
-    const rate = interestRate(input.kind, keepsRate ? existing.interestRateMilliPct : input.interestRateMilliPct);
-    const terms = resolveTerms(tx, id, input.kind, input.mortgageTerms);
-    const requestedDate = keepOmitted(input.openingDate, existing.openingDate);
-    // A mortgage with terms has a fixed opening date (decision 0027).
-    const openingDate = terms && requestedDate === null ? effectiveOpeningDate(tx, existing) : requestedDate;
-    const next = {
-      name: input.name.trim(),
-      institution: input.institution === undefined ? existing.institution : blankToNull(input.institution),
-      kind: input.kind,
-      onBudget: input.onBudget,
+    const storedTerms = readTerms(tx, id) ?? null;
+    const next = mergedWrite(accountCreateSchema, { ...existing, mortgageTerms: storedTerms }, input);
+    assertSameClass(existing.kind, next.kind);
+    const openingDate = next.openingDate ?? null;
+    const openingBalance = next.openingBalance ?? existing.openingBalance;
+    // A mortgage with terms has a fixed opening date and balance (decision 0027). Only a write with the terms changes them.
+    const keepsTerms = storedTerms !== null && input.mortgageTerms === undefined;
+    if (keepsTerms && (openingDate !== existing.openingDate || openingBalance !== existing.openingBalance)) {
+      throw new ServiceError("opening_date_fixed", 400);
+    }
+    const values = {
+      name: next.name,
+      institution: blankToNull(next.institution),
+      kind: next.kind,
+      onBudget: next.onBudget ?? existing.onBudget,
       openingDate,
-      openingBalance: input.openingBalance ?? existing.openingBalance,
-      ...card,
-      interestRateMilliPct: rate,
+      openingBalance,
+      ...cardFields(next.kind, next),
+      interestRateMilliPct: interestRate(next.kind, next.interestRateMilliPct),
     };
-    const saved = { ...existing, ...next, sortKey: foldName(next.name) };
-    tx.update(accounts).set({ ...next, sortKey: saved.sortKey }).where(eq(accounts.id, id)).run();
+    const saved = { ...existing, ...values, sortKey: foldName(values.name) };
+    tx.update(accounts).set({ ...values, sortKey: saved.sortKey }).where(eq(accounts.id, id)).run();
     tx.audit({
       entity: "accounts",
       entityId: id,
@@ -140,31 +144,8 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
       before: accountAuditSnapshot(existing),
       after: accountAuditSnapshot(saved),
     });
-    saveTerms(tx, id, { date: openingDate, balance: next.openingBalance }, terms);
+    saveTerms(tx, id, { date: openingDate, balance: openingBalance }, next.mortgageTerms ?? null);
     return toAccount(saved, balanceOf(tx, saved), automaticOpening(tx, id));
-  });
-}
-
-export function applyOpeningSuggestion(
-  db: Db,
-  id: string,
-  input: { amount: number; date: string } & WriteInput,
-): Account {
-  const existing = db.select().from(accounts).where(eq(accounts.id, id)).get();
-  if (!existing) {
-    throw new ServiceError("account_not_found", 404);
-  }
-  if (hasTerms(db, id)) {
-    throw new ServiceError("opening_date_fixed", 400);
-  }
-  return updateAccount(db, id, {
-    name: existing.name,
-    kind: existing.kind,
-    onBudget: existing.onBudget,
-    openingDate: input.date,
-    openingBalance: input.amount,
-    source: input.source,
-    at: input.at,
   });
 }
 

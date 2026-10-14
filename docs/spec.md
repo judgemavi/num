@@ -95,6 +95,9 @@ The owner finds information about unknown merchants with Claude through MCP.
 - **Lists:** Filter, sort and page state is in the URL. The URL agrees 1:1 with the API query.
   Pagination is on the server (decision 0004).
 - **Rates:** Interest rates are integers in thousandths of a percent (`MilliPct`). Example: 6.875% = `6875`.
+- **Changes:** A `PATCH` body has only the fields that change. A field that the body leaves out keeps its stored value.
+  `null` clears a field that can be empty. The checks that use more than one field run on the stored record with the
+  changes. A list field (for example the lines of a transaction) replaces the stored list (decision 0040).
   The user types a percent with a maximum of 3 decimal places.
 - **IDs:** Use UUID text.
 - **Delete:** A delete removes the record (hard delete). The audit log keeps the record as it was (§11). Only documents
@@ -138,6 +141,8 @@ The app helps the user set it, always with one click and never without the user:
 - In reconcile (§7.5), when the account has no checkpoint and the balances are different:
   "Set the opening balance so this statement balances" (opening balance + the difference).
 - The app does not offer these two suggestions for a mortgage with terms. Its opening date is fixed (§5.2, decision 0027).
+- A suggestion changes only `openingDate` and `openingBalance` (a `PATCH` of the account). On a mortgage with terms,
+  a change of these two fields must include the terms (decision 0040).
 
 ### 5.2 Mortgage terms
 
