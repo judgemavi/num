@@ -1,5 +1,7 @@
-import { inboxDecisions, transactionLines } from "@num/db";
+import { inboxDecisions, transactionLines, transactions } from "@num/db";
+import type { Transaction } from "@num/shared";
 import { and, eq, isNull, like, sql } from "drizzle-orm";
+import { auditTransaction, readTransaction } from "./transaction-record";
 import { hasNoOpenLine } from "./transaction-sql";
 import type { Reader, WriteTx } from "./write";
 
@@ -35,6 +37,40 @@ export function recordKeep(tx: WriteTx, transactionId: string, at: string): void
   const row = { itemKey, decision: "keep_uncategorized" as const, reason: null, decidedAt: at };
   tx.insert(inboxDecisions).values(row).run();
   tx.audit({ entity: "inbox_decisions", entityId: itemKey, action: "create", before: null, after: row });
+}
+
+function hasKeep(db: Reader, transactionId: string): boolean {
+  return db.select({ key: inboxDecisions.itemKey }).from(inboxDecisions).where(eq(inboxDecisions.itemKey, keepKey(transactionId))).get() !== undefined;
+}
+
+/**
+ * True when the transaction teaches a learned label: one line, not a mirror, with a category, or with no category and
+ * no transfer and the keep decision (decision 0046).
+ */
+export function teachesLabel(db: Reader, txn: Pick<Transaction, "id" | "mirror" | "lines">): boolean {
+  const line = txn.lines[0];
+  if (txn.mirror || txn.lines.length !== 1 || !line || line.transferAccountId !== null) {
+    return false;
+  }
+  return line.categoryId !== null || hasKeep(db, txn.id);
+}
+
+/**
+ * The answer "no category" (decision 0046): records the keep decision and removes the automatic fields of an automatic
+ * "no category". The caller makes sure that the transaction is uncategorized.
+ */
+export function answerNoCategory(tx: WriteTx, transactionId: string, at: string): void {
+  recordKeep(tx, transactionId, at);
+  const row = tx.select({ autoReason: transactions.autoReason }).from(transactions).where(eq(transactions.id, transactionId)).get();
+  if (!row || row.autoReason === null) {
+    return;
+  }
+  const before = readTransaction(tx, transactionId);
+  tx.update(transactions)
+    .set({ autoReason: null, autoSourceId: null, autoConfidence: null, editedAt: at })
+    .where(eq(transactions.id, transactionId))
+    .run();
+  auditTransaction(tx, transactionId, "update", before, readTransaction(tx, transactionId));
 }
 
 /** Removes the keep decisions of transactions that have a category, a transfer or a split in every line. */

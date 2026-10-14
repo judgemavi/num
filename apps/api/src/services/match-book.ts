@@ -4,6 +4,7 @@ import {
   amountGuardFor,
   bandSignals,
   buildPayeeIndex,
+  candidateKey,
   containedMatch,
   familyMatch,
   fitLabels,
@@ -24,6 +25,7 @@ import {
   type RecurringSignal,
 } from "@num/shared";
 import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import { keepPrefix } from "./decision-keep";
 import { loadMortgageLearned, type MortgageHit, type MortgageLearned } from "./mortgage-learned";
 import { literal } from "./transaction-sql";
 import type { Reader } from "./write";
@@ -34,7 +36,8 @@ import type { Reader } from "./write";
  */
 type ConfirmRow = Pick<TransactionRow, "id" | "date" | "amount" | "merchantId"> & {
   payee: TransactionRow["payeeNormalized"];
-  categoryId: string;
+  /** Null is the label "no category" of a kept row (decision 0046). */
+  categoryId: string | null;
 };
 
 type TransferRow = Pick<TransactionRow, "id" | "date"> & {
@@ -59,10 +62,15 @@ function directionOf(amount: number): Direction {
   return amount < 0 ? "out" : "in";
 }
 
-/** What the confirmed rows of one direction teach. Each map is keyed by the normalized payee. */
+/**
+ * What the confirmed rows of one direction teach. Each map is keyed by the normalized payee. `payeeLearned` has the
+ * "no category" labels. `named`, `labels`, `tops` and `index` do not: the similar payee and the brand family signals
+ * do not use them (decision 0046).
+ */
 type Side = {
   bands: Map<string, LearnedLabel[]>;
-  payeeLearned: Map<string, LearnedScore[]>;
+  payeeLearned: Map<string, LearnedScore<string | null>[]>;
+  named: Map<string, LearnedScore[]>;
   /** The learned signals of an amount, keyed by the payee and the labels whose band contains the amount. */
   bandLearned: Map<string, ReturnType<typeof bandSignals>>;
   labels: Map<string, string>;
@@ -96,16 +104,19 @@ function byPayee<T extends { payee: string }>(rows: readonly T[]): Map<string, T
 /** A category label wins over a learned transfer. Learned transfers ignore the direction. */
 function buildSide(rows: readonly ConfirmRow[], transferTops: ReadonlyMap<string, FamilySignal>): Side {
   const bands = new Map<string, LearnedLabel[]>();
-  const payeeLearned = new Map<string, LearnedScore[]>();
+  const payeeLearned = new Map<string, LearnedScore<string | null>[]>();
+  const named = new Map<string, LearnedScore[]>();
   const labels = new Map<string, string>();
   const tops = new Map<string, FamilySignal>();
   for (const [payee, list] of byPayee(rows)) {
     const scores = learnedConfidence(list);
     payeeLearned.set(payee, scores);
     bands.set(payee, learnedLabels(list));
-    const top = scores[0];
+    const categories = scores.flatMap(({ categoryId, ...score }) => (categoryId === null ? [] : [{ ...score, categoryId }]));
+    const top = categories[0];
     if (top) {
-      labels.set(payee, `${top.categoryId}\0${top.merchantId ?? ""}`);
+      named.set(payee, categories);
+      labels.set(payee, candidateKey(top.categoryId, top.merchantId));
       tops.set(payee, { ...top, transferAccountId: null });
     }
   }
@@ -118,6 +129,7 @@ function buildSide(rows: readonly ConfirmRow[], transferTops: ReadonlyMap<string
   return {
     bands,
     payeeLearned,
+    named,
     bandLearned: new Map(),
     labels,
     tops,
@@ -134,8 +146,10 @@ export function loadMatchBook(db: Reader): MatchBook {
     from transactions t
     inner join transaction_lines l on l.transaction_id = t.id
     where ${confirmedLine}
-      and l.category_id is not null
       and l.transfer_account_id is null
+      and (l.category_id is not null or exists (
+        select 1 from inbox_decisions d where d.item_key = ${keepPrefix} || t.id
+      ))
   `);
   const transfers = db.all<TransferRow>(sql`
     select t.id as id, t.date as date, t.payee_normalized as payee, l.transfer_account_id as transferAccountId
@@ -172,9 +186,14 @@ function transferLearned(rows: readonly TransferRow[]): LearnedRow[] {
   return rows.map((row) => ({ id: row.id, date: row.date, categoryId: row.transferAccountId, merchantId: null }));
 }
 
+/** True when the payee has answers of its own. A kept "no category" is an answer (decision 0046). */
+function hasAnswers(side: Side, payee: string) {
+  return side.labels.has(payee) || side.payeeLearned.has(payee);
+}
+
 /** The learned payee that a payee without answers of its own contains (decision 0026). */
 function containedFor(side: Side, payee: string): string | null {
-  if (side.labels.has(payee)) {
+  if (hasAnswers(side, payee)) {
     return null;
   }
   let found = side.contained.get(payee);
@@ -187,7 +206,7 @@ function containedFor(side: Side, payee: string): string | null {
 
 /** The answer that other learned payees with the same first word teach, when they all agree (decision 0026, rule 7). */
 function familyFor(side: Side, payee: string): FamilySignal | null {
-  if (side.labels.has(payee)) {
+  if (hasAnswers(side, payee)) {
     return null;
   }
   let found = side.families.get(payee);
@@ -239,7 +258,7 @@ export function scorePayee(
     recurring: input.recurring,
     similar: contained
       ? {
-          scores: side.payeeLearned.get(contained) ?? [],
+          scores: side.named.get(contained) ?? [],
           transferRows: book.transfersByPayee.get(contained) ?? [],
         }
       : null,

@@ -4,14 +4,15 @@ import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { openUnreadableKeys } from "./book-settings";
-import { keepPrefix } from "./decision-keep";
+import { answerNoCategory, isUncategorized, keepPrefix, teachesLabel } from "./decision-keep";
 import { decidedKeys, pairKey } from "./decision-keys";
-import { isUncategorized } from "./decision-keep";
+import { spreadSureLabels } from "./match-apply";
 import { openFundingPaychecks } from "./funding-paychecks";
 import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
 import { listTransferPairs } from "./suggestions";
-import { write, type WriteInput } from "./write";
+import { readTransaction } from "./transaction-record";
+import { write, type WriteInput, type WriteTx } from "./write";
 
 const codeForKind: Record<string, InboxDecisionCode | undefined> = {
   transfer_pair: "not_transfer",
@@ -76,6 +77,10 @@ export function decideInboxItem(
   const at = input.at ?? utcNow();
   const row = { itemKey, decision, reason: null, decidedAt: at };
   write(db, { source: input.source, at }, (tx) => {
+    if (kind === "uncategorized") {
+      keepAnswer(tx, itemKey.slice(keepPrefix.length), at);
+      return;
+    }
     tx.insert(inboxDecisions).values(row).run();
     tx.audit({
       entity: "inbox_decisions",
@@ -86,6 +91,15 @@ export function decideInboxItem(
     });
   });
   return row;
+}
+
+/** The answer "no category" teaches, thus the rows of the same payee are scored again (decisions 0043, 0046). */
+function keepAnswer(tx: WriteTx, transactionId: string, at: string) {
+  answerNoCategory(tx, transactionId, at);
+  const saved = readTransaction(tx, transactionId);
+  if (teachesLabel(tx, saved)) {
+    spreadSureLabels(tx, [saved.payeeNormalized], new Set([transactionId]));
+  }
 }
 
 export function undoInboxDecision(db: Db, itemKey: string, input: WriteInput): { itemKey: string } {

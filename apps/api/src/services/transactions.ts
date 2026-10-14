@@ -25,7 +25,7 @@ import { transactionReconciled } from "./reconciled";
 import { assertPayee, assertReconciledMoney, assertReferences } from "./transaction-checks";
 import { removeTransaction } from "./transaction-erase";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
-import { isUncategorized, recordKeep } from "./decision-keep";
+import { isUncategorized, recordKeep, teachesLabel } from "./decision-keep";
 import { clearUnreadableLine } from "./unreadable-line";
 import { mergedWrite } from "./patch";
 import { keepOmitted, write, type AuditSource, type WriteTx, type WriteInput, type Reader } from "./write";
@@ -48,14 +48,6 @@ function labelChanged(existing: TransactionRow, existingLines: StoredLine[], hea
 
 function isTransferOrSplit(lines: NormalizedLine[]) {
   return lines.length !== 1 || lines.some((line) => line.transferAccountId !== null);
-}
-
-function isUserConfirmation(txn: Transaction) {
-  if (txn.mirror || txn.lines.length !== 1) {
-    return false;
-  }
-  const line = txn.lines[0];
-  return line !== undefined && line.categoryId !== null && line.transferAccountId === null;
 }
 
 function requireActive(db: Reader, id: string): TransactionRow {
@@ -118,7 +110,7 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
   }
   const created = readTransaction(tx, id);
   auditTransaction(tx, id, "create", null, created);
-  if (spread && isUserConfirmation(created)) {
+  if (spread && teachesLabel(tx, created)) {
     spreadSureLabels(tx, [created.payeeNormalized], new Set([created.id]));
   }
   return created;
@@ -180,7 +172,7 @@ export function applyTransactionUpdate(
   if (peer && !peer.mirror && saved.transferPeerId === null) {
     recordPairNo(tx, id, peer.id, at);
   }
-  if (spread && changed && isUserConfirmation(saved)) {
+  if (spread && changed && teachesLabel(tx, saved)) {
     spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));
   }
   return saved;
@@ -213,7 +205,11 @@ export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transac
     confirmLinkedPeer(tx, existing, at);
     const saved = readTransaction(tx, id);
     auditTransaction(tx, id, "update", before, saved);
-    if (isUserConfirmation(saved)) {
+    // An automatic "no category" becomes a kept row (decision 0046).
+    if (isUncategorized(tx, id)) {
+      recordKeep(tx, id, at);
+    }
+    if (teachesLabel(tx, saved)) {
       spreadSureLabels(tx, [saved.payeeNormalized], new Set([saved.id]));
     }
     linkAutomatic(tx, id);
@@ -237,7 +233,7 @@ export function spreadAfterConfirmations(
   for (const id of ids) {
     except.add(id);
     const saved = readTransaction(tx, id);
-    if (saved.autoReason === null && isUserConfirmation(saved)) {
+    if (saved.autoReason === null && teachesLabel(tx, saved)) {
       payees.push(saved.payeeNormalized);
     }
   }
@@ -278,6 +274,10 @@ export function updateTransaction(db: Db, id: string, input: TransactionUpdate &
     }
     if (input.keepUncategorized && isUncategorized(tx, id)) {
       recordKeep(tx, id, at);
+      // A kept "no category" teaches (decision 0046). An automatic label teaches after "Looks right".
+      if (updated.autoReason === null && teachesLabel(tx, updated)) {
+        spreadSureLabels(tx, [updated.payeeNormalized], new Set([id]));
+      }
     }
     return updated;
   });

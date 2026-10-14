@@ -3,10 +3,11 @@ import { candidateKey, learnedConfidence, newestFirst, type LearnedRow, type Lea
 /** Decision 0036: the newest confirmed amounts of a learned label make its band. */
 export const bandSize = 6;
 
-export type BandRow = LearnedRow & { amount: number };
+/** A null category is the label "no category" (decision 0046). */
+export type BandRow = LearnedRow<string | null> & { amount: number };
 
 /** One learned label (category + merchant) of one key, with the band of its amounts in absolute milliunits. */
-export type LearnedLabel = { key: string; categoryId: string; rows: BandRow[]; low: number; high: number; factor: number };
+export type LearnedLabel = { key: string; categoryId: string | null; rows: BandRow[]; low: number; high: number; factor: number };
 
 /** width = (high − low) / high. factor = 1 − 0.05 × min(1, width / 0.5). */
 export function widthFactor(low: number, high: number): number {
@@ -27,7 +28,7 @@ export function bandNear(band: Pick<LearnedLabel, "low" | "high">, amount: numbe
 
 /** The labels of the confirmed rows of one key. Make them once when the match data loads. */
 export function learnedLabels(rows: readonly BandRow[]): LearnedLabel[] {
-  const groups = new Map<string, { categoryId: string; rows: BandRow[] }>();
+  const groups = new Map<string, { categoryId: string | null; rows: BandRow[] }>();
   for (const row of rows) {
     const key = candidateKey(row.categoryId, row.merchantId);
     const group = groups.get(key);
@@ -51,7 +52,7 @@ export function fitLabels(labels: readonly LearnedLabel[], amount: number): Lear
 }
 
 /** The payee + amount scores: the rows of the labels that fit, each score × the width factor of its label. */
-function labelScores(fit: readonly LearnedLabel[]): LearnedScore[] {
+function labelScores(fit: readonly LearnedLabel[]) {
   const factors = new Map(fit.map((label) => [label.key, label.factor]));
   return learnedConfidence(fit.flatMap((label) => label.rows)).map((score) => ({
     ...score,
@@ -61,7 +62,8 @@ function labelScores(fit: readonly LearnedLabel[]): LearnedScore[] {
 
 /**
  * True when no band contains the amount and the result must not be automatic: the labels have two or more categories
- * (decisions 0043, 0044), or one category and no band is near the amount (decision 0045).
+ * (decisions 0043, 0044), or one category and no band is near the amount (decision 0045). "No category" counts as a
+ * category (decision 0046).
  */
 export function amountGuardFor(labels: readonly LearnedLabel[], fit: readonly LearnedLabel[], amount: number): boolean {
   if (fit.length > 0 || labels.length === 0) {
@@ -75,7 +77,7 @@ export function amountGuardFor(labels: readonly LearnedLabel[], fit: readonly Le
  * The learned signals of one amount. When a band contains the amount, the payee signal is only for the labels of the
  * bands that contain it (decision 0044). The signals depend only on the payee and the fit labels.
  */
-export function bandSignals(fit: readonly LearnedLabel[], payeeScores: readonly LearnedScore[]) {
+export function bandSignals(fit: readonly LearnedLabel[], payeeScores: readonly LearnedScore<string | null>[]) {
   if (fit.length === 0) {
     return { amountScores: [], payeeScores };
   }

@@ -18,6 +18,8 @@ export const suggestionSchema = z.object({
   sourceId: z.uuid().nullable(),
   confidence: z.number().int().min(0).max(1000),
   mortgage: z.boolean(),
+  /** The answer is "no category": keep the row uncategorized (decision 0046). */
+  keep: z.boolean(),
 });
 
 export const suggestionQuerySchema = z.object({
@@ -44,10 +46,11 @@ const none: Suggestion = {
   sourceId: null,
   confidence: 0,
   mortgage: false,
+  keep: false,
 };
 
 export function suggestionFromMatch(result: MatchResult): Suggestion {
-  if (result.level === "none" || result.mortgage || (result.categoryId === null && result.transferAccountId === null)) {
+  if (result.level === "none" || result.mortgage || (result.categoryId === null && result.transferAccountId === null && !result.keep)) {
     return none;
   }
   const reason: AutoReason | "none" = result.reason ?? "none";
@@ -60,6 +63,7 @@ export function suggestionFromMatch(result: MatchResult): Suggestion {
     sourceId: result.sourceId,
     confidence: result.confidenceMilli,
     mortgage: false,
+    keep: result.keep,
   };
 }
 

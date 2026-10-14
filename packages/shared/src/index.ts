@@ -274,6 +274,7 @@ export { buildPayeeIndex, containedMatch, familyMatch, type PayeeIndex } from ".
 export { amountGuardFor, bandSignals, fitLabels, learnedLabels, type LearnedLabel } from "./amount-band";
 export {
   autoReasons,
+  candidateKey,
   combineConfidence,
   confidenceMilli,
   likelyMinimum,

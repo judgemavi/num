@@ -10,7 +10,7 @@ import {
   type Suggestion,
 } from "./index";
 
-const none: Suggestion = { merchantId: null, categoryId: null, transferAccountId: null, reason: "none", level: "none", sourceId: null, confidence: 0, mortgage: false };
+const none: Suggestion = { merchantId: null, categoryId: null, transferAccountId: null, reason: "none", level: "none", sourceId: null, confidence: 0, mortgage: false, keep: false };
 const coffee = "11111111-1111-4111-8111-111111111111";
 const merchant = "22222222-2222-4222-8222-222222222222";
 const savings = "33333333-3333-4333-8333-333333333333";
@@ -40,7 +40,7 @@ test("transfer is preselected only on evidence", () => {
   expect(preselectTransfer({ transferRule: false, oppositeMatch: false })).toBe(false);
   expect(preselectTransfer({ transferRule: true, oppositeMatch: false })).toBe(true);
   expect(preselectTransfer({ transferRule: false, oppositeMatch: true })).toBe(true);
-  const category: Suggestion = { merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "learned_payee", level: "maybe", sourceId: null, confidence: 700, mortgage: false };
+  const category: Suggestion = { merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "learned_payee", level: "maybe", sourceId: null, confidence: 700, mortgage: false, keep: false };
   const fromHistory = resolveEditorChoice({
     direction: "out",
     suggestion: category,

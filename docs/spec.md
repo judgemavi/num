@@ -537,6 +537,9 @@ Width factor = 1 − 0.05 × min(1, width / 0.5).
 Examples: payee + amount with 1 answer = 0.85; payee only with 1 answer = 0.85 × 0.95 = 0.81; payee only with 2 agreeing
 answers = 0.86; Coffee, Eating out, Coffee (newest first) = 0.71 × 0.946 = 0.68.
 A confirmation is a category or merchant that the user chose or accepted ("Looks right"), not one that the app set.
+A kept "no category" (decision `keep_uncategorized`) is also a confirmation: it teaches the label "no category"
+(decision 0046). An automatic "no category" keeps the row uncategorized with the automatic fields; "Looks right"
+records the keep.
 
 Combining: signals for the same candidate combine as 1 − Π(1 − cᵢ). Exception: the payee + amount signal and the payee
 signal for the same candidate do not combine; the candidate takes the higher one (decision 0036). The best candidate must lead the second by ≥ 0.2;

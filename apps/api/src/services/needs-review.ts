@@ -147,7 +147,7 @@ export function listNeedsReview(
         cached = suggestionFromMatch(result);
         scored.set(key, cached);
       }
-      if (cached.categoryId || cached.transferAccountId) {
+      if (cached.categoryId || cached.transferAccountId || cached.keep) {
         suggestion = cached;
       }
       const mortgage = row.lineCount === 1 && !row.reconciled ? mortgageSuggestion(db, mortgageLearnedFor(book, row.payee), row) : null;
@@ -207,6 +207,8 @@ export function listNeedsReview(
       review.refund = refundAsk;
     } else {
       review.suggestion = suggestion;
+      // "Yes" to a "no category" suggestion is the keep decision (decision 0046).
+      review.itemKey = suggestion?.keep ? keepKey(row.id) : null;
     }
     hits.push({ id: row.id, date: row.date, accountId: row.accountId, merchantId: row.merchantId, review });
   }

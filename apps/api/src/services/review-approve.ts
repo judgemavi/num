@@ -3,6 +3,7 @@ import { utcNow, type TransactionFilter } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { answerNoCategory, isUncategorized, recordKeep } from "./decision-keep";
 import { applySuggestion } from "./inbox-group";
 import { linkAutomatic } from "./auto-link";
 import { requireAsOf, type NeedsReviewHit } from "./needs-review";
@@ -24,6 +25,10 @@ function confirmSure(tx: WriteTx, id: string, at: string, peers: Set<string>) {
   const before = readTransaction(tx, id);
   tx.update(transactions).set({ ...clearedAuto, editedAt: at }).where(eq(transactions.id, id)).run();
   auditTransaction(tx, id, "update", before, readTransaction(tx, id));
+  // An automatic "no category" becomes a kept row (decision 0046).
+  if (isUncategorized(tx, id)) {
+    recordKeep(tx, id, at);
+  }
   const peer = confirmLinkedPeer(tx, existing, at);
   if (peer) {
     peers.add(peer);
@@ -36,6 +41,10 @@ function applyLikely(tx: WriteTx, hit: NeedsReviewHit, at: string) {
   const suggestion = hit.review.suggestion;
   if (!suggestion) {
     return false;
+  }
+  if (suggestion.keep) {
+    answerNoCategory(tx, hit.id, at);
+    return true;
   }
   const skip = applySuggestion(
     tx,

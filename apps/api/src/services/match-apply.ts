@@ -46,6 +46,7 @@ export function applyLinkedPlan(
     categoryId: mortgage ? null : plan.categoryId,
     merchantId: plan.merchantId,
     transferAccountId: mortgage ? plan.transferAccountId : null,
+    keep: false,
     mortgage,
     signals: [],
   };
@@ -108,6 +109,7 @@ export function linkRecurring(tx: WriteTx, planId: string, dueDate: string, tran
   });
 }
 
+/** The fields of an automatic label. An automatic "no category" has a null category (decision 0046). */
 export function labelFields(result: MatchResult, merchantId: string | null) {
   if (result.level !== "automatic" || result.reason === null) {
     return null;
@@ -120,7 +122,7 @@ export function labelFields(result: MatchResult, merchantId: string | null) {
       autoConfidence: result.confidenceMilli,
     };
   }
-  if (result.transferAccountId !== null || result.categoryId === null) {
+  if (result.transferAccountId !== null || (result.categoryId === null && !result.keep)) {
     return null;
   }
   return {
@@ -134,7 +136,7 @@ export function labelFields(result: MatchResult, merchantId: string | null) {
 
 function applyRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
   const label = labelFields(result, row.merchantId);
-  if (!label || !("categoryId" in label) || !label.categoryId) {
+  if (!label || !("categoryId" in label)) {
     return;
   }
   const before = readTransaction(tx, row.id);
@@ -149,15 +151,21 @@ function applyRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
     .run();
   tx.update(transactionLines).set({ categoryId: label.categoryId }).where(eq(transactionLines.id, row.lineId)).run();
   auditTransaction(tx, row.id, "label", before, readTransaction(tx, row.id));
-  linkRefundIfSure(tx, row.id);
+  if (label.categoryId !== null) {
+    linkRefundIfSure(tx, row.id);
+  }
 }
 
 /** Automatic labels that a confirmation scores again (decision 0043). */
 const learnedReasons = ["learned_amount", "learned_payee"] as const;
 
+function isLearnedLabel(row: OpenRow) {
+  return learnedReasons.some((reason) => reason === row.autoReason);
+}
+
 /**
- * Rows of these payees with one line and no transfer: uncategorized, or labelled by a learned signal.
- * A row that the user kept uncategorized is not in the list (decision 0045).
+ * Rows of these payees with one line and no transfer: uncategorized, or labelled by a learned signal. A learned label
+ * can be "no category" (decision 0046). A row that the user kept uncategorized is not in the list (decision 0045).
  */
 function openRows(tx: WriteTx, payees: string[]) {
   return tx
@@ -192,7 +200,10 @@ function openRows(tx: WriteTx, payees: string[]) {
     .all();
 }
 
-/** The same label keeps its category with the new values. A result that is not automatic removes the category. */
+/**
+ * The same label keeps its category with the new values. A result that is not automatic removes the category and the
+ * automatic fields. An automatic "no category" has the null category of its row.
+ */
 function rescoreRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
   const fields = labelFields(result, row.merchantId);
   const label = fields && "categoryId" in fields ? fields : null;
@@ -213,7 +224,7 @@ function rescoreRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
   }
   const before = readTransaction(tx, row.id);
   tx.update(transactions).set(auto).where(eq(transactions.id, row.id)).run();
-  if (!label) {
+  if (!label && row.categoryId !== null) {
     tx.update(transactionLines).set({ categoryId: null }).where(eq(transactionLines.id, row.lineId)).run();
   }
   auditTransaction(tx, row.id, "label", before, readTransaction(tx, row.id));
@@ -232,7 +243,7 @@ export function spreadSureLabels(tx: WriteTx, payees: readonly string[], except:
   const rows = openRows(tx, [...wanted]).filter((row) => !except.has(row.id));
   for (const row of rows) {
     const result = scorePayee(book, { payee: row.payee, amount: row.amount, recurring: null });
-    if (row.categoryId !== null) {
+    if (row.categoryId !== null || isLearnedLabel(row)) {
       rescoreRow(tx, row, result);
     } else if (result.level === "automatic") {
       applyRow(tx, row, result);

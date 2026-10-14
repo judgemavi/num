@@ -138,5 +138,6 @@ export function mortgageSuggestion(
     sourceId: hit.sourceId,
     confidence,
     mortgage: true,
+    keep: false,
   };
 }

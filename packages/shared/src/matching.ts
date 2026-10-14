@@ -15,15 +15,19 @@ export const similarFactor = 0.9;
 export const familyFactor = 0.85;
 export const recurringConfidence = 0.99;
 
-export type LearnedRow = {
+/**
+ * One confirmed answer. `categoryId` is the learned id. In the category rows of a payee, null is the label
+ * "no category": a kept uncategorized row (decision 0046).
+ */
+export type LearnedRow<Label extends string | null = string> = {
   id: string;
   date: string;
-  categoryId: string;
+  categoryId: Label;
   merchantId: string | null;
 };
 
-export type LearnedScore = {
-  categoryId: string;
+export type LearnedScore<Label extends string | null = string> = {
+  categoryId: Label;
   merchantId: string | null;
   confidence: number;
   sourceId: string;
@@ -57,8 +61,8 @@ export type FamilySignal = {
 
 export type ScoreInput = {
   recurring: RecurringSignal | null;
-  amountScores: readonly LearnedScore[];
-  payeeScores: readonly LearnedScore[];
+  amountScores: readonly LearnedScore<string | null>[];
+  payeeScores: readonly LearnedScore<string | null>[];
   similar: SimilarPayee | null;
   family?: FamilySignal | null;
   transferRows: readonly { id: string; date: string; transferAccountId: string }[];
@@ -75,6 +79,8 @@ export type MatchSignal = {
   categoryId: string | null;
   merchantId: string | null;
   transferAccountId: string | null;
+  /** The answer is "no category": the row stays uncategorized (decision 0046). */
+  keep: boolean;
   sourceId: string | null;
 };
 
@@ -88,6 +94,7 @@ export type MatchResult = {
   categoryId: string | null;
   merchantId: string | null;
   transferAccountId: string | null;
+  keep: boolean;
   mortgage: boolean;
   signals: MatchSignal[];
 };
@@ -109,6 +116,7 @@ const emptyMatch: MatchResult = {
   categoryId: null,
   merchantId: null,
   transferAccountId: null,
+  keep: false,
   mortgage: false,
   signals: [],
 };
@@ -120,11 +128,12 @@ export function newestFirst(left: { date: string; id: string }, right: { date: s
   return left.id < right.id ? 1 : left.id > right.id ? -1 : 0;
 }
 
-export function candidateKey(categoryId: string, merchantId: string | null) {
-  return `${categoryId}\0${merchantId ?? ""}`;
+/** The key of one learned label. A null category is the label "no category" (decision 0046). */
+export function candidateKey(categoryId: string | null, merchantId: string | null) {
+  return `${categoryId ?? "keep"}\0${merchantId ?? ""}`;
 }
 
-export function learnedConfidence(rows: readonly LearnedRow[]): LearnedScore[] {
+export function learnedConfidence<Label extends string | null>(rows: readonly LearnedRow<Label>[]): LearnedScore<Label>[] {
   const ordered = [...rows].sort(newestFirst);
   const count = ordered.length;
   if (count === 0) {
@@ -138,7 +147,7 @@ export function learnedConfidence(rows: readonly LearnedRow[]): LearnedScore[] {
     total += weight;
   }
   const certainty = 1 - 0.15 * 0.6 ** (count - 1);
-  const groups = new Map<string, { row: LearnedRow; weight: number }>();
+  const groups = new Map<string, { row: LearnedRow<Label>; key: string; weight: number }>();
   ordered.forEach((row, index) => {
     const key = candidateKey(row.categoryId, row.merchantId);
     const weight = weights[index] ?? 0;
@@ -146,21 +155,17 @@ export function learnedConfidence(rows: readonly LearnedRow[]): LearnedScore[] {
     if (current) {
       current.weight += weight;
     } else {
-      groups.set(key, { row, weight });
+      groups.set(key, { row, key, weight });
     }
   });
-  const scores: LearnedScore[] = [];
-  for (const group of groups.values()) {
-    const confidence = total === 0 ? 0 : (group.weight / total) * certainty;
-    scores.push({
+  return [...groups.values()]
+    .sort((left, right) => right.weight - left.weight || (left.key < right.key ? -1 : 1))
+    .map((group) => ({
       categoryId: group.row.categoryId,
       merchantId: group.row.merchantId,
-      confidence,
+      confidence: total === 0 ? 0 : (group.weight / total) * certainty,
       sourceId: group.row.id,
-    });
-  }
-  scores.sort((left, right) => right.confidence - left.confidence || (left.categoryId < right.categoryId ? -1 : 1));
-  return scores;
+    }));
 }
 
 export function combineConfidence(values: readonly number[]): number {
@@ -184,7 +189,7 @@ export function matchLevel(confidence: number, lead: number, suggestionOnly: boo
 
 function pushLearned(
   signals: MatchSignal[],
-  scores: readonly LearnedScore[],
+  scores: readonly LearnedScore<string | null>[],
   reason: AutoReason,
   factor: number,
 ): void {
@@ -199,6 +204,7 @@ function pushLearned(
       categoryId: score.categoryId,
       merchantId: score.merchantId,
       transferAccountId: null,
+      keep: score.categoryId === null,
       sourceId: score.sourceId,
     });
   }
@@ -220,6 +226,7 @@ function pushTransfers(
       categoryId: null,
       merchantId: null,
       transferAccountId: score.categoryId,
+      keep: false,
       sourceId: score.sourceId,
     });
   }
@@ -234,6 +241,7 @@ function collectSignals(input: ScoreInput) {
       categoryId: null,
       merchantId: input.recurring.merchantId,
       transferAccountId: input.recurring.transferAccountId,
+      keep: false,
       sourceId: input.recurring.planId,
     });
     return signals;
@@ -245,6 +253,7 @@ function collectSignals(input: ScoreInput) {
       categoryId: input.recurring.categoryId,
       merchantId: input.recurring.merchantId,
       transferAccountId: null,
+      keep: false,
       sourceId: input.recurring.planId,
     });
     return signals;
@@ -256,6 +265,7 @@ function collectSignals(input: ScoreInput) {
       categoryId: null,
       merchantId: null,
       transferAccountId: input.recurring.transferAccountId,
+      keep: false,
       sourceId: input.recurring.planId,
     });
   }
@@ -272,6 +282,7 @@ function collectSignals(input: ScoreInput) {
       categoryId: input.family.categoryId,
       merchantId: input.family.merchantId,
       transferAccountId: input.family.transferAccountId,
+      keep: false,
       sourceId: input.family.sourceId,
     });
   }
@@ -298,7 +309,7 @@ function groupCandidates(signals: readonly MatchSignal[]): Candidate[] {
   for (const signal of signals) {
     const key = signal.transferAccountId
       ? `transfer\0${signal.transferAccountId}`
-      : signal.categoryId
+      : signal.categoryId || signal.keep
         ? candidateKey(signal.categoryId, signal.merchantId)
         : "";
     if (key.length === 0) {
@@ -337,6 +348,7 @@ function resultFrom(candidate: Candidate, second: number | null, mortgage: boole
     categoryId: top.categoryId,
     merchantId: top.merchantId,
     transferAccountId: top.transferAccountId,
+    keep: top.keep,
     mortgage,
     signals: candidate.signals,
   };

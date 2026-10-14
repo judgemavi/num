@@ -239,8 +239,9 @@ test("a row that the user kept uncategorized is not labelled again after a confi
     expect(sample.read(kept).categoryId).toBeNull();
     sample.confirm("2026-08-01", 2_000_000, sample.rental.id, "E-TRANSFER");
     expect(sample.read(kept)).toMatchObject({ categoryId: null, autoReason: null });
-    const open = sample.automatic("2026-08-15", 1_900_000, sample.rental.id, "learned_payee", "E-TRANSFER");
-    updateTransaction(sample.db, open, { lines: [{ amount: 1_900_000 }], ...saved });
+    // The kept 1,900 teaches "no category" for its band (decision 0046). A row in the Rental Income band is labelled.
+    const open = sample.automatic("2026-08-15", 2_000_000, sample.rental.id, "learned_payee", "E-TRANSFER");
+    updateTransaction(sample.db, open, { lines: [{ amount: 2_000_000 }], ...saved });
     sample.confirm("2026-09-01", 2_000_000, sample.rental.id, "E-TRANSFER");
     expect(sample.read(open).categoryId).toBe(sample.rental.id);
     expect(sample.read(kept).categoryId).toBeNull();

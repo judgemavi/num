@@ -126,6 +126,19 @@ export function ReviewAnswers({ row }: { row: TransactionListItem }) {
       );
     }
     const suggestion = review.suggestion;
+    if (suggestion?.keep && review.itemKey) {
+      const itemKey = review.itemKey;
+      return (
+        <Button
+          type="button"
+          size="sm"
+          disabled={busy}
+          onClick={() => answer.mutate({ kind: "decide", asOf: localAsOf(), itemKey, decision: "keep_uncategorized" })}
+        >
+          Yes
+        </Button>
+      );
+    }
     if (suggestion && (suggestion.categoryId || suggestion.transferAccountId)) {
       return (
         <Button

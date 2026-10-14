@@ -28,7 +28,11 @@ function SuggestionHint({ suggestion }: { suggestion: Suggestion }) {
   const account = useAccountLabels().get(suggestion.transferAccountId ?? "");
   const parts = suggestion.mortgage
     ? [account ? `Mortgage payment · ${account}` : null]
-    : [merchant ? `Merchant: ${merchant}` : null, category ? `Category: ${category}` : null, account ? `Transfer: ${account}` : null];
+    : [
+        merchant ? `Merchant: ${merchant}` : null,
+        suggestion.keep ? "No category" : category ? `Category: ${category}` : null,
+        account ? `Transfer: ${account}` : null,
+      ];
   const shown = parts.filter((part): part is string => part !== null);
   if (suggestion.reason === "none" || shown.length === 0) {
     return null;

@@ -33,8 +33,11 @@ function Proposal({ row }: { row: TransactionListItem }) {
   const review = row.review;
   const suggestion = review?.suggestion;
   const proposes = review && review.level !== "sure" && review.question === "categorize" && suggestion;
-  if (!proposes || !(suggestion.categoryId || suggestion.transferAccountId)) {
+  if (!proposes || !(suggestion.categoryId || suggestion.transferAccountId || suggestion.keep)) {
     return null;
+  }
+  if (suggestion.keep) {
+    return <span>No category?</span>;
   }
   if (suggestion.mortgage && suggestion.transferAccountId) {
     return <span>{`Mortgage payment · ${accounts.get(suggestion.transferAccountId) ?? "your mortgage"}?`}</span>;
