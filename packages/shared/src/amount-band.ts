@@ -19,6 +19,12 @@ export function bandContains(band: Pick<LearnedLabel, "low" | "high">, amount: n
   return size >= band.low * 99 && size <= band.high * 101;
 }
 
+/** Decision 0045: the amount is from 75% of the lowest to 125% of the highest. Integer milliunits only. */
+export function bandNear(band: Pick<LearnedLabel, "low" | "high">, amount: number): boolean {
+  const size = Math.abs(amount) * 100;
+  return size >= band.low * 75 && size <= band.high * 125;
+}
+
 /** The labels of the confirmed rows of one key. Make them once when the match data loads. */
 export function learnedLabels(rows: readonly BandRow[]): LearnedLabel[] {
   const groups = new Map<string, { categoryId: string; rows: BandRow[] }>();
@@ -54,19 +60,28 @@ function labelScores(fit: readonly LearnedLabel[]): LearnedScore[] {
 }
 
 /**
- * The learned signals of one amount. When a band contains the amount, the payee signal is only for the labels of the
- * bands that contain it (decision 0044). When no band contains it and the labels have two or more categories, the
- * result is not automatic (decisions 0043, 0044).
+ * True when no band contains the amount and the result must not be automatic: the labels have two or more categories
+ * (decisions 0043, 0044), or one category and no band is near the amount (decision 0045).
  */
-export function bandSignals(labels: readonly LearnedLabel[], fit: readonly LearnedLabel[], payeeScores: readonly LearnedScore[]) {
+export function amountGuardFor(labels: readonly LearnedLabel[], fit: readonly LearnedLabel[], amount: number): boolean {
+  if (fit.length > 0 || labels.length === 0) {
+    return false;
+  }
+  const categories = new Set(labels.map((label) => label.categoryId));
+  return categories.size > 1 || !labels.some((label) => bandNear(label, amount));
+}
+
+/**
+ * The learned signals of one amount. When a band contains the amount, the payee signal is only for the labels of the
+ * bands that contain it (decision 0044). The signals depend only on the payee and the fit labels.
+ */
+export function bandSignals(fit: readonly LearnedLabel[], payeeScores: readonly LearnedScore[]) {
   if (fit.length === 0) {
-    const categories = new Set(labels.map((label) => label.categoryId));
-    return { amountScores: [], payeeScores, amountGuard: categories.size > 1 };
+    return { amountScores: [], payeeScores };
   }
   const keys = new Set(fit.map((label) => label.key));
   return {
     amountScores: labelScores(fit),
     payeeScores: payeeScores.filter((score) => keys.has(candidateKey(score.categoryId, score.merchantId))),
-    amountGuard: false,
   };
 }

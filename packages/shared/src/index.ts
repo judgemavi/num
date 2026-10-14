@@ -271,7 +271,7 @@ export {
 export { oppositeTransferAccount, transferHintQuerySchema, transferHintSchema } from "./transfer-hint";
 export { uncategorizedLineKey } from "./payee";
 export { buildPayeeIndex, containedMatch, familyMatch, type PayeeIndex } from "./payee-contain";
-export { bandSignals, fitLabels, learnedLabels, type LearnedLabel } from "./amount-band";
+export { amountGuardFor, bandSignals, fitLabels, learnedLabels, type LearnedLabel } from "./amount-band";
 export {
   autoReasons,
   combineConfidence,

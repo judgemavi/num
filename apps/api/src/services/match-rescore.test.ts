@@ -11,7 +11,7 @@ import { createCategory } from "./categories";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { createMerchant } from "./merchants";
 import { listNeedsReview } from "./needs-review";
-import { createTransaction, getTransaction } from "./transactions";
+import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at: "2026-10-08T16:00:00.000Z" };
 const payee = "SEND E-TFR";
@@ -200,6 +200,50 @@ test("after a confirmation, an old automatic label switches to the label whose b
       autoConfidence: 899,
     });
     expect(sample.labelAudits(id)).toBe(1);
+  } finally {
+    sample.close();
+  }
+});
+
+test("after a confirmation, one-category automatic rows far from the band go back to uncategorized and a near row keeps its label (decision 0045)", () => {
+  const sample = book();
+  const name = "E-TRANSFER";
+  try {
+    for (const month of ["01", "02", "03", "04", "05", "06"]) {
+      sample.confirm(`2026-${month}-01`, 2000000, sample.rental.id, name);
+    }
+    const far = [40000, 18720, 500000].map((amount) => sample.automatic("2026-06-10", amount, sample.rental.id, "learned_payee", name));
+    const near = sample.automatic("2026-06-10", 1500000, sample.rental.id, "learned_payee", name);
+    sample.confirm("2026-07-01", 2000000, sample.rental.id, name);
+    const hits = listNeedsReview(sample.db, "2026-08-01");
+    for (const id of far) {
+      expect(sample.read(id).categoryId).toBe(null);
+      expect(sample.read(id).autoReason).toBe(null);
+      expect(hits.find((hit) => hit.id === id)?.review.suggestion?.categoryId).toBe(sample.rental.id);
+    }
+    expect(sample.read(near).categoryId).toBe(sample.rental.id);
+    expect(sample.read(near).autoReason).toBe("learned_payee");
+  } finally {
+    sample.close();
+  }
+});
+
+test("a row that the user kept uncategorized is not labelled again after a confirmation (decision 0045)", () => {
+  const sample = book();
+  try {
+    for (const date of ["2026-05-01", "2026-06-01", "2026-07-01"]) {
+      sample.confirm(date, 2_000_000, sample.rental.id, "E-TRANSFER");
+    }
+    const kept = sample.automatic("2026-07-15", 1_900_000, sample.rental.id, "learned_payee", "E-TRANSFER");
+    updateTransaction(sample.db, kept, { lines: [{ amount: 1_900_000 }], keepUncategorized: true, ...saved });
+    expect(sample.read(kept).categoryId).toBeNull();
+    sample.confirm("2026-08-01", 2_000_000, sample.rental.id, "E-TRANSFER");
+    expect(sample.read(kept)).toMatchObject({ categoryId: null, autoReason: null });
+    const open = sample.automatic("2026-08-15", 1_900_000, sample.rental.id, "learned_payee", "E-TRANSFER");
+    updateTransaction(sample.db, open, { lines: [{ amount: 1_900_000 }], ...saved });
+    sample.confirm("2026-09-01", 2_000_000, sample.rental.id, "E-TRANSFER");
+    expect(sample.read(open).categoryId).toBe(sample.rental.id);
+    expect(sample.read(kept).categoryId).toBeNull();
   } finally {
     sample.close();
   }

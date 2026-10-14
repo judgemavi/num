@@ -1,6 +1,7 @@
-import { accounts, occurrenceLinks, transactionLines, transactions } from "@num/db";
+import { accounts, inboxDecisions, occurrenceLinks, transactionLines, transactions } from "@num/db";
 import { utcNow, type MatchResult } from "@num/shared";
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, notExists, or, sql } from "drizzle-orm";
+import { keepPrefix } from "./decision-keep";
 import { mortgageLinesFor } from "./mortgage-learned";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { linkRefundIfSure } from "./refund-auto";
@@ -154,7 +155,10 @@ function applyRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
 /** Automatic labels that a confirmation scores again (decision 0043). */
 const learnedReasons = ["learned_amount", "learned_payee"] as const;
 
-/** Rows of these payees with one line and no transfer: uncategorized, or labelled by a learned signal. */
+/**
+ * Rows of these payees with one line and no transfer: uncategorized, or labelled by a learned signal.
+ * A row that the user kept uncategorized is not in the list (decision 0045).
+ */
 function openRows(tx: WriteTx, payees: string[]) {
   return tx
     .select({
@@ -177,6 +181,12 @@ function openRows(tx: WriteTx, payees: string[]) {
         or(isNull(transactionLines.categoryId), inArray(transactions.autoReason, learnedReasons)),
         isNull(transactionLines.transferAccountId),
         isOnlyLine,
+        notExists(
+          tx
+            .select({ key: inboxDecisions.itemKey })
+            .from(inboxDecisions)
+            .where(eq(inboxDecisions.itemKey, sql`${keepPrefix} || ${transactions.id}`)),
+        ),
       ),
     )
     .all();

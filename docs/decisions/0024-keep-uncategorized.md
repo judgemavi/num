@@ -1,6 +1,7 @@
 # 0024 — Keep a transaction uncategorized
 
 Status: approved (owner, 2026-10-12)
+Changed by decision 0045 (2026-10-14): a save with no category after an automatic label also records the decision.
 
 ## Context
 

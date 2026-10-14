@@ -283,3 +283,24 @@ test("keeping a row uncategorized removes it from Needs review and Hygiene until
     expect(() => decideInboxItem(db, asOf, keyOf, "keep_uncategorized", saved)).toThrow();
   });
 });
+
+test("saving an automatically labelled row with no category keeps it out of Needs review until it gets a category", () => {
+  withBook((db) => {
+    const bank = account(db, "Bank");
+    const rental = createCategory(db, { name: "Rental Income", kind: "income", ...saved });
+    const confirmed = pay(db, bank.id, "2026-01-01", 2_000_000, "E-TRANSFER", rental.id);
+    const row = pay(db, bank.id, "2026-02-01", 40_000, "E-TRANSFER", rental.id);
+    stampAuto(db, row.id, confirmed.id);
+    expect(listNeedsReview(db, asOf).map((hit) => hit.id)).toEqual([row.id]);
+
+    updateTransaction(db, row.id, { lines: [{ amount: 40_000 }], keepUncategorized: true, ...saved });
+    expect(getTransaction(db, row.id)?.autoReason).toBe(null);
+    expect(decisionRows(db).map((item) => item.itemKey)).toEqual([`uncategorized:${row.id}`]);
+    expect(listNeedsReview(db, asOf)).toEqual([]);
+    expect(approve(db, "likely", 0, noFilter, "2026-04-02T18:00:00Z").ids).toEqual([]);
+    expect(getTransaction(db, row.id)?.lines[0]?.categoryId).toBe(null);
+
+    updateTransaction(db, row.id, { lines: [{ amount: 40_000, categoryId: rental.id }], ...saved });
+    expect(decisionRows(db)).toEqual([]);
+  });
+});

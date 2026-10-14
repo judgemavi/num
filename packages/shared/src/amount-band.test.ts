@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { bandContains, bandSignals, fitLabels, learnedLabels, widthFactor, type BandRow } from "./amount-band";
+import { amountGuardFor, bandContains, bandNear, bandSignals, fitLabels, learnedLabels, widthFactor, type BandRow } from "./amount-band";
 import { learnedConfidence, scoreMatch, type RecurringSignal } from "./matching";
 
 function row(id: string, date: string, categoryId: string, amount: number, merchantId: string | null = null): BandRow {
@@ -8,7 +8,8 @@ function row(id: string, date: string, categoryId: string, amount: number, merch
 
 function signals(rows: readonly BandRow[], amount: number) {
   const labels = learnedLabels(rows);
-  return bandSignals(labels, fitLabels(labels, amount), learnedConfidence(rows));
+  const fit = fitLabels(labels, amount);
+  return { ...bandSignals(fit, learnedConfidence(rows)), amountGuard: amountGuardFor(labels, fit, amount) };
 }
 
 function score(rows: readonly BandRow[], amount: number, recurring: RecurringSignal | null = null) {
@@ -84,6 +85,41 @@ test("one category with older lower pay: the older amount is outside the band an
   expect(result.reason).toBe("learned_payee");
   expect(result.confidenceMilli).toBeGreaterThanOrEqual(850);
   expect(result.level).toBe("automatic");
+});
+
+test("one category: an amount near the band, below or above, is automatic (decision 0045)", () => {
+  const pay = monthly("p", 1, "pay", [5173240, 5400000, 5600000, 5800000, 6000000, 6200000]);
+  for (const amount of [4750910, 7000000]) {
+    expect(fitLabels(learnedLabels(pay), amount)).toEqual([]);
+    expect(signals(pay, amount).amountGuard).toBe(false);
+    const result = score(pay, amount);
+    expect(result.categoryId).toBe("pay");
+    expect(result.level).toBe("automatic");
+  }
+});
+
+test("one category: an amount not near the band gives a suggestion (decision 0045)", () => {
+  const rental = monthly("r", 1, "rental", Array<number>(8).fill(2000000));
+  for (const amount of [40000, 18720, 500000, 2600000]) {
+    expect(signals(rental, amount).amountGuard).toBe(true);
+    const result = score(rental, amount);
+    expect(result.categoryId).toBe("rental");
+    expect(result.confidenceMilli).toBeGreaterThanOrEqual(850);
+    expect(result.level).toBe("suggestion");
+  }
+});
+
+test("near is from exactly 75% of the lowest to exactly 125% of the highest amount", () => {
+  const band = { low: 2000000, high: 3000000 };
+  expect(bandNear(band, 1500000)).toBe(true);
+  expect(bandNear(band, 1499999)).toBe(false);
+  expect(bandNear(band, -3750000)).toBe(true);
+  expect(bandNear(band, -3750001)).toBe(false);
+  const rows = [row("a", "2026-01-01", "rent", -2000000), row("b", "2026-02-01", "rent", -3000000)];
+  expect(signals(rows, -1500000).amountGuard).toBe(false);
+  expect(signals(rows, -1499999).amountGuard).toBe(true);
+  expect(signals(rows, -3750000).amountGuard).toBe(false);
+  expect(signals(rows, -3750001).amountGuard).toBe(true);
 });
 
 test("two categories and an amount outside all bands is not automatic (decisions 0043, 0044)", () => {

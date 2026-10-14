@@ -198,7 +198,8 @@ Rules:
 - The sum of the lines must be equal to the transaction amount.
 - A transaction has one or more lines.
 - A line without a category and without a transfer is **uncategorized**. It needs review (§7.3), unless the user
-  kept it uncategorized (decision 0024).
+  kept it uncategorized (decision 0024). Saving a transaction with no category after its automatic label was removed
+  also keeps it uncategorized (decision 0045).
 - **Transfers:**
   - A line with `transferAccountId` has a **mirror transaction** in the target account.
   - The mirror amount = −(line amount). The mirror date = the line's transaction date.
@@ -546,7 +547,8 @@ It applies on every link: automatic link on import, and a manual link in the UI.
 Decision with the fixed threshold 0.85 (decision 0039):
 - confidence ≥ 0.85 and a clear lead: **automatic** (the label is applied; it still needs review).
   Exception (decisions 0043, 0044): when the learned labels of the key have two or more categories and no band
-  contains the amount, the result is not automatic.
+  contains the amount, the result is not automatic. With one category, an amount outside all bands is automatic only
+  when it is from 75% of the lowest to 125% of the highest amount of a band (decision 0045).
 - confidence ≥ 0.60: **suggestion** (preselected, not applied).
 - less: no suggestion.
 The app compares confidence in thousandths (0–1000) with the thresholds (decision 0036).

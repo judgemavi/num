@@ -103,8 +103,9 @@ export function buildTransactionSave(input: SubmitInput): BuildResult {
   if (!existing) {
     return { ok: true, save: { kind: "create", body: { ...parsed.data, unreadableItemKey: input.unreadableItemKey } } };
   }
-  const keep = hasOpenLine(existing.lines) && hasOpenLine(parsed.data.lines);
   const labelled = existing.autoReason !== null;
+  // Decisions 0024, 0045: a save with no category keeps the row when it needed review or had an automatic label.
+  const keep = (labelled || hasOpenLine(existing.lines)) && hasOpenLine(parsed.data.lines);
   const patch = editPatch(parsed.data, storedBody(existing));
   if (!patch && !keep) {
     return { ok: true, save: labelled ? { kind: "confirm", id: existing.id } : null };

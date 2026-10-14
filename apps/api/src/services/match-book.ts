@@ -1,6 +1,7 @@
 import { accounts, occurrenceLinks, recurringPlans, settings, transactions, type TransactionRow } from "@num/db";
 import {
   Temporal,
+  amountGuardFor,
   bandSignals,
   buildPayeeIndex,
   containedMatch,
@@ -229,11 +230,12 @@ export function scorePayee(
   const fitKey = `${input.payee}\0${fit.map((label) => label.key).join("\0")}`;
   let learned = side.bandLearned.get(fitKey);
   if (!learned) {
-    learned = bandSignals(bands, fit, side.payeeLearned.get(input.payee) ?? []);
+    learned = bandSignals(fit, side.payeeLearned.get(input.payee) ?? []);
     side.bandLearned.set(fitKey, learned);
   }
   return scoreMatch({
     ...learned,
+    amountGuard: amountGuardFor(bands, fit, input.amount),
     recurring: input.recurring,
     similar: contained
       ? {
