@@ -55,7 +55,7 @@ export function transactionError(code: ErrorCode | undefined): string {
     case "paycheck_funded":
       return "Undo the funding first.";
     case "payee_raw_locked":
-      return "The bank text stays as it was imported.";
+      return "The description of an imported transaction does not change.";
     case "account_archived":
       return "Choose an active account.";
     case "category_archived":

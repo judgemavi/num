@@ -116,7 +116,6 @@ test("a card purchase lowers the bucket and a card payment does not", () => {
       date: "2026-03-02",
       amount: -42_000,
       payeeRaw: "Card payment",
-      status: "open",
       lines: [{ amount: -42_000, transferAccountId: card.id }],
       ...saved,
     });

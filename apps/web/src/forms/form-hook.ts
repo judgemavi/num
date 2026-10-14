@@ -7,7 +7,6 @@ import {
   MoneyField,
   SelectField,
   SwitchField,
-  TextareaField,
   TextField,
 } from "@/forms/fields";
 import { FormError, FormShell, SubmitButton } from "@/forms/form-parts";
@@ -23,7 +22,6 @@ export const { useAppForm, withForm } = createFormHook({
   fieldComponents: {
     TextField,
     MoneyField,
-    TextareaField,
     DateInputField,
     SelectField,
     ComboboxField,

@@ -49,7 +49,6 @@ function purchase(db: Db, accountId: string, categoryId: string, amount: number,
     date,
     amount,
     payeeRaw: "Example shop",
-    status: "open",
     lines: [{ amount, categoryId }],
     ...saved,
   });

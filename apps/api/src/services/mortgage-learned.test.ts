@@ -86,7 +86,6 @@ function open(db: Db, accountId: string, date: string, amount: number) {
     date,
     amount,
     payeeRaw: "STRIVE MTG",
-    status: "open",
     lines: [{ amount, categoryId: null, memo: null, transferAccountId: null, tagIds: [] }],
     ...saved,
   });
@@ -100,7 +99,6 @@ function confirmSplit(sample: Sample, date: string, amount: number, interestCate
     date,
     amount,
     payeeRaw: "STRIVE MTG",
-    status: "open",
     lines: [
       { amount: -interest, categoryId: interestCategoryId, memo: null, transferAccountId: null, tagIds: [] },
       { amount: amount + interest, categoryId: null, memo: null, transferAccountId: sample.mortgage.id, tagIds: [] },
@@ -207,7 +205,6 @@ test("a split that is not a mortgage payment teaches nothing", () => {
       date: "2026-03-01",
       amount: -581_600,
       payeeRaw: "STRIVE MTG",
-      status: "open",
       lines: [
         { amount: -10_000, categoryId: sample.other.id, memo: null, transferAccountId: null, tagIds: [] },
         { amount: -571_600, categoryId: null, memo: null, transferAccountId: sample.mortgage.id, tagIds: [] },

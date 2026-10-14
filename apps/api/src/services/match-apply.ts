@@ -76,10 +76,8 @@ export function applyLinkedPlan(
           date: current.date,
           amount: current.amount,
           merchantId: current.merchantId,
-          notes: current.notes,
           payeeRaw: current.payeeRaw,
           payeeNormalized: current.payeeNormalized,
-          status: current.status === "cleared" ? current.status : "open",
         }, current.source, principal, false);
       }
     }

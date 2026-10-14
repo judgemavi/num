@@ -147,7 +147,7 @@ export function TransactionFilterBar() {
 
   return (
     <FilterBar
-      search={<SearchBox id="transaction-search" placeholder="Payee, notes or merchant" label="Search" query={search.q} onQuery={(q) => patch({ q })} />}
+      search={<SearchBox id="transaction-search" placeholder="Payee or merchant" label="Search" query={search.q} onQuery={(q) => patch({ q })} />}
       activeCount={badges.length}
       badges={badges}
       onOpenChange={(open) => {

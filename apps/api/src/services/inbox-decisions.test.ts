@@ -69,7 +69,6 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
     amount,
     payeeRaw: payee,
     merchantId,
-    status: "open",
     lines: [{ amount, categoryId, memo: null, transferAccountId: null, tagIds: [] }],
     ...saved,
   });
@@ -224,7 +223,6 @@ test("each no decision hides its review item until undo", () => {
       date: "2026-03-02",
       amount: 1000,
       payeeRaw: "By hand",
-      status: "open" as const,
       lines: [{ amount: 1000, categoryId: null, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     };

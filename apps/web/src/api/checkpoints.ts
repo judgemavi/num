@@ -1,6 +1,6 @@
-import type { CheckpointCreate, Clearance } from "@num/shared";
+import type { CheckpointCreate } from "@num/shared";
 import { queryOptions, skipToken, useMutation } from "@tanstack/react-query";
-import { clearanceError, unlockError } from "@/accounts/format";
+import { unlockError } from "@/accounts/format";
 import { api, formWrite, unwrap } from "@/api/client";
 
 /** The checkpoints of an account and the closing date and the closing balance of the last imported statement. */
@@ -43,14 +43,5 @@ export function useUnlockCheckpoint() {
     meta: { errorText: unlockError },
     mutationFn: ({ accountId, checkpointId }: { accountId: string; checkpointId: string }) =>
       unwrap(api.accounts[":id"].checkpoints[":checkpointId"].unlock.$post({ param: { id: accountId, checkpointId } })),
-  });
-}
-
-/** Mark transactions of an account as cleared or open. */
-export function useMarkClearance() {
-  return useMutation({
-    meta: { errorText: clearanceError },
-    mutationFn: ({ accountId, body }: { accountId: string; body: Clearance }) =>
-      unwrap(api.accounts[":id"].clearance.$post({ param: { id: accountId }, json: body })),
   });
 }

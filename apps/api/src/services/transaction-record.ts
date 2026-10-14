@@ -2,17 +2,14 @@ import { transactions, type TransactionRow } from "@num/db";
 import {
   refundOfIdAfterEdit,
   storedPayee,
-  transactionInputStatuses,
   type Transaction,
   type TransactionCreate,
-  type TransactionInputStatus,
   type TransactionSource,
 } from "@num/shared";
 import { eq } from "drizzle-orm";
-import { ServiceError } from "../service-error";
 import { loadLines, type StoredLine } from "./transaction-lines";
 import { transactionReconciled } from "./reconciled";
-import { blankToNull, requireText } from "./transaction-rules";
+import { requireText } from "./transaction-rules";
 import type { WriteTx, Reader } from "./write";
 
 export type Header = {
@@ -20,17 +17,13 @@ export type Header = {
   date: string;
   amount: number;
   merchantId: string | null;
-  notes: string | null;
   payeeRaw: string;
   payeeNormalized: string;
-  status: TransactionInputStatus;
   refundOfId?: string | null;
 };
 
 /** The automatic label of a transaction. */
 export type AutoStamp = Pick<TransactionRow, "autoReason" | "autoSourceId" | "autoConfidence">;
-
-export type TransactionBody = Omit<TransactionCreate, "status"> & { status: string };
 
 export function recordSource(source: "ui" | TransactionSource): TransactionSource {
   if (source === "ui") {
@@ -39,23 +32,13 @@ export function recordSource(source: "ui" | TransactionSource): TransactionSourc
   return source;
 }
 
-function inputStatus(status: string) {
-  const known = transactionInputStatuses.find((item) => item === status);
-  if (!known) {
-    throw new ServiceError("transaction_status_invalid", 400);
-  }
-  return known;
-}
-
-export function headerFrom(input: TransactionBody): Header {
+export function headerFrom(input: TransactionCreate): Header {
   return {
     accountId: input.accountId,
     date: input.date,
     amount: input.amount,
     merchantId: input.merchantId ?? null,
-    notes: blankToNull(input.notes),
     ...storedPayee(requireText(input.payeeRaw, "payeeRaw")),
-    status: inputStatus(input.status),
     ...(input.refundOfId === undefined ? {} : { refundOfId: input.refundOfId }),
   };
 }
@@ -109,7 +92,6 @@ export function toTransaction(db: Reader, row: TransactionRow, lines: StoredLine
     date: row.date,
     amount: row.amount,
     merchantId: row.merchantId,
-    notes: row.notes,
     payeeRaw: row.payeeRaw,
     payeeNormalized: row.payeeNormalized,
     status: row.status,

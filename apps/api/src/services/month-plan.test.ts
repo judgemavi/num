@@ -99,7 +99,6 @@ test("funding and spending inside the month do not change the plan", () => {
       date: "2026-03-12",
       amount: -80_000,
       payeeRaw: "Market",
-      status: "open",
       lines: [{ amount: -80_000, categoryId: groceries.id }],
       ...saved,
     });
@@ -202,7 +201,6 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
         date,
         amount: amounts[index] ?? 0,
         payeeRaw: "Payroll",
-        status: "open",
         lines: [{ amount: amounts[index] ?? 0, categoryId: pay.id }],
         ...saved,
       });
@@ -234,7 +232,6 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       date: "2026-03-01",
       amount: 500_000,
       payeeRaw: "Payroll",
-      status: "open",
       lines: [{ amount: 500_000, categoryId: pay.id }],
       ...saved,
     });

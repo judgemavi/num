@@ -1,6 +1,6 @@
 import { choicesForDirection, defaultChoice, merchantForChoice } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { ChevronRight, Ellipsis } from "lucide-react";
+import { Ellipsis } from "lucide-react";
 import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
 import { inboxDecisionsQuery, useUndoDecision } from "@/api/review";
@@ -8,7 +8,6 @@ import { useArchiveTag } from "@/api/tags";
 import { useTags } from "@/editors/lookups";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +16,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { withForm } from "@/forms/form-hook";
-import { useStore } from "@tanstack/react-form";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TagForm } from "@/settings/tag-form";
@@ -102,48 +100,8 @@ export const MoneySection = withForm({
   },
 });
 
-/**
- * Notes, tags, the bank text and "Cleared". The section is closed until the person opens it. It opens by itself when
- * a save stops because the bank text is empty.
- */
-export const MoreDetails = withForm({
-  defaultValues: blankTransaction,
-  props: { payeeLocked: false, clearedLocked: false },
-  render: function MoreDetailsRender({ form, payeeLocked, clearedLocked }) {
-    const [open, setOpen] = useState(false);
-    const needsPayee = useStore(form.store, (state) => state.submissionAttempts > 0 && state.values.payee.trim().length === 0);
-    // A change of state during render: the section opens in the same render as the error, and stays open.
-    if (needsPayee && !open) {
-      setOpen(true);
-    }
-    return (
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary">
-          <ChevronRight className={`size-4 transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true" />
-          More details
-        </CollapsibleTrigger>
-        <CollapsibleContent className="grid gap-4 pt-3">
-          <form.AppField name="notes">{(field) => <field.TextareaField id="txn-notes" label="Notes" />}</form.AppField>
-          <form.Field name="tagIds">{(field) => <TagsField tagIds={field.state.value} onTags={field.handleChange} />}</form.Field>
-          <form.AppField name="payee">
-            {(field) => (
-              <field.TextField
-                id="txn-payee"
-                label="Bank text"
-                disabled={payeeLocked}
-                description={payeeLocked ? "The bank text stays as it was imported." : undefined}
-              />
-            )}
-          </form.AppField>
-          <form.AppField name="cleared">{(field) => <field.CheckboxField id="txn-cleared" label="Cleared" disabled={clearedLocked} />}</form.AppField>
-        </CollapsibleContent>
-      </Collapsible>
-    );
-  },
-});
-
 /** The tags of the transaction: a picker that adds a tag, and a button for each tag that removes it. */
-function TagsField({ tagIds, onTags }: { tagIds: string[]; onTags: (ids: string[]) => void }) {
+export function TagsField({ tagIds, onTags }: { tagIds: string[]; onTags: (ids: string[]) => void }) {
   const archiveTag = useArchiveTag();
   const tags = useTags();
   const [created, setCreated] = useState<typeof tags>([]);

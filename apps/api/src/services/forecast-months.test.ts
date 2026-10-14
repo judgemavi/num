@@ -37,7 +37,6 @@ function record(db: Db, accountId: string, date: string, amount: number, line: {
     date,
     amount,
     payeeRaw: "Example",
-    status: "open",
     lines: [{ amount, ...line }],
     ...saved,
   });

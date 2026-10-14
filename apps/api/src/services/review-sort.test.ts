@@ -34,7 +34,7 @@ function account(db: Db, name: string) {
 }
 
 function pay(db: Db, accountId: string, date: string, amount: number, payee: string, categoryId?: string) {
-  return createTransaction(db, { accountId, date, amount, payeeRaw: payee, status: "cleared", lines: [{ amount, categoryId }], ...saved });
+  return createTransaction(db, { accountId, date, amount, payeeRaw: payee, lines: [{ amount, categoryId }], ...saved });
 }
 
 /** A row with an automatic label and its score: a Sure row. */
@@ -57,7 +57,6 @@ function sample(db: Db) {
     date: "2026-03-03",
     amount: -20_000,
     payeeRaw: "Market",
-    status: "cleared",
     lines: [{ amount: -10_000, categoryId: other.id }, { amount: -10_000 }],
     ...saved,
   });

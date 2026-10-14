@@ -56,7 +56,6 @@ function spend(db: Db, accountId: string, categoryId: string, date: string, amou
     date,
     amount,
     payeeRaw: "Shop",
-    status: "open",
     lines: [{ amount, categoryId }],
     ...saved,
   });
@@ -68,7 +67,6 @@ function payCard(db: Db, fromId: string, cardId: string, date: string, amount: n
     date,
     amount: -amount,
     payeeRaw: "Card payment",
-    status: "open",
     lines: [{ amount: -amount, transferAccountId: cardId }],
     ...saved,
   });

@@ -13,7 +13,6 @@ function stored(categoryId: string | null, autoReason: Transaction["autoReason"]
     date: "2026-03-01",
     amount: 40_000,
     merchantId: null,
-    notes: null,
     payeeRaw: "E-TRANSFER",
     payeeNormalized: "E-TRANSFER",
     status: "cleared",

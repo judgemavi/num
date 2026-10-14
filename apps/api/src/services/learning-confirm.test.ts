@@ -90,7 +90,6 @@ test("accepting a transfer pair clears the automatic reason", () => {
       date: "2026-03-01",
       amount: -20_000,
       payeeRaw: "MOVE",
-      status: "open",
       lines: [{ amount: -20_000 }],
       ...saved,
     });
@@ -99,7 +98,6 @@ test("accepting a transfer pair clears the automatic reason", () => {
       date: "2026-03-02",
       amount: 20_000,
       payeeRaw: "MOVE",
-      status: "open",
       lines: [{ amount: 20_000 }],
       ...saved,
     });
@@ -135,7 +133,6 @@ test("an automatic label keeps a merchant the user set", () => {
       amount: -4000,
       payeeRaw: "NORTH CAFE",
       merchantId: shop.id,
-      status: "open",
       lines: [{ amount: -4000 }],
       ...saved,
     });
@@ -144,7 +141,6 @@ test("an automatic label keeps a merchant the user set", () => {
       date: "2026-03-01",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000 }],
       ...saved,
     });
@@ -154,8 +150,6 @@ test("an automatic label keeps a merchant the user set", () => {
       amount: first.amount,
       payeeRaw: first.payeeRaw,
       merchantId: null,
-      notes: null,
-      status: "open",
       lines: [{ amount: first.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });
@@ -168,7 +162,7 @@ test("an automatic label keeps a merchant the user set", () => {
   }
 });
 
-test("a notes edit is not a confirmation and Looks right is", () => {
+test("a memo edit is not a confirmation and Looks right is", () => {
   const sample = book();
   try {
     const food = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
@@ -177,7 +171,6 @@ test("a notes edit is not a confirmation and Looks right is", () => {
       date: "2026-03-01",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000 }],
       ...saved,
     });
@@ -186,7 +179,6 @@ test("a notes edit is not a confirmation and Looks right is", () => {
       date: "2026-03-02",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000 }],
       ...saved,
     });
@@ -196,8 +188,6 @@ test("a notes edit is not a confirmation and Looks right is", () => {
       amount: first.amount,
       payeeRaw: first.payeeRaw,
       merchantId: null,
-      notes: null,
-      status: "open",
       lines: [{ amount: first.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });
@@ -206,7 +196,6 @@ test("a notes edit is not a confirmation and Looks right is", () => {
       date: "2026-03-03",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000 }],
       ...saved,
     });
@@ -216,13 +205,11 @@ test("a notes edit is not a confirmation and Looks right is", () => {
       amount: second.amount,
       payeeRaw: second.payeeRaw,
       merchantId: null,
-      notes: "A note",
-      status: "open",
-      lines: [{ amount: second.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
+      lines: [{ amount: second.amount, categoryId: food.id, memo: "A note", transferAccountId: null, tagIds: [] }],
       ...saved,
     });
     expect(getTransaction(sample.db, second.id)?.autoReason).toBe("learned_amount");
-    expect(getTransaction(sample.db, second.id)?.notes).toBe("A note");
+    expect(getTransaction(sample.db, second.id)?.lines[0]?.memo).toBe("A note");
     expect(lineCategory(sample.db, third.id)).toBeNull();
     acceptLooksRight(sample.db, second.id, saved);
     expect(getTransaction(sample.db, second.id)?.autoReason).toBeNull();
@@ -243,7 +230,6 @@ test("an import labels only its own rows and undo removes those labels", () => {
       date: "2026-02-01",
       amount: -3000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -3000 }],
       ...saved,
     });
@@ -252,7 +238,6 @@ test("an import labels only its own rows and undo removes those labels", () => {
       date: "2026-01-01",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000, categoryId: food.id, memo: null, tagIds: [] }],
       ...saved,
     });
@@ -284,7 +269,6 @@ test("a conflict suggests the most recent confirmation and does not label", () =
       date: "2026-03-01",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000, categoryId: coffee.id }],
       ...saved,
     });
@@ -293,7 +277,6 @@ test("a conflict suggests the most recent confirmation and does not label", () =
       date: "2026-03-10",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000, categoryId: groceries.id }],
       ...saved,
     });
@@ -302,7 +285,6 @@ test("a conflict suggests the most recent confirmation and does not label", () =
       date: "2026-03-11",
       amount: -5000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -5000 }],
       ...saved,
     });

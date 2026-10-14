@@ -99,7 +99,6 @@ function money(db: Db, accountId: string, categoryId: string, date: string, amou
     date,
     amount,
     payeeRaw,
-    status: "open",
     lines: [{ amount, categoryId }],
     ...saved,
   });
@@ -187,7 +186,6 @@ test("a card purchase does not change Unassigned", () => {
       date: "2026-10-03",
       amount: -20_000,
       payeeRaw: "Card payment",
-      status: "open",
       lines: [{ amount: -20_000, transferAccountId: card.id }],
       ...saved,
     });

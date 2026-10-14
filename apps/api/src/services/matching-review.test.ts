@@ -170,7 +170,6 @@ test("a mortgage import links an existing opposite row", () => {
       date: "2026-03-01",
       amount: split.principal,
       payeeRaw: "PRINCIPAL",
-      status: "open",
       lines: [{ amount: split.principal }],
       ...saved,
     });
@@ -215,7 +214,6 @@ test("a recurring link labels even when payee history disagrees", () => {
         date,
         amount: -4000,
         payeeRaw: "NORTH CAFE",
-        status: "open",
         lines: [{ amount: -4000, categoryId: food.id }],
         ...saved,
       });
@@ -263,7 +261,6 @@ test("a spread label does not block import undo", () => {
       date: "2026-03-01",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000, categoryId: food.id }],
       ...saved,
     });
@@ -292,7 +289,6 @@ test("a learned transfer preselects Transfer and is not automatic", () => {
       date: "2026-03-01",
       amount: -8000,
       payeeRaw: "VISA PAYMENT",
-      status: "open",
       lines: [{ amount: -8000, transferAccountId: visa.id }],
       ...saved,
     });
@@ -301,7 +297,6 @@ test("a learned transfer preselects Transfer and is not automatic", () => {
       date: "2026-03-02",
       amount: -8000,
       payeeRaw: "VISA PAYMENT",
-      status: "open",
       lines: [{ amount: -8000 }],
       ...saved,
     });
@@ -322,7 +317,6 @@ function learn(sample: ReturnType<typeof book>, payeeRaw: string, categoryId: st
     date: "2026-01-12",
     amount: -4000,
     payeeRaw,
-    status: "open",
     lines: [{ amount: -4000, categoryId }],
     ...saved,
   });
@@ -380,7 +374,6 @@ test("a payee that contains a learned payee is a similar suggestion and never au
         date,
         amount: -4000,
         payeeRaw: "COSTCO WHOLESALE",
-        status: "open",
         lines: [{ amount: -4000, categoryId: food.id }],
         ...saved,
       });

@@ -96,8 +96,6 @@ test("the first confirmation labels the payee's other rows and the next import",
       amount: first.amount,
       payeeRaw: first.payeeRaw,
       merchantId: shop.id,
-      notes: null,
-      status: "open",
       lines: [{ amount: first.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });
@@ -136,7 +134,6 @@ test("a transfer and a split are never labeled automatically", () => {
       date: "2026-03-01",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000 }],
       ...saved,
     });
@@ -145,7 +142,6 @@ test("a transfer and a split are never labeled automatically", () => {
       date: "2026-03-02",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [
         { amount: -2500, memo: null, tagIds: [] },
         { amount: -1500, categoryId: food.id, memo: null, tagIds: [] },
@@ -157,7 +153,6 @@ test("a transfer and a split are never labeled automatically", () => {
       date: "2026-03-03",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000, transferAccountId: visa.id, memo: null, tagIds: [] }],
       ...saved,
     });
@@ -167,8 +162,6 @@ test("a transfer and a split are never labeled automatically", () => {
       amount: plain.amount,
       payeeRaw: plain.payeeRaw,
       merchantId: null,
-      notes: null,
-      status: "open",
       lines: [{ amount: plain.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });
@@ -202,7 +195,6 @@ test("a disagreeing confirmation stops automatic labels", () => {
         date: `2026-03-0${day}`,
         amount: -4000,
         payeeRaw: "NORTH CAFE",
-        status: "open",
         lines: [{ amount: -4000, categoryId: coffee.id, memo: null, tagIds: [] }],
         ...saved,
       });
@@ -212,7 +204,6 @@ test("a disagreeing confirmation stops automatic labels", () => {
       date: "2026-03-10",
       amount: -5000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -5000 }],
       ...saved,
     });
@@ -221,7 +212,6 @@ test("a disagreeing confirmation stops automatic labels", () => {
       date: "2026-03-11",
       amount: -6000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -6000, categoryId: groceries.id, memo: null, tagIds: [] }],
       ...saved,
     });
@@ -246,7 +236,6 @@ test("a correction clears the automatic reason and counts as a confirmation", ()
       date: "2026-03-01",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000 }],
       ...saved,
     });
@@ -255,7 +244,6 @@ test("a correction clears the automatic reason and counts as a confirmation", ()
       date: "2026-03-02",
       amount: -4000,
       payeeRaw: "NORTH CAFE",
-      status: "open",
       lines: [{ amount: -4000 }],
       ...saved,
     });
@@ -265,8 +253,6 @@ test("a correction clears the automatic reason and counts as a confirmation", ()
       amount: first.amount,
       payeeRaw: first.payeeRaw,
       merchantId: null,
-      notes: null,
-      status: "open",
       lines: [{ amount: first.amount, categoryId: coffee.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });
@@ -277,8 +263,6 @@ test("a correction clears the automatic reason and counts as a confirmation", ()
       amount: second.amount,
       payeeRaw: second.payeeRaw,
       merchantId: null,
-      notes: null,
-      status: "open",
       lines: [{ amount: second.amount, categoryId: groceries.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });

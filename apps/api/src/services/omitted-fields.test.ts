@@ -220,7 +220,7 @@ test("a plan patch is checked with the stored fields that it leaves out", () => 
   });
 });
 
-test("a transaction update keeps the merchant and the note that it leaves out and clears them when they are null", () => {
+test("a transaction update keeps the merchant that it leaves out and clears it when it is null", () => {
   withBook((db) => {
     const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
     const merchant = createMerchant(db, { name: "Example shop", ...saved });
@@ -229,20 +229,17 @@ test("a transaction update keeps the merchant and the note that it leaves out an
       date: "2026-03-01",
       amount: -5000,
       payeeRaw: "Example shop",
-      status: "open" as const,
       lines: [{ amount: -5000 }],
       ...saved,
     };
-    const created = createTransaction(db, { ...body, merchantId: merchant.id, notes: "weekly" });
+    const created = createTransaction(db, { ...body, merchantId: merchant.id });
 
     const kept = updateTransaction(db, created.id, { ...body, date: "2026-03-02" });
     expect(kept.date).toBe("2026-03-02");
     expect(kept.merchantId).toBe(merchant.id);
-    expect(kept.notes).toBe("weekly");
 
-    const cleared = updateTransaction(db, created.id, { ...body, merchantId: null, notes: null });
+    const cleared = updateTransaction(db, created.id, { ...body, merchantId: null });
     expect(cleared.merchantId).toBeNull();
-    expect(cleared.notes).toBeNull();
   });
 });
 
@@ -255,19 +252,18 @@ test("a transaction patch keeps the lines that it leaves out and checks the amou
       date: "2026-03-01",
       amount: -5000,
       payeeRaw: "Example shop",
-      status: "open",
       lines: [{ amount: -5000, categoryId: category.id }],
       ...saved,
     });
 
-    const noted = updateTransaction(db, created.id, { notes: "weekly", ...saved });
-    expect(noted.notes).toBe("weekly");
-    expect(noted.lines.map((line) => [line.amount, line.categoryId])).toEqual([[-5000, category.id]]);
+    const moved = updateTransaction(db, created.id, { date: "2026-03-02", ...saved });
+    expect(moved.date).toBe("2026-03-02");
+    expect(moved.lines.map((line) => [line.amount, line.categoryId])).toEqual([[-5000, category.id]]);
 
     expect(() => updateTransaction(db, created.id, { amount: -7000, ...saved })).toThrow();
     const changed = updateTransaction(db, created.id, { amount: -7000, lines: [{ amount: -7000, categoryId: category.id }], ...saved });
     expect(changed.amount).toBe(-7000);
-    expect(changed.notes).toBe("weekly");
+    expect(changed.date).toBe("2026-03-02");
   });
 });
 

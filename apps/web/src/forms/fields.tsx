@@ -5,7 +5,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { useBookCurrency } from "@/editors/lookups";
 import { useFieldContext } from "@/forms/form-context";
 import { decimalsError } from "@/money";
@@ -79,15 +78,6 @@ export function MoneyField({ id, label, description, className, labelClassName, 
       {description ? <FieldDescription>{description}</FieldDescription> : null}
       {error ? <FieldError>{error}</FieldError> : null}
     </Field>
-  );
-}
-
-export function TextareaField({ id, label, description, className }: FieldFrame) {
-  const field = useFieldContext<string>();
-  return (
-    <Frame id={id} label={label} description={description} className={className}>
-      <Textarea id={id} name={field.name} value={field.state.value} onChange={(event) => field.handleChange(event.target.value)} onBlur={field.handleBlur} />
-    </Frame>
   );
 }
 

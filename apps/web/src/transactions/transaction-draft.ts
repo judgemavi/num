@@ -86,8 +86,6 @@ export function transactionValues(categories: Category[], transaction: Transacti
     direction: transaction ? moneyDirection(transaction.amount) : "out",
     amount: transaction ? amountText(Math.abs(transaction.amount)) : "",
     payee: transaction?.payeeRaw ?? "",
-    notes: transaction?.notes ?? "",
-    cleared: transaction?.status === "cleared",
     merchantId: transaction && !pair ? transaction.merchantId : null,
     refundOfId: purchase ? purchase.id : transaction ? transaction.refundOfId : null,
     choice: pair ? "transfer" : purchase ? "refund" : choiceOf(transaction, categories),

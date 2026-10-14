@@ -23,8 +23,6 @@ export function linkRefundToPurchase(
         amount: current.amount,
         payeeRaw: current.payeeRaw,
         merchantId: current.merchantId,
-        notes: current.notes,
-        status: current.status,
         lines: current.lines.map((line) => ({
           amount: line.amount,
           memo: line.memo,

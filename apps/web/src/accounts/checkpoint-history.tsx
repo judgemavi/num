@@ -18,7 +18,7 @@ export function CheckpointHistory({ accountId }: { accountId: string }) {
   async function unlock(item: Checkpoint) {
     const ok = await confirm({
       title: "Unlock this checkpoint?",
-      description: `Transactions that only the ${formatDate(item.date)} checkpoint covers return to cleared. You can edit them again.`,
+      description: `Transactions that only the ${formatDate(item.date)} checkpoint covers are not locked after this. You can edit them again.`,
       confirmLabel: "Unlock checkpoint",
     });
     if (ok) {

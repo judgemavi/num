@@ -28,7 +28,6 @@ test("an imported refund that comes before its purchase in the file is linked", 
         date,
         amount,
         payeeRaw: "NORTH CAFE",
-        status: "cleared",
         lines: [{ amount, categoryId: food.id }],
         ...saved,
       });

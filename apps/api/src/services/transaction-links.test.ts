@@ -16,7 +16,6 @@ test("a mortgage payment splits principal and interest", () => {
       date: "2026-04-01",
       amount: -1_500_000,
       payeeRaw: "Example lender",
-      status: "cleared",
       lines: [
         { amount: -1_200_000, transferAccountId: mortgage.id },
         { amount: -300_000, categoryId: interest.id, memo: "Interest" },
@@ -34,7 +33,7 @@ test("a mortgage payment splits principal and interest", () => {
     expect(mirror.lines[0]?.transferAccountId).toBe(chequing.id);
     expect(mirror.lines[0]?.categoryId).toBeNull();
     expect(mirror.status).toBe("open");
-    expect(created.status).toBe("cleared");
+    expect(created.status).toBe("open");
   } finally {
     book.close();
   }

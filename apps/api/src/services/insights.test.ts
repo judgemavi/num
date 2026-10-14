@@ -60,7 +60,6 @@ function spend(
     amount: input.amount,
     merchantId: input.merchantId ?? null,
     payeeRaw: "Example shop",
-    status: "open",
     lines: [line],
     ...saved,
   };

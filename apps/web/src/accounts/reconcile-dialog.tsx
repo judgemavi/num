@@ -128,7 +128,7 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
             </p>
             {uncleared.length > 0 ? (
               <div>
-                <h3 className="text-sm font-semibold">Uncleared</h3>
+                <h3 className="text-sm font-semibold">Pending: not on a statement yet</h3>
                 <ul className="mt-1 grid gap-1 text-sm text-muted-foreground">
                   {uncleared.map((item) => (
                     <li key={item.id}>
@@ -164,7 +164,7 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
               </div>
             ) : null}
             {uncleared.length === 0 && duplicates.length === 0 && gaps.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No uncleared transactions, duplicates, or gaps were found.</p>
+              <p className="text-sm text-muted-foreground">No pending transactions, duplicates, or gaps were found.</p>
             ) : null}
             {compare.openingSuggestion ? (
               <Button

@@ -77,7 +77,6 @@ function learnTransfer(db: Db, ids: Ids, payee: string) {
     date: "2026-01-05",
     amount: -10_000,
     payeeRaw: payee,
-    status: "cleared",
     lines: [{ amount: -10_000, transferAccountId: ids.savings }],
     ...saved,
   });
@@ -147,7 +146,6 @@ test("Not a transfer unlinks the pair, records the no and stays answered", () =>
       date: "2026-03-10",
       amount: -50_000,
       payeeRaw: "MOVE TO SAVINGS",
-      status: "cleared",
       lines: [{ amount: -50_000, categoryId: ids.other }],
       ...saved,
     });
@@ -192,7 +190,6 @@ function refundOf(db: Db, ids: Ids, date: string, amount: number, categoryId: st
     date,
     amount,
     payeeRaw,
-    status: "cleared",
     lines: [{ amount }],
     ...saved,
   });
@@ -213,7 +210,6 @@ function fee(db: Db, ids: Ids) {
     date: "2026-03-01",
     amount: -17_950,
     payeeRaw: "MONTHLY ACCOUNT FEE",
-    status: "cleared",
     lines: [{ amount: -17_950, categoryId: ids.fees }],
     ...saved,
   });

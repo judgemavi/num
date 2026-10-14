@@ -89,7 +89,6 @@ function post(db: Db, accountId: string, date: string, amount: number, categoryI
     date,
     amount,
     payeeRaw: amount > 0 ? "Pay" : "Shop",
-    status: "cleared",
     lines: [{ amount, categoryId }],
     ...saved,
   });
@@ -170,7 +169,6 @@ test("a full card passes when the last statement is paid by the derived due date
       date: "2026-01-20",
       amount: -40_000,
       payeeRaw: "Card payment",
-      status: "cleared",
       lines: [{ amount: -40_000, transferAccountId: card.id }],
       ...saved,
     });
@@ -246,7 +244,6 @@ test("the inbox passes when every item is within 7 days", () => {
       date: "2026-01-28",
       amount: -100,
       payeeRaw: "Shop",
-      status: "cleared",
       lines: [{ amount: -100 }],
       ...saved,
     });
@@ -262,7 +259,6 @@ test("the inbox fails when an item is older than 7 days", () => {
       date: "2026-01-01",
       amount: -100,
       payeeRaw: "Shop",
-      status: "cleared",
       lines: [{ amount: -100 }],
       ...saved,
     });

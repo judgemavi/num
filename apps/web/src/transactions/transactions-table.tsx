@@ -3,7 +3,6 @@ import { Lock } from "lucide-react";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEditors } from "@/editors/editor-api";
 import type { SortChoice } from "@/lists/list-search";
@@ -18,19 +17,12 @@ export type TransactionSort = SortChoice<NonNullable<TransactionListQuery["sort"
 /** The sort order of the table. The Needs review page also sorts by confidence (decision 0049). */
 type TableSort = SortChoice<NonNullable<TransactionReviewListQuery["sort"]>>;
 
-export type Selection = {
-  ids: string[];
-  onToggle: (id: string, on: boolean) => void;
-  onTogglePage: (on: boolean) => void;
-};
-
 type Props = {
   rows: TransactionListItem[];
   /** The text of the table when it has no rows. */
   empty: string;
   showBalance: boolean;
   hideAccount?: boolean;
-  selection?: Selection;
   sort: TableSort;
   onSort: (column: TransactionSort["sort"]) => void;
 };
@@ -62,15 +54,13 @@ function ConfidenceHead() {
 }
 
 export function TransactionsTable(props: Props) {
-  const { rows, empty, showBalance, hideAccount, selection, sort, onSort } = props;
+  const { rows, empty, showBalance, hideAccount, sort, onSort } = props;
   const { openEditor } = useEditors();
   const currency = useBookCurrency();
   const accountNames = useAccountLabels();
   // The Needs review page shows the proposed label and the confidence (decision 0048).
   const onReview = useOnReview();
-  const columns = 5 + (showBalance ? 1 : 0) + (hideAccount ? 0 : 1) + (selection ? 1 : 0) + 1;
-  const selectable = selection ? rows.filter((row) => !row.reconciled) : [];
-  const selectedOnPage = selection ? selectable.filter((row) => selection.ids.includes(row.id)) : [];
+  const columns = 5 + (showBalance ? 1 : 0) + (hideAccount ? 0 : 1) + 1;
 
   function renderRow(row: TransactionListItem) {
     const open = () => void openEditor("transaction", { id: row.id });
@@ -86,17 +76,6 @@ export function TransactionsTable(props: Props) {
           open();
         }}
       >
-        {selection ? (
-          <TableCell onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-            {row.reconciled ? null : (
-              <Checkbox
-                aria-label={`Select ${row.payeeRaw}`}
-                checked={selection.ids.includes(row.id)}
-                onCheckedChange={(value) => selection.onToggle(row.id, value === true)}
-              />
-            )}
-          </TableCell>
-        ) : null}
         <TableCell>{formatDate(row.date)}</TableCell>
         {hideAccount ? null : <TableCell>{accountNames.get(row.accountId) ?? row.accountName}</TableCell>}
         <TableCell>
@@ -143,16 +122,6 @@ export function TransactionsTable(props: Props) {
       <Table>
         <TableHeader>
           <TableRow>
-            {selection ? (
-              <TableHead>
-                <Checkbox
-                  aria-label="Select transactions on this page"
-                  disabled={selectable.length === 0}
-                  checked={selectedOnPage.length === 0 ? false : selectedOnPage.length === selectable.length ? true : "indeterminate"}
-                  onCheckedChange={(value) => selection.onTogglePage(value === true)}
-                />
-              </TableHead>
-            ) : null}
             <SortHead column="date" label="Date" sort={sort} onSort={onSort} />
             {hideAccount ? null : <TableHead>Account</TableHead>}
             <SortHead column="payeeRaw" label="Payee" sort={sort} onSort={onSort} />

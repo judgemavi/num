@@ -63,7 +63,6 @@ function add(
     date: string;
     amount: number;
     payeeRaw: string;
-    notes?: string;
     merchantId?: string;
     categoryId?: string;
     transferAccountId?: string;
@@ -75,9 +74,7 @@ function add(
     date: input.date,
     amount: input.amount,
     payeeRaw: input.payeeRaw,
-    notes: input.notes,
     merchantId: input.merchantId,
-    status: "open",
     lines: [
       {
         amount: input.amount,
@@ -98,7 +95,6 @@ test("filters match account, category, merchant, tag, date, text and uncategoriz
       date: "2026-02-01",
       amount: -2000,
       payeeRaw: "North Market",
-      notes: "winter apples",
       merchantId: fixture.merchantId,
       categoryId: fixture.food.id,
       tagIds: [fixture.trip.id],
@@ -127,7 +123,6 @@ test("filters match account, category, merchant, tag, date, text and uncategoriz
       date: "2026-04-02",
       amount: -500,
       payeeRaw: "Split shop",
-      status: "open",
       lines: [
         { amount: -300, categoryId: fixture.food.id },
         { amount: -200 },
@@ -154,8 +149,7 @@ test("filters match account, category, merchant, tag, date, text and uncategoriz
     expect(listTransactions(fixture.db, { ...page, from: "2026-02-01", to: "2026-02-01" }).items.map((item) => item.id)).toEqual([
       food.id,
     ]);
-    expect(listTransactions(fixture.db, { ...page, q: "APPLES" }).items.map((item) => item.id)).toEqual([food.id]);
-    expect(listTransactions(fixture.db, { ...page, q: "north" }).items.map((item) => item.id)).toEqual([food.id]);
+    expect(listTransactions(fixture.db, { ...page, q: "NORTH" }).items.map((item) => item.id)).toEqual([food.id]);
     expect(listTransactions(fixture.db, { ...page, q: "harbor" }).items.map((item) => item.id)).toEqual([food.id]);
     expect(listTransactions(fixture.db, { ...page, q: "missing" }).total).toBe(0);
 

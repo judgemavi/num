@@ -44,7 +44,6 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
     date,
     amount,
     payeeRaw: payee,
-    status: "cleared",
     lines: [{ amount, categoryId }],
     ...saved,
   });
@@ -222,7 +221,6 @@ test("a row has a bulk level only when the bulk action can apply it", () => {
       date: "2026-03-03",
       amount: -20_000,
       payeeRaw: "Market",
-      status: "cleared",
       lines: [
         { amount: -10_000, categoryId: other.id },
         { amount: -10_000 },
@@ -253,7 +251,6 @@ test("keeping a row uncategorized removes it from Needs review and Hygiene until
       date: "2026-01-05",
       amount: -20_000,
       payeeRaw: "KEEP ME",
-      status: "cleared" as const,
       lines: [{ amount: -20_000 }],
       ...saved,
     };

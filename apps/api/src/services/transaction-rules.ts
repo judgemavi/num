@@ -9,7 +9,7 @@ export type NormalizedLine = {
   tagIds: string[];
 };
 
-export function blankToNull(value: string | null | undefined): string | null {
+function blankToNull(value: string | null | undefined): string | null {
   if (value === undefined || value === null) {
     return null;
   }

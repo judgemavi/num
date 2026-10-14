@@ -10,7 +10,6 @@ import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { compareCheckpoint, createCheckpoint, unlockCheckpoint } from "./checkpoints";
-import { setClearance } from "./transaction-clearance";
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
 
 function tempDatabase() {
@@ -72,7 +71,6 @@ function entry(
   accountId: string,
   amount: number,
   date: string,
-  status: "open" | "cleared" = "open",
 ): TransactionCreate & typeof saved {
   const lines: TransactionLineInput[] = [{ amount }];
   return {
@@ -80,7 +78,6 @@ function entry(
     date,
     amount,
     payeeRaw: "Example shop",
-    status,
     lines,
     ...saved,
   };
@@ -90,7 +87,7 @@ test("a checkpoint is created only when the balances are equal, and only rows on
   const book = tempDatabase();
   try {
     const chequing = account(book.db, 10000);
-    const before = createTransaction(book.db, entry(chequing.id, -2000, "2026-02-01", "cleared"));
+    const before = createTransaction(book.db, entry(chequing.id, -2000, "2026-02-01"));
     const onDate = createTransaction(book.db, entry(chequing.id, -3000, "2026-02-15"));
     const after = createTransaction(book.db, entry(chequing.id, -4000, "2026-02-20"));
     const removed = createTransaction(book.db, entry(chequing.id, -500, "2026-02-10"));
@@ -116,7 +113,7 @@ test("a checkpoint is created only when the balances are equal, and only rows on
     })).toBe(1);
 
     expect(getTransaction(book.db, before.id)?.reconciled).toBe(true);
-    expect(getTransaction(book.db, before.id)?.status).toBe("cleared");
+    expect(getTransaction(book.db, before.id)?.status).toBe("open");
     expect(getTransaction(book.db, onDate.id)?.reconciled).toBe(true);
     expect(getTransaction(book.db, onDate.id)?.status).toBe("open");
     expect(getTransaction(book.db, after.id)?.reconciled).toBe(false);
@@ -129,16 +126,12 @@ test("a checkpoint is created only when the balances are equal, and only rows on
         }),
       "transaction_reconciled",
     );
-    expectCode(
-      () => setClearance(book.db, chequing.id, { transactionIds: [onDate.id], status: "open", ...saved }),
-      "transaction_reconciled",
-    );
     expect(getTransaction(book.db, onDate.id)?.amount).toBe(-3000);
 
     const unlocked = unlockCheckpoint(book.db, chequing.id, createdId, { ...saved, at: "2026-10-08T16:00:00Z" });
     expect(unlocked.unlockedAt).toBe("2026-10-08T16:00:00Z");
     expect(getTransaction(book.db, before.id)?.reconciled).toBe(false);
-    expect(getTransaction(book.db, before.id)?.status).toBe("cleared");
+    expect(getTransaction(book.db, before.id)?.status).toBe("open");
     expect(getTransaction(book.db, onDate.id)?.reconciled).toBe(false);
     expect(getTransaction(book.db, onDate.id)?.status).toBe("open");
     expect(getTransaction(book.db, after.id)?.reconciled).toBe(false);
@@ -153,9 +146,6 @@ test("a checkpoint is created only when the balances are equal, and only rows on
 
     const edited = updateTransaction(book.db, onDate.id, entry(chequing.id, -3010, "2026-02-15"));
     expect(edited.amount).toBe(-3010);
-    const cleared = setClearance(book.db, chequing.id, { transactionIds: [before.id], status: "open", ...saved });
-    expect(cleared.updated).toBe(1);
-    expect(getTransaction(book.db, before.id)?.status).toBe("open");
   } finally {
     book.close();
   }

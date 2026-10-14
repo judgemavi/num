@@ -39,7 +39,6 @@ function money(db: Db, accountId: string, date: string, amount: number, category
     date,
     amount,
     payeeRaw: "Corner Shop",
-    status: "cleared",
     merchantId,
     lines: [{ amount, categoryId }],
     ...saved,
@@ -149,7 +148,6 @@ test("a link that the person set is not changed", () => {
       date: "2026-03-10",
       amount: 20_000,
       payeeRaw: "Corner Shop",
-      status: "cleared",
       lines: [{ amount: 20_000, categoryId: ids.food }],
       refundOfId: chosen.id,
       ...saved,
@@ -161,9 +159,7 @@ test("a link that the person set is not changed", () => {
       date: "2026-03-10",
       amount: 20_000,
       payeeRaw: "Corner Shop",
-      status: "cleared",
       lines: [{ amount: 20_000, categoryId: ids.food }],
-      notes: "kept",
       ...saved,
     });
     expect(getTransaction(db, refund.id)?.refundOfId).toBe(chosen.id);
@@ -221,7 +217,6 @@ test("removing a link records Not linked to a purchase", () => {
       date: "2026-03-10",
       amount: 20_000,
       payeeRaw: "Corner Shop",
-      status: "cleared",
       lines: [{ amount: 20_000, categoryId: ids.food }],
       refundOfId: null,
       ...saved,

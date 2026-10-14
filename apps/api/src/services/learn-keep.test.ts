@@ -43,9 +43,9 @@ function book() {
   const other = createCategory(db, { name: "Other income", kind: "income", ...saved });
   const groceries = createCategory(db, { name: "Groceries", kind: "expense", ...saved });
   const confirm = (date: string, amount: number, categoryId: string, payeeRaw = payee) =>
-    createTransaction(db, { accountId: account.id, date, amount, payeeRaw, status: "open", lines: [{ amount, categoryId }], ...saved }).id;
+    createTransaction(db, { accountId: account.id, date, amount, payeeRaw, lines: [{ amount, categoryId }], ...saved }).id;
   const open = (date: string, amount: number, payeeRaw = payee) =>
-    createTransaction(db, { accountId: account.id, date, amount, payeeRaw, status: "open", lines: [{ amount }], ...saved }).id;
+    createTransaction(db, { accountId: account.id, date, amount, payeeRaw, lines: [{ amount }], ...saved }).id;
   /** The user saves the uncategorized row with no category (decision 0024). */
   const keep = (date: string, amount: number, payeeRaw = payee) => {
     const id = open(date, amount, payeeRaw);

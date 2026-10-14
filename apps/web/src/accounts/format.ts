@@ -106,13 +106,6 @@ export function accountError(code: ErrorCode | undefined): string {
   }
 }
 
-/** The text of a failed "Mark cleared" or "Mark open" on the transactions of an account. */
-export function clearanceError(code: ErrorCode | undefined): string {
-  return code === "transaction_reconciled"
-    ? "Unlock the checkpoint before you change a reconciled transaction."
-    : "The transactions did not update. Try again.";
-}
-
 /** The text of a failed unlock of a checkpoint. */
 export function unlockError(code: ErrorCode | undefined): string {
   return code === "checkpoint_unlocked" ? "This checkpoint is already unlocked." : "The checkpoint did not unlock. Try again.";

@@ -23,7 +23,6 @@ export const transactions = sqliteTable(
     date: text("date").notNull(),
     amount: integer("amount").notNull(),
     merchantId: text("merchant_id").references(() => merchants.id),
-    notes: text("notes"),
     payeeRaw: text("payee_raw").notNull(),
     payeeNormalized: text("payee_normalized").notNull(),
     status: text("status", { enum: transactionStatuses }).notNull(),

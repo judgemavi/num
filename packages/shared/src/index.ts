@@ -78,8 +78,6 @@ export {
   checkpointHelpSchema,
   checkpointListSchema,
   checkpointSchema,
-  clearanceResultSchema,
-  clearanceSchema,
   closingHintSchema,
   printedStatementBalance,
   storedStatementBalance,
@@ -88,7 +86,6 @@ export {
   type CheckpointCompare,
   type CheckpointCreate,
   type CheckpointHelp,
-  type Clearance,
   type ClosingHint,
 } from "./checkpoint";
 export { cardStatements, defaultCardDueDays } from "./card-statement";
@@ -530,7 +527,6 @@ export {
 } from "./mortgage-match";
 export {
   transactionCreateSchema,
-  transactionInputStatuses,
   transactionLineInputSchema,
   transactionLineSchema,
   approveLevelSchema,
@@ -553,7 +549,6 @@ export {
   transactionStatuses,
   type Transaction,
   type TransactionCreate,
-  type TransactionInputStatus,
   type TransactionFilter,
   type TransactionLine,
   type TransactionLineInput,

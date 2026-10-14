@@ -38,7 +38,6 @@ export function insertMirror(
       date: header.date,
       amount,
       merchantId: header.merchantId,
-      notes: header.notes,
       payeeRaw: header.payeeRaw,
       payeeNormalized: header.payeeNormalized,
       status: "open",

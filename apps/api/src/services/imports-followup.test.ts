@@ -273,7 +273,6 @@ test("an imported row is cleared, a match sets cleared, and undo restores the ea
       date: "2026-04-01",
       amount: -10000,
       payeeRaw: "RENT",
-      status: "open",
       lines: [{ amount: -10000 }],
       source: "ui",
       at,

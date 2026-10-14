@@ -2,7 +2,6 @@ import { z } from "zod";
 import { accountClass, type AccountKind } from "./account";
 import { isoDateSchema } from "./date";
 import { openingSuggestionSchema } from "./opening";
-import { transactionInputStatuses } from "./transaction";
 import { isUtcTimestamp } from "./time";
 import { amountSchema } from "./money";
 import { queryFlag, queryNumber } from "./list";
@@ -79,15 +78,6 @@ export const checkpointListSchema = z.object({
   closing: closingHintSchema,
 });
 
-export const clearanceSchema = z.object({
-  transactionIds: z.array(z.uuid()).min(1).max(200),
-  status: z.enum(transactionInputStatuses),
-});
-
-export const clearanceResultSchema = z.object({
-  updated: z.number().int().min(0),
-});
-
 export const accountActivityQuerySchema = z.object({
   page: queryNumber().min(1).default(1),
   reconcile: queryFlag,
@@ -98,5 +88,4 @@ export type CheckpointHelp = z.infer<typeof checkpointHelpSchema>;
 export type CheckpointCompare = z.infer<typeof checkpointCompareSchema>;
 export type CheckpointCreate = z.infer<typeof checkpointCreateSchema>;
 export type ClosingHint = z.infer<typeof closingHintSchema>;
-export type Clearance = z.infer<typeof clearanceSchema>;
 export type AccountActivityQuery = z.output<typeof accountActivityQuerySchema>;

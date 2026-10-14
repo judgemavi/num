@@ -29,7 +29,7 @@ function book() {
   const other = createCategory(db, { name: "Other income", kind: "income", ...saved });
   const merchant = createMerchant(db, { name: "Landlord", ...saved });
   const confirm = (date: string, amount: number, categoryId: string, payeeRaw = payee) =>
-    createTransaction(db, { accountId: account.id, date, amount, payeeRaw, status: "open", lines: [{ amount, categoryId }], ...saved });
+    createTransaction(db, { accountId: account.id, date, amount, payeeRaw, lines: [{ amount, categoryId }], ...saved });
   /** A row that the app labelled before. */
   const automatic = (date: string, amount: number, categoryId: string, autoReason: AutoReason, payeeRaw = payee) => {
     const row = createTransaction(db, {
@@ -38,7 +38,6 @@ function book() {
       amount,
       payeeRaw,
       merchantId: merchant.id,
-      status: "open",
       lines: [{ amount }],
       ...saved,
     });

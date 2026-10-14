@@ -47,7 +47,6 @@ function createFromReview(tx: WriteTx, row: ReturnType<typeof requireReview>): s
       autoReason: applied.autoReason,
       autoSourceId: applied.autoSourceId,
       autoConfidence: applied.autoConfidence,
-      notes: null,
       payeeRaw: payee.payeeRaw,
       payeeNormalized: payee.payeeNormalized,
       status: "cleared",

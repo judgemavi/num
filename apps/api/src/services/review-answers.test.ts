@@ -38,7 +38,7 @@ function withBook(run: (db: Db, ids: { cash: string; savings: string; food: stri
 }
 
 function pay(db: Db, accountId: string, date: string, amount: number, payee: string, categoryId?: string) {
-  return createTransaction(db, { accountId, date, amount, payeeRaw: payee, status: "cleared", lines: [{ amount, categoryId }], ...saved });
+  return createTransaction(db, { accountId, date, amount, payeeRaw: payee, lines: [{ amount, categoryId }], ...saved });
 }
 
 function questionOf(db: Db, id: string) {

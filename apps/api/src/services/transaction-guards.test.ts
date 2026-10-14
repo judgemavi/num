@@ -1,9 +1,10 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateDatabase, openDatabase, settings } from "@num/db";
-import type { AccountKind, ErrorCode, TransactionLineInput, TransactionStatus } from "@num/shared";
+import { migrateDatabase, openDatabase, settings, transactions } from "@num/db";
+import type { AccountKind, ErrorCode, TransactionLineInput } from "@num/shared";
 import { expect, test } from "bun:test";
+import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
 import { archiveAccount, createAccount } from "./accounts";
@@ -49,13 +50,12 @@ function account(db: Db, name: string, kind: AccountKind) {
   });
 }
 
-function lines(accountId: string, amount: number, items: TransactionLineInput[], status: TransactionStatus = "open") {
+function lines(accountId: string, amount: number, items: TransactionLineInput[]) {
   return {
     accountId,
     date: "2026-04-01",
     amount,
     payeeRaw: "Example shop",
-    status,
     lines: items,
     ...saved,
   };
@@ -91,18 +91,15 @@ test("a mirror amount change is rejected when the source has more than one line"
     expect(getTransaction(book.db, mirror.id)?.amount).toBe(1_200_000);
 
     const edited = updateTransaction(book.db, mirror.id, {
-      ...lines(mortgage.id, 1_200_000, [{ amount: 1_200_000, transferAccountId: chequing.id }], "open"),
+      ...lines(mortgage.id, 1_200_000, [{ amount: 1_200_000, transferAccountId: chequing.id }]),
       date: "2026-04-02",
-      notes: "Principal",
     });
     expect(edited.amount).toBe(1_200_000);
     expect(edited.date).toBe("2026-04-02");
-    expect(edited.notes).toBe("Principal");
     expect(edited.transferPeerId).toBeNull();
     const source = getTransaction(book.db, created.id);
     expect(source?.amount).toBe(-1_500_000);
     expect(source?.date).toBe("2026-04-01");
-    expect(source?.notes).toBeNull();
     expect(source?.transferPeerId).toBeNull();
     expect(source?.lines.map((line) => line.amount)).toEqual([-1_200_000, -300_000]);
     expect(source?.lines[0]?.transferAccountId).toBeNull();
@@ -117,11 +114,9 @@ test("a mirror amount change is rejected when the source has more than one line"
           { amount: -1_000_000, transferAccountId: mortgage.id },
           { amount: -300_000, categoryId: interest.id, memo: "Interest" },
         ],
-        "cleared",
       ),
     );
     expect(corrected.amount).toBe(-1_300_000);
-    expect(corrected.status).toBe("cleared");
     const nextMirror = getTransaction(book.db, corrected.transferPeerId ?? "");
     expect(nextMirror?.id).not.toBe(mirror.id);
     expect(nextMirror?.mirror).toBe(true);
@@ -133,48 +128,25 @@ test("a mirror amount change is rejected when the source has more than one line"
   }
 });
 
-test("a new mirror starts open", () => {
+test("a new transaction and its new mirror start open, and an edit keeps the status that the app set", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db, "Chequing", "chequing");
     const savings = account(book.db, "Savings", "savings");
-    const created = createTransaction(
-      book.db,
-      lines(chequing.id, -50_000, [{ amount: -50_000, transferAccountId: savings.id }], "cleared"),
-    );
+    const created = createTransaction(book.db, lines(chequing.id, -50_000, [{ amount: -50_000, transferAccountId: savings.id }]));
     const mirror = getTransaction(book.db, created.transferPeerId ?? "");
     if (!mirror) {
       throw new Error("Transfer peer is missing");
     }
-    expect(created.status).toBe("cleared");
+    expect(created.status).toBe("open");
     expect(mirror.status).toBe("open");
 
-    const clearedMirror = updateTransaction(
-      book.db,
-      mirror.id,
-      lines(savings.id, 50_000, [{ amount: 50_000, transferAccountId: chequing.id }], "cleared"),
-    );
-    expect(clearedMirror.status).toBe("cleared");
-    expect(getTransaction(book.db, created.id)?.status).toBe("cleared");
-
-    const edited = updateTransaction(
-      book.db,
-      created.id,
-      lines(chequing.id, -50_000, [{ amount: -50_000, transferAccountId: savings.id }], "open"),
-    );
-    expect(edited.status).toBe("open");
-    expect(getTransaction(book.db, mirror.id)?.status).toBe("cleared");
-  } finally {
-    book.close();
-  }
-});
-
-test("status reconciled is rejected on create", () => {
-  const book = tempDatabase();
-  try {
-    const cash = account(book.db, "Cash", "cash");
-    const body = lines(cash.id, -100, [{ amount: -100 }]);
-    expectCode(() => createTransaction(book.db, { ...body, status: "reconciled" }), "transaction_status_invalid");
+    // An import sets "cleared" (decision 0050). An edit by the person does not change the status.
+    book.db.update(transactions).set({ status: "cleared" }).where(eq(transactions.id, created.id)).run();
+    const edited = updateTransaction(book.db, created.id, { date: "2026-04-02", ...saved });
+    expect(edited.date).toBe("2026-04-02");
+    expect(edited.status).toBe("cleared");
+    expect(getTransaction(book.db, mirror.id)?.status).toBe("open");
   } finally {
     book.close();
   }

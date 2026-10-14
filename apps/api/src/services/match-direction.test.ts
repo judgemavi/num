@@ -19,7 +19,7 @@ function book() {
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
   const account = createAccount(db, { name: "Everyday", institution: null, kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
   const confirm = (payeeRaw: string, date: string, amount: number, line: { categoryId?: string; transferAccountId?: string }) =>
-    createTransaction(db, { accountId: account.id, date, amount, payeeRaw, status: "open", lines: [{ amount, ...line }], ...saved });
+    createTransaction(db, { accountId: account.id, date, amount, payeeRaw, lines: [{ amount, ...line }], ...saved });
   return {
     db,
     confirm,

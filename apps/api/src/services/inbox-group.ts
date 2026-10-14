@@ -4,19 +4,16 @@ import {
   type GroupSkipReason,
   type InboxGroupApply,
   type Transaction,
+  type TransactionCreate,
 } from "@num/shared";
 import type { Db } from "../db";
 import { linkAutomatic } from "./auto-link";
-import { readTransaction, type TransactionBody } from "./transaction-record";
+import { readTransaction } from "./transaction-record";
 import { mortgageLinesFor } from "./mortgage-learned";
 import { applyTransactionUpdate, spreadAfterConfirmations } from "./transactions";
 import { write, type Reader, type WriteTx, type WriteInput } from "./write";
 
 type Patch = Pick<InboxGroupApply, "categoryId" | "transferAccountId" | "merchantId" | "accountId" | "mortgage">;
-
-function statusOf(transaction: Transaction) {
-  return transaction.status === "cleared" ? "cleared" : "open";
-}
 
 function skipReason(transaction: Transaction, patch: Patch): GroupSkipReason | null {
   if (transaction.accountId !== patch.accountId) {
@@ -35,20 +32,18 @@ function skipReason(transaction: Transaction, patch: Patch): GroupSkipReason | n
   return null;
 }
 
-function mortgageBodyFor(transaction: Transaction, lines: NonNullable<ReturnType<typeof mortgageLinesFor>>): TransactionBody {
+function mortgageBodyFor(transaction: Transaction, lines: NonNullable<ReturnType<typeof mortgageLinesFor>>): TransactionCreate {
   return {
     accountId: transaction.accountId,
     date: transaction.date,
     amount: transaction.amount,
     payeeRaw: transaction.payeeRaw,
     merchantId: null,
-    notes: transaction.notes,
-    status: statusOf(transaction),
     lines,
   };
 }
 
-function bodyFor(transaction: Transaction, patch: Patch): TransactionBody {
+function bodyFor(transaction: Transaction, patch: Patch): TransactionCreate {
   const transferAccountId = patch.transferAccountId;
   const merchantId = transferAccountId ? null : (patch.merchantId ?? transaction.merchantId);
   if (transferAccountId) {
@@ -59,8 +54,6 @@ function bodyFor(transaction: Transaction, patch: Patch): TransactionBody {
       amount: transaction.amount,
       payeeRaw: transaction.payeeRaw,
       merchantId,
-      notes: transaction.notes,
-      status: statusOf(transaction),
       lines: [
         {
           amount: transaction.amount,
@@ -78,8 +71,6 @@ function bodyFor(transaction: Transaction, patch: Patch): TransactionBody {
     amount: transaction.amount,
     payeeRaw: transaction.payeeRaw,
     merchantId,
-    notes: transaction.notes,
-    status: statusOf(transaction),
     lines: transaction.lines.map((line) => ({
       amount: line.amount,
       memo: line.memo,
@@ -91,7 +82,7 @@ function bodyFor(transaction: Transaction, patch: Patch): TransactionBody {
 }
 
 /** The reason why the group action leaves a row as it is, or the new body of the row. A read: it never writes. */
-function resolve(db: Reader, id: string, patch: Patch): { skip: GroupSkip } | { body: TransactionBody } {
+function resolve(db: Reader, id: string, patch: Patch): { skip: GroupSkip } | { body: TransactionCreate } {
   let transaction: Transaction;
   try {
     transaction = readTransaction(db, id);

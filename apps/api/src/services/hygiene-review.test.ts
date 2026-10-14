@@ -73,7 +73,6 @@ function changedPlan(db: Db) {
     date: "2026-01-15",
     amount: -19_990,
     payeeRaw: "Stream",
-    status: "cleared",
     lines: [{ amount: -19_990, categoryId: food.id }],
     ...saved,
   });
@@ -97,7 +96,6 @@ test("an older unpaid statement fails after a newer statement exists", () => {
       date: "2026-02-10",
       amount: -10_000,
       payeeRaw: "Shop",
-      status: "cleared",
       lines: [{ amount: -10_000, categoryId: food.id }],
       ...saved,
     });

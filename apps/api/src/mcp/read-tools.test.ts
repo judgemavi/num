@@ -121,7 +121,6 @@ function seed(db: Db, dir: string) {
     amount: -4_000,
     payeeRaw: "North Market",
     merchantId: merchant.id,
-    status: "cleared",
     lines: [{ amount: -4_000, categoryId: category.id }],
     ...saved,
   });

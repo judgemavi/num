@@ -81,7 +81,6 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
     amount,
     payeeRaw: payee,
     merchantId,
-    status: "open",
     lines: [{ amount, categoryId, memo: null, transferAccountId: null, tagIds: [] }],
     ...saved,
   });
@@ -154,8 +153,6 @@ test("each review source appears and leaves after its action", () => {
       amount: open.amount,
       payeeRaw: open.payeeRaw,
       merchantId: open.merchantId,
-      notes: open.notes,
-      status: "open",
       lines: [{ amount: open.amount, categoryId: food.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });

@@ -102,7 +102,6 @@ function paycheck(db: Db) {
     date: "2026-10-01",
     amount: 500_000,
     payeeRaw: "Payroll",
-    status: "open",
     lines: [{ amount: 500_000, categoryId: pay.id }],
     ...saved,
   });
@@ -206,7 +205,6 @@ test("import undo skips a row the user linked as a transfer", () => {
       date: "2026-01-02",
       amount: 8000,
       payeeRaw: "From cash",
-      status: "open",
       lines: [{ amount: 8000 }],
       ...saved,
     });
@@ -257,7 +255,6 @@ test("undo of a row with a refund pointing at it clears the link", () => {
       date: "2026-01-05",
       amount: 4000,
       payeeRaw: "NORTH MARKET",
-      status: "open",
       lines: [{ amount: 4000, categoryId: groceries.id }],
       refundOfId: purchase.id,
       ...saved,
@@ -301,7 +298,6 @@ test("delete of a transfer removes the mirror and leaves no orphan transfer line
       date: "2026-04-01",
       amount: -5000,
       payeeRaw: "Move",
-      status: "open",
       lines: [{ amount: -5000, transferAccountId: savings.id }],
       ...saved,
     });

@@ -42,7 +42,6 @@ export const errorCodes = [
   "transaction_not_found",
   "refund_link_invalid",
   "transaction_reconciled",
-  "transaction_status_invalid",
   "checkpoint_not_found",
   "checkpoint_unlocked",
   "checkpoint_unbalanced",

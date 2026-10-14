@@ -4,8 +4,6 @@ import {
   checkpointCreateSchema,
   checkpointListSchema,
   checkpointSchema,
-  clearanceResultSchema,
-  clearanceSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
@@ -15,7 +13,6 @@ import {
   listCheckpoints,
   unlockCheckpoint,
 } from "../services/checkpoints";
-import { setClearance } from "../services/transaction-clearance";
 import { validationHook } from "../validation";
 import { errorResponse } from "./common";
 
@@ -101,29 +98,6 @@ const unlockRoute = createRoute({
   },
 });
 
-const clearanceRoute = createRoute({
-  operationId: "post_accounts_id_clearance",
-  description: "Create or run accounts (clearance). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
-  method: "post",
-  path: "/api/accounts/{id}/clearance",
-  request: {
-    params: accountParams,
-    body: {
-      required: true,
-      content: { "application/json": { schema: clearanceSchema } },
-    },
-  },
-  responses: {
-    200: {
-      description: "Transactions marked open or cleared",
-      content: { "application/json": { schema: clearanceResultSchema } },
-    },
-    400: errorResponse,
-    404: errorResponse,
-    409: errorResponse,
-  },
-});
-
 export function checkpointRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook })
     .openapi(listRoute, (c) => c.json(listCheckpoints(db, c.req.valid("param").id), 200))
@@ -138,10 +112,6 @@ export function checkpointRoutes(db: Db) {
     .openapi(unlockRoute, (c) => {
       const { id, checkpointId } = c.req.valid("param");
       return c.json(unlockCheckpoint(db, id, checkpointId, { source: "ui" }), 200);
-    })
-    .openapi(clearanceRoute, (c) => {
-      const { id } = c.req.valid("param");
-      return c.json(setClearance(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
     });
 }
 

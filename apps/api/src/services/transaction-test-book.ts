@@ -62,7 +62,6 @@ export function entry(
     date,
     amount,
     payeeRaw: "Example shop",
-    status: "open",
     lines,
     ...saved,
   };

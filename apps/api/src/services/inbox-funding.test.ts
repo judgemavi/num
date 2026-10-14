@@ -72,7 +72,6 @@ test("cover from Unassigned uses a fund event and clears the overspent item", ()
       date: "2026-10-02",
       amount: -42_000,
       payeeRaw: "Dining out",
-      status: "open",
       lines: [{ amount: -42_000, categoryId: dining.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });
@@ -115,7 +114,6 @@ test("a linked paycheck is waiting for funding until its funding run, and return
       date: "2026-10-01",
       amount: 500_000,
       payeeRaw: "Payroll",
-      status: "open",
       lines: [{ amount: 500_000, categoryId: pay.id, memo: null, transferAccountId: null, tagIds: [] }],
       ...saved,
     });

@@ -1,5 +1,5 @@
 import { transactions, type TransactionRow } from "@num/db";
-import { transactionWriteSchema, utcNow, type Transaction, type TransactionUpdate, type TransactionWrite } from "@num/shared";
+import { transactionWriteSchema, utcNow, type Transaction, type TransactionCreate, type TransactionUpdate, type TransactionWrite } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -13,7 +13,6 @@ import {
   toTransaction,
   type AutoStamp,
   type Header,
-  type TransactionBody,
 } from "./transaction-record";
 import { assertLineShape, isMirrorSide, normalizeLine, type NormalizedLine } from "./transaction-rules";
 import { linkAutomatic } from "./auto-link";
@@ -73,7 +72,7 @@ export function getTransaction(db: Db, id: string): Transaction | null {
   return toTransaction(db, row, loadLines(db, id));
 }
 
-function headerFor(input: TransactionBody, lines: ReturnType<typeof normalizeLine>[]) {
+function headerFor(input: TransactionCreate, lines: ReturnType<typeof normalizeLine>[]) {
   const header = headerFrom(input);
   if (lines.some((line) => line.transferAccountId !== null)) {
     return { ...header, merchantId: null };
@@ -81,7 +80,7 @@ function headerFor(input: TransactionBody, lines: ReturnType<typeof normalizeLin
   return header;
 }
 
-export function insertTransaction(tx: WriteTx, input: TransactionBody, source: AuditSource, spread = true): Transaction {
+export function insertTransaction(tx: WriteTx, input: TransactionCreate, source: AuditSource, spread = true): Transaction {
   const typed = input.lines.map(normalizeLine);
   const recordSourceName = recordSource(source);
   const id = crypto.randomUUID();
@@ -94,6 +93,7 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
     .values({
       id,
       ...header,
+      status: "open",
       refundOfId: header.refundOfId ?? null,
       source: recordSourceName,
       importRowId: null,
@@ -117,7 +117,7 @@ export function insertTransaction(tx: WriteTx, input: TransactionBody, source: A
   return created;
 }
 
-export function createTransaction(db: Db, input: TransactionBody & WriteInput): Transaction {
+export function createTransaction(db: Db, input: TransactionCreate & WriteInput): Transaction {
   requireWholeAmounts(db, [input.amount, ...input.lines.map((line) => line.amount)]);
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
@@ -130,24 +130,17 @@ export function createTransaction(db: Db, input: TransactionBody & WriteInput): 
   });
 }
 
-/** A merchant or a note that the update leaves out keeps its stored value. An explicit null clears it. */
+/** A merchant that the update leaves out keeps its stored value. An explicit null clears it. */
 export function applyTransactionUpdate(
   tx: WriteTx,
   id: string,
-  input: TransactionBody,
+  input: TransactionCreate,
   at: string,
   spread = true,
 ): Transaction {
   const lines = input.lines.map(normalizeLine);
   const existing = requireActive(tx, id);
-  const header = headerFor(
-    {
-      ...input,
-      merchantId: keepOmitted(input.merchantId, existing.merchantId),
-      notes: keepOmitted(input.notes, existing.notes),
-    },
-    lines,
-  );
+  const header = headerFor({ ...input, merchantId: keepOmitted(input.merchantId, existing.merchantId) }, lines);
   const existingLines = loadLines(tx, id);
   const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
   const peerLines = peer ? loadLines(tx, peer.id) : [];
@@ -249,9 +242,7 @@ function storedBody(txn: Transaction): TransactionWrite {
     date: txn.date,
     amount: txn.amount,
     merchantId: txn.merchantId,
-    notes: txn.notes,
     payeeRaw: txn.payeeRaw,
-    status: txn.status,
     lines: txn.lines.map(({ amount, memo, categoryId, transferAccountId, tagIds }) => ({ amount, memo, categoryId, transferAccountId, tagIds })),
     refundOfId: txn.refundOfId,
   };

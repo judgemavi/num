@@ -14,7 +14,7 @@ import { useAppForm } from "@/forms/form-hook";
 import { formatMoney } from "@/money";
 import { formatDate, levelLabel, refundedText, transactionError } from "@/transactions/format";
 import { mortgageSplitFill, useMortgageSplit } from "@/transactions/mortgage-split";
-import { DecisionNotes, DeleteMenu, MoneySection, MoreDetails } from "@/transactions/transaction-parts";
+import { DecisionNotes, DeleteMenu, MoneySection, TagsField } from "@/transactions/transaction-parts";
 import { PaymentForField } from "@/transactions/payment-for-field";
 import { alreadyChosen, answerFilled, quietChange, signedTotal, transactionValues, useSuggestion } from "@/transactions/transaction-draft";
 import { buildTransactionSave, reviewAnswer } from "@/transactions/transaction-submit";
@@ -69,7 +69,7 @@ export function TransactionForm({
       onSubmit: ({ value }) => {
         const total = signedTotal(currency, storedTotal(value), value.amount, value.direction);
         if (value.payee.trim().length === 0) {
-          return "Enter the bank text.";
+          return "Enter a description.";
         }
         if (!/^\d{4}-\d{2}-\d{2}$/.test(value.date)) {
           return "Choose a date.";
@@ -159,7 +159,7 @@ export function TransactionForm({
     totalMilli === null ||
     (values.choice === "transfer" && !values.transferAccountId) ||
     (values.choice === "split" && (left !== 0 || splitBlank(values.lines)));
-  const summary = `${formatDate(values.date)} · ${accountLabels.get(values.accountId) ?? "Account"} · ${values.direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(totalMilli ?? 0))} · ${values.payee}`;
+  const summary = `${formatDate(values.date)} · ${accountLabels.get(values.accountId) ?? "Account"} · ${values.direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(totalMilli ?? 0))}`;
 
   return (
     <form.AppForm>
@@ -179,7 +179,7 @@ export function TransactionForm({
             </p>
           ) : null}
           {reconciled ? (
-            <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, notes, category and tags can change.</p>
+            <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, category and tags can change.</p>
           ) : null}
           {transaction?.autoReason ? (
             <div>
@@ -191,6 +191,16 @@ export function TransactionForm({
           ) : (
             <MoneySection form={form} moneyLocked={reconciled || amountLocked || imported} accountLocked={reconciled} />
           )}
+          <form.AppField name="payee">
+            {(field) => (
+              <field.TextField
+                id="txn-payee"
+                label="Description"
+                disabled={imported}
+                description={imported ? "From the bank import. It does not change." : undefined}
+              />
+            )}
+          </form.AppField>
           <WhatIsThis
             form={form}
             choiceLocked={reconciled || amountLocked}
@@ -204,7 +214,7 @@ export function TransactionForm({
           />
           {review?.question === "recurring_ambiguous" && review.recurring ? <PaymentForField form={form} occurrence={review.recurring} /> : null}
           {transaction?.refundedAmount ? <p className="text-sm text-muted-foreground">{refundedText(currency, transaction.refundedAmount)}</p> : null}
-          <MoreDetails form={form} payeeLocked={imported} clearedLocked={reconciled} />
+          <form.Field name="tagIds">{(field) => <TagsField tagIds={field.state.value} onTags={field.handleChange} />}</form.Field>
           {values.mortgageFilled ? <p role="status">{mortgageNotice}</p> : null}
           <form.FormError />
         </DialogBody>

@@ -33,9 +33,7 @@ function storedBody(existing: Transaction): TransactionWrite {
     date: existing.date,
     amount: existing.amount,
     merchantId: existing.merchantId,
-    notes: existing.notes,
     payeeRaw: existing.payeeRaw,
-    status: existing.status,
     lines: existing.lines.map((line) => ({
       amount: line.amount,
       memo: line.memo,
@@ -113,9 +111,7 @@ export function buildTransactionSave(input: SubmitInput): BuildResult {
     date: input.date,
     amount: input.totalMilli,
     merchantId: merchantForChoice(input.choice, input.merchantId),
-    notes: input.notes.trim().length === 0 ? null : input.notes.trim(),
     payeeRaw: input.payee.trim(),
-    status: input.cleared ? "cleared" : "open",
     lines: built,
     refundOfId: input.choice === "refund" ? input.refundOfId : null,
   };

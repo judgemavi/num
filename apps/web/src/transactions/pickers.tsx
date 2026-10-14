@@ -65,7 +65,7 @@ export function AccountPicker({ id, value, onChange, disabled, depth = 0, except
   );
 }
 
-/** `payee` is the bank text. The form for a new merchant starts with the name that the bank text gives. */
+/** `payee` is the description. The form for a new merchant starts with the name that the description gives. */
 export function MerchantPicker({ id, value, onChange, disabled, depth = 0, payee }: PickerProps & { payee: string }) {
   const { merchantOptions, archivedMerchants } = merchantOptionLists(useMerchants(), value);
   const archive = useArchiveMerchant();

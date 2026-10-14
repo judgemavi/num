@@ -151,7 +151,6 @@ function filters(query: TransactionFilter) {
     parts.push(
       or(
         contains(sql`${transactions.payeeRaw}`, query.q),
-        contains(sql`ifnull(${transactions.notes}, '')`, query.q),
         contains(sql`ifnull(${merchants.name}, '')`, query.q),
       ),
     );
