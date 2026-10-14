@@ -208,7 +208,10 @@ The Amount cell shows only the exceptions: a lock icon for a reconciled row (Too
 and "Pending" for an open row (entered by hand, not yet on a statement). A cleared row shows nothing.
 The Status column (right-most) shows a Badge only when the row needs review: the level (Sure, Likely, Maybe, never a
 percentage) for a row with a suggestion or an automatic label, and "Needs review" for a row with a question or no
-suggestion. A row has no buttons. The whole row opens the editor. No dismiss, no queue mode.
+suggestion. On `/transactions/review` the column is "Confidence" (decision 0048): the level, "Question" for a question,
+and nothing for a row with no suggestion. There, the Category column shows the proposed label and merchant of a
+suggestion (the same text as a stored label; the level tells that it is a proposal) and "Transfer to <account>" for a
+possible transfer. A row has no buttons. The whole row opens the editor. No dismiss, no queue mode.
 The table has no group rows. The page header of `/transactions/review` has "Approve all Sure · N" and
 "Approve all Likely · N" (shared confirm) for the rows that match the filters.
 

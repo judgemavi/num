@@ -604,8 +604,11 @@ A changed recurring amount is not in Needs review: the Recurring plan screen sho
 Needs review is its own page, `/transactions/review`, with the same table, columns, sort order and pages as
 `/transactions`. The page has only the transactions that need review. Both pages show two tabs: "All" and
 "Needs review · N".
-- **Status column:** a row that needs review shows its level (Sure, Likely, Maybe) when it has a suggestion or an
-  automatic label, and "Needs review" when it has a question or no suggestion. Other rows show nothing.
+- **Status column (All page):** a row that needs review shows its level (Sure, Likely, Maybe) when it has a suggestion
+  or an automatic label, and "Needs review" when it has a question or no suggestion. Other rows show nothing.
+- **Needs review page (decision 0048):** the Status column is the Confidence column. It shows the level, "Question" for
+  a question, and nothing for a row with no suggestion. The Category column shows the proposed label and merchant of a
+  suggestion, and "Transfer to <account>" for a possible transfer. Other rows show the stored label.
 - **Answer in the editor:** a row has no buttons. A click on the row opens the transaction editor, and Save is the
   answer. A question is a field of the editor, filled with the proposed answer:
   - Possible transfer: "What is this?" is Transfer, with the other account and its matched transaction. Save as a
@@ -832,7 +835,7 @@ There are 7 screens (decision 0021).
 | Screen | Contents |
 |---|---|
 | Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); hygiene checks (§10); this month: income → bills → bucket funding → left to save, "Fund this paycheck", missed payments, overspent buckets, goal status; spending changes this month; net worth. Each card links to its screen. |
-| Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column, detail and edit, lines, tags, transfers |
+| Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers |
 | Buckets | Balances, funding history, moves, goals (feasibility), settings |
 | Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups, categories), merchants, tags, net worth, mortgage. Decision 0030. |
 | Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |

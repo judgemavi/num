@@ -1,4 +1,5 @@
 import type { TransactionListItem } from "@num/shared";
+import { useMerchantNames } from "@/editors/lookups";
 import { useTargetText } from "@/transactions/names";
 
 function labelText(row: TransactionListItem, targetText: ReturnType<typeof useTargetText>) {
@@ -20,6 +21,30 @@ export function CategoryCell({ row }: { row: TransactionListItem }) {
     <>
       <div>{labelText(row, targetText)}</div>
       {row.merchantName ? <div className="text-muted-foreground">{row.merchantName}</div> : null}
+    </>
+  );
+}
+
+/**
+ * The Category column of the Needs review page (decision 0048). A suggestion or a transfer pair shows the proposed
+ * label and merchant. Other rows show the stored label, as on the All page.
+ */
+export function ProposedCategoryCell({ row }: { row: TransactionListItem }) {
+  const targetText = useTargetText();
+  const merchants = useMerchantNames();
+  const review = row.review;
+  if (review?.question === "transfer_pair" && review.transfer) {
+    return <div>{targetText({ categoryId: null, transferAccountId: review.transfer.otherAccountId })}</div>;
+  }
+  const suggestion = review?.question === "categorize" ? review.suggestion : null;
+  if (!suggestion) {
+    return <CategoryCell row={row} />;
+  }
+  const merchant = merchants.get(suggestion.merchantId ?? "");
+  return (
+    <>
+      <div>{suggestion.keep ? "No category" : targetText(suggestion)}</div>
+      {merchant ? <div className="text-muted-foreground">{merchant}</div> : null}
     </>
   );
 }

@@ -8,9 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useEditors } from "@/editors/editor-api";
 import type { SortChoice } from "@/lists/list-search";
 import { useAccountLabels, useBookCurrency } from "@/editors/lookups";
-import { CategoryCell } from "@/transactions/category-cell";
+import { CategoryCell, ProposedCategoryCell } from "@/transactions/category-cell";
 import { formatDate, refundOfText, refundedText } from "@/transactions/format";
-import { ReviewStatus } from "@/transactions/review-status";
+import { ReviewConfidence, ReviewStatus } from "@/transactions/review-status";
+import { useOnReview } from "@/transactions/use-transaction-list";
 
 export type TransactionSort = SortChoice<NonNullable<TransactionListQuery["sort"]>>;
 
@@ -47,6 +48,8 @@ export function TransactionsTable(props: Props) {
   const { openEditor } = useEditors();
   const currency = useBookCurrency();
   const accountNames = useAccountLabels();
+  // The Needs review page shows the proposed label and the confidence (decision 0048).
+  const onReview = useOnReview();
   const columns = 5 + (showBalance ? 1 : 0) + (hideAccount ? 0 : 1) + (selection ? 1 : 0) + 1;
   const selectable = selection ? rows.filter((row) => !row.reconciled) : [];
   const selectedOnPage = selection ? selectable.filter((row) => selection.ids.includes(row.id)) : [];
@@ -84,7 +87,7 @@ export function TransactionsTable(props: Props) {
           {row.refundedAmount ? <div className="text-muted-foreground">{refundedText(currency, row.refundedAmount)}</div> : null}
         </TableCell>
         <TableCell>
-          <CategoryCell row={row} />
+          {onReview ? <ProposedCategoryCell row={row} /> : <CategoryCell row={row} />}
         </TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-2">
@@ -111,7 +114,7 @@ export function TransactionsTable(props: Props) {
           </TableCell>
         ) : null}
         <TableCell>
-          <ReviewStatus review={row.review} />
+          {onReview ? <ReviewConfidence review={row.review} /> : <ReviewStatus review={row.review} />}
         </TableCell>
       </TableRow>
     );
@@ -138,7 +141,7 @@ export function TransactionsTable(props: Props) {
             <TableHead>Category</TableHead>
             <SortHead column="amount" label="Amount" props={props} className="text-right" />
             {showBalance ? <TableHead className="text-right">Balance</TableHead> : null}
-            <TableHead>Status</TableHead>
+            <TableHead>{onReview ? "Confidence" : "Status"}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
