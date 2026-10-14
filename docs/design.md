@@ -212,8 +212,8 @@ Columns: a checkbox, Date, Account, Payee, Category, Amount, Status (and Balance
 The checkbox column (decision 0051) shows only on these two pages, not on the page of an account. A click on the
 checkbox selects the row; a click on another part of the row opens the editor. Shift and click selects a range. The
 header checkbox selects all rows of the page. The checkbox of a loan payment is disabled, with the Tooltip "Loan
-payments are changed one at a time." (decision 0053) With a selection, the ActionBar (§6) shows "N selected", "Approve · N"
-(outline), "Edit…" (primary) and "Clear". Approve has no confirm.
+payments are changed one at a time." (decision 0053) With a selection, the ActionBar (§6) shows "N selected", "Edit…" (primary) and "Clear". On `/transactions/review` it
+also shows "Approve · N" (outline) before "Edit…". Approve has no confirm.
 The Category column shows the category, "Transfer to <account>", "Loan payment", or "Uncategorized", and the merchant
 below it.
 The Amount cell shows only the exceptions: a lock icon for a reconciled row (Tooltip: "Checked against your balance on <date>")

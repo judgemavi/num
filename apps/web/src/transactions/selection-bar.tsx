@@ -4,7 +4,7 @@ import { ActionBar } from "@/components/action-bar";
 import { Button } from "@/components/ui/button";
 import { useEditors } from "@/editors/editor-api";
 import { useSelection } from "@/transactions/selection-state";
-import { useTransactionPage } from "@/transactions/use-transaction-list";
+import { useOnReview, useTransactionPage } from "@/transactions/use-transaction-list";
 
 /**
  * True when Approve applies something to the row: its automatic label, or a suggestion that the row can take. A row
@@ -22,32 +22,43 @@ function canApprove(row: TransactionListItem) {
   return suggestion !== null && !(suggestion.transferAccountId !== null && row.reconciled);
 }
 
-/** "N selected", "Approve · N", "Edit…" and "Clear" while one or more rows of the page are selected (decision 0051). */
+/** "Approve · N" for the selected rows. Only the Needs review page has it. */
+function ApproveSelected({ rows, onApproved }: { rows: TransactionListItem[]; onApproved: () => void }) {
+  const approve = useApproveSelected();
+  const approvable = rows.filter(canApprove).length;
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+      disabled={approvable === 0 || approve.isPending}
+      onClick={() => approve.mutate(rows.map((row) => row.id), { onSuccess: onApproved })}
+    >
+      {`Approve · ${approvable}`}
+    </Button>
+  );
+}
+
+/**
+ * "N selected", "Edit…" and "Clear" while one or more rows of the page are selected. The Needs review page also has
+ * "Approve · N" (decision 0051).
+ */
 export function SelectionBar() {
   const selection = useSelection();
+  const review = useOnReview();
   const { page } = useTransactionPage();
-  const approve = useApproveSelected();
   const { openEditor } = useEditors();
   const rows = selection ? page.items.filter((row) => selection.ids.has(row.id)) : [];
   if (!selection || rows.length === 0) {
     return null;
   }
   const ids = rows.map((row) => row.id);
-  const approvable = rows.filter(canApprove).length;
 
   return (
     <ActionBar label="Selected transactions">
       <span className="text-sm font-semibold whitespace-nowrap">{`${rows.length} selected`}</span>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-        disabled={approvable === 0 || approve.isPending}
-        onClick={() => approve.mutate(ids, { onSuccess: () => selection.clear() })}
-      >
-        {`Approve · ${approvable}`}
-      </Button>
+      {review ? <ApproveSelected rows={rows} onApproved={selection.clear} /> : null}
       <Button
         type="button"
         size="sm"

@@ -22,7 +22,7 @@ import type { Db } from "../db";
 import { bookStep } from "./book-step";
 import { decidedKeys } from "./decision-keys";
 import { ServiceError } from "../service-error";
-import { applyLinkedPlan } from "./match-apply";
+import { applyLinkedPlan, isDecided } from "./match-apply";
 import { withoutId, write, type WriteInput } from "./write";
 
 type TxnRow = {
@@ -341,7 +341,8 @@ export function autoLink(db: Db, asOf: string, input: WriteInput & { accountId?:
   write(db, { source: input.source, at: input.at }, (tx) => {
     for (const pair of unique) {
       const plan = byPlan.get(pair.planId);
-      if (plan) {
+      // An automatic link labels only a row that the person did not decide.
+      if (plan && !isDecided(tx, pair.transactionId)) {
         applyLinkedPlan(tx, plan, pair.transactionId);
       }
       const id = crypto.randomUUID();

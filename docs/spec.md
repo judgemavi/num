@@ -554,7 +554,8 @@ records the keep.
 Combining: signals for the same candidate combine as 1 − Π(1 − cᵢ). Exception: the payee + amount signal and the payee
 signal for the same candidate do not combine; the candidate takes the higher one (decision 0036). The best candidate must lead the second by ≥ 0.2;
 otherwise it is a suggestion only.
-Exception: a recurring link is the user's own intent. It always labels (automatic), and other signals do not compete with it.
+Exception: a recurring link is the user's own intent. It labels (automatic), and other signals do not compete with it.
+An automatic recurring link never changes a label that the user confirmed or a row that the user kept uncategorized.
 It applies on every link: automatic link on import, and a manual link in the UI.
 
 Decision with the fixed threshold 0.85 (decision 0039):
@@ -639,7 +640,8 @@ It has the same sort orders, and also a sort by confidence (decision 0049). The 
   on the checkbox selects the row; a click on another part of the row opens the editor. Shift and click selects a
   range. The header checkbox selects all rows of the page; a selection does not go across pages. A loan payment cannot be
   selected (decision 0053). The selection clears when the page, the filters or the sort order change.
-- **Action bar:** with one or more selected rows, a bar shows "N selected", "Approve · N", "Edit…" and "Clear".
+- **Action bar:** with one or more selected rows, a bar shows "N selected", "Edit…" and "Clear". On the Needs review
+  page it also shows "Approve · N".
   - **Approve** applies the automatic label or the suggestion of each selected row as a confirmation (no confirm;
     audited; one write). A row with a question or with no suggestion is skipped. The count on the button is the number
     of rows that it approves. To approve many rows, the user selects a page (sorted by confidence, high to low, by

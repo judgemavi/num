@@ -25,7 +25,8 @@ at a time." The skip reason `split` is `loan_payment`.
      "Split transactions are edited one at a time."
    - The selection is state of the screen. It clears when the page, the filters or the sort order change.
 2. **Action bar.** When one or more rows are selected, a bar shows at the bottom of the screen:
-   "N selected", "Approve · N", "Edit…" and "Clear".
+   "N selected", "Approve · N", "Edit…" and "Clear". "Approve" shows only on `/transactions/review`
+   (owner change, 2026-10-14).
    - "Approve" applies the label or the suggestion of each selected row as a confirmation. A row with no suggestion
      or with a question is skipped. The count on the button is the number of rows that it approves. There is no
      confirmation. The toast shows the number of approved transactions.

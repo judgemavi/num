@@ -1,7 +1,7 @@
 import { accounts, inboxDecisions, occurrenceLinks, transactionLines, transactions } from "@num/db";
 import { utcNow, type MatchResult } from "@num/shared";
 import { and, eq, inArray, isNull, notExists, or, sql } from "drizzle-orm";
-import { keepPrefix } from "./decision-keep";
+import { isUncategorized, keepKey, keepPrefix } from "./decision-keep";
 import { mortgageLinesFor } from "./mortgage-learned";
 import { loadMatchBook, scorePayee } from "./match-book";
 import { linkRefundIfSure } from "./refund-auto";
@@ -18,6 +18,21 @@ export function mortgageSplitLines(tx: WriteTx, result: MatchResult, fromAccount
     return null;
   }
   return mortgageLinesFor(tx, result.transferAccountId, fromAccountId, date, amount);
+}
+
+/**
+ * True when the person decided the label of the transaction: a category, a transfer or a kept "no category", with no
+ * automatic label. An automatic link to a recurring plan does not replace such a decision.
+ */
+export function isDecided(tx: WriteTx, transactionId: string) {
+  const row = tx.select({ autoReason: transactions.autoReason }).from(transactions).where(eq(transactions.id, transactionId)).get();
+  if (!row || row.autoReason !== null) {
+    return false;
+  }
+  if (!isUncategorized(tx, transactionId)) {
+    return true;
+  }
+  return tx.select({ key: inboxDecisions.itemKey }).from(inboxDecisions).where(eq(inboxDecisions.itemKey, keepKey(transactionId))).get() !== undefined;
 }
 
 export function applyLinkedPlan(
