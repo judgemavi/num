@@ -3,6 +3,7 @@ import { utcNow, type Merchant } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { getMerchant } from "./merchants";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { withoutId, write, type WriteTx, type WriteInput } from "./write";
 
@@ -35,11 +36,8 @@ export function mergeMerchants(db: Db, sourceId: string, targetId: string, input
   }
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
-    const source = tx.select().from(merchants).where(eq(merchants.id, sourceId)).get();
-    const target = tx.select().from(merchants).where(eq(merchants.id, targetId)).get();
-    if (!source || !target) {
-      throw new ServiceError("merchant_not_found", 404);
-    }
+    const source = getMerchant(tx, sourceId);
+    const target = getMerchant(tx, targetId);
     if (target.archivedAt) {
       throw new ServiceError("merchant_archived", 409);
     }

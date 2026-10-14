@@ -1,5 +1,6 @@
 import {
   cardStatementListSchema,
+  checkpointCompareQuerySchema,
   checkpointCompareSchema,
   checkpointCreateSchema,
   checkpointListSchema,
@@ -47,16 +48,13 @@ const listRoute = createRoute({
 });
 
 const compareRoute = createRoute({
-  operationId: "post_accounts_id_checkpoints_compare",
-  description: "Create or run accounts. This does not change records outside this action. Amounts are integer minor units. Money that enters the account is positive.",
-  method: "post",
+  operationId: "get_accounts_id_checkpoints_compare",
+  description: "Read accounts. This does not create, change or delete a record. Compare a statement balance with the book. Amounts are integer minor units. Money that enters the account is positive.",
+  method: "get",
   path: "/api/accounts/{id}/checkpoints/compare",
   request: {
     params: accountParams,
-    body: {
-      required: true,
-      content: { "application/json": { schema: checkpointCreateSchema } },
-    },
+    query: checkpointCompareQuerySchema,
   },
   responses: {
     200: {
@@ -167,7 +165,7 @@ export function checkpointRoutes(db: Db) {
     .openapi(statementsRoute, (c) => c.json(listCardStatements(db, c.req.valid("param").id), 200))
     .openapi(compareRoute, (c) => {
       const { id } = c.req.valid("param");
-      return c.json(compareCheckpoint(db, id, c.req.valid("json")), 200);
+      return c.json(compareCheckpoint(db, id, c.req.valid("query")), 200);
     })
     .openapi(createRouteDef, (c) => {
       const { id } = c.req.valid("param");

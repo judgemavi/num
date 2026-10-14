@@ -1,6 +1,6 @@
 import { bucketEvents, buckets, type BucketEventRow } from "@num/db";
 import { isIsoDate, utcNow, type BucketCover, type BucketEvent, type BucketEventCreate } from "@num/shared";
-import { eq, isNull } from "drizzle-orm";
+import { desc, eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
@@ -112,13 +112,12 @@ export function undoBucketEvent(db: Db, bucketId: string, eventId: string, input
 }
 
 export function listBucketEvents(db: Db): { items: BucketEvent[] } {
-  const rows = db.select().from(bucketEvents).where(isNull(bucketEvents.undoneAt)).all();
-  rows.sort((left, right) => {
-    if (left.date !== right.date) {
-      return left.date < right.date ? 1 : -1;
-    }
-    return left.id < right.id ? 1 : -1;
-  });
+  const rows = db
+    .select()
+    .from(bucketEvents)
+    .where(isNull(bucketEvents.undoneAt))
+    .orderBy(desc(bucketEvents.date), desc(bucketEvents.id))
+    .all();
   return { items: rows };
 }
 

@@ -1,5 +1,5 @@
 import { fundingRuns, occurrenceLinks, recurringPlans, transactions } from "@num/db";
-import { and, eq, gt, isNotNull, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { decidedKeys } from "./decision-keys";
 
@@ -28,6 +28,7 @@ export function listFundingPaychecks(db: Db) {
         isNull(fundingRuns.id),
       ),
     )
+    .orderBy(desc(transactions.date), desc(transactions.id))
     .all();
   const items = rows.map((row) => ({
     incomeTransactionId: row.incomeTransactionId,
@@ -38,12 +39,6 @@ export function listFundingPaychecks(db: Db) {
     amountMode: row.amountMode,
     kept: hidden.has(`paycheck_funding:${row.incomeTransactionId}`),
   }));
-  items.sort((left, right) => {
-    if (left.date !== right.date) {
-      return left.date < right.date ? 1 : -1;
-    }
-    return left.incomeTransactionId < right.incomeTransactionId ? 1 : -1;
-  });
   return { items };
 }
 

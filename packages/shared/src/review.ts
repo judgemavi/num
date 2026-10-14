@@ -150,16 +150,6 @@ export const inboxGroupApplyResultSchema = z.object({
   skipped: z.array(skippedRowSchema),
 });
 
-export const payeeCountQuerySchema = z.object({
-  payee: z.string().trim().min(1).max(200),
-  accountId: z.uuid(),
-  except: z.string().optional(),
-});
-
-export const payeeCountSchema = z.object({
-  count: z.number().int().nonnegative(),
-});
-
 export type InboxDecision = z.infer<typeof inboxDecisionSchema>;
 export type ImportReviewResolve = z.infer<typeof importReviewResolveSchema>;
 export type InboxGroupApply = z.infer<typeof inboxGroupApplySchema>;

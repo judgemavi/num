@@ -1,18 +1,14 @@
 import {
-  normalizePayee,
   utcNow,
   type GroupSkip,
   type GroupSkipReason,
   type InboxGroupApply,
   type Transaction,
 } from "@num/shared";
-import { transactions } from "@num/db";
-import { and, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { linkAutomatic } from "./auto-link";
 import { readTransaction, type TransactionBody } from "./transaction-record";
 import { mortgageLinesFor } from "./mortgage-learned";
-import { hasOpenLine, lineCount, literal } from "./transaction-sql";
 import { applyTransactionUpdate, spreadAfterConfirmations } from "./transactions";
 import { write, type Reader, type WriteTx, type WriteInput } from "./write";
 
@@ -166,25 +162,3 @@ export function applyInboxGroup(db: Db, input: InboxGroupApply & WriteInput): { 
   });
   return { applied, skipped };
 }
-
-export function countOtherUncategorized(db: Db, payeeRaw: string, accountId: string, exceptIds: readonly string[]): number {
-  const payee = normalizePayee(payeeRaw);
-  if (payee.length === 0) {
-    return 0;
-  }
-  const except = new Set(exceptIds);
-  return db
-    .select({ id: transactions.id })
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.payeeNormalized, payee),
-        eq(transactions.accountId, accountId),
-        eq(lineCount(transactions.id), literal(1)),
-        hasOpenLine(transactions.id),
-      ),
-    )
-    .all()
-    .filter((row) => !except.has(row.id)).length;
-}
-

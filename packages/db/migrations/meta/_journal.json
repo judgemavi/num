@@ -57,6 +57,13 @@
       "when": 1791936529593,
       "tag": "0007_remove_month_closes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791983159232,
+      "tag": "0008_sort_keys_and_account_created_at",
+      "breakpoints": true
     }
   ]
 }

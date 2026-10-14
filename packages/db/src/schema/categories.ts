@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { categoryKinds } from "@num/shared";
 
 export const categoryGroups = sqliteTable(
@@ -7,8 +7,13 @@ export const categoryGroups = sqliteTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
+    /** The folded name (`foldName`). The list sorts by it. */
+    sortKey: text("sort_key").notNull(),
   },
-  (table) => [uniqueIndex("category_groups_name_lower_unique").on(sql`lower(${table.name})`)],
+  (table) => [
+    uniqueIndex("category_groups_name_lower_unique").on(sql`lower(${table.name})`),
+    index("category_groups_sort_key_idx").on(table.sortKey, table.name, table.id),
+  ],
 );
 export type CategoryGroupRow = typeof categoryGroups.$inferSelect;
 
@@ -21,8 +26,13 @@ export const categories = sqliteTable(
     groupId: text("group_id").references(() => categoryGroups.id),
     essential: integer("essential", { mode: "boolean" }).notNull(),
     archivedAt: text("archived_at"),
+    /** The folded name (`foldName`). The list sorts by it. */
+    sortKey: text("sort_key").notNull(),
   },
-  (table) => [uniqueIndex("categories_name_lower_unique").on(sql`lower(${table.name})`)],
+  (table) => [
+    uniqueIndex("categories_name_lower_unique").on(sql`lower(${table.name})`),
+    index("categories_sort_key_idx").on(table.sortKey, table.name, table.id),
+  ],
 );
 export type CategoryRow = typeof categories.$inferSelect;
 
@@ -32,8 +42,13 @@ export const tags = sqliteTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     archivedAt: text("archived_at"),
+    /** The folded name (`foldName`). The list sorts by it. */
+    sortKey: text("sort_key").notNull(),
   },
-  (table) => [uniqueIndex("tags_name_lower_unique").on(sql`lower(${table.name})`)],
+  (table) => [
+    uniqueIndex("tags_name_lower_unique").on(sql`lower(${table.name})`),
+    index("tags_sort_key_idx").on(table.sortKey, table.name, table.id),
+  ],
 );
 export type TagRow = typeof tags.$inferSelect;
 
@@ -43,7 +58,12 @@ export const merchants = sqliteTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     archivedAt: text("archived_at"),
+    /** The folded name (`foldName`). The list sorts by it. */
+    sortKey: text("sort_key").notNull(),
   },
-  (table) => [uniqueIndex("merchants_name_lower_unique").on(sql`lower(${table.name})`)],
+  (table) => [
+    uniqueIndex("merchants_name_lower_unique").on(sql`lower(${table.name})`),
+    index("merchants_sort_key_idx").on(table.sortKey, table.name, table.id),
+  ],
 );
 export type MerchantRow = typeof merchants.$inferSelect;

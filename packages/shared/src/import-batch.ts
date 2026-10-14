@@ -25,25 +25,6 @@ export const importRowOutcomes = ["created", "matched", "needs_review", "duplica
 
 export type ImportRowOutcome = (typeof importRowOutcomes)[number];
 
-export function importBatchStatus(input: {
-  undoneAt: string | null;
-  needsReview: number;
-  batchId: string;
-  unreadableLines: readonly number[];
-  decidedKeys: ReadonlySet<string>;
-}): ImportViewStatus {
-  if (input.undoneAt !== null) {
-    return "undone";
-  }
-  const unreadableOpen = input.unreadableLines.some(
-    (line) => !input.decidedKeys.has(`import_unreadable:${input.batchId}:${line}`),
-  );
-  if (input.needsReview > 0 || unreadableOpen) {
-    return "needs_you";
-  }
-  return "imported";
-}
-
 const timestampSchema = z.string().refine(isUtcTimestamp);
 
 export const importBatchSchema = z.object({

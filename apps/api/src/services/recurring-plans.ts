@@ -1,5 +1,6 @@
 import { accounts, categories, merchants, recurringPlans, type RecurringPlanRow } from "@num/db";
 import {
+  foldName,
   Temporal,
   utcNow,
   type Plan,
@@ -8,19 +9,11 @@ import {
   type PlanListQuery,
   type PlanUpdate,
 } from "@num/shared";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { keepOmitted, withoutId, write, type WriteTx, type WriteInput } from "./write";
-import { compareText, pageOf } from "./paging";
-
-function compareName(left: string, right: string) {
-  const folded = compareText(left.toLowerCase(), right.toLowerCase());
-  if (folded !== 0) {
-    return folded;
-  }
-  return compareText(left, right);
-}
+import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 
 function fieldsOf(input: PlanCreate) {
   const transfer = input.kind === "transfer";
@@ -118,8 +111,8 @@ function assertRefs(tx: WriteTx, value: PlanFields) {
   }
 }
 
-function requirePlan(tx: WriteTx, id: string): RecurringPlanRow {
-  const row = tx.select().from(recurringPlans).where(eq(recurringPlans.id, id)).get();
+function requirePlan(tx: WriteTx, id: string): Omit<RecurringPlanRow, "sortKey"> {
+  const row = withoutSortKey(tx.select().from(recurringPlans).where(eq(recurringPlans.id, id)).get());
   if (!row) {
     throw new ServiceError("plan_not_found", 404);
   }
@@ -127,7 +120,7 @@ function requirePlan(tx: WriteTx, id: string): RecurringPlanRow {
 }
 
 export function getPlan(db: Db, id: string): Plan {
-  const row = db.select().from(recurringPlans).where(eq(recurringPlans.id, id)).get();
+  const row = withoutSortKey(db.select().from(recurringPlans).where(eq(recurringPlans.id, id)).get());
   if (!row) {
     throw new ServiceError("plan_not_found", 404);
   }
@@ -135,38 +128,17 @@ export function getPlan(db: Db, id: string): Plan {
 }
 
 export function listPlans(db: Db, query: PlanListQuery) {
-  const rows = db
-    .select()
-    .from(recurringPlans)
-    .all()
-    .filter((row) => {
-      if (query.archived ? row.archivedAt === null : row.archivedAt !== null) {
-        return false;
-      }
-      if (query.kind && row.kind !== query.kind) {
-        return false;
-      }
-      if (query.accountId && row.accountId !== query.accountId) {
-        return false;
-      }
-      if (query.q && !row.name.toLowerCase().includes(query.q.toLowerCase())) {
-        return false;
-      }
-      return true;
-    });
-  const dir = query.dir === "desc" ? -1 : 1;
-  const sort = query.sort ?? "name";
-  rows.sort((left, right) => {
-    const field =
-      sort === "startDate"
-        ? compareText(left.startDate, right.startDate)
-        : compareName(left.name, right.name);
-    if (field !== 0) {
-      return field * dir;
-    }
-    return compareText(left.id, right.id);
-  });
-  return pageOf(rows, query);
+  const where = and(
+    query.archived ? isNotNull(recurringPlans.archivedAt) : isNull(recurringPlans.archivedAt),
+    query.kind ? eq(recurringPlans.kind, query.kind) : undefined,
+    query.accountId ? eq(recurringPlans.accountId, query.accountId) : undefined,
+    query.q ? sql`instr(${recurringPlans.sortKey}, ${foldName(query.q)}) > 0` : undefined,
+  );
+  const order =
+    query.sort === "startDate" ? byColumn(recurringPlans.startDate, recurringPlans.id, query.dir) : byName(recurringPlans, query.dir);
+  const { limit, offset } = windowOf(query);
+  const rows = db.select().from(recurringPlans).where(where).orderBy(...order).limit(limit).offset(offset).all();
+  return pagedOf(rows.map((row) => withoutSortKey(row)), totalOf(db, recurringPlans, where), query);
 }
 
 export function createPlan(db: Db, input: PlanCreate & WriteInput): Plan {
@@ -175,7 +147,7 @@ export function createPlan(db: Db, input: PlanCreate & WriteInput): Plan {
   const row = { id, ...value, archivedAt: null };
   write(db, { source: input.source, at: input.at }, (tx) => {
     assertRefs(tx, value);
-    tx.insert(recurringPlans).values(row).run();
+    tx.insert(recurringPlans).values({ ...row, sortKey: foldName(row.name) }).run();
     tx.audit({
       entity: "recurring_plans",
       entityId: id,
@@ -203,7 +175,7 @@ export function updatePlan(db: Db, id: string, input: PlanUpdate & WriteInput): 
     });
     assertRefs(tx, value);
     const next = { ...value, archivedAt: existing.archivedAt };
-    tx.update(recurringPlans).set(value).where(eq(recurringPlans.id, id)).run();
+    tx.update(recurringPlans).set({ ...value, sortKey: foldName(value.name) }).where(eq(recurringPlans.id, id)).run();
     tx.audit({
       entity: "recurring_plans",
       entityId: id,

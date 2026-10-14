@@ -578,7 +578,7 @@ the level and one-click answers. The whole row opens the transaction editor (a c
   with the count; audited; one write). Maybe and Questions are answered one row at a time.
 - An approval is a confirmation (it counts for learning).
 - Home shows the count and links to the view.
-The editor's group mode stays available for bulk edits that the user starts (for example from a selection on Transactions).
+The editor has no group mode (decision 0034). The user answers a group of rows with "Approve all Sure" and "Approve all Likely".
 
 **Create on the spot.** Every picker of user-managed things shows "+ Create new <thing>" as its first option (decision 0018).
 Choosing it opens that entity's form inline below the picker (the same form component as in Settings or Accounts).

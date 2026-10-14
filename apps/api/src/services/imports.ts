@@ -11,7 +11,7 @@ import {
   type ColumnMap,
   type ImportResult,
 } from "@num/shared";
-import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { restoreDocument } from "./documents";
@@ -162,13 +162,12 @@ export function listImportBatches(db: Db, accountId: string) {
   if (!account) {
     throw new ServiceError("account_not_found", 404);
   }
-  const batches = db.select().from(importBatches).where(eq(importBatches.accountId, accountId)).all();
-  batches.sort((left, right) => {
-    if (left.createdAt !== right.createdAt) {
-      return left.createdAt < right.createdAt ? 1 : -1;
-    }
-    return left.id < right.id ? 1 : -1;
-  });
+  const batches = db
+    .select()
+    .from(importBatches)
+    .where(eq(importBatches.accountId, accountId))
+    .orderBy(desc(importBatches.createdAt), desc(importBatches.id))
+    .all();
   return { items: batches.map((batch) => presentBatch(db, batch)) };
 }
 

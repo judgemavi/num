@@ -133,6 +133,9 @@ test("the import list filters by account, status and date", () => {
 
     const needsYou = listImportView(book.db, { ...page, status: "needs_you" });
     expect(needsYou.items.map((item) => item.filename)).toEqual(["open.csv", "april.csv"]);
+    expect(needsYou.total).toBe(2);
+    expect(listImportView(book.db, { ...page, status: "undone" }).total).toBe(1);
+    expect(listImportView(book.db, { ...page, status: "imported" }).total).toBe(2);
 
     const april = listImportView(book.db, { ...page, from: "2026-04-01", to: "2026-04-30" });
     expect(april.items.map((item) => item.filename)).toEqual(["open.csv", "dismissed.csv", "april.csv"]);

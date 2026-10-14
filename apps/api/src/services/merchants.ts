@@ -1,5 +1,6 @@
-import { merchants } from "@num/db";
+import { merchants, type MerchantRow } from "@num/db";
 import {
+  foldName,
   utcNow,
   type Merchant,
   type MerchantCreate,
@@ -9,12 +10,12 @@ import {
 import { eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { withoutId, write, type WriteTx, type WriteInput } from "./write";
-import { compareText, pageOf } from "./paging";
+import { byName, pagedOf, totalOf, windowOf } from "./list-sql";
+import { withoutId, write, type Reader, type WriteTx, type WriteInput } from "./write";
 
-function compareName(left: string, right: string) {
-  const folded = compareText(left.toLowerCase(), right.toLowerCase());
-  return folded === 0 ? compareText(left, right) : folded;
+/** The stored row has the sort key. The API shows the fields of the schema only. */
+function toMerchant({ id, name, archivedAt }: MerchantRow): Merchant {
+  return { id, name, archivedAt };
 }
 
 function assertName(tx: WriteTx, name: string, exceptId?: string) {
@@ -28,23 +29,26 @@ function assertName(tx: WriteTx, name: string, exceptId?: string) {
   }
 }
 
-export function getMerchant(db: Db, id: string): Merchant {
+export function getMerchant(db: Reader, id: string): Merchant {
   const row = db.select().from(merchants).where(eq(merchants.id, id)).get();
   if (!row) {
     throw new ServiceError("merchant_not_found", 404);
   }
-  return row;
+  return toMerchant(row);
 }
 
+/** Sort, page and count run in SQL. The order is the folded name, then the name, then the id. */
 export function listMerchants(db: Db, query: MerchantListQuery) {
+  const where = query.archived ? isNotNull(merchants.archivedAt) : isNull(merchants.archivedAt);
   const rows = db
     .select()
     .from(merchants)
-    .where(query.archived ? isNotNull(merchants.archivedAt) : isNull(merchants.archivedAt))
+    .where(where)
+    .orderBy(...byName(merchants, query.dir))
+    .limit(windowOf(query).limit)
+    .offset(windowOf(query).offset)
     .all();
-  const dir = query.dir === "desc" ? -1 : 1;
-  rows.sort((left, right) => compareName(left.name, right.name) * dir || compareText(left.id, right.id));
-  return pageOf(rows, query);
+  return pagedOf(rows.map(toMerchant), totalOf(db, merchants, where), query);
 }
 
 export function createMerchant(db: Db, input: MerchantCreate & WriteInput): Merchant {
@@ -56,7 +60,7 @@ export function createMerchant(db: Db, input: MerchantCreate & WriteInput): Merc
   };
   write(db, { source: input.source, at: input.at }, (tx) => {
     assertName(tx, row.name);
-    tx.insert(merchants).values(row).run();
+    tx.insert(merchants).values({ ...row, sortKey: foldName(row.name) }).run();
     tx.audit({ entity: "merchants", entityId: id, action: "create", before: null, after: withoutId(row) });
   });
   return row;
@@ -64,16 +68,13 @@ export function createMerchant(db: Db, input: MerchantCreate & WriteInput): Merc
 
 export function updateMerchant(db: Db, id: string, input: MerchantUpdate & WriteInput): Merchant {
   return write(db, { source: input.source, at: input.at }, (tx) => {
-    const existing = tx.select().from(merchants).where(eq(merchants.id, id)).get();
-    if (!existing) {
-      throw new ServiceError("merchant_not_found", 404);
-    }
+    const existing = getMerchant(tx, id);
     const next = {
       name: input.name.trim(),
       archivedAt: existing.archivedAt,
     };
     assertName(tx, next.name, id);
-    tx.update(merchants).set({ name: next.name }).where(eq(merchants.id, id)).run();
+    tx.update(merchants).set({ name: next.name, sortKey: foldName(next.name) }).where(eq(merchants.id, id)).run();
     tx.audit({
       entity: "merchants",
       entityId: id,
@@ -88,10 +89,7 @@ export function updateMerchant(db: Db, id: string, input: MerchantUpdate & Write
 export function archiveMerchant(db: Db, id: string, input: WriteInput): Merchant {
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
-    const existing = tx.select().from(merchants).where(eq(merchants.id, id)).get();
-    if (!existing) {
-      throw new ServiceError("merchant_not_found", 404);
-    }
+    const existing = getMerchant(tx, id);
     if (existing.archivedAt) {
       throw new ServiceError("merchant_archived", 409);
     }
@@ -104,10 +102,7 @@ export function archiveMerchant(db: Db, id: string, input: WriteInput): Merchant
 
 export function restoreMerchant(db: Db, id: string, input: WriteInput): Merchant {
   return write(db, { source: input.source, at: input.at }, (tx) => {
-    const existing = tx.select().from(merchants).where(eq(merchants.id, id)).get();
-    if (!existing) {
-      throw new ServiceError("merchant_not_found", 404);
-    }
+    const existing = getMerchant(tx, id);
     if (!existing.archivedAt) {
       throw new ServiceError("merchant_not_archived", 409);
     }

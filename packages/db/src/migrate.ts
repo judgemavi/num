@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
+import { fillSortKeys } from "./sort-keys";
 
 const migrationsFolder = join(import.meta.dir, "..", "migrations");
 
@@ -42,6 +43,7 @@ export function migrateDatabase(sqlite: Database) {
       throw new Error(`Foreign key check failed: ${violations.length} rows`);
     }
     assertJournalApplied(sqlite);
+    fillSortKeys(sqlite);
   } finally {
     sqlite.exec("pragma foreign_keys = on");
   }

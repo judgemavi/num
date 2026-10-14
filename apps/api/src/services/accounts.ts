@@ -2,6 +2,7 @@ import { accounts, type AccountRow } from "@num/db";
 import {
   allowsInterestRate,
   defaultOnBudget,
+  foldName,
   type Account,
   type AccountCreate,
   type AccountListQuery,
@@ -17,7 +18,7 @@ import { accountAuditSnapshot } from "./account-snapshot";
 import { hasTerms, resolveTerms, saveTerms } from "./mortgage-terms";
 import { automaticOpening, automaticOpenings, effectiveOpeningDate, type AutomaticOpening } from "./opening-date";
 import { keepOmitted, write, type WriteInput } from "./write";
-import { compareText, pageOf } from "./paging";
+import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 
 function blankToNull(value: string | null | undefined) {
   if (value === undefined || value === null) {
@@ -28,7 +29,7 @@ function blankToNull(value: string | null | undefined) {
 }
 
 function toAccount(row: AccountRow, balance: number, automatic: AutomaticOpening): Account {
-  const { id, name, institution, kind, onBudget, openingDate, ...rest } = row;
+  const { id, name, institution, kind, onBudget, openingDate, createdAt, ...rest } = withoutSortKey(row);
   return {
     id,
     name,
@@ -44,20 +45,11 @@ function toAccount(row: AccountRow, balance: number, automatic: AutomaticOpening
   };
 }
 
-function compareName(left: string, right: string) {
-  const folded = compareText(left.toLowerCase(), right.toLowerCase());
-  if (folded !== 0) {
-    return folded;
-  }
-  return compareText(left, right);
-}
-
 export function listAccounts(db: Db, query: AccountListQuery) {
-  const rows = db
-    .select()
-    .from(accounts)
-    .where(query.archived ? isNotNull(accounts.archivedAt) : isNull(accounts.archivedAt))
-    .all();
+  const where = query.archived ? isNotNull(accounts.archivedAt) : isNull(accounts.archivedAt);
+  const order = query.sort === "kind" ? byColumn(accounts.kind, accounts.id, query.dir) : byName(accounts, query.dir);
+  const { limit, offset } = windowOf(query);
+  const rows = db.select().from(accounts).where(where).orderBy(...order).limit(limit).offset(offset).all();
   const openings = automaticOpenings(
     db,
     rows.map((row) => row.id),
@@ -65,20 +57,11 @@ export function listAccounts(db: Db, query: AccountListQuery) {
   const items = balancesOf(db, rows).map(({ account, balance }) => {
     const automatic = openings.get(account.id);
     if (!automatic) {
-      throw new Error("Account has no creation record");
+      throw new ServiceError("account_not_found", 404);
     }
     return toAccount(account, balance, automatic);
   });
-  const sort = query.sort ?? "name";
-  const dir = query.dir === "desc" ? -1 : 1;
-  items.sort((left, right) => {
-    const field = sort === "kind" ? compareText(left.kind, right.kind) : compareName(left.name, right.name);
-    if (field !== 0) {
-      return field * dir;
-    }
-    return compareText(left.id, right.id);
-  });
-  return pageOf(items, query);
+  return pagedOf(items, totalOf(db, accounts, where), query);
 }
 
 export function createAccount(db: Db, input: AccountCreate & WriteInput): Account {
@@ -100,6 +83,8 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
     interestRateMilliPct: rate,
     importPreset: null,
     columnMap: null,
+    createdAt: at,
+    sortKey: foldName(input.name.trim()),
   };
   write(db, { source: input.source, at }, (tx) => {
     tx.insert(accounts).values(row).run();
@@ -143,8 +128,8 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
       ...card,
       interestRateMilliPct: rate,
     };
-    const saved = { ...existing, ...next };
-    tx.update(accounts).set(next).where(eq(accounts.id, id)).run();
+    const saved = { ...existing, ...next, sortKey: foldName(next.name) };
+    tx.update(accounts).set({ ...next, sortKey: saved.sortKey }).where(eq(accounts.id, id)).run();
     tx.audit({
       entity: "accounts",
       entityId: id,

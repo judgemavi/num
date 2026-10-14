@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { accounts, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
+import { accounts, auditLog, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
 import { columnMapSchema, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -123,6 +123,25 @@ test("a user-set opening date does not move when older rows are imported", () =>
       openingAutomatic: false,
       automaticOpeningDate: "2026-01-14",
     });
+  } finally {
+    book.close();
+  }
+});
+
+test("an account with no opening date and no rows opens on the day of its creation, from its own column", () => {
+  const book = tempBook();
+  try {
+    const account = createAccount(book.db, {
+      name: "Cash",
+      institution: null,
+      kind: "chequing",
+      openingBalance: 0,
+      source: "ui",
+      at: "2026-10-07T23:30:00Z",
+    });
+    book.db.delete(auditLog).run();
+    expect(getAccount(book.db, account.id).automaticOpeningDate).toBe("2026-10-07");
+    expect(book.db.select({ createdAt: accounts.createdAt }).from(accounts).get()).toEqual({ createdAt: "2026-10-07T23:30:00Z" });
   } finally {
     book.close();
   }

@@ -4,24 +4,30 @@ import { bucketColors, bucketEventKinds, bucketIcons, bucketKinds, sinkingRepeat
 import { categories } from "./categories";
 import { transactions } from "./ledger";
 
-export const buckets = sqliteTable("buckets", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  kind: text("kind", { enum: bucketKinds }).notNull(),
-  priority: integer("priority").notNull(),
-  essential: integer("essential", { mode: "boolean" }).notNull(),
-  color: text("color", { enum: bucketColors }).notNull(),
-  icon: text("icon", { enum: bucketIcons }).notNull(),
-  startDate: text("start_date").notNull(),
-  archivedAt: text("archived_at"),
-  refillTo: integer("refill_to"),
-  amount: integer("amount"),
-  dueDate: text("due_date"),
-  repeat: text("repeat", { enum: sinkingRepeats }),
-  target: integer("target"),
-  targetDate: text("target_date"),
-  fixedAmount: integer("fixed_amount"),
-});
+export const buckets = sqliteTable(
+  "buckets",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    kind: text("kind", { enum: bucketKinds }).notNull(),
+    priority: integer("priority").notNull(),
+    essential: integer("essential", { mode: "boolean" }).notNull(),
+    color: text("color", { enum: bucketColors }).notNull(),
+    icon: text("icon", { enum: bucketIcons }).notNull(),
+    startDate: text("start_date").notNull(),
+    archivedAt: text("archived_at"),
+    refillTo: integer("refill_to"),
+    amount: integer("amount"),
+    dueDate: text("due_date"),
+    repeat: text("repeat", { enum: sinkingRepeats }),
+    target: integer("target"),
+    targetDate: text("target_date"),
+    fixedAmount: integer("fixed_amount"),
+    /** The folded name (`foldName`). The list sorts by it. */
+    sortKey: text("sort_key").notNull(),
+  },
+  (table) => [index("buckets_sort_key_idx").on(table.sortKey, table.name, table.id)],
+);
 export type BucketRow = typeof buckets.$inferSelect;
 
 export const bucketCategories = sqliteTable("bucket_categories", {

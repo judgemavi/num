@@ -3,9 +3,7 @@ import { usePrefetchQuery, useSuspenseQueries, useSuspenseQuery } from "@tanstac
 import { useDeferredValue } from "react";
 import { inboxDecisionsQuery } from "@/api/review";
 import { transactionQuery } from "@/api/transactions";
-import { Boundary } from "@/components/boundary";
 import type { EditorInput } from "@/editors/editor-types";
-import { GroupEditor } from "@/transactions/transaction-group";
 import { TransactionForm } from "@/transactions/transaction-form";
 
 function amountLocked(transaction: Transaction, peer: Transaction | undefined) {
@@ -16,14 +14,7 @@ function amountLocked(transaction: Transaction, peer: Transaction | undefined) {
   return peer.lines.length > 1 && line.transferAccountId === peer.accountId;
 }
 
-export function TransactionEditor({ id, groupIds, ...create }: EditorInput["transaction"]) {
-  if (groupIds && groupIds.length > 0) {
-    return (
-      <Boundary look="dialog" loading="Loading the transactions." failed="The transactions did not load.">
-        <GroupEditor ids={groupIds} />
-      </Boundary>
-    );
-  }
+export function TransactionEditor({ id, ...create }: EditorInput["transaction"]) {
   if (id === null) {
     return <TransactionForm {...create} transaction={null} amountLocked={false} />;
   }

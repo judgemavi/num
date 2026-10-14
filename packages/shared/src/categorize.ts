@@ -6,9 +6,8 @@ export const whatChoices = ["spending", "income", "refund", "transfer", "split"]
 
 export type WhatChoice = (typeof whatChoices)[number];
 
-export function choicesForDirection(direction: MoneyDirection, group = false): WhatChoice[] {
-  const choices: WhatChoice[] = direction === "out" ? ["spending", "transfer", "split"] : ["income", "refund", "transfer", "split"];
-  return group ? choices.filter((choice) => choice !== "split") : choices;
+export function choicesForDirection(direction: MoneyDirection): WhatChoice[] {
+  return direction === "out" ? ["spending", "transfer", "split"] : ["income", "refund", "transfer", "split"];
 }
 
 export function defaultChoice(direction: MoneyDirection): WhatChoice {

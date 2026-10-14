@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { merchants, migrateDatabase, openDatabase, transactions } from "@num/db";
-import { storedPayee } from "@num/shared";
+import { foldName, storedPayee } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
 import { ServiceError } from "../service-error";
@@ -40,7 +40,7 @@ function account(db: ReturnType<typeof tempDatabase>["db"], name = "Chequing") {
 
 function merchant(db: ReturnType<typeof tempDatabase>["db"], name: string) {
   const id = crypto.randomUUID();
-  db.insert(merchants).values({ id, name, archivedAt: null }).run();
+  db.insert(merchants).values({ id, name, sortKey: foldName(name), archivedAt: null }).run();
   return id;
 }
 

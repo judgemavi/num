@@ -18,10 +18,11 @@ export function closingHintQuery(accountId: string) {
 }
 
 /** Compare a statement balance with the book. This does not save a checkpoint. */
-export function useCompareCheckpoint() {
-  return useMutation({
-    mutationFn: ({ accountId, body }: { accountId: string; body: CheckpointCreate }) =>
-      unwrap(api.accounts[":id"].checkpoints.compare.$post({ param: { id: accountId }, json: body })),
+export function checkpointCompareQuery(accountId: string, { date, statementBalance }: CheckpointCreate) {
+  return queryOptions({
+    queryKey: ["checkpoint-compare", accountId, date, statementBalance],
+    queryFn: () =>
+      unwrap(api.accounts[":id"].checkpoints.compare.$get({ param: { id: accountId }, query: { date, statementBalance } })),
   });
 }
 

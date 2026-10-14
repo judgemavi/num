@@ -6,13 +6,11 @@ import {
   inboxDecisionUndoSchema,
   inboxGroupApplyResultSchema,
   inboxGroupApplySchema,
-  payeeCountQuerySchema,
-  payeeCountSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { decideInboxItem, decisionRows, undoInboxDecision } from "../services/inbox-decisions";
-import { applyInboxGroup, countOtherUncategorized } from "../services/inbox-group";
+import { applyInboxGroup } from "../services/inbox-group";
 import { validationHook } from "../validation";
 import { errorResponse } from "./common";
 
@@ -71,32 +69,9 @@ const groupRoute = createRoute({
   },
 });
 
-const payeeCountRoute = createRoute({
-  operationId: "get_transactions_payee_count",
-  description: "Count other uncategorized rows for this payee.",
-  method: "get",
-  path: "/api/transactions/payee-count",
-  request: { query: payeeCountQuerySchema },
-  responses: {
-    200: { description: "Other uncategorized rows for this payee", content: { "application/json": { schema: payeeCountSchema } } },
-    400: errorResponse,
-  },
-});
-
-function exceptIds(except: string | undefined) {
-  if (!except) {
-    return [];
-  }
-  return except.split(",").map((id) => id.trim()).filter((id) => id.length > 0);
-}
-
 export function inboxRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook })
     .openapi(groupRoute, (c) => c.json(applyInboxGroup(db, { ...c.req.valid("json"), source: "ui" }), 200))
-    .openapi(payeeCountRoute, (c) => {
-      const query = c.req.valid("query");
-      return c.json({ count: countOtherUncategorized(db, query.payee, query.accountId, exceptIds(query.except)) }, 200);
-    })
     .openapi(decisionsRoute, (c) => c.json({ items: decisionRows(db) }, 200))
     .openapi(decideRoute, (c) => {
       const body = c.req.valid("json");

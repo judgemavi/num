@@ -98,6 +98,8 @@ test("currency cannot change after the first transaction", () => {
         onBudget: true,
         openingDate: "2026-01-01",
         openingBalance: 0,
+        createdAt: at,
+        sortKey: "cash",
       })
       .run();
     db.db

@@ -1,5 +1,6 @@
 import { bucketCategories, categories, categoryGroups, transactionLines } from "@num/db";
 import {
+  foldName,
   utcNow,
   type Category,
   type CategoryCreate,
@@ -10,19 +11,11 @@ import {
   type CategoryListQuery,
   type CategoryUpdate,
 } from "@num/shared";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { withoutId, write, type WriteTx, type WriteInput } from "./write";
-import { compareText, pageOf } from "./paging";
-
-function compareName(left: string, right: string) {
-  const folded = compareText(left.toLowerCase(), right.toLowerCase());
-  if (folded !== 0) {
-    return folded;
-  }
-  return compareText(left, right);
-}
+import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 
 function assertGroup(tx: WriteTx, groupId: string | null) {
   if (groupId === null) {
@@ -78,7 +71,7 @@ function assertKindChange(tx: WriteTx, id: string, current: CategoryKind, next: 
 }
 
 export function getCategoryGroup(db: Db, id: string): CategoryGroup {
-  const row = db.select().from(categoryGroups).where(eq(categoryGroups.id, id)).get();
+  const row = withoutSortKey(db.select().from(categoryGroups).where(eq(categoryGroups.id, id)).get());
   if (!row) {
     throw new ServiceError("group_not_found", 404);
   }
@@ -86,7 +79,7 @@ export function getCategoryGroup(db: Db, id: string): CategoryGroup {
 }
 
 export function getCategory(db: Db, id: string): Category {
-  const row = db.select().from(categories).where(eq(categories.id, id)).get();
+  const row = withoutSortKey(db.select().from(categories).where(eq(categories.id, id)).get());
   if (!row) {
     throw new ServiceError("category_not_found", 404);
   }
@@ -94,9 +87,8 @@ export function getCategory(db: Db, id: string): Category {
 }
 
 export function listCategoryGroups(db: Db): { items: CategoryGroup[] } {
-  const items = db.select().from(categoryGroups).all();
-  items.sort((left, right) => compareName(left.name, right.name) || compareText(left.id, right.id));
-  return { items };
+  const rows = db.select().from(categoryGroups).orderBy(...byName(categoryGroups, "asc")).all();
+  return { items: rows.map((row) => withoutSortKey(row)) };
 }
 
 export function createCategoryGroup(db: Db, input: CategoryGroupCreate & WriteInput): CategoryGroup {
@@ -104,7 +96,7 @@ export function createCategoryGroup(db: Db, input: CategoryGroupCreate & WriteIn
   return write(db, { source: input.source, at: input.at }, (tx) => {
     const row = { id, name: input.name.trim() };
     assertGroupName(tx, row.name);
-    tx.insert(categoryGroups).values(row).run();
+    tx.insert(categoryGroups).values({ ...row, sortKey: foldName(row.name) }).run();
     tx.audit({
       entity: "category_groups",
       entityId: id,
@@ -122,13 +114,13 @@ export function updateCategoryGroup(
   input: CategoryGroupUpdate & WriteInput,
 ): CategoryGroup {
   return write(db, { source: input.source, at: input.at }, (tx) => {
-    const existing = tx.select().from(categoryGroups).where(eq(categoryGroups.id, id)).get();
+    const existing = withoutSortKey(tx.select().from(categoryGroups).where(eq(categoryGroups.id, id)).get());
     if (!existing) {
       throw new ServiceError("group_not_found", 404);
     }
     const next = { name: input.name.trim() };
     assertGroupName(tx, next.name, id);
-    tx.update(categoryGroups).set({ name: next.name }).where(eq(categoryGroups.id, id)).run();
+    tx.update(categoryGroups).set({ name: next.name, sortKey: foldName(next.name) }).where(eq(categoryGroups.id, id)).run();
     tx.audit({
       entity: "category_groups",
       entityId: id,
@@ -142,11 +134,11 @@ export function updateCategoryGroup(
 
 export function deleteCategoryGroup(db: Db, id: string, input: WriteInput): void {
   write(db, { source: input.source, at: input.at }, (tx) => {
-    const existing = tx.select().from(categoryGroups).where(eq(categoryGroups.id, id)).get();
+    const existing = withoutSortKey(tx.select().from(categoryGroups).where(eq(categoryGroups.id, id)).get());
     if (!existing) {
       throw new ServiceError("group_not_found", 404);
     }
-    const members = tx.select().from(categories).where(eq(categories.groupId, id)).all();
+    const members = tx.select().from(categories).where(eq(categories.groupId, id)).all().map((row) => withoutSortKey(row));
     for (const category of members) {
       const next = { ...category, groupId: null };
       tx.update(categories).set({ groupId: null }).where(eq(categories.id, category.id)).run();
@@ -170,30 +162,13 @@ export function deleteCategoryGroup(db: Db, id: string, input: WriteInput): void
 }
 
 export function listCategories(db: Db, query: CategoryListQuery) {
-  const rows = db
-    .select()
-    .from(categories)
-    .all()
-    .filter((row) => (query.archived ? row.archivedAt !== null : row.archivedAt === null))
-    .filter((row) => {
-      if (query.groupId === undefined) {
-        return true;
-      }
-      if (query.groupId === "none") {
-        return row.groupId === null;
-      }
-      return row.groupId === query.groupId;
-    });
-  const sort = query.sort ?? "name";
-  const dir = query.dir === "desc" ? -1 : 1;
-  rows.sort((left, right) => {
-    const field = sort === "kind" ? compareText(left.kind, right.kind) : compareName(left.name, right.name);
-    if (field !== 0) {
-      return field * dir;
-    }
-    return compareText(left.id, right.id);
-  });
-  return pageOf(rows, query);
+  const groupFilter =
+    query.groupId === undefined ? undefined : query.groupId === "none" ? isNull(categories.groupId) : eq(categories.groupId, query.groupId);
+  const where = and(query.archived ? isNotNull(categories.archivedAt) : isNull(categories.archivedAt), groupFilter);
+  const order = query.sort === "kind" ? byColumn(categories.kind, categories.id, query.dir) : byName(categories, query.dir);
+  const { limit, offset } = windowOf(query);
+  const rows = db.select().from(categories).where(where).orderBy(...order).limit(limit).offset(offset).all();
+  return pagedOf(rows.map((row) => withoutSortKey(row)), totalOf(db, categories, where), query);
 }
 
 export function createCategory(db: Db, input: CategoryCreate & WriteInput): Category {
@@ -211,7 +186,7 @@ export function createCategory(db: Db, input: CategoryCreate & WriteInput): Cate
   write(db, { source: input.source, at: input.at }, (tx) => {
     assertGroup(tx, row.groupId);
     assertCategoryName(tx, row.name);
-    tx.insert(categories).values(row).run();
+    tx.insert(categories).values({ ...row, sortKey: foldName(row.name) }).run();
     tx.audit({
       entity: "categories",
       entityId: id,
@@ -225,7 +200,7 @@ export function createCategory(db: Db, input: CategoryCreate & WriteInput): Cate
 
 export function updateCategory(db: Db, id: string, input: CategoryUpdate & WriteInput): Category {
   return write(db, { source: input.source, at: input.at }, (tx) => {
-    const existing = tx.select().from(categories).where(eq(categories.id, id)).get();
+    const existing = withoutSortKey(tx.select().from(categories).where(eq(categories.id, id)).get());
     if (!existing) {
       throw new ServiceError("category_not_found", 404);
     }
@@ -242,7 +217,7 @@ export function updateCategory(db: Db, id: string, input: CategoryUpdate & Write
       archivedAt: existing.archivedAt,
     };
     tx.update(categories)
-      .set({ name: next.name, kind: next.kind, groupId: next.groupId, essential: next.essential })
+      .set({ name: next.name, sortKey: foldName(next.name), kind: next.kind, groupId: next.groupId, essential: next.essential })
       .where(eq(categories.id, id))
       .run();
     tx.audit({
@@ -259,7 +234,7 @@ export function updateCategory(db: Db, id: string, input: CategoryUpdate & Write
 export function archiveCategory(db: Db, id: string, input: WriteInput): Category {
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
-    const existing = tx.select().from(categories).where(eq(categories.id, id)).get();
+    const existing = withoutSortKey(tx.select().from(categories).where(eq(categories.id, id)).get());
     if (!existing) {
       throw new ServiceError("category_not_found", 404);
     }
@@ -281,7 +256,7 @@ export function archiveCategory(db: Db, id: string, input: WriteInput): Category
 
 export function restoreCategory(db: Db, id: string, input: WriteInput): Category {
   return write(db, { source: input.source, at: input.at }, (tx) => {
-    const existing = tx.select().from(categories).where(eq(categories.id, id)).get();
+    const existing = withoutSortKey(tx.select().from(categories).where(eq(categories.id, id)).get());
     if (!existing) {
       throw new ServiceError("category_not_found", 404);
     }

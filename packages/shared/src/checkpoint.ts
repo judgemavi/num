@@ -13,6 +13,12 @@ export const checkpointCreateSchema = z.object({
   statementBalance: centsSchema,
 });
 
+/** The query of the compare read: the same two values as a checkpoint, in the URL. */
+export const checkpointCompareQuerySchema = z.object({
+  date: isoDateSchema,
+  statementBalance: queryNumber().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER),
+});
+
 export const checkpointSchema = z.object({
   id: z.uuid(),
   accountId: z.uuid(),

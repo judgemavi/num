@@ -66,6 +66,7 @@ export {
 } from "./category";
 export {
   accountActivityQuerySchema,
+  checkpointCompareQuerySchema,
   checkpointCompareSchema,
   checkpointCreateSchema,
   checkpointHelpSchema,
@@ -190,7 +191,6 @@ export {
 } from "./detect-format";
 export {
   importBatchSchema,
-  importBatchStatus,
   importCountsSchema,
   importDetailRowSchema,
   importDetailSchema,
@@ -237,6 +237,7 @@ export {
 } from "./merchant";
 export { archivedNameMatch, type NamedId } from "./name-match";
 export { canOfferInlineCreate, finishInlineCreate, inlineCreateMaxDepth, type InlineCreateResult } from "./inline-create";
+export { foldName } from "./fold";
 export { merchantNameFromPayee, normalizePayee, storedPayee } from "./payee";
 export {
   autoRefundPurchase,
@@ -468,8 +469,6 @@ export {
   inboxDecisionUndoSchema,
   inboxGroupApplyResultSchema,
   inboxGroupApplySchema,
-  payeeCountQuerySchema,
-  payeeCountSchema,
   reviewCountSchema,
   reviewQuestions,
   reviewRecurringSchema,

@@ -124,6 +124,8 @@ function addLine(db: ReturnType<typeof tempDatabase>["db"], categoryId: string) 
       onBudget: true,
       openingDate: "2026-01-01",
       openingBalance: 0,
+      createdAt: at,
+      sortKey: "cash",
     })
     .run();
   const transactionId = crypto.randomUUID();
@@ -154,6 +156,7 @@ function addBucket(db: ReturnType<typeof tempDatabase>["db"], categoryId: string
     .values({
       id: bucketId,
       name: "Food money",
+      sortKey: "food money",
       kind: "spending",
       priority: 1,
       essential: false,

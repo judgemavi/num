@@ -14,7 +14,7 @@ import {
   type ForecastDelta,
   type ForecastFlow,
 } from "@num/shared";
-import { and, eq, gt, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, asc, eq, gt, isNotNull, isNull, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { Db } from "../db";
 import { balancesOf } from "./account-balance";
@@ -85,9 +85,9 @@ export function readForecast(db: Db, asOf: string): Forecast {
   const openAccounts = db
     .select()
     .from(accounts)
-    .all()
-    .filter((row) => row.onBudget && row.archivedAt === null)
-    .sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
+    .where(and(eq(accounts.onBudget, true), isNull(accounts.archivedAt)))
+    .orderBy(asc(accounts.name))
+    .all();
   const accountIds = new Set(openAccounts.map((row) => row.id));
   const plans = db
     .select()

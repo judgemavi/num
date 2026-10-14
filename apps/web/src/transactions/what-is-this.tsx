@@ -25,7 +25,6 @@ type WhatIsThisProps = {
   choice: WhatChoice;
   onChoice: (choice: WhatChoice) => void;
   choiceLocked: boolean;
-  groupMode?: boolean;
   categoryId: string | null;
   onCategoryId: (id: string | null) => void;
   categoryLocked: boolean;
@@ -107,7 +106,6 @@ export function WhatIsThis({
   choice,
   onChoice,
   choiceLocked,
-  groupMode = false,
   categoryId,
   onCategoryId,
   categoryLocked,
@@ -131,7 +129,7 @@ export function WhatIsThis({
 }: WhatIsThisProps) {
   const currency = useBookCurrency();
   const transferLabel = direction === "out" ? "To account" : "From account";
-  const choices = choicesForDirection(direction, groupMode);
+  const choices = choicesForDirection(direction);
   const left = choice === "split" && totalMinor !== null ? splitRemainder(currency, totalMinor, direction, lines) : choice === "split" ? null : 0;
   const lastLineRest = choice === "split" && totalMinor !== null ? restOnLastLine(currency, totalMinor, direction, lines) : null;
   const categoryKind = categoryKindForChoice(choice);

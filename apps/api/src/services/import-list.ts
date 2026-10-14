@@ -1,16 +1,16 @@
 import { accounts, documents, importBatches, importRows, inboxDecisions, transactions } from "@num/db";
 import {
-  importBatchStatus,
   Temporal,
   type ImportDetail,
   type ImportDetailRow,
   type ImportViewItem,
   type ImportViewQuery,
+  type ImportViewStatus,
 } from "@num/shared";
-import { and, count, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lte, ne, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { pageOf } from "./paging";
+import { pagedOf, totalOf, windowOf } from "./list-sql";
 
 type OutcomeCounts = {
   created: number;
@@ -51,29 +51,44 @@ function newestFirst(query: ImportViewQuery) {
   return query.dir === "desc";
 }
 
-function compareItems(left: ImportViewItem, right: ImportViewItem, newest: boolean) {
-  if (left.createdAt !== right.createdAt) {
-    const order = left.createdAt < right.createdAt ? -1 : 1;
-    return newest ? -order : order;
+/**
+ * The status of a batch: undone; needs you when a row needs review or an unreadable line has no decision; else imported.
+ * The status is a SQL value, thus the list filters, sorts and pages in SQL.
+ */
+const statusSql = sql<ImportViewStatus>`case
+  when ${importBatches.undoneAt} is not null then 'undone'
+  when exists (select 1 from ${importRows} where ${importRows.batchId} = ${importBatches.id} and ${importRows.outcome} = 'needs_review')
+    or exists (
+      select 1 from json_each(${importBatches.unreadableJson}) as line
+      where not exists (
+        select 1 from ${inboxDecisions}
+        where ${inboxDecisions.itemKey} = 'import_unreadable:' || ${importBatches.id} || ':' || json_extract(line.value, '$.line')
+      )
+    )
+  then 'needs_you'
+  else 'imported'
+end`;
+
+function outcomeCounts(db: Db, batchIds: string[]) {
+  const outcomes = db
+    .select({ batchId: importRows.batchId, outcome: importRows.outcome, total: count() })
+    .from(importRows)
+    .where(inArray(importRows.batchId, batchIds))
+    .groupBy(importRows.batchId, importRows.outcome)
+    .all();
+  const byBatch = new Map<string, OutcomeCounts>();
+  for (const row of outcomes) {
+    const counts = byBatch.get(row.batchId) ?? emptyCounts();
+    addOutcome(counts, row.outcome, row.total);
+    byBatch.set(row.batchId, counts);
   }
-  const idOrder = left.id < right.id ? -1 : 1;
-  return newest ? -idOrder : idOrder;
+  return byBatch;
 }
 
-function withinDates(createdAt: string, query: ImportViewQuery) {
-  const date = createdAt.slice(0, 10);
-  if (query.from && date < query.from) {
-    return false;
-  }
-  if (query.to && date > query.to) {
-    return false;
-  }
-  return true;
-}
-
-function loadItems(db: Db): ImportViewItem[] {
-  const decided = new Set(db.select({ itemKey: inboxDecisions.itemKey }).from(inboxDecisions).all().map((row) => row.itemKey));
-  const batches = db
+/** The batches that match `where`, in order, for one window. The window is the whole list when `window` is absent. */
+function loadItems(db: Db, where: SQL | undefined, newest: boolean, window?: { limit: number; offset: number }): ImportViewItem[] {
+  const order = newest ? desc : asc;
+  const query = db
     .select({
       id: importBatches.id,
       accountId: importBatches.accountId,
@@ -83,56 +98,36 @@ function loadItems(db: Db): ImportViewItem[] {
       periodStart: importBatches.periodStart,
       periodEnd: importBatches.periodEnd,
       createdAt: importBatches.createdAt,
-      undoneAt: importBatches.undoneAt,
+      status: statusSql,
       unreadableJson: importBatches.unreadableJson,
     })
     .from(importBatches)
     .innerJoin(accounts, eq(accounts.id, importBatches.accountId))
     .leftJoin(documents, eq(documents.id, importBatches.documentId))
-    .all();
-  const outcomes = db
-    .select({ batchId: importRows.batchId, outcome: importRows.outcome, total: count() })
-    .from(importRows)
-    .groupBy(importRows.batchId, importRows.outcome)
-    .all();
-  const byBatch = new Map<string, OutcomeCounts>();
-  for (const row of outcomes) {
-    const counts = byBatch.get(row.batchId) ?? emptyCounts();
-    addOutcome(counts, row.outcome, row.total);
-    byBatch.set(row.batchId, counts);
-  }
-
-  return batches.map((batch) => {
-    const counts = byBatch.get(batch.id) ?? emptyCounts();
-    const unreadable = batch.unreadableJson;
-    return {
-      id: batch.id,
-      accountId: batch.accountId,
-      accountName: batch.accountName,
-      documentId: batch.documentId,
-      filename: batch.filename ?? null,
-      periodStart: batch.periodStart,
-      periodEnd: batch.periodEnd,
-      createdAt: batch.createdAt,
-      status: importBatchStatus({
-        undoneAt: batch.undoneAt,
-        needsReview: counts.needsReview,
-        batchId: batch.id,
-        unreadableLines: unreadable.map((row) => row.line),
-        decidedKeys: decided,
-      }),
-      counts: { ...counts, unreadable: unreadable.length },
-    };
-  });
+    .where(where)
+    .orderBy(order(importBatches.createdAt), order(importBatches.id))
+    .$dynamic();
+  const batches = (window ? query.limit(window.limit).offset(window.offset) : query).all();
+  const byBatch = outcomeCounts(
+    db,
+    batches.map((batch) => batch.id),
+  );
+  return batches.map(({ unreadableJson, ...batch }) => ({
+    ...batch,
+    filename: batch.filename ?? null,
+    counts: { ...(byBatch.get(batch.id) ?? emptyCounts()), unreadable: unreadableJson.length },
+  }));
 }
 
 export function listImportView(db: Db, query: ImportViewQuery) {
-  const items = loadItems(db)
-    .filter((item) => (query.accountId ? item.accountId === query.accountId : true))
-    .filter((item) => withinDates(item.createdAt, query))
-    .filter((item) => (query.status ? item.status === query.status : true))
-    .sort((left, right) => compareItems(left, right, newestFirst(query)));
-  return pageOf(items, query);
+  const where = and(
+    query.accountId ? eq(importBatches.accountId, query.accountId) : undefined,
+    query.from ? gte(sql`substr(${importBatches.createdAt}, 1, 10)`, query.from) : undefined,
+    query.to ? lte(sql`substr(${importBatches.createdAt}, 1, 10)`, query.to) : undefined,
+    query.status ? sql`${statusSql} = ${query.status}` : undefined,
+  );
+  const items = loadItems(db, where, newestFirst(query), windowOf(query));
+  return pagedOf(items, totalOf(db, importBatches, where), query);
 }
 
 function isEarlier(candidate: EarlierCandidate, createdAt: string, rowIndex: number, rowId: string) {
@@ -155,7 +150,7 @@ function pickEarlier(candidates: EarlierCandidate[], createdAt: string, rowIndex
 }
 
 export function getImportDetail(db: Db, id: string): ImportDetail {
-  const item = loadItems(db).find((batch) => batch.id === id);
+  const item = loadItems(db, eq(importBatches.id, id), true)[0];
   if (!item) {
     throw new ServiceError("import_not_found", 404);
   }

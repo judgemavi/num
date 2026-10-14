@@ -1,6 +1,6 @@
 import { bucketEvents, buckets, fundingRuns, transactions, type FundingRunRow } from "@num/db";
 import { fundingLimit, isIsoDate, utcNow, type FundingRun, type FundingRunCreate } from "@num/shared";
-import { eq, isNotNull, sql } from "drizzle-orm";
+import { desc, eq, isNotNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { activeFundingRun, fundingPosition, requirePaycheck } from "./funding-book";
@@ -165,6 +165,7 @@ export function listFundingRuns(db: Db): { items: FundingRun[] } {
   const items = db
     .select()
     .from(fundingRuns)
+    .orderBy(desc(fundingRuns.createdAt), desc(fundingRuns.id))
     .all()
     .map((row) => ({
       id: row.id,
@@ -175,11 +176,5 @@ export function listFundingRuns(db: Db): { items: FundingRun[] } {
       createdAt: row.createdAt,
       undoneAt: row.undoneAt,
     }));
-  items.sort((left, right) => {
-    if (left.createdAt !== right.createdAt) {
-      return left.createdAt < right.createdAt ? 1 : -1;
-    }
-    return left.id < right.id ? 1 : -1;
-  });
   return { items };
 }

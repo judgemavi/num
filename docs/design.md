@@ -190,9 +190,6 @@ Order, top to bottom:
    confirms the automatic label or applies the suggestion shown in the form; with a change it saves and confirms.
    The header shows only the level and the reason; no action buttons.
 
-**Group mode:** opened with several transactions that the user selected. Header: "12 transactions · $84.20".
-Category, transfer and merchant apply to all; the user can exclude items. Split is not available.
-
 Needs review is the Transactions table with the Needs review filter on (decision 0021). There is no second list component.
 Columns: Date, Account, Payee, Category, Amount, Review (and Balance when one account is shown). There is no Status column.
 The Category column shows the category, "Transfer to <account>", or "Uncategorized", and the merchant below it.
@@ -212,7 +209,7 @@ With the Needs review filter on, the table puts rows in groups by level: Sure, L
 - An editor loads its own data when it opens (by ID, through the query cache). List rows carry only what they show.
 - Editors do not stack. Only one top-level editor is open at a time (decision 0018).
 - One shared `confirm()` (AlertDialog) for every confirmation.
-- The URL shows the open single-record editor (`?edit=transaction:<id>`). Back closes it. Group mode stays in memory.
+- The URL shows the open single-record editor (`?edit=transaction:<id>`). Back closes it.
 
 **Create on the spot:** the first option of every picker of user-managed things (categories, groups, tags,
 merchants, accounts) is "+ Create new <thing>". Choosing it expands that entity's form inline below the picker, prefilled

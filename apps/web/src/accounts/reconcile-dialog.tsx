@@ -7,10 +7,10 @@ import {
   toMinorUnits,
   type CheckpointCreate,
 } from "@num/shared";
-import { useSuspenseQueries } from "@tanstack/react-query";
+import { useQuery, useSuspenseQueries } from "@tanstack/react-query";
 import { useState } from "react";
 import { accountQuery, useSetOpeningBalance } from "@/api/accounts";
-import { closingHintQuery, useCompareCheckpoint, useCreateCheckpoint } from "@/api/checkpoints";
+import { checkpointCompareQuery, closingHintQuery, useCreateCheckpoint } from "@/api/checkpoints";
 import { errorCode } from "@/api/client";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
@@ -40,11 +40,13 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
   const [date, setDate] = useState(closing?.date ?? "");
   const [amount, setAmount] = useState(closing ? fromMinorUnits(currency, printedStatementBalance(kind, closing.balance)) : "");
   const [invalid, setInvalid] = useState(false);
-  const check = useCompareCheckpoint();
+  // The values that the user sent with "Check". The compare read runs for them. An edit of a value clears them.
+  const [checked, setChecked] = useState<CheckpointCreate | null>(null);
+  const check = useQuery({ ...checkpointCompareQuery(accountId, checked ?? { date: "", statementBalance: 0 }), enabled: checked !== null });
   const create = useCreateCheckpoint();
   const opening = useSetOpeningBalance();
-  const compare = check.data ?? null;
-  const saving = check.isPending || create.isPending || opening.isPending;
+  const compare = checked ? (check.data ?? null) : null;
+  const saving = check.isFetching || create.isPending || opening.isPending;
 
   function parsedAmount() {
     try {
@@ -68,7 +70,6 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
 
   /** Remove the result and the error of each request. A new step starts with no old message. */
   function clearRequests() {
-    check.reset();
     create.reset();
     opening.reset();
   }
@@ -77,9 +78,7 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
     const payload = body();
     clearRequests();
     setInvalid(!payload);
-    if (payload) {
-      check.mutate({ accountId, body: payload });
-    }
+    setChecked(payload);
   }
 
   function saveCheckpoint() {
@@ -87,7 +86,7 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
     if (!payload || !compare?.balanced) {
       return;
     }
-    create.mutate({ accountId, body: payload }, { onSuccess: () => close(), onError: () => check.reset() });
+    create.mutate({ accountId, body: payload }, { onSuccess: () => close(), onError: () => setChecked(null) });
   }
 
   function setOpening() {
@@ -95,14 +94,14 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
     if (!suggestion) {
       return;
     }
-    opening.mutate({ accountId, suggestion }, { onSuccess: checkBalance });
+    opening.mutate({ accountId, suggestion });
   }
 
   function errorText() {
     if (invalid) {
       return "Enter a statement date and balance.";
     }
-    if (check.isError) {
+    if (checked && check.isError) {
       return "The balances did not load. Try again.";
     }
     if (opening.isError) {
@@ -147,7 +146,7 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
             required
             onChange={(value) => {
               setDate(value);
-              check.reset();
+              setChecked(null);
             }}
           />
         </Field>
@@ -160,7 +159,7 @@ export function ReconcileDialog({ accountId }: EditorInput["reconcile"]) {
             required
             onChange={(event) => {
               setAmount(event.target.value);
-              check.reset();
+              setChecked(null);
             }}
           />
           <FieldDescription>

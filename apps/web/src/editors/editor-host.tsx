@@ -45,9 +45,6 @@ function urlKeyOf(frame: EditorFrame, pageAccountId: string | undefined) {
   if (!isRecordEditorKind(frame.kind) || !("id" in frame.input)) {
     return null;
   }
-  if ("groupIds" in frame.input && (frame.input.groupIds?.length ?? 0) > 0) {
-    return null;
-  }
   return formatEditParam(frame.kind, frame.input.id);
 }
 

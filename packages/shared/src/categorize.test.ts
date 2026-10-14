@@ -20,7 +20,6 @@ test("direction sets the default choice", () => {
   expect(defaultChoice("in")).toBe("income");
   expect(choicesForDirection("out")).toEqual(["spending", "transfer", "split"]);
   expect(choicesForDirection("in")).toEqual(["income", "refund", "transfer", "split"]);
-  expect(choicesForDirection("out", true)).toEqual(["spending", "transfer"]);
   expect(resolveEditorChoice({
     direction: "out",
     suggestion: none,

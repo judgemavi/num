@@ -5,7 +5,7 @@ import {
   type CheckpointCompare,
   type ClosingHint,
 } from "@num/shared";
-import { and, eq, gte, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { calculatedBalance } from "./checkpoint-balance";
@@ -124,13 +124,8 @@ export function listCheckpoints(db: Db, accountId: string): { items: Checkpoint[
     .select()
     .from(checkpoints)
     .where(eq(checkpoints.accountId, accountId))
-    .all()
-    .sort((left, right) => {
-      if (left.date !== right.date) {
-        return left.date < right.date ? 1 : -1;
-      }
-      return left.id < right.id ? 1 : -1;
-    });
+    .orderBy(desc(checkpoints.date), desc(checkpoints.id))
+    .all();
   return { items };
 }
 
@@ -175,8 +170,9 @@ export function latestClosing(db: Db, accountId: string): ClosingHint {
         isNotNull(importBatches.closingBalance),
       ),
     )
+    .orderBy(desc(importBatches.createdAt))
+    .limit(1)
     .all();
-  rows.sort((left, right) => (left.createdAt < right.createdAt ? 1 : left.createdAt > right.createdAt ? -1 : 0));
   const latest = rows[0];
   if (!latest || latest.closingDate === null || latest.closingBalance === null) {
     return { closingDate: null, closingBalance: null };
