@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { archivedQuery, listQuerySchema, optionalQuery, pagedResponseSchema, queryId, queryText } from "./list";
 import { amountModes, businessDayShifts, planFrequencies, planKinds } from "./recurring-calc";
-import { type PlanProposal } from "./recurring-detect";
+import { proposalSubject, type PlanProposal } from "./recurring-detect";
 import { isUtcTimestamp } from "./time";
 import { amountSchema } from "./money";
 
@@ -157,7 +157,8 @@ export const ambiguousLinkSchema = z.object({
 
 export const planProposalSchema = z.object({
   accountId: z.uuid(),
-  merchantId: z.uuid(),
+  merchantId: z.uuid().nullable(),
+  categoryId: z.uuid().nullable(),
   freq: z.enum(planFrequencies),
   interval: z.number().int(),
   startDate: isoDateSchema,
@@ -168,8 +169,10 @@ export const planProposalSchema = z.object({
   transactionIds: z.array(z.uuid()),
 });
 
-export function planProposalKey(item: Pick<PlanProposal, "accountId" | "merchantId" | "startDate" | "freq" | "interval">): string {
-  return `plan_proposal:${item.accountId}:${item.merchantId}:${item.startDate}:${item.freq}:${item.interval}`;
+export function planProposalKey(
+  item: Pick<PlanProposal, "accountId" | "merchantId" | "categoryId" | "expectedAmount" | "startDate" | "freq" | "interval">,
+): string {
+  return `plan_proposal:${item.accountId}:${proposalSubject(item)}:${item.startDate}:${item.freq}:${item.interval}`;
 }
 
 export const recurringSignalsSchema = z.object({

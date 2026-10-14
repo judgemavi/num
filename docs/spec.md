@@ -666,10 +666,14 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
 - **Changed amount.** If a linked amount is outside the tolerance, the Recurring plan screen shows it
   (decision 0047). Example: "Netflix $16.99 → $19.99. Update the plan?"
 - **Missed.** If an occurrence is older than the grace period, has no link and is not skipped, Home shows it (This month).
-- **Detection.** Recurring → "Detected" suggests a new plan (Home shows a count) when a merchant has:
+- **Detection.** Recurring → "Detected" suggests a new plan (Home shows a count) when a group of transactions in one
+  account has:
   - 3 or more transactions.
   - Gaps that agree with weekly, biweekly, monthly or yearly, within ±3 days.
-  - Amounts within 10% of their median.
+  - Amounts within 10% of their median. Older transactions at the start of the run with an amount outside this band
+    are not part of the plan (decision 0054).
+  - The group is the merchant. A transaction with no merchant and one line that is not a transfer goes in the group
+    of its category. With no category, it goes in the group of its exact amount (decision 0054).
 - **Time windows** (they keep the work small and Home calm):
   - Link candidates: occurrences from the later of `startDate` and `asOf` − 13 months.
   - Missed: only occurrences in the last 35 days. Older unlinked occurrences show in the plan history.

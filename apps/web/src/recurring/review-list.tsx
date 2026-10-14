@@ -3,7 +3,9 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { recurringSignalsQuery, useAddDetectedPlan } from "@/api/recurring";
 import { useDecideItem } from "@/api/review";
 import { localAsOf } from "@/as-of";
-import { useMerchantNames } from "@/editors/lookups";
+import { useCategoryNames, useMerchantNames } from "@/editors/lookups";
+import { useEditors } from "@/editors/editor-api";
+import { Amount } from "@/components/amount";
 import { repeatLabel } from "@/review/format";
 import { formatDate } from "@/transactions/format";
 import { ListCard, ListRow, listName } from "@/components/list-card";
@@ -17,7 +19,7 @@ function proposedPlan(item: PlanProposal, name: string): PlanCreate {
     expectedAmount: item.expectedAmount,
     tolerance: item.tolerance,
     amountMode: item.amountMode,
-    categoryId: null,
+    categoryId: item.categoryId,
     transferAccountId: null,
     merchantId: item.merchantId,
     startDate: item.startDate,
@@ -36,6 +38,8 @@ export function ReviewList() {
   const asOf = localAsOf();
   const { data: signals } = useSuspenseQuery(recurringSignalsQuery(asOf));
   const merchantName = useMerchantNames();
+  const categoryName = useCategoryNames();
+  const { openEditor } = useEditors();
   const create = useAddDetectedPlan();
   const decide = useDecideItem();
   const pending = create.isPending || decide.isPending;
@@ -46,12 +50,14 @@ export function ReviewList() {
   return (
     <ListCard label="Detected" title="Detected">
       {signals.proposals.map((item) => {
-        const name = merchantName.get(item.merchantId) ?? "Merchant";
+        // A proposal for one amount has no name: the person names it in the form (decision 0054).
+        const name = item.merchantId ? merchantName.get(item.merchantId) : item.categoryId ? categoryName.get(item.categoryId) : undefined;
         const itemKey = planProposalKey(item);
+        const kind = item.expectedAmount < 0 ? "bill" : "income";
         return (
           <ListRow key={itemKey}>
             <div className={listName}>
-              {name}
+              {name ?? <Amount value={item.expectedAmount} />}
               <small>
                 {repeatLabel(item.freq, item.interval)} from {formatDate(item.startDate)}
               </small>
@@ -60,7 +66,11 @@ export function ReviewList() {
               type="button"
               disabled={pending}
               onClick={() => {
-                create.mutate(proposedPlan(item, name));
+                if (name) {
+                  create.mutate(proposedPlan(item, name));
+                } else {
+                  void openEditor("plan", { id: null, seed: { ...item, name: "", kind } });
+                }
               }}
             >
               {item.expectedAmount >= 0 ? "Add recurring income" : "Add a recurring payment"}

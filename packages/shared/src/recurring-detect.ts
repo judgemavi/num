@@ -1,17 +1,24 @@
 import { Temporal } from "temporal-polyfill";
 import { medianAmount, medianOf, type AmountMode, type PlanFrequency } from "./recurring-calc";
 
+/**
+ * `plain` is true for a transaction with one line that is not a transfer. `categoryId` is the category of that line.
+ */
 export type DetectionTransaction = {
   id: string;
   accountId: string;
-  merchantId: string;
+  merchantId: string | null;
+  plain: boolean;
+  categoryId: string | null;
   date: string;
   amount: number;
 };
 
+/** A proposal has a merchant, or else a category (decision 0054). With neither, it groups one exact amount. */
 export type PlanProposal = {
   accountId: string;
-  merchantId: string;
+  merchantId: string | null;
+  categoryId: string | null;
   freq: PlanFrequency;
   interval: number;
   startDate: string;
@@ -61,9 +68,11 @@ function proposalFrom(
   const first = rows[0];
   const start = Temporal.PlainDate.from(first?.date ?? "1970-01-01");
   const varied = amounts.some((amount) => amount !== amounts[0]);
+  const merchantId = first?.merchantId ?? null;
   return {
     accountId: first?.accountId ?? "",
-    merchantId: first?.merchantId ?? "",
+    merchantId,
+    categoryId: merchantId ? null : (first?.categoryId ?? null),
     freq: pattern.freq,
     interval: pattern.interval,
     startDate: start.toString(),
@@ -109,11 +118,37 @@ function latestRun(sorted: readonly DetectionTransaction[], step: number): PlanP
     }
     start -= 1;
   }
-  const window = sorted.slice(start);
-  if (window.length < 3 || !withinTenPercent(window.map((row) => row.amount))) {
+  // An old amount outside the band (a first bill with a fee) does not stop the later regular rows (decision 0054).
+  while (sorted.length - start >= 3) {
+    const window = sorted.slice(start);
+    if (withinTenPercent(window.map((row) => row.amount))) {
+      return proposalFrom(window, pattern, step);
+    }
+    start += 1;
+  }
+  return null;
+}
+
+/**
+ * The group of a transaction: its merchant; else its category; else its exact amount (decision 0054).
+ * A transaction with no merchant and a split or a transfer is in no group.
+ */
+function groupKey(transaction: DetectionTransaction) {
+  if (transaction.merchantId) {
+    return `merchant\0${transaction.merchantId}`;
+  }
+  if (!transaction.plain) {
     return null;
   }
-  return proposalFrom(window, pattern, step);
+  return transaction.categoryId ? `category\0${transaction.categoryId}` : `amount\0${transaction.amount}`;
+}
+
+/** What a proposal is about: its merchant, its category or its one amount (decision 0054). */
+export function proposalSubject(item: Pick<PlanProposal, "merchantId" | "categoryId" | "expectedAmount">): string {
+  if (item.merchantId) {
+    return item.merchantId;
+  }
+  return item.categoryId ? `category-${item.categoryId}` : `amount-${item.expectedAmount}`;
 }
 
 /** `step` is the milliunits in one minor unit of the book currency. */
@@ -124,7 +159,11 @@ export function detectPlans(transactions: readonly DetectionTransaction[], step:
     if (since && (transaction.date < since || (asOf !== undefined && transaction.date > asOf))) {
       continue;
     }
-    const key = `${transaction.accountId}\0${transaction.merchantId}`;
+    const group = groupKey(transaction);
+    if (!group) {
+      continue;
+    }
+    const key = `${transaction.accountId}\0${group}`;
     const rows = groups.get(key) ?? [];
     rows.push(transaction);
     groups.set(key, rows);
@@ -146,8 +185,10 @@ export function detectPlans(transactions: readonly DetectionTransaction[], step:
     if (left.accountId !== right.accountId) {
       return left.accountId < right.accountId ? -1 : 1;
     }
-    if (left.merchantId !== right.merchantId) {
-      return left.merchantId < right.merchantId ? -1 : 1;
+    const leftSubject = proposalSubject(left);
+    const rightSubject = proposalSubject(right);
+    if (leftSubject !== rightSubject) {
+      return leftSubject < rightSubject ? -1 : 1;
     }
     return left.startDate < right.startDate ? -1 : left.startDate > right.startDate ? 1 : 0;
   });

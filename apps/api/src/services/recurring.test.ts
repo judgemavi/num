@@ -7,6 +7,8 @@ import { expect, test } from "bun:test";
 import { createDb } from "../db";
 import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
+import { createCategory } from "./categories";
+import { createTransaction } from "./transactions";
 import { createPlan } from "./recurring-plans";
 import { linkOccurrence } from "./recurring-links";
 import { autoLink, listOccurrences, recurringSignals } from "./recurring-view";
@@ -253,6 +255,51 @@ test("an old unlinked occurrence is not missed", () => {
     expect(missed.map((item) => item.dueDate)).toEqual(["2026-09-15"]);
     const history = listOccurrences(db, plan.id, "2026-10-07").items.find((item) => item.dueDate === "2024-01-15");
     expect(history?.status).toBe("open");
+  } finally {
+    close();
+  }
+});
+
+test("a payment with no merchant is detected by its category until a plan with that category covers it", () => {
+  const { db, close } = tempDatabase();
+  try {
+    const chequing = account(db);
+    const rent = createCategory(db, { name: "Rent", kind: "expense", essential: true, source: "ui", at });
+    for (const date of ["2026-07-02", "2026-08-04", "2026-09-01", "2026-10-01"]) {
+      createTransaction(db, {
+        accountId: chequing.id,
+        date,
+        amount: -1_800_000,
+        payeeRaw: `Transfer out ${date}`,
+        merchantId: null,
+        lines: [{ amount: -1_800_000, categoryId: rent.id, memo: null, transferAccountId: null, tagIds: [] }],
+        source: "ui",
+        at,
+      });
+    }
+    const proposals = recurringSignals(db, "2026-10-14").proposals;
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]).toMatchObject({ merchantId: null, categoryId: rent.id, freq: "monthly", expectedAmount: -1_800_000 });
+
+    createPlan(db, {
+      name: "Rent",
+      kind: "bill",
+      accountId: chequing.id,
+      categoryId: rent.id,
+      expectedAmount: -1_800_000,
+      tolerance: 0,
+      amountMode: "fixed",
+      startDate: "2026-07-01",
+      freq: "monthly",
+      interval: 1,
+      monthDay: 1,
+      businessDayShift: "none",
+      active: true,
+      fundsBuckets: false,
+      source: "ui",
+      at,
+    });
+    expect(recurringSignals(db, "2026-10-14").proposals).toEqual([]);
   } finally {
     close();
   }

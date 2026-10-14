@@ -30,7 +30,7 @@ export function planValues(draft: Plan | PlanSeed | "new", initialKind: PlanKind
     kind,
     accountId: seed?.accountId ?? null,
     transferAccountId: current?.transferAccountId ?? null,
-    categoryId: current?.categoryId ?? null,
+    categoryId: seed?.categoryId ?? null,
     merchantId: seed?.merchantId ?? null,
     amount: seed ? amountForForm(kind, seed.expectedAmount) : "",
     tolerance: seed ? amountText(seed.tolerance) : "0",

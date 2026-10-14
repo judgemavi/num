@@ -1,4 +1,4 @@
-import { occurrenceLinks, recurringPlans, settings, transactions, type OccurrenceLinkRow, type RecurringPlanRow } from "@num/db";
+import { occurrenceLinks, recurringPlans, settings, transactionLines, transactions, type OccurrenceLinkRow, type RecurringPlanRow } from "@num/db";
 import {
   Temporal,
   planProposalKey,
@@ -13,9 +13,10 @@ import {
   type Occurrence,
   type OccurrenceStatus,
   type OpenOccurrence,
+  type PlanProposal,
   type RecurringSignals,
 } from "@num/shared";
-import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { bookStep } from "./book-step";
 import { decidedKeys } from "./decision-keys";
@@ -105,20 +106,60 @@ function transactionsForAccounts(db: Db, accountIds: readonly string[], from: st
   return rows;
 }
 
+/** Each transaction of the detection window, with its one category when it is a plain transaction (decision 0054). */
 function detectionTransactions(db: Db, asOf: string): DetectionTransaction[] {
   const since = Temporal.PlainDate.from(asOf).subtract({ months: 18 }).toString();
-  return db
+  const rows = db
     .select({
       id: transactions.id,
       accountId: transactions.accountId,
       merchantId: transactions.merchantId,
+      transferPeerId: transactions.transferPeerId,
       date: transactions.date,
       amount: transactions.amount,
+      categoryId: transactionLines.categoryId,
+      transferAccountId: transactionLines.transferAccountId,
     })
     .from(transactions)
-    .where(and(isNotNull(transactions.merchantId), gte(transactions.date, since), lte(transactions.date, asOf)))
-    .all()
-    .flatMap((row) => (row.merchantId ? [{ ...row, merchantId: row.merchantId }] : []));
+    .innerJoin(transactionLines, eq(transactionLines.transactionId, transactions.id))
+    .where(and(gte(transactions.date, since), lte(transactions.date, asOf)))
+    .all();
+  const byId = new Map<string, DetectionTransaction>();
+  for (const row of rows) {
+    const seen = byId.get(row.id);
+    if (seen) {
+      byId.set(row.id, { ...seen, plain: false, categoryId: null });
+      continue;
+    }
+    const plain = row.transferPeerId === null && row.transferAccountId === null;
+    byId.set(row.id, {
+      id: row.id,
+      accountId: row.accountId,
+      merchantId: row.merchantId,
+      plain,
+      categoryId: plain ? row.categoryId : null,
+      date: row.date,
+      amount: row.amount,
+    });
+  }
+  return [...byId.values()];
+}
+
+/**
+ * A plan of the account covers a proposal for its merchant. A plan with no merchant covers a proposal for its
+ * category, or a proposal for one amount when it has no category and the amount is in its tolerance (decision 0054).
+ */
+function covers(plan: RecurringPlanRow, proposal: PlanProposal) {
+  if (plan.accountId !== proposal.accountId) {
+    return false;
+  }
+  if (proposal.merchantId || plan.merchantId) {
+    return plan.merchantId === proposal.merchantId;
+  }
+  if (proposal.categoryId || plan.categoryId) {
+    return plan.categoryId === proposal.categoryId;
+  }
+  return withinTolerance(proposal.expectedAmount, plan.expectedAmount, plan.tolerance);
 }
 
 function requirePlan(db: Db, id: string): RecurringPlanRow {
@@ -260,10 +301,9 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
   const taken = new Set(linkedIds);
   const candidates = linkTransactions(db, plans, asOf, grace).filter((txn) => !taken.has(txn.id));
   const ambiguous = matchLinks(openOccurrences(plans, links, asOf, grace), candidates, grace).ambiguous;
-  const covered = new Set(plans.filter((row) => row.merchantId).map((row) => `${row.accountId}|${row.merchantId}`));
   const declined = decidedKeys(db, "plan_proposal");
   const proposals = detectPlans(detectionTransactions(db, asOf), bookStep(db), asOf).filter((proposal) => {
-    return !covered.has(`${proposal.accountId}|${proposal.merchantId}`) && !declined.has(planProposalKey(proposal));
+    return !plans.some((plan) => covers(plan, proposal)) && !declined.has(planProposalKey(proposal));
   });
   return { changed, missed, ambiguous, proposals };
 }

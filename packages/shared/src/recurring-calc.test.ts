@@ -74,8 +74,8 @@ test("a variable plan uses the median and the lowest of the last 6, then the fal
   expect(medianOf([-3, -2])).toBe(-3);
 });
 
-function txn(id: string, date: string, amount: number, merchantId = "merchant-1"): DetectionTransaction {
-  return { id, accountId: "account-1", merchantId, date, amount };
+function txn(id: string, date: string, amount: number, merchantId: string | null = "merchant-1"): DetectionTransaction {
+  return { id, accountId: "account-1", merchantId, plain: true, categoryId: null, date, amount };
 }
 
 test("detection needs 3 transactions, regular gaps within 3 days, and amounts within 10 percent", () => {
@@ -209,4 +209,47 @@ test("auto-link matches one candidate and leaves every other case open", () => {
   );
   expect(shared.unique).toEqual([]);
   expect(shared.ambiguous).toHaveLength(2);
+});
+
+test("an old amount outside the band does not stop the later regular run", () => {
+  const found = detectPlans([
+    txn("a", "2026-04-06", -150000),
+    txn("b", "2026-05-04", -50000),
+    txn("c", "2026-06-03", -50000),
+    txn("d", "2026-07-06", -50000),
+  ], 10);
+  expect(found).toHaveLength(1);
+  expect(found[0]).toMatchObject({ freq: "monthly", expectedAmount: -50000, transactionIds: ["b", "c", "d"] });
+
+  expect(
+    detectPlans([txn("a", "2026-04-06", -150000), txn("b", "2026-05-04", -50000), txn("c", "2026-06-03", -50000)], 10),
+  ).toEqual([]);
+});
+
+test("with no merchant, detection groups by category, else by one exact amount", () => {
+  const rent = (id: string, date: string, amount: number) => ({ ...txn(id, date, amount, null), categoryId: "rent" });
+  const byCategory = detectPlans([
+    rent("a", "2026-06-01", 1_500_000),
+    rent("b", "2026-07-06", 1_500_000),
+    rent("c", "2026-08-04", 1_500_000),
+    rent("d", "2026-09-01", 1_500_000),
+    rent("e", "2026-10-02", 1_500_000),
+  ], 10);
+  expect(byCategory).toHaveLength(1);
+  expect(byCategory[0]).toMatchObject({ merchantId: null, categoryId: "rent", transactionIds: ["b", "c", "d", "e"] });
+
+  const byAmount = detectPlans([
+    txn("a", "2026-07-01", -1_800_000, null),
+    txn("b", "2026-07-15", -30_000, null),
+    txn("c", "2026-08-01", -1_800_000, null),
+    txn("d", "2026-08-20", -60_000, null),
+    txn("e", "2026-09-01", -1_800_000, null),
+  ], 10);
+  expect(byAmount).toHaveLength(1);
+  expect(byAmount[0]).toMatchObject({ merchantId: null, categoryId: null, transactionIds: ["a", "c", "e"] });
+});
+
+test("a split or a transfer with no merchant is not detected", () => {
+  const split = (id: string, date: string) => ({ ...txn(id, date, -400_000, null), plain: false });
+  expect(detectPlans([split("a", "2026-09-02"), split("b", "2026-09-09"), split("c", "2026-09-16")], 10)).toEqual([]);
 });
