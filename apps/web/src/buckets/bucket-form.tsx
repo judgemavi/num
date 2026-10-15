@@ -2,7 +2,6 @@ import { isSavings, recedeDefault, type Bucket } from "@num/shared";
 import { useStore } from "@tanstack/react-form";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import { useState } from "react";
 import { ColorPicker, IconPicker } from "@/buckets/bucket-pickers";
 import { bucketBody, bucketValues } from "@/buckets/bucket-values";
 import { localAsOf } from "@/as-of";
@@ -11,22 +10,14 @@ import { bucketOptionsQuery, useCreateBucket, useUpdateBucket } from "@/api/buck
 import { choiceIn } from "@/components/choice";
 import { ChoiceCard } from "@/components/choice-card";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody } from "@/editors/form-chrome";
 import { useAppForm } from "@/forms/form-hook";
 import { useActiveBuckets, useBookCurrency, useCategories, useCategoryNames } from "@/editors/lookups";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup } from "@/components/ui/radio-group";
+import { OptionCombobox } from "@/transactions/option-combobox";
 
 const kindChoices = [
   { value: "spending", title: "Spending", description: "Filled up to an amount. What is left carries over." },
@@ -87,7 +78,6 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
       <form.FormShell>
         <DialogHeader>
           <DialogTitle>{current ? "Edit bucket" : "New bucket"}</DialogTitle>
-          <DialogDescription>A bucket keeps money for one purpose. The balance carries over.</DialogDescription>
         </DialogHeader>
         <DialogBody>
           <form.AppField name="name">{(field) => <field.TextField id="bucket-name" label="Name" required />}</form.AppField>
@@ -210,7 +200,6 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
 
 /** The expense categories of the bucket. The field offers the active expense categories that are not in a different bucket. */
 function CategoryField({ bucketId, selected, onChange }: { bucketId: string | null; selected: string[]; onChange: (ids: string[]) => void }) {
-  const [open, setOpen] = useState(false);
   const categories = useCategories();
   const names = useCategoryNames();
   const { data: buckets } = useSuspenseQuery(bucketOptionsQuery());
@@ -221,36 +210,18 @@ function CategoryField({ bucketId, selected, onChange }: { bucketId: string | nu
 
   return (
     <Field>
-      <FieldLabel>Categories</FieldLabel>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button type="button" variant="outline" className="w-full justify-between rounded-xl font-normal">
-            Add an expense category
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-(--radix-popover-trigger-width) p-0">
-          <Command>
-            <CommandInput placeholder="Search" />
-            <CommandList>
-              <CommandEmpty>No expense categories left.</CommandEmpty>
-              <CommandGroup>
-                {remaining.map((category) => (
-                  <CommandItem
-                    key={category.id}
-                    value={category.name}
-                    onSelect={() => {
-                      onChange([...selected, category.id]);
-                      setOpen(false);
-                    }}
-                  >
-                    {category.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+      <FieldLabel htmlFor="bucket-categories">Categories</FieldLabel>
+      <OptionCombobox
+        id="bucket-categories"
+        value={null}
+        options={remaining.map((category) => ({ id: category.id, label: category.name }))}
+        placeholder="Add an expense category"
+        onChange={(id) => {
+          if (id) {
+            onChange([...selected, id]);
+          }
+        }}
+      />
       {selected.length > 0 ? (
         <ul className="grid gap-1">
           {selected.map((id) => (

@@ -26,7 +26,7 @@ export function IncomeRow({ bucket }: { bucket: Bucket }) {
   const changed = signals.changed.some((item) => item.bucketId === bucket.id);
 
   return (
-    <ListRow onOpen={() => void openEditor("income", { id: bucket.id })}>
+    <ListRow label={bucket.name} onOpen={() => void openEditor("income", { id: bucket.id })}>
       <IconTile hue={bucket.color}>
         <BucketGlyph name={bucket.icon} />
       </IconTile>

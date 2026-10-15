@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 
+/** The back link above a page header: a muted chevron and the name of the parent page. */
+export const backLink = "inline-flex min-h-11 items-center gap-1 self-start justify-self-start font-semibold text-muted-foreground hover:text-foreground";
+
 type PageHeaderProps = {
   /** The line above the title. A screen can give a component that loads the line by itself. */
   kicker: ReactNode;

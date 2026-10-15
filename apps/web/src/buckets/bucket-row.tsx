@@ -22,7 +22,7 @@ export function BucketRow({ bucket }: { bucket: Bucket }) {
 
   return (
     <>
-      <ListRow onOpen={() => void openEditor("bucket", { id: bucket.id })}>
+      <ListRow label={bucket.name} onOpen={() => void openEditor("bucket", { id: bucket.id })}>
         <IconTile hue={bucket.color}>
           <BucketGlyph name={bucket.icon} />
         </IconTile>

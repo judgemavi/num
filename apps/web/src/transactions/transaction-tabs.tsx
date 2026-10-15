@@ -21,7 +21,7 @@ function ReviewTotal() {
 export function TransactionTabs() {
   return (
     <Tabs value={useOnReview() ? "review" : "all"}>
-      <TabsList variant="line" className="h-auto">
+      <TabsList variant="line">
         <TabsTrigger value="all" className={tabClass} asChild>
           <Link to="/transactions">All</Link>
         </TabsTrigger>

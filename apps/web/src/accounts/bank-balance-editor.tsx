@@ -5,7 +5,7 @@ import { bankBalanceListQuery, useSaveBankBalance } from "@/api/bank-balances";
 import { errorCode } from "@/api/client";
 import { bankBalanceError } from "@/accounts/format";
 import { Button } from "@/components/ui/button";
-import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEditorFrame } from "@/editors/editor-api";
 import type { EditorInput } from "@/editors/editor-types";
 import { DialogBody } from "@/editors/form-chrome";
@@ -61,7 +61,6 @@ export function BankBalanceEditor({ accountId, id }: EditorInput["bankBalance"])
     <form.AppForm>
       <DialogHeader>
         <DialogTitle>{id ? "Change bank balance" : "Add bank balance"}</DialogTitle>
-        <DialogDescription>Enter the balance that your bank shows on a date.</DialogDescription>
       </DialogHeader>
       <form.FormShell>
         <DialogBody>

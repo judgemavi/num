@@ -7,6 +7,7 @@ import { ListCard, ListRow, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { ItemActions } from "@/components/ui/item";
 import { useEditors } from "@/editors/editor-api";
 import { useAccountLabels, useBookCurrency, useCategoryNames, useMerchantNames } from "@/editors/lookups";
 import { formatMoney } from "@/money";
@@ -48,23 +49,18 @@ export function DetectedList() {
         const itemKey = planProposalKey(item);
         const add = () => void openEditor(item.expectedAmount > 0 ? "income" : "commitment", { id: null, seed: { ...item, name: name ?? "" } });
         return (
-          <ListRow key={itemKey} onOpen={add}>
+          <ListRow key={itemKey} label={name ?? "No merchant"} onOpen={add}>
             <div className={listName}>
               {name ?? "No merchant"}
               <small>
                 {formatMoney(currency, Math.abs(item.expectedAmount))} · {scheduleLabel(item)}
               </small>
             </div>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={(event) => {
-                event.stopPropagation();
-                add();
-              }}
-            >
-              Add
-            </Button>
+            <ItemActions className="relative z-10">
+              <Button type="button" variant="secondary" onClick={add}>
+                Add
+              </Button>
+            </ItemActions>
             <RowMenu label={`Actions for ${name ?? "this suggestion"}`}>
               <DropdownMenuItem className="min-h-11" disabled={decide.isPending} onSelect={() => decide.mutate({ asOf, itemKey, decision: "not_recurring" })}>
                 Not recurring

@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEditorFrame } from "@/editors/editor-api";
 
 export const dialogFrameClass = "flex min-h-0 flex-1 flex-col overflow-hidden";
@@ -15,19 +15,14 @@ export function DialogPanel({ className, ...props }: ComponentProps<"div">) {
   return <div className={cn(dialogFrameClass, className)} {...props} />;
 }
 
-export function FormHeading({ inline = false, title, description }: { inline?: boolean; title: string; description: string }) {
+/** The title of a form. A form has no description: the title and the fields tell what the form does. */
+export function FormHeading({ inline = false, title }: { inline?: boolean; title: string }) {
   if (inline) {
-    return (
-      <div className="grid gap-1">
-        <h3 className="font-display text-xl leading-none font-extrabold uppercase">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-    );
+    return <h3 className="font-display text-xl leading-none font-extrabold uppercase">{title}</h3>;
   }
   return (
     <DialogHeader>
       <DialogTitle>{title}</DialogTitle>
-      <DialogDescription>{description}</DialogDescription>
     </DialogHeader>
   );
 }

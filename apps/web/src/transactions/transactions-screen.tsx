@@ -1,6 +1,8 @@
 import { Plus } from "lucide-react";
 import { Boundary } from "@/components/boundary";
+import { ListEmpty } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { ListPager } from "@/lists/list-pager";
 import { useLastPage } from "@/lists/use-list-search";
@@ -81,13 +83,18 @@ function TransactionList() {
   const empty = hasFilters(shown) ? "No transactions match." : review ? "Nothing needs review." : "No transactions yet.";
 
   return (
-    <TransactionsTable
-      rows={page.items}
-      empty={empty}
-      showBalance={selectedAccount !== undefined && selectedAccount.kind !== "investment" && selectedAccount.kind !== "property"}
-      sort={sort}
-      onSort={sortBy}
-    />
+    <Card aria-label="Transactions" className="gap-0 overflow-hidden py-0">
+      {page.items.length === 0 ? (
+        <ListEmpty>{empty}</ListEmpty>
+      ) : (
+        <TransactionsTable
+          rows={page.items}
+          showBalance={selectedAccount !== undefined && selectedAccount.kind !== "investment" && selectedAccount.kind !== "property"}
+          sort={sort}
+          onSort={sortBy}
+        />
+      )}
+    </Card>
   );
 }
 

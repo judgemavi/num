@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
+import { ChevronLeft } from "lucide-react";
 import { accountQuery } from "@/api/accounts";
 import { errorCode } from "@/api/client";
 import { AccountImports } from "@/accounts/account-imports";
@@ -11,7 +12,7 @@ import { accountDetail, kindLabel } from "@/accounts/format";
 import { accountLabel } from "@/accounts/label";
 import { useEditors } from "@/editors/editor-api";
 import { Boundary } from "@/components/boundary";
-import { PageHeader } from "@/components/page-header";
+import { backLink, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 
 const accountRoute = getRouteApi("/accounts_/$accountId");
@@ -51,8 +52,12 @@ function AccountPage() {
 
   return (
     <>
+      <Link to="/accounts" className={backLink}>
+        <ChevronLeft size={18} aria-hidden="true" />
+        Accounts
+      </Link>
       <PageHeader
-        kicker={kindLabel(row.kind)}
+        kicker={detail ? `${kindLabel(row.kind)} · ${detail}` : kindLabel(row.kind)}
         title={accountLabel(row)}
         actions={
           <>
@@ -62,12 +67,6 @@ function AccountPage() {
           </>
         }
       />
-      <p className="text-sm">
-        <Link to="/accounts" className="font-semibold text-primary">
-          Accounts
-        </Link>
-        {detail ? <span className="text-muted-foreground"> · {detail}</span> : null}
-      </p>
       <AccountSummary accountId={row.id} />
       <div className="grid items-start gap-5">
         {row.kind === "mortgage" ? <MortgagePanel accountId={row.id} /> : null}

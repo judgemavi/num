@@ -8,7 +8,7 @@ import { formatDate } from "@/transactions/format";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { ListCard, ListRow, listName } from "@/components/list-card";
+import { ListCard, ListEmpty, ListRow, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 
 type UpcomingItem = UpcomingList["items"][number];
@@ -45,7 +45,7 @@ function UpcomingRows() {
 
   return (
     <ListCard label="Upcoming" title="Next 30 days">
-      {upcoming.items.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">Nothing in the next 30 days.</p> : null}
+      {upcoming.items.length === 0 ? <ListEmpty>Nothing in the next 30 days.</ListEmpty> : null}
       {upcoming.items.map((item) => {
         const schedule = schedules.find((row) => row.id === item.bucketId);
         const name = schedule?.name ?? "";
@@ -53,6 +53,7 @@ function UpcomingRows() {
         return (
           <ListRow
             key={`${item.bucketId}|${item.dueDate}`}
+            label={`${name} on ${formatDate(item.dueDate)}`}
             onOpen={schedule ? () => void openEditor(schedule.kind, { id: item.bucketId }) : undefined}
           >
             <div className={listName}>

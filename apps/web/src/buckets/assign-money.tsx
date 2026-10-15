@@ -17,12 +17,10 @@ type AssignMoneyProps = {
 const copy = {
   fund: {
     title: "Fund from Unassigned",
-    text: "Move money from Unassigned into this bucket. This does not move money between accounts.",
     action: "Fund",
   },
   release: {
     title: "Release to Unassigned",
-    text: "Move money from this bucket back to Unassigned. This does not move money between accounts.",
     action: "Release",
   },
 } as const;
@@ -64,7 +62,7 @@ export function AssignMoney({ bucket, kind }: AssignMoneyProps) {
         <DialogHeader>
           <DialogTitle>{labels.title}</DialogTitle>
           <DialogDescription>
-            {bucket.name}. {labels.text}
+            {bucket.name}. This does not move money between accounts.
           </DialogDescription>
         </DialogHeader>
         <DialogBody>

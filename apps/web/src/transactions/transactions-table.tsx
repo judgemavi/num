@@ -20,13 +20,14 @@ type TableSort = SortChoice<NonNullable<TransactionReviewListQuery["sort"]>>;
 
 type Props = {
   rows: TransactionListItem[];
-  /** The text of the table when it has no rows. */
-  empty: string;
   showBalance: boolean;
   hideAccount?: boolean;
   sort: TableSort;
   onSort: (column: TransactionSort["sort"]) => void;
 };
+
+/** A column that shows only from `md`. On a phone the table shows the checkbox, Date, Payee and Amount (design §6a). */
+const wide = "max-md:hidden";
 
 type SortHeadProps<Column extends string> = {
   column: Column;
@@ -41,7 +42,7 @@ function SortHead<Column extends string>({ column, label, sort, onSort, classNam
   const sorted = sort.sort !== column ? "none" : sort.dir === "asc" ? "ascending" : "descending";
   return (
     <TableHead aria-sort={sorted} className={className}>
-      <Button type="button" variant="ghost" size="sm" onClick={() => onSort(column)}>
+      <Button type="button" variant="ghost" size="sm" className="-mx-2 px-2 text-xs font-bold tracking-wider uppercase" onClick={() => onSort(column)}>
         {label}
       </Button>
     </TableHead>
@@ -51,7 +52,7 @@ function SortHead<Column extends string>({ column, label, sort, onSort, classNam
 /** The Confidence header of Needs review sorts by confidence. */
 function ConfidenceHead() {
   const { sort, sortBy } = useReviewSearch();
-  return <SortHead column="confidence" label="Confidence" sort={sort} onSort={sortBy} />;
+  return <SortHead column="confidence" label="Confidence" sort={sort} onSort={sortBy} className={wide} />;
 }
 
 const loanPaymentHint = "Loan payments are changed one at a time.";
@@ -112,17 +113,17 @@ function SelectAllHead({ rows }: { rows: TransactionListItem[] }) {
 }
 
 export function TransactionsTable(props: Props) {
-  const { rows, empty, showBalance, hideAccount, sort, onSort } = props;
+  const { rows, showBalance, hideAccount, sort, onSort } = props;
   const { openEditor } = useEditors();
   const currency = useBookCurrency();
   const accountNames = useAccountLabels();
   // The Needs review page shows the proposed label and the confidence.
   const onReview = useOnReview();
-  const selecting = useSelection() !== null;
-  const columns = 5 + (showBalance ? 1 : 0) + (hideAccount ? 0 : 1) + 1 + (selecting ? 1 : 0);
 
   function renderRow(row: TransactionListItem) {
     const open = () => void openEditor("transaction", { id: row.id });
+    const category = onReview ? <ProposedCategoryCell row={row} /> : <CategoryCell row={row} />;
+    const status = onReview ? <ReviewConfidence review={row.review} /> : <ReviewStatus review={row.review} />;
     return (
       <TableRow
         key={row.id}
@@ -137,15 +138,18 @@ export function TransactionsTable(props: Props) {
       >
         <SelectCell rows={rows} row={row} />
         <TableCell>{formatDate(row.date)}</TableCell>
-        {hideAccount ? null : <TableCell>{accountNames.get(row.accountId) ?? row.accountName}</TableCell>}
-        <TableCell>
+        {hideAccount ? null : <TableCell className={wide}>{accountNames.get(row.accountId) ?? row.accountName}</TableCell>}
+        <TableCell className="max-md:whitespace-normal">
           <div>{row.payeeRaw}</div>
           {row.refundOf ? <div className="text-muted-foreground">{refundOfText(currency, row.refundOf.date, row.refundOf.amount)}</div> : null}
           {row.refundedAmount ? <div className="text-muted-foreground">{refundedText(currency, row.refundedAmount)}</div> : null}
+          {/* On a phone the Category and Status columns do not show. Their text goes under the payee. */}
+          <div className="grid justify-items-start gap-1 text-[13px] text-muted-foreground md:hidden">
+            {category}
+            {status}
+          </div>
         </TableCell>
-        <TableCell>
-          {onReview ? <ProposedCategoryCell row={row} /> : <CategoryCell row={row} />}
-        </TableCell>
+        <TableCell className={wide}>{category}</TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-2">
             {row.status === "open" ? (
@@ -161,40 +165,26 @@ export function TransactionsTable(props: Props) {
             )}
           </TableCell>
         ) : null}
-        <TableCell>
-          {onReview ? <ReviewConfidence review={row.review} /> : <ReviewStatus review={row.review} />}
-        </TableCell>
+        <TableCell className={wide}>{status}</TableCell>
       </TableRow>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-[16px] border border-border bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <SelectAllHead rows={rows} />
-            <SortHead column="date" label="Date" sort={sort} onSort={onSort} />
-            {hideAccount ? null : <TableHead>Account</TableHead>}
-            <SortHead column="payeeRaw" label="Payee" sort={sort} onSort={onSort} />
-            <TableHead>Category</TableHead>
-            <SortHead column="amount" label="Amount" sort={sort} onSort={onSort} className="text-right" />
-            {showBalance ? <TableHead className="text-right">Balance</TableHead> : null}
-            {onReview ? <ConfidenceHead /> : <TableHead>Status</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={columns} className="text-muted-foreground">
-                {empty}
-              </TableCell>
-            </TableRow>
-          ) : (
-            rows.map(renderRow)
-          )}
-        </TableBody>
-      </Table>
-    </div>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <SelectAllHead rows={rows} />
+          <SortHead column="date" label="Date" sort={sort} onSort={onSort} />
+          {hideAccount ? null : <TableHead className={wide}>Account</TableHead>}
+          <SortHead column="payeeRaw" label="Payee" sort={sort} onSort={onSort} />
+          <TableHead className={wide}>Category</TableHead>
+          <SortHead column="amount" label="Amount" sort={sort} onSort={onSort} className="text-right" />
+          {showBalance ? <TableHead className="text-right">Balance</TableHead> : null}
+          {onReview ? <ConfidenceHead /> : <TableHead className={wide}>Status</TableHead>}
+        </TableRow>
+      </TableHeader>
+      <TableBody>{rows.map(renderRow)}</TableBody>
+    </Table>
   );
 }

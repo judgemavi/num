@@ -133,9 +133,7 @@ export function TransactionForm({
       <form.FormShell>
         <DialogHeader>
           <DialogTitle>{transaction ? "Edit transaction" : "New transaction"}</DialogTitle>
-          <DialogDescription>
-            {amountLocked ? "This side follows the other account. Change the amount there." : "Say where the money went."}
-          </DialogDescription>
+          {amountLocked ? <DialogDescription>This side follows the other account. Change the amount there.</DialogDescription> : null}
         </DialogHeader>
         <DialogBody>
           {transaction ? <DecisionNotes transactionId={transaction.id} /> : null}

@@ -61,9 +61,12 @@ in docs or code. Git history keeps the records. An idea that the owner refuses g
 - Use shadcn components for all UI controls. Add them with the shadcn CLI when a slice needs them:
   - Forms: `Field` and `Label`.
   - Short lists of options: `Select`.
-  - Long lists of options: Combobox (`Command` + `Popover`).
+  - Long lists of options: the one Combobox, `OptionCombobox` (`Command` + `Popover`). Do not build a second one.
   - Create and edit: `Dialog`.
-  - Lists of records: ListCard rows (`docs/design.md` §6). `Table` only for the Transactions list.
+  - Lists of records: ListCard rows (`docs/design.md` §6), built on `Item`. `Table` only for the Transactions list.
+  - Empty lists: `ListEmpty` (shadcn `Empty`, one line).
+  - Chips: `ToggleGroup` (and `Toggle`).
+  - Field controls: the `fieldControl` look (`components/field-control.ts`).
   - Confirmations: `AlertDialog`.
 - Do not use native `<select>`, `<label>` or custom-styled inputs.
 - Before you write a UI component, check the shadcn component list (https://ui.shadcn.com/docs/components).

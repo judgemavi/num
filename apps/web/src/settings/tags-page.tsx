@@ -1,9 +1,10 @@
+import { Plus } from "lucide-react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { tagListQuery, useArchiveTag } from "@/api/tags";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { Boundary } from "@/components/boundary";
-import { ListCard, ListRow, listName } from "@/components/list-card";
+import { ListCard, ListEmpty, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ function Tags() {
         title="Tags"
         actions={
           <Button type="button" onClick={() => void openEditor("tag", { id: null })}>
+            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
             New
           </Button>
         }
@@ -46,10 +48,10 @@ function Tags() {
       <ArchivedFilterBar list={list} switchId="filter-archived-tags" sortId="tag-sort" sortOptions={nameSortOptions} />
       <ListCard label="Tags">
         {rows.length === 0 ? (
-          <p className="px-5 py-5 text-muted-foreground">{list.shown.archived ? "No archived tags." : "No tags yet."}</p>
+          <ListEmpty>{list.shown.archived ? "No archived tags." : "No tags yet."}</ListEmpty>
         ) : (
           rows.map((tag) => (
-            <ListRow key={tag.id} size="simple" onOpen={() => void openEditor("tag", { id: tag.id })}>
+            <ListRow key={tag.id} size="simple" label={tag.name} onOpen={() => void openEditor("tag", { id: tag.id })}>
               <div className={listName}>{tag.name}</div>
               <RowMenu label={`Actions for ${tag.name}`}>
                 <ArchiveMenuItem

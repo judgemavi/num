@@ -80,7 +80,6 @@ export function CategoryForm({ category, initialName, initialKind, inline = fals
       <FormHeading
         inline={inline}
         title={category ? "Edit category" : "New category"}
-        description={category ? "Change the name, the kind or the group." : "Add a category for income or expenses."}
       />
       <form.FormShell inline={inline} className={inline ? "flex flex-col gap-4" : undefined}>
         <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>

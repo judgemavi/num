@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Amount } from "@/components/amount";
-import { ListCard, ListRow, listName } from "@/components/list-card";
+import { ListCard, ListEmpty, ListRow, listName } from "@/components/list-card";
 import { useBookCurrency } from "@/editors/lookups";
 import type { SliceColor } from "@/home/spending/spend-arcs";
 import { formatMoney } from "@/money";
@@ -31,9 +31,9 @@ export function CategorySpendList({ title, rows, actions }: { title: string; row
   const currency = useBookCurrency();
   return (
     <ListCard label={title} title={title} actions={actions}>
-      {rows.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">No spending in this period.</p> : null}
+      {rows.length === 0 ? <ListEmpty>No spending in this period.</ListEmpty> : null}
       {rows.map((row) => (
-        <ListRow key={row.key} size="dense" current={row.current} onOpen={row.onOpen}>
+        <ListRow key={row.key} size="dense" current={row.current} label={row.name} onOpen={row.onOpen}>
           <Dot color={row.color} />
           <span className={listName}>
             {row.name}

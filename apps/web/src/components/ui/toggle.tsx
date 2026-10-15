@@ -4,13 +4,14 @@ import { cn } from "cn"
 import { Toggle as TogglePrimitive } from "radix-ui"
 
 const toggleVariants = cva(
-  "group/toggle inline-flex items-center justify-center gap-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",
+  "group/toggle inline-flex items-center justify-center gap-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default: "bg-transparent hover:bg-sunken",
+        // The Chip of docs/design.md §6: a separate pill with a `control` border. Selected: iris fill, white text.
         outline:
-          "h-11 min-h-11 border border-input bg-card px-3.5 text-foreground hover:bg-sunken data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground",
+          "border border-input bg-card text-foreground hover:bg-sunken data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary-hover",
       },
       size: {
         default: "h-11 min-h-11 px-3.5",

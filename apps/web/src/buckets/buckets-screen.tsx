@@ -15,7 +15,7 @@ import { useBucketBoard, useBucketSearch } from "@/buckets/use-board";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
 import { JarsIllustration } from "@/components/illustrations";
-import { ListCard, ListGroup } from "@/components/list-card";
+import { ListCard, ListEmpty, ListGroup } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,6 @@ export function BucketsScreen() {
   return (
     <Boundary loading="Loading buckets." failed="The buckets did not load.">
       <BucketsHeader />
-      <BucketFilterBar />
       <BucketsSummary />
       <GoalFeasibility />
       <BucketsBody />
@@ -63,6 +62,7 @@ function BucketsBody() {
   return (
     <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
       <div className="grid gap-5">
+        <BucketFilterBar />
         <BucketList />
       </div>
       <div className="grid gap-5">
@@ -135,7 +135,7 @@ function BucketList() {
   return (
     <ListCard label="All buckets">
       {rows.length === 0 ? (
-        <p className="px-5 py-5 text-muted-foreground">{shown.archived ? "No archived buckets." : "No buckets yet."}</p>
+        <ListEmpty>{shown.archived ? "No archived buckets." : "No buckets yet."}</ListEmpty>
       ) : (
         groupOrder.map((group) => {
           const kept = rows.filter((bucket) => group.kinds.includes(bucket.kind));

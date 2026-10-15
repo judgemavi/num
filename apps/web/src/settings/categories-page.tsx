@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { categoryListQuery, useArchiveCategory } from "@/api/categories";
@@ -6,7 +7,7 @@ import { useGroupNames, useGroups } from "@/editors/lookups";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { Boundary } from "@/components/boundary";
 import { FilterBar } from "@/components/filter-bar";
-import { ListCard, ListRow, listName } from "@/components/list-card";
+import { ListCard, ListEmpty, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,7 @@ function Categories() {
         title="Categories"
         actions={
           <Button type="button" onClick={() => void openEditor("category", { id: null })}>
+            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
             New
           </Button>
         }
@@ -107,10 +109,10 @@ function Categories() {
       />
       <ListCard label="Categories">
         {rows.length === 0 ? (
-          <p className="px-5 py-5 text-muted-foreground">{shown.archived ? "No archived categories." : "No categories."}</p>
+          <ListEmpty>{shown.archived ? "No archived categories." : "No categories."}</ListEmpty>
         ) : (
           rows.map((category) => (
-            <ListRow key={category.id} size="simple" onOpen={() => void openEditor("category", { id: category.id })}>
+            <ListRow key={category.id} size="simple" label={category.name} onOpen={() => void openEditor("category", { id: category.id })}>
               <div className={listName}>
                 {category.name}
                 <small>{category.groupId ? (groupName.get(category.groupId) ?? "No group") : "No group"}</small>

@@ -100,8 +100,11 @@ Every main screen has, from top to bottom:
    A screen without a page tint (the account page) uses the surface colour and has no illustration.
    Home: below the hero, one row with three small amounts (18px, weight 600): "In your accounts" − "Saving buckets" −
    "Set aside for bills".
+   Transactions has no summary strip. The count of the transactions is the small line of its page header.
+   On a phone the facts have no hairlines. They go below the hero amount, side by side, and wrap to a new line.
 3. **Content:** a main list card, and a 336px side panel column on the right.
-   Below 1024px the side panel goes below the list.
+   Below 1024px the side panel goes below the list. The filter bar of the list is directly above the list card, below
+   the summary strip.
 
 Inside 32px page padding. 20px gaps between cards.
 
@@ -114,17 +117,18 @@ global component CSS (AGENTS.md).
 | Component | Rules |
 |---|---|
 | Button | Height ≥ 44px, pill shape, weight 600. Variants: primary (iris), secondary (surface + `control` border), ghost (muted text). One primary button in each decision. |
-| Chip | Toggle choice in a row. Pill, 44px, `control` border. Selected: iris fill, white text. Can show a small secondary value. |
+| Chip | Toggle choice in a row. It is the shadcn `ToggleGroup` item (and `Toggle`). Separate pills with a gap, never joined segments. Pill, 44px, `control` border. Selected: iris fill, white text, weight 600. Can show a small secondary value. The colour and icon pickers of a bucket use the same `ToggleGroup` with swatches. |
 | Pill | Status label, 24px high. Neutral, positive (pos-soft/pos) or attention (attn-soft/attn). |
 | Count | Tomato badge with ink text. Only for "needs you" counts. |
 | Amount | Formats with `Intl` in the browser. Tabular figures. "Owed" label for liabilities. 16px/600. In a secondary line (13px, normal weight) it has the size and the weight of the line. |
-| ListCard | One card. Optional group header rows: 12px uppercase label on the left, the group total on the right. Rows: min height 60px (48px for simple lists, 36px for dense lists), hairline between rows (lighter in dense lists), `row-hover` on hover, the name in iris on hover. The name column is flexible. The columns after it (a bar, a kind, the amount) have fixed widths, thus they line up in all rows of the card. Long secondary text goes below the name, not in the amount column. On a phone each column after the name takes a full line. A dense list (the spending list on Home) has a dot, the name and the amount on one line, also on a phone. On a touch screen a dense row is 44px high. |
-| IconTile | 36–40px tile with an identity hue: soft fill, deep glyph. |
+| ListCard | One card. Each row is a shadcn `Item`. A row that opens has one target: a button or a link that covers the row (the row is not a `div` with a key handler). The More menu and the one visible button are `ItemActions` above the target. Optional group header rows: 12px uppercase label on the left, the group total on the right, the same height with and without a total. One hairline is above a header (not above the first group) and one is under it. Lines are never doubled. Rows: min height 60px (48px for simple lists, 36px for dense lists), hairline between rows (lighter in dense lists), `row-hover` on hover, the name in iris on hover. The name column is flexible. The columns after it (a bar, a kind, the amount) have fixed widths, thus they line up in all rows of the card. Long secondary text goes below the name, not in the amount column. On a phone each column after the name takes a full line below the name, and the More button stays at the top right of the row. A dense list (the spending list on Home) has a dot, the name and the amount on one line, also on a phone. On a touch screen a dense row is 44px high. |
+| IconTile | 36–40px tile with an identity hue: soft fill, deep glyph. It is the media of the row (`ItemMedia`). |
+| Empty | The empty state of a list: shadcn `Empty` with one quiet line (the title, 15px, muted). No icon, no description, no large block. |
 | Progress | 8px bar, round ends, `sunken` track. Fill = the identity glyph colour. Over budget: `attn-soft` track and tomato text, no fill. |
 | SummaryStrip | §5. |
 | SidePanel | Card, 18–20px padding, title 16px/700, short text, one action. |
-| Dialog | shadcn Dialog. Radius 20px, `scrim` overlay, display title, footer with hairline and buttons on the right. |
-| Field | Label above (14px/600), input 44px high, radius 12px, `control` border, 3px iris focus ring. Help text 13px muted below. |
+| Dialog | shadcn Dialog. Radius 20px, `scrim` overlay, display title, footer with hairline and buttons on the right. A dialog has a description under the title only when it gives a fact that the user needs (example: "This does not move money between accounts."). A description does not repeat or explain the title. |
+| Field | Label above (14px/600), input 44px high, radius 12px, `control` border, 3px iris focus ring. Help text 13px muted below. A text input, a `Select` trigger, a Combobox trigger, a date trigger and the search field have one look: the same height, radius, border, 16px text (a phone does not zoom in) and focus ring. A trigger shows a chevron at the end (a date trigger shows a calendar). There is one Combobox component (Command + Popover) for every long list of options. |
 | Choice cards | Radio choices as cards with a title and a one-line description (example: account kind). Selected: iris border and `primary-soft` fill. |
 | Reveal | A sub-section that shows only after a choice (example: card details). `bg` fill, hairline border, radius 14px. |
 | ActionBar | Actions for the selected rows of a table. A floating `ink` pill with white text, bottom centre of the screen, with the dialog shadow. Left: "N selected". Then 44px buttons: an outline button on the dark fill (white text, white border at low opacity), one primary (iris) button, and a ghost "Clear". It shows only while one or more rows are selected. The page gets space at its end, thus the bar does not cover the last rows and the pager. |
@@ -140,6 +144,7 @@ Use shadcn `Table` only for the Transactions list. All other record lists use Li
   Do not use tomato for destructive actions. Tomato means "this needs you" only.
 - Show a status only when it is not the default. Example: show a "Paused" badge on a bucket; do not show "Active".
 - Do not repeat information that the group already gives. Example: no "Income" label on rows in the Income group.
+- A "New" button in a page header has a plus icon before the word, on every page.
 - A button uses only the verb when the dialog, card, page or row already names the record: "Save", "Add", "New",
   "Delete". Keep the noun only when the verb alone is not clear: a menu item that opens a different record ("Add bank
   balance"), a link to a different screen ("Imports"), two choices for the same row, or a source or destination that
@@ -155,7 +160,12 @@ Use shadcn `Table` only for the Transactions list. All other record lists use Li
 
 **Settings:** each area is its own subpage with its own URL: `/settings/groups`, `/settings/categories`,
 `/settings/tags`, `/settings/merchants`, `/settings/currency`, `/settings/ai`, `/settings/backup`. Desktop: a settings sub-navigation (a short vertical list) on the left of the content.
+It uses the same shadcn Sidebar menu items as the main sidebar (§4), thus the two look the same.
 Phone: `/settings` shows the list of areas; each opens its own page with a back link. Do not put all areas on one page.
+The record lists of Settings are simple lists (48px rows).
+
+**Back link:** a page under another page (an account page, a settings area on a phone) has a back link above the
+page header: a muted chevron and the name of the parent page.
 
 **Filters (all list screens):** one compact filter bar, one row high.
 - Left: search field (max 320px) with a search icon.
@@ -166,7 +176,7 @@ Phone: `/settings` shows the list of areas; each opens its own page with a back 
   and a "Clear all" ghost button. A click on × removes that filter.
 - Do not show all filter fields on the page.
 
-**Focus:** one focus style for each control: a 3px iris ring. Do not add an outline as well.
+**Focus:** one focus style for each control: a 3px iris ring (`ring`, full opacity). Do not add an outline as well.
 A search field inside a Command or Popover has no ring and no fill; the open popover shows the focus.
 
 **Full height:** the app shell fills the viewport height. The desktop sidebar is full height and stays in place when the page scrolls.
@@ -214,8 +224,14 @@ Order, top to bottom:
 
 Needs review is its own route with the same table: `/transactions` shows all transactions and
 `/transactions/review` shows only the transactions that need review. There is no second list component. Both pages show
-two tabs (links) in the page header: "All" and "Needs review · N". A tab link does not keep the search and the filters.
+two tabs (links) in the page header: "All" and "Needs review · N" (with the count, also when it is 0). The tabs are 44px
+high. The text of a tab that is not selected is muted. The selected tab has an iris line under it. With no row, the
+review page shows its empty state. A tab link does not keep the search and the filters.
 Columns: a checkbox, Date, Account, Payee, Category, Amount, Status (and Balance when one account is shown).
+All column headers have one style: 12px, weight 700, uppercase, muted. A sortable header is a button with the same text.
+On a phone (width < 768px) the table shows only the checkbox, Date, Payee and Amount (and Balance on the page of an
+account). The Account, Category and Status columns do not show. Under the payee, a secondary line shows the category
+and, when there is one, the Status badge. The table does not scroll sideways.
 The checkbox column shows only on these two pages, not on the page of an account. A click on the
 checkbox selects the row; a click on another part of the row opens the editor. Shift and click selects a range. The
 header checkbox selects all rows of the page. The checkbox of a loan payment is disabled, with the Tooltip "Loan
@@ -293,7 +309,7 @@ give each one an accessible label, or `aria-hidden` when the text already says t
 
 **Home "Needs you":** one ListCard with a tomato count badge. Each row: an IconTile with the hue of its kind, a title,
 one short detail line and a chevron. The whole row opens the screen of its fix. Home is read-only: a row has no buttons
-and no menu. With no item: one line, "All clear". A section title "Spending" (display font, uppercase) starts the Spending
+and no menu. With no item, the "Needs you" section does not show. A section title "Spending" (display font, uppercase) starts the Spending
 part of Home.
 - **Buckets:** each bucket has a `color` (one identity hue) and an `icon` (from a fixed lucide set). The user picks them.
   The app suggests a hue in rotation for a new bucket.

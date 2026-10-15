@@ -167,9 +167,9 @@ function AppShell() {
     <SidebarProvider defaultOpen={sidebarDefaultOpen()} className="h-svh overflow-hidden bg-background">
       <AppSidebar pathname={pathname} />
       <SidebarInset className="min-h-0 overflow-y-auto bg-background">
-        <main className="grid content-start gap-5 px-4 pt-2 pb-[calc(96px+env(safe-area-inset-bottom))] md:px-8 md:py-7 md:pb-9">
+        <div className="grid content-start gap-5 px-4 pt-2 pb-[calc(96px+env(safe-area-inset-bottom))] md:px-8 md:py-7 md:pb-9">
           <Outlet />
-        </main>
+        </div>
       </SidebarInset>
       <PhoneTabs pathname={pathname} />
     </SidebarProvider>

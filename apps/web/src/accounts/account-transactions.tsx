@@ -4,7 +4,7 @@ import { useDeferredValue, useState } from "react";
 import { accountQuery } from "@/api/accounts";
 import { transactionListQuery } from "@/api/transactions";
 import { Boundary } from "@/components/boundary";
-import { ListCard } from "@/components/list-card";
+import { ListCard, ListEmpty } from "@/components/list-card";
 import { localAsOf } from "@/as-of";
 import { columnSort, lastPageOf, sortParams } from "@/lists/list-search";
 import { ListPager } from "@/lists/list-pager";
@@ -59,11 +59,10 @@ function AccountActivity() {
   return (
     <ListCard label="Transactions" title="Transactions">
       {rows.length === 0 ? (
-        <p className="px-5 py-5 text-muted-foreground">No transactions in this account.</p>
+        <ListEmpty>No transactions in this account.</ListEmpty>
       ) : (
         <TransactionsTable
           rows={rows}
-          empty="No transactions in this account."
           showBalance={account.kind !== "investment" && account.kind !== "property"}
           hideAccount
           sort={sort}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 const tints = {
   home: "bg-tint-home",
@@ -35,7 +36,7 @@ export function SummaryStrip({ tint, label, amount, below, hint, facts, illustra
           {hint ? <p className="mt-2.5 text-sm text-muted-foreground">{hint}</p> : null}
         </div>
         {facts ? (
-          <div className="flex flex-wrap gap-y-3">{facts}</div>
+          <div className="flex flex-wrap gap-y-3 max-md:gap-x-8">{facts}</div>
         ) : (
           <span className="max-md:hidden" />
         )}
@@ -45,12 +46,15 @@ export function SummaryStrip({ tint, label, amount, below, hint, facts, illustra
   );
 }
 
-/** A fact of the strip: a label and its amount. */
+/** A fact of the strip: a label and its amount. A hairline is before each fact. On a phone the facts have no hairline. */
 export function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid gap-0.5 border-l border-foreground/12 px-6">
-      <span className="text-[13px] text-muted-foreground">{label}</span>
-      {children}
+    <div className="flex">
+      <Separator orientation="vertical" className="bg-foreground/12 max-md:hidden" />
+      <div className="grid gap-0.5 md:px-6">
+        <span className="text-[13px] text-muted-foreground">{label}</span>
+        {children}
+      </div>
     </div>
   );
 }

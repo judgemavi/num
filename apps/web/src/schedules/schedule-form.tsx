@@ -7,7 +7,7 @@ import { localAsOf } from "@/as-of";
 import { ColorPicker, IconPicker } from "@/buckets/bucket-pickers";
 import { requestError } from "@/buckets/format";
 import { Button } from "@/components/ui/button";
-import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody } from "@/editors/form-chrome";
@@ -45,13 +45,11 @@ const words = {
   commitment: {
     add: "New bill",
     edit: "Edit bill",
-    describe: "A payment you must make on a schedule. The app keeps money for it in a bucket.",
     hint: "Enter the amount you pay each time.",
   },
   income: {
     add: "New income",
     edit: "Edit income",
-    describe: "A deposit you expect on a schedule. It goes to Unassigned.",
     hint: "Enter the amount you receive each time.",
   },
 } as const;
@@ -107,7 +105,6 @@ export function ScheduleForm({ kind, draft }: { kind: "commitment" | "income"; d
     <form.AppForm>
       <DialogHeader>
         <DialogTitle>{current ? text.edit : text.add}</DialogTitle>
-        <DialogDescription>{text.describe}</DialogDescription>
       </DialogHeader>
       <form.FormShell>
         <DialogBody>

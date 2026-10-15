@@ -5,7 +5,7 @@ import { useLinkOccurrence, useSkipOccurrence } from "@/api/schedules";
 import { linkCandidatesQuery } from "@/api/transactions";
 import { bucketError } from "@/buckets/format";
 import { Button } from "@/components/ui/button";
-import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FieldError } from "@/components/ui/field";
 import { useEditorFrame } from "@/editors/editor-api";
 import type { EditorInput } from "@/editors/editor-types";
@@ -51,7 +51,6 @@ export function SkipOccurrenceEditor({ bucketId, dueDate }: EditorInput["skipOcc
       <form.FormShell>
         <DialogHeader>
           <DialogTitle>Skip this occurrence</DialogTitle>
-          <DialogDescription>Tell why this one will not happen. You can restore it later.</DialogDescription>
         </DialogHeader>
         <DialogBody>
           <form.AppField name="reason">{(field) => <field.TextField id="skip-reason" label="Reason" />}</form.AppField>
@@ -101,7 +100,6 @@ export function LinkOccurrenceEditor({ bucketId, accountId, dueDate }: EditorInp
       <form.FormShell>
         <DialogHeader>
           <DialogTitle>Link a transaction</DialogTitle>
-          <DialogDescription>Choose a transaction on this account.</DialogDescription>
         </DialogHeader>
         <DialogBody>
           <form.AppField name="transactionId">

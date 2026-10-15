@@ -1,6 +1,6 @@
 import { accountClass, netWorthOf } from "@num/shared";
 import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Plus, Upload } from "lucide-react";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { IconTile } from "@/components/icon-tile";
 import { BalanceScaleIllustration } from "@/components/illustrations";
-import { ListCard, ListGroup, ListRow, listAmt, listMid, listName } from "@/components/list-card";
+import { ListCard, ListEmpty, ListGroup, ListRow, listAmt, listMid, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RowMenu } from "@/components/row-menu";
@@ -36,7 +36,6 @@ export function AccountsScreen() {
 
 function AccountsPage() {
   const { search, shown } = useAccountSearch();
-  const openAccount = useNavigate();
   const { openEditor } = useEditors();
   const bookCurrency = useBookCurrency();
   // The list on the screen stays while the list for a new filter or a new sort order loads.
@@ -75,7 +74,6 @@ function AccountsPage() {
           </>
         }
       />
-      <AccountFilterBar />
       <SummaryStrip
         tint="accounts"
         label={search.archived ? "Archived balances" : "Net worth"}
@@ -93,9 +91,10 @@ function AccountsPage() {
         illustration={<BalanceScaleIllustration />}
       />
       <div className="grid items-start gap-5">
+        <AccountFilterBar />
         <ListCard label="All accounts">
           {groups.length === 0 ? (
-            <p className="px-5 py-5 text-muted-foreground">{search.archived ? "No archived accounts." : "No accounts yet."}</p>
+            <ListEmpty>{search.archived ? "No archived accounts." : "No accounts yet."}</ListEmpty>
           ) : (
             groups.map((group) => (
               <div key={group.id}>
@@ -106,12 +105,8 @@ function AccountsPage() {
                 {group.items.map((account) => (
                     <ListRow
                       key={account.id}
-                      onOpen={() => {
-                        void openAccount({
-                          to: "/accounts/$accountId",
-                          params: { accountId: account.id },
-                        });
-                      }}
+                      label={accountLabel(account)}
+                      link={<Link to="/accounts/$accountId" params={{ accountId: account.id }} />}
                     >
                       <IconTile hue={groupHue[group.id]}>
                         <AccountIcon kind={account.kind} />

@@ -52,7 +52,7 @@ export function MoveMoney({ fromId }: EditorInput["moveMoney"]) {
       <form.FormShell>
         <DialogHeader>
           <DialogTitle>Move money</DialogTitle>
-          <DialogDescription>Move money from one bucket to another. This does not move money between accounts.</DialogDescription>
+          <DialogDescription>This does not move money between accounts.</DialogDescription>
         </DialogHeader>
         <DialogBody>
           <form.AppField name="from">

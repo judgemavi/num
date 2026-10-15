@@ -3,7 +3,8 @@ import { useSaveBookCurrency } from "@/api/settings";
 import { Boundary } from "@/components/boundary";
 import { PageHeader } from "@/components/page-header";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { CurrencyCombobox } from "@/currency-combobox";
+import { useCurrencyOptions } from "@/currency-options";
+import { OptionCombobox } from "@/transactions/option-combobox";
 import { useBookCurrency } from "@/editors/lookups";
 import { useAppForm } from "@/forms/form-hook";
 import { SettingsBack } from "@/settings/settings-nav";
@@ -23,6 +24,7 @@ export function CurrencyPage() {
 function CurrencyForm() {
   const current = useBookCurrency();
   const save = useSaveBookCurrency();
+  const currencies = useCurrencyOptions();
   const form = useAppForm({
     defaultValues: { currency: current },
     validators: {
@@ -44,19 +46,31 @@ function CurrencyForm() {
           {(field) => (
             <Field>
               <FieldLabel htmlFor="book-currency">Book currency</FieldLabel>
-              <CurrencyCombobox id="book-currency" value={field.state.value} onChange={field.handleChange} />
+              <OptionCombobox
+                id="book-currency"
+                value={field.state.value}
+                options={currencies}
+                placeholder="Select a currency"
+                onChange={(code) => {
+                  if (code) {
+                    field.handleChange(code);
+                  }
+                }}
+              />
               <FieldDescription>Only the symbol changes. Amounts are not converted.</FieldDescription>
             </Field>
           )}
         </form.Field>
         <form.FormError invalid="Choose a currency." />
-        <form.Subscribe selector={(state) => state.values.currency === current}>
-          {(unchanged) => (
-            <form.SubmitButton disabled={unchanged} saving="Saving currency">
-              Save
-            </form.SubmitButton>
-          )}
-        </form.Subscribe>
+        <div className="flex justify-end">
+          <form.Subscribe selector={(state) => state.values.currency === current}>
+            {(unchanged) => (
+              <form.SubmitButton disabled={unchanged} saving="Saving currency">
+                Save
+              </form.SubmitButton>
+            )}
+          </form.Subscribe>
+        </div>
       </form.FormShell>
     </form.AppForm>
   );

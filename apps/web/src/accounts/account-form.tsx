@@ -72,7 +72,6 @@ export function AccountForm({ account, terms = null, initialName, inline = false
       <FormHeading
         inline={inline}
         title={account ? "Edit account" : "Add an account"}
-        description={account ? "Change the details of this account." : "Add an account to the book."}
       />
       <form.FormShell inline={inline} className={inline ? "grid gap-4" : undefined}>
         <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>

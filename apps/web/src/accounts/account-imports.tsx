@@ -81,6 +81,7 @@ function ImportRows({ accountId, onUndo }: { accountId: string; onUndo: (item: I
     <ListRow
       key={item.id}
       size="simple"
+      label={formatImportDate(item.createdAt)}
       onOpen={() => void openEditor("importInfo", { filename: item.filename, counts: item.counts, unreadable: item.unreadable })}
     >
       <div className="min-w-0 flex-1">

@@ -66,7 +66,6 @@ export function MerchantForm({ merchant, initialName, inline = false, depth = 0 
       inline={inline}
       idPrefix={inline ? `merchant-${depth}-name` : "merchant-name"}
       title={merchant ? "Edit merchant" : "New merchant"}
-      description="A merchant groups the transactions of one business."
       submitLabel={merchant ? "Save" : "Add"}
       saving="Saving"
     >

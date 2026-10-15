@@ -133,7 +133,8 @@ export function EditorHost({ children }: { children: ReactNode }) {
             }
           }}
         >
-          <DialogContent className={panelClass(editor.frame.kind)}>
+          {/* Most editors have no description. An editor that has one shows it under the title. */}
+          <DialogContent aria-describedby={undefined} className={panelClass(editor.frame.kind)}>
             <EditorFrameContext key={editor.key} value={{ close: (result = null) => host.close(editor.key, result) }}>
               <EditorBody {...editor.frame} />
             </EditorFrameContext>
@@ -148,7 +149,8 @@ export function EditorHost({ children }: { children: ReactNode }) {
           }
         }}
       >
-        <AlertDialogContent className="z-[70]">
+        {/* A confirmation with no text description has no AlertDialogDescription. */}
+        <AlertDialogContent className="z-[70]" {...(typeof description === "string" ? {} : { "aria-describedby": undefined })}>
           <AlertDialogHeader>
             <AlertDialogTitle>{confirm?.title}</AlertDialogTitle>
             {typeof description === "string" ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}

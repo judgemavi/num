@@ -81,7 +81,7 @@ export function FilterBar({
             <SheetTrigger asChild>
               <FiltersButton count={activeCount} />
             </SheetTrigger>
-            <SheetContent side="bottom" className="flex max-h-[85vh] flex-col gap-0 overflow-hidden rounded-t-[20px] p-0">
+            <SheetContent side="bottom" aria-describedby={undefined} className="flex max-h-[85vh] flex-col gap-0 overflow-hidden rounded-t-[20px] p-0">
               <SheetHeader className="shrink-0 px-4 pt-4">
                 <SheetTitle className="font-display text-2xl font-extrabold uppercase [font-stretch:72%]">Filters</SheetTitle>
               </SheetHeader>
@@ -116,14 +116,9 @@ export function FilterBar({
           {badges.map((badge) => (
             <Badge key={badge.key} variant="neutral" className="h-11 gap-1 overflow-visible px-3 text-sm font-semibold">
               {badge.label}
-              <button
-                type="button"
-                className="grid size-11 place-items-center rounded-full"
-                aria-label={`Remove ${badge.label}`}
-                onClick={badge.onRemove}
-              >
-                <X size={14} aria-hidden="true" />
-              </button>
+              <Button type="button" variant="ghost" size="icon" className="-mr-3" aria-label={`Remove ${badge.label}`} onClick={badge.onRemove}>
+                <X className="size-3.5" aria-hidden="true" />
+              </Button>
             </Badge>
           ))}
           <Button type="button" variant="ghost" onClick={onClearAll}>

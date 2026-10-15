@@ -5,11 +5,14 @@ import { useSetOpeningBalance } from "@/api/accounts";
 import { Button } from "@/components/ui/button";
 import { useAccounts } from "@/editors/lookups";
 
-/** One line under an account in a list. It shows nothing for an account with no bank balance. */
+/**
+ * One line under an account in a list. It shows only an account that does not match its bank: a match is the default
+ * and shows nothing. It shows nothing for an account with no bank balance.
+ */
 export function BankStatusLine({ accountId }: { accountId: string }) {
   const kind = useAccounts().find((account) => account.id === accountId)?.kind;
   const status = useBankStatus(accountId);
-  if (!status || !kind) {
+  if (!status || !kind || status.difference === 0) {
     return null;
   }
   return <BankStatusText kind={kind} status={status} />;

@@ -1,9 +1,10 @@
+import { Plus } from "lucide-react";
 import { useDeleteGroup } from "@/api/categories";
 import { Boundary } from "@/components/boundary";
 import { useEditors } from "@/editors/editor-api";
 import { useCategories, useGroups } from "@/editors/lookups";
 import { SettingsBack } from "@/settings/settings-nav";
-import { ListCard, ListRow, listName } from "@/components/list-card";
+import { ListCard, ListEmpty, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
@@ -43,16 +44,17 @@ function Groups() {
         title="Groups"
         actions={
           <Button type="button" onClick={() => void openEditor("group", { id: null })}>
+            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
             New
           </Button>
         }
       />
       <ListCard label="Groups">
         {rows.length === 0 ? (
-          <p className="px-5 py-5 text-muted-foreground">No groups.</p>
+          <ListEmpty>No groups.</ListEmpty>
         ) : (
           rows.map((group) => (
-            <ListRow key={group.id} size="simple" onOpen={() => void openEditor("group", { id: group.id })}>
+            <ListRow key={group.id} size="simple" label={group.name} onOpen={() => void openEditor("group", { id: group.id })}>
               <div className={listName}>
                 {group.name}
                 <small>{countLabel(counts.get(group.id) ?? 0)}</small>

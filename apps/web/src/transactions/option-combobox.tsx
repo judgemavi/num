@@ -1,12 +1,14 @@
 import { archivedNameMatch } from "@num/shared";
-import { ChevronsUpDown } from "lucide-react";
+import { cn } from "cn";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { fieldControl, fieldControlIcon } from "@/components/field-control";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-export type Option = {
-  id: string;
+export type Option<Id extends string = string> = {
+  id: Id;
   label: string;
 };
 
@@ -21,25 +23,26 @@ type ArchivedMatch = {
   label: string;
 };
 
-type OptionComboboxProps = {
+type OptionComboboxProps<Id extends string> = {
   id: string;
   value: string | null;
-  options: Option[];
+  options: Option<Id>[];
   placeholder: string;
   emptyLabel?: string;
   disabled?: boolean;
+  invalid?: boolean;
   create?: CreateAction;
   archived?: ArchivedMatch[];
   onRestore?: (id: string) => void;
   preserveOrder?: boolean;
-  onChange: (id: string | null) => void;
+  onChange: (id: Id | null) => void;
 };
 
 function sameName(left: string, right: string) {
   return left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
 }
 
-function visibleOptions(options: Option[], query: string, preserveOrder: boolean): Option[] {
+function visibleOptions<Id extends string>(options: Option<Id>[], query: string, preserveOrder: boolean) {
   const needle = query.trim().toLocaleLowerCase();
   const matched = needle.length === 0 ? options : options.filter((option) => option.label.toLocaleLowerCase().includes(needle));
   if (preserveOrder) {
@@ -55,19 +58,21 @@ function visibleOptions(options: Option[], query: string, preserveOrder: boolean
   });
 }
 
-export function OptionCombobox({
+/** The one Combobox (Command + Popover) of the app. Every picker of a long list of options uses it. */
+export function OptionCombobox<Id extends string>({
   id,
   value,
   options,
   placeholder,
   emptyLabel,
   disabled = false,
+  invalid = false,
   create,
   archived,
   onRestore,
   preserveOrder = false,
   onChange,
-}: OptionComboboxProps) {
+}: OptionComboboxProps<Id>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const selected = options.find((option) => option.id === value);
@@ -79,7 +84,7 @@ export function OptionCombobox({
     (archived ?? []).map((item) => ({ id: item.id, name: item.label })),
   );
 
-  function pick(next: string | null) {
+  function pick(next: Id | null) {
     onChange(next);
     setOpen(false);
     setSearch("");
@@ -88,9 +93,18 @@ export function OptionCombobox({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button id={id} type="button" variant="outline" role="combobox" aria-expanded={open} disabled={disabled} className="w-full justify-between rounded-xl font-normal">
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          aria-invalid={invalid}
+          disabled={disabled}
+          className={cn(fieldControl, selected ? "" : "text-muted-foreground")}
+        >
           <span className="truncate">{selected?.label ?? placeholder}</span>
-          <ChevronsUpDown />
+          <ChevronDown className={fieldControlIcon} aria-hidden="true" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-(--radix-popover-trigger-width) p-0">

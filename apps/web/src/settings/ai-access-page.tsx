@@ -2,7 +2,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { aiAccessQuery, useSaveAiAccess } from "@/api/settings";
 import { Boundary } from "@/components/boundary";
 import { PageHeader } from "@/components/page-header";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { SettingsBack } from "@/settings/settings-nav";
 
@@ -23,14 +23,12 @@ function AiAccessSetting() {
   const save = useSaveAiAccess();
 
   return (
-    <>
-      <Field orientation="horizontal">
+    <Field orientation="horizontal" className="max-w-xl">
+      <FieldContent>
         <FieldLabel htmlFor="ai-can-write">Let an AI change the books</FieldLabel>
-        <Switch id="ai-can-write" checked={setting.aiCanWrite} onCheckedChange={(checked) => save.mutate(checked)} />
-        <FieldDescription>
-          When this is off, an AI can read the books and cannot change them. A change still needs your approval.
-        </FieldDescription>
-      </Field>
-    </>
+        <FieldDescription>When this is off, an AI can only read the books.</FieldDescription>
+      </FieldContent>
+      <Switch id="ai-can-write" checked={setting.aiCanWrite} onCheckedChange={(checked) => save.mutate(checked)} />
+    </Field>
   );
 }

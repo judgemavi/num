@@ -9,17 +9,16 @@ export const NameFields = withForm({
   defaultValues: { name: "" },
   props: {
     title: "",
-    description: "",
     /** The text of the save button, and its text while the form saves. */
     submitLabel: "",
     saving: "",
     inline: false,
     idPrefix: "record-name",
   },
-  render: function NameFieldsRender({ form, title, description, submitLabel, saving, inline, idPrefix, children }) {
+  render: function NameFieldsRender({ form, title, submitLabel, saving, inline, idPrefix, children }) {
     return (
       <form.AppForm>
-        <FormHeading inline={inline} title={title} description={description} />
+        <FormHeading inline={inline} title={title} />
         <form.FormShell inline={inline} className={inline ? "flex flex-col gap-4" : undefined}>
           <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
             {children}

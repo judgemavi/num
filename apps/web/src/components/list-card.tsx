@@ -1,5 +1,9 @@
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
+import { cn } from "cn";
+import { Slot } from "radix-ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Item } from "@/components/ui/item";
 
 type ListCardProps = {
   label: string;
@@ -22,55 +26,82 @@ export function ListCard({ label, title, actions, children }: ListCardProps) {
   );
 }
 
+/**
+ * The header row of a group. A hairline is above it (not above the first group of the card) and one is under it. The
+ * first row of the group has no hairline of its own. The header has the same height with and without a total.
+ */
 export function ListGroup({ label, aside }: { label: string; aside?: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-b px-5 pt-3.5 pb-2 text-xs font-bold tracking-wider uppercase first:border-t-0">
+    <div className="list-group flex min-h-11 items-center justify-between gap-3 border-t border-b px-5 py-2 text-xs font-bold tracking-wider uppercase [:first-child>&:first-child]:border-t-0">
       <span>{label}</span>
       {aside ? <span className="text-sm font-semibold tracking-normal normal-case">{aside}</span> : null}
     </div>
   );
 }
 
+/** The one empty state of a list: one quiet line. */
+export function ListEmpty({ children }: { children: ReactNode }) {
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyTitle>{children}</EmptyTitle>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
 // A simple row is 48px high. A dense row is 36px high, with a lighter hairline. On a touch screen it is 44px high.
 const rowSize = {
-  default: "min-h-[60px] py-2 max-md:flex-wrap",
-  simple: "min-h-12 py-2 max-md:flex-wrap",
+  default: "min-h-[60px] py-2",
+  simple: "min-h-12 py-0.5",
   dense: "min-h-9 py-1 border-border/50 pointer-coarse:min-h-11",
 } as const;
 
+// The target of the row covers the whole row. The other controls of the row are above it (`ItemActions`).
+const rowTarget =
+  "absolute inset-0 cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset";
+
+/**
+ * A row that opens has a target: `onOpen` (it opens an editor or does an action) or `link` (a `Link` with no children
+ * that goes to a page). `label` is the accessible name of the target.
+ */
+type RowTarget =
+  | { label: string; onOpen?: () => void; link?: ReactElement }
+  | { label?: undefined; onOpen?: undefined; link?: undefined };
+
+/**
+ * A row of a ListCard (`docs/design.md` §6), built on the shadcn `Item`. The target of a row that opens is a button or
+ * a link that covers the row.
+ */
 export function ListRow({
   size = "default",
   current = false,
+  label,
   onOpen,
+  link,
   children,
-}: {
+}: RowTarget & {
   size?: keyof typeof rowSize;
   current?: boolean;
-  onOpen?: () => void;
   children: ReactNode;
 }) {
   return (
-    <div
+    <Item
       aria-current={current ? "true" : undefined}
-      className={`flex items-center gap-3.5 border-t px-5 first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary ${rowSize[size]} ${onOpen ? "cursor-pointer" : ""} ${current ? "bg-primary-soft" : ""}`}
-      tabIndex={onOpen ? 0 : undefined}
-      onClick={onOpen}
-      onKeyDown={
-        onOpen
-          ? (event) => {
-              if (event.target !== event.currentTarget) {
-                return;
-              }
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onOpen();
-              }
-            }
-          : undefined
-      }
+      className={cn(
+        "relative flex-nowrap gap-3.5 rounded-none border-0 border-t border-border px-5 text-[15px] first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary max-md:flex-wrap [.list-group+&]:border-t-0",
+        rowSize[size],
+        current && "bg-primary-soft",
+      )}
     >
+      {onOpen ? <button type="button" aria-label={label} className={rowTarget} onClick={onOpen} /> : null}
+      {link ? (
+        <Slot.Root aria-label={label} className={rowTarget}>
+          {link}
+        </Slot.Root>
+      ) : null}
       {children}
-    </div>
+    </Item>
   );
 }
 
@@ -81,6 +112,7 @@ const smallLines = "[&_small]:block [&_small]:text-[13px] [&_small]:font-normal 
 export const listName = `list-name min-w-0 flex-1 font-semibold ${smallLines}`;
 
 // The columns after the name have fixed widths. Thus the columns of all rows in a card line up, also when the amounts
-// and their secondary lines have different lengths. On a phone each column takes a full line.
-export const listMid = "w-40 shrink-0 max-md:basis-full";
-export const listAmt = `w-40 shrink-0 text-right text-base max-md:w-auto max-md:basis-full ${smallLines}`;
+// and their secondary lines have different lengths. On a phone each column takes a full line below the name, and the
+// row actions stay at the top right.
+export const listMid = "w-40 shrink-0 max-md:order-1 max-md:basis-full";
+export const listAmt = `w-40 shrink-0 text-right text-base max-md:order-1 max-md:w-auto max-md:basis-full ${smallLines}`;

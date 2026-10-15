@@ -79,7 +79,7 @@ function ImportListRow({ item }: { item: ImportViewItem }) {
   const navigate = importsRoute.useNavigate();
   const accountName = useAccountLabels().get(item.accountId) ?? item.accountName;
   return (
-    <ListRow onOpen={() => void navigate({ to: "/accounts/imports/$importId", params: { importId: item.id } })}>
+    <ListRow label={item.filename ?? "Statement"} onOpen={() => void navigate({ to: "/accounts/imports/$importId", params: { importId: item.id } })}>
       <div className={listName}>
         <p>{item.filename ?? "Statement"}</p>
         <small>

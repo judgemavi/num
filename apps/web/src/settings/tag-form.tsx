@@ -33,7 +33,6 @@ export function TagForm({ id, initialName, inline = false, idPrefix = "record-na
       inline={inline}
       idPrefix={idPrefix}
       title={id ? "Rename tag" : "New tag"}
-      description="Use a tag for a trip or a project."
       submitLabel={id ? "Save" : "Add"}
       saving="Saving tag"
     />

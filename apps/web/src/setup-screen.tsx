@@ -1,5 +1,6 @@
 import { categorySets, setupRequestSchema, type CategorySet, type ErrorCode } from "@num/shared";
-import { CurrencyCombobox } from "@/currency-combobox";
+import { useCurrencyOptions } from "@/currency-options";
+import { OptionCombobox } from "@/transactions/option-combobox";
 import { errorCode } from "@/api/client";
 import { useCompleteSetup } from "@/api/setup";
 import { ChoiceCard } from "@/components/choice-card";
@@ -27,6 +28,7 @@ function messageFor(code: ErrorCode | undefined) {
 
 export function SetupScreen({ onAlreadyComplete }: SetupScreenProps) {
   const setup = useCompleteSetup();
+  const currencies = useCurrencyOptions();
   const form = useAppForm({
     defaultValues: { currency: "", categorySet: fieldValue<CategorySet>("default") },
     validators: {
@@ -62,7 +64,14 @@ export function SetupScreen({ onAlreadyComplete }: SetupScreenProps) {
               return (
                 <Field data-invalid={invalid}>
                   <FieldLabel htmlFor="currency">Currency</FieldLabel>
-                  <CurrencyCombobox id="currency" value={field.state.value} invalid={invalid} onChange={field.handleChange} />
+                  <OptionCombobox
+                    id="currency"
+                    value={field.state.value}
+                    options={currencies}
+                    placeholder="Select a currency"
+                    invalid={invalid}
+                    onChange={(code) => field.handleChange(code ?? "")}
+                  />
                 </Field>
               );
             }}

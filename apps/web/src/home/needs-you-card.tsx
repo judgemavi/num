@@ -168,17 +168,19 @@ function useRows(items: readonly NeedsYouItem[]): Row[] {
   });
 }
 
-/** Home "Needs you": only the items that need the user. Each row opens the screen of its fix. */
+/** Home "Needs you": only the items that need the user. Each row opens the screen of its fix. With no item, it does not show. */
 export function NeedsYouCard() {
   const { data } = useSuspenseQuery(needsYouQuery(localAsOf()));
   const rows = useRows(data.items);
+  if (rows.length === 0) {
+    return null;
+  }
   return (
-    <ListCard label="Needs you" title="Needs you" actions={rows.length > 0 ? <Badge variant="count">{rows.length}</Badge> : null}>
-      {rows.length === 0 ? <p className="px-5 py-4 text-muted-foreground">All clear</p> : null}
+    <ListCard label="Needs you" title="Needs you" actions={<Badge variant="count">{rows.length}</Badge>}>
       {rows.map((row) => {
         const Icon = row.icon;
         return (
-          <ListRow key={row.key} onOpen={row.open}>
+          <ListRow key={row.key} label={row.title} onOpen={row.open}>
             <IconTile hue={row.hue}>
               <Icon strokeWidth={1.8} />
             </IconTile>

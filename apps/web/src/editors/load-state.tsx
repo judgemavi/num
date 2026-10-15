@@ -1,6 +1,6 @@
 import { Loading } from "@/components/loading";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody } from "@/editors/form-chrome";
 
 export function LoadingLine({ label }: { label: string }) {
@@ -8,7 +8,6 @@ export function LoadingLine({ label }: { label: string }) {
     <>
       <DialogHeader>
         <DialogTitle className="sr-only">{label}</DialogTitle>
-        <DialogDescription className="sr-only">{label}</DialogDescription>
       </DialogHeader>
       <DialogBody>
         <Loading label={label} />
@@ -22,7 +21,6 @@ export function LoadError({ label, onRetry }: { label: string; onRetry: () => vo
     <>
       <DialogHeader>
         <DialogTitle className="sr-only">{label}</DialogTitle>
-        <DialogDescription className="sr-only">{label}</DialogDescription>
       </DialogHeader>
       <DialogBody>
         <div className="grid gap-3">

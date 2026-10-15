@@ -1,6 +1,7 @@
 import { Temporal } from "@num/shared";
 import { CalendarIcon } from "lucide-react";
 import { useState } from "react";
+import { fieldControl, fieldControlIcon } from "@/components/field-control";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -58,20 +59,17 @@ export function DateField({ id, value, onChange, disabled, required, placeholder
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
+        <Button
           id={id}
           type="button"
+          variant="outline"
           disabled={disabled}
           aria-required={required}
-          className={cn(
-            "flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-input bg-card px-3.5 text-left text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
-            selected ? "" : "text-muted-foreground",
-            className,
-          )}
+          className={cn(fieldControl, selected ? "" : "text-muted-foreground", className)}
         >
           <span className="truncate">{selected ? showDate(selected) : placeholder}</span>
-          <CalendarIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        </button>
+          <CalendarIcon className={fieldControlIcon} aria-hidden="true" />
+        </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar

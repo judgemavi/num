@@ -36,7 +36,7 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
   const over = bucket.balance < 0;
 
   return (
-    <ListRow onOpen={() => void openEditor("commitment", { id: bucket.id })}>
+    <ListRow label={bucket.name} onOpen={() => void openEditor("commitment", { id: bucket.id })}>
       <IconTile hue={bucket.color}>
         <BucketGlyph name={bucket.icon} />
       </IconTile>
@@ -44,7 +44,17 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
         {bucket.name}
         {bucket.pausedAt ? <Badge variant="neutral">Paused</Badge> : null}
         {changed ? <Badge variant="attention">Amount changed</Badge> : null}
-        <small>{need ? `Due ${formatDate(need.dueDate)}` : "No next payment"}</small>
+        <small>
+          {need ? `Due ${formatDate(need.dueDate)}` : "No next payment"}
+          {need && need.short > 0 ? (
+            <span className="text-attn">
+              {" · "}
+              <Amount value={need.short} /> short
+            </span>
+          ) : need && need.covered > 0 ? (
+            ` · Fills ${formatDate(billFillsOn(need.dueDate, asOf))}`
+          ) : null}
+        </small>
       </div>
       <div className={listMid}>
         <BucketBar hue={bucket.color} balance={bucket.balance} target={amount} label={barLabel(bucket, currency, amount)} />
@@ -60,13 +70,6 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
         <small>
           of <Amount value={amount} />
         </small>
-        {need && need.short > 0 ? (
-          <small className="text-attn">
-            <Amount value={need.short} /> short
-          </small>
-        ) : need && need.covered > 0 ? (
-          <small>Fills {formatDate(billFillsOn(need.dueDate, asOf))}</small>
-        ) : null}
       </div>
       <RowMenu label={`Actions for ${bucket.name}`}>
         {bucket.archivedAt ? null : (

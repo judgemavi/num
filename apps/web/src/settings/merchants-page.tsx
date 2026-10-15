@@ -1,9 +1,10 @@
+import { Plus } from "lucide-react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { merchantListQuery, useArchiveMerchant } from "@/api/merchants";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { Boundary } from "@/components/boundary";
-import { ListCard, ListRow, listName } from "@/components/list-card";
+import { ListCard, ListEmpty, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ function Merchants() {
         title="Merchants"
         actions={
           <Button type="button" onClick={() => void openEditor("merchant", { id: null })}>
+            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
             New
           </Button>
         }
@@ -47,10 +49,10 @@ function Merchants() {
       <ArchivedFilterBar list={list} switchId="filter-archived-merchants" sortId="merchant-sort" sortLabel="Sort merchants" sortOptions={nameSortOptions} />
       <ListCard label="Merchants">
         {rows.length === 0 ? (
-          <p className="px-5 py-5 text-muted-foreground">{list.shown.archived ? "No archived merchants." : "No merchants yet."}</p>
+          <ListEmpty>{list.shown.archived ? "No archived merchants." : "No merchants yet."}</ListEmpty>
         ) : (
           rows.map((merchant) => (
-            <ListRow key={merchant.id} size="simple" onOpen={() => void openEditor("merchant", { id: merchant.id })}>
+            <ListRow key={merchant.id} size="simple" label={merchant.name} onOpen={() => void openEditor("merchant", { id: merchant.id })}>
               <div className={listName}>{merchant.name}</div>
               <RowMenu label={`Actions for ${merchant.name}`}>
                 <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("mergeMerchant", { merchantId: merchant.id })}>
