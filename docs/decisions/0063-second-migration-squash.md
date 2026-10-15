@@ -1,6 +1,6 @@
 # 0063 — Second migration squash and removal of upgrade code
 
-Status: proposed
+Status: approved (owner, 2026-10-15)
 
 ## Context
 
