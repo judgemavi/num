@@ -11,7 +11,7 @@ export function scheduleSignalsQuery(asOf: string) {
   });
 }
 
-/** The occurrences of all active schedules in the next 30 days (decision 0055). */
+/** The occurrences of all active schedules in the next 30 days. */
 export function upcomingQuery(asOf: string) {
   return queryOptions({
     queryKey: ["upcoming-occurrences", asOf],

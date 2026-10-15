@@ -10,7 +10,7 @@ export const monthDaySchema = z
   .int()
   .refine((day) => day === -1 || (day >= 1 && day <= 31));
 
-/** The schedule of a commitment or an income bucket (spec §5.7, decision 0062). */
+/** The schedule of a commitment or an income bucket (spec §5.7). */
 export const scheduleSchema = z.object({
   accountId: z.uuid(),
   expectedAmount: amountSchema,

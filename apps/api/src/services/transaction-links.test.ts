@@ -31,7 +31,7 @@ test("a mortgage payment puts the principal and the interest on two lines", () =
     expect(mirror.lines[0]?.amount).toBe(1_200_000);
     expect(mirror.lines[0]?.transferAccountId).toBe(chequing.id);
     expect(mirror.lines[0]?.categoryId).toBeNull();
-    // Chequing and the mortgage get no imports (decision 0052).
+    // Chequing and the mortgage get no imports.
     expect(mirror.status).toBe("cleared");
     expect(created.status).toBe("cleared");
   } finally {

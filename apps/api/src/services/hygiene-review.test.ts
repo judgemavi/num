@@ -77,7 +77,7 @@ function changedPlan(db: Db) {
   linkOccurrence(db, plan.id, "2026-01-15", paid.id, saved);
 }
 
-test("a changed amount does not fail the recurring check (decision 0047)", () => {
+test("a changed amount does not fail the recurring check", () => {
   withBook((db) => {
     changedPlan(db);
     expect(check(db, "2026-01-20", "recurring")).toMatchObject({ pass: true, missed: 0 });

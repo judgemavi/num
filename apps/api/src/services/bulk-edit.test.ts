@@ -51,7 +51,7 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
   });
 }
 
-/** A loan payment: the interest on a category line and the principal on a transfer line to a loan (decision 0053). */
+/** A loan payment: the interest on a category line and the principal on a transfer line to a loan. */
 function loanPayment(db: Db, accountId: string, date: string, payee: string) {
   const loan = createAccount(db, { name: `Loan ${date}`, kind: "loan", openingDate: "2026-01-01", openingBalance: 0, ...saved });
   const interest = createCategory(db, { name: `Interest ${date}`, kind: "expense", ...saved });

@@ -268,7 +268,7 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     at,
     accountId: account.id,
     dataDir,
-    // A new file, or the same file again after its document was erased (decision 0041).
+    // A new file, or the same file again after its document was erased.
     bytes: stored && !stored.deletedAt ? null : input.bytes,
     document: stored
       ? { ...stored, filename: stored.filename }

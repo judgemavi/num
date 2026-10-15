@@ -48,7 +48,7 @@ function loanPayment(book: ReturnType<typeof tempDatabase>, from: string, loanId
   });
 }
 
-test("the start interest of a mortgage with terms comes from the schedule for the date (decision 0053)", () => {
+test("the start interest of a mortgage with terms comes from the schedule for the date", () => {
   const book = mortgageBook();
   try {
     const scheduled = mortgageSplitForDate({
@@ -72,7 +72,7 @@ test("the start interest of a mortgage with terms comes from the schedule for th
   }
 });
 
-test("the start interest category comes from the terms, else from the last loan payment to the account (decision 0053)", () => {
+test("the start interest category comes from the terms, else from the last loan payment to the account", () => {
   const book = mortgageBook();
   try {
     const fees = createCategory(book.db, { name: "Fees", kind: "expense", ...saved });

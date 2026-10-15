@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { levelLabel } from "@/transactions/format";
 
 /**
- * The Status column of the All page (decision 0047). A row that needs review shows its level when it has a suggestion
+ * The Status column of the All page. A row that needs review shows its level when it has a suggestion
  * or an automatic label, and "Needs review" when it has a question or no suggestion. Other rows show nothing.
  */
 export function ReviewStatus({ review }: { review: TransactionReview | null }) {
@@ -15,7 +15,7 @@ export function ReviewStatus({ review }: { review: TransactionReview | null }) {
 }
 
 /**
- * The Confidence column of the Needs review page (decision 0048). A question shows "Question". A row with a suggestion
+ * The Confidence column of the Needs review page. A question shows "Question". A row with a suggestion
  * or an automatic label shows its level. A row with no suggestion shows nothing.
  */
 export function ReviewConfidence({ review }: { review: TransactionReview | null }) {

@@ -71,7 +71,7 @@ test("transfer is preselected only on evidence", () => {
   expect(fromMatch.transferAccountId).toBe(savings);
 });
 
-test("a learned mortgage payment gives Loan payment to the mortgage (decision 0053)", () => {
+test("a learned mortgage payment gives Loan payment to the mortgage", () => {
   const mortgage: Suggestion = { ...none, transferAccountId: savings, reason: "learned_payee", level: "likely", confidence: 800, mortgage: true };
   const resolved = resolveEditorChoice({ direction: "out", suggestion: mortgage, categoryKind: null, transferAccountFromRule: savings, oppositeAccountId: null });
   expect(resolved).toEqual({ choice: "loan_payment", categoryId: null, transferAccountId: savings, merchantId: null });

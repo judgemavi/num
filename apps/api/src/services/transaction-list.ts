@@ -281,7 +281,7 @@ export function listTransactions(db: Db, query: TransactionListQuery & { asOf?: 
   );
 }
 
-/** The levels from low to high confidence. A question has no level (decision 0049). */
+/** The levels from low to high confidence. A question has no level. */
 const levelRanks = { none: 0, question: 1, maybe: 2, likely: 3, sure: 4 };
 
 /** The score of a row in its level: the score of the automatic label or of the suggestion. Scores are 0 to 1000. */
@@ -304,8 +304,8 @@ function confidenceOrder(hits: readonly NeedsReviewHit[], dir: TransactionReview
 }
 
 /**
- * A page of the transactions that need review (decision 0047). The same filters and pages as the list.
- * The list also sorts by confidence. With no sort, the order is confidence, high to low (decision 0049).
+ * A page of the transactions that need review. The same filters and pages as the list.
+ * The list also sorts by confidence. With no sort, the order is confidence, high to low.
  */
 export function listReviewTransactions(db: Db, query: TransactionReviewListQuery & { asOf: string }) {
   const hits = filteredReviewHits(db, query, query.asOf);

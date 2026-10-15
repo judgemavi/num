@@ -19,7 +19,7 @@ const choiceLabel = {
 } satisfies Record<(typeof bulkChoices)[number], string>;
 
 /**
- * "What is this?" of the bulk editor (decision 0051). The category choices follow the direction, as in the single
+ * "What is this?" of the bulk editor. The category choices follow the direction, as in the single
  * editor. Transfer shows only when all rows are in one account (`accountId`).
  */
 export const BulkWhatField = withForm({

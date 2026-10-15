@@ -12,7 +12,7 @@ import { useAppForm } from "@/forms/form-hook";
 /**
  * The buckets that stay below zero after the fill, and the control that covers each one with money from a second
  * bucket. The fill covers a negative bucket from Unassigned, thus the panel shows only what Unassigned could not
- * cover (decision 0059).
+ * cover.
  */
 export function OverspentPanel() {
   const items = useOverspent();

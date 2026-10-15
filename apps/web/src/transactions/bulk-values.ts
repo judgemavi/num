@@ -5,7 +5,7 @@ export const bulkChoices = ["none", "spending", "income", "refund", "transfer"] 
 
 export const merchantModes = ["none", "change"] as const;
 
-/** The start values of the bulk editor. Each field starts as "No change" (decision 0051). */
+/** The start values of the bulk editor. Each field starts as "No change". */
 export const bulkValues = {
   what: fieldValue<(typeof bulkChoices)[number]>("none"),
   categoryId: fieldValue<string | null>(null),

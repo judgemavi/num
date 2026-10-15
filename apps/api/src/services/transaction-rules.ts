@@ -86,7 +86,7 @@ export function assertLineShape(accountId: string, amount: number, lines: Normal
 }
 
 /**
- * The lines of a loan payment (decision 0053): two lines, both money out, one category line (the interest) and one
+ * The lines of a loan payment: two lines, both money out, one category line (the interest) and one
  * transfer line (the principal). The kinds of the category and of the account are checked with the stored records.
  */
 export function loanPaymentLines(lines: NormalizedLine[]) {

@@ -45,7 +45,7 @@ function lastInterestCategory(db: Reader, loanAccountId: string) {
 }
 
 /**
- * The start values of the Loan payment fields (decision 0053). The interest comes from the schedule of a mortgage
+ * The start values of the Loan payment fields. The interest comes from the schedule of a mortgage
  * with terms. The interest category is the one of the terms, else the one of the latest loan payment to the account.
  */
 export function loanPaymentDefaults(db: Reader, loanAccountId: string, date: string) {

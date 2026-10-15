@@ -107,7 +107,7 @@ export type RefundCandidate = {
 
 export const reversalWindowDays = 3;
 
-/** "payee": same payee key within 90 days. "reversal": same account, category and amount within 3 days (decision 0023). */
+/** "payee": same payee key within 90 days. "reversal": same account, category and amount within 3 days. */
 export type RefundCandidateKind = "payee" | "reversal";
 
 export type RefundSubject = {
@@ -141,7 +141,7 @@ export function candidateKind(refund: RefundSubject, row: RefundCandidate): Refu
 export const refundQuestionLimit = 3;
 
 /**
- * Purchases that a refund can point to (decisions 0022 and 0023): same payee key within 90 days, or the same
+ * Purchases that a refund can point to: same payee key within 90 days, or the same
  * account, category and amount within 3 days with any payee. Each has room left for this refund.
  * The same amount comes first, then the most recent.
  */

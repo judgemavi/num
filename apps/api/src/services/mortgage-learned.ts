@@ -103,7 +103,7 @@ export function mortgageLinesFor(db: Reader, mortgageAccountId: string, fromAcco
     return null;
   }
   const fitted = mortgagePrefillLines(split.interest, split.principal, Math.abs(amount));
-  // A loan payment has two lines of money out (decision 0053).
+  // A loan payment has two lines of money out.
   if (fitted.principal <= 0 || fitted.interest <= 0) {
     return null;
   }

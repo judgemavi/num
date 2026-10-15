@@ -15,7 +15,7 @@ function ReviewTotal() {
 }
 
 /**
- * The two views of Transactions: All and Needs review (decision 0047). Each tab is a link. A link does not keep the
+ * The two views of Transactions: All and Needs review. Each tab is a link. A link does not keep the
  * search and the filters: each page starts with its defaults.
  */
 export function TransactionTabs() {

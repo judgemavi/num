@@ -57,7 +57,7 @@ export function TextField({ id, label, description, className, labelClassName, .
 export function MoneyField({ id, label, description, className, labelClassName, ...input }: InputProps) {
   const field = useFieldContext<string>();
   const currency = useBookCurrency();
-  // An unchanged stored amount keeps its value and is not sent (decision 0040). Thus only a typed amount gets the rule.
+  // An unchanged stored amount keeps its value and is not sent. Thus only a typed amount gets the rule.
   const error = field.state.meta.isDefaultValue ? null : decimalsError(currency, field.state.value);
   return (
     <Field className={className} data-invalid={error !== null}>

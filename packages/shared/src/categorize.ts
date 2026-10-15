@@ -29,7 +29,7 @@ export function preselectTransfer(input: { transferRule: boolean; oppositeMatch:
   return input.transferRule || input.oppositeMatch;
 }
 
-/** A transfer and a loan payment have no merchant (decision 0053). */
+/** A transfer and a loan payment have no merchant. */
 export function merchantForChoice(choice: WhatChoice, merchantId: string | null): string | null {
   return choice === "transfer" || choice === "loan_payment" ? null : merchantId;
 }
@@ -52,7 +52,7 @@ export function resolveEditorChoice(input: {
   oppositeAccountId: string | null;
 }): { choice: WhatChoice; categoryId: string | null; transferAccountId: string | null; merchantId: string | null } {
   const transferFromRule = input.transferAccountFromRule;
-  // The learned mortgage payment (decision 0025) is a loan payment to the mortgage (decision 0053).
+  // The learned mortgage payment is a loan payment to the mortgage.
   if (input.suggestion?.mortgage && input.suggestion.transferAccountId && input.direction === "out") {
     return { choice: "loan_payment", categoryId: null, transferAccountId: input.suggestion.transferAccountId, merchantId: null };
   }

@@ -129,7 +129,7 @@ export function runSetup(db: Db, input: SetupInput): { currency: CurrencyCode; c
   return { currency, categorySet: input.categorySet };
 }
 
-/** A change of the book currency is a relabel. Stored amounts do not change (decision 0038). */
+/** A change of the book currency is a relabel. Stored amounts do not change. */
 export function changeCurrency(db: Db, input: CurrencyInput): { currency: CurrencyCode } {
   assertCurrency(input.currency);
   const currency = input.currency;

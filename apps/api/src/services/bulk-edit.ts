@@ -22,7 +22,7 @@ import { applyTransactionUpdate, confirmLinkedPeer, spreadAfterConfirmations } f
 import { linkTransferPair, recordPairNo } from "./transfer-auto";
 import { write, type Reader, type WriteInput, type WriteTx } from "./write";
 
-/** "What is this?" of a bulk edit. Approve also applies a mortgage suggestion: a loan payment from the schedule (decisions 0025, 0053). */
+/** "What is this?" of a bulk edit. Approve also applies a mortgage suggestion: a loan payment from the schedule. */
 type BulkWhat = NonNullable<BulkEdit["what"]> | { kind: "mortgage"; accountId: string; transferAccountId: string };
 
 /** The change to each row. A field that is undefined does not change. */
@@ -113,7 +113,7 @@ function sameBody(transaction: Transaction, body: TransactionCreate) {
   );
 }
 
-/** True when "What is this?" answers the open question of the row (decision 0047). */
+/** True when "What is this?" answers the open question of the row. */
 function answersQuestion(patch: BulkPatch, review: TransactionReview | undefined) {
   return patch.what !== undefined && (review?.question === "transfer_pair" || review?.question === "refund_purchase");
 }
@@ -152,7 +152,7 @@ function acceptsPair(patch: BulkPatch, review: TransactionReview | undefined) {
 
 /**
  * The "no" answer of an open question when the change answers it another way, as the single editor does
- * (decision 0047): a possible transfer records `not_transfer`, a refund with no purchase records `not_linked`.
+ *: a possible transfer records `not_transfer`, a refund with no purchase records `not_linked`.
  */
 function recordNoAnswer(tx: WriteTx, id: string, patch: BulkPatch, review: TransactionReview | undefined, at: string) {
   if (!review || !answersQuestion(patch, review)) {
@@ -185,7 +185,7 @@ export function applyToRow(tx: WriteTx, id: string, patch: BulkPatch, at: string
     applyTransactionUpdate(tx, id, found.body, at, { spread: false, confirm: true });
     recordNoAnswer(tx, id, patch, review, at);
   }
-  // A confirmed automatic "no category" becomes a kept row (decision 0046). A confirmed automatic pair confirms both rows.
+  // A confirmed automatic "no category" becomes a kept row. A confirmed automatic pair confirms both rows.
   if (existing?.autoReason && isUncategorized(tx, id)) {
     recordKeep(tx, id, at);
   }
@@ -197,7 +197,7 @@ export function applyToRow(tx: WriteTx, id: string, patch: BulkPatch, at: string
 }
 
 /**
- * The bulk edit of selected rows (decision 0051). One write for all rows, with one audit entry for each changed row.
+ * The bulk edit of selected rows. One write for all rows, with one audit entry for each changed row.
  * Each changed row counts as a confirmation for learning. A row that cannot take the change is skipped, with a reason.
  */
 export function bulkEdit(db: Db, asOf: string, input: BulkEdit & WriteInput): { changed: number; skipped: BulkSkip[] } {

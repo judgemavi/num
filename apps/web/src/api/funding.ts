@@ -39,8 +39,8 @@ export function fillPaid(result: unknown): boolean {
 }
 
 /**
- * The automatic fill (decision 0059). It first links the transactions that match an occurrence of a commitment or an
- * income (decision 0062), because a link changes the balances. The browser sends the date of today.
+ * The automatic fill. It first links the transactions that match an occurrence of a commitment or an
+ * income, because a link changes the balances. The browser sends the date of today.
  */
 export function useFill() {
   return useMutation({

@@ -27,7 +27,7 @@ function requireMortgage(db: Reader, accountId: string) {
   return account;
 }
 
-/** A mortgage with terms always has a stored opening date (decision 0027). */
+/** A mortgage with terms always has a stored opening date. */
 export function storedOpeningDate(account: { openingDate: string | null }) {
   if (account.openingDate === null) {
     throw new Error("A mortgage with terms has no opening date");

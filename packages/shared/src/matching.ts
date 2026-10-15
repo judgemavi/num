@@ -3,8 +3,8 @@ export const autoReasons = ["recurring", "learned_amount", "learned_payee", "sim
 export type AutoReason = (typeof autoReasons)[number];
 
 /**
- * A suggestion at or above this confidence, in thousandths, is an automatic label (decision 0039). The level compares
- * it with `confidenceMilli` (decision 0036).
+ * A suggestion at or above this confidence, in thousandths, is an automatic label. The level compares
+ * it with `confidenceMilli`.
  */
 const automaticThreshold = 850;
 
@@ -17,7 +17,7 @@ export const recurringConfidence = 0.99;
 
 /**
  * One confirmed answer. `categoryId` is the learned id. In the category rows of a payee, null is the label
- * "no category": a kept uncategorized row (decision 0046).
+ * "no category": a kept uncategorized row.
  */
 export type LearnedRow<Label extends string | null = string> = {
   id: string;
@@ -43,13 +43,13 @@ export type RecurringSignal = {
   mortgage: boolean;
 };
 
-/** A learned payee that the new payee contains with other words left (decision 0026). */
+/** A learned payee that the new payee contains with other words left. */
 export type SimilarPayee = {
   scores: readonly LearnedScore[];
   transferRows: readonly { id: string; date: string; transferAccountId: string }[];
 };
 
-/** Other learned payees with the same first word that all teach one answer (decision 0026, rule 7). */
+/** Other learned payees with the same first word that all teach one answer (rule 7). */
 export type FamilySignal = {
   categoryId: string | null;
   merchantId: string | null;
@@ -68,7 +68,7 @@ export type ScoreInput = {
   transferRows: readonly { id: string; date: string; transferAccountId: string }[];
   /**
    * The learned labels of the key have two or more categories and no band contains the amount. The result is then not
-   * automatic (decisions 0043, 0044).
+   * automatic.
    */
   amountGuard: boolean;
 };
@@ -79,7 +79,7 @@ export type MatchSignal = {
   categoryId: string | null;
   merchantId: string | null;
   transferAccountId: string | null;
-  /** The answer is "no category": the row stays uncategorized (decision 0046). */
+  /** The answer is "no category": the row stays uncategorized. */
   keep: boolean;
   sourceId: string | null;
 };
@@ -128,7 +128,7 @@ export function newestFirst(left: { date: string; id: string }, right: { date: s
   return left.id < right.id ? 1 : left.id > right.id ? -1 : 0;
 }
 
-/** The key of one learned label. A null category is the label "no category" (decision 0046). */
+/** The key of one learned label. A null category is the label "no category". */
 export function candidateKey(categoryId: string | null, merchantId: string | null) {
   return `${categoryId ?? "keep"}\0${merchantId ?? ""}`;
 }
@@ -290,7 +290,7 @@ function collectSignals(input: ScoreInput) {
   return signals;
 }
 
-/** Decision 0036: payee + amount and payee learn from the same rows. The candidate takes the higher one of the two. */
+/** Payee + amount and payee learn from the same rows. The candidate takes the higher one of the two. */
 function candidateConfidence(signals: readonly MatchSignal[]) {
   let learned = 0;
   const others: number[] = [];

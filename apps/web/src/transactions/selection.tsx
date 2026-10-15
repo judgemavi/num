@@ -14,7 +14,7 @@ function rangeOf(rows: readonly TransactionListItem[], from: string, to: string)
 }
 
 /**
- * The row selection of the transaction table on `/transactions` and `/transactions/review` (decision 0051). The
+ * The row selection of the transaction table on `/transactions` and `/transactions/review`. The
  * selection is state of the screen. It belongs to the page, the filters and the sort order on the screen, thus it
  * clears when one of them changes.
  */

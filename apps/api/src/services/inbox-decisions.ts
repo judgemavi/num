@@ -89,7 +89,7 @@ export function decideInboxItem(
   return row;
 }
 
-/** The answer "no category" teaches, thus the rows of the same payee are scored again (decisions 0043, 0046). */
+/** The answer "no category" teaches, thus the rows of the same payee are scored again. */
 function keepAnswer(tx: WriteTx, transactionId: string, at: string) {
   answerNoCategory(tx, transactionId, at);
   const saved = readTransaction(tx, transactionId);

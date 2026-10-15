@@ -179,7 +179,7 @@ test("a recurring, refund or transfer automatic row never changes", () => {
   }
 });
 
-test("after a confirmation, an old automatic label switches to the label whose band contains the amount (decision 0044)", () => {
+test("after a confirmation, an old automatic label switches to the label whose band contains the amount", () => {
   const sample = book();
   const name = "E-TRANSFER";
   try {
@@ -204,7 +204,7 @@ test("after a confirmation, an old automatic label switches to the label whose b
   }
 });
 
-test("after a confirmation, one-category automatic rows far from the band go back to uncategorized and a near row keeps its label (decision 0045)", () => {
+test("after a confirmation, one-category automatic rows far from the band go back to uncategorized and a near row keeps its label", () => {
   const sample = book();
   const name = "E-TRANSFER";
   try {
@@ -227,7 +227,7 @@ test("after a confirmation, one-category automatic rows far from the band go bac
   }
 });
 
-test("a row that the user kept uncategorized is not labelled again after a confirmation (decision 0045)", () => {
+test("a row that the user kept uncategorized is not labelled again after a confirmation", () => {
   const sample = book();
   try {
     for (const date of ["2026-05-01", "2026-06-01", "2026-07-01"]) {
@@ -238,7 +238,7 @@ test("a row that the user kept uncategorized is not labelled again after a confi
     expect(sample.read(kept).categoryId).toBeNull();
     sample.confirm("2026-08-01", 2_000_000, sample.rental.id, "E-TRANSFER");
     expect(sample.read(kept)).toMatchObject({ categoryId: null, autoReason: null });
-    // The kept 1,900 teaches "no category" for its band (decision 0046). A row in the Rental Income band is labelled.
+    // The kept 1,900 teaches "no category" for its band. A row in the Rental Income band is labelled.
     const open = sample.automatic("2026-08-15", 2_000_000, sample.rental.id, "learned_payee", "E-TRANSFER");
     updateTransaction(sample.db, open, { lines: [{ amount: 2_000_000 }], ...saved });
     sample.confirm("2026-09-01", 2_000_000, sample.rental.id, "E-TRANSFER");

@@ -149,7 +149,7 @@ test("a transfer to the same account is rejected", () => {
   }
 });
 
-test("a transaction with more than one line must be a loan payment (decision 0053)", () => {
+test("a transaction with more than one line must be a loan payment", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db, "Chequing", "chequing");
@@ -211,7 +211,7 @@ test("a transaction with more than one line must be a loan payment (decision 005
     expect(principal.accountId).toBe(loan.id);
     expect(principal.amount).toBe(600);
     expect(principal.mirror).toBe(true);
-    // A loan account gets no imports (decision 0052).
+    // A loan account gets no imports.
     expect(principal.status).toBe("cleared");
     const updated = updateTransaction(
       book.db,

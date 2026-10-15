@@ -8,7 +8,7 @@ import { OptionCombobox } from "@/transactions/option-combobox";
 import { blankTransaction } from "@/transactions/transaction-draft";
 
 /**
- * "Payment for…": the answer to "Which payment is this?" (decision 0047). It starts empty, because more than one
+ * "Payment for…": the answer to "Which payment is this?". It starts empty, because more than one
  * transaction can be that payment. Save with the payment links the transaction to it.
  */
 export const PaymentForField = withForm({

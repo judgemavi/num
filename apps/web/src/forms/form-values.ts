@@ -15,7 +15,7 @@ export function keptAmount(text: string, start: { text: string; amount: number }
 }
 
 /**
- * The patch of an edit form (decision 0040): the fields of the request body that differ from the body of the start
+ * The patch of an edit form: the fields of the request body that differ from the body of the start
  * values. Null when no field changed: the form then closes without a write.
  */
 export function editPatch<B extends object>(body: B, start: B): Partial<B> | null {

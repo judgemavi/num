@@ -15,7 +15,7 @@ export type RecedeAheadInput = {
 };
 
 /**
- * The first date after `asOf` when the projected pool is less than 0 (decision 0065 item 9), the amount that the
+ * The first date after `asOf` when the projected pool is less than 0, the amount that the
  * emergency fund would give and the part that it cannot cover. On each date `d`:
  * pool = Unassigned + income(asOf, d] − Σ max(0, outflow_b(asOf, d] − balance_b) − other outflow(asOf, d].
  * Spending of a bucket that its balance holds does not lower the pool. A negative balance is already in Unassigned,

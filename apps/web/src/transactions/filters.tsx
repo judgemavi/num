@@ -18,7 +18,7 @@ const sortOptions = [
   { sort: "payeeRaw", dir: "desc", label: "Payee, Z to A" },
 ] as const;
 
-/** Needs review also sorts by confidence, high to low first (decision 0049). */
+/** Needs review also sorts by confidence, high to low first. */
 const reviewSortOptions = [
   { sort: "confidence", dir: "desc", label: "Confidence, high to low" },
   { sort: "confidence", dir: "asc", label: "Confidence, low to high" },

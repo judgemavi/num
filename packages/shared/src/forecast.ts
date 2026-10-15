@@ -189,7 +189,7 @@ function dailyShares(total: number, daysInMonth: number, step: number) {
   return Array.from({ length: daysInMonth }, (_, index) => (index < extra ? base + 1 : base) * step);
 }
 
-/** The usual day of the month of the payments into a card in the last 12 months before `asOf` (decision 0057). */
+/** The usual day of the month of the payments into a card in the last 12 months before `asOf`. */
 export function cardPaymentDay(paymentDates: readonly string[], asOf: string): number | null {
   const from = Temporal.PlainDate.from(asOf).subtract({ months: 12 }).toString();
   const days = paymentDates

@@ -14,7 +14,7 @@ import { OptionCombobox } from "@/transactions/option-combobox";
 
 const refundProps = {
   linked: fieldValue<Transaction["refundOf"]>(null),
-  /** The candidate purchases of the question "Refund of which purchase?". The list shows them first (decision 0047). */
+  /** The candidate purchases of the question "Refund of which purchase?". The list shows them first. */
   candidates: fieldValue<NonNullable<TransactionReview["refund"]>["purchases"]>([]),
 };
 

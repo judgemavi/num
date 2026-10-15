@@ -9,7 +9,7 @@ export function bookCurrencyQuery() {
   });
 }
 
-/** A change of the book currency is a relabel. Amounts do not change (decision 0038). */
+/** A change of the book currency is a relabel. Amounts do not change. */
 export function useSaveBookCurrency() {
   return useMutation({
     mutationFn: (currency: CurrencyCode) => unwrap(api.settings.currency.$patch({ json: { currency } })),

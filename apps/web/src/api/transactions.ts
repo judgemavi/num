@@ -14,8 +14,8 @@ export function transactionListQuery(search: TransactionListQuery, asOf: string)
 }
 
 /**
- * One page of the rows that need review (decision 0047), and the counts of their levels on all pages. The page also
- * sorts by confidence (decision 0049).
+ * One page of the rows that need review, and the counts of their levels on all pages. The page also
+ * sorts by confidence.
  */
 export function transactionReviewListQuery(search: TransactionReviewListQuery, asOf: string) {
   return queryOptions({
@@ -111,7 +111,7 @@ export function useDeleteTransaction() {
 }
 
 /**
- * The bulk edit of the selected rows (decision 0051). A field that is not in the body does not change. The server
+ * The bulk edit of the selected rows. A field that is not in the body does not change. The server
  * skips a row that cannot take the change. The toast shows the count of changed and skipped rows.
  */
 export function useBulkEdit() {

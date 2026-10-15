@@ -21,7 +21,7 @@ import { WhatIsThis } from "@/transactions/what-is-this";
 
 type TransactionFormProps = {
   transaction: Transaction | null;
-  /** The Needs review question of the saved transaction. Its fields start with the proposed answer (decision 0047). */
+  /** The Needs review question of the saved transaction. Its fields start with the proposed answer. */
   review?: TransactionReview | null;
   /** True when this side of a transfer follows the other account. */
   amountLocked: boolean;
@@ -51,7 +51,7 @@ export function TransactionForm({
   const save = useSaveTransaction();
   const remove = useDeleteTransaction();
   const imported = transaction?.source === "import";
-  // An imported transaction keeps its amount. An amount that the person did not change keeps its stored value (decision 0040).
+  // An imported transaction keeps its amount. An amount that the person did not change keeps its stored value.
   const startAmount = transaction ? amountText(Math.abs(transaction.amount)) : null;
   const storedTotal = (value: { amount: string; direction: MoneyDirection }) =>
     transaction && (imported || (value.amount === startAmount && value.direction === moneyDirection(transaction.amount))) ? transaction.amount : null;

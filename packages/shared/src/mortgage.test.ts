@@ -257,7 +257,7 @@ describe("mortgage schedule", () => {
   });
 });
 
-describe("opening balance and opening date (decision 0027)", () => {
+describe("opening balance and opening date", () => {
   const terms = {
     rateMilliPct: 5_000,
     compounding: "semiannual" as const,

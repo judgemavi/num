@@ -54,7 +54,7 @@ export const transactionCreateSchema = transactionWriteSchema.extend({
 });
 
 /**
- * The Needs review question that the editor showed with the transaction (decision 0047). The saved fields give the
+ * The Needs review question that the editor showed with the transaction. The saved fields give the
  * answer:
  * - `transfer_pair`: one transfer line to the account of `otherId` accepts the pair. Other lines record `not_transfer`.
  * - `refund_purchase`: a refund with a purchase links it. No purchase records `not_linked`.
@@ -68,7 +68,7 @@ export const reviewAnswerSchema = z.discriminatedUnion("question", [
 
 /**
  * A PATCH body: only the fields that change. `lines` replaces all the lines. `keepUncategorized` records the answer
- * "keep uncategorized" (decision 0024) and `answer` gives the answer to a Needs review question; they are not fields.
+ * "keep uncategorized" and `answer` gives the answer to a Needs review question; they are not fields.
  */
 export const transactionUpdateSchema = transactionWriteSchema.partial().extend({
   keepUncategorized: z.boolean().optional(),
@@ -126,10 +126,10 @@ export const transactionListApiQuerySchema = transactionListQuerySchema.extend({
   asOf: queryDate,
 });
 
-/** The Needs review list also sorts by confidence (decision 0049). */
+/** The Needs review list also sorts by confidence. */
 export const reviewSortColumns = [...transactionSortColumns, "confidence"] as const;
 
-/** The Needs review list: the same filters and pages as the transaction list (decision 0047), and one more sort column. */
+/** The Needs review list: the same filters and pages as the transaction list, and one more sort column. */
 export const transactionReviewListQuerySchema = listQuerySchema(reviewSortColumns).extend(transactionFilterSchema.shape);
 
 /** The query of the Needs review read: the list query and `asOf`. */

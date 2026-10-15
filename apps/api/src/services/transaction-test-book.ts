@@ -53,7 +53,7 @@ export function account(db: Db, name: string, kind: AccountKind) {
   });
 }
 
-/** The account gets imports: it has a column map. A new manual transaction or mirror in it is `open` (decision 0052). */
+/** The account gets imports: it has a column map. A new manual transaction or mirror in it is `open`. */
 export function getsImports(db: Db, accountId: string) {
   db.update(accounts).set({ columnMap: map }).where(eq(accounts.id, accountId)).run();
 }

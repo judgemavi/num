@@ -81,7 +81,7 @@ function hasKey(db: Db, asOfDate: string, itemKey: string): boolean {
   if (signals.missed.some((item) => `recurring_missed:${item.bucketId}:${item.dueDate}` === itemKey)) {
     return true;
   }
-  // The Recurring screen shows a changed amount until its decision (decision 0047).
+  // The Recurring screen shows a changed amount until its decision.
   const changed = signals.changed.some((item) => `recurring_changed:${item.bucketId}:${item.dueDate}` === itemKey);
   if (changed && !decidedKeys(db).has(itemKey)) {
     return true;

@@ -120,7 +120,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
     assertSameClass(existing.kind, next.kind);
     const openingDate = next.openingDate ?? null;
     const openingBalance = next.openingBalance ?? existing.openingBalance;
-    // A mortgage with terms has a fixed opening date and balance (decision 0027). Only a write with the terms changes them.
+    // A mortgage with terms has a fixed opening date and balance. Only a write with the terms changes them.
     const keepsTerms = storedTerms !== null && input.mortgageTerms === undefined;
     if (keepsTerms && (openingDate !== existing.openingDate || openingBalance !== existing.openingBalance)) {
       throw new ServiceError("opening_date_fixed", 400);

@@ -9,7 +9,7 @@ export type EditorInput = {
     initialAccountId?: string;
     unreadableItemKey?: string;
   };
-  /** The bulk editor of the selected rows (decision 0051). It is not in the URL. */
+  /** The bulk editor of the selected rows. It is not in the URL. */
   bulkEdit: { ids: string[] };
   account: { id: string | null; name?: string };
   category: { id: string | null; name?: string; kind?: CategoryKind };

@@ -59,7 +59,7 @@ const words = {
   },
 } as const;
 
-/** The form of a commitment or an income: a bucket with a schedule (decision 0062). */
+/** The form of a commitment or an income: a bucket with a schedule. */
 export function ScheduleForm({ kind, draft }: { kind: "commitment" | "income"; draft: Bucket | ScheduleSeed | "new" }) {
   const { close } = useEditorFrame();
   const currency = useBookCurrency();

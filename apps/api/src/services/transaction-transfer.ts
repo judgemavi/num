@@ -188,7 +188,7 @@ function rewriteMirror(
       autoReason: null,
       autoSourceId: null,
       autoConfidence: null,
-      // A mirror that moves to another account gets the status of a new mirror there (decision 0052).
+      // A mirror that moves to another account gets the status of a new mirror there.
       ...(peer.accountId === target ? {} : { status: newTransactionStatus(tx, target) }),
     })
     .where(eq(transactions.id, peer.id))

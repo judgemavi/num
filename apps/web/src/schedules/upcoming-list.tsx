@@ -26,7 +26,7 @@ function statusText(item: UpcomingItem) {
   return null;
 }
 
-/** The occurrences of all active schedules in the next 30 days (decision 0055). */
+/** The occurrences of all active schedules in the next 30 days. */
 export function UpcomingOccurrences() {
   return (
     <Boundary loading="Loading upcoming." failed="Upcoming did not load.">

@@ -20,7 +20,7 @@ function requireActiveBucket(tx: WriteTx, id: string) {
   if (row.archivedAt) {
     throw new ServiceError("bucket_archived", 409);
   }
-  // An income holds no money and has no events (decision 0062).
+  // An income holds no money and has no events.
   if (row.kind === "income") {
     throw new ServiceError("bucket_fields_invalid", 400, { field: "kind" });
   }

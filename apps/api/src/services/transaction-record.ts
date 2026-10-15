@@ -25,7 +25,7 @@ export type Header = {
 export type AutoStamp = Pick<TransactionRow, "autoReason" | "autoSourceId" | "autoConfidence">;
 
 /**
- * The status of a new manual, MCP or mirror transaction (decision 0052): `open` when its account gets imports
+ * The status of a new manual, MCP or mirror transaction: `open` when its account gets imports
  * (it has an import preset or a column map), else `cleared`. An imported transaction is always `cleared`.
  */
 export function newTransactionStatus(db: Reader, accountId: string) {

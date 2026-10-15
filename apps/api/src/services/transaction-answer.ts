@@ -26,7 +26,7 @@ export function acceptedPeer(tx: WriteTx, body: TransactionWrite, otherId: strin
 }
 
 /**
- * The answer that a save gives to a question that the editor showed (decision 0047). The pair that the save accepts
+ * The answer that a save gives to a question that the editor showed. The pair that the save accepts
  * does not come here. A "no" is a decision that the app records, thus the question does not come back.
  */
 export function recordSaveAnswer(tx: WriteTx, saved: Transaction, answer: ReviewAnswer, at: string): void {

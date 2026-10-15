@@ -106,7 +106,7 @@ function loadPurchases(db: Reader, payees: readonly string[], from: string) {
 }
 
 /**
- * Same-day reversal candidates (decision 0023): spending in the same account and expense category, the same
+ * Same-day reversal candidates: spending in the same account and expense category, the same
  * absolute amount, dated 0 to 3 days before the refund. One indexed join; give an id to read one refund.
  */
 function loadReversals(db: Reader, id?: string) {
@@ -198,7 +198,7 @@ export function refundQuestions(db: Reader, hidden: ReadonlySet<string>): Map<st
 }
 
 /**
- * Decisions 0022 and 0023. A refund that gets its category links itself to its purchase when exactly one candidate
+ * A refund that gets its category links itself to its purchase when exactly one candidate
  * has the same amount. It takes the category and the merchant of the purchase and counts as an automatic label.
  */
 export function linkRefundIfSure(tx: WriteTx, transactionId: string): void {
@@ -239,7 +239,7 @@ export function linkRefundIfSure(tx: WriteTx, transactionId: string): void {
   auditTransaction(tx, refund.id, "label", before, readTransaction(tx, refund.id));
 }
 
-/** The person removed a link: record the same "no" as "Not linked to a purchase" (decision 0022). */
+/** The person removed a link: record the same "no" as "Not linked to a purchase". */
 export function recordRefundNo(tx: WriteTx, transactionId: string, at: string): void {
   const itemKey = refundItemKey(transactionId);
   if (tx.select().from(inboxDecisions).where(eq(inboxDecisions.itemKey, itemKey)).get()) {

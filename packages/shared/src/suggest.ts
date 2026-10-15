@@ -18,7 +18,7 @@ export const suggestionSchema = z.object({
   sourceId: z.uuid().nullable(),
   confidence: z.number().int().min(0).max(1000),
   mortgage: z.boolean(),
-  /** The answer is "no category": keep the row uncategorized (decision 0046). */
+  /** The answer is "no category": keep the row uncategorized. */
   keep: z.boolean(),
 });
 

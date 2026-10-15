@@ -43,7 +43,7 @@ function storedBody(existing: Transaction): TransactionWrite {
 }
 
 /**
- * The answer that the save gives to the question of the transaction (decision 0047). The saved fields give the answer:
+ * The answer that the save gives to the question of the transaction. The saved fields give the answer:
  * the server accepts the pair, links the purchase, or records the "no". A payment is an answer only when the person
  * chose it.
  */
@@ -67,8 +67,8 @@ function hasOpenLine(lines: readonly { categoryId?: string | null; transferAccou
 }
 
 /**
- * The interest of a loan payment as a negative amount (decision 0053). An interest text that the person did not change
- * keeps its stored amount (decision 0040). It is more than zero and less than the amount.
+ * The interest of a loan payment as a negative amount. An interest text that the person did not change
+ * keeps its stored amount. It is more than zero and less than the amount.
  */
 export function loanInterest(input: Pick<SubmitInput, "currency" | "transaction" | "totalMilli" | "interest">): number {
   const stored = interestLine(input.transaction);
@@ -146,7 +146,7 @@ export function buildTransactionSave(input: SubmitInput): BuildResult {
     return { ok: true, save: { kind: "create", body: { ...parsed.data, unreadableItemKey: input.unreadableItemKey } } };
   }
   const labelled = existing.autoReason !== null;
-  // Decisions 0024, 0045: a save with no category keeps the row when it needed review or had an automatic label.
+  // A save with no category keeps the row when it needed review or had an automatic label.
   const keep = (labelled || hasOpenLine(existing.lines)) && hasOpenLine(parsed.data.lines);
   const patch = editPatch(parsed.data, storedBody(existing));
   const { answer } = input;

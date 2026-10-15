@@ -135,7 +135,7 @@ function learnedTransfer(tx: WriteTx, payee: string, fromAccountId: string, toAc
 }
 
 /**
- * Decision 0023. Links the row and its opposite row as a transfer pair (no new mirror) when exactly one candidate
+ * Links the row and its opposite row as a transfer pair (no new mirror) when exactly one candidate
  * exists for each, no "no" is recorded, and one payee is a learned transfer. Both rows become an automatic label.
  * A read never calls this. The 90-day limit of the pair list does not apply: a write has no `asOf`.
  */
@@ -162,7 +162,7 @@ export function linkTransferIfSure(tx: WriteTx, transactionId: string): void {
   linkTransferPair(tx, row.id, peer.id, null);
 }
 
-/** The person unlinked a pair of two real rows ("Not a transfer"): record the same "no" as the pair question (decision 0016). */
+/** The person unlinked a pair of two real rows ("Not a transfer"): record the same "no" as the pair question. */
 export function recordPairNo(tx: WriteTx, leftId: string, rightId: string, at: string): void {
   const itemKey = pairKey(leftId, rightId);
   if (tx.select().from(inboxDecisions).where(eq(inboxDecisions.itemKey, itemKey)).get()) {

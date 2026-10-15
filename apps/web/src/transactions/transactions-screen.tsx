@@ -15,10 +15,10 @@ import { useEditors } from "@/editors/editor-api";
 import { useAccounts } from "@/editors/lookups";
 
 /**
- * The screen of `/transactions` and of `/transactions/review` (decision 0047). The two pages show the same table.
+ * The screen of `/transactions` and of `/transactions/review`. The two pages show the same table.
  * The screen puts the parts in their places. Each part reads its own data. The filter bar shows new filters at once.
  * The rows and the count load in their own boundaries. Thus a read of the rows never removes the filter bar, and the
- * search box keeps the focus while the rows load. The rows can be selected for approve and bulk edit (decision 0051).
+ * search box keeps the focus while the rows load. The rows can be selected for approve and bulk edit.
  */
 export function TransactionsScreen() {
   // The list does not need the lists of the filter bar. Its read starts here, thus it does not wait for them.

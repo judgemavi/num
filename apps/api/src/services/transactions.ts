@@ -128,7 +128,7 @@ export function createTransaction(db: Db, input: TransactionCreate & WriteInput)
 /**
  * A merchant that the update leaves out keeps its stored value. An explicit null clears it.
  * `spread: false` leaves the spread of labels to the caller (a batch spreads once). `confirm: true` makes the update a
- * confirmation: it also clears an automatic label that stays (decision 0051).
+ * confirmation: it also clears an automatic label that stays.
  */
 export function applyTransactionUpdate(
   tx: WriteTx,
@@ -198,7 +198,7 @@ export function acceptLooksRight(db: Db, id: string, input: WriteInput): Transac
     confirmLinkedPeer(tx, existing, at);
     const saved = readTransaction(tx, id);
     auditTransaction(tx, id, "update", before, saved);
-    // An automatic "no category" becomes a kept row (decision 0046).
+    // An automatic "no category" becomes a kept row.
     if (isUncategorized(tx, id)) {
       recordKeep(tx, id, at);
     }
@@ -248,7 +248,7 @@ function storedBody(txn: Transaction): TransactionWrite {
 }
 
 /**
- * The save accepts the proposed pair (decision 0047): the two transactions become the two sides of one transfer, as
+ * The save accepts the proposed pair: the two transactions become the two sides of one transfer, as
  * "accept the pair" does. The other fields of the save then apply to the linked transaction.
  */
 function acceptPairOnSave(tx: WriteTx, id: string, otherId: string, input: TransactionUpdate, at: string): Transaction {
@@ -268,7 +268,7 @@ function acceptPairOnSave(tx: WriteTx, id: string, otherId: string, input: Trans
  * `answer` is the Needs review question that the editor showed: the saved fields answer it in the same write.
  */
 export function updateTransaction(db: Db, id: string, input: TransactionUpdate & WriteInput): Transaction {
-  // Only the amounts in the patch. A stored amount is not checked again (decision 0040).
+  // Only the amounts in the patch. A stored amount is not checked again.
   requireWholeAmounts(db, [input.amount, ...(input.lines ?? []).map((line) => line.amount)]);
   const at = input.at ?? utcNow();
   const { answer } = input;
@@ -289,7 +289,7 @@ export function updateTransaction(db: Db, id: string, input: TransactionUpdate &
     }
     if (input.keepUncategorized && isUncategorized(tx, id)) {
       recordKeep(tx, id, at);
-      // A kept "no category" teaches (decision 0046). An automatic label teaches after "Looks right".
+      // A kept "no category" teaches. An automatic label teaches after "Looks right".
       if (updated.autoReason === null && teachesLabel(tx, updated)) {
         spreadSureLabels(tx, [updated.payeeNormalized], new Set([id]));
       }

@@ -75,7 +75,7 @@ export function assertReferences(
   }
 }
 
-/** A transaction with more than one line is a loan payment: an expense category and a transfer to a mortgage or a loan (decision 0053). */
+/** A transaction with more than one line is a loan payment: an expense category and a transfer to a mortgage or a loan. */
 export function assertLoanPaymentTargets(db: Reader, lines: NormalizedLine[]): void {
   const loan = lines.length > 1 ? loanPaymentLines(lines) : null;
   if (!loan) {

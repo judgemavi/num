@@ -103,7 +103,7 @@ function reviewAge(state: ReviewState, asOf: string) {
   return { code: "review" as const, pass: old.length === 0, limitDays: reviewAgeDays, oldCount: old.length, oldestDate };
 }
 
-/** The last 3 complete months, newest first (decision 0031). */
+/** The last 3 complete months, newest first. */
 function savingsRate(db: Db, asOf: string) {
   const months = lastCompleteMonths(db, asOf, 3).reverse();
   const oldest = months[months.length - 1];
@@ -116,13 +116,13 @@ function savingsRate(db: Db, asOf: string) {
   return { code: "savings_rate" as const, pass: rows.every((item) => item.savings >= 0), months: rows };
 }
 
-/** Missed payments. A changed amount is answered on the Buckets screen, not here (decision 0047). */
+/** Missed payments. A changed amount is answered on the Buckets screen, not here. */
 function recurring(state: ReviewState) {
   const missed = state.signals.missed.length;
   return { code: "recurring" as const, pass: missed === 0, missed };
 }
 
-/** The fill covers a negative bucket from Unassigned. The check fails when a bucket stays negative (decision 0059). */
+/** The fill covers a negative bucket from Unassigned. The check fails when a bucket stays negative. */
 function overspent(db: Db, asOf: string) {
   const items = listOverspent(db).items;
   const balance = items.reduce((sum, item) => sum + item.balance, 0);

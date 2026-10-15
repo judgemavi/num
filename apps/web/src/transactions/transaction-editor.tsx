@@ -25,7 +25,7 @@ export function TransactionEditor({ id, ...create }: EditorInput["transaction"])
 function SavedTransaction({ id }: { id: string }) {
   // The form shows the Needs review answers of the transaction. Their read starts here, with the read of the transaction.
   usePrefetchQuery(inboxDecisionsQuery());
-  // The Needs review question of the transaction gives the start values of its fields (decision 0047).
+  // The Needs review question of the transaction gives the start values of its fields.
   const [{ data: transaction }, { data: review }] = useSuspenseQueries({ queries: [transactionQuery(id), transactionReviewQuery(id, localAsOf())] });
   // A read in the background can make the transaction a transfer. The other side then loads in a transition, thus
   // the form stays on the screen. The list of ids is empty for a transaction that is not a transfer.

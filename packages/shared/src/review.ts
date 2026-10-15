@@ -111,8 +111,8 @@ export const transferPairAcceptSchema = z.object({
 });
 
 /**
- * Why approve or bulk edit leaves a selected row as it is (decision 0051).
- * - `loan_payment`: the row (or the other side of its transfer) is a loan payment, with two lines (decision 0053).
+ * Why approve or bulk edit leaves a selected row as it is.
+ * - `loan_payment`: the row (or the other side of its transfer) is a loan payment, with two lines.
  * - `other_account`: a transfer applies only to the rows of its account.
  * - `transfer_target`: the row is in the account that the transfer goes to.
  * - `direction`: an income category on money out.
@@ -140,7 +140,7 @@ const skippedRowSchema = z.object({
   reason: z.enum(bulkSkipReasons),
 });
 
-/** The selected rows: one page of the list at most (decision 0051). */
+/** The selected rows: one page of the list at most. */
 const selectedIds = z.array(z.uuid()).min(1).max(maxPageSize);
 
 export const approveSelectedSchema = z.object({
@@ -159,7 +159,7 @@ const bulkWhatSchema = z.discriminatedUnion("kind", [
 ]);
 
 /**
- * A bulk edit (decision 0051). A field that is not in the body does not change. `merchantId: null` removes the
+ * A bulk edit. A field that is not in the body does not change. `merchantId: null` removes the
  * merchant. Tags are added and removed; the edit does not replace all tags of a row.
  */
 export const bulkEditSchema = z

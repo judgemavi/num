@@ -23,7 +23,7 @@ const loanProps = {
 };
 
 /**
- * The fields of a loan payment (decision 0053): the loan account, the interest, the principal and the interest
+ * The fields of a loan payment: the loan account, the interest, the principal and the interest
  * category. The interest and the interest category get their start values when the person chooses the loan account.
  */
 export const LoanPaymentFields = withForm({

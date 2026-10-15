@@ -8,7 +8,7 @@ import { useOnReview, useTransactionPage } from "@/transactions/use-transaction-
 
 /**
  * True when Approve applies something to the row: its automatic label, or a suggestion that the row can take. A row
- * with a question or with no suggestion is skipped (decision 0051).
+ * with a question or with no suggestion is skipped.
  */
 function canApprove(row: TransactionListItem) {
   const review = row.review;
@@ -42,7 +42,7 @@ function ApproveSelected({ rows, onApproved }: { rows: TransactionListItem[]; on
 
 /**
  * "N selected", "Edit…" and "Clear" while one or more rows of the page are selected. The Needs review page also has
- * "Approve · N" (decision 0051).
+ * "Approve · N".
  */
 export function SelectionBar() {
   const selection = useSelection();

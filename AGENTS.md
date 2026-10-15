@@ -5,21 +5,24 @@ Writing standard: ASD-STE100 (Simplified Technical English). Use it for all docs
 ## Sources of truth
 
 1. `docs/spec.md` — what the app is. Do not change it.
-2. `docs/roadmap.md` — the build order and acceptance criteria.
-3. `docs/decisions/` — approved decisions.
+2. `docs/design.md` — the look of the web app.
+3. `docs/roadmap.md` — the open slices and their acceptance criteria.
 
 If the spec is not clear, or if two documents do not agree: **stop and ask the owner.** Do not guess. Do not design a new concept.
 If you think the spec is wrong, write a proposed decision record (`docs/decisions/NNNN-title.md`, status "proposed"). Then stop.
+A decision record is a change request, not an archive. When the owner approves it, the slice applies its rules to
+`docs/spec.md`, `docs/design.md` or this file, then deletes the record in the same commit. Do not cite decision numbers
+in docs or code. Git history keeps the records. An idea that the owner refuses goes in spec §3.1 with its reason.
 
 ## Work rules
 
-- Do one roadmap slice at a time. Use a branch from `v2` with the name `v2/<slice>-<short-name>`. Example: `v2/2.2-import-pipeline`.
+- Do one roadmap slice at a time. Use a branch from `main` with the name `v2/<slice>-<short-name>`. Example: `v2/2.2-import-pipeline`.
 - Do not commit to `main`. Do not merge. The owner merges after review.
 - Do only the work in the slice. Do not add features, screens, fields or settings that the spec does not have.
 - Do not leave TODOs, placeholders or partial features. If you cannot complete an item, stop and tell the owner.
 - Do not add compatibility code, aliases or shims. v2 has no users before cutover.
 - Do not add a dependency without a reason in the PR description.
-  The dependency license must be compatible with AGPL-3.0 (decision 0003).
+  The dependency license must be compatible with AGPL-3.0.
 
 ## Data safety
 
@@ -29,7 +32,7 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 - The `v1` branch is private and read-only. Read it only with `git show v1:<path>`.
   Do not check it out, merge it, rebase it or push it.
 - Tests must use temporary databases.
-- Money is integer milliunits: thousandths of the major unit, for every currency (decision 0038).
+- Money is integer milliunits: thousandths of the major unit, for every currency.
   Do not use floating-point numbers for money. Round a calculated amount to the minor unit of the book currency with
   the helpers in `packages/shared/src/currency.ts` (`divideAmount`, `roundToStep`, `floorToStep`).
   Do not write a fixed amount (a tolerance, a threshold) in code; express it in steps of the book currency.
@@ -70,8 +73,10 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 - Style with Tailwind classes in the components. `index.css` contains only tokens (`@theme`), base styles and the font.
   Do not write global component CSS. Do not target shadcn internals (`data-slot`) from CSS.
 - The web app imports only `packages/shared`. Do not import `packages/db` or API code in the web app.
-  Exception: `apps/web/src/api/client.ts` imports the API route types with `import type` for the RPC client (decision 0032).
-- Calls from the web app to the API (decision 0032):
+  Exception: `apps/web/src/api/client.ts` imports the API route types with `import type` for the RPC client.
+- Calls from the web app to the API:
+  - Each route file builds its routes as one `@hono/zod-openapi` chain and returns the app. `app.ts` mounts the route
+    files as one chain. Thus `AppType` has every route for the RPC client.
   - Use only the Hono RPC client (`api` in `apps/web/src/api/client.ts`). Do not call `fetch` in a component.
   - Put the query options and the mutation hooks in `apps/web/src/api/`, one file for each resource.
   - A read is a `useSuspenseQuery` (or `useSuspenseQueries` for reads that start together). A write is a
@@ -92,11 +97,13 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
     Exception: a mutation hook that deletes a record calls `removeQueries` for that record in its `mutationFn`.
     Thus the rule does not read a record that is not in the book.
   - Do not parse a response body with Zod. The route gives its type.
+  - Each mutation hook sets `meta`: `formWrite` when a form shows the error, or `errorText` (the toast text for each
+    error code). Without them, the toast says "That change did not save. Try again."
   - A component that does a write calls its own mutation hook. Do not pass a mutation as a prop.
   - Do not stop a query to keep a form on the screen. An editor shows the loading line only for the first load.
   - `main.tsx` sets the defaults of each read: no second request after an answer with an error code, one more
     request after no answer, and data stays fresh for 30 seconds.
-- TypeScript and components (decision 0033):
+- TypeScript and components:
   - Types come from inference: Drizzle, Zod (`z.infer`), the Hono RPC client, `queryOptions` and the router.
   - Do not declare a type that the compiler can infer.
   - Do not use a cast (`as`) to get a type back. Correct the source of the type.
@@ -113,7 +120,7 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
   - When more than one part of a screen shows the same read, each part calls the same hook for it
     (`useInsightsReport()`). The screen starts the reads of its parts with `usePrefetchQuery`.
 - Use `Temporal.PlainDate` for calendar dates. Do not use `Date` for calendar dates.
-- Lists: one shared Zod query schema for the URL and the API. Follow decision 0004.
+- Lists: one shared Zod query schema for the URL and the API. The list rules are in spec §4 (Lists).
   - A route gives its shared schema to `validateSearch` through `searchWithDefaults(...)`. A value in the URL that is
     not valid then goes back to its default. The API uses the schema itself and answers 400. The router infers the
     search types. Do not write a type or a function for the search of a route. The root route validates `edit`.
@@ -126,7 +133,7 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
   - Use `SearchBox` for a search box, a TanStack form for a filter panel, `useLastPage` with `ListPager` for the
     pages, `SortSelect` for the sort control and `ArchiveMenuItem` for "Archive" and "Restore" in a row menu.
   - The key of a list query has only the values that the request uses. `edit` is not in a key or in a request.
-- Forms (decision 0035):
+- Forms:
   - Each form uses `useAppForm` (`forms/form-hook.ts`). Do not keep the value of a field in `useState`.
   - Use the field components (`field.TextField`, `field.MoneyField`, `field.SelectField` and the others) in
     `form.AppField`. For a picker, use `form.Field` and give `field.state.value` and `field.handleChange` to it.
@@ -140,6 +147,8 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
     writes has one.
   - A change that follows a change of a field goes in the `listeners` of that field. A change that the form makes
     (a suggestion, a fill from the schedule) does not mark the field as changed.
+  - An edit form sends only the fields that differ from its start values (`editPatch`). A money field that the person
+    did not change keeps the stored amount (`keptAmount`). An edit with no change closes without a write.
   - Keep `useState` only for state of the screen: open or closed, the selected row, the hover.
 - For a control with a fixed list of choices, use `ChoiceSelect` (`components/choice-select.tsx`) or `choiceIn`
   (`components/choice.ts`). They give the type of the choices. Do not use a cast on the value of a control.
@@ -155,7 +164,9 @@ If you think the spec is wrong, write a proposed decision record (`docs/decision
 
 ## Tests
 
-- Write tests only for logic. Decision 0004 gives the list.
+- Write tests only for logic: money calculations and balances; invariants (spec §5); parsers, identity, duplicates
+  and matching; payee normalization and suggestions; recurring dates, buckets, funding, forecast and mortgage
+  calculations; undo.
 - Do not write tests for simple CRUD, UI rendering, framework behavior or schema shape.
 - Do not write browser end-to-end tests. The owner does usability tests.
 - Use plain language in the UI (spec §2.6).

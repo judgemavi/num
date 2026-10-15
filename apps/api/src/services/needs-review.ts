@@ -28,7 +28,7 @@ export type NeedsReviewHit = {
   date: string;
   accountId: string;
   merchantId: string | null;
-  /** The score of the automatic label. A Sure row sorts by it (decision 0049). */
+  /** The score of the automatic label. A Sure row sorts by it. */
   autoConfidence: number | null;
   review: TransactionReview;
 };
@@ -69,7 +69,7 @@ function loadBases(db: Db, ids: readonly string[]) {
   );
 }
 
-/** A row is Likely only when Approve can apply its suggestion (decision 0051). Other rows with a suggestion are Maybe. */
+/** A row is Likely only when Approve can apply its suggestion. Other rows with a suggestion are Maybe. */
 function rowLevel(row: Base, automatic: boolean, suggestion: Suggestion | null) {
   const level = reviewLevel(automatic, suggestion ? suggestion.confidence : null);
   if (level !== "likely") {
@@ -190,7 +190,7 @@ export function listNeedsReview(
       review.refund = refundAsk;
     } else {
       review.suggestion = suggestion;
-      // "Yes" to a "no category" suggestion is the keep decision (decision 0046).
+      // "Yes" to a "no category" suggestion is the keep decision.
       review.itemKey = suggestion?.keep ? keepKey(row.id) : null;
     }
     hits.push({ id: row.id, date: row.date, accountId: row.accountId, merchantId: row.merchantId, autoConfidence: row.autoConfidence, review });

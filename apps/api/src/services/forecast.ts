@@ -67,7 +67,7 @@ export function readForecast(db: Db, asOf: string): Forecast {
 /**
  * The input of the forecast (spec §8). Each flow has its bucket: a commitment, an income or a spending bucket.
  * `transfersOut` are the commitment payments by transfer to an account that is not an open on-budget account (a loan
- * payment, for example). They leave the pool (decision 0065 item 9), but they are not spending in the forecast.
+ * payment, for example). They leave the pool, but they are not spending in the forecast.
  */
 export function forecastInput(db: Db, asOf: string): ForecastInput & { transfersOut: ForecastFlow[] } {
   const step = bookStep(db);

@@ -1,4 +1,4 @@
-/** Decision 0026: match a new payee to a learned payee that it contains. The result is always "similar". */
+/** Match a new payee to a learned payee that it contains. The result is always "similar". */
 
 const cutMinimum = 4;
 
@@ -80,7 +80,7 @@ export function containedMatch(
 }
 
 /**
- * Brand family (decision 0026, rule 7): the other learned payees with the same first word as the new payee.
+ * Brand family (rule 7): the other learned payees with the same first word as the new payee.
  * Returns them when there are 2 or more and all teach the same answer. Otherwise null.
  */
 export function familyMatch(

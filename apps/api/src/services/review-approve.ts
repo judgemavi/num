@@ -24,7 +24,7 @@ function confirmLabel(tx: WriteTx, id: string, at: string, peers: Set<string>) {
   const before = readTransaction(tx, id);
   tx.update(transactions).set({ ...clearedAuto, editedAt: at }).where(eq(transactions.id, id)).run();
   auditTransaction(tx, id, "update", before, readTransaction(tx, id));
-  // An automatic "no category" becomes a kept row (decision 0046).
+  // An automatic "no category" becomes a kept row.
   if (isUncategorized(tx, id)) {
     recordKeep(tx, id, at);
   }
@@ -77,7 +77,7 @@ function approvalOf(db: Db, id: string, hit: NeedsReviewHit | undefined): { skip
 }
 
 /**
- * Approve the selected rows (decision 0051): apply the automatic label or the suggestion of each row as a
+ * Approve the selected rows: apply the automatic label or the suggestion of each row as a
  * confirmation. A row with a question or with no suggestion is skipped. One write; each approved row counts as a
  * confirmation for learning.
  */

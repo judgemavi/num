@@ -31,7 +31,7 @@ export const queryFlag = z
 
 export const archivedQuery = { archived: queryFlag };
 
-/** The most rows on one page of a list. Approve and bulk edit also take one page at most (decision 0051). */
+/** The most rows on one page of a list. Approve and bulk edit also take one page at most. */
 export const maxPageSize = 200;
 
 export function listQuerySchema<const T extends readonly [string, ...string[]]>(columns: T) {
@@ -78,7 +78,7 @@ function validSearch(schema: z.ZodType, raw: unknown): Record<string, unknown> {
 /**
  * The search schema of a page of the web app. A value in the URL that is not valid goes back to its default: the
  * schema reads the URL without it. The API uses the query schema itself, thus it answers 400 to a value that is not
- * valid (decision 0004).
+ * valid.
  */
 export function searchWithDefaults<T extends z.ZodType>(schema: T) {
   return z.preprocess((raw: z.input<T>) => validSearch(schema, raw), schema);

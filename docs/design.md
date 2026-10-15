@@ -2,7 +2,7 @@
 
 Writing standard: ASD-STE100.
 
-Status: **approved** (decision 0009). This file is the source of truth for the look of the web app.
+Status: **approved**. This file is the source of truth for the look of the web app.
 The visual reference is `docs/design/signal-reference.html`. Open it in a browser. It uses synthetic data.
 
 ## 1. Principles
@@ -127,7 +127,7 @@ global component CSS (AGENTS.md).
 | Choice cards | Radio choices as cards with a title and a one-line description (example: account kind). Selected: iris border and `primary-soft` fill. |
 | Reveal | A sub-section that shows only after a choice (example: card details). `bg` fill, hairline border, radius 14px. |
 | Disclosure | "More options: …" link-style button that opens optional fields. |
-| ActionBar | Actions for the selected rows of a table (decision 0051). A floating `ink` pill with white text, bottom centre of the screen, with the dialog shadow. Left: "N selected". Then 44px buttons: an outline button on the dark fill (white text, white border at low opacity), one primary (iris) button, and a ghost "Clear". It shows only while one or more rows are selected. The page gets space at its end, thus the bar does not cover the last rows and the pager. |
+| ActionBar | Actions for the selected rows of a table. A floating `ink` pill with white text, bottom centre of the screen, with the dialog shadow. Left: "N selected". Then 44px buttons: an outline button on the dark fill (white text, white border at low opacity), one primary (iris) button, and a ghost "Clear". It shows only while one or more rows are selected. The page gets space at its end, thus the bar does not cover the last rows and the pager. |
 
 Use shadcn `Table` only for the Transactions list. All other record lists use ListCard rows.
 
@@ -135,24 +135,26 @@ Use shadcn `Table` only for the Transactions list. All other record lists use Li
 - Click a row to open it (edit dialog or detail). The whole row is the target.
 - Show a maximum of one visible button in a row. Put other actions in a "More" menu
   (shadcn `DropdownMenu`, an icon-only ghost button with `aria-label`).
-- Group headers have no visible buttons. Their actions (rename, reorder, delete) go in the group's "More" menu.
+- Group headers have no visible buttons. Their actions (rename, delete) go in the group's "More" menu.
 - Archive, delete and other destructive actions are neutral menu items. Confirm them with `AlertDialog`.
   Do not use tomato for destructive actions. Tomato means "this needs you" only.
 - Show a status only when it is not the default. Example: show an "Essential" badge; do not show "Not essential".
 - Do not repeat information that the group already gives. Example: no "Income" label on rows in the Income group.
 - A button uses only the verb when the dialog, card, page or row already names the record: "Save", "Add", "New",
-  "Delete". Keep the noun only when the verb alone is not clear (decision 0064).
+  "Delete". Keep the noun only when the verb alone is not clear: a menu item that opens a different record ("Add bank
+  balance"), a link to a different screen ("Imports"), two choices for the same row, or a source or destination that
+  the person must know ("Fund from Unassigned").
 
-**Messages after a write (decision 0042):** shadcn `Sonner` toasts, one `Toaster` at the app root, bottom centre.
+**Messages after a write:** shadcn `Sonner` toasts, one `Toaster` at the app root, bottom centre.
 - A write that has no form (a row action, a one-click answer, archive, undo, cover) shows an error toast when it
   fails. Do not show the error of such a write in the page.
 - A form shows the error of its write in the form (`FormError`). It shows no toast.
 - A write that can be undone with an existing route shows a success toast with an "Undo" action. Other writes show no
-  success toast, except Approve and the bulk editor (decision 0051), which show the number of approved or changed
+  success toast, except Approve and the bulk editor, which show the number of approved or changed
   transactions and the number of skipped rows: "10 changed · 2 skipped".
 
 **Settings:** each area is its own subpage with its own URL: `/settings/groups`, `/settings/categories`,
-`/settings/tags`, `/settings/backup`. Desktop: a settings sub-navigation (a short vertical list) on the left of the content.
+`/settings/tags`, `/settings/merchants`, `/settings/currency`, `/settings/ai`, `/settings/backup`. Desktop: a settings sub-navigation (a short vertical list) on the left of the content.
 Phone: `/settings` shows the list of areas; each opens its own page with a back link. Do not put all areas on one page.
 
 **Filters (all list screens):** one compact filter bar, one row high.
@@ -169,12 +171,12 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 
 **Full height:** the app shell fills the viewport height. The desktop sidebar is full height and stays in place when the page scrolls.
 
-**Charts (decision 0030):** use only the chart tokens `chart-1` to `chart-5`, `est` and `attn`.
+**Charts:** use only the chart tokens `chart-1` to `chart-5`, `est` and `attn`.
 - Insights timeline: income bars `chart-3`, spending bars `chart-2`, balance line `chart-5`.
   Forecast bars and the balance forecast line use the same colour at a lower opacity (lighter tone).
   When the forecast ends inside a month, the forecast part of that bar also has a dashed outline in the same colour.
   The known-only forecast line is `est`, dashed. The `asOf` marker is `muted`, dashed.
-- Spending donut (decision 0058): two rings. The inner ring is the groups: slices take `chart-1` to `chart-5` in order.
+- Spending donut: two rings. The inner ring is the groups: slices take `chart-1` to `chart-5` in order.
   After 5 slices, the colours repeat at a lower opacity. "Uncategorized" is `est`. The outer ring is the categories.
   A category takes the colour of its group at a lower opacity. The opacity is lower for each next category of the group.
   The list next to the donut shows the same colour as a dot in each row. A slice has a hover tooltip, in the style of
@@ -195,44 +197,44 @@ Order, top to bottom:
    - Money out: Spending · Transfer · Loan payment. Money in: Income · Refund · Transfer.
    - Spending / Refund: expense categories only. Income: income categories only.
    - Transfer: "To account" / "From account" Combobox (link an existing match or create the mirror). No merchant.
-   - Loan payment (decision 0053): "Loan account" Combobox (mortgage and loan accounts that are not archived),
+   - Loan payment: "Loan account" Combobox (mortgage and loan accounts that are not archived),
      "Interest" (money field), "Principal" (read-only: the amount minus the interest) and "Interest category"
      (Combobox of expense categories). For a mortgage with terms, Interest starts with the interest of the schedule,
      with the hint "From the payment schedule." Interest category starts with the category of the terms, else the
      category of the last loan payment to that account. No merchant.
 5. **Merchant** Combobox, with the suggestion and its level. Hidden for Transfer and Loan payment.
 6. **Tags**. All fields show; the editor has no collapsed section. There is no "Cleared" control and no "status" word
-   in the UI: only the app sets the status (decision 0050).
+   in the UI: only the app sets the status.
 7. Footer: Save (primary). Delete goes in a More menu (shared confirm).
    There is one primary button, Save. When the transaction needs review, Save is the user's answer: with no change it
    confirms the automatic label or applies the suggestion shown in the form; with a change it saves and confirms.
-   A question is a field filled with the proposed answer (decision 0047): Transfer to the other account of a pair,
+   A question is a field filled with the proposed answer: Transfer to the other account of a pair,
    the candidate purchases first in "Refund of…", and "Payment for…" (Combobox, starts empty) for a recurring payment.
    The header shows only the level; no action buttons.
 
-Needs review is its own route with the same table (decision 0047): `/transactions` shows all transactions and
+Needs review is its own route with the same table: `/transactions` shows all transactions and
 `/transactions/review` shows only the transactions that need review. There is no second list component. Both pages show
 two tabs (links) in the page header: "All" and "Needs review · N". A tab link does not keep the search and the filters.
 Columns: a checkbox, Date, Account, Payee, Category, Amount, Status (and Balance when one account is shown).
-The checkbox column (decision 0051) shows only on these two pages, not on the page of an account. A click on the
+The checkbox column shows only on these two pages, not on the page of an account. A click on the
 checkbox selects the row; a click on another part of the row opens the editor. Shift and click selects a range. The
 header checkbox selects all rows of the page. The checkbox of a loan payment is disabled, with the Tooltip "Loan
-payments are changed one at a time." (decision 0053) With a selection, the ActionBar (§6) shows "N selected", "Edit…" (primary) and "Clear". On `/transactions/review` it
+payments are changed one at a time." With a selection, the ActionBar (§6) shows "N selected", "Edit…" (primary) and "Clear". On `/transactions/review` it
 also shows "Approve · N" (outline) before "Edit…". Approve has no confirm.
 The Category column shows the category, "Transfer to <account>" (money out) or "Transfer from <account>" (money in), "Loan payment", or "Uncategorized", and the merchant
 below it.
-The Amount cell shows only the exception: "Pending" for an open row (entered by hand in an account that gets imports, not yet on a statement; decision 0052).
+The Amount cell shows only the exception: "Pending" for an open row (entered by hand in an account that gets imports, not yet on a statement).
 A cleared row shows nothing.
 The Status column (right-most) shows a Badge only when the row needs review: the level (Sure, Likely, Maybe, never a
 percentage) for a row with a suggestion or an automatic label, and "Needs review" for a row with a question or no
-suggestion. On `/transactions/review` the column is "Confidence" (decision 0048): the level, "Question" for a question,
-and nothing for a row with no suggestion. The Confidence header is a sort button, as Date, Payee and Amount are
-(decision 0049). There, the Category column shows the proposed label and merchant of a
+suggestion. On `/transactions/review` the column is "Confidence": the level, "Question" for a question,
+and nothing for a row with no suggestion. The Confidence header is a sort button, as Date, Payee and Amount are.
+There, the Category column shows the proposed label and merchant of a
 suggestion (the same text as a stored label; the level tells that it is a proposal) and "Transfer to <account>" or "Transfer from <account>" for a
 possible transfer. A row has no buttons. The whole row opens the editor. No dismiss, no queue mode.
 The table has no group rows. The page header of `/transactions/review` has no "Approve all" buttons.
 
-**Bulk editor (decision 0051).** "Edit…" in the ActionBar opens it through `openEditor` (§6b). It is not in the URL.
+**Bulk editor.** "Edit…" in the ActionBar opens it through `openEditor` (§6b). It is not in the URL.
 - Header: "Edit N transactions", and below it the account (or "N accounts"), the date range and the total.
 - Fields, each starts as "No change": **What is this?** (ToggleGroup: No change, the category choices of the direction,
   Transfer; Transfer only when all rows are in one account, with an "Other account" Combobox; money out and money in
@@ -251,7 +253,7 @@ The table has no group rows. The page header of `/transactions/review` has no "A
 - One dialog host at the app root. Screens call `openEditor(kind, props)`. Screens do not render their own dialogs.
   Only the open editor exists in the page.
 - An editor loads its own data when it opens (by ID, through the query cache). List rows carry only what they show.
-- Editors do not stack. Only one top-level editor is open at a time (decision 0018).
+- Editors do not stack. Only one top-level editor is open at a time.
 - One shared `confirm()` (AlertDialog) for every confirmation.
 - The URL shows the open single-record editor (`?edit=transaction:<id>`). Back closes it.
 
@@ -260,10 +262,12 @@ merchants, accounts) is "+ Create new <thing>". Choosing it expands that entity'
 with the typed text. Save creates, selects and collapses; Cancel collapses. Inline forms nest at most two levels (category
 form → "+ Create new group"). An archived match shows "Restore 'X'".
 
-**Account editor, mortgage (decision 0027):** when the kind is mortgage, the Account form has a "Mortgage terms" section
+**Account editor, mortgage:** when the kind is mortgage, the Account form has a "Mortgage terms" section
 under the amount owed. It is open by default, with the help line "Add the terms to see the payment schedule and the
-interest and principal of each payment." The opening date has the help line from decision 0027, and the form shows the
-first payment warning from decision 0027. There is no separate mortgage terms editor.
+interest and principal of each payment." The opening date has the help line "Use the date of the last payment before the first payment in Num. Use the amount
+owed after that payment." When the first payment date is not one payment period after the opening date, the form
+shows the warning "The first payment is not one payment period after the opening date. The first payment gets more
+or less interest than a regular payment." The person can save. There is no separate mortgage terms editor.
 
 **Mortgage schedule:** one ListCard for each year. Each row shows the date, the payment, the interest, the principal and
 the balance after the payment. A past row also shows the actual payment or "No payment". Past years are collapsed

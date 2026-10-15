@@ -66,7 +66,7 @@ test("the width factor is 1 at width 0, 0.975 at 0.25 and 0.95 from 0.5", () => 
   expect(widthFactor(0, 0)).toBe(1);
 });
 
-test("one category: an amount outside the band uses the payee signal and is automatic (decision 0044)", () => {
+test("one category: an amount outside the band uses the payee signal and is automatic", () => {
   const rows = [row("a", "2026-01-01", "pay", 5349850), row("b", "2026-01-31", "pay", 6445710)];
   expect(fitLabels(learnedLabels(rows), 7000000)).toEqual([]);
   const result = score(rows, 7000000);
@@ -87,7 +87,7 @@ test("one category with older lower pay: the older amount is outside the band an
   expect(result.level).toBe("automatic");
 });
 
-test("one category: an amount near the band, below or above, is automatic (decision 0045)", () => {
+test("one category: an amount near the band, below or above, is automatic", () => {
   const pay = monthly("p", 1, "pay", [5173240, 5400000, 5600000, 5800000, 6000000, 6200000]);
   for (const amount of [4750910, 7000000]) {
     expect(fitLabels(learnedLabels(pay), amount)).toEqual([]);
@@ -98,7 +98,7 @@ test("one category: an amount near the band, below or above, is automatic (decis
   }
 });
 
-test("one category: an amount not near the band gives a suggestion (decision 0045)", () => {
+test("one category: an amount not near the band gives a suggestion", () => {
   const rental = monthly("r", 1, "rental", Array<number>(8).fill(2000000));
   for (const amount of [40000, 18720, 500000, 2600000]) {
     expect(signals(rental, amount).amountGuard).toBe(true);
@@ -122,7 +122,7 @@ test("near is from exactly 75% of the lowest to exactly 125% of the highest amou
   expect(signals(rows, -3750001).amountGuard).toBe(true);
 });
 
-test("two categories and an amount outside all bands is not automatic (decisions 0043, 0044)", () => {
+test("two categories and an amount outside all bands is not automatic", () => {
   const rows = [...monthly("m", 1, "misc", [-40000, -80000]), ...monthly("r", 3, "rent", Array<number>(7).fill(-2550000))];
   expect(signals(rows, -1500000).amountGuard).toBe(true);
   for (const amount of [-15000, -1500000, -2000000]) {

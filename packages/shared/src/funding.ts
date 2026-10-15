@@ -51,7 +51,7 @@ export function roundUpShare(shortfall: number, months: number, step: number): n
   return divideAmount(shortfall, months, step, "up");
 }
 
-/** What the monthly amount of a commitment needs (decision 0062 item 5). `amount` is the safe amount, as a positive number. */
+/** What the monthly amount of a commitment needs. `amount` is the safe amount, as a positive number. */
 export type MonthlyCommitment = {
   schedule: PlanSchedule;
   amount: number;
@@ -69,7 +69,7 @@ export type MonthlyBucket = {
   amount: number | null;
   dueDate: string | null;
   repeat: "none" | "yearly" | null;
-  /** The target of the bucket. For the emergency kind, the calculated target (decision 0060). */
+  /** The target of the bucket. For the emergency kind, the calculated target. */
   target: number | null;
   targetDate: string | null;
   fixedAmount: number | null;
@@ -83,7 +83,7 @@ export function monthsUntil(month: string, date: string): number {
 }
 
 /**
- * The monthly amount of a bucket (decision 0059 item 1). `balance` is the balance at the start of `month`, without the
+ * The monthly amount of a bucket. `balance` is the balance at the start of `month`, without the
  * funding of that month. Each amount is rounded up to a whole minor unit (`step`).
  */
 /** The due date that counts for `month`. A yearly bucket rolls a past due date forward by whole years. */
@@ -111,7 +111,7 @@ function periodAfter(date: string, schedule: PlanSchedule) {
   return end.toString();
 }
 
-/** The monthly amount of a commitment (decision 0062 item 5), from the occurrences on or after the start date of the bucket. */
+/** The monthly amount of a commitment, from the occurrences on or after the start date of the bucket. */
 function commitmentAmount(bucket: MonthlyBucket, commitment: MonthlyCommitment, balance: number, month: string, step: number): number {
   const monthFirst = `${month}-01`;
   const from = bucket.startDate > monthFirst ? bucket.startDate : monthFirst;
@@ -161,7 +161,7 @@ export const fundingPositionSchema = z.object({
 export const fillResultSchema = z.object({
   /** The total that this fill paid. 0 when nothing was owed or Unassigned was used. */
   paid: nonNegative,
-  /** The number of events that this fill wrote: covers, payments and money back from the emergency fund (decision 0065). */
+  /** The number of events that this fill wrote: covers, payments and money back from the emergency fund. */
   payments: nonNegative,
 });
 

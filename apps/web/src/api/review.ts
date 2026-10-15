@@ -47,7 +47,7 @@ export function useUndoDecision() {
 }
 
 /**
- * Approve the selected rows (decision 0051): apply the automatic label or the suggestion of each row as a confirmation.
+ * Approve the selected rows: apply the automatic label or the suggestion of each row as a confirmation.
  * The server skips a row with a question or with no suggestion. No route undoes an approval, thus the toast has no "Undo".
  */
 export function useApproveSelected() {

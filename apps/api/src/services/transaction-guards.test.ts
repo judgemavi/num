@@ -122,7 +122,7 @@ test("a mirror amount change is rejected when the source has more than one line"
     expect(nextMirror?.id).not.toBe(mirror.id);
     expect(nextMirror?.mirror).toBe(true);
     expect(nextMirror?.amount).toBe(1_000_000);
-    // A mortgage gets no imports: its mirror is cleared (decision 0052).
+    // A mortgage gets no imports: its mirror is cleared.
     expect(nextMirror?.status).toBe("cleared");
     expect(nextMirror?.lines).toHaveLength(1);
   } finally {
@@ -130,7 +130,7 @@ test("a mirror amount change is rejected when the source has more than one line"
   }
 });
 
-test("a new transaction and its new mirror are open only in an account that gets imports (decision 0052)", () => {
+test("a new transaction and its new mirror are open only in an account that gets imports", () => {
   const book = tempDatabase();
   try {
     const chequing = account(book.db, "Chequing", "chequing");
@@ -157,7 +157,7 @@ test("a new transaction and its new mirror are open only in an account that gets
     expect(moved.transferPeerId).toBe(mirror?.id ?? "");
     expect(getTransaction(book.db, moved.transferPeerId ?? "")?.status).toBe("open");
 
-    // An import sets "cleared" (decision 0050). An edit by the person does not change the status.
+    // An import sets "cleared". An edit by the person does not change the status.
     book.db.update(transactions).set({ status: "cleared" }).where(eq(transactions.id, created.id)).run();
     const edited = updateTransaction(book.db, created.id, { date: "2026-04-02", ...saved });
     expect(edited.date).toBe("2026-04-02");

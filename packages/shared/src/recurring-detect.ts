@@ -3,7 +3,7 @@ import { medianAmount, medianOf, type AmountMode, type PlanFrequency } from "./r
 
 /**
  * `plain` is true for a transaction with one line that is not a transfer. `categoryId` is the category of that line.
- * `transferAccountId` is the target of the one transfer line of a transfer or a loan payment (decision 0056).
+ * `transferAccountId` is the target of the one transfer line of a transfer or a loan payment.
  */
 export type DetectionTransaction = {
   id: string;
@@ -17,7 +17,7 @@ export type DetectionTransaction = {
 };
 
 /**
- * A proposal has a merchant, or else a category (decision 0054), or else a transfer target (decision 0056).
+ * A proposal has a merchant, or else a category, or else a transfer target.
  * With none, it groups one exact amount.
  */
 export type PlanProposal = {
@@ -125,7 +125,7 @@ function latestRun(sorted: readonly DetectionTransaction[], step: number): PlanP
     }
     start -= 1;
   }
-  // An old amount outside the band (a first bill with a fee) does not stop the later regular rows (decision 0054).
+  // An old amount outside the band (a first bill with a fee) does not stop the later regular rows.
   while (sorted.length - start >= 3) {
     const window = sorted.slice(start);
     if (withinTenPercent(window.map((row) => row.amount))) {
@@ -137,9 +137,9 @@ function latestRun(sorted: readonly DetectionTransaction[], step: number): PlanP
 }
 
 /**
- * The group of a transaction: its merchant; else its category; else its exact amount (decision 0054).
+ * The group of a transaction: its merchant; else its category; else its exact amount.
  * With no merchant, money out with one transfer line (a transfer or a loan payment) goes in the group of the
- * transfer target (decision 0056). Other splits and transfers are in no group.
+ * transfer target. Other splits and transfers are in no group.
  */
 function groupKey(transaction: DetectionTransaction) {
   if (transaction.merchantId) {
@@ -154,7 +154,7 @@ function groupKey(transaction: DetectionTransaction) {
   return transaction.categoryId ? `category\0${transaction.categoryId}` : `amount\0${transaction.amount}`;
 }
 
-/** What a proposal is about: its merchant, its transfer target, its category or its one amount (decisions 0054, 0056). */
+/** What a proposal is about: its merchant, its transfer target, its category or its one amount. */
 export function proposalSubject(item: Pick<PlanProposal, "merchantId" | "categoryId" | "transferAccountId" | "expectedAmount">): string {
   if (item.merchantId) {
     return item.merchantId;

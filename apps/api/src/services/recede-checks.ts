@@ -8,7 +8,7 @@ import { emergencyBucket } from "./emergency-fund";
 import { forecastInput } from "./forecast";
 import { fundingPosition } from "./funding-book";
 
-/** The recedes of the emergency bucket in the month of `asOf` that are not undone, for each covered bucket (decision 0065 item 8). */
+/** The recedes of the emergency bucket in the month of `asOf` that are not undone, for each covered bucket. */
 function recedeMonth(db: Db, reserveId: string, asOf: string) {
   const month = asOf.slice(0, 7);
   const rows = db
@@ -35,7 +35,7 @@ function recedeMonth(db: Db, reserveId: string, asOf: string) {
   return { code: "recede_month" as const, pass: rows.length === 0, month, total, items };
 }
 
-/** The first date in the forecast when the pool goes below 0 (decision 0065 item 9). */
+/** The first date in the forecast when the pool goes below 0. */
 function recedeAheadCheck(db: Db, reserveId: string, asOf: string) {
   const balances = bucketBalances(db, asOf);
   const input = forecastInput(db, asOf);

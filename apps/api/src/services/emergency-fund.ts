@@ -104,7 +104,7 @@ function plannedMonthly(db: Reader, asOf: string) {
 }
 
 /**
- * The monthly essential spending (decision 0060): the median of the last 6 complete months before `asOf`. With fewer
+ * The monthly essential spending: the median of the last 6 complete months before `asOf`. With fewer
  * than 3 complete months that have lines, the planned figure.
  */
 export function monthlyEssential(db: Reader, asOf: string): { monthly: number; basis: EmergencyFund["basis"] } {

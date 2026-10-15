@@ -5,7 +5,7 @@ import { buckets } from "./buckets";
 import { categories, merchants } from "./categories";
 import { transactions } from "./ledger";
 
-/** The schedule of a commitment or an income bucket (decision 0062). The bucket has the name, the archive state and the kind. */
+/** The schedule of a commitment or an income bucket. The bucket has the name, the archive state and the kind. */
 export const schedules = sqliteTable("schedules", {
   bucketId: text("bucket_id")
     .primaryKey()

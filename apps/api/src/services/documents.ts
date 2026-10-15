@@ -24,7 +24,7 @@ export function writeStoredFile(dataDir: string, hash: string, bytes: Uint8Array
 }
 
 /**
- * The same file again after its document was erased (decision 0041): the file is stored again and the document
+ * The same file again after its document was erased: the file is stored again and the document
  * loses its erased mark. The file is written first. If the write of the row fails, the file is removed again.
  */
 export function restoreDocument(db: Db, dataDir: string, row: DocumentRow, bytes: Uint8Array, input: WriteInput): Document {
@@ -60,7 +60,7 @@ export function readDocumentFile(db: Db, dataDir: string, id: string): DocumentF
 }
 
 /**
- * Erase the file of a document (decision 0041). The row stays with its filename, hash and upload time, and gets the
+ * Erase the file of a document. The row stays with its filename, hash and upload time, and gets the
  * erased mark `deletedAt`. The import batch and its transactions stay.
  *
  * The file moves to a side name inside the database transaction. If the transaction fails, the file moves back. After

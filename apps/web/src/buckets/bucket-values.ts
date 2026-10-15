@@ -67,7 +67,7 @@ function bucketFields(currency: string, value: BucketValues, stored: Bucket | nu
 
 /**
  * The request body of the Bucket form, or the text of the first error. For a saved bucket, `patch` has only the fields
- * that changed (decision 0040). It is null when nothing changed.
+ * that changed. It is null when nothing changed.
  */
 export function bucketBody(currency: string, value: BucketValues, stored: Bucket | null) {
   let body;

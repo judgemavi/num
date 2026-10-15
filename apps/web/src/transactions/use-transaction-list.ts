@@ -7,7 +7,7 @@ import { useListSearch } from "@/lists/use-list-search";
 const allRoute = getRouteApi("/transactions");
 const reviewRoute = getRouteApi("/transactions_/review");
 
-/** True on the Needs review page. The two pages show the same table (decision 0047). */
+/** True on the Needs review page. The two pages show the same table. */
 export function useOnReview() {
   return useMatch({ from: "/transactions_/review", shouldThrow: false }) !== undefined;
 }
@@ -17,7 +17,7 @@ export function useAllSearch() {
   return useListSearch(allRoute.useSearch(), allRoute.useNavigate(), { sort: "date", dir: "desc" });
 }
 
-/** The filters, the sort order and the page of the Needs review page. The default is confidence, high to low (decision 0049). */
+/** The filters, the sort order and the page of the Needs review page. The default is confidence, high to low. */
 export function useReviewSearch() {
   return useListSearch(reviewRoute.useSearch(), reviewRoute.useNavigate(), { sort: "confidence", dir: "desc" });
 }

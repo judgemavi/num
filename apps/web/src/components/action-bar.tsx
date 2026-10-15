@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * The bar of actions for the selected rows (decision 0051, design §6): an ink pill with white text at the bottom centre
+ * The bar of actions for the selected rows (design §6): an ink pill with white text at the bottom centre
  * of the screen, with the dialog shadow. A space at the end of the page keeps the last rows and the pager above it.
  */
 export function ActionBar({ label, children }: { label: string; children: ReactNode }) {

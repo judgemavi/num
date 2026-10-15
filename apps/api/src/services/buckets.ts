@@ -156,7 +156,7 @@ export function readBucket(db: Reader, id: string): Bucket {
   return toBucket(row, categoryIdsFor(db, id), scheduleOf(db, id), balance);
 }
 
-/** Priority sort: the direction applies to the priority. A commitment comes first in a tie, then the id (decision 0062 item 8). */
+/** Priority sort: the direction applies to the priority. A commitment comes first in a tie, then the id. */
 const dir = (column: typeof buckets.priority, direction: "asc" | "desc" | undefined) => (direction === "desc" ? desc(column) : asc(column));
 
 function bucketCount(db: Reader) {
@@ -202,7 +202,7 @@ export function listOverspent(db: Db): { items: OverspentBucket[] } {
   return { items };
 }
 
-/** One emergency bucket in a book, also an archived one (decision 0060). */
+/** One emergency bucket in a book, also an archived one. */
 function assertNoEmergency(tx: WriteTx) {
   if (tx.select({ id: buckets.id }).from(buckets).where(eq(buckets.kind, "emergency")).get()) {
     throw new ServiceError("bucket_emergency_exists", 409);
@@ -232,7 +232,7 @@ function insertBucket(tx: WriteTx, input: BucketCreate & { asOf: string }): stri
   return id;
 }
 
-/** The emergency bucket with the default settings (decision 0060). The setup makes it. */
+/** The emergency bucket with the default settings. The setup makes it. */
 export function insertEmergencyBucket(tx: WriteTx, asOf: string): string {
   const last = tx
     .select({ priority: max(buckets.priority) })
@@ -242,7 +242,7 @@ export function insertEmergencyBucket(tx: WriteTx, asOf: string): string {
   return insertBucket(tx, {
     name: "Emergency fund",
     kind: "emergency",
-    // After the spending and sinking buckets, before the goals (decision 0060).
+    // After the spending and sinking buckets, before the goals.
     priority: (last?.priority ?? -1) + 1,
     essential: true,
     color: "sky",
@@ -278,7 +278,7 @@ function sameFamily(left: BucketRow["kind"], right: BucketRow["kind"]) {
 
 /** A PATCH: a field that the patch leaves out keeps its stored value. The kind fields are checked on the result. */
 export function updateBucket(db: Db, id: string, input: BucketUpdate & WriteInput): Bucket {
-  // Only the amounts in the patch. A stored amount is not checked again (decision 0040).
+  // Only the amounts in the patch. A stored amount is not checked again.
   requireWholeAmounts(db, [input.refillTo, input.amount, input.target, input.fixedAmount, ...scheduleAmounts(input.schedule)]);
   return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = withoutSortKey(tx.select().from(buckets).where(eq(buckets.id, id)).get());

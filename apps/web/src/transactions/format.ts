@@ -18,7 +18,7 @@ export function levelLabel(level: ReviewLevel): string {
   return "No suggestion";
 }
 
-/** The text of the toast after approve or a bulk edit (decision 0051): "10 approved · 2 skipped". */
+/** The text of the toast after approve or a bulk edit: "10 approved · 2 skipped". */
 export function countText(done: number, doneWord: string, skipped: number): string {
   return skipped > 0 ? `${done} ${doneWord} · ${skipped} skipped` : `${done} ${doneWord}`;
 }

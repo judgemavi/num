@@ -45,7 +45,7 @@ function book() {
     createTransaction(db, { accountId: account.id, date, amount, payeeRaw, lines: [{ amount, categoryId }], ...saved }).id;
   const open = (date: string, amount: number, payeeRaw = payee) =>
     createTransaction(db, { accountId: account.id, date, amount, payeeRaw, lines: [{ amount }], ...saved }).id;
-  /** The user saves the uncategorized row with no category (decision 0024). */
+  /** The user saves the uncategorized row with no category. */
   const keep = (date: string, amount: number, payeeRaw = payee) => {
     const id = open(date, amount, payeeRaw);
     updateTransaction(db, id, { lines: [{ amount }], keepUncategorized: true, ...saved });

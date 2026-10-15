@@ -7,7 +7,7 @@ export function documentPath(id: string): string {
   return api.documents[":id"].$path({ param: { id } });
 }
 
-/** Erase the file of a document. The record of the document, the import and its transactions stay (decision 0041). */
+/** Erase the file of a document. The record of the document, the import and its transactions stay. */
 export function useEraseDocument() {
   return useMutation({
     meta: { errorText: importError },

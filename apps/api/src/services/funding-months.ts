@@ -32,7 +32,7 @@ function fundedByBucket(db: Reader, month: string) {
 /**
  * The monthly amount (from the balance at the start of the month, with the covers of the month), the funding of the
  * month that is not undone, and the amount still owed, for each active bucket that has started, in priority order
- * (decision 0059). The emergency bucket owes its target − its balance on `asOf`, minimum 0 (decision 0065). Its monthly
+ *. The emergency bucket owes its target − its balance on `asOf`, minimum 0. Its monthly
  * amount is the funding of the month plus that amount.
  */
 export function monthlyRows(db: Reader, asOf: string): MonthlyRow[] {

@@ -101,7 +101,7 @@ export const MoneySection = withForm({
 
 /**
  * The tags of the transaction: a picker that adds a tag, and a button for each tag that removes it. The bulk editor
- * uses it for "Add tags" (decision 0051).
+ * uses it for "Add tags".
  */
 export function TagsField({ id = "txn-tag", label = "Tags", tagIds, onTags }: { id?: string; label?: string; tagIds: string[]; onTags: (ids: string[]) => void }) {
   const archiveTag = useArchiveTag();

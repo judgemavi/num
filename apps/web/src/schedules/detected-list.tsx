@@ -29,7 +29,7 @@ export function DetectedList() {
     return null;
   }
 
-  /** With a name, one click adds the schedule. A proposal for one amount has no name: the person names it in the form (decision 0054). */
+  /** With a name, one click adds the schedule. A proposal for one amount has no name: the person names it in the form. */
   function add(kind: "commitment" | "income", item: PlanProposal, name: string | undefined) {
     if (!name) {
       void openEditor(kind, { id: null, seed: { ...item, name: "" } });

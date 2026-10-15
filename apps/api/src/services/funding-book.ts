@@ -64,7 +64,7 @@ export function fundingPosition(db: Reader, asOf: string): FundingPosition {
   };
 }
 
-/** The yearly amount of a schedule divided by 12, with its safe amount (decision 0062 item 10). */
+/** The yearly amount of a schedule divided by 12, with its safe amount. */
 export function yearlyShare(db: Reader, schedules: readonly ScheduleView[], asOf: string): number {
   const end = Temporal.PlainDate.from(asOf).add({ months: 12 }).subtract({ days: 1 }).toString();
   const amounts = scheduleAmounts(db, schedules, asOf);

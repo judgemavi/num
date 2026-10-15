@@ -65,7 +65,7 @@ export type MonthPlanBucketSource = {
   fixedAmount: number | null;
   startDate: string;
   actualFunded: number;
-  /** The schedule data of a commitment for its monthly amount (decision 0062 item 5). Null for the other kinds. */
+  /** The schedule data of a commitment for its monthly amount. Null for the other kinds. */
   commitment: MonthlyCommitment | null;
 };
 
@@ -233,7 +233,7 @@ function monthFigures(input: PlanInput) {
     }
   }
 
-  // The commitments are their own section (decision 0062 item 15): the monthly amount of each commitment bucket.
+  // The commitments are their own section: the monthly amount of each commitment bucket.
   const byAmount = (left: { planned: number; name: string }, right: { planned: number; name: string }) =>
     right.planned - left.planned || (left.name < right.name ? -1 : 1);
   const fundingItems = funded.filter((item) => item.kind !== "commitment").sort(byAmount);

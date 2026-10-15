@@ -10,7 +10,7 @@ export const bucketKinds = ["commitment", "income", "spending", "sinking", "goal
 
 export type BucketKind = (typeof bucketKinds)[number];
 
-/** A commitment and an income have a schedule (decision 0062). */
+/** A commitment and an income have a schedule. */
 export function hasSchedule(kind: BucketKind): kind is "commitment" | "income" {
   return kind === "commitment" || kind === "income";
 }
@@ -19,7 +19,7 @@ export const sinkingRepeats = ["none", "yearly"] as const;
 
 export type SinkingRepeat = (typeof sinkingRepeats)[number];
 
-/** The events that the user makes. The fill makes `cover` (decision 0059) and `recede` (decision 0065). */
+/** The events that the user makes. The fill makes `cover` and `recede`. */
 export const manualEventKinds = ["fund", "move", "release"] as const;
 export const bucketEventKinds = [...manualEventKinds, "cover", "recede"] as const;
 
@@ -54,7 +54,7 @@ export const bucketIcons = [
 
 export type BucketIcon = (typeof bucketIcons)[number];
 
-/** The order of buckets: the priority, then a commitment first, then the id (decision 0062 item 8). */
+/** The order of buckets: the priority, then a commitment first, then the id. */
 export function comparePriority(
   left: { priority: number; kind: BucketKind; id: string },
   right: { priority: number; kind: BucketKind; id: string },
@@ -71,7 +71,7 @@ export function comparePriority(
 const nameSchema = z.string().trim().min(1);
 const monthCount = z.number().int().min(1).max(120);
 
-/** The settings of a new emergency bucket (decision 0060). */
+/** The settings of a new emergency bucket. */
 export const emergencyDefaults = { months: 3 } as const;
 const bucketFields = {
   name: nameSchema,
@@ -189,7 +189,7 @@ export const bucketWriteSchema = bucketWriteFields.superRefine(scheduleRules).re
 /** A PATCH body: only the fields that change. The API checks the kind fields on the stored bucket with the patch. */
 export const bucketUpdateSchema = bucketWriteFields.partial();
 
-// A new bucket can leave out startDate. Then the bucket starts on asOf (decision 0029).
+// A new bucket can leave out startDate. Then the bucket starts on asOf.
 export const bucketCreateSchema = z
   .object({ ...bucketFields, startDate: isoDateSchema.optional() })
   .superRefine(scheduleRules)

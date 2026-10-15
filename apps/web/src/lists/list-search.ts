@@ -5,7 +5,7 @@ type Direction = (typeof sortDirections)[number];
 /** A sort order of a list: a column of the list query schema and a direction. */
 export type SortChoice<Column extends string> = { sort: Column; dir: Direction };
 
-/** The time that the search box waits before it changes the URL (decision 0004). */
+/** The time that the search box waits before it changes the URL. */
 export const searchDelayMs = 300;
 
 /**
@@ -19,7 +19,7 @@ export function sortOf<Column extends string>(search: { sort?: Column; dir?: Dir
   };
 }
 
-/** The sort values for the URL. The default sort order is not written to the URL (decision 0004). */
+/** The sort values for the URL. The default sort order is not written to the URL. */
 export function sortParams<Column extends string>(choice: SortChoice<Column>, fallback: SortChoice<Column>) {
   return choice.sort === fallback.sort && choice.dir === fallback.dir ? { sort: undefined, dir: undefined } : { sort: choice.sort, dir: choice.dir };
 }

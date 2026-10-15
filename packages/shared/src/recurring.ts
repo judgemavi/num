@@ -22,7 +22,7 @@ export const occurrenceListSchema = z.object({
   items: z.array(occurrenceSchema),
 });
 
-/** The occurrences of all active schedules in the next 30 days, by date (decision 0055). */
+/** The occurrences of all active schedules in the next 30 days, by date. */
 export const upcomingListSchema = z.object({
   items: z.array(occurrenceSchema.extend({ bucketId: z.uuid(), accountId: z.uuid(), forecastAmount: amountSchema })),
 });

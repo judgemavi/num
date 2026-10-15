@@ -7,7 +7,7 @@ function labelText(row: TransactionListItem, targetText: ReturnType<typeof useTa
     return "Loan payment";
   }
   const line = row.lines[0] ?? { categoryId: null, transferAccountId: null };
-  // An automatic label with no category and no transfer is the answer "no category" (decision 0046).
+  // An automatic label with no category and no transfer is the answer "no category".
   if (row.autoReason !== null && line.categoryId === null && line.transferAccountId === null) {
     return "No category";
   }
@@ -26,7 +26,7 @@ export function CategoryCell({ row }: { row: TransactionListItem }) {
 }
 
 /**
- * The Category column of the Needs review page (decision 0048). A suggestion or a transfer pair shows the proposed
+ * The Category column of the Needs review page. A suggestion or a transfer pair shows the proposed
  * label and merchant. Other rows show the stored label, as on the All page.
  */
 export function ProposedCategoryCell({ row }: { row: TransactionListItem }) {

@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useFill } from "@/api/funding";
 
 /**
- * The automatic fill of the buckets (decision 0059). It runs when the app opens and after each successful write
+ * The automatic fill of the buckets. It runs when the app opens and after each successful write
  * that is not a fill. The fill is idempotent, thus a run that has nothing to pay writes nothing.
  */
 export function AutoFill() {

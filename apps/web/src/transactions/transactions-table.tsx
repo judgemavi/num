@@ -15,7 +15,7 @@ import { useOnReview, useReviewSearch } from "@/transactions/use-transaction-lis
 
 export type TransactionSort = SortChoice<NonNullable<TransactionListQuery["sort"]>>;
 
-/** The sort order of the table. The Needs review page also sorts by confidence (decision 0049). */
+/** The sort order of the table. The Needs review page also sorts by confidence. */
 type TableSort = SortChoice<NonNullable<TransactionReviewListQuery["sort"]>>;
 
 type Props = {
@@ -48,7 +48,7 @@ function SortHead<Column extends string>({ column, label, sort, onSort, classNam
   );
 }
 
-/** The Confidence header of Needs review sorts by confidence (decision 0049). */
+/** The Confidence header of Needs review sorts by confidence. */
 function ConfidenceHead() {
   const { sort, sortBy } = useReviewSearch();
   return <SortHead column="confidence" label="Confidence" sort={sort} onSort={sortBy} />;
@@ -56,7 +56,7 @@ function ConfidenceHead() {
 
 const loanPaymentHint = "Loan payments are changed one at a time.";
 
-/** The checkbox of a row. A click selects the row; Shift and click selects a range (decision 0051). */
+/** The checkbox of a row. A click selects the row; Shift and click selects a range. */
 function SelectCell({ rows, row }: { rows: TransactionListItem[]; row: TransactionListItem }) {
   const selection = useSelection();
   if (!selection) {
@@ -116,7 +116,7 @@ export function TransactionsTable(props: Props) {
   const { openEditor } = useEditors();
   const currency = useBookCurrency();
   const accountNames = useAccountLabels();
-  // The Needs review page shows the proposed label and the confidence (decision 0048).
+  // The Needs review page shows the proposed label and the confidence.
   const onReview = useOnReview();
   const selecting = useSelection() !== null;
   const columns = 5 + (showBalance ? 1 : 0) + (hideAccount ? 0 : 1) + 1 + (selecting ? 1 : 0);

@@ -110,7 +110,7 @@ function scheduleFields(currency: string, kind: ScheduleKind, value: ScheduleFor
 
 /**
  * The request body of the Commitment and Income forms, or the text of the first error. For a saved bucket, `patch` has
- * only the fields that changed (decision 0040). It is null when nothing changed.
+ * only the fields that changed. It is null when nothing changed.
  */
 export function scheduleBody(currency: string, kind: ScheduleKind, value: ScheduleFormValues, stored: Bucket | null) {
   let fields;

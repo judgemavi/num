@@ -15,7 +15,7 @@ const emergencyFundCheckSchema = z.object({
   months: nonNegative,
 });
 
-/** The money that went from the emergency fund back to Unassigned this month, for each covered bucket (decision 0065 item 8). */
+/** The money that went from the emergency fund back to Unassigned this month, for each covered bucket. */
 const recedeMonthCheckSchema = z.object({
   code: z.literal("recede_month"),
   pass: z.boolean(),
@@ -24,7 +24,7 @@ const recedeMonthCheckSchema = z.object({
   items: z.array(z.object({ bucketId: z.uuid(), amount: nonNegative })),
 });
 
-/** The first date when the forecast pool goes below 0, and what the emergency fund would give (decision 0065 item 9). */
+/** The first date when the forecast pool goes below 0, and what the emergency fund would give. */
 const recedeAheadCheckSchema = z.object({
   code: z.literal("recede_ahead"),
   pass: z.boolean(),

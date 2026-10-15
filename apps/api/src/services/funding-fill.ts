@@ -15,7 +15,7 @@ function requireSetup(db: Reader) {
   }
 }
 
-/** A recede has the covered bucket in `otherBucketId` (decision 0065). */
+/** A recede has the covered bucket in `otherBucketId`. */
 type FillEvent = { kind: "cover" | "fund" | "recede"; bucketId: string; otherBucketId: string | null; amount: number; month: string | null };
 
 /** The bucket balances in memory, and Unassigned after the events that are added. */
@@ -36,7 +36,7 @@ function pool(db: Reader, asOf: string) {
 }
 
 /**
- * The covers (decisions 0059 item 8, 0065 item 3): N − S in total, in priority order. S is the part of the negative
+ * The covers: N − S in total, in priority order. S is the part of the negative
  * balances that cash did not cover (the negative Unassigned). When a bucket stays short, a recede gives the missing part
  * from the emergency bucket, down to 0, then the cover is written. The emergency bucket does not cover itself.
  */
@@ -69,7 +69,7 @@ function coverEvents(db: Reader, asOf: string): FillEvent[] {
 }
 
 /**
- * The owed amounts of the month of `asOf`, in priority order, from Unassigned (decision 0059). It reads the covers of
+ * The owed amounts of the month of `asOf`, in priority order, from Unassigned. It reads the covers of
  * the month, thus the covers are written first. An owed amount never causes a recede. A held month owes nothing.
  */
 function fundEvents(db: Reader, asOf: string): FillEvent[] {

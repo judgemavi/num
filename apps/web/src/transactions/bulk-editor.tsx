@@ -16,7 +16,7 @@ import { bulkChoices, bulkValues } from "@/transactions/bulk-values";
 import { formatDate, transactionError } from "@/transactions/format";
 import { useTargetText } from "@/transactions/names";
 
-/** The bulk editor of the selected rows (decision 0051). It reads each row by its id. */
+/** The bulk editor of the selected rows. It reads each row by its id. */
 export function BulkEditor({ ids }: EditorInput["bulkEdit"]) {
   const rows = useSuspenseQueries({ queries: ids.map((id) => transactionQuery(id)) }).map((result) => result.data);
   return <BulkForm rows={rows} />;

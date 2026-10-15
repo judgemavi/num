@@ -36,7 +36,7 @@ function save(transaction: Transaction, categoryId: string | null) {
   return built.ok ? built.save : null;
 }
 
-describe("keep uncategorized on save (decisions 0024, 0045)", () => {
+describe("keep uncategorized on save", () => {
   test("removing an automatic label and saving with no category keeps the row", () => {
     const result = save(stored(category, "learned_payee"), null);
     expect(result?.kind).toBe("update");
@@ -59,7 +59,7 @@ describe("keep uncategorized on save (decisions 0024, 0045)", () => {
   });
 });
 
-describe("the answer to a Needs review question (decision 0047)", () => {
+describe("the answer to a Needs review question", () => {
   const otherId = "00000000-0000-4000-8000-000000000006";
   const bucketId = "00000000-0000-4000-8000-000000000007";
   const base = { level: "none" as const, reason: null, suggestion: null, itemKey: null, transfer: null, recurring: null, refund: null };
@@ -88,7 +88,7 @@ describe("the answer to a Needs review question (decision 0047)", () => {
   });
 });
 
-describe("a loan payment (decision 0053)", () => {
+describe("a loan payment", () => {
   const loan = "00000000-0000-4000-8000-000000000008";
   const interestCategory = "00000000-0000-4000-8000-000000000009";
   const values = { ...transactionValues([], null, "00000000-0000-4000-8000-000000000003"), choice: "loan_payment" as const, transferAccountId: loan, interestCategoryId: interestCategory };

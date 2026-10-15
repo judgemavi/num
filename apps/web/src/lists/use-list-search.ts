@@ -3,7 +3,7 @@ import { pageQuery } from "@/editors/page-search";
 import { columnSort, lastPageOf, sortOf, sortParams, type SortChoice } from "@/lists/list-search";
 
 /**
- * The list query in the URL of a route, and the functions that change it (decision 0004). Give it the search and the
+ * The list query in the URL of a route, and the functions that change it. Give it the search and the
  * `navigate` function of the route (`getRouteApi(...)`), and the default sort order of the list.
  * - `search` is the list query in the URL. The filter bar shows it at once.
  * - `shown` is the list query of the rows on the screen. Read the list with it, thus the rows stay while new rows load.
@@ -52,7 +52,7 @@ export function useListSearch<Column extends string, Search extends { page: numb
 
 /**
  * The number of the last page of a list. When the page in the URL is after the last page, the URL changes to the last
- * page (decision 0004). The change waits until the rows on the screen are for the URL.
+ * page. The change waits until the rows on the screen are for the URL.
  */
 export function useLastPage(
   list: { settled: boolean; search: { page: number }; setPage: (page: number, options: { replace: boolean }) => void },

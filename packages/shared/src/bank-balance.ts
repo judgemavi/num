@@ -19,7 +19,7 @@ export const bankBalanceSchema = z.object({
   createdAt: z.string().refine(isUtcTimestamp),
 });
 
-/** The latest bank balance of an account against the calculated balance on its date (decision 0057). */
+/** The latest bank balance of an account against the calculated balance on its date. */
 export const bankStatusSchema = z.object({
   accountId: z.uuid(),
   date: isoDateSchema,

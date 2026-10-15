@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Marks an integer milliunit field so MCP can describe money on that tool only (decision 0038). */
+/** Marks an integer milliunit field so MCP can describe money on that tool only. */
 export const amountSchema = z
   .number()
   .int()

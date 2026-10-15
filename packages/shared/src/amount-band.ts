@@ -1,9 +1,9 @@
 import { candidateKey, learnedConfidence, newestFirst, type LearnedRow, type LearnedScore } from "./matching";
 
-/** Decision 0036: the newest confirmed amounts of a learned label make its band. */
+/** The newest confirmed amounts of a learned label make its band. */
 export const bandSize = 6;
 
-/** A null category is the label "no category" (decision 0046). */
+/** A null category is the label "no category". */
 export type BandRow = LearnedRow<string | null> & { amount: number };
 
 /** One learned label (category + merchant) of one key, with the band of its amounts in absolute milliunits. */
@@ -20,7 +20,7 @@ export function bandContains(band: Pick<LearnedLabel, "low" | "high">, amount: n
   return size >= band.low * 99 && size <= band.high * 101;
 }
 
-/** Decision 0045: the amount is from 75% of the lowest to 125% of the highest. Integer milliunits only. */
+/** The amount is from 75% of the lowest to 125% of the highest. Integer milliunits only. */
 export function bandNear(band: Pick<LearnedLabel, "low" | "high">, amount: number): boolean {
   const size = Math.abs(amount) * 100;
   return size >= band.low * 75 && size <= band.high * 125;
@@ -62,8 +62,8 @@ function labelScores(fit: readonly LearnedLabel[]) {
 
 /**
  * True when no band contains the amount and the result must not be automatic: the labels have two or more categories
- * (decisions 0043, 0044), or one category and no band is near the amount (decision 0045). "No category" counts as a
- * category (decision 0046).
+ *, or one category and no band is near the amount. "No category" counts as a
+ * category.
  */
 export function amountGuardFor(labels: readonly LearnedLabel[], fit: readonly LearnedLabel[], amount: number): boolean {
   if (fit.length > 0 || labels.length === 0) {
@@ -75,7 +75,7 @@ export function amountGuardFor(labels: readonly LearnedLabel[], fit: readonly Le
 
 /**
  * The learned signals of one amount. When a band contains the amount, the payee signal is only for the labels of the
- * bands that contain it (decision 0044). The signals depend only on the payee and the fit labels.
+ * bands that contain it. The signals depend only on the payee and the fit labels.
  */
 export function bandSignals(fit: readonly LearnedLabel[], payeeScores: readonly LearnedScore<string | null>[]) {
   if (fit.length === 0) {

@@ -112,7 +112,7 @@ export const importViewItemSchema = z.object({
   accountName: z.string(),
   documentId: z.uuid().nullable(),
   filename: z.string().nullable(),
-  /** The time the file was erased (decision 0041). The record of the document stays. */
+  /** The time the file was erased. The record of the document stays. */
   documentDeletedAt: timestampSchema.nullable(),
   /** The transactions that the rows of this import made or matched. They stay when the file is erased. */
   transactionCount: z.number().int().nonnegative(),

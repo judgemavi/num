@@ -72,7 +72,7 @@ export function applyLinkedSchedule(
   }
   tx.update(transactions)
     .set({
-      // A loan payment has no merchant (decision 0053).
+      // A loan payment has no merchant.
       merchantId: lines ? null : (schedule.merchantId ?? txn.merchantId),
       autoReason: "recurring",
       autoSourceId: schedule.id,
@@ -123,7 +123,7 @@ export function linkRecurring(tx: WriteTx, bucketId: string, dueDate: string, tr
   });
 }
 
-/** The fields of an automatic label. An automatic "no category" has a null category (decision 0046). */
+/** The fields of an automatic label. An automatic "no category" has a null category. */
 export function labelFields(result: MatchResult, merchantId: string | null) {
   if (result.level !== "automatic" || result.reason === null) {
     return null;
@@ -170,7 +170,7 @@ function applyRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
   }
 }
 
-/** Automatic labels that a confirmation scores again (decision 0043). */
+/** Automatic labels that a confirmation scores again. */
 const learnedReasons = ["learned_amount", "learned_payee"] as const;
 
 function isLearnedLabel(row: OpenRow) {
@@ -179,7 +179,7 @@ function isLearnedLabel(row: OpenRow) {
 
 /**
  * Rows of these payees with one line and no transfer: uncategorized, or labelled by a learned signal. A learned label
- * can be "no category" (decision 0046). A row that the user kept uncategorized is not in the list (decision 0045).
+ * can be "no category". A row that the user kept uncategorized is not in the list.
  */
 function openRows(tx: WriteTx, payees: string[]) {
   return tx
@@ -245,7 +245,7 @@ function rescoreRow(tx: WriteTx, row: OpenRow, result: MatchResult): void {
 }
 
 /**
- * Labels uncategorized rows for these payees, and scores again their automatic labels from learning (decision 0043).
+ * Labels uncategorized rows for these payees, and scores again their automatic labels from learning.
  * Confirmed rows and other automatic reasons do not change.
  */
 export function spreadSureLabels(tx: WriteTx, payees: readonly string[], except: ReadonlySet<string>): void {

@@ -41,7 +41,7 @@ export function mortgageViewQuery(accountId: string, asOf: string, { extra, lump
 }
 
 /**
- * The start values of a loan payment to a mortgage or loan account on a date (decision 0053): the interest from the
+ * The start values of a loan payment to a mortgage or loan account on a date: the interest from the
  * payment schedule and the interest category. Each one is null when there is none.
  */
 export function loanPaymentDefaultsQuery(accountId: string, date: string) {

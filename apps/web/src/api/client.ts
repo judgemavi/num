@@ -11,7 +11,7 @@ import { hc, type ClientResponse } from "hono/client";
  * Query keys:
  * - The first part is the resource name: plural for a collection (`"tags"`), singular for one record (`"tag"`).
  * - One record: `["tag", id]`.
- * - A list: `["tags", query]`. `query` is the parsed query object (decision 0004).
+ * - A list: `["tags", query]`. `query` is the parsed query object.
  * - A fixed view of a collection: `["tags", "options"]`.
  *
  * No code invalidates a query by its key. After each successful mutation, the rule in `main.tsx` invalidates all queries.

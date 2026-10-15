@@ -127,7 +127,7 @@ function startBody(currency: string, hasSection: boolean, stored: NonNullable<St
 
 /**
  * The request body of the Account form, or the text of the first error. For a saved account the body is a patch: only
- * the fields that changed (decision 0040), or null with no error when nothing changed. The API checks the body also:
+ * the fields that changed, or null with no error when nothing changed. The API checks the body also:
  * an answer with `invalid_body` shows "Check the account fields."
  */
 export function accountBody(currency: string, value: AccountValues, hasSection: boolean, stored: Stored) {

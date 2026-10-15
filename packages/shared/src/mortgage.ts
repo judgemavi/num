@@ -32,7 +32,7 @@ export const mortgageTermsSchema = mortgageTermsWriteSchema.extend({
 export type MortgageTerms = z.infer<typeof mortgageTermsSchema>;
 export type MortgageTermsWrite = z.infer<typeof mortgageTermsWriteSchema>;
 
-/** The amount owed and the date of the account's opening balance. The schedule starts here (decision 0027). */
+/** The amount owed and the date of the account's opening balance. The schedule starts here. */
 export type MortgageOpening = {
   balance: number;
   date: string;
@@ -360,7 +360,7 @@ export const mortgageViewSchema = z.object({
     .nullable(),
 });
 
-/** The start values of the Loan payment fields (decision 0053). Null when there is no start value. */
+/** The start values of the Loan payment fields. Null when there is no start value. */
 export const loanPaymentDefaultsSchema = z.object({
   interest: positiveAmountSchema.nullable(),
   interestCategoryId: z.uuid().nullable(),

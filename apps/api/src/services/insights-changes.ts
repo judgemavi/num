@@ -5,7 +5,7 @@ import type { Db } from "../db";
 import type { LedgerLine } from "./ledger-lines";
 import type { Period } from "./insights-period";
 
-/** The change month: the selected month, or the month of the last day of the period (decision 0031). */
+/** The change month: the selected month, or the month of the last day of the period. */
 export function changeMonth(period: Period, month: string | undefined): string {
   return month ?? period.to.slice(0, 7);
 }

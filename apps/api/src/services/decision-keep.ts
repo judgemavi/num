@@ -45,7 +45,7 @@ function hasKeep(db: Reader, transactionId: string): boolean {
 
 /**
  * True when the transaction teaches a learned label: one line, not a mirror, with a category, or with no category and
- * no transfer and the keep decision (decision 0046).
+ * no transfer and the keep decision.
  */
 export function teachesLabel(db: Reader, txn: Pick<Transaction, "id" | "mirror" | "lines">): boolean {
   const line = txn.lines[0];
@@ -56,7 +56,7 @@ export function teachesLabel(db: Reader, txn: Pick<Transaction, "id" | "mirror" 
 }
 
 /**
- * The answer "no category" (decision 0046): records the keep decision and removes the automatic fields of an automatic
+ * The answer "no category": records the keep decision and removes the automatic fields of an automatic
  * "no category". The caller makes sure that the transaction is uncategorized.
  */
 export function answerNoCategory(tx: WriteTx, transactionId: string, at: string): void {

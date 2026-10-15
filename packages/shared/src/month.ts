@@ -20,7 +20,7 @@ export function priorMonths(month: string): [string, string, string] {
 }
 
 /**
- * The last `count` complete months, oldest first (decision 0031).
+ * The last `count` complete months, oldest first.
  * A complete month is a calendar month whose last day is before `asOf`
  * and that is not before the month of the first transaction in the book.
  */

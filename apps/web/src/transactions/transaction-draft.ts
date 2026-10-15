@@ -58,7 +58,7 @@ export function alreadyChosen(transaction: Transaction | null): boolean {
   return transaction.lines.length > 1 || transaction.lines.some((line) => line.categoryId !== null || line.transferAccountId !== null);
 }
 
-/** The interest line of a saved loan payment (decision 0053): the category line of a transaction with two lines. */
+/** The interest line of a saved loan payment: the category line of a transaction with two lines. */
 export function interestLine(transaction: Transaction | null) {
   return transaction && transaction.lines.length > 1 ? (transaction.lines.find((line) => line.transferAccountId === null) ?? null) : null;
 }
@@ -66,7 +66,7 @@ export function interestLine(transaction: Transaction | null) {
 /**
  * The start values of the Transaction form. A saved transaction gives its values. A new transaction starts on
  * `accountId` with today's date. The question of a transaction that needs review fills its proposed answer
- * (decision 0047): a transfer pair gives Transfer to the account of the other transaction, and a refund gives the first
+ *: a transfer pair gives Transfer to the account of the other transaction, and a refund gives the first
  * candidate purchase. "Payment for…" starts empty, because more than one transaction can be that payment.
  */
 export function transactionValues(categories: Category[], transaction: Transaction | null, accountId: string, review: TransactionReview | null = null) {
@@ -85,7 +85,7 @@ export function transactionValues(categories: Category[], transaction: Transacti
     categoryId: pair || interest ? null : (transaction?.lines[0]?.categoryId ?? null),
     /** The other account of a transfer, or the loan account of a loan payment. */
     transferAccountId: pair ? pair.otherAccountId : (transaction?.lines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null),
-    /** The interest of a loan payment, as the person types it (decision 0053). */
+    /** The interest of a loan payment, as the person types it. */
     interest: interest ? amountText(Math.abs(interest.amount)) : "",
     interestCategoryId: interest?.categoryId ?? null,
     tagIds: [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])],

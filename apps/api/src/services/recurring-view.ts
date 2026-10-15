@@ -101,7 +101,7 @@ function transactionsForAccounts(db: Db, accountIds: readonly string[], from: st
 
 /**
  * Each transaction of the detection window with the facts of its lines: the category of a plain transaction
- * (decision 0054) and the target of its one transfer line (decision 0056).
+ * and the target of its one transfer line.
  */
 function detectionTransactions(db: Db, asOf: string): DetectionTransaction[] {
   const since = Temporal.PlainDate.from(asOf).subtract({ months: 18 }).toString();
@@ -147,8 +147,8 @@ function detectionTransactions(db: Db, asOf: string): DetectionTransaction[] {
 
 /**
  * A schedule of the account covers a proposal for its merchant. A schedule with no merchant covers a proposal for its
- * category, or a proposal for one amount when it has no category and the amount is in its tolerance (decision 0054).
- * A schedule with no merchant covers a proposal for its transfer target (decision 0056).
+ * category, or a proposal for one amount when it has no category and the amount is in its tolerance.
+ * A schedule with no merchant covers a proposal for its transfer target.
  */
 function covers(schedule: ScheduleView, proposal: PlanProposal) {
   if (schedule.accountId !== proposal.accountId) {
@@ -229,7 +229,7 @@ export function listOccurrences(db: Db, bucketId: string, asOf: string) {
 
 const upcomingDays = 30;
 
-/** The occurrences of all active schedules from `asOf` to 30 days later, by date (decision 0055). */
+/** The occurrences of all active schedules from `asOf` to 30 days later, by date. */
 export function listUpcoming(db: Db, asOf: string): UpcomingList {
   const until = Temporal.PlainDate.from(asOf).add({ days: upcomingDays }).toString();
   const items = activeSchedules(db).flatMap((row) => {

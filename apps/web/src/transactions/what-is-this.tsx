@@ -56,13 +56,13 @@ export const WhatIsThis = withForm({
     categoryLocked: false,
     transferLocked: false,
     amountsLocked: false,
-    /** False for a saved loan payment: its fields keep the saved values (decision 0053). */
+    /** False for a saved loan payment: its fields keep the saved values. */
     loanFill: true,
     /** The stored amount while the amount is unchanged, or the amount of an imported transaction. */
     storedAmount: fieldValue<number | null>(null),
     /** The purchase that the saved refund links to. */
     linkedRefund: fieldValue<Transaction["refundOf"]>(null),
-    /** The proposed transfer pair: the other transaction (decision 0047). */
+    /** The proposed transfer pair: the other transaction. */
     pair: fieldValue<TransactionReview["transfer"]>(null),
     /** The candidate purchases of the question "Refund of which purchase?". */
     refundCandidates: fieldValue<NonNullable<TransactionReview["refund"]>["purchases"]>([]),

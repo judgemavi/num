@@ -36,7 +36,7 @@ import type { Reader } from "./write";
  */
 type ConfirmRow = Pick<TransactionRow, "id" | "date" | "amount" | "merchantId"> & {
   payee: TransactionRow["payeeNormalized"];
-  /** Null is the label "no category" of a kept row (decision 0046). */
+  /** Null is the label "no category" of a kept row. */
   categoryId: string | null;
 };
 
@@ -57,7 +57,7 @@ const confirmedLine = sql`
 
 type Direction = "out" | "in";
 
-/** Decision 0036: the learned key is the payee and the direction. Zero is money in. */
+/** The learned key is the payee and the direction. Zero is money in. */
 function directionOf(amount: number): Direction {
   return amount < 0 ? "out" : "in";
 }
@@ -65,7 +65,7 @@ function directionOf(amount: number): Direction {
 /**
  * What the confirmed rows of one direction teach. Each map is keyed by the normalized payee. `payeeLearned` has the
  * "no category" labels. `named`, `labels`, `tops` and `index` do not: the similar payee and the brand family signals
- * do not use them (decision 0046).
+ * do not use them.
  */
 type Side = {
   bands: Map<string, LearnedLabel[]>;
@@ -186,12 +186,12 @@ function transferLearned(rows: readonly TransferRow[]): LearnedRow[] {
   return rows.map((row) => ({ id: row.id, date: row.date, categoryId: row.transferAccountId, merchantId: null }));
 }
 
-/** True when the payee has answers of its own. A kept "no category" is an answer (decision 0046). */
+/** True when the payee has answers of its own. A kept "no category" is an answer. */
 function hasAnswers(side: Side, payee: string) {
   return side.labels.has(payee) || side.payeeLearned.has(payee);
 }
 
-/** The learned payee that a payee without answers of its own contains (decision 0026). */
+/** The learned payee that a payee without answers of its own contains. */
 function containedFor(side: Side, payee: string): string | null {
   if (hasAnswers(side, payee)) {
     return null;
@@ -204,7 +204,7 @@ function containedFor(side: Side, payee: string): string | null {
   return found;
 }
 
-/** The answer that other learned payees with the same first word teach, when they all agree (decision 0026, rule 7). */
+/** The answer that other learned payees with the same first word teach, when they all agree (rule 7). */
 function familyFor(side: Side, payee: string): FamilySignal | null {
   if (hasAnswers(side, payee)) {
     return null;
