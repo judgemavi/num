@@ -102,11 +102,19 @@ Every main screen has, from top to bottom:
    "Set aside for bills".
    Transactions has no summary strip. The count of the transactions is the small line of its page header.
    On a phone the facts have no hairlines. They go below the hero amount, side by side, and wrap to a new line.
+   On a phone the three amounts of Home are a sum in two columns: the label on the left and the amount on the right,
+   one line for each amount. The minus sign is at the start of the label ("− Saving buckets"), not after an amount.
+   The lines under the hero amount use the full width of the strip.
 3. **Content:** a main list card, and a 336px side panel column on the right.
-   Below 1024px the side panel goes below the list. The filter bar of the list is directly above the list card, below
-   the summary strip.
+   Below 1280px the side panel goes below the list. Thus the rows of the list are not too narrow. The filter bar of the
+   list is directly above the list card, below the summary strip.
 
 Inside 32px page padding. 20px gaps between cards.
+
+**Width:** no page, list or table scrolls sideways at any width. A row follows the width of its card (a container
+query), not the width of the screen. A narrow card (a phone, a tablet, a half-screen window) shows the narrow row.
+A name, a date and an amount never wrap one word on each line: the name truncates with an ellipsis, and a date and an
+amount do not wrap.
 
 ## 6. Components
 
@@ -121,7 +129,7 @@ global component CSS (AGENTS.md).
 | Pill | Status label, 24px high. Neutral, positive (pos-soft/pos) or attention (attn-soft/attn). |
 | Count | Tomato badge with ink text. Only for "needs you" counts. |
 | Amount | Formats with `Intl` in the browser. Tabular figures. "Owed" label for liabilities. 16px/600. In a secondary line (13px, normal weight) it has the size and the weight of the line. |
-| ListCard | One card. Each row is a shadcn `Item`. A row that opens has one target: a button or a link that covers the row (the row is not a `div` with a key handler). The More menu and the one visible button are `ItemActions` above the target. Optional group header rows: 12px uppercase label on the left, the group total on the right, the same height with and without a total. One hairline is above a header (not above the first group) and one is under it. Lines are never doubled. Rows: min height 60px (48px for simple lists, 36px for dense lists), hairline between rows (lighter in dense lists), `row-hover` on hover, the name in iris on hover. The name column is flexible. The columns after it (a bar, a kind, the amount) have fixed widths, thus they line up in all rows of the card. Long secondary text goes below the name, not in the amount column. On a phone each column after the name takes a full line below the name, and the More button stays at the top right of the row. A dense list (the spending list on Home) has a dot, the name and the amount on one line, also on a phone. On a touch screen a dense row is 44px high. |
+| ListCard | One card. Each row is a shadcn `Item`. A row that opens has one target: a button or a link that covers the row (the row is not a `div` with a key handler). The More menu and the one visible button are `ItemActions` above the target. Optional group header rows: 12px uppercase label on the left, the group total on the right, the same height with and without a total. One hairline is above a header (not above the first group) and one is under it. Lines are never doubled. Rows: min height 60px (48px for simple lists, 36px for dense lists), hairline between rows (lighter in dense lists), `row-hover` on hover, the name in iris on hover. The name column is flexible. The columns after it (a bar, a kind, the amount) have fixed widths, thus they line up in all rows of the card. Long secondary text goes below the name, not in the amount column. In a narrow row (the row is less than 42rem wide) each column after the name takes a full line below the name, and the More button stays at the top right of the row. A bucket row in a narrow row: line 1 is the icon, the name (it truncates), the balance on the right and the More button. Line 2 (muted) is the detail: for a bill "Due <date> · of <amount>" and the short or the fill text; for another bucket its detail and "of <target>" (a spending bucket shows only its detail; an income has no target). Line 2 breaks only after a "·". A thin progress bar in the full width of the row is under the two lines. An income has no bar. The bucket row has no separate amount line. A dense list (the spending list on Home) has a dot, the name and the amount on one line, also on a phone. On a touch screen a dense row is 44px high. |
 | IconTile | 36–40px tile with an identity hue: soft fill, deep glyph. It is the media of the row (`ItemMedia`). |
 | Empty | The empty state of a list: shadcn `Empty` with one quiet line (the title, 15px, muted). No icon, no description, no large block. |
 | Progress | 8px bar, round ends, `sunken` track. Fill = the identity glyph colour. Over budget: `attn-soft` track and tomato text, no fill. |
@@ -173,8 +181,9 @@ page header: a muted chevron and the name of the parent page.
   It opens a `Popover` on desktop and a `Sheet` on the phone with all filter fields and "Apply" / "Clear".
 - Then, only when filters are active: a "Clear" ghost button. A click removes all filters.
 - Right: the sort control (`Select` or `DropdownMenu`).
-- On the phone, the search field becomes narrower. When the row has no space, the sort control goes to a second
-  line. The bar does not scroll sideways.
+- On the phone the bar has two lines. Line 1: the search field in the full width. Line 2: "Filters", "Clear" (only when
+  filters are active) and the sort control. The sort control fills the rest of the line, and its text truncates with
+  an ellipsis. A list with no search field has only line 2. On desktop the bar is one row.
 - Below the bar, only when filters are active: one `Badge` for each active filter ("Account: Visa Card ×").
   The row has only the badges. A click on × removes that filter.
 - Do not show all filter fields on the page.
@@ -232,9 +241,14 @@ high. The text of a tab that is not selected is muted. The selected tab has an i
 review page shows its empty state. A tab link does not keep the search and the filters.
 Columns: a checkbox, Date, Account, Payee, Category, Amount, Status (and Balance when one account is shown).
 All column headers have one style: 12px, weight 700, uppercase, muted. A sortable header is a button with the same text.
-On a phone (width < 768px) the table shows only the checkbox, Date, Payee and Amount (and Balance on the page of an
-account). The Account, Category and Status columns do not show. Under the payee, a secondary line shows the category
-and, when there is one, the Status badge. The table does not scroll sideways.
+The table follows the width of its container, not of the screen. It never scrolls sideways.
+- A narrow table (less than 48rem: a phone, a tablet, a half-screen window) shows the checkbox and one cell with two
+  lines. Line 1: the payee (it truncates) and the amount on the right. Line 2 (muted): the date · the category or the
+  transfer text ("Transfer to …"), and "Pending" for a pending row. At the end of line 2: a small Status badge only when
+  the row needs review (on the Needs review page, the confidence badge), and the balance on the page of an account.
+  The header shows the checkbox and the sort buttons "Payee", "Date" and "Amount" (on the right).
+- A wider table shows the columns. The payee and the category truncate. The Account column shows only when the table
+  is 56rem wide or more.
 The checkbox column shows only on these two pages, not on the page of an account. A click on the
 checkbox selects the row; a click on another part of the row opens the editor. Shift and click selects a range. The
 header checkbox selects all rows of the page. The checkbox of a loan payment is disabled, with the Tooltip "Loan

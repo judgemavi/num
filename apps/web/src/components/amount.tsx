@@ -18,7 +18,7 @@ export function Amount({ value, owed = false, hero = false, className }: AmountP
   const signed = showOwed ? -value : value;
   if (!hero) {
     return (
-      <span className={`text-base font-semibold tabular-nums in-[small]:[font-size:inherit] in-[small]:[font-weight:inherit] in-[small]:[line-height:inherit] ${className ?? ""}`}>
+      <span className={`text-base font-semibold whitespace-nowrap tabular-nums in-[small]:[font-size:inherit] in-[small]:[font-weight:inherit] in-[small]:[line-height:inherit] ${className ?? ""}`}>
         {showOwed ? <span className="mr-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Owed</span> : null}
         {formatMoney(currency, signed)}
       </span>

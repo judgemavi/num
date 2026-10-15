@@ -4,6 +4,7 @@ import { useArchiveBucket } from "@/api/buckets";
 import { scheduleSignalsQuery } from "@/api/schedules";
 import { localAsOf } from "@/as-of";
 import { BucketGlyph } from "@/buckets/icons";
+import { BucketTitle } from "@/buckets/bucket-title";
 import { Amount } from "@/components/amount";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { IconTile } from "@/components/icon-tile";
@@ -31,11 +32,15 @@ export function IncomeRow({ bucket }: { bucket: Bucket }) {
         <BucketGlyph name={bucket.icon} />
       </IconTile>
       <div className={listName}>
-        {bucket.name}
-        {changed ? <Badge variant="attention">Amount changed</Badge> : null}
+        <BucketTitle
+          name={bucket.name}
+          badges={changed ? <Badge variant="attention">Amount changed</Badge> : null}
+          amount={<Amount value={schedule.expectedAmount} />}
+          over={false}
+        />
         <small>{scheduleLabel(schedule)}</small>
       </div>
-      <div className={listAmt}>
+      <div className={`${listAmt} @max-2xl:hidden`}>
         <Amount value={schedule.expectedAmount} />
       </div>
       <RowMenu label={`Actions for ${bucket.name}`}>

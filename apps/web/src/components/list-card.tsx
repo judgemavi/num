@@ -71,7 +71,7 @@ type RowTarget =
 
 /**
  * A row of a ListCard (`docs/design.md` §6), built on the shadcn `Item`. The target of a row that opens is a button or
- * a link that covers the row.
+ * a link that covers the row. The row is a size container: the columns follow the width of the row, not of the screen.
  */
 export function ListRow({
   size = "default",
@@ -89,7 +89,7 @@ export function ListRow({
     <Item
       aria-current={current ? "true" : undefined}
       className={cn(
-        "relative flex-nowrap gap-3.5 rounded-none border-0 border-t border-border px-5 text-[15px] first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary max-md:flex-wrap [.list-group+&]:border-t-0",
+        "@container relative flex-wrap gap-3.5 rounded-none border-0 border-t border-border px-5 text-[15px] first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary [.list-group+&]:border-t-0",
         rowSize[size],
         current && "bg-primary-soft",
       )}
@@ -112,7 +112,7 @@ const smallLines = "[&_small]:block [&_small]:text-[13px] [&_small]:font-normal 
 export const listName = `list-name min-w-0 flex-1 font-semibold ${smallLines}`;
 
 // The columns after the name have fixed widths. Thus the columns of all rows in a card line up, also when the amounts
-// and their secondary lines have different lengths. On a phone each column takes a full line below the name, and the
-// row actions stay at the top right.
-export const listMid = "w-40 shrink-0 max-md:order-1 max-md:basis-full";
-export const listAmt = `w-40 shrink-0 text-right text-base max-md:order-1 max-md:w-auto max-md:basis-full ${smallLines}`;
+// and their secondary lines have different lengths. In a narrow row (less than 42rem) each column takes a full line
+// below the name, and the row actions stay at the top right.
+export const listMid = "w-40 shrink-0 @max-2xl:order-1 @max-2xl:basis-full";
+export const listAmt = `w-40 shrink-0 text-right text-base @max-2xl:order-1 @max-2xl:w-auto @max-2xl:basis-full ${smallLines}`;

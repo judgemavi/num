@@ -57,13 +57,13 @@ function UpcomingRows() {
             onOpen={schedule ? () => void openEditor(schedule.kind, { id: item.bucketId }) : undefined}
           >
             <div className={listName}>
-              {name}
+              <span className="block truncate">{name}</span>
               <small>
                 {formatDate(item.dueDate)}
                 {note ? ` · ${note}` : null}
               </small>
             </div>
-            <Amount value={item.actualAmount ?? item.forecastAmount} />
+            <Amount value={item.actualAmount ?? item.forecastAmount} className="shrink-0" />
             <RowMenu label={`Actions for ${name} on ${formatDate(item.dueDate)}`}>
               {item.transactionId ? (
                 <DropdownMenuItem className="min-h-11" onSelect={() => unlink.mutate({ bucketId: item.bucketId, dueDate: item.dueDate })}>

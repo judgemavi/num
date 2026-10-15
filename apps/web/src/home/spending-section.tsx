@@ -2,7 +2,6 @@ import { Temporal, type ErrorCode } from "@num/shared";
 import { errorCode } from "@/api/client";
 import { localAsOf } from "@/as-of";
 import { Boundary } from "@/components/boundary";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBookCurrency, useCategoryNames, useTagNames } from "@/editors/lookups";
 import { monthTitle, rateText } from "@/home/spending/format";
@@ -60,19 +59,14 @@ function SpendingLine() {
 }
 
 function TimelineCard() {
-  const { data, search, patchSearch } = useSpendingReport();
+  const { data, search } = useSpendingReport();
   const categoryName = useCategoryNames().get(search.category ?? "");
   const tagName = useTagNames().get(data.tagId ?? "");
   const scope = categoryName ?? tagName;
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 px-5 pt-5 md:px-6">
-        <CardTitle className="text-base font-bold">{scope ? `${scope} spending` : "Income, spending and balance"}</CardTitle>
-        {search.category ? (
-          <Button type="button" variant="ghost" onClick={() => patchSearch({ category: undefined })}>
-            Show all
-          </Button>
-        ) : null}
+        <CardTitle className="text-base font-bold">{scope ? `${scope} spending` : "Income and spending"}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3 px-5 pb-5 md:px-6">
         <TimelineChart />

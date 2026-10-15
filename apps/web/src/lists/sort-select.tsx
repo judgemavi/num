@@ -15,7 +15,7 @@ export function SortSelect<Column extends string>({ id, label, value, options, o
     <ChoiceSelect
       id={id}
       aria-label={label}
-      className="w-fit min-w-44"
+      className="w-fit min-w-44 max-md:w-full max-md:min-w-0"
       itemClassName="min-h-11"
       value={sortKey(value)}
       options={options.map((option) => ({ value: sortKey(option), label: option.label }))}

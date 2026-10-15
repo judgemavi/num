@@ -74,7 +74,7 @@ export function FilterBar({
 
   return (
     <div className="grid gap-3">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="flex min-w-0 flex-nowrap items-center gap-2 max-md:flex-wrap">
         {search}
         {phone ? (
           <Sheet open={open} onOpenChange={changeOpen}>
@@ -113,7 +113,7 @@ export function FilterBar({
           </Button>
         ) : null}
         {sort ? (
-          <div className="ml-auto shrink-0">{sort}</div>
+          <div className="ml-auto shrink-0 max-md:ml-0 max-md:min-w-0 max-md:flex-1">{sort}</div>
         ) : null}
       </div>
       {badges.length > 0 ? (

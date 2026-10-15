@@ -46,7 +46,7 @@ function SelectTrigger({
       data-size={size}
       className={cn(
         fieldControl,
-        "data-placeholder:text-muted-foreground",
+        "data-placeholder:text-muted-foreground *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate",
         className
       )}
       {...props}

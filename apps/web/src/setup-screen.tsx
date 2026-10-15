@@ -47,7 +47,7 @@ export function SetupScreen({ onAlreadyComplete }: SetupScreenProps) {
   });
 
   return (
-    <main className="mx-auto grid min-h-svh w-full max-w-xl content-center gap-3 px-4 py-8">
+    <main className="mx-auto grid min-h-dvh w-full max-w-xl content-center gap-3 px-4 py-8">
       <p className="font-display flex items-center gap-2.5 text-2xl leading-none font-extrabold [font-stretch:72%]">
         <span className="grid size-7 place-items-center rounded-lg bg-foreground text-base text-background" aria-hidden="true">
           N

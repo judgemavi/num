@@ -11,7 +11,7 @@ export function TagSelect() {
   const { search, patchSearch } = useSpendingSearch();
   const options = useTags().map((tag) => ({ id: tag.id, label: tag.archivedAt ? `${tag.name} (archived)` : tag.name }));
   return (
-    <Field className="w-56">
+    <Field className="w-56 max-md:w-auto max-md:min-w-28 max-md:flex-1 max-md:basis-0">
       <FieldLabel htmlFor="spending-tag">Tag</FieldLabel>
       <OptionCombobox
         id="spending-tag"

@@ -60,7 +60,7 @@ function BucketsBody() {
   const asOf = localAsOf();
   usePrefetchQuery(upcomingQuery(asOf));
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
+    <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_336px]">
       <div className="grid gap-5">
         <BucketFilterBar />
         <BucketList />

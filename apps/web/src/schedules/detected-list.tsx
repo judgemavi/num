@@ -51,7 +51,7 @@ export function DetectedList() {
         return (
           <ListRow key={itemKey} label={name ?? "No merchant"} onOpen={add}>
             <div className={listName}>
-              {name ?? "No merchant"}
+              <span className="block truncate">{name ?? "No merchant"}</span>
               <small>
                 {formatMoney(currency, Math.abs(item.expectedAmount))} · {scheduleLabel(item)}
               </small>

@@ -6,6 +6,7 @@ import { localAsOf } from "@/as-of";
 import { BucketBar } from "@/buckets/bucket-bar";
 import { barLabel } from "@/buckets/format";
 import { BucketGlyph } from "@/buckets/icons";
+import { BucketTitle } from "@/buckets/bucket-title";
 import { PauseMenuItem } from "@/buckets/pause-menu-item";
 import { Amount } from "@/components/amount";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
@@ -34,6 +35,13 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
   const amount = need?.amount ?? 0;
   const changed = signals.changed.some((item) => item.bucketId === bucket.id);
   const over = bucket.balance < 0;
+  const balance = over ? (
+    <>
+      Over by <Amount value={-bucket.balance} />
+    </>
+  ) : (
+    <Amount value={bucket.balance} />
+  );
 
   return (
     <ListRow label={bucket.name} onOpen={() => void openEditor("commitment", { id: bucket.id })}>
@@ -41,32 +49,46 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
         <BucketGlyph name={bucket.icon} />
       </IconTile>
       <div className={listName}>
-        {bucket.name}
-        {bucket.pausedAt ? <Badge variant="neutral">Paused</Badge> : null}
-        {changed ? <Badge variant="attention">Amount changed</Badge> : null}
+        <BucketTitle
+          name={bucket.name}
+          badges={
+            <>
+              {bucket.pausedAt ? <Badge variant="neutral">Paused</Badge> : null}
+              {changed ? <Badge variant="attention">Amount changed</Badge> : null}
+            </>
+          }
+          amount={balance}
+          over={over}
+        />
         <small>
-          {need ? `Due ${formatDate(need.dueDate)}` : "No next payment"}
+          <span className="whitespace-nowrap">{need ? `Due ${formatDate(need.dueDate)}` : "No next payment"}</span>
+          {/* In a narrow row the amount of the payment goes on this line. The line breaks only after a "·". */}
+          <span className="hidden @max-2xl:inline">
+            {"\u00a0· "}
+            <span className="whitespace-nowrap">
+              of <Amount value={amount} />
+            </span>
+          </span>
           {need && need.short > 0 ? (
             <span className="text-attn">
-              {" · "}
-              <Amount value={need.short} /> short
+              {"\u00a0· "}
+              <span className="whitespace-nowrap">
+                <Amount value={need.short} /> short
+              </span>
             </span>
           ) : need && need.covered > 0 ? (
-            ` · Fills ${formatDate(billFillsOn(need.dueDate, asOf))}`
+            <>
+              {"\u00a0· "}
+              <span className="whitespace-nowrap">{`Fills ${formatDate(billFillsOn(need.dueDate, asOf))}`}</span>
+            </>
           ) : null}
         </small>
       </div>
       <div className={listMid}>
         <BucketBar hue={bucket.color} balance={bucket.balance} target={amount} label={barLabel(bucket, currency, amount)} />
       </div>
-      <div className={`${listAmt} ${over ? "text-attn" : ""}`}>
-        {over ? (
-          <>
-            Over by <Amount value={-bucket.balance} />
-          </>
-        ) : (
-          <Amount value={bucket.balance} />
-        )}
+      <div className={`${listAmt} @max-2xl:hidden ${over ? "text-attn" : ""}`}>
+        {balance}
         <small>
           of <Amount value={amount} />
         </small>

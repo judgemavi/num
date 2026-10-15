@@ -2,6 +2,7 @@ import type { Bucket } from "@num/shared";
 import { useArchiveBucket } from "@/api/buckets";
 import { useBucketFigures } from "@/buckets/use-bucket-figures";
 import { BucketGlyph } from "@/buckets/icons";
+import { BucketTitle } from "@/buckets/bucket-title";
 import { BucketBar } from "@/buckets/bucket-bar";
 import { PauseMenuItem } from "@/buckets/pause-menu-item";
 import { Amount } from "@/components/amount";
@@ -19,6 +20,18 @@ export function BucketRow({ bucket }: { bucket: Bucket }) {
   const archive = useArchiveBucket();
   const { target, detail, label } = useBucketFigures(bucket);
   const over = bucket.balance < 0;
+  const spending = bucket.kind === "spending";
+  const balance = over ? (
+    <>
+      Over by <Amount value={-bucket.balance} />
+    </>
+  ) : spending ? (
+    <>
+      <Amount value={bucket.balance} /> left
+    </>
+  ) : (
+    <Amount value={bucket.balance} />
+  );
 
   return (
     <>
@@ -27,28 +40,29 @@ export function BucketRow({ bucket }: { bucket: Bucket }) {
           <BucketGlyph name={bucket.icon} />
         </IconTile>
         <div className={listName}>
-          {bucket.name}
-          {bucket.pausedAt ? <Badge variant="neutral">Paused</Badge> : null}
-          <small>{detail}</small>
+          <BucketTitle name={bucket.name} badges={bucket.pausedAt ? <Badge variant="neutral">Paused</Badge> : null} amount={balance} over={over} />
+          <small>
+            {detail}
+            {/* In a narrow row the target goes on this line. A spending bucket shows its monthly amount in the detail. */}
+            {spending ? null : (
+              <span className="hidden @max-2xl:inline">
+                {"\u00a0· "}
+                <span className="whitespace-nowrap">
+                  of <Amount value={target} />
+                </span>
+              </span>
+            )}
+          </small>
         </div>
         <div className={listMid}>
           <BucketBar hue={bucket.color} balance={bucket.balance} target={target} label={label} />
         </div>
-        <div className={`${listAmt} ${over ? "text-attn" : ""}`}>
-          {over ? (
-            <>
-              Over by <Amount value={-bucket.balance} />
-            </>
-          ) : bucket.kind === "spending" ? (
-            <>
-              <Amount value={bucket.balance} /> left
-              <small>of <Amount value={target} /></small>
-            </>
-          ) : (
-            <>
-              <Amount value={bucket.balance} />
-              <small>of <Amount value={target} /></small>
-            </>
+        <div className={`${listAmt} @max-2xl:hidden ${over ? "text-attn" : ""}`}>
+          {balance}
+          {over ? null : (
+            <small>
+              of <Amount value={target} />
+            </small>
           )}
         </div>
         <RowMenu label={`Actions for ${bucket.name}`}>

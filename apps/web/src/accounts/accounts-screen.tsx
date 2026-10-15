@@ -116,7 +116,7 @@ function AccountsPage() {
                         {owedToYou(account) ? <small className="text-attn">{owedToYouWarning}</small> : null}
                         <BankStatusLine accountId={account.id} />
                       </div>
-                      <div className={`${listMid} text-[13px] text-muted-foreground max-md:hidden`}>
+                      <div className={`${listMid} text-[13px] text-muted-foreground @max-2xl:hidden`}>
                         {account.archivedAt ? <Badge variant="attention">Archived</Badge> : kindLabel(account.kind)}
                       </div>
                       <div className={listAmt}>

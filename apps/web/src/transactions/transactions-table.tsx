@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useEditors } from "@/editors/editor-api";
 import type { SortChoice } from "@/lists/list-search";
 import { useAccountLabels, useBookCurrency } from "@/editors/lookups";
-import { CategoryCell, ProposedCategoryCell } from "@/transactions/category-cell";
+import { CategoryCell } from "@/transactions/category-cell";
+import { useRowLabel } from "@/transactions/row-label";
 import { formatDate, refundOfText, refundedText } from "@/transactions/format";
 import { ReviewConfidence, ReviewStatus } from "@/transactions/review-status";
 import { selectable, useSelection } from "@/transactions/selection-state";
@@ -26,8 +27,14 @@ type Props = {
   onSort: (column: TransactionSort["sort"]) => void;
 };
 
-/** A column that shows only from `md`. On a phone the table shows the checkbox, Date, Payee and Amount (design §6a). */
-const wide = "max-md:hidden";
+/**
+ * The table follows the width of its container, not of the screen (design §6a). A narrow table (less than 48rem)
+ * shows the checkbox and one cell with two lines. A wide table shows the columns. The Account column shows only when
+ * the table has 56rem.
+ */
+const wide = "@max-3xl:hidden";
+const narrow = "@3xl:hidden";
+const account = "@max-4xl:hidden";
 
 type SortHeadProps<Column extends string> = {
   column: Column;
@@ -37,14 +44,21 @@ type SortHeadProps<Column extends string> = {
   className?: string;
 };
 
+/** The button of a header that sorts the table by its column. */
+function SortButton<Column extends string>({ column, label, onSort }: { column: Column; label: string; onSort: (column: Column) => void }) {
+  return (
+    <Button type="button" variant="ghost" size="sm" className="-mx-2 px-2 text-xs font-bold tracking-wider uppercase" onClick={() => onSort(column)}>
+      {label}
+    </Button>
+  );
+}
+
 /** A column header that sorts the table by its column. */
 function SortHead<Column extends string>({ column, label, sort, onSort, className }: SortHeadProps<Column>) {
   const sorted = sort.sort !== column ? "none" : sort.dir === "asc" ? "ascending" : "descending";
   return (
     <TableHead aria-sort={sorted} className={className}>
-      <Button type="button" variant="ghost" size="sm" className="-mx-2 px-2 text-xs font-bold tracking-wider uppercase" onClick={() => onSort(column)}>
-        {label}
-      </Button>
+      <SortButton column={column} label={label} onSort={onSort} />
     </TableHead>
   );
 }
@@ -119,10 +133,13 @@ export function TransactionsTable(props: Props) {
   const accountNames = useAccountLabels();
   // The Needs review page shows the proposed label and the confidence.
   const onReview = useOnReview();
+  const rowLabel = useRowLabel(onReview);
 
   function renderRow(row: TransactionListItem) {
     const open = () => void openEditor("transaction", { id: row.id });
-    const category = onReview ? <ProposedCategoryCell row={row} /> : <CategoryCell row={row} />;
+    const { label, merchant } = rowLabel(row);
+    const balance =
+      showBalance && row.runningBalance !== null ? <Amount value={row.runningBalance} owed={accountClass(row.accountKind) === "liability"} /> : null;
     const status = onReview ? <ReviewConfidence review={row.review} /> : <ReviewStatus review={row.review} />;
     return (
       <TableRow
@@ -137,20 +154,31 @@ export function TransactionsTable(props: Props) {
         }}
       >
         <SelectCell rows={rows} row={row} />
-        <TableCell>{formatDate(row.date)}</TableCell>
-        {hideAccount ? null : <TableCell className={wide}>{accountNames.get(row.accountId) ?? row.accountName}</TableCell>}
-        <TableCell className="max-md:whitespace-normal">
-          <div>{row.payeeRaw}</div>
-          {row.refundOf ? <div className="text-muted-foreground">{refundOfText(currency, row.refundOf.date, row.refundOf.amount)}</div> : null}
-          {row.refundedAmount ? <div className="text-muted-foreground">{refundedText(currency, row.refundedAmount)}</div> : null}
-          {/* On a phone the Category and Status columns do not show. Their text goes under the payee. */}
-          <div className="grid justify-items-start gap-1 text-[13px] text-muted-foreground md:hidden">
-            {category}
+        {/* A narrow table: line 1 is the payee and the amount; line 2 is the date and the label. */}
+        <TableCell className={`w-full max-w-0 ${narrow}`}>
+          <div className="flex items-baseline gap-3">
+            <span className="min-w-0 flex-1 truncate font-semibold">{row.payeeRaw}</span>
+            <Amount value={row.amount} className="shrink-0" />
+          </div>
+          <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+            <span className="min-w-0 flex-1 truncate">
+              {[formatDate(row.date), label, row.status === "open" ? "Pending" : null].filter(Boolean).join(" · ")}
+            </span>
             {status}
+            {balance ? <small className="shrink-0 text-[13px]">{balance}</small> : null}
           </div>
         </TableCell>
-        <TableCell className={wide}>{category}</TableCell>
-        <TableCell className="text-right">
+        <TableCell className={wide}>{formatDate(row.date)}</TableCell>
+        {hideAccount ? null : <TableCell className={`${wide} ${account}`}>{accountNames.get(row.accountId) ?? row.accountName}</TableCell>}
+        <TableCell className={`w-full max-w-0 ${wide}`}>
+          <div className="truncate">{row.payeeRaw}</div>
+          {row.refundOf ? <div className="truncate text-muted-foreground">{refundOfText(currency, row.refundOf.date, row.refundOf.amount)}</div> : null}
+          {row.refundedAmount ? <div className="truncate text-muted-foreground">{refundedText(currency, row.refundedAmount)}</div> : null}
+        </TableCell>
+        <TableCell className={`max-w-48 [&>div]:truncate ${wide}`}>
+          <CategoryCell label={label} merchant={merchant} />
+        </TableCell>
+        <TableCell className={`text-right ${wide}`}>
           <div className="flex items-center justify-end gap-2">
             {row.status === "open" ? (
               <span className="text-sm text-muted-foreground">Pending</span>
@@ -158,33 +186,39 @@ export function TransactionsTable(props: Props) {
             <Amount value={row.amount} />
           </div>
         </TableCell>
-        {showBalance ? (
-          <TableCell className="text-right">
-            {row.runningBalance === null ? null : (
-              <Amount value={row.runningBalance} owed={accountClass(row.accountKind) === "liability"} />
-            )}
-          </TableCell>
-        ) : null}
+        {showBalance ? <TableCell className={`text-right ${wide}`}>{balance}</TableCell> : null}
         <TableCell className={wide}>{status}</TableCell>
       </TableRow>
     );
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <SelectAllHead rows={rows} />
-          <SortHead column="date" label="Date" sort={sort} onSort={onSort} />
-          {hideAccount ? null : <TableHead className={wide}>Account</TableHead>}
-          <SortHead column="payeeRaw" label="Payee" sort={sort} onSort={onSort} />
-          <TableHead className={wide}>Category</TableHead>
-          <SortHead column="amount" label="Amount" sort={sort} onSort={onSort} className="text-right" />
-          {showBalance ? <TableHead className="text-right">Balance</TableHead> : null}
-          {onReview ? <ConfidenceHead /> : <TableHead className={wide}>Status</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>{rows.map(renderRow)}</TableBody>
-    </Table>
+    <div className="@container">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <SelectAllHead rows={rows} />
+            {/* A narrow table has one header cell with the sort buttons of its two lines. */}
+            <TableHead className={narrow}>
+              <div className="flex items-center gap-4">
+                <SortButton column="payeeRaw" label="Payee" onSort={onSort} />
+                <SortButton column="date" label="Date" onSort={onSort} />
+                <span className="ml-auto">
+                  <SortButton column="amount" label="Amount" onSort={onSort} />
+                </span>
+              </div>
+            </TableHead>
+            <SortHead column="date" label="Date" sort={sort} onSort={onSort} className={wide} />
+            {hideAccount ? null : <TableHead className={`${wide} ${account}`}>Account</TableHead>}
+            <SortHead column="payeeRaw" label="Payee" sort={sort} onSort={onSort} className={wide} />
+            <TableHead className={wide}>Category</TableHead>
+            <SortHead column="amount" label="Amount" sort={sort} onSort={onSort} className={`text-right ${wide}`} />
+            {showBalance ? <TableHead className={`text-right ${wide}`}>Balance</TableHead> : null}
+            {onReview ? <ConfidenceHead /> : <TableHead className={wide}>Status</TableHead>}
+          </TableRow>
+        </TableHeader>
+        <TableBody>{rows.map(renderRow)}</TableBody>
+      </Table>
+    </div>
   );
 }

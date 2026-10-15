@@ -36,17 +36,17 @@ export function PeriodSelect() {
 
   return (
     <>
-      <Field className="w-44">
+      <Field className="w-44 max-md:w-auto max-md:min-w-28 max-md:flex-1 max-md:basis-0">
         <FieldLabel htmlFor="spending-period">Period</FieldLabel>
         <ChoiceSelect id="spending-period" aria-label="Period" value={current} options={windows} onValueChange={chooseWindow} />
       </Field>
       {current === "custom" ? (
         <>
-          <Field className="w-44">
+          <Field className="w-44 max-md:w-auto max-md:min-w-28 max-md:flex-1 max-md:basis-0">
             <FieldLabel htmlFor="spending-from">From</FieldLabel>
             <DateField id="spending-from" value={from ?? ""} required onChange={(value) => patchSearch({ from: value || undefined })} />
           </Field>
-          <Field className="w-44">
+          <Field className="w-44 max-md:w-auto max-md:min-w-28 max-md:flex-1 max-md:basis-0">
             <FieldLabel htmlFor="spending-to">To</FieldLabel>
             <DateField id="spending-to" value={to ?? ""} required onChange={(value) => patchSearch({ to: value || undefined })} />
           </Field>
