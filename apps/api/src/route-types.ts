@@ -2,7 +2,7 @@ export type { AppType } from "./app";
 export type { AccountRoutes } from "./routes/accounts";
 export type { BucketRoutes } from "./routes/buckets";
 export type { CategoryRoutes } from "./routes/categories";
-export type { CheckpointRoutes } from "./routes/checkpoints";
+export type { BankBalanceRoutes } from "./routes/bank-balances";
 export type { DocumentRoutes } from "./routes/documents";
 export type { ForecastRoutes } from "./routes/forecast";
 export type { FundingRoutes } from "./routes/funding";

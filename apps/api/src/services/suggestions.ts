@@ -13,8 +13,7 @@ import { and, eq, gte, isNull, lte, ne, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { mortgageSuggestion } from "./mortgage-learned";
-import { transactionReconciled } from "./reconciled";
-import { isImported, isReconciled, lineCount, literal } from "./transaction-sql";
+import { isImported, lineCount, literal } from "./transaction-sql";
 import { loadMatchBook, mortgageLearnedFor, scorePayee } from "./match-book";
 import { linkLearnedTransfers, linkTransferPair } from "./transfer-auto";
 import { write, type WriteInput } from "./write";
@@ -36,7 +35,6 @@ export function transferHint(db: Db, input: { accountId: string; date: string; a
       date: transactions.date,
       amount: transactions.amount,
       lineCount: lineCount(transactions.id),
-      reconciled: isReconciled(transactions),
     })
     .from(transactions)
     .where(
@@ -60,7 +58,7 @@ export function suggestForPayee(db: Db, accountId: string, rawPayee: string, amo
   const book = loadMatchBook(db);
   const payee = normalizePayee(rawPayee);
   const base = suggestionFromMatch(scorePayee(book, { payee, amount, recurring: null }));
-  if (date === undefined || transactionReconciled(db, accountId, date)) {
+  if (date === undefined) {
     return base;
   }
   const mortgage = mortgageSuggestion(db, mortgageLearnedFor(book, payee), { payee, accountId, date, amount });

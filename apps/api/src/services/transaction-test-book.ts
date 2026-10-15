@@ -10,8 +10,7 @@ import { createDb, type Db } from "../db";
 import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { map } from "./import-test-book";
-import { compareCheckpoint, createCheckpoint } from "./checkpoints";
-import { createTransaction, getTransaction } from "./transactions";
+import { getTransaction } from "./transactions";
 
 export function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-transactions-"));
@@ -99,19 +98,4 @@ export function requirePeer(db: Db, record: Transaction): Transaction {
     throw new Error("Transfer peer is missing");
   }
   return peer;
-}
-
-/**
- * A Maybe row: a reconciled row with no category whose suggestion is a learned transfer to `otherAccountId`. Approve
- * cannot apply a transfer to a reconciled row (decision 0051). The rows are in January.
- */
-export function reconciledTransferRow(db: Db, accountId: string, otherAccountId: string) {
-  const move = (date: string, transferAccountId: string | null) =>
-    createTransaction(db, { accountId, date, amount: -30_000, payeeRaw: "Rent move", lines: [{ amount: -30_000, transferAccountId }], ...saved });
-  move("2026-01-05", otherAccountId);
-  move("2026-01-06", otherAccountId);
-  const row = move("2026-01-20", null);
-  const balance = compareCheckpoint(db, accountId, { date: "2026-01-20", statementBalance: 0 }).calculatedBalance;
-  createCheckpoint(db, accountId, { date: "2026-01-20", statementBalance: balance, ...saved });
-  return row;
 }

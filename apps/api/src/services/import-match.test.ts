@@ -1,4 +1,4 @@
-import { checkpoints, transactions } from "@num/db";
+import { transactions } from "@num/db";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createAccount } from "./accounts";
@@ -67,7 +67,7 @@ test("one match candidate links the row and several candidates need review", () 
   }
 });
 
-test("undo removes only unedited, unreconciled rows", () => {
+test("undo removes only unedited rows", () => {
   const book = tempBook();
   try {
     createTransaction(book.db, {
@@ -82,21 +82,19 @@ test("undo removes only unedited, unreconciled rows", () => {
     const result = importCsv(book.db, book.dir, book.account.id, "month.csv", [
       "01/20/2026,KEEP,-1.00",
       "01/21/2026,EDIT,-2.00",
-      "01/12/2026,LOCK,-3.00",
       "01/13/2026,MANUAL MATCH,-4.00",
     ]);
     expect(result.kind).toBe("batch");
     if (result.kind !== "batch") {
       return;
     }
-    expect(result.counts.created).toBe(3);
+    expect(result.counts.created).toBe(2);
     expect(result.counts.matched).toBe(1);
 
     const rows = book.db.select().from(transactions).all();
     const edit = rows.find((row) => row.payeeRaw === "EDIT");
-    const lock = rows.find((row) => row.payeeRaw === "LOCK");
     const manual = rows.find((row) => row.payeeRaw === "MANUAL");
-    if (!edit || !lock || !manual) {
+    if (!edit || !manual) {
       throw new Error("Imported rows are missing");
     }
     const current = getTransaction(book.db, edit.id);
@@ -112,21 +110,12 @@ test("undo removes only unedited, unreconciled rows", () => {
       source: "ui",
       at: "2026-10-08T16:00:00Z",
     });
-    book.db.insert(checkpoints).values({
-      id: crypto.randomUUID(),
-      accountId: lock.accountId,
-      date: lock.date,
-      statementBalance: 0,
-      createdAt: at,
-      unlockedAt: null,
-    }).run();
 
     const undone = undoImportBatch(book.db, result.id, { source: "import", at: "2026-10-09T16:00:00Z" });
-    expect(undone.blocked.map((row) => row.reason).sort()).toEqual(["edited", "reconciled"]);
+    expect(undone.blocked.map((row) => row.reason).sort()).toEqual(["edited"]);
     const after = book.db.select().from(transactions).all();
     expect(after.find((row) => row.payeeRaw === "KEEP")).toBeUndefined();
     expect(after.find((row) => row.payeeRaw === "EDIT")).toBeDefined();
-    expect(after.find((row) => row.payeeRaw === "LOCK")).toBeDefined();
     expect(after.find((row) => row.payeeRaw === "MANUAL")).toBeDefined();
     expect(after.find((row) => row.payeeRaw === "MANUAL")?.importRowId).toBeNull();
     expect(undone.batch.undoneAt).toBeNull();

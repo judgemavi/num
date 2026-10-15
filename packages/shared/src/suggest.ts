@@ -120,7 +120,6 @@ export type TransferMatchRow = {
   date: string;
   amount: number;
   lineCount: number;
-  reconciled: boolean;
 };
 
 /** One unlinked opposite transaction within ±3 days. The closest date wins. */
@@ -133,7 +132,6 @@ export function chooseTransferMatch(
     (row) =>
       row.amount === wanted &&
       row.lineCount === 1 &&
-      !row.reconciled &&
       dayDistance(row.date, input.date) <= 3,
   );
   open.sort((left, right) => {

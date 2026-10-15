@@ -46,14 +46,13 @@ test("a transfer pair needs one imported row", () => {
 });
 
 function matchRow(patch: Partial<TransferMatchRow> & Pick<TransferMatchRow, "id" | "date">): TransferMatchRow {
-  return { amount: 50_000, lineCount: 1, reconciled: false, ...patch };
+  return { amount: 50_000, lineCount: 1, ...patch };
 }
 
 test("a transfer match is the closest unlinked opposite row within 3 days", () => {
   const rows = [
     matchRow({ id: "far", date: "2026-04-05" }),
     matchRow({ id: "near", date: "2026-04-02" }),
-    matchRow({ id: "locked", date: "2026-04-01", reconciled: true }),
     matchRow({ id: "split", date: "2026-04-01", lineCount: 2 }),
     matchRow({ id: "same", date: "2026-04-01" }),
   ];

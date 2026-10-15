@@ -2,7 +2,6 @@ import { transactionLines, transactions, type TransactionRow } from "@num/db";
 import { chooseTransferMatch, utcNow, type TransactionSource } from "@num/shared";
 import { and, eq, isNull, ne } from "drizzle-orm";
 import { ServiceError } from "../service-error";
-import { dateIsReconciled, latestCheckpointDate } from "./reconciled";
 import { eraseTransaction } from "./transaction-erase";
 import { loadLines, replaceLines, type StoredLine } from "./transaction-lines";
 import { auditTransaction, automaticPair, headerForWrite, newTransactionStatus, readTransaction, toTransaction, type AutoStamp, type Header } from "./transaction-record";
@@ -109,9 +108,8 @@ function findTransferMatch(tx: WriteTx, input: { sourceId: string; targetAccount
       ),
     )
     .all();
-  const checkpoint = latestCheckpointDate(tx, input.targetAccountId);
   return chooseTransferMatch(
-    rows.map((row) => ({ ...row, reconciled: dateIsReconciled(row.date, checkpoint) })),
+    rows,
     { date: input.date, lineAmount: input.lineAmount },
   );
 }

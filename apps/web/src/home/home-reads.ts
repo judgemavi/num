@@ -1,5 +1,6 @@
 import type { InsightsSearch } from "@num/shared";
 import type { QueryClient } from "@tanstack/react-query";
+import { bankStatusesQuery } from "@/api/bank-balances";
 import { overspentQuery } from "@/api/buckets";
 import { fundingPaychecksQuery } from "@/api/funding";
 import { hygieneQuery, insightsQuery } from "@/api/insights";
@@ -24,5 +25,6 @@ export function startHomeReads(queryClient: QueryClient) {
   void queryClient.prefetchQuery(fundingPaychecksQuery());
   void queryClient.prefetchQuery(recurringSignalsQuery(asOf));
   void queryClient.prefetchQuery(overspentQuery());
+  void queryClient.prefetchQuery(bankStatusesQuery());
   void queryClient.prefetchQuery(insightsQuery(asOf, homeInsights));
 }

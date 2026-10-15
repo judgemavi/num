@@ -9,7 +9,7 @@ import { createDb } from "../db";
 import { createAccount, getAccount, updateAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { mortgageAccountView } from "./mortgage";
-import { checkpointOpeningSuggestion, importOpeningSuggestion } from "./opening-suggestion";
+import { bankOpeningSuggestion, importOpeningSuggestion } from "./opening-suggestion";
 
 const at = "2026-10-08T16:00:00.000Z";
 const saved = { source: "ui" as const, at };
@@ -168,8 +168,7 @@ test("a mortgage with terms gets no opening balance suggestion, and the apply is
     const mortgage = createAccount(sample.db, { ...mortgageFields(-100_000_000, sample.terms), onBudget: undefined });
     const row = { date: "2026-04-02", amount: -5_000, balance: -90_000_000 };
     expect(importOpeningSuggestion(sample.db, mortgage.id, row)).toBeNull();
-    const input = { calculatedBalance: -100_000_000, statementBalance: -90_000_000 };
-    expect(checkpointOpeningSuggestion(sample.db, mortgage, input)).toBeNull();
+    expect(bankOpeningSuggestion(sample.db, mortgage, { date: "2026-04-02", balance: -90_000_000 }, -100_000_000)).toBeNull();
     expect(() => updateAccount(sample.db, mortgage.id, { openingBalance: -90_000_000, openingDate: "2026-04-01", ...saved })).toThrow();
     expect(getAccount(sample.db, mortgage.id).openingDate).toBe("2026-02-01");
     const plain = createAccount(sample.db, { name: "Plain", kind: "mortgage", openingBalance: -100_000_000, ...saved });

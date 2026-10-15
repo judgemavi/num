@@ -185,10 +185,10 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
   if (lump && (!Number.isSafeInteger(lump.amount) || lump.amount < 1)) {
     throw new Error("Lump sum is not a safe integer");
   }
-  const checkpoints = sortedValuations(valuations);
+  const dated = sortedValuations(valuations);
   let balance = loan.principal;
   let previous = loan.principalAsOf;
-  for (const valuation of checkpoints) {
+  for (const valuation of dated) {
     if (valuation.date === loan.principalAsOf) {
       balance = owed(valuation.balance);
     }
@@ -205,8 +205,8 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
   const limit = 50 * periods;
   for (let index = 0; index < limit && balance > 0; index += 1) {
     const date = mortgagePaymentDate(loan.firstPaymentDate, index, frequency);
-    while (cursor < checkpoints.length && checkpoints[cursor].date < date) {
-      const valuation = checkpoints[cursor];
+    while (cursor < dated.length && dated[cursor].date < date) {
+      const valuation = dated[cursor];
       cursor += 1;
       if (valuation.date <= previous) {
         continue;
@@ -244,8 +244,8 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
       throw new Error("Schedule amount is not a safe integer");
     }
     payments.push({ date, payment, principal, interest: covered, balance });
-    if (cursor < checkpoints.length && checkpoints[cursor].date === date) {
-      balance = owed(checkpoints[cursor].balance);
+    if (cursor < dated.length && dated[cursor].date === date) {
+      balance = owed(dated[cursor].balance);
       payments[payments.length - 1].balance = balance;
       cursor += 1;
     }

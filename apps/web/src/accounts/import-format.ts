@@ -10,7 +10,6 @@ const unreadableText: Record<UnreadableReason, string> = {
 
 const blockText: Record<UndoBlockReason, string> = {
   edited: "Edited after import",
-  reconciled: "Reconciled",
 };
 
 export function unreadableLabel(reason: UnreadableReason): string {

@@ -67,9 +67,6 @@ function skipReason(db: Reader, transaction: Transaction, patch: BulkPatch): Bul
   if (peer && peer.lines.length !== 1) {
     return "loan_payment";
   }
-  if (transferAfter(what, line.transferAccountId) !== line.transferAccountId && (transaction.reconciled || peer?.reconciled)) {
-    return "reconciled";
-  }
   // The single editor shows only expense categories for money out (spec §7.3).
   if (what?.kind === "category" && moneyDirection(transaction.amount) === "out" && categoryKind(db, what.categoryId) === "income") {
     return "direction";

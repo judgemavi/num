@@ -216,8 +216,7 @@ payments are changed one at a time." (decision 0053) With a selection, the Actio
 also shows "Approve · N" (outline) before "Edit…". Approve has no confirm.
 The Category column shows the category, "Transfer to <account>" (money out) or "Transfer from <account>" (money in), "Loan payment", or "Uncategorized", and the merchant
 below it.
-The Amount cell shows only the exceptions: a lock icon for a reconciled row (Tooltip: "Checked against your balance on <date>")
-and "Pending" for an open row (entered by hand in an account that gets imports, not yet on a statement; decision 0052).
+The Amount cell shows only the exception: "Pending" for an open row (entered by hand in an account that gets imports, not yet on a statement; decision 0052).
 A cleared row shows nothing.
 The Status column (right-most) shows a Badge only when the row needs review: the level (Sure, Likely, Maybe, never a
 percentage) for a row with a suggestion or an automatic label, and "Needs review" for a row with a question or no

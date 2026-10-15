@@ -10,7 +10,6 @@ import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { listNeedsReview } from "./needs-review";
 import { listReviewTransactions } from "./transaction-list";
-import { reconciledTransferRow } from "./transaction-test-book";
 import { createTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at: "2026-04-02T16:00:00Z" };
@@ -50,9 +49,12 @@ function sample(db: Db) {
   const cash = account(db, "Cash");
   const savings = account(db, "Savings");
   const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
+  const tools = createCategory(db, { name: "Tools", kind: "expense", ...saved });
   pay(db, cash.id, "2026-03-01", -20_000, "Market", food.id);
   const likely = pay(db, cash.id, "2026-03-02", -20_000, "Market");
-  const maybe = reconciledTransferRow(db, cash.id, savings.id);
+  pay(db, cash.id, "2026-03-03", -9000, "Corner shop", food.id);
+  pay(db, cash.id, "2026-03-04", -9000, "Corner shop", tools.id);
+  const maybe = pay(db, cash.id, "2026-03-04", -9000, "Corner shop");
   const out = pay(db, cash.id, "2026-03-05", -500_000, "Move");
   const into = pay(db, savings.id, "2026-03-06", 500_000, "Move");
   db.update(transactions).set({ source: "import" }).where(eq(transactions.id, out.id)).run();

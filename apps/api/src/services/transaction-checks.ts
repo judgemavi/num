@@ -1,43 +1,9 @@
-import { accounts, categories, merchants, tags, type TransactionRow } from "@num/db";
+import { accounts, categories, merchants, tags } from "@num/db";
 import { eq } from "drizzle-orm";
 import { ServiceError } from "../service-error";
-import type { StoredLine } from "./transaction-lines";
 import type { Header } from "./transaction-record";
 import { loanPaymentLines, type NormalizedLine } from "./transaction-rules";
-import { transactionReconciled } from "./reconciled";
 import type { WriteTx, Reader } from "./write";
-
-function moneySame(existing: TransactionRow, existingLines: StoredLine[], header: Header, lines: NormalizedLine[]) {
-  if (header.date !== existing.date || header.accountId !== existing.accountId || header.amount !== existing.amount) {
-    return false;
-  }
-  if (lines.length !== existingLines.length) {
-    return false;
-  }
-  const key = (amount: number, transferAccountId: string | null) => `${amount}\0${transferAccountId ?? ""}`;
-  const next = lines.map((line) => key(line.amount, line.transferAccountId)).sort();
-  const current = existingLines.map((line) => key(line.amount, line.transferAccountId)).sort();
-  return next.every((value, index) => value === current[index]);
-}
-
-export function assertReconciledMoney(
-  db: Reader,
-  existing: TransactionRow,
-  existingLines: StoredLine[],
-  peer: TransactionRow | null,
-  header: Header,
-  lines: NormalizedLine[],
-): void {
-  const locked =
-    transactionReconciled(db, existing.accountId, existing.date) ||
-    (peer !== null && transactionReconciled(db, peer.accountId, peer.date));
-  if (!locked) {
-    return;
-  }
-  if (!moneySame(existing, existingLines, header, lines)) {
-    throw new ServiceError("transaction_reconciled", 409);
-  }
-}
 
 export function assertPayee(existing: { source: string; payeeRaw: string }, payeeRaw: string): void {
   if (existing.source === "import" && existing.payeeRaw !== payeeRaw) {

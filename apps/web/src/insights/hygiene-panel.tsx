@@ -15,16 +15,6 @@ function detail(check: HygieneCheck, currency: string) {
     const place = check.source === "goals" ? "essential goals" : "savings accounts";
     return `${formatMoney(currency, check.held)} in ${place} · ${check.months} months needs ${formatMoney(currency, check.need)}`;
   }
-  if (check.code === "cards_paid") {
-    const late = check.items.filter((item) => !item.pass);
-    if (check.items.length === 0) {
-      return "No card is set to pay the full statement.";
-    }
-    if (late.length === 0) {
-      return "Each latest statement was paid by its due date.";
-    }
-    return `${late.length} still unpaid after the due date.`;
-  }
   if (check.code === "imports_current") {
     const stale = check.items.filter((item) => !item.pass);
     const missing = check.items.filter((item) => item.lastImportDate === null);
@@ -77,7 +67,6 @@ function detail(check: HygieneCheck, currency: string) {
 
 const titles: Record<HygieneCheck["code"], string> = {
   emergency_fund: "Emergency fund",
-  cards_paid: "Cards paid in full",
   imports_current: "Imports are current",
   review: "Review",
   sinking_funds: "Sinking funds",
@@ -88,7 +77,6 @@ const titles: Record<HygieneCheck["code"], string> = {
 
 const places: Record<HygieneCheck["code"], string> = {
   emergency_fund: "Buckets",
-  cards_paid: "Accounts",
   imports_current: "Imports",
   review: "Review",
   sinking_funds: "Buckets",
@@ -107,10 +95,6 @@ export function HygienePanel() {
   function open(check: HygieneCheck) {
     if (check.code === "emergency_fund" || check.code === "sinking_funds" || check.code === "overspent") {
       void go({ to: "/buckets" });
-      return;
-    }
-    if (check.code === "cards_paid") {
-      void go({ to: "/accounts" });
       return;
     }
     if (check.code === "imports_current") {

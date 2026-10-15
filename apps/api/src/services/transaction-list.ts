@@ -11,7 +11,7 @@ import { alias, QueryBuilder, type AnySQLiteColumn } from "drizzle-orm/sqlite-co
 import type { Db } from "../db";
 import { linesForIds } from "./transaction-list-lines";
 import { listNeedsReview, reviewCounts, type NeedsReviewHit } from "./needs-review";
-import { hasOpenLine, isReconciled, refundedSum } from "./transaction-sql";
+import { hasOpenLine, refundedSum } from "./transaction-sql";
 
 const sortColumns = {
   date: transactions.date,
@@ -39,7 +39,6 @@ const listColumns = {
   merchantId: transactions.merchantId,
   merchantName: merchants.name,
   status: transactions.status,
-  reconciled: isReconciled(transactions),
   accountOpening: accounts.openingBalance,
   autoReason: transactions.autoReason,
   autoConfidence: transactions.autoConfidence,

@@ -1,5 +1,4 @@
 import { expect, test } from "bun:test";
-import { createCheckpoint } from "./checkpoints";
 import { createCategory } from "./categories";
 import { createMerchant } from "./merchants";
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
@@ -66,15 +65,6 @@ test("a transfer links an opposite row within 3 days and mirrors when none match
     const mirror = requirePeer(book.db, tooFar);
     expect(mirror.accountId).toBe(visa.id);
     expect(mirror.amount).toBe(8000);
-
-    const held = createTransaction(book.db, entry(visa.id, 1000, [{ amount: 1000 }], "2026-06-01"));
-    createCheckpoint(book.db, visa.id, { date: "2026-06-01", statementBalance: 67_000, ...saved });
-    const aroundHeld = createTransaction(
-      book.db,
-      entry(chequing.id, -1000, [{ amount: -1000, transferAccountId: visa.id }], "2026-06-01"),
-    );
-    expect(aroundHeld.transferPeerId).not.toBe(held.id);
-    expect(getTransaction(book.db, held.id)?.transferPeerId).toBeNull();
   } finally {
     book.close();
   }

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkpoints, inboxDecisions, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
+import { inboxDecisions, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
 import { columnMapSchema } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
@@ -282,18 +282,6 @@ test("undoing the second import and then the first both work", () => {
     expect(out?.editedAt).toBeNull();
     expect(undoImportBatch(db, batch.outId, saved).blocked).toEqual([]);
     expect(rowsOf(db, -50_000)).toHaveLength(0);
-  });
-});
-
-test("undo is blocked when the linked peer is reconciled", () => {
-  withBook((db, ids) => {
-    learnTransfer(db, ids, "MOVE TO SAVINGS");
-    const batch = pairImport(db, ids, "MOVE TO SAVINGS", "FROM EVERYDAY");
-    db.insert(checkpoints).values({ id: crypto.randomUUID(), accountId: ids.savings, date: "2026-03-15", statementBalance: 0, createdAt: at }).run();
-    const result = undoImportBatch(db, batch.outId, saved);
-    expect(result.blocked.map((item) => item.reason)).toEqual(["reconciled"]);
-    expect(rowsOf(db, -50_000)).toHaveLength(1);
-    expect(rowsOf(db, -50_000)[0]?.transferPeerId).not.toBeNull();
   });
 });
 

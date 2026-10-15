@@ -5,7 +5,7 @@ import { registerMcp } from "./mcp/register";
 import { accountRoutes } from "./routes/accounts";
 import { bucketRoutes } from "./routes/buckets";
 import { categoryRoutes } from "./routes/categories";
-import { checkpointRoutes } from "./routes/checkpoints";
+import { bankBalanceRoutes } from "./routes/bank-balances";
 import { documentRoutes } from "./routes/documents";
 import { forecastRoutes } from "./routes/forecast";
 import { fundingRoutes } from "./routes/funding";
@@ -52,7 +52,7 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
     .route("/", accountRoutes(db))
     .route("/", mortgageRoutes(db))
     .route("/", insightsRoutes(db))
-    .route("/", checkpointRoutes(db))
+    .route("/", bankBalanceRoutes(db))
     .route("/", bucketRoutes(db))
     .route("/", fundingRoutes(db))
     .route("/", forecastRoutes(db))

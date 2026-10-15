@@ -19,7 +19,7 @@ import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
 import { mortgageSuggestion } from "./mortgage-learned";
 import { listTransferPairs } from "./suggestions";
-import { hasOpenLine, isReconciled, lineCount } from "./transaction-sql";
+import { hasOpenLine, lineCount } from "./transaction-sql";
 
 type Base = ReturnType<typeof loadBases>[number];
 
@@ -62,7 +62,6 @@ function loadBases(db: Db, ids: readonly string[]) {
         autoConfidence: transactions.autoConfidence,
         openLine: sql<boolean>`${hasOpenLine(transactions.id)}`.mapWith(Boolean),
         lineCount: lineCount(transactions.id),
-        reconciled: isReconciled(transactions),
       })
       .from(transactions)
       .where(inArray(transactions.id, group))
@@ -76,7 +75,7 @@ function rowLevel(row: Base, automatic: boolean, suggestion: Suggestion | null) 
   if (level !== "likely") {
     return level;
   }
-  const canApply = row.lineCount === 1 && !(suggestion?.transferAccountId && row.reconciled);
+  const canApply = row.lineCount === 1;
   return canApply ? "likely" : "maybe";
 }
 
@@ -151,7 +150,7 @@ export function listNeedsReview(
       if (cached.categoryId || cached.transferAccountId || cached.keep) {
         suggestion = cached;
       }
-      const mortgage = row.lineCount === 1 && !row.reconciled ? mortgageSuggestion(db, mortgageLearnedFor(book, row.payee), row) : null;
+      const mortgage = row.lineCount === 1 ? mortgageSuggestion(db, mortgageLearnedFor(book, row.payee), row) : null;
       if (mortgage && (suggestion === null || mortgage.confidence > suggestion.confidence)) {
         suggestion = mortgage;
       }

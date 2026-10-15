@@ -6,7 +6,7 @@ import { errorCode } from "@/api/client";
 import { AccountImports } from "@/accounts/account-imports";
 import { MortgagePanel } from "@/accounts/mortgage-panel";
 import { AccountTransactions } from "@/accounts/account-transactions";
-import { CheckpointHistory } from "@/accounts/checkpoint-history";
+import { BankBalanceHistory } from "@/accounts/bank-balance-history";
 import { accountDetail, kindLabel } from "@/accounts/format";
 import { accountLabel } from "@/accounts/label";
 import { useEditors } from "@/editors/editor-api";
@@ -18,8 +18,7 @@ import { Button } from "@/components/ui/button";
 const accountRoute = getRouteApi("/accounts_/$accountId");
 
 /**
- * The page of one account. `reconcile` in the URL opens the reconcile editor: the editor host reads it.
- * When the API says that it has no such account, the page shows the way back to the list.
+ * The page of one account. When the API says that it has no such account, the page shows the way back to the list.
  */
 export function AccountScreen() {
   return (
@@ -61,9 +60,6 @@ function AccountPage() {
             <Button type="button" variant="outline" onClick={() => void openEditor("account", { id: accountId })}>
               Edit
             </Button>
-            <Button type="button" onClick={() => void openEditor("reconcile", { accountId })}>
-              Reconcile
-            </Button>
           </>
         }
       />
@@ -79,7 +75,7 @@ function AccountPage() {
       <div className="grid items-start gap-5">
         {row.kind === "mortgage" ? <MortgagePanel accountId={row.id} /> : null}
         <AccountTransactions />
-        <CheckpointHistory accountId={row.id} />
+        <BankBalanceHistory accountId={row.id} />
         <AccountImports accountId={row.id} />
       </div>
     </>

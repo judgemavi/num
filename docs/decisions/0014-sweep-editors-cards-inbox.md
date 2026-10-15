@@ -4,6 +4,7 @@ Writing standard: ASD-STE100.
 
 Status: accepted
 Date: 2026-10-08
+Changed by decision 0057 (2026-10-14): a card has no statements and no due dates. The app learns the payment day from the payments.
 
 ## Context
 

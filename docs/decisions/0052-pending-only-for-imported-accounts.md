@@ -1,6 +1,7 @@
 # 0052 — Pending only in accounts that get imports
 
 Status: approved (owner, 2026-10-14)
+Changed by decision 0057 (2026-10-14): the reconcile help (`uncleared`) is removed. The rule for "Pending" stays.
 
 ## Context
 

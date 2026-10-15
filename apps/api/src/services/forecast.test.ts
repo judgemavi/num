@@ -7,7 +7,6 @@ import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createBucket } from "./buckets";
 import { createCategory } from "./categories";
-import { createCheckpoint } from "./checkpoints";
 import { readForecast } from "./forecast";
 import { linkOccurrence } from "./recurring-links";
 import { createPlan } from "./recurring-plans";
@@ -73,20 +72,17 @@ function payCard(db: Db, fromId: string, cardId: string, date: string, amount: n
   });
 }
 
-test("a card purchase moves cash on the due date only", () => {
+test("a card purchase moves cash on the payment day only", () => {
   const book = tempDatabase();
   try {
     const cash = cashAccount(book.db, "Cash", 500_000);
     const card = cardAccount(book.db, "full");
     const groceries = expense(book.db, "Groceries");
     spend(book.db, card.id, groceries.id, "2026-08-01", -10_000);
-    createCheckpoint(book.db, card.id, { date: "2026-08-01", statementBalance: -10_000, ...saved });
     payCard(book.db, cash.id, card.id, "2026-08-22", 10_000);
     spend(book.db, card.id, groceries.id, "2026-09-01", -10_000);
-    createCheckpoint(book.db, card.id, { date: "2026-09-01", statementBalance: -10_000, ...saved });
     payCard(book.db, cash.id, card.id, "2026-09-22", 10_000);
     spend(book.db, card.id, groceries.id, "2026-10-01", -20_000);
-    createCheckpoint(book.db, card.id, { date: "2026-10-01", statementBalance: -20_000, ...saved });
 
     const forecast = readForecast(book.db, "2026-10-08");
     const cashRow = forecast.accounts.find((row) => row.accountId === cash.id);

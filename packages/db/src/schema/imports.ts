@@ -86,17 +86,17 @@ export const valuations = sqliteTable(
   (table) => [uniqueIndex("valuations_account_date").on(table.accountId, table.date)],
 );
 
-export const checkpoints = sqliteTable(
-  "checkpoints",
+export const bankBalances = sqliteTable(
+  "bank_balances",
   {
     id: text("id").primaryKey(),
     accountId: text("account_id")
       .notNull()
       .references(() => accounts.id),
     date: text("date").notNull(),
-    statementBalance: integer("statement_balance").notNull(),
+    balance: integer("balance").notNull(),
+    importBatchId: text("import_batch_id").references(() => importBatches.id),
     createdAt: text("created_at").notNull(),
-    unlockedAt: text("unlocked_at"),
   },
-  (table) => [index("checkpoints_account_date").on(table.accountId, table.date)],
+  (table) => [uniqueIndex("bank_balances_account_date").on(table.accountId, table.date)],
 );

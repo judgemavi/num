@@ -3,8 +3,8 @@ import { utcNow, type ImportUndo, type UndoBlockReason } from "@num/shared";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { removeImportBankBalance } from "./bank-balances";
 import { presentBatch } from "./import-read";
-import { transactionReconciled } from "./reconciled";
 import { hasActiveFundingRun, removeTransaction } from "./transaction-erase";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource } from "./write";
@@ -12,15 +12,6 @@ import { write, type AuditSource } from "./write";
 function blockReason(db: Db, txn: TransactionRow | undefined): UndoBlockReason | "removed" | null {
   if (!txn) {
     return "removed";
-  }
-  if (transactionReconciled(db, txn.accountId, txn.date)) {
-    return "reconciled";
-  }
-  if (txn.transferPeerId) {
-    const peer = db.select().from(transactions).where(eq(transactions.id, txn.transferPeerId)).get();
-    if (peer && transactionReconciled(db, peer.accountId, peer.date)) {
-      return "reconciled";
-    }
   }
   if (txn.editedAt !== null || hasActiveFundingRun(db, txn.id)) {
     return "edited";
@@ -116,6 +107,7 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
     const undoneAt = stillActive.length === 0 ? at : null;
     if (undoneAt) {
       tx.update(importBatches).set({ undoneAt }).where(eq(importBatches.id, id)).run();
+      removeImportBankBalance(tx, id);
     }
     const next = tx.select().from(importBatches).where(eq(importBatches.id, id)).get();
     if (!next) {

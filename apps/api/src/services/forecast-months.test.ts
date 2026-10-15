@@ -8,7 +8,6 @@ import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createBucket } from "./buckets";
 import { createCategory } from "./categories";
-import { createCheckpoint } from "./checkpoints";
 import { readForecast } from "./forecast";
 import { linkOccurrence } from "./recurring-links";
 import { createPlan } from "./recurring-plans";
@@ -105,13 +104,10 @@ test("forecast months: unlinked income, bills and variable spending; card paymen
     record(book.db, cash.id, "2026-06-10", -5_000, { categoryId: dining.id });
 
     record(book.db, card.id, "2026-08-01", -10_000, {});
-    createCheckpoint(book.db, card.id, { date: "2026-08-01", statementBalance: -10_000, ...saved });
     record(book.db, cash.id, "2026-08-22", -10_000, { transferAccountId: card.id });
     record(book.db, card.id, "2026-09-01", -10_000, {});
-    createCheckpoint(book.db, card.id, { date: "2026-09-01", statementBalance: -10_000, ...saved });
     record(book.db, cash.id, "2026-09-22", -10_000, { transferAccountId: card.id });
     record(book.db, card.id, "2026-10-01", -20_000, {});
-    createCheckpoint(book.db, card.id, { date: "2026-10-01", statementBalance: -20_000, ...saved });
 
     const forecast = readForecast(book.db, "2026-10-01");
     const cashRow = forecast.accounts.find((row) => row.accountId === cash.id);

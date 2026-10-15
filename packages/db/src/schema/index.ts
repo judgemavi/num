@@ -4,7 +4,7 @@ export { bucketCategories, bucketEvents, buckets, fundingRuns } from "./buckets"
 export type { BucketEventRow, BucketRow, FundingRunRow } from "./buckets";
 export { categories, categoryGroups, merchants, tags } from "./categories";
 export type { CategoryGroupRow, CategoryRow, MerchantRow, TagRow } from "./categories";
-export { checkpoints, documents, importBatches, importRows, valuations } from "./imports";
+export { bankBalances, documents, importBatches, importRows, valuations } from "./imports";
 export type { DocumentRow, ImportBatchRow } from "./imports";
 export { lineTags, transactionLines, transactions } from "./ledger";
 export type { TransactionRow } from "./ledger";

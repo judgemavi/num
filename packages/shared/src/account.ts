@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { columnMapSchema } from "./statement";
-import { archivedQuery, listQuerySchema, pagedResponseSchema } from "./list";
+import { archivedQuery, listQuerySchema, pagedResponseSchema, queryNumber } from "./list";
 import { interestRateMilliPctSchema } from "./rate";
 import { isUtcTimestamp } from "./time";
 import { amountSchema, nonNegativeAmountSchema } from "./money";
@@ -178,9 +178,14 @@ export const accountListQuerySchema = listQuerySchema(["name", "kind"]).extend({
   ...archivedQuery,
 });
 
+export const accountActivityQuerySchema = z.object({
+  page: queryNumber().min(1).default(1),
+});
+
 export const accountListSchema = pagedResponseSchema(accountSchema);
 
 export type Account = z.infer<typeof accountSchema>;
 export type AccountCreate = z.infer<typeof accountCreateSchema>;
 export type AccountUpdate = z.infer<typeof accountUpdateSchema>;
+export type AccountActivityQuery = z.output<typeof accountActivityQuerySchema>;
 export type AccountListQuery = z.output<typeof accountListQuerySchema>;

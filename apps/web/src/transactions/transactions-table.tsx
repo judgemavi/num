@@ -1,5 +1,4 @@
 import { accountClass, type TransactionListItem, type TransactionListQuery, type TransactionReviewListQuery } from "@num/shared";
-import { Lock } from "lucide-react";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -149,16 +148,7 @@ export function TransactionsTable(props: Props) {
         </TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-2">
-            {row.reconciled ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span role="img" aria-label="Checked against your balance" tabIndex={0}>
-                    <Lock className="size-3.5 text-muted-foreground" aria-hidden />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>Checked against your balance</TooltipContent>
-              </Tooltip>
-            ) : row.status === "open" ? (
+            {row.status === "open" ? (
               <span className="text-sm text-muted-foreground">Pending</span>
             ) : null}
             <Amount value={row.amount} />

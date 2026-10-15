@@ -1,13 +1,12 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { accounts, auditLog, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
+import { accounts, auditLog, migrateDatabase, openDatabase, settings } from "@num/db";
 import { columnMapSchema, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { getAccount, createAccount } from "./accounts";
-import { compareCheckpoint } from "./checkpoints";
 import { importStatement } from "./imports";
 
 const at = "2026-10-07T16:00:00Z";
@@ -62,7 +61,7 @@ function importCsv(db: Db, dir: string, accountId: string, filename: string, lin
   return result;
 }
 
-test("an import of older rows moves the effective opening date and checkpoint help includes them", () => {
+test("an import of older rows moves the effective opening date", () => {
   const book = tempBook();
   try {
     const account = createAccount(book.db, {
@@ -87,16 +86,6 @@ test("an import of older rows moves the effective opening date and checkpoint he
       automaticOpeningDate: "2026-01-14",
     });
 
-    const row = book.db.select().from(transactions).where(eq(transactions.accountId, account.id)).get();
-    if (!row) {
-      throw new Error("Import did not create a transaction");
-    }
-    book.db.update(transactions).set({ status: "open" }).where(eq(transactions.id, row.id)).run();
-    const help = compareCheckpoint(book.db, account.id, { date: "2026-01-15", statementBalance: 0 });
-    expect(help.help).toContainEqual({
-      code: "uncleared",
-      transaction: { id: row.id, date: "2026-01-15", payee: "Shop", amount: -12500 },
-    });
 
     importCsv(book.db, book.dir, account.id, "december.csv", ["12/01/2025,Older shop,-4.00"]);
     expect(getAccount(book.db, account.id).openingDate).toBe("2025-11-30");

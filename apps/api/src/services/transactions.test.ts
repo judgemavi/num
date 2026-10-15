@@ -1,10 +1,9 @@
 import type { Transaction } from "@num/shared";
 import { expect, test } from "bun:test";
-import { createCheckpoint } from "./checkpoints";
 import { createCategory } from "./categories";
 import { createTag } from "./tags";
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
-import { tempDatabase, saved, expectCode, account, entry, countWrites, requirePeer, getsImports } from "./transaction-test-book";
+import { tempDatabase, saved, expectCode, account, entry, countWrites, requirePeer } from "./transaction-test-book";
 
 test("lines must sum to the transaction amount", () => {
   const book = tempDatabase();
@@ -228,49 +227,3 @@ test("a transaction with more than one line must be a loan payment (decision 005
   }
 });
 
-test("a reconciled transaction accepts a category change and rejects an amount change", () => {
-  const book = tempDatabase();
-  try {
-    const chequing = account(book.db, "Chequing", "chequing");
-    const savings = account(book.db, "Savings", "savings");
-    const food = createCategory(book.db, { name: "Food", kind: "expense", ...saved });
-    getsImports(book.db, chequing.id);
-    const created = createTransaction(book.db, entry(chequing.id, -150, [{ amount: -150 }]));
-    createCheckpoint(book.db, chequing.id, { date: created.date, statementBalance: -150, ...saved });
-    expect(getTransaction(book.db, created.id)?.reconciled).toBe(true);
-    expect(getTransaction(book.db, created.id)?.status).toBe("open");
-    expectCode(
-      () => updateTransaction(book.db, created.id, entry(chequing.id, -160, [{ amount: -160 }])),
-      "transaction_reconciled",
-    );
-    const changed = updateTransaction(book.db, created.id, entry(chequing.id, -150, [{ amount: -150, categoryId: food.id }]));
-    expect(changed.reconciled).toBe(true);
-    expect(changed.status).toBe("open");
-    expect(changed.amount).toBe(-150);
-    expect(changed.lines[0]?.categoryId).toBe(food.id);
-    expectCode(() => deleteTransaction(book.db, created.id, saved), "transaction_reconciled");
-    expect(getTransaction(book.db, created.id)?.reconciled).toBe(true);
-
-    const transfer = createTransaction(
-      book.db,
-      entry(chequing.id, -300, [{ amount: -300, transferAccountId: savings.id }]),
-    );
-    const mirror = requirePeer(book.db, transfer);
-    createCheckpoint(book.db, savings.id, { date: mirror.date, statementBalance: 300, ...saved });
-    expectCode(
-      () =>
-        updateTransaction(
-          book.db,
-          transfer.id,
-          entry(chequing.id, -310, [{ amount: -310, transferAccountId: savings.id }]),
-        ),
-      "transaction_reconciled",
-    );
-    expectCode(() => deleteTransaction(book.db, transfer.id, saved), "transaction_reconciled");
-    expect(getTransaction(book.db, transfer.id)?.amount).toBe(-300);
-    expect(getTransaction(book.db, mirror.id)?.amount).toBe(300);
-    expect(getTransaction(book.db, mirror.id)?.reconciled).toBe(true);
-  } finally {
-    book.close();
-  }
-});

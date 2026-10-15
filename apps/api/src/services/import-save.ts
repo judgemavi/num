@@ -4,6 +4,7 @@ import { normalizePayee, storedPayee, type ColumnMap, type ImportBatch, type Mat
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountAuditSnapshot } from "./account-snapshot";
+import { saveImportBankBalance } from "./bank-balances";
 import { storedFile, writeStoredFile } from "./documents";
 import { countOutcomes, presentBatch } from "./import-read";
 import type { PlannedImportRow } from "./import-plan";
@@ -279,6 +280,15 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
           undoneAt: null,
         })
         .run();
+      if (input.closingDate !== null && input.closingBalance !== null) {
+        saveImportBankBalance(tx, {
+          accountId: input.accountId,
+          batchId,
+          date: input.closingDate,
+          balance: input.closingBalance,
+          at: input.at,
+        });
+      }
       const created = input.rows.filter((row) => row.outcome === "created");
       const book = loadMatchBook(tx);
       const pending = created.map((row) => ({

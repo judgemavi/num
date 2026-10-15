@@ -55,8 +55,6 @@ export function transactionError(code: ErrorCode | undefined): string {
       return "Change this amount on the other side of the transfer.";
     case "mirror_one_line":
       return "This side of the transfer has one line.";
-    case "transaction_reconciled":
-      return "Unlock the checkpoint before you change this transaction.";
     case "paycheck_funded":
       return "Undo the funding first.";
     case "payee_raw_locked":

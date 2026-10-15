@@ -7,7 +7,6 @@ import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
-import { createCheckpoint } from "./checkpoints";
 import { readHygiene } from "./hygiene";
 import { linkOccurrence } from "./recurring-links";
 import { createPlan } from "./recurring-plans";
@@ -83,36 +82,6 @@ test("a changed amount does not fail the recurring check (decision 0047)", () =>
   withBook((db) => {
     changedPlan(db);
     expect(check(db, "2026-01-20", "recurring")).toMatchObject({ pass: true, missed: 0 });
-  });
-});
-
-test("an older unpaid statement fails after a newer statement exists", () => {
-  withBook((db) => {
-    const card = account(db, "credit_card", "Card", -40_000);
-    const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-    createCheckpoint(db, card.id, { date: "2026-01-15", statementBalance: -40_000, ...saved });
-    createTransaction(db, {
-      accountId: card.id,
-      date: "2026-02-10",
-      amount: -10_000,
-      payeeRaw: "Shop",
-      lines: [{ amount: -10_000, categoryId: food.id }],
-      ...saved,
-    });
-    createCheckpoint(db, card.id, { date: "2026-02-15", statementBalance: -50_000, ...saved });
-    const row = check(db, "2026-02-20", "cards_paid");
-    expect(row.pass).toBe(false);
-    expect(row.items[0]).toMatchObject({ statementDate: "2026-01-15", dueDate: "2026-02-05", owed: 40_000, paid: 0, pass: false });
-  });
-});
-
-test("a statement dated after asOf is ignored", () => {
-  withBook((db) => {
-    const card = account(db, "credit_card", "Card", -10_000);
-    createCheckpoint(db, card.id, { date: "2026-03-01", statementBalance: -10_000, ...saved });
-    const row = check(db, "2026-02-10", "cards_paid");
-    expect(row.pass).toBe(true);
-    expect(row.items[0]).toMatchObject({ statementDate: null, dueDate: null, owed: 0, paid: 0, pass: true });
   });
 });
 

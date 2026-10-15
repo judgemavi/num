@@ -1,5 +1,6 @@
 import { notifyManager, useQueryClient, useSuspenseQueries } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
+import { bankStatusesQuery } from "@/api/bank-balances";
 import { overspentQuery } from "@/api/buckets";
 import { fundingPaychecksQuery } from "@/api/funding";
 import { hygieneQuery } from "@/api/insights";
@@ -8,7 +9,7 @@ import { reviewSummaryQuery } from "@/api/review";
 import { localAsOf } from "@/as-of";
 import { Boundary } from "@/components/boundary";
 import { PageHeader } from "@/components/page-header";
-import { ForecastStrip, MissedPaymentsCard, MonthPlanCards, NetWorthCard, OverspentCard, PaychecksCard, ReviewCard, SpendingChangesCard } from "@/home/home-cards";
+import { BankMismatchCard, ForecastStrip, MissedPaymentsCard, MonthPlanCards, NetWorthCard, OverspentCard, PaychecksCard, ReviewCard, SpendingChangesCard } from "@/home/home-cards";
 import { HygienePanel } from "@/insights/hygiene-panel";
 
 /**
@@ -30,6 +31,9 @@ export function HomeScreen() {
       </Boundary>
       <Boundary loading="Loading the hygiene checks." failed="The hygiene checks did not load.">
         <HygienePanel />
+      </Boundary>
+      <Boundary loading={null} failed="The bank balances did not load.">
+        <BankMismatchCard />
       </Boundary>
       <Boundary loading="Loading the plan of the month." failed="The plan of the month did not load.">
         <MonthPlanCards />
@@ -55,7 +59,7 @@ export function HomeScreen() {
 
 /** The reads of the kicker. The cards do the same reads. */
 function kickerReads(asOf: string) {
-  return [hygieneQuery(asOf), reviewSummaryQuery(asOf), fundingPaychecksQuery(), recurringSignalsQuery(asOf), overspentQuery()] as const;
+  return [hygieneQuery(asOf), reviewSummaryQuery(asOf), fundingPaychecksQuery(), recurringSignalsQuery(asOf), overspentQuery(), bankStatusesQuery()] as const;
 }
 
 /**
@@ -79,10 +83,10 @@ function HomeKickerPlace() {
 
 /** "All clear" when no card needs the person. It reads the same data as the cards, from the cache. */
 function HomeKicker() {
-  const [{ data: hygiene }, { data: review }, { data: paychecks }, { data: signals }, { data: overspent }] = useSuspenseQueries({
+  const [{ data: hygiene }, { data: review }, { data: paychecks }, { data: signals }, { data: overspent }, { data: bank }] = useSuspenseQueries({
     queries: kickerReads(localAsOf()),
   });
   const clear =
-    review.total === 0 && hygiene.checks.every((item) => item.pass) && paychecks.every((item) => item.kept) && signals.missed.length === 0 && overspent.length === 0;
+    review.total === 0 && hygiene.checks.every((item) => item.pass) && paychecks.every((item) => item.kept) && signals.missed.length === 0 && overspent.length === 0 && bank.items.every((item) => item.difference === 0);
   return clear ? "All clear" : "This week";
 }

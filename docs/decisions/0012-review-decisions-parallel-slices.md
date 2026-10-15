@@ -4,6 +4,7 @@ Writing standard: ASD-STE100.
 
 Status: accepted
 Date: 2026-10-08
+Changed by decision 0057 (2026-10-14): there is no lock. A reconciled state, an unlock and locked money fields do not exist.
 
 ## Context
 

@@ -20,13 +20,13 @@ All features must support one of these three loops:
 |---|---|---|---|
 | Weekly review | One time each week | 10 min | Statements are imported. Nothing needs review. Home is all clear. |
 | Paycheck funding | At each paycheck | 2 min | The paycheck is assigned to buckets with one click. |
-| Monthly reconcile | At the start of each month | 15 min | Balances agree with statements. Insights shows the changes of the month. |
+| Monthly check | At the start of each month | 15 min | Each account matches its bank (§5.13). Insights shows the changes of the month. |
 
 If a screen or feature does not support one of these loops, do not add it.
 
 ## 2. Principles
 
-1. **Correct money.** Use integer milliunits for all amounts (§4). Account balances must agree with bank statements.
+1. **Correct money.** Use integer milliunits for all amounts (§4). Each account balance must agree with the balance of its bank (§5.13).
 2. **Deterministic.** Use schedules, history, text similarity and arithmetic (confidence scores, §7.3). Do not use ML. The app does not call an LLM.
 3. **Money never changes by itself.** The app does not create, change or delete money (amounts, dates, accounts,
    transfers, loan payments) without a user action. Labels (category and merchant) can be automatic when the app is sure
@@ -126,7 +126,7 @@ Rules:
   The default is true for `chequing`, `savings`, `cash` and `credit_card`. The default is false for all other kinds.
   The user can change it. The UI label is "Use this account's money in my budget", under "More details".
 - Card fields (only for `credit_card`): `paymentPolicy` (`full | fixed | manual`, UI label "How you pay"), `fixedPayment?`.
-  There is no statement day, due day or credit limit: statement dates move, and the app derives them (§5.13).
+  There is no statement day, due day or credit limit. The app learns the payment day from the payments (§8, decision 0057).
 - Import fields: `importPreset?` (a preset ID) and `columnMap?` (JSON, §7.2). The app saves them after the first import.
 - `interestRateMilliPct?` is for savings and loans (not for credit cards). It is for information and for payoff calculations.
 - Balance of a transaction account = `openingBalance` + the sum of the transaction amounts in the account.
@@ -139,8 +139,8 @@ before the first transaction of the account (or the creation date when there is 
 The app helps the user set it, always with one click and never without the user:
 - After the first import of a file with a running balance: "Set the opening balance from this statement".
   Value = the first row's balance − the first row's amount, dated the day before the first row.
-- In reconcile (§7.5), when the account has no checkpoint and the balances are different:
-  "Set the opening balance so this statement balances" (opening balance + the difference).
+- On the account, when the bank balance and the calculated balance are different (§5.13) and the account has no earlier
+  bank balance that is equal: "Start this account from the bank's balance" (opening balance + the difference).
 - The app does not offer these two suggestions for a mortgage with terms. Its opening date is fixed (§5.2, decision 0027).
 - A suggestion changes only `openingDate` and `openingBalance` (a `PATCH` of the account). On a mortgage with terms,
   a change of these two fields must include the terms (decision 0040).
@@ -187,8 +187,7 @@ Transaction fields:
 - `payeeRaw`: the description. On an imported transaction it is the bank text. Do not change it after import.
   The user can change it on a manual or MCP transaction. The UI calls it "Description".
 - `payeeNormalized`: `normalizePayee(payeeRaw)`, stored and indexed. The app sets it on each write.
-- `status`: `open | cleared` (stored). A transaction is **reconciled** when its date is on or before the latest active
-  checkpoint of its account. The app calculates this; it is not stored.
+- `status`: `open | cleared` (stored). A transaction is never locked (decision 0057).
 - `source`: `import | manual | mcp`
 - `importRowId?`, `transferPeerId?`
 
@@ -226,7 +225,7 @@ Rules:
     (decision 0052).
   - If the source transaction has more than one line, the user cannot change the mirror amount.
     The user changes the amount on the source transaction.
-- Only the app sets `status`. The user and the API do not set it. Reconciled is calculated (§5.13).
+- Only the app sets `status`. The user and the API do not set it. 
 - An account **gets imports** when it has `importPreset` or `columnMap` (decision 0052). A new manual or MCP transaction
   is `open` when its account gets imports, else `cleared`. When an account gets its first import, the status of its
   existing transactions does not change.
@@ -236,9 +235,8 @@ Rules:
 - A mortgage payment is a loan payment: one chequing transaction with two lines:
   - A transfer line for the principal. The target is the mortgage account.
   - An expense line for the interest. The category is the interest category.
-- A `reconciled` transaction locks its money fields: date, account, amount, line amounts, transfer targets, and delete.
-  To change them, the user must first unlock its checkpoint (§7.5).
-  Merchant, line categories, memos and tags stay editable (audited). They do not change balances.
+- A transaction can change at any time. The audit log records each change. A change that breaks an earlier match with
+  the bank shows as a difference on the account (§5.13).
 
 ### 5.5 Tag
 
@@ -331,7 +329,7 @@ Fields: `accountId`, `date`, `balance`, `note?`, `documentId?`.
 
 Use valuations for:
 - `investment` and `property` accounts.
-- Lender checkpoints for `mortgage` and `loan` accounts.
+- Lender balances for `mortgage` and `loan` accounts.
 
 An account has a maximum of one active valuation on each date.
 
@@ -368,19 +366,22 @@ The user can remove the file of a document (decision 0041). The app deletes the 
 its transactions stay. The download of a removed file answers 404, and the UI shows "File removed".
 There is no upload without an import: a file comes in through an import (§7.2).
 
-### 5.13 Checkpoint
+### 5.13 Bank balance
 
-Checkpoint fields: `accountId`, `date`, `statementBalance`, `createdAt`, `unlockedAt?`.
-- The app creates a checkpoint only if the calculated balance on `date` is equal to `statementBalance`.
-- After a checkpoint, the transactions of the account on or before `date` are reconciled (calculated, §5.4).
-
-**Card statements are derived (no fixed days):**
-- A checkpoint of a `credit_card` account is a statement: its date and balance.
-- Due date of a statement = statement date + the median number of days between earlier statements and the next card
-  payment (a transfer into the card account). It needs 2 or more examples; otherwise use 21 days.
-- Future statement dates are estimated as one month after the last statement. The forecast and the hygiene checks use
-  the statements and the due dates. The API does not have a separate list of statements, and the UI does not show one
-  (decision 0039).
+Bank balance fields: `accountId`, `date`, `balance`, `importBatchId?`, `createdAt`. An account has a maximum of one bank
+balance on each date. The UI calls it "Bank balance" (decision 0057).
+- A bank balance is a fact from the bank. The app saves it also when the calculated balance on `date` is not equal.
+- An import with a closing balance saves a bank balance for its closing date with its `importBatchId` (§7.2). For an
+  account whose files have no balance, the user adds one on the account page: the date and the balance. The user can
+  change and delete a bank balance. The audit log records each change.
+- **Status.** The app compares the calculated balance on the date of the latest bank balance with that balance. It
+  calculates the status for each request; it does not store it. The status is "Matches your bank on <date>", or
+  "Your bank says <x>. Num says <y>. <difference> different."
+- **Actions when not equal.** "Compare transactions" opens Transactions for the account up to the date of the bank
+  balance. "Start this account from the bank's balance" sets the opening balance (§5.1). The app does not show it for a
+  mortgage with terms (decision 0040), or when an earlier bank balance is equal.
+- The app does not show possible causes of a difference.
+- A card has no statements and no due dates. A bank balance of a `credit_card` account is the same as on other accounts.
 
 ### 5.14 (Removed)
 
@@ -482,11 +483,12 @@ The user can create, edit and archive accounts.
    - More than one candidate: the row needs review in its import detail.
 5. If there is no match, the outcome is `created`. The app creates a transaction with one line.
    §7.3 gives the merchant and category.
-6. If the file has a running balance, the app stores `closingBalance` and `closingDate`.
-   The app then offers a checkpoint (§7.5).
+6. If the file has a running balance, the app stores `closingBalance` and `closingDate`. It saves a bank balance
+   for `closingDate` with the `importBatchId` (§5.13). It replaces a bank balance that has the same date.
 7. The app shows the batch summary. Example: "42 created · 8 matched · 3 duplicates · 2 need review".
 8. **Undo batch:**
-   - The app removes the transactions that the batch created, if they are not reconciled and not edited after import.
+   - The app removes the transactions that the batch created, if they are not edited after import.
+   - The app removes the bank balance that the batch saved.
    - The app removes the links of matched rows.
    - The app shows the rows that it cannot undo.
    - The app removes the recurring occurrence links of the transactions that it removes (audited).
@@ -651,8 +653,7 @@ It has the same sort orders, and also a sort by confidence (decision 0049). The 
     choices follow the direction; money out and money in together allow only Transfer), the merchant, "Add tags" and
     "Remove tags". The bulk editor does not change the date, the amount, the description, the account or the line
     memos. Save writes all rows in one write (no confirm), with one audit entry for each changed row. A row that cannot
-    take the change is skipped with a reason (loan payment, reconciled for a transfer, another account, the transfer
-    target). The result shows the counts: "10 changed · 2 skipped".
+    take the change is skipped with a reason (loan payment, another account, the transfer target). The result shows the counts: "10 changed · 2 skipped".
 - An approval and a bulk edit are confirmations (they count for learning).
 - Home shows the count and links to Needs review.
 The editor has no group mode (decision 0034). The user answers a group of rows from a selection: Approve, or Edit… in
@@ -697,16 +698,12 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
   - Read only the transactions inside these windows from the database. Do not load all transactions.
 - Plans do not create transactions.
 
-### 7.5 Reconcile
+### 7.5 Bank balance
 
-**Checkpoint.**
-1. The user enters the statement date and balance. Or, the import supplies them.
-2. If the balances are not equal, the app shows the difference.
-   It also shows possible causes: `open` transactions (not on a statement yet) within 7 days of the date, possible
-   duplicates (same amount within 3 days), date ranges of 7 or more days with no transactions.
-3. The user cannot force a checkpoint when the balances are not equal.
-
-**Unlock.** The user can unlock a checkpoint to edit reconciled transactions. The audit log records the unlock.
+1. The import supplies the bank balance (§7.2). For an account whose files have no balance, the user adds one (§5.13).
+2. The Accounts list, the account page and Home show the status (§5.13). Home is all clear only when each account matches
+   its bank.
+3. The user can change or delete a bank balance. A bank balance does not lock a transaction.
 
 ### 7.6 Paycheck funding
 
@@ -759,9 +756,11 @@ The forecast is daily, for 90 days. It shows each on-budget account and the tota
   Do not include lines larger than 3 × the median line of that category.
 
 **Card payments:**
-- `full`: the balance of the latest statement (§5.13). The payment occurs on its due date, from the usual payment account
-  of the card. Spending after that statement goes into the next estimated statement.
-- `fixed`: `fixedPayment`.
+- **Payment day.** The median day of the month of the transfers into the card in the last 12 months before `asOf`. With
+  one payment, the day of that payment. With no payment, the forecast has no payment for the card and shows the warning of `manual`.
+- `full`: the balance of the card on `asOf`, on the next payment day, from the usual payment account of the card. The
+  amount can be larger than the real payment, because it includes spending after the cut-off (decision 0057).
+- `fixed`: `fixedPayment` on the next payment day.
 - `manual`: no payment. The app shows a warning.
 
 **Output:**
@@ -795,7 +794,6 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 | Check | The check passes when |
 |---|---|
 | Emergency fund | Essential goal buckets (or savings accounts, if there are no essential goal buckets) ≥ `emergencyFundMonths` × (monthly bills + monthly essential refills) |
-| Cards paid in full | The last statement balance of each `full` card was paid by its derived due date (§5.13) |
 | Imports are current | Each on-budget account has an import in the last `staleImportDays` days |
 | Review | No transaction has needed review for more than 7 days |
 | Sinking funds | Each yearly `bill` plan has a sinking bucket for its category |
@@ -811,7 +809,6 @@ Undo is available for:
 - Import batch.
 - Funding run.
 - Bucket move.
-- Checkpoint (unlock).
 
 To correct other records, the user edits them. The audit log records each edit.
 
@@ -825,7 +822,7 @@ To correct other records, the user edits them. The audit log records each edit.
   in-process through the same Hono app, so validation, error codes and the audit log are the same as REST. A new route is
   a new tool. MCP has no business logic of its own.
 - File upload routes take the file content in the tool input (for example a CSV made from a PDF statement).
-- Annotations: GET = read-only; DELETE, undo, import, funding, checkpoint, account changes and approve = destructive.
+- Annotations: GET = read-only; DELETE, undo, import, funding, bank balance, account changes and approve = destructive.
   The MCP client asks the user before it runs a write tool.
 - Approve (`post_transactions_approve`) and bulk edit (`post_transactions_bulk`) take the ids of the selected
   transactions, one page at most, as the UI does (decision 0051). One tool serves one row and many rows.
@@ -876,11 +873,11 @@ There are 7 screens (decision 0021).
 
 | Screen | Contents |
 |---|---|
-| Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); hygiene checks (§10); this month: income → bills → bucket funding → left to save, "Fund this paycheck", missed payments, overspent buckets, goal status; spending changes this month; net worth. Each card links to its screen. |
+| Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); each account that does not match its bank (§5.13); hygiene checks (§10); this month: income → bills → bucket funding → left to save, "Fund this paycheck", missed payments, overspent buckets, goal status; spending changes this month; net worth. Each card links to its screen. |
 | Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers, row selection with Approve and the bulk editor (decision 0051) |
 | Buckets | Balances, funding history, moves, goals (feasibility), settings |
 | Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups, categories), merchants, tags, net worth, mortgage. Decision 0030. |
-| Accounts | List with balances, import, checkpoints, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
+| Accounts | List with balances and the bank status of each account (§5.13), import, bank balances, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
 | Recurring | Plans, Upcoming (occurrences of all plans in the next 30 days, decision 0055), links, skips, Detected (new plan suggestions) |
 | Settings | Subpages: Groups, Categories, Tags, Merchants, Currency (decision 0038), AI access, Backup. |
 

@@ -73,8 +73,6 @@ export function inboxError(code: ErrorCode | undefined): string {
       return "That decision is already undone.";
     case "occurrence_taken":
       return "That occurrence already has a decision.";
-    case "transaction_reconciled":
-      return "Unlock the checkpoint before this change.";
     default:
       return "The change did not save. Try again.";
   }

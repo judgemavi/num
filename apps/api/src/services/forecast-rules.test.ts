@@ -6,7 +6,6 @@ import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
-import { createCheckpoint } from "./checkpoints";
 import { readForecast } from "./forecast";
 import { linkOccurrence, skipOccurrence } from "./recurring-links";
 import { createPlan } from "./recurring-plans";
@@ -117,92 +116,56 @@ test("a card has no below-zero risk", () => {
   }
 });
 
-test("one chequing account pays the card when there is no payment history", () => {
+test("a full card with no payment history has no payment and gets the manual warning", () => {
+  const book = tempDatabase();
+  try {
+    const cash = cashAccount(book.db, "Cash", 100_000);
+    const card = cardAccount(book.db, "full");
+    spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -20_000);
+    const forecast = readForecast(book.db, "2026-10-08");
+    expect(forecast.warnings).toEqual([{ code: "manual_card", accountId: card.id }]);
+    expect(forecast.accounts.find((row) => row.accountId === cash.id)?.estimated.at(-1)).toBe(100_000);
+  } finally {
+    book.close();
+  }
+});
+
+test("a full card pays its balance on asOf on the median payment day, from the usual payment account", () => {
   const book = tempDatabase();
   try {
     const cash = cashAccount(book.db, "Cash", 100_000);
     const other = cashAccount(book.db, "Other", 100_000);
     const card = cardAccount(book.db, "full");
-    spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -20_000);
-    createCheckpoint(book.db, card.id, { date: "2026-10-01", statementBalance: -20_000, ...saved });
-    const two = readForecast(book.db, "2026-10-08");
-    const due = two.dates.indexOf("2026-10-22");
-    expect(two.warnings).toContainEqual({ code: "no_payment_account", accountId: card.id });
-    expect(two.accounts.find((row) => row.accountId === cash.id)?.known[due]).toBe(100_000);
-    expect(two.accounts.find((row) => row.accountId === other.id)?.known[due]).toBe(100_000);
-  } finally {
-    book.close();
-  }
-  const alone = tempDatabase();
-  try {
-    const cash = cashAccount(alone.db, "Cash", 100_000);
-    const card = cardAccount(alone.db, "full");
-    spend(alone.db, card.id, expense(alone.db, "Shop").id, "2026-10-01", -20_000);
-    createCheckpoint(alone.db, card.id, { date: "2026-10-01", statementBalance: -20_000, ...saved });
-    const one = readForecast(alone.db, "2026-10-08");
-    const due = one.dates.indexOf("2026-10-22");
-    const before = one.dates.indexOf("2026-10-21");
-    const cashRow = one.accounts.find((row) => row.accountId === cash.id);
-    expect(one.warnings).toEqual([]);
-    expect(cashRow?.known[before]).toBe(100_000);
-    expect(cashRow?.known[due]).toBe(80_000);
-    expect(one.total.known[before]).toBe(one.total.known[due]);
-  } finally {
-    alone.close();
-  }
-});
-
-test("a stale statement still schedules the next payment from the balance at asOf", () => {
-  const book = tempDatabase();
-  try {
-    const cash = cashAccount(book.db, "Cash", 100_000);
-    const card = cardAccount(book.db, "full");
-    spend(book.db, card.id, expense(book.db, "Shop").id, "2026-07-01", -30_000);
-    createCheckpoint(book.db, card.id, { date: "2026-07-01", statementBalance: -30_000, ...saved });
+    spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -30_000);
+    payCard(book.db, cash.id, card.id, "2026-08-21", 5_000);
+    payCard(book.db, cash.id, card.id, "2026-09-23", 5_000);
     const forecast = readForecast(book.db, "2026-10-08");
     const due = forecast.dates.indexOf("2026-10-22");
     const before = forecast.dates.indexOf("2026-10-21");
     const cashRow = forecast.accounts.find((row) => row.accountId === cash.id);
     const cardRow = forecast.accounts.find((row) => row.accountId === card.id);
-    expect(cashRow?.estimated[before]).toBe(100_000);
-    expect(cashRow?.estimated[due]).toBe(70_000);
+    expect(forecast.warnings).toEqual([]);
+    expect(cashRow?.known[before]).toBe(90_000);
+    expect(cashRow?.known[due]).toBe(70_000);
     expect(cardRow?.estimated[due]).toBe(0);
-    expect(forecast.total.estimated[before]).toBe(forecast.total.estimated[due]);
+    expect(forecast.accounts.find((row) => row.accountId === other.id)?.known[due]).toBe(100_000);
+    expect(forecast.total.known[before]).toBe(forecast.total.known[due]);
   } finally {
     book.close();
   }
 });
 
-test("a partial payment reduces the next card payment", () => {
-  const book = tempDatabase();
-  try {
-    const cash = cashAccount(book.db, "Cash", 200_000);
-    const card = cardAccount(book.db, "full");
-    spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -20_000);
-    createCheckpoint(book.db, card.id, { date: "2026-10-01", statementBalance: -20_000, ...saved });
-    payCard(book.db, cash.id, card.id, "2026-10-05", 5_000);
-    const forecast = readForecast(book.db, "2026-10-08");
-    const due = forecast.dates.indexOf("2026-10-22");
-    const before = forecast.dates.indexOf("2026-10-21");
-    const cashRow = forecast.accounts.find((row) => row.accountId === cash.id);
-    expect(cashRow?.known[before]).toBe(195_000);
-    expect(cashRow?.known[due]).toBe(180_000);
-  } finally {
-    book.close();
-  }
-});
-
-test("fixed and manual cards follow their payment policy", () => {
+test("a fixed card pays its fixed payment and a manual card has no payment", () => {
   const book = tempDatabase();
   try {
     const cash = cashAccount(book.db, "Cash", 100_000);
     const card = cardAccount(book.db, "fixed", 10_000);
+    payCard(book.db, cash.id, card.id, "2026-09-22", 5_000);
     spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -40_000);
-    createCheckpoint(book.db, card.id, { date: "2026-10-01", statementBalance: -40_000, ...saved });
     const forecast = readForecast(book.db, "2026-10-08");
     const due = forecast.dates.indexOf("2026-10-22");
-    expect(forecast.accounts.find((row) => row.accountId === cash.id)?.known[due]).toBe(90_000);
-    expect(forecast.accounts.find((row) => row.accountId === card.id)?.known[due]).toBe(-30_000);
+    expect(forecast.accounts.find((row) => row.accountId === cash.id)?.known[due]).toBe(85_000);
+    expect(forecast.accounts.find((row) => row.accountId === card.id)?.known[due]).toBe(-25_000);
     expect(forecast.accounts.find((row) => row.accountId === card.id)?.risk).toBeNull();
   } finally {
     book.close();

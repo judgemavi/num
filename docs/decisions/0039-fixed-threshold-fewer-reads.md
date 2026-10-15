@@ -1,6 +1,7 @@
 # 0039 — Fixed matching threshold and fewer read routes
 
 Status: accepted (owner, 2026-10-14)
+Changed by decision 0057 (2026-10-14): checkpoints, the closing read and the card statement calculation are removed. The bank balance list replaces them.
 
 ## Context
 

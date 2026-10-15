@@ -8,7 +8,6 @@ import {
 } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { loadLines, type StoredLine } from "./transaction-lines";
-import { transactionReconciled } from "./reconciled";
 import { requireText } from "./transaction-rules";
 import type { WriteTx, Reader } from "./write";
 
@@ -108,7 +107,6 @@ export function toTransaction(db: Reader, row: TransactionRow, lines: StoredLine
     payeeRaw: row.payeeRaw,
     payeeNormalized: row.payeeNormalized,
     status: row.status,
-    reconciled: transactionReconciled(db, row.accountId, row.date),
     source: row.source,
     importRowId: row.importRowId,
     transferPeerId: row.transferPeerId,

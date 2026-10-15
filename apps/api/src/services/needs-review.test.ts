@@ -13,7 +13,6 @@ import { listNeedsReview } from "./needs-review";
 import { approveSelected } from "./review-approve";
 import { linkOccurrence } from "./recurring-links";
 import { createPlan } from "./recurring-plans";
-import { reconciledTransferRow } from "./transaction-test-book";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at: "2026-04-02T16:00:00Z" };
@@ -191,22 +190,6 @@ test("approve skips a row with a question, a row with no suggestion and a row th
       ],
     });
     expect(db.select().from(auditLog).where(eq(auditLog.at, at)).all()).toHaveLength(0);
-  });
-});
-
-test("a row is Likely only when approve can apply its suggestion", () => {
-  withBook((db) => {
-    const cash = account(db, "Cash");
-    const savings = account(db, "Savings");
-    const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-    pay(db, cash.id, "2026-03-01", -20_000, "Market", food.id);
-    const likely = pay(db, cash.id, "2026-03-02", -20_000, "Market");
-    const locked = reconciledTransferRow(db, cash.id, savings.id);
-    const hits = new Map(listNeedsReview(db, asOf).map((hit) => [hit.id, hit]));
-    expect(hits.get(likely.id)?.review.level).toBe("likely");
-    expect(hits.get(locked.id)?.review.suggestion?.transferAccountId).toBe(savings.id);
-    expect(hits.get(locked.id)?.review.level).toBe("maybe");
-    expect(approve(db, [likely.id, locked.id], "2026-04-02T18:20:00Z")).toEqual({ approved: 1, skipped: [{ id: locked.id, reason: "reconciled" }] });
   });
 });
 

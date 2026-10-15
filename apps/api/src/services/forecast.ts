@@ -1,7 +1,7 @@
-import { accounts, bucketCategories, buckets, categories, checkpoints, occurrenceLinks, recurringPlans, settings, transactionLines, transactions, type RecurringPlanRow } from "@num/db";
+import { accounts, bucketCategories, buckets, categories, occurrenceLinks, recurringPlans, settings, transactionLines, transactions, type RecurringPlanRow } from "@num/db";
 import {
   buildForecast,
-  cardForecastSchedule,
+  cardPaymentDay,
   forecastDates,
   isIsoDate,
   nextIncomeDate,
@@ -218,35 +218,21 @@ export function readForecast(db: Db, asOf: string): Forecast {
     if (account.kind !== "credit_card" || policy === null) {
       continue;
     }
-    if (policy === "manual") {
-      warnings.push({ code: "manual_card", accountId: account.id });
-    }
-    const statements = db
-      .select({ date: checkpoints.date, balance: checkpoints.statementBalance })
-      .from(checkpoints)
-      .where(and(eq(checkpoints.accountId, account.id), isNull(checkpoints.unlockedAt)))
-      .all();
     const payments = db
-      .select({ date: transactions.date, amount: transactions.amount, accountId: peer.accountId })
+      .select({ date: transactions.date, accountId: peer.accountId })
       .from(transactions)
       .innerJoin(peer, eq(peer.id, transactions.transferPeerId))
       .where(and(eq(transactions.accountId, account.id), gt(transactions.amount, literal(0))))
       .all();
-    const fromHistory = usualAccount(payments);
-    const chequing = openAccounts.filter((row) => row.kind === "chequing");
-    const paymentAccountId = fromHistory ?? (chequing.length === 1 ? chequing[0]?.id ?? null : null);
-    if (policy !== "manual" && statements.length > 0 && paymentAccountId === null) {
-      warnings.push({ code: "no_payment_account", accountId: account.id });
-    }
-    const schedule = cardForecastSchedule({
-      statements,
-      payments: payments.map((row) => ({ date: row.date, amount: row.amount })),
+    const paymentDay = cardPaymentDay(
+      payments.map((row) => row.date),
       asOf,
-      horizonEnd,
-      policy,
-      fixedPayment: account.fixedPayment,
-    });
-    cards.push({ accountId: account.id, paymentAccountId, policy, fixedPayment: account.fixedPayment, ...schedule });
+    );
+    if (policy === "manual" || paymentDay === null) {
+      warnings.push({ code: "manual_card", accountId: account.id });
+    }
+    const paymentAccountId = usualAccount(payments);
+    cards.push({ accountId: account.id, paymentAccountId, policy, fixedPayment: account.fixedPayment, paymentDay });
   }
 
   const forecast = buildForecast({

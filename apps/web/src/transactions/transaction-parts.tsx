@@ -26,8 +26,8 @@ import { blankTransaction, quietChange } from "@/transactions/transaction-draft"
 /** Money out or in, the amount, the account and the date of a transaction that the person enters by hand. */
 export const MoneySection = withForm({
   defaultValues: blankTransaction,
-  props: { moneyLocked: false, accountLocked: false },
-  render: function MoneySectionRender({ form, moneyLocked, accountLocked }) {
+  props: { moneyLocked: false },
+  render: function MoneySectionRender({ form, moneyLocked }) {
     return (
       <>
         <form.Field
@@ -83,7 +83,6 @@ export const MoneySection = withForm({
                 <AccountPicker
                   id="txn-account"
                   value={field.state.value || null}
-                  disabled={accountLocked}
                   onChange={(id) => {
                     if (id) {
                       field.handleChange(id);
@@ -93,7 +92,7 @@ export const MoneySection = withForm({
               </Field>
             )}
           </form.Field>
-          <form.AppField name="date">{(field) => <field.DateInputField id="txn-date" label="Date" disabled={accountLocked} required />}</form.AppField>
+          <form.AppField name="date">{(field) => <field.DateInputField id="txn-date" label="Date" required />}</form.AppField>
         </div>
       </>
     );

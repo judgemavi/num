@@ -77,7 +77,7 @@ export const importResultSchema = z.discriminatedUnion("kind", [
 
 export type ImportResult = z.infer<typeof importResultSchema>;
 
-export const undoBlockReasons = ["edited", "reconciled"] as const;
+export const undoBlockReasons = ["edited"] as const;
 
 export const importUndoSchema = z.object({
   batch: importBatchSchema,

@@ -7,7 +7,6 @@ import { and, eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { bulkEdit } from "./bulk-edit";
-import { createCheckpoint } from "./checkpoints";
 import { createCategory } from "./categories";
 import { decisionRows } from "./inbox-decisions";
 import { createMerchant } from "./merchants";
@@ -95,41 +94,36 @@ test("a failure writes nothing, and only the selected rows change", () => {
   });
 });
 
-test("a transfer skips a loan payment, a reconciled row, the transfer target and a row of another account", () => {
+test("a transfer skips a loan payment, the transfer target and a row of another account", () => {
   withBook((db, ids) => {
     const open = pay(db, ids.cash, "2026-03-01", -4000, "Cafe");
     const loan = loanPayment(db, ids.cash, "2026-03-03", "Cafe").payment;
-    const locked = pay(db, ids.cash, "2026-02-01", -500, "Cafe");
-    createCheckpoint(db, ids.cash, { date: "2026-02-01", statementBalance: -500, ...saved });
     const target = pay(db, ids.savings, "2026-03-04", -700, "Cafe");
     const visa = createAccount(db, { name: "Other", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const elsewhere = pay(db, visa.id, "2026-03-05", -900, "Cafe");
     const result = bulkEdit(db, asOf, {
-      transactionIds: [open.id, loan.id, locked.id, target.id, elsewhere.id],
+      transactionIds: [open.id, loan.id, target.id, elsewhere.id],
       what: { kind: "transfer", accountId: ids.cash, transferAccountId: ids.savings },
       ...saved,
     });
     expect(result.changed).toBe(1);
     expect(result.skipped).toEqual([
       { id: loan.id, reason: "loan_payment" },
-      { id: locked.id, reason: "reconciled" },
       { id: target.id, reason: "transfer_target" },
       { id: elsewhere.id, reason: "other_account" },
     ]);
     expect(getTransaction(db, open.id)?.lines[0]?.transferAccountId).toBe(ids.savings);
-    expect(getTransaction(db, locked.id)?.lines[0]?.transferAccountId).toBeNull();
   });
 });
 
-test("a category skips the wrong direction and a row with no change, and changes a reconciled row", () => {
+test("a category skips the wrong direction and a row with no change", () => {
   withBook((db, ids) => {
-    const locked = pay(db, ids.cash, "2026-02-01", 500, "Pay");
-    createCheckpoint(db, ids.cash, { date: "2026-02-01", statementBalance: 500, ...saved });
+    const early = pay(db, ids.cash, "2026-02-01", 500, "Pay");
     const income = pay(db, ids.cash, "2026-03-06", 9000, "Pay");
     const done = pay(db, ids.cash, "2026-03-07", 1000, "Pay", { lines: [{ amount: 1000, categoryId: ids.salary }] });
     const out = pay(db, ids.cash, "2026-03-08", -1000, "Shop");
     const result = bulkEdit(db, asOf, {
-      transactionIds: [locked.id, income.id, done.id, out.id],
+      transactionIds: [early.id, income.id, done.id, out.id],
       what: { kind: "category", categoryId: ids.salary },
       ...saved,
     });
@@ -140,7 +134,7 @@ test("a category skips the wrong direction and a row with no change, and changes
         { id: out.id, reason: "direction" },
       ],
     });
-    expect(getTransaction(db, locked.id)?.lines[0]?.categoryId).toBe(ids.salary);
+    expect(getTransaction(db, early.id)?.lines[0]?.categoryId).toBe(ids.salary);
     expect(getTransaction(db, out.id)?.lines[0]?.categoryId).toBeNull();
   });
 });

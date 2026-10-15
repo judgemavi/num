@@ -14,7 +14,7 @@ import { CategoryPicker } from "@/transactions/pickers";
 import { blankTransaction, quietChange, readPositive } from "@/transactions/transaction-draft";
 
 const loanProps = {
-  /** True when the loan account and the interest must not change: the transaction is reconciled. */
+  /** True when the loan account and the interest must not change: the amount follows the other side. */
   moneyLocked: false,
   /** False for a saved loan payment: its fields keep the saved values and do not take the start values. */
   fill: true,

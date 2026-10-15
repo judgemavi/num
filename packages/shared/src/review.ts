@@ -115,7 +115,6 @@ export const transferPairAcceptSchema = z.object({
 /**
  * Why approve or bulk edit leaves a selected row as it is (decision 0051).
  * - `loan_payment`: the row (or the other side of its transfer) is a loan payment, with two lines (decision 0053).
- * - `reconciled`: the change moves money of a reconciled row (a transfer).
  * - `other_account`: a transfer applies only to the rows of its account.
  * - `transfer_target`: the row is in the account that the transfer goes to.
  * - `direction`: an income category on money out.
@@ -126,7 +125,6 @@ export const transferPairAcceptSchema = z.object({
  */
 const bulkSkipReasons = [
   "loan_payment",
-  "reconciled",
   "other_account",
   "transfer_target",
   "direction",

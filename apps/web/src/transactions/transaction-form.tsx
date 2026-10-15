@@ -50,7 +50,6 @@ export function TransactionForm({
   const accountLabels = useAccountLabels();
   const save = useSaveTransaction();
   const remove = useDeleteTransaction();
-  const reconciled = transaction?.reconciled === true;
   const imported = transaction?.source === "import";
   // An imported transaction keeps its amount. An amount that the person did not change keeps its stored value (decision 0040).
   const startAmount = transaction ? amountText(Math.abs(transaction.amount)) : null;
@@ -146,9 +145,6 @@ export function TransactionForm({
               {rawLine}
             </p>
           ) : null}
-          {reconciled ? (
-            <p role="status">This transaction is reconciled. Date, account, amount and transfer stay locked. Merchant, category and tags can change.</p>
-          ) : null}
           {transaction?.autoReason ? (
             <div>
               <Badge variant="neutral">{levelLabel("sure")}</Badge>
@@ -157,7 +153,7 @@ export function TransactionForm({
           {imported ? (
             <p className="text-sm">{summary}</p>
           ) : (
-            <MoneySection form={form} moneyLocked={reconciled || amountLocked || imported} accountLocked={reconciled} />
+            <MoneySection form={form} moneyLocked={amountLocked || imported} />
           )}
           <form.AppField name="payee">
             {(field) => (
@@ -171,10 +167,10 @@ export function TransactionForm({
           </form.AppField>
           <WhatIsThis
             form={form}
-            choiceLocked={reconciled || amountLocked}
+            choiceLocked={amountLocked}
             categoryLocked={amountLocked}
-            transferLocked={reconciled || amountLocked}
-            amountsLocked={reconciled || amountLocked}
+            transferLocked={amountLocked}
+            amountsLocked={amountLocked}
             loanFill={interestLine(transaction) === null}
             storedAmount={storedTotal(values)}
             linkedRefund={values.refundOfId !== null && transaction?.refundOf?.id === values.refundOfId ? transaction.refundOf : null}
@@ -187,7 +183,7 @@ export function TransactionForm({
           <form.FormError />
         </DialogBody>
         <DialogFooter>
-          {transaction && !reconciled ? (
+          {transaction ? (
             <DeleteMenu
               kind={deleteKind}
               onDelete={() => {

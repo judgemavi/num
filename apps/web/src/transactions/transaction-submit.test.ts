@@ -16,7 +16,6 @@ function stored(categoryId: string | null, autoReason: Transaction["autoReason"]
     payeeRaw: "E-TRANSFER",
     payeeNormalized: "E-TRANSFER",
     status: "cleared",
-    reconciled: false,
     source: "import",
     importRowId: null,
     transferPeerId: null,

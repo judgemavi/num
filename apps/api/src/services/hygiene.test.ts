@@ -8,7 +8,6 @@ import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createBucket } from "./buckets";
 import { createCategory } from "./categories";
-import { createCheckpoint } from "./checkpoints";
 import { readHygiene } from "./hygiene";
 import { importStatement } from "./imports";
 import { createPlan } from "./recurring-plans";
@@ -156,35 +155,6 @@ test("the emergency fund fails when an essential goal is short, even if savings 
     });
     const row = check(db, "2026-06-15", "emergency_fund");
     expect(row).toMatchObject({ pass: false, source: "goals", held: 0, need: 12_000 });
-  });
-});
-
-test("a full card passes when the last statement is paid by the derived due date", () => {
-  withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 100_000);
-    const card = account(db, "credit_card", "Card", -40_000);
-    createCheckpoint(db, card.id, { date: "2026-01-15", statementBalance: -40_000, ...saved });
-    createTransaction(db, {
-      accountId: cash.id,
-      date: "2026-01-20",
-      amount: -40_000,
-      payeeRaw: "Card payment",
-      lines: [{ amount: -40_000, transferAccountId: card.id }],
-      ...saved,
-    });
-    const row = check(db, "2026-02-10", "cards_paid");
-    expect(row.pass).toBe(true);
-    expect(row.items[0]).toMatchObject({ accountId: card.id, statementDate: "2026-01-15", dueDate: "2026-02-05", owed: 40_000, paid: 40_000, pass: true });
-  });
-});
-
-test("a full card fails when the statement is still unpaid after the derived due date", () => {
-  withBook((db) => {
-    const card = account(db, "credit_card", "Card", -40_000);
-    createCheckpoint(db, card.id, { date: "2026-01-15", statementBalance: -40_000, ...saved });
-    const row = check(db, "2026-02-10", "cards_paid");
-    expect(row.pass).toBe(false);
-    expect(row.items[0]).toMatchObject({ owed: 40_000, paid: 0, dueDate: "2026-02-05", pass: false });
   });
 });
 

@@ -22,8 +22,7 @@ import { linkLearnedTransfers, linkTransferPair, recordPairNo } from "./transfer
 import { acceptedPeer, pairIsOpen, recordSaveAnswer } from "./transaction-answer";
 import { assertRefundLink, withRefundPurchase } from "./refund-link";
 import { spreadSureLabels } from "./match-apply";
-import { transactionReconciled } from "./reconciled";
-import { assertLoanPaymentTargets, assertPayee, assertReconciledMoney, assertReferences } from "./transaction-checks";
+import { assertLoanPaymentTargets, assertPayee, assertReferences } from "./transaction-checks";
 import { removeTransaction } from "./transaction-erase";
 import { applyMirrorEdit, applySourceEdit, attachTransfer } from "./transaction-transfer";
 import { isUncategorized, recordKeep, teachesLabel } from "./decision-keep";
@@ -57,12 +56,6 @@ function requireActive(db: Reader, id: string): TransactionRow {
     throw new ServiceError("transaction_not_found", 404);
   }
   return row;
-}
-
-function assertDeletable(db: Reader, row: TransactionRow, peer: TransactionRow | null): void {
-  if (transactionReconciled(db, row.accountId, row.date) || (peer !== null && transactionReconciled(db, peer.accountId, peer.date))) {
-    throw new ServiceError("transaction_reconciled", 409);
-  }
 }
 
 export function getTransaction(db: Db, id: string): Transaction | null {
@@ -150,7 +143,6 @@ export function applyTransactionUpdate(
   const existingLines = loadLines(tx, id);
   const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
   const peerLines = peer ? loadLines(tx, peer.id) : [];
-  assertReconciledMoney(tx, existing, existingLines, peer, header, lines);
   assertPayee(existing, header.payeeRaw);
   assertLineShape(header.accountId, header.amount, lines);
   const previousTarget = existingLines.find((line) => line.transferAccountId !== null)?.transferAccountId ?? null;
@@ -313,9 +305,7 @@ export function updateTransaction(db: Db, id: string, input: TransactionUpdate &
 export function deleteTransaction(db: Db, id: string, input: WriteInput): Transaction {
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
-    const existing = requireActive(tx, id);
-    const peer = existing.transferPeerId ? requireActive(tx, existing.transferPeerId) : null;
-    assertDeletable(tx, existing, peer);
+    requireActive(tx, id);
     return removeTransaction(tx, id, at);
   });
 }

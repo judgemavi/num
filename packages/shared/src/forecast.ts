@@ -1,7 +1,6 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import type { AccountKind, PaymentPolicy } from "./account";
-import { cardStatements } from "./card-statement";
 import { isoDateSchema } from "./date";
 import { isMonthKey } from "./month";
 import { billReserveDays } from "./funding";
@@ -12,7 +11,7 @@ import { amountSchema } from "./money";
 export const forecastDayCount = 90;
 
 
-export const forecastWarningCodes = ["manual_card", "no_payment_account"] as const;
+export const forecastWarningCodes = ["manual_card"] as const;
 
 export const forecastRisks = ["below_zero", "below_buffer"] as const;
 
@@ -82,8 +81,7 @@ export type ForecastCard = {
   paymentAccountId: string | null;
   policy: PaymentPolicy;
   fixedPayment: number | null;
-  knownPayment: { date: string; amount: number } | null;
-  estimatedStatements: { date: string; dueDate: string }[];
+  paymentDay: number | null;
 };
 
 const riskKinds = new Set<AccountKind>(["chequing", "savings", "cash"]);
@@ -184,53 +182,18 @@ function dailyShares(total: number, daysInMonth: number, step: number) {
   return Array.from({ length: daysInMonth }, (_, index) => (index < extra ? base + 1 : base) * step);
 }
 
-export function cardForecastSchedule(input: {
-  statements: readonly { date: string; balance: number }[];
-  payments: readonly { date: string; amount: number }[];
-  asOf: string;
-  horizonEnd: string;
-  policy: PaymentPolicy;
-  fixedPayment: number | null;
-}): { knownPayment: { date: string; amount: number } | null; estimatedStatements: { date: string; dueDate: string }[] } {
-  const none = { knownPayment: null, estimatedStatements: [] as { date: string; dueDate: string }[] };
-  if (input.policy === "manual" || input.statements.length === 0) {
-    return none;
-  }
-  const listed = cardStatements({
-    statements: input.statements.map((statement) => ({ date: statement.date })),
-    paymentDates: input.payments.map((payment) => payment.date),
-  });
-  const actual = listed.filter((item) => item.code === "statement");
-  const latest = actual[actual.length - 1];
-  if (!latest) {
-    return none;
-  }
-  const balance = [...input.statements].reverse().find((statement) => statement.date === latest.date)?.balance ?? 0;
-  const gap = Temporal.PlainDate.from(latest.date).until(Temporal.PlainDate.from(latest.dueDate), { largestUnit: "day" }).days;
-  const paidSince = input.payments.reduce((sum, payment) => {
-    if (payment.date > latest.date && payment.date <= input.asOf) {
-      return sum + payment.amount;
-    }
-    return sum;
-  }, 0);
-  const owed = input.policy === "fixed" ? (input.fixedPayment ?? 0) : Math.max(0, -balance);
-  const remaining = Math.max(0, owed - paidSince);
-  let knownPayment: { date: string; amount: number } | null = null;
-  if (remaining > 0 && latest.dueDate >= input.asOf && latest.dueDate <= input.horizonEnd) {
-    knownPayment = { date: latest.dueDate, amount: remaining };
-  }
-  const estimatedStatements: { date: string; dueDate: string }[] = [];
-  let cursor = Temporal.PlainDate.from(latest.date);
-  for (let step = 0; step < 6; step += 1) {
-    cursor = cursor.add({ months: 1 });
-    const dueDate = cursor.add({ days: gap }).toString();
-    const date = cursor.toString();
-    if (date > input.horizonEnd && dueDate > input.horizonEnd) {
-      break;
-    }
-    estimatedStatements.push({ date, dueDate });
-  }
-  return { knownPayment, estimatedStatements };
+/** The usual day of the month of the payments into a card in the last 12 months before `asOf` (decision 0057). */
+export function cardPaymentDay(paymentDates: readonly string[], asOf: string): number | null {
+  const from = Temporal.PlainDate.from(asOf).subtract({ months: 12 }).toString();
+  const days = paymentDates
+    .filter((date) => date > from && date <= asOf)
+    .map((date) => Temporal.PlainDate.from(date).day);
+  return days.length === 0 ? null : medianOf(days);
+}
+
+function isPaymentDay(date: string, paymentDay: number) {
+  const plain = Temporal.PlainDate.from(date);
+  return plain.day === Math.min(paymentDay, plain.daysInMonth);
 }
 
 function lowestPoint(dates: readonly string[], values: readonly number[]) {
@@ -288,41 +251,25 @@ export function buildForecast(input: ForecastInput): Forecast {
 
   const knownSeries = new Map<string, number[]>(ids.map((id) => [id, []]));
   const estimatedSeries = new Map<string, number[]>(ids.map((id) => [id, []]));
-  const captures = new Map<string, number>();
-  const horizonEnd = dates[dates.length - 1] ?? input.asOf;
-  for (const card of input.cards) {
-    const stale = card.estimatedStatements.filter((statement) => statement.date < input.asOf);
-    const latestStale = stale[stale.length - 1];
-    if (latestStale && latestStale.dueDate >= input.asOf && latestStale.dueDate <= horizonEnd) {
-      captures.set(`${card.accountId}|${latestStale.date}`, estimated.get(card.accountId) ?? 0);
-    }
-  }
-
+  const cutOff = new Map(input.cards.map((card) => [card.accountId, Math.max(0, -(known.get(card.accountId) ?? 0))]));
+  const paid = new Set<string>();
   for (let day = 0; day < dates.length; day += 1) {
     const date = dates[day] ?? "";
     applyDay(known, knownDeltas[day] ?? new Map());
     applyDay(estimated, knownDeltas[day] ?? new Map());
     applyDay(estimated, estimatedDeltas[day] ?? new Map());
     for (const card of input.cards) {
-      if (card.knownPayment?.date === date) {
-        pay(known, card.accountId, card.paymentAccountId, card.knownPayment.amount);
-        pay(estimated, card.accountId, card.paymentAccountId, card.knownPayment.amount);
+      if (card.policy === "manual" || card.paymentDay === null || !isPaymentDay(date, card.paymentDay)) {
+        continue;
       }
-      for (const statement of card.estimatedStatements) {
-        if (statement.date === date) {
-          captures.set(`${card.accountId}|${statement.date}`, estimated.get(card.accountId) ?? 0);
-        }
+      const owed = cutOff.get(card.accountId) ?? 0;
+      const scheduled = card.policy === "fixed" ? (card.fixedPayment ?? 0) : owed;
+      if (!paid.has(card.accountId)) {
+        pay(known, card.accountId, card.paymentAccountId, scheduled);
+        paid.add(card.accountId);
       }
-      for (const statement of card.estimatedStatements) {
-        if (statement.dueDate !== date || card.policy === "manual") {
-          continue;
-        }
-        const scheduled =
-          card.policy === "fixed"
-            ? (card.fixedPayment ?? 0)
-            : Math.max(0, -(captures.get(`${card.accountId}|${statement.date}`) ?? 0));
-        pay(estimated, card.accountId, card.paymentAccountId, scheduled);
-      }
+      pay(estimated, card.accountId, card.paymentAccountId, scheduled);
+      cutOff.set(card.accountId, Math.max(0, -(estimated.get(card.accountId) ?? 0)));
     }
     for (const id of ids) {
       knownSeries.get(id)?.push(known.get(id) ?? 0);

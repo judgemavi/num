@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from "react";
 import { Boundary } from "@/components/boundary";
-import { ReconcileDialog } from "@/accounts/reconcile-dialog";
+import { BankBalanceEditor } from "@/accounts/bank-balance-editor";
 import { ImportForm } from "@/accounts/import-dialog";
 import { AccountEditor, ImportInfoEditor } from "@/editors/account-editors";
 import { FundPaycheck } from "@/buckets/fund-paycheck";
@@ -25,7 +25,7 @@ const editors: { [K in EditorKind]: (input: EditorInput[K]) => ReactNode } = {
   bucket: BucketEditor,
   plan: PlanEditor,
   import: ImportForm,
-  reconcile: ReconcileDialog,
+  bankBalance: BankBalanceEditor,
   fundPaycheck: FundPaycheck,
   assignMoney: AssignEditor,
   moveMoney: MoveMoney,
@@ -48,7 +48,7 @@ const loadText: { [K in EditorKind]: { loading: string; failed: string } } = {
   bucket: { loading: "Loading the bucket.", failed: "The bucket did not load." },
   plan: { loading: "Loading recurring.", failed: "Recurring did not load." },
   import: { loading: "Loading the import.", failed: "The import did not load." },
-  reconcile: { loading: "Loading the account.", failed: "The account did not load." },
+  bankBalance: { loading: "Loading the account.", failed: "The account did not load." },
   fundPaycheck: { loading: "Loading paychecks.", failed: "The paychecks did not load." },
   assignMoney: { loading: "Loading the bucket.", failed: "The bucket did not load." },
   moveMoney: { loading: "Loading buckets.", failed: "The buckets did not load." },

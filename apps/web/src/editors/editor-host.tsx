@@ -1,4 +1,4 @@
-import { useParams, useRouter, useRouterState, useSearch } from "@tanstack/react-router";
+import { useRouter, useRouterState, useSearch } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   AlertDialog,
@@ -17,31 +17,14 @@ import { EditorBody } from "@/editors/editor-registry";
 import { createEditorStore } from "@/editors/editor-store";
 import type { EditorFrame, EditorInput, EditorKind } from "@/editors/editor-types";
 
-/** The name of the reconcile editor of an account in the URL state of the host. The `edit` value never has this text. */
-function reconcileKey(accountId: string) {
-  return `reconcile:${accountId}`;
-}
-
-/**
- * The editor that the URL shows. `edit` shows the editor of one record. `reconcile` on the page of an account shows
- * the reconcile editor of that account. The bulk editor and the other editors are not in the URL.
- */
-function editorOfUrl(search: { edit?: string; reconcile?: boolean }, accountId: string | undefined) {
+/** The editor that the URL shows. `edit` shows the editor of one record. The bulk editor and the other editors are not in the URL. */
+function editorOfUrl(search: { edit?: string }) {
   const edit = parseEditParam(search.edit);
-  if (edit) {
-    return { key: formatEditParam(edit.kind, edit.id), frame: frameOf<RecordEditorKind>(edit.kind, { id: edit.id }) };
-  }
-  if (search.reconcile && accountId) {
-    return { key: reconcileKey(accountId), frame: frameOf("reconcile", { accountId }) };
-  }
-  return null;
+  return edit ? { key: formatEditParam(edit.kind, edit.id), frame: frameOf<RecordEditorKind>(edit.kind, { id: edit.id }) } : null;
 }
 
-/** The key of an editor in the URL. Null when the URL does not show this editor. `pageAccountId` is the account of the page. */
-function urlKeyOf(frame: EditorFrame, pageAccountId: string | undefined) {
-  if (frame.kind === "reconcile") {
-    return frame.input.accountId === pageAccountId ? reconcileKey(pageAccountId) : null;
-  }
+/** The key of an editor in the URL. Null when the URL does not show this editor. */
+function urlKeyOf(frame: EditorFrame) {
   if (!isRecordEditorKind(frame.kind) || !("id" in frame.input)) {
     return null;
   }
@@ -67,9 +50,7 @@ function createHost(router: ReturnType<typeof useRouter>) {
   /** Show one editor in the URL, or no editor. */
   function writeUrl(shown: { frame: EditorFrame; key: string } | null, replace: boolean) {
     // A value that is `undefined` is not in the URL.
-    const reconcile = shown?.frame.kind === "reconcile";
-    const search = { edit: shown && !reconcile ? shown.key : undefined, reconcile: reconcile ? true : undefined };
-    void router.navigate({ to: ".", replace, search: (prev) => ({ ...prev, ...search }) });
+    void router.navigate({ to: ".", replace, search: (prev) => ({ ...prev, edit: shown?.key }) });
   }
 
   /** Close an editor and remove it from the URL. */
@@ -112,8 +93,7 @@ function createHost(router: ReturnType<typeof useRouter>) {
         const hadUrl = open !== null && open.editValue !== null;
         // The type argument makes the frame of one kind a member of the union of all frames.
         const frame = frameOf<EditorKind>(kind, input);
-        const page = router.matchRoute({ to: "/accounts/$accountId" });
-        const editValue = urlKeyOf(frame, page ? page.accountId : undefined);
+        const editValue = urlKeyOf(frame);
         const done = store.open(frame, { editValue, pushed: editValue !== null && !hadUrl });
         if (editValue) {
           writeUrl({ frame, key: editValue }, hadUrl);
@@ -131,15 +111,13 @@ export function EditorHost({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const edit = useSearch({ strict: false, select: (search) => search.edit });
-  const reconcile = useSearch({ strict: false, select: (search) => search.reconcile });
-  const accountId = useParams({ strict: false, select: (params) => params.accountId });
   const [host] = useState(() => createHost(router));
   const { editor, confirm } = useSyncExternalStore(host.store.subscribe, host.store.snapshot);
 
   // The router is the source of the URL. The store of the host is not a part of React. This effect makes them agree.
   useEffect(() => {
-    host.followUrl(editorOfUrl({ edit, reconcile }, accountId), pathname);
-  }, [host, pathname, edit, reconcile, accountId]);
+    host.followUrl(editorOfUrl({ edit }), pathname);
+  }, [host, pathname, edit]);
 
   const description = confirm?.description;
 

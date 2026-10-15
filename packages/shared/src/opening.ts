@@ -24,17 +24,18 @@ export function openingFromFirstRow(input: { balance: number; amount: number; da
   return { amount, date: dayBefore(input.date) };
 }
 
-export function reconcileOpening(input: {
-  hasCheckpoint: boolean;
+/** The opening balance that makes the calculated balance equal the bank balance (opening balance + the difference). */
+export function openingFromBankBalance(input: {
+  hasMatchingBankBalance: boolean;
   openingBalance: number;
   calculatedBalance: number;
-  statementBalance: number;
+  bankBalance: number;
   date: string;
 }): OpeningSuggestion | null {
-  if (input.hasCheckpoint || input.calculatedBalance === input.statementBalance) {
+  if (input.hasMatchingBankBalance || input.calculatedBalance === input.bankBalance) {
     return null;
   }
-  const amount = input.openingBalance - (input.calculatedBalance - input.statementBalance);
+  const amount = input.openingBalance - (input.calculatedBalance - input.bankBalance);
   if (!Number.isSafeInteger(amount)) {
     return null;
   }

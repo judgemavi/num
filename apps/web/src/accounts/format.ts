@@ -21,7 +21,7 @@ const kindLabels: Record<AccountKind, string> = {
 };
 
 const policyLabels: Record<PaymentPolicy, string> = {
-  full: "Pay the full statement",
+  full: "Pay the full balance",
   fixed: "Pay a fixed amount",
   manual: "Choose each payment",
 };
@@ -106,9 +106,16 @@ export function accountError(code: ErrorCode | undefined): string {
   }
 }
 
-/** The text of a failed unlock of a checkpoint. */
-export function unlockError(code: ErrorCode | undefined): string {
-  return code === "checkpoint_unlocked" ? "This checkpoint is already unlocked." : "The checkpoint did not unlock. Try again.";
+/** The text of a failed write of a bank balance. */
+export function bankBalanceError(code: ErrorCode | undefined): string {
+  switch (code) {
+    case "bank_balance_exists":
+      return "There is already a bank balance for this date. Change that one.";
+    case "amount_too_precise":
+      return "An amount has more decimal places than the currency has.";
+    default:
+      return "The bank balance did not save. Try again.";
+  }
 }
 
 /** The warning of a mortgage or a loan with a positive balance: the book shows money owed to the person. */

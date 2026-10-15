@@ -18,21 +18,6 @@ const emergencyFundCheckSchema = z.object({
   need: nonNegative,
 });
 
-const cardPaidSchema = z.object({
-  accountId: z.uuid(),
-  statementDate: isoDateSchema.nullable(),
-  dueDate: isoDateSchema.nullable(),
-  owed: nonNegative,
-  paid: nonNegative,
-  pass: z.boolean(),
-});
-
-const cardsPaidCheckSchema = z.object({
-  code: z.literal("cards_paid"),
-  pass: z.boolean(),
-  items: z.array(cardPaidSchema),
-});
-
 const importFreshSchema = z.object({
   accountId: z.uuid(),
   lastImportDate: isoDateSchema.nullable(),
@@ -94,7 +79,6 @@ const overspentCheckSchema = z.object({
 
 export const hygieneCheckSchema = z.discriminatedUnion("code", [
   emergencyFundCheckSchema,
-  cardsPaidCheckSchema,
   importsCheckSchema,
   reviewCheckSchema,
   sinkingCheckSchema,
@@ -107,9 +91,8 @@ export const hygieneSchema = z.object({
   asOf: isoDateSchema,
   checks: z.tuple([
     emergencyFundCheckSchema,
-    cardsPaidCheckSchema,
-    importsCheckSchema,
-      reviewCheckSchema,
+      importsCheckSchema,
+    reviewCheckSchema,
     sinkingCheckSchema,
     savingsRateCheckSchema,
     recurringCheckSchema,

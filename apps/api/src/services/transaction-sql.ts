@@ -1,5 +1,5 @@
-import { checkpoints, transactionLines, transactions } from "@num/db";
-import { and, count, eq, exists, isNotNull, isNull, lte, max, ne, notExists, or, sql, type SQL } from "drizzle-orm";
+import { transactionLines, transactions } from "@num/db";
+import { and, count, eq, exists, isNotNull, isNull, ne, notExists, or, sql, type SQL } from "drizzle-orm";
 import { alias, QueryBuilder, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 /**
@@ -75,15 +75,6 @@ export function lineCategory(transactionId: Outer) {
     .select({ categoryId: transactionLines.categoryId })
     .from(transactionLines)
     .where(eq(transactionLines.transactionId, transactionId))}`;
-}
-
-/** True when the date is on or before the latest locked checkpoint of the account. */
-export function isReconciled(row: { accountId: AnySQLiteColumn; date: AnySQLiteColumn }) {
-  const latest = query
-    .select({ date: max(checkpoints.date) })
-    .from(checkpoints)
-    .where(and(eq(checkpoints.accountId, row.accountId), isNull(checkpoints.unlockedAt)));
-  return sql<boolean>`case when ${lte(row.date, sql`${latest}`)} then 1 else 0 end`.mapWith(Boolean);
 }
 
 const refunds = alias(transactions, "refunds");

@@ -85,6 +85,13 @@
       "when": 1792017184056,
       "tag": "0011_clear_open_in_accounts_without_imports",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1792021510030,
+      "tag": "0012_bank_balances",
+      "breakpoints": true
     }
   ]
 }

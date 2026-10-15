@@ -1,5 +1,5 @@
 import { accountClass, netWorthOf } from "@num/shared";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Upload } from "lucide-react";
 import { useEditors } from "@/editors/editor-api";
@@ -9,6 +9,8 @@ import { accountCountLabel, accountDetail, formatBalance, formatMoney, kindLabel
 import { accountLabel } from "@/accounts/label";
 import { groupAccounts, groupHue, groupLabel } from "@/accounts/groups";
 import { accountListQuery, useArchiveAccount } from "@/api/accounts";
+import { BankStatusLine } from "@/accounts/bank-status";
+import { bankStatusesQuery } from "@/api/bank-balances";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
 import { AccountFilterBar } from "@/accounts/filters";
@@ -23,7 +25,6 @@ import { PageHeader } from "@/components/page-header";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
-import { SidePanel } from "@/components/side-panel";
 import { SplitBar } from "@/components/split-bar";
 import { hueColor } from "@/components/hue";
 
@@ -42,12 +43,12 @@ function AccountsPage() {
   const bookCurrency = useBookCurrency();
   // The list on the screen stays while the list for a new filter or a new sort order loads.
   const { data: accounts } = useSuspenseQuery(accountListQuery(shown));
+  usePrefetchQuery(bankStatusesQuery());
   const archive = useArchiveAccount();
 
   const rows = accounts.items;
   const groups = groupAccounts(rows);
   const worth = netWorthOf(rows);
-  const cards = rows.filter((account) => account.kind === "credit_card");
 
   return (
     <>
@@ -103,7 +104,7 @@ function AccountsPage() {
         }
         illustration={<BalanceScaleIllustration />}
       />
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
+      <div className="grid items-start gap-5">
         <ListCard label="All accounts">
           {groups.length === 0 ? (
             <p className="px-5 py-5 text-muted-foreground">{search.archived ? "No archived accounts." : "No accounts yet."}</p>
@@ -139,6 +140,7 @@ function AccountsPage() {
                         <Amount value={account.balance} owed={accountClass(account.kind) === "liability"} />
                         {detail ? <small>{detail}</small> : null}
                         {owedToYou(account) ? <small className="text-attn">{owedToYouWarning}</small> : null}
+                        <BankStatusLine accountId={account.id} />
                       </div>
                       <RowMenu label={`Actions for ${accountLabel(account)}`}>
                         <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("account", { id: account.id })}>
@@ -147,17 +149,8 @@ function AccountsPage() {
                         <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("import", { accountId: account.id })}>
                           Import a statement
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="min-h-11"
-                          onSelect={() => {
-                            void openAccount({
-                              to: "/accounts/$accountId",
-                              params: { accountId: account.id },
-                              search: { reconcile: true },
-                            });
-                          }}
-                        >
-                          Reconcile
+                        <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("bankBalance", { accountId: account.id, id: null })}>
+                          Add bank balance
                         </DropdownMenuItem>
                         <ArchiveMenuItem
                           archived={account.archivedAt !== null}
@@ -180,25 +173,6 @@ function AccountsPage() {
             ))
           )}
         </ListCard>
-        <div className="grid content-start gap-5">
-          {cards.length === 0 ? (
-            <SidePanel title="Card statements" text="Add a credit card to see what you owe." />
-          ) : (
-            <ListCard label="Card statements" title="Card statements">
-              {cards.map((account) => (
-                <ListRow key={account.id} simple>
-                  <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-                    {accountLabel(account)}
-                    <small>{account.paymentPolicy === "full" ? "Pays the full statement" : ""}</small>
-                  </div>
-                  <div className="ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-                    <Amount value={account.balance} owed />
-                  </div>
-                </ListRow>
-              ))}
-            </ListCard>
-          )}
-        </div>
       </div>
     </>
   );

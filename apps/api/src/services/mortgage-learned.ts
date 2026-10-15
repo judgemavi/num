@@ -116,7 +116,7 @@ export function mortgageLinesFor(db: Reader, mortgageAccountId: string, fromAcco
 
 export type MortgageRow = { payee: string; accountId: string; date: string; amount: number };
 
-/** The "Mortgage payment" suggestion for an uncategorized, unreconciled money-out row. Always Likely at most. */
+/** The "Mortgage payment" suggestion for an uncategorized money-out row. Always Likely at most. */
 export function mortgageSuggestion(
   db: Reader,
   hit: MortgageHit | null,

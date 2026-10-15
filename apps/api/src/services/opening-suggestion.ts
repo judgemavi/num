@@ -1,18 +1,25 @@
-import { checkpoints, importBatches } from "@num/db";
-import { openingFromFirstRow, reconcileOpening, type OpeningSuggestion } from "@num/shared";
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { accounts, bankBalances, importBatches, type AccountRow } from "@num/db";
+import { openingFromBankBalance, openingFromFirstRow, type OpeningSuggestion } from "@num/shared";
+import { and, eq, isNotNull, isNull, lt } from "drizzle-orm";
+import { calculatedBalance } from "./calculated-balance";
 import { hasTerms } from "./mortgage-terms";
 import { earliestTransactionDate, effectiveOpeningDate } from "./opening-date";
 import type { Reader } from "./write";
 
-function hasActiveCheckpoint(db: Reader, accountId: string) {
-  return (
-    db
-      .select({ id: checkpoints.id })
-      .from(checkpoints)
-      .where(and(eq(checkpoints.accountId, accountId), isNull(checkpoints.unlockedAt)))
-      .get() !== undefined
-  );
+type OpeningAccount = Pick<AccountRow, "id" | "kind" | "openingBalance" | "openingDate">;
+
+/** True when the account has a bank balance (before `before`, when given) that is equal to its calculated balance. */
+function hasMatchingBankBalance(db: Reader, account: OpeningAccount, before?: string) {
+  const filters = [eq(bankBalances.accountId, account.id)];
+  if (before !== undefined) {
+    filters.push(lt(bankBalances.date, before));
+  }
+  return db
+    .select({ date: bankBalances.date, balance: bankBalances.balance })
+    .from(bankBalances)
+    .where(and(...filters))
+    .all()
+    .some((row) => calculatedBalance(db, account, row.date) === row.balance);
 }
 
 function hadRunningBalanceImport(db: Reader, accountId: string) {
@@ -37,26 +44,31 @@ export function importOpeningSuggestion(
   accountId: string,
   firstRow: { date: string; amount: number; balance: number } | null,
 ): OpeningSuggestion | null {
-  if (!firstRow || hasTerms(db, accountId) || hasActiveCheckpoint(db, accountId) || hadRunningBalanceImport(db, accountId)) {
+  if (!firstRow || hasTerms(db, accountId) || hadRunningBalanceImport(db, accountId)) {
+    return null;
+  }
+  const account = db.select().from(accounts).where(eq(accounts.id, accountId)).get();
+  if (!account || hasMatchingBankBalance(db, account)) {
     return null;
   }
   return openingFromFirstRow(firstRow);
 }
 
-export function checkpointOpeningSuggestion(
+export function bankOpeningSuggestion(
   db: Reader,
-  account: { id: string; openingBalance: number; openingDate: string | null },
-  input: { calculatedBalance: number; statementBalance: number },
+  account: OpeningAccount,
+  latest: { date: string; balance: number },
+  calculated: number,
 ): OpeningSuggestion | null {
   if (hasTerms(db, account.id)) {
     return null;
   }
   const first = earliestTransactionDate(db, account.id);
-  return reconcileOpening({
-    hasCheckpoint: hasActiveCheckpoint(db, account.id),
+  return openingFromBankBalance({
+    hasMatchingBankBalance: hasMatchingBankBalance(db, account, latest.date),
     openingBalance: account.openingBalance,
-    calculatedBalance: input.calculatedBalance,
-    statementBalance: input.statementBalance,
+    calculatedBalance: calculated,
+    bankBalance: latest.balance,
     date: effectiveOpeningDate(db, { id: account.id, openingDate: first ? null : account.openingDate }),
   });
 }

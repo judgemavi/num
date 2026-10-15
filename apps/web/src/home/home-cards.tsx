@@ -1,5 +1,7 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { BankStatusText } from "@/accounts/bank-status";
+import { useBankMismatches } from "@/accounts/bank-status-reads";
 import { overspentQuery } from "@/api/buckets";
 import { fundingPaychecksQuery } from "@/api/funding";
 import { insightsQuery } from "@/api/insights";
@@ -16,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEditors } from "@/editors/editor-api";
-import { useActivePlans, useBookCurrency, useCategoryNames } from "@/editors/lookups";
+import { useAccountLabels, useAccounts, useActivePlans, useBookCurrency, useCategoryNames } from "@/editors/lookups";
 import { homeInsights } from "@/home/home-reads";
 import { signedMoney } from "@/insights/format";
 import { formatMoney } from "@/money";
@@ -169,6 +171,33 @@ export function MissedPaymentsCard() {
             Skip
           </Button>
         </ListRow>
+        );
+      })}
+    </ListCard>
+  );
+}
+
+/** The accounts that do not match their bank. The card shows only when there is one. */
+export function BankMismatchCard() {
+  const mismatches = useBankMismatches();
+  const accounts = useAccounts();
+  const labels = useAccountLabels();
+  if (mismatches.length === 0) {
+    return null;
+  }
+  return (
+    <ListCard label="Bank balances" title="Accounts that do not match your bank">
+      {mismatches.map((status) => {
+        const kind = accounts.find((account) => account.id === status.accountId)?.kind;
+        return (
+          <ListRow key={status.accountId}>
+            <span className={listName}>
+              <Link to="/accounts/$accountId" params={{ accountId: status.accountId }} className="font-semibold text-primary">
+                {labels.get(status.accountId)}
+              </Link>
+              {kind ? <BankStatusText kind={kind} status={status} /> : null}
+            </span>
+          </ListRow>
         );
       })}
     </ListCard>

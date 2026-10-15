@@ -2,7 +2,6 @@ import { accounts, inboxDecisions, transactionLines, transactions } from "@num/d
 import { Temporal } from "@num/shared";
 import { and, eq, gte, inArray, isNull, lte, ne, type SQL } from "drizzle-orm";
 import { pairKey } from "./decision-keys";
-import { transactionReconciled } from "./reconciled";
 import { ServiceError } from "../service-error";
 import { loadLines, replaceLines } from "./transaction-lines";
 import { auditTransaction, readTransaction, toTransaction } from "./transaction-record";
@@ -28,9 +27,6 @@ export function linkTransferPair(tx: WriteTx, leftId: string, rightId: string, e
   }
   if (left.transferPeerId || right.transferPeerId) {
     throw new ServiceError("transfer_pair_not_found", 404);
-  }
-  if (transactionReconciled(tx, left.accountId, left.date) || transactionReconciled(tx, right.accountId, right.date)) {
-    throw new ServiceError("transaction_reconciled", 409);
   }
   const leftLines = loadLines(tx, left.id);
   const rightLines = loadLines(tx, right.id);
@@ -161,9 +157,6 @@ export function linkTransferIfSure(tx: WriteTx, transactionId: string): void {
     return;
   }
   if (!learnedTransfer(tx, row.payee, row.accountId, peer.accountId) && !learnedTransfer(tx, peer.payee, peer.accountId, row.accountId)) {
-    return;
-  }
-  if (transactionReconciled(tx, row.accountId, row.date) || transactionReconciled(tx, peer.accountId, peer.date)) {
     return;
   }
   linkTransferPair(tx, row.id, peer.id, null);

@@ -1,5 +1,4 @@
 import {
-  cardStatements,
   isIsoDate,
   monthLastDay,
   reviewAgeDays,
@@ -13,7 +12,6 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listAccounts } from "./accounts";
 import { listBuckets, listOverspent } from "./buckets";
-import { cardLedger } from "./card-ledger";
 import { lastCompleteMonths } from "./complete-months";
 import { monthlyBills } from "./funding-book";
 import { importFreshness, settingNumber } from "./book-settings";
@@ -92,41 +90,6 @@ function emergencyFund(db: Db, asOf: string) {
   };
 }
 
-function cardsPaid(db: Db, asOf: string) {
-  const items = accounts(db)
-    .filter((account) => account.kind === "credit_card" && account.paymentPolicy === "full")
-    .map((account) => {
-      const ledger = cardLedger(db, account.id);
-      const due = cardStatements({
-        statements: ledger.statements.filter((row) => row.date <= asOf),
-        paymentDates: ledger.payments.filter((payment) => payment.date <= asOf).map((payment) => payment.date),
-      }).filter((item) => item.code === "statement" && item.date <= asOf && item.dueDate <= asOf);
-      const latest = due[due.length - 1];
-      if (!latest) {
-        return { accountId: account.id, statementDate: null, dueDate: null, owed: 0, paid: 0, pass: true };
-      }
-      const statement = ledger.statements
-        .filter((row) => row.date === latest.date)
-        .sort((left, right) => (left.createdAt < right.createdAt ? 1 : -1))[0];
-      const owed = Math.max(0, -(statement?.balance ?? 0));
-      const paid = ledger.payments.reduce((sum, payment) => {
-        if (payment.date > latest.date && payment.date <= latest.dueDate) {
-          return sum + payment.amount;
-        }
-        return sum;
-      }, 0);
-      return {
-        accountId: account.id,
-        statementDate: latest.date,
-        dueDate: latest.dueDate,
-        owed,
-        paid,
-        pass: paid >= owed,
-      };
-    });
-  return { code: "cards_paid" as const, pass: items.every((item) => item.pass), items };
-}
-
 function importsCurrent(db: Db, asOf: string) {
   const staleImportDays = settingNumber(db, "staleImportDays", 10);
   const imported = new Map(importFreshness(db, asOf).map((row) => [row.accountId, row.lastImportAt]));
@@ -203,7 +166,6 @@ export function readHygiene(db: Db, asOf: string): Hygiene {
     asOf,
     checks: [
       emergencyFund(db, asOf),
-      cardsPaid(db, asOf),
       importsCurrent(db, asOf),
       reviewAge(state, asOf),
       sinkingFunds(db),

@@ -19,7 +19,7 @@ function canApprove(row: TransactionListItem) {
     return true;
   }
   const suggestion = review.suggestion;
-  return suggestion !== null && !(suggestion.transferAccountId !== null && row.reconciled);
+  return suggestion !== null;
 }
 
 /** "Approve · N" for the selected rows. Only the Needs review page has it. */

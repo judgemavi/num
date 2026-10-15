@@ -71,11 +71,11 @@ export function mortgageAccountView(
   const account = requireMortgage(db, accountId);
   const terms = getMortgageTerms(db, accountId);
   const loan = mortgageLoan(terms, { balance: account.openingBalance, date: storedOpeningDate(account) }, bookStep(db));
-  const checkpoints = activeValuations(db, accountId);
-  const schedule = mortgageSchedule(loan, checkpoints);
+  const dated = activeValuations(db, accountId);
+  const schedule = mortgageSchedule(loan, dated);
   const perPayment = options.extra ?? 0;
   const lump = options.lumpSum && options.lumpSum > 0 && options.lumpDate ? { date: options.lumpDate, amount: options.lumpSum } : null;
-  const effect = perPayment > 0 || lump ? mortgageExtraEffect(loan, checkpoints, { perPayment, lumpSum: lump }) : null;
+  const effect = perPayment > 0 || lump ? mortgageExtraEffect(loan, dated, { perPayment, lumpSum: lump }) : null;
   return {
     balance: balanceOf(db, { id: account.id, kind: "mortgage", openingBalance: account.openingBalance }, asOf),
     rateMilliPct: terms.rateMilliPct,

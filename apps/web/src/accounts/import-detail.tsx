@@ -94,7 +94,7 @@ function ImportDetailPage() {
       title: "Some rows stayed",
       description: (
         <div className="grid gap-3">
-          <p>These rows were edited or reconciled, so this undo left them in place.</p>
+          <p>These rows were edited after import, so this undo left them in place.</p>
           <ul className="grid max-h-64 gap-3 overflow-y-auto">
             {blocked.map((row) => (
               <li key={row.rowIndex} className="grid gap-1 border-t pt-3 text-sm">
