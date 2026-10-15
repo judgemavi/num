@@ -62,7 +62,7 @@ function TimelineCard() {
           </Button>
         ) : null}
       </CardHeader>
-      <CardContent className="grid gap-3 px-5 pb-5 md:px-6">
+      <CardContent className="flex flex-1 flex-col gap-3 px-5 pb-5 md:px-6">
         <TimelineChart />
       </CardContent>
     </Card>

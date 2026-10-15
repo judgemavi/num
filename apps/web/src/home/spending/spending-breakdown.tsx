@@ -70,9 +70,8 @@ export function SpendDonutCard() {
     <Card>
       <CardHeader className="px-5 pt-5">
         <CardTitle className="text-base font-bold">Spending by group and category</CardTitle>
-        <p className="text-sm text-muted-foreground">Inner ring: groups. Outer ring: categories. Select a slice to see its categories.</p>
       </CardHeader>
-      <CardContent className="px-5 pb-5">
+      <CardContent className="flex flex-1 items-center px-5 pb-5">
         <SpendDonut
           arcs={arcs}
           nameOf={(arc) => ({ name: arc.ring === "group" ? groupName(arc.row) : categoryName(arc.row), group: parentName(arc) })}

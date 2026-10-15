@@ -1,22 +1,23 @@
-import { useState } from "react";
+import { memo, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { createPortal } from "react-dom";
+import { Label, Pie, PieChart, Sector, type PieSectorShapeProps } from "recharts";
+import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { useBookCurrency } from "@/editors/lookups";
-import { formatMoney } from "@/money";
+import { ChartTip } from "@/home/spending/chart-tip";
 import type { Arc } from "@/home/spending/spend-arcs";
+import { formatMoney } from "@/money";
 
-const size = 240;
-const center = size / 2;
-const rings = { group: { inner: 52, outer: 80 }, category: { inner: 84, outer: 116 } };
+/** The chart tokens of the slices. The arcs give the token and the opacity of each slice. */
+const config = {
+  "chart-1": { color: "var(--chart-1)" },
+  "chart-2": { color: "var(--chart-2)" },
+  "chart-3": { color: "var(--chart-3)" },
+  "chart-4": { color: "var(--chart-4)" },
+  "chart-5": { color: "var(--chart-5)" },
+  est: { color: "var(--est)" },
+} satisfies ChartConfig;
 
-function point(radius: number, turn: number) {
-  const angle = turn * 2 * Math.PI - Math.PI / 2;
-  return `${(center + radius * Math.cos(angle)).toFixed(2)} ${(center + radius * Math.sin(angle)).toFixed(2)}`;
-}
-
-function arcPath(ring: Arc["ring"], start: number, end: number) {
-  const { inner, outer } = rings[ring];
-  const large = end - start > 0.5 ? 1 : 0;
-  return `M${point(outer, start)}A${outer} ${outer} 0 ${large} 1 ${point(outer, end)}L${point(inner, end)}A${inner} ${inner} 0 ${large} 0 ${point(inner, start)}Z`;
-}
+const rings = { group: { innerRadius: "43%", outerRadius: "67%" }, category: { innerRadius: "70%", outerRadius: "97%" } };
 
 function percent(share: number) {
   return `${Math.round(share * 100)}%`;
@@ -33,80 +34,138 @@ type SpendDonutProps = {
   onSelect: (arc: Arc) => void;
 };
 
-function Tooltip({ arc, lines }: { arc: Arc; lines: string[] }) {
-  const { inner, outer } = rings[arc.ring];
-  const angle = ((arc.start + arc.end) / 2) * 2 * Math.PI - Math.PI / 2;
-  const radius = (inner + outer) / 2;
-  const left = Math.min(80, Math.max(20, ((center + radius * Math.cos(angle)) / size) * 100));
-  const top = ((center + radius * Math.sin(angle)) / size) * 100;
+/** The slice under the pointer or with the focus, and the middle of the slice in the box of the donut. */
+type Shown = { arc: Arc; x: number; y: number; size: number };
+
+/** The lines of the tooltip and of the accessible name of a slice. */
+function sliceLines(currency: string, arc: Arc, nameOf: SpendDonutProps["nameOf"]) {
+  const { name, group } = nameOf(arc);
+  const amount = formatMoney(currency, arc.row.amount);
+  const ofTotal = `${percent(arc.end - arc.start)} of spending`;
+  return arc.ofGroup === null ? [name, amount, ofTotal] : [name, group, amount, `${percent(arc.ofGroup)} of ${group}`, ofTotal];
+}
+
+/** The tooltip of a slice, in the chart tooltip style. */
+function SliceTooltip({ shown, lines }: { shown: Shown; lines: string[] }) {
+  const [title, ...rest] = lines;
+  // The tooltip is outside the chart box, where the chart colour variables are not set. It uses the token itself.
+  const color = `var(--${shown.arc.color.token})`;
+  const left = Math.min(80, Math.max(20, (shown.x / shown.size) * 100));
   return (
-    <div
-      className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[115%] rounded-[12px] border bg-card px-3 py-2 text-sm whitespace-nowrap shadow-[var(--shadow)]"
-      style={{ left: `${left}%`, top: `${top}%` }}
-    >
-      {lines.map((line, position) => (
-        <p key={position} className={position === 0 ? "font-semibold" : undefined}>
-          {line}
-        </p>
-      ))}
+    <div className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[115%] whitespace-nowrap" style={{ left: `${left}%`, top: `${(shown.y / shown.size) * 100}%` }}>
+      <ChartTooltipContent
+        active
+        hideLabel
+        payload={[{ name: shown.arc.key, value: shown.arc.end - shown.arc.start, graphicalItemId: shown.arc.ring, color }]}
+        formatter={() => (
+          <div className="grid gap-0.5">
+            <ChartTip color={color} opacity={shown.arc.color.opacity} text={title ?? ""} />
+            {rest.map((line) => (
+              <p key={line} className="pl-[18px] tabular-nums">
+                {line}
+              </p>
+            ))}
+          </div>
+        )}
+      />
     </div>
   );
 }
 
-export function SpendDonut({ arcs, nameOf, centerLabel, isLit, isPressed, canSelect, onSelect }: SpendDonutProps) {
+type RingsProps = Omit<SpendDonutProps, "centerLabel"> & { setShown: Dispatch<SetStateAction<Shown | null>> };
+
+/**
+ * The two rings. Recharts makes new slice elements each time a ring renders. Thus the rings do not render again when
+ * the tooltip changes, and a slice that had the focus before a render gets it back.
+ */
+const Rings = memo(function Rings({ arcs, nameOf, isLit, isPressed, canSelect, onSelect, setShown }: RingsProps) {
   const currency = useBookCurrency();
-  const [hover, setHover] = useState<string | null>(null);
-  const lines = (arc: Arc) => {
-    const { name, group } = nameOf(arc);
-    const amount = formatMoney(currency, arc.row.amount);
-    const ofTotal = `${percent(arc.end - arc.start)} of spending`;
-    return arc.ofGroup === null ? [name, amount, ofTotal] : [name, group, amount, `${percent(arc.ofGroup)} of ${group}`, ofTotal];
-  };
-  const hovered = arcs.find((arc) => arc.key === hover);
+  const focused = useRef<string | null>(null);
+  const data = useMemo(() => {
+    const ring = (name: Arc["ring"]) => arcs.filter((arc) => arc.ring === name).map((arc) => ({ key: arc.key, share: arc.end - arc.start, arc }));
+    return { group: ring("group"), category: ring("category") };
+  }, [arcs]);
+
+  /** Recharts calls this function for each slice. */
+  function slice(props: PieSectorShapeProps) {
+    const arc: Arc = props.payload.arc;
+    const active = canSelect(arc);
+    // The middle of the slice. Recharts measures angles from 3 o'clock, counterclockwise.
+    const angle = (-(props.startAngle + props.endAngle) / 2) * (Math.PI / 180);
+    const radius = (props.innerRadius + props.outerRadius) / 2;
+    const show = () => setShown({ arc, x: props.cx + radius * Math.cos(angle), y: props.cy + radius * Math.sin(angle), size: props.cx * 2 });
+    const hide = () => setShown((current) => (current?.arc.key === arc.key ? null : current));
+    const keepFocus = (element: SVGGElement | null) => {
+      if (element && focused.current === arc.key && document.activeElement === document.body) {
+        element.focus();
+      }
+    };
+    const opacity = isLit(arc) ? arc.color.opacity : arc.color.opacity * 0.35;
+    return (
+      <g
+        ref={active ? keepFocus : undefined}
+        role={active ? "button" : "img"}
+        tabIndex={active ? 0 : undefined}
+        aria-label={sliceLines(currency, arc, nameOf).join(", ")}
+        aria-pressed={active ? isPressed(arc) : undefined}
+        className={active ? "cursor-pointer outline-none focus-visible:[&>path]:stroke-ring" : undefined}
+        onClick={active ? () => onSelect(arc) : undefined}
+        onKeyDown={(event) => {
+          if (active && (event.key === "Enter" || event.key === " ")) {
+            event.preventDefault();
+            onSelect(arc);
+          }
+        }}
+        onPointerEnter={show}
+        onPointerLeave={hide}
+        onFocus={() => {
+          focused.current = arc.key;
+          show();
+        }}
+        onBlur={(event) => {
+          // A slice that Recharts removes is not connected. Its focus comes back on the new slice.
+          if (event.currentTarget.isConnected) {
+            focused.current = null;
+          }
+          hide();
+        }}
+      >
+        <Sector {...props} fill={`var(--color-${arc.color.token})`} fillOpacity={opacity} stroke="var(--card)" strokeWidth={2} />
+      </g>
+    );
+  }
+
+  return (["group", "category"] as const).map((name) => (
+    <Pie key={name} data={data[name]} dataKey="share" nameKey="key" startAngle={90} endAngle={-270} {...rings[name]} rootTabIndex={-1} isAnimationActive={false} shape={slice} />
+  ));
+});
+
+/** The two rings of spending: groups inside, their categories outside. A slice is a button when it can be selected. */
+export function SpendDonut({ centerLabel, ...props }: SpendDonutProps) {
+  const currency = useBookCurrency();
+  const [shown, setShown] = useState<Shown | null>(null);
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
   return (
-    <div className="relative mx-auto w-full max-w-[280px]">
-      <svg viewBox={`0 0 ${size} ${size}`} className="h-auto w-full" role="group" aria-label={centerLabel}>
-        {arcs.length === 0 ? (
-          <circle cx={center} cy={center} r={(rings.category.outer + rings.group.inner) / 2} className="fill-none stroke-sunken" strokeWidth={rings.category.outer - rings.group.inner} />
-        ) : null}
-        {arcs.map((arc) => {
-          const active = canSelect(arc);
-          const { inner, outer } = rings[arc.ring];
-          return (
-            <g
-              key={arc.key}
-              role={active ? "button" : "img"}
-              tabIndex={active ? 0 : undefined}
-              aria-label={lines(arc).join(", ")}
-              aria-pressed={active ? isPressed(arc) : undefined}
-              opacity={isLit(arc) ? arc.color.opacity : arc.color.opacity * 0.35}
-              className={`stroke-card ${active ? "cursor-pointer outline-none focus-visible:opacity-100 focus-visible:[&>*]:stroke-ring" : ""}`}
-              strokeWidth="2"
-              onClick={active ? () => onSelect(arc) : undefined}
-              onKeyDown={(event) => {
-                if (active && (event.key === "Enter" || event.key === " ")) {
-                  event.preventDefault();
-                  onSelect(arc);
-                }
-              }}
-              onPointerEnter={() => setHover(arc.key)}
-              onPointerLeave={() => setHover(null)}
-              onFocus={() => setHover(arc.key)}
-              onBlur={() => setHover(null)}
-            >
-              {arc.end - arc.start >= 0.9999 ? (
-                <circle cx={center} cy={center} r={(outer + inner) / 2} fill="none" strokeWidth={outer - inner} className={arc.color.stroke} />
-              ) : (
-                <path d={arcPath(arc.ring, arc.start, arc.end)} className={arc.color.fill} />
-              )}
-            </g>
-          );
-        })}
-        <text x={center} y={center + 5} textAnchor="middle" className="fill-muted-foreground text-[12px] font-semibold">
-          {centerLabel}
-        </text>
-      </svg>
-      {hovered ? <Tooltip arc={hovered} lines={lines(hovered)} /> : null}
+    <div ref={setHost} className="relative mx-auto w-full max-w-[280px]">
+      <ChartContainer config={config} role="group" aria-label={centerLabel} className="aspect-square w-full">
+        <PieChart accessibilityLayer={false}>
+          {/* The ring under the slices: grey when there is no spending. It also holds the label in the centre. */}
+          <Pie
+            data={[{ share: 1 }]}
+            dataKey="share"
+            innerRadius={rings.group.innerRadius}
+            outerRadius={rings.category.outerRadius}
+            fill={props.arcs.length === 0 ? "var(--sunken)" : "none"}
+            stroke="none"
+            isAnimationActive={false}
+          >
+            <Label value={centerLabel} position="center" fill="var(--muted-foreground)" fontSize={12} fontWeight={600} />
+          </Pie>
+          <Rings {...props} setShown={setShown} />
+          {/* The tooltip needs the chart context, and it is HTML. Thus it goes from inside the chart to the box of the donut. */}
+          {shown && host ? createPortal(<SliceTooltip shown={shown} lines={sliceLines(currency, shown.arc, props.nameOf)} />, host) : null}
+        </PieChart>
+      </ChartContainer>
     </div>
   );
 }

@@ -1,16 +1,17 @@
 import type { InsightGroupRow, InsightRow } from "@num/shared";
 
-type Tone = { fill: string; stroke: string; dot: string };
+/** `token` is the chart token of the slice. `dot` is the class of the same colour for the dot in the list. */
+type Tone = { token: "chart-1" | "chart-2" | "chart-3" | "chart-4" | "chart-5" | "est"; dot: string };
 
 const palette: Tone[] = [
-  { fill: "fill-chart-1", stroke: "stroke-chart-1", dot: "bg-chart-1" },
-  { fill: "fill-chart-2", stroke: "stroke-chart-2", dot: "bg-chart-2" },
-  { fill: "fill-chart-3", stroke: "stroke-chart-3", dot: "bg-chart-3" },
-  { fill: "fill-chart-4", stroke: "stroke-chart-4", dot: "bg-chart-4" },
-  { fill: "fill-chart-5", stroke: "stroke-chart-5", dot: "bg-chart-5" },
+  { token: "chart-1", dot: "bg-chart-1" },
+  { token: "chart-2", dot: "bg-chart-2" },
+  { token: "chart-3", dot: "bg-chart-3" },
+  { token: "chart-4", dot: "bg-chart-4" },
+  { token: "chart-5", dot: "bg-chart-5" },
 ];
 
-export const neutralTone: Tone = { fill: "fill-est", stroke: "stroke-est", dot: "bg-est" };
+const neutralTone: Tone = { token: "est", dot: "bg-est" };
 
 export type SliceColor = Tone & { opacity: number };
 
