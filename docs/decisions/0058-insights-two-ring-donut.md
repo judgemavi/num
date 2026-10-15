@@ -25,15 +25,16 @@ Status: approved (owner, 2026-10-14)
    - A click on a category slice selects the category (`category` in the URL), as in decision 0030 item 9. The group
      of the category is highlighted. The list shows only that category under its group.
    - "Uncategorized" is not selectable. The keyboard works on all selectable slices.
-   - A "Show all" control clears the selection.
 5. **Colours.** Groups take `chart-1` to `chart-5` in order, and repeat at a lower opacity after 5. "Uncategorized"
    is `est`. A category takes the colour of its group, at a lower opacity for each next category. No new colour.
 6. **Tooltip.** A slice shows a tooltip on hover and on keyboard focus. A group slice shows the name, the amount and
    the share of the total spending. A category slice shows the name, the group, the amount, the share of its group
    and the share of the total spending. The browser formats all values.
-7. **List (amends 0030 item 11).** "Spending by category" is next to the donut. Each group is a row with its
-   total and a colour dot. Its categories are rows under it. A row opens Transactions with the filter of the group,
-   the category, or the uncategorized lines.
+7. **List (amends 0030 item 11).** The list is hidden when no slice is selected. When a slice is selected, the
+   list is to the right of the donut. It shows the selected group: one row for the group total, and its categories
+   under it, each with a colour dot. When a category is selected, the list shows only that category under its group.
+   A row opens Transactions with the filter of the group or the category. A "Clear" control clears the selection.
+   The tag list is in the same column, under the list. Exact values without a selection are in the tooltips.
 8. **Merchants (amends 0030 items 16 and 18).** The list of spending by merchant is removed from the screen and from
    the API. The tag list stays. "New merchants" in Changes does not change.
 9. **API.** The report has `groups`. Each group row has `categories`. The report does not depend on the selection.
