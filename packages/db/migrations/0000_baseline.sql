@@ -68,7 +68,7 @@ CREATE TABLE `buckets` (
 	`name` text NOT NULL,
 	`kind` text NOT NULL,
 	`priority` integer NOT NULL,
-	`essential` integer NOT NULL,
+	`essential` integer,
 	`color` text NOT NULL,
 	`icon` text NOT NULL,
 	`start_date` text NOT NULL,
@@ -81,7 +81,8 @@ CREATE TABLE `buckets` (
 	`target_date` text,
 	`fixed_amount` integer,
 	`months` integer,
-	`fill_months` integer,
+	`can_recede` integer,
+	`paused_at` text,
 	`sort_key` text NOT NULL
 );
 --> statement-breakpoint
@@ -180,11 +181,6 @@ CREATE TABLE `merchants` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX `merchants_name_lower_unique` ON `merchants` (lower("name"));--> statement-breakpoint
 CREATE INDEX `merchants_sort_key_idx` ON `merchants` (`sort_key`,`name`,`id`);--> statement-breakpoint
-CREATE TABLE `month_holds` (
-	`month` text PRIMARY KEY NOT NULL,
-	`created_at` text NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE `mortgage_terms` (
 	`account_id` text PRIMARY KEY NOT NULL,
 	`rate_milli_pct` integer NOT NULL,
@@ -231,7 +227,6 @@ CREATE TABLE `schedules` (
 	`month_day` integer,
 	`business_day_shift` text NOT NULL,
 	`end_date` text,
-	`payday` integer NOT NULL,
 	FOREIGN KEY (`bucket_id`) REFERENCES `buckets`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE no action,

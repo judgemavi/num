@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "18ce9d96-836f-4a1d-8698-586561b56c6b",
+  "id": "8d04c417-f96a-4611-b8e2-1bda3acbf773",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "accounts": {
@@ -486,7 +486,7 @@
           "name": "essential",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "color": {
@@ -573,9 +573,16 @@
           "notNull": false,
           "autoincrement": false
         },
-        "fill_months": {
-          "name": "fill_months",
+        "can_recede": {
+          "name": "can_recede",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "paused_at": {
+          "name": "paused_at",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1244,30 +1251,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "month_holds": {
-      "name": "month_holds",
-      "columns": {
-        "month": {
-          "name": "month",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "mortgage_terms": {
       "name": "mortgage_terms",
       "columns": {
@@ -1602,13 +1585,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false
-        },
-        "payday": {
-          "name": "payday",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
           "autoincrement": false
         }
       },
