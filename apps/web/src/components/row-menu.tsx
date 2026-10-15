@@ -3,7 +3,7 @@ import { Ellipsis } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-/** The "More" menu of a row or a page. A `ListRow` puts it in the top-right corner of the row (`menu`). */
+/** The "More" menu of a row or a page. A `ListRow` puts it at the end of line 1 of the row (`menu`). */
 export function RowMenu({ label, children }: { label: string; children: ReactNode }) {
   return (
     <DropdownMenu>

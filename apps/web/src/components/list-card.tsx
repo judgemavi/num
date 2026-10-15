@@ -51,17 +51,33 @@ export function ListEmpty({ children }: { children: ReactNode }) {
 }
 
 // A simple row is 48px high. A dense row is 36px high, with a lighter hairline. On a touch screen it is 44px high.
+// `--menu-shift` keeps the 44px hit area of the row menu inside the row on a touch screen (see `rowMenu`).
 const rowSize = {
-  default: "min-h-[60px] py-2",
-  simple: "min-h-12 py-0.5",
-  dense: "min-h-9 py-1 border-border/50 pointer-coarse:min-h-11",
+  default: "min-h-[60px] py-2 [--menu-shift:2px]",
+  simple: "min-h-12 py-0.5 [--menu-shift:8px]",
+  dense: "min-h-9 py-1 border-border/50 pointer-coarse:min-h-11 [--menu-shift:6px]",
 } as const;
 
 // The target of the row covers the whole row. The other controls of the row are above it (`ItemActions`).
-// The menu of a row is in the top-right corner of the row. It has no column: a row with a menu has more space at the
-// top, and the content of the row uses the full width. The hit area stays above the content of the row: 28px with a
-// mouse, 44px on a touch screen (that row has more space at the top).
 const rowTarget = "absolute inset-0 cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset";
+
+// The menu of a row is the last item of line 1, after the amount. Its column is only as wide as the button: 28px with
+// a mouse, 36px on a touch screen. Thus it does not cover the amount. The hit area is 28px high with a mouse and 44px
+// high on a touch screen. The button is centred on the line of the amount:
+// - The amount column has a second line (`small`): the menu column has an empty second line of the same height under
+//   the button. It is centred like the amount column, thus the button is centred on line 1 of the amount. A negative
+//   margin keeps the row at its normal height.
+// - A narrow row, or a row with no amount column, and the name has a second line: the button is at the top, on line 1.
+// - Else the button is centred on the row.
+// On line 1, a 44px hit area goes above the row. Thus on a touch screen the hit area moves down by `--menu-shift` into
+// the row, and the icon moves up by the same distance. The icon stays on line 1.
+const rowMenu = cn(
+  "relative z-10 -mx-1.5 shrink-0 *:size-7 pointer-coarse:*:h-11 pointer-coarse:*:w-9",
+  "[--menu-lift:0px] pointer-coarse:*:translate-y-(--menu-lift) pointer-coarse:*:*:-translate-y-(--menu-lift)",
+  "@2xl:group-has-[.list-amt>small]/item:flex-col @2xl:group-has-[.list-amt>small]/item:-my-2.5 @2xl:group-has-[.list-amt>small]/item:gap-0 @2xl:group-has-[.list-amt>small]/item:after:h-lh @2xl:group-has-[.list-amt>small]/item:after:text-[13px] @2xl:group-has-[.list-amt>small]/item:[--menu-lift:var(--menu-shift)]",
+  "group-not-has-[.list-amt]/item:group-has-[.list-name>small]/item:h-6 group-not-has-[.list-amt]/item:group-has-[.list-name>small]/item:self-start group-not-has-[.list-amt]/item:group-has-[.list-name>small]/item:[--menu-lift:var(--menu-shift)]",
+  "@max-2xl:group-has-[.list-name>small]/item:h-6 @max-2xl:group-has-[.list-name>small]/item:self-start @max-2xl:group-has-[.list-name>small]/item:[--menu-lift:var(--menu-shift)]",
+);
 
 /**
  * A row that opens has a target: `onOpen` (it opens an editor or does an action) or `link` (a `Link` with no children
@@ -94,7 +110,6 @@ export function ListRow({
       className={cn(
         "@container relative flex-wrap gap-3.5 rounded-none border-0 border-t border-border px-5 text-[15px] first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary [.list-group+&]:border-t-0",
         rowSize[size],
-        menu ? "pt-9 pointer-fine:pt-6" : null,
         current && "bg-primary-soft",
       )}
     >
@@ -105,9 +120,7 @@ export function ListRow({
         </Slot.Root>
       ) : null}
       {children}
-      {menu ? (
-        <ItemActions className="absolute -top-2 right-1.5 z-10 pointer-fine:-top-1 pointer-fine:right-3.5 *:pointer-fine:size-7">{menu}</ItemActions>
-      ) : null}
+      {menu ? <ItemActions className={rowMenu}>{menu}</ItemActions> : null}
     </Item>
   );
 }
@@ -122,7 +135,7 @@ export const listName = `list-name min-w-0 flex-1 font-semibold ${smallLines}`;
 // and their secondary lines have different lengths. In a narrow row (less than 42rem) the middle column takes a full
 // line below the name. The amount column does not show: `ListTitle` puts the amount at the end of line 1.
 export const listMid = "w-40 shrink-0 @max-2xl:order-1 @max-2xl:basis-full";
-export const listAmt = `w-40 shrink-0 text-right text-base @max-2xl:hidden ${smallLines}`;
+export const listAmt = `list-amt w-40 shrink-0 text-right text-base @max-2xl:hidden ${smallLines}`;
 
 /**
  * Line 1 of a row with an amount column: the name (it truncates) and its badges. In a narrow row the amount goes at

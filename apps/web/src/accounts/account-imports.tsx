@@ -7,7 +7,7 @@ import { accountLabel } from "@/accounts/label";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
-import { ListCard, ListRow } from "@/components/list-card";
+import { ListCard, ListRow, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
@@ -93,12 +93,12 @@ function ImportRows({ accountId, onUndo }: { accountId: string; onUndo: (item: I
         )
       }
     >
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold">{formatImportDate(item.createdAt)}</p>
-        <p className="text-[13px] text-muted-foreground">
+      <div className={listName}>
+        {formatImportDate(item.createdAt)}
+        <small>
           {item.filename ?? "Statement"}
           {item.undoneAt ? " · Undone" : ""}
-        </p>
+        </small>
       </div>
       <p className="text-right text-[13px] text-muted-foreground">{importCountText(item.counts)}</p>
     </ListRow>
