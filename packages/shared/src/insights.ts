@@ -94,7 +94,6 @@ export const insightsSchema = z.object({
   savingsRateMilliPct: z.number().int().nullable(),
   changes: insightChangesSchema,
   groups: z.array(groupRowSchema),
-  tags: z.array(rowSchema),
   timeline: timelineSchema,
   netWorth: z
     .array(

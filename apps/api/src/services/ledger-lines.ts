@@ -1,4 +1,4 @@
-import { categories, lineTags, transactionLines, transactions } from "@num/db";
+import { categories, transactionLines, transactions } from "@num/db";
 import { flowLineKind, type FlowLine } from "@num/shared";
 import { and, eq, gte, lte } from "drizzle-orm";
 import type { Db } from "../db";
@@ -13,7 +13,6 @@ export type LedgerLine = {
   merchantId: string | null;
   kind: FlowLine["kind"];
   transfer: boolean;
-  tagIds: string[];
 };
 
 export function loadLedgerLines(db: Db, range?: { from: string; through: string }): LedgerLine[] {
@@ -38,13 +37,6 @@ export function loadLedgerLines(db: Db, range?: { from: string; through: string 
       ),
     )
     .all();
-  const tags = db.select({ lineId: lineTags.lineId, tagId: lineTags.tagId }).from(lineTags).all();
-  const byLine = new Map<string, string[]>();
-  for (const tag of tags) {
-    const list = byLine.get(tag.lineId) ?? [];
-    list.push(tag.tagId);
-    byLine.set(tag.lineId, list);
-  }
   return rows.map((row) => ({
     lineId: row.lineId,
     date: row.date,
@@ -55,6 +47,5 @@ export function loadLedgerLines(db: Db, range?: { from: string; through: string 
     merchantId: row.merchantId,
     kind: flowLineKind(row.kind),
     transfer: row.transferAccountId !== null,
-    tagIds: byLine.get(row.lineId) ?? [],
   }));
 }

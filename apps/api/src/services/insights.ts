@@ -6,7 +6,7 @@ import { ServiceError } from "../service-error";
 import { changeMonth, readInsightChanges } from "./insights-changes";
 import { loadLedgerLines } from "./ledger-lines";
 import { breakdownRange, firstTransactionDate, windowPeriod } from "./insights-period";
-import { groupRows, spendTotals, tagRows } from "./insights-spend";
+import { groupRows, spendTotals } from "./insights-spend";
 import { readTimeline } from "./insights-timeline";
 import { netWorthSeries, type MonthPoint } from "./insights-worth";
 
@@ -53,7 +53,6 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
     savingsRateMilliPct: totals.savingsRateMilliPct,
     changes: readInsightChanges(db, facts, changeMonth(period, query.month), query.asOf),
     groups: groupRows(facts, range),
-    tags: tagRows(facts, range),
     timeline: readTimeline(db, facts, period, query.asOf, category),
     netWorth: netWorthSeries(db, monthEnds(query.asOf, 24)),
   };

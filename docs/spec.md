@@ -785,8 +785,7 @@ After 90 days, show only the monthly net values (Home, this month). Do not show 
   of its group. A click on a group highlights it and limits the list to it. A click on a category limits the timeline
   and the list to that category. The list is to the right of the donut. It shows only when a slice is selected.
   Decisions 0030 and 0058.
-- Spending by tag: a list for the period. A row opens Transactions with the filter. There is no list by merchant
-  (decision 0058).
+- There is no list of spending by merchant or by tag (decision 0058).
 - **Net worth.** Assets − liabilities at the end of each month. Show a chart for 24 months.
 - **Mortgage.** Balance, rate, schedule and payoff date. Also, the effect of an extra payment amount.
 
@@ -879,7 +878,7 @@ There are 7 screens (decision 0021).
 | Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); each account that does not match its bank (§5.13); hygiene checks (§10); this month: income → bills → bucket funding → left to save, "Fund this paycheck", missed payments, overspent buckets, goal status; spending changes this month; net worth. Each card links to its screen. |
 | Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers, row selection with Approve and the bulk editor (decision 0051) |
 | Buckets | Balances, funding history, moves, goals (feasibility), settings |
-| Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups and categories in two rings), tags, net worth, mortgage. Decisions 0030, 0058. |
+| Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups and categories in two rings), net worth, mortgage. Decisions 0030, 0058. |
 | Accounts | List with balances and the bank status of each account (§5.13), import, bank balances, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
 | Recurring | Plans, Upcoming (occurrences of all plans in the next 30 days, decision 0055), links, skips, Detected (new plan suggestions) |
 | Settings | Subpages: Groups, Categories, Tags, Merchants, Currency (decision 0038), AI access, Backup. |

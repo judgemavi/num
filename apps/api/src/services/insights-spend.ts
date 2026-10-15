@@ -86,16 +86,3 @@ export function groupRows(facts: readonly LedgerLine[], period: Period): Insight
   }
   return rows;
 }
-
-/** Spending by tag, largest first. A line with no tag is not in the list. */
-export function tagRows(facts: readonly LedgerLine[], period: Period): InsightRow[] {
-  const totals = new Map<string, number>();
-  for (const fact of facts) {
-    if (inPeriod(fact, period) && isExpenseLine(fact)) {
-      for (const tagId of fact.tagIds) {
-        addTo(totals, tagId, expenseSpending(fact.amount));
-      }
-    }
-  }
-  return itemRows(totals);
-}

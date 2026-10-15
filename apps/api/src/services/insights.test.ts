@@ -11,7 +11,6 @@ import { createCategory, createCategoryGroup } from "./categories";
 import { readInsights } from "./insights";
 import { createMerchant } from "./merchants";
 import { mortgageAccountView } from "./mortgage";
-import { createTag } from "./tags";
 import { createTransaction } from "./transactions";
 
 function tempDatabase() {
@@ -44,7 +43,6 @@ function spend(
     categoryId?: string | null;
     merchantId?: string | null;
     transferAccountId?: string | null;
-    tagIds?: string[];
   },
 ) {
   const line = {
@@ -52,7 +50,7 @@ function spend(
     memo: null,
     categoryId: input.transferAccountId ? null : (input.categoryId ?? null),
     transferAccountId: input.transferAccountId ?? null,
-    tagIds: input.tagIds ?? [],
+    tagIds: [],
   };
   const body: TransactionCreate & typeof saved = {
     accountId: input.accountId,
@@ -109,8 +107,6 @@ test("group totals: refunds reduce spending, transfers are excluded, No group an
     const repairs = createCategory(book.db, { name: "Repairs", kind: "expense", groupId: home.id, ...saved });
     const fun = createCategory(book.db, { name: "Fun", kind: "expense", ...saved });
     const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
-    const trip = createTag(book.db, { name: "Trip", ...saved });
-    const gift = createTag(book.db, { name: "Gift", ...saved });
     spend(book.db, { accountId: chequing.id, date: "2026-06-02", amount: -100_000, categoryId: groceries.id });
     spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: 25_000, categoryId: groceries.id });
     spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: 10_000, categoryId: repairs.id });
@@ -122,7 +118,6 @@ test("group totals: refunds reduce spending, transfers are excluded, No group an
       date: "2026-06-07",
       amount: -20_000,
       categoryId: fun.id,
-      tagIds: [trip.id, gift.id],
     });
 
     const sums = rawClassified(book.db);
@@ -148,10 +143,6 @@ test("group totals: refunds reduce spending, transfers are excluded, No group an
     ]);
     expect(sums.uncategorized).toBe(-30_000);
     expect(readInsights(book.db, { ...query, category: groceries.id }).groups).toEqual(report.groups);
-
-    expect(report.tags).toHaveLength(2);
-    expect(report.tags).toContainEqual({ id: trip.id, kind: "item", amount: 20_000, inflow: null });
-    expect(report.tags).toContainEqual({ id: gift.id, kind: "item", amount: 20_000, inflow: null });
   } finally {
     book.close();
   }

@@ -6,7 +6,7 @@ Status: approved (owner, 2026-10-14)
 
 1. Decision 0030 gives a donut with two levels. The user selects a group, and the donut shows its categories.
    A "Back" control returns to the groups. The user cannot see groups and categories together.
-2. The list of spending by merchant has little use next to the donut. The owner asks to remove it.
+2. The lists of spending by merchant and by tag have little use next to the donut. The owner asks to remove them.
 
 ## Decision
 
@@ -34,11 +34,12 @@ Status: approved (owner, 2026-10-14)
    list is to the right of the donut. It shows the selected group: one row for the group total, and its categories
    under it, each with a colour dot. When a category is selected, the list shows only that category under its group.
    A row opens Transactions with the filter of the group or the category. A "Clear" control clears the selection.
-   The tag list is in the same column, under the list. Exact values without a selection are in the tooltips.
-8. **Merchants (amends 0030 items 16 and 18).** The list of spending by merchant is removed from the screen and from
-   the API. The tag list stays. "New merchants" in Changes does not change.
+   Exact values without a selection are in the tooltips.
+8. **Merchants and tags (amends 0030 items 16 and 18).** The list of spending by merchant is removed from the screen and from
+   the API. The list of spending by tag is also removed from the screen and from the API.
+   "New merchants" in Changes does not change.
 9. **API.** The report has `groups`. Each group row has `categories`. The report does not depend on the selection.
-   The query has no `group` field. The page keeps `group` in its search only. `donut`, `rows` and `merchants` are removed.
+   The query has no `group` field. The page keeps `group` in its search only. `donut`, `rows`, `merchants` and `tags` are removed.
 
 ## Consequences
 
