@@ -9,7 +9,7 @@ function add(balances: Map<string, number>, id: string, amount: number) {
 
 const owner = alias(buckets, "link_owner");
 
-// Spec 5.8 and decisions 0029, 0062: events count on all dates. Lines count only from the bucket's start date.
+// Spec 5.8 and decisions 0029, 0062, 0065 (a recede is money back to Unassigned, as a release is): events count on all dates. Lines count only from the bucket's start date.
 // A commitment counts the full amount of its linked payments. Its payment does not count in a category bucket.
 export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
   const balances = new Map<string, number>();
@@ -32,7 +32,7 @@ export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
   for (const event of events) {
     if (event.kind === "fund" || event.kind === "cover") {
       add(balances, event.bucketId, event.amount);
-    } else if (event.kind === "release") {
+    } else if (event.kind === "release" || event.kind === "recede") {
       add(balances, event.bucketId, -event.amount);
     } else if (event.kind === "move" && event.otherBucketId) {
       add(balances, event.bucketId, -event.amount);

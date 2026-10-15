@@ -10,6 +10,7 @@ import {
   type Forecast,
   type ForecastDelta,
   type ForecastFlow,
+  type ForecastInput,
 } from "@num/shared";
 import { and, asc, eq, gt, isNotNull, isNull, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
@@ -54,12 +55,21 @@ function bufferOf(db: Db) {
 
 function scheduleFlows(schedule: ScheduleView, date: string, amount: number): ForecastFlow[] {
   if (schedule.kind === "income") {
-    return [{ date, income: amount, spending: 0 }];
+    return [{ date, income: amount, spending: 0, bucketId: schedule.id }];
   }
-  return schedule.transferAccountId === null ? [{ date, income: 0, spending: -amount }] : [];
+  return schedule.transferAccountId === null ? [{ date, income: 0, spending: -amount, bucketId: schedule.id }] : [];
 }
 
 export function readForecast(db: Db, asOf: string): Forecast {
+  return buildForecast(forecastInput(db, asOf));
+}
+
+/**
+ * The input of the forecast (spec §8). Each flow has its bucket: a commitment, an income or a spending bucket.
+ * `transfersOut` are the commitment payments by transfer to an account that is not an open on-budget account (a loan
+ * payment, for example). They leave the pool (decision 0065 item 9), but they are not spending in the forecast.
+ */
+export function forecastInput(db: Db, asOf: string): ForecastInput & { transfersOut: ForecastFlow[] } {
   const step = bookStep(db);
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
@@ -81,6 +91,7 @@ export function readForecast(db: Db, asOf: string): Forecast {
   const linkedTransactions = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
   const deltas: ForecastDelta[] = [];
   const flows: ForecastFlow[] = [];
+  const transfersOut: ForecastFlow[] = [];
   for (const schedule of schedules) {
     const amount = amounts.get(schedule.id)?.forecast ?? schedule.expectedAmount;
     for (const date of occurrenceDates(schedule, horizonEnd, asOf)) {
@@ -90,6 +101,9 @@ export function readForecast(db: Db, asOf: string): Forecast {
       if (accountIds.has(schedule.accountId)) {
         deltas.push({ date: date.dueDate, accountId: schedule.accountId, amount, series: "known" });
         flows.push(...scheduleFlows(schedule, date.dueDate, amount));
+        if (schedule.kind === "commitment" && schedule.transferAccountId && !accountIds.has(schedule.transferAccountId)) {
+          transfersOut.push({ date: date.dueDate, income: 0, spending: -amount, bucketId: schedule.id });
+        }
       }
       if (schedule.transferAccountId && accountIds.has(schedule.transferAccountId)) {
         deltas.push({ date: date.dueDate, accountId: schedule.transferAccountId, amount: -amount, series: "known" });
@@ -133,13 +147,13 @@ export function readForecast(db: Db, asOf: string): Forecast {
     .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
     .where(and(isNotNull(transactionLines.categoryId)))
     .all();
-  const monthly: { accountId: string; monthly: number }[] = [];
+  const monthly: { accountId: string; monthly: number; bucketId: string | null }[] = [];
   for (const bucket of spending) {
     const categoryIds = new Set([...bucketOf].filter(([, bucketId]) => bucketId === bucket.id).map(([categoryId]) => categoryId));
     const rows = lines.filter((line) => line.categoryId !== null && categoryIds.has(line.categoryId) && accountIds.has(line.accountId));
     const accountId = usualAccount(rows);
     if (accountId && bucket.refillTo) {
-      monthly.push({ accountId, monthly: bucket.refillTo });
+      monthly.push({ accountId, monthly: bucket.refillTo, bucketId: bucket.id });
     }
   }
   for (const categoryId of expenseIds) {
@@ -160,12 +174,12 @@ export function readForecast(db: Db, asOf: string): Forecast {
     );
     const accountId = usualAccount(rows.filter((line) => accountIds.has(line.accountId)));
     if (accountId && amount > 0) {
-      monthly.push({ accountId, monthly: amount });
+      monthly.push({ accountId, monthly: amount, bucketId: null });
     }
   }
   const variable = spendDeltas(dates, monthly, step);
   deltas.push(...variable);
-  flows.push(...variable.map((delta) => ({ date: delta.date, income: 0, spending: -delta.amount })));
+  flows.push(...variable.map((delta) => ({ date: delta.date, income: 0, spending: -delta.amount, bucketId: delta.bucketId })));
 
   const warnings: Forecast["warnings"] = [];
   const cards = [];
@@ -191,7 +205,7 @@ export function readForecast(db: Db, asOf: string): Forecast {
     cards.push({ accountId: account.id, paymentAccountId, policy, fixedPayment: account.fixedPayment, paymentDay });
   }
 
-  const forecast = buildForecast({
+  return {
     asOf,
     bufferAmount: bufferOf(db),
     nextIncomeDate: nextPayday(schedules, skipped, asOf),
@@ -204,6 +218,6 @@ export function readForecast(db: Db, asOf: string): Forecast {
     deltas,
     flows,
     cards,
-  });
-  return forecast;
+    transfersOut,
+  };
 }

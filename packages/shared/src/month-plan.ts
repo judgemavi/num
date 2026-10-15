@@ -63,8 +63,6 @@ export type MonthPlanBucketSource = {
   target: number | null;
   targetDate: string | null;
   fixedAmount: number | null;
-  /** The months to fill an emergency bucket from 0. `target` is the calculated target for this kind (decision 0060). */
-  fillMonths: number | null;
   startDate: string;
   actualFunded: number;
   /** The schedule data of a commitment for its monthly amount (decision 0062 item 5). Null for the other kinds. */
@@ -118,7 +116,6 @@ export const monthPlanSchema = z.object({
       income: nonNegative,
       commitments: nonNegative,
       refills: nonNegative,
-      emergency: nonNegative,
       surplus: money,
       need: nonNegative,
       shortfall: nonNegative,
@@ -220,7 +217,6 @@ function monthFigures(input: PlanInput) {
   const funded: MonthPlan["funding"]["items"] = [];
   const need: { bucket: MonthPlanBucketSource; monthly: number }[] = [];
   let refills = 0;
-  let emergency = 0;
 
   const activeBuckets = input.buckets.filter((bucket) => !bucket.archived && bucket.kind !== "income").sort(comparePriority);
 
@@ -232,9 +228,7 @@ function monthFigures(input: PlanInput) {
     }
     if (bucket.kind === "spending") {
       refills += monthly;
-    } else if (bucket.kind === "emergency") {
-      emergency += monthly;
-    } else if (bucket.kind !== "commitment" && monthly > 0) {
+    } else if ((bucket.kind === "sinking" || bucket.kind === "goal") && monthly > 0) {
       need.push({ bucket, monthly });
     }
   }
@@ -257,7 +251,7 @@ function monthFigures(input: PlanInput) {
   if (hasIncome) {
     const incomeSafe = divideAmount(incomeYear, 12, input.step);
     const commitmentSafe = divideAmount(commitmentYear, 12, input.step);
-    const surplus = incomeSafe - commitmentSafe - refills - emergency;
+    const surplus = incomeSafe - commitmentSafe - refills;
     const total = need.reduce((sum, item) => sum + item.monthly, 0);
     const shares = surplusShares(surplus, need.map((item) => ({ bucketId: item.bucket.id, monthly: item.monthly, dueDate: goalDateOf(item.bucket) })), input.step);
     const buckets = need.map(({ bucket, monthly }): NonNullable<MonthPlan["feasibility"]>["buckets"][number] => {
@@ -268,7 +262,7 @@ function monthFigures(input: PlanInput) {
       const later = dueDate !== null && room > 0 && monthly > room && gap > 0 ? firstOfMonthAfter(input.month, Math.ceil(gap / room)) : null;
       return { bucketId: bucket.id, name: bucket.name, kind: bucket.kind === "sinking" ? "sinking" : "goal", monthly, dueDate, laterDate: later !== null && dueDate !== null && later > dueDate ? later : null };
     });
-    feasibility = { income: incomeSafe, commitments: commitmentSafe, refills, emergency, surplus, need: total, shortfall: Math.max(0, total - surplus), buckets };
+    feasibility = { income: incomeSafe, commitments: commitmentSafe, refills, surplus, need: total, shortfall: Math.max(0, total - surplus), buckets };
   }
 
   const plan: MonthPlan = {

@@ -13,7 +13,24 @@ const emergencyFundCheckSchema = z.object({
   balance: money,
   target: nonNegative,
   months: nonNegative,
-  monthly: nonNegative,
+});
+
+/** The money that went from the emergency fund back to Unassigned this month, for each covered bucket (decision 0065 item 8). */
+const recedeMonthCheckSchema = z.object({
+  code: z.literal("recede_month"),
+  pass: z.boolean(),
+  month: monthKeySchema,
+  total: nonNegative,
+  items: z.array(z.object({ bucketId: z.uuid(), amount: nonNegative })),
+});
+
+/** The first date when the forecast pool goes below 0, and what the emergency fund would give (decision 0065 item 9). */
+const recedeAheadCheckSchema = z.object({
+  code: z.literal("recede_ahead"),
+  pass: z.boolean(),
+  date: isoDateSchema.nullable(),
+  amount: nonNegative,
+  uncovered: nonNegative,
 });
 
 const importFreshSchema = z.object({
@@ -66,6 +83,8 @@ const overspentCheckSchema = z.object({
 
 export const hygieneCheckSchema = z.discriminatedUnion("code", [
   emergencyFundCheckSchema,
+  recedeMonthCheckSchema,
+  recedeAheadCheckSchema,
   importsCheckSchema,
   reviewCheckSchema,
   savingsRateCheckSchema,
@@ -75,7 +94,7 @@ export const hygieneCheckSchema = z.discriminatedUnion("code", [
 
 export const hygieneSchema = z.object({
   asOf: isoDateSchema,
-  /** The emergency fund check is left out when the emergency bucket is archived. */
+  /** The emergency fund and recede checks are left out when the book has no active emergency bucket. */
   checks: z.array(hygieneCheckSchema),
 });
 

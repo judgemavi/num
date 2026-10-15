@@ -42,7 +42,6 @@ const spendingFields = {
   targetDate: null,
   fixedAmount: null,
   months: null,
-  fillMonths: null,
   schedule: null,
 };
 

@@ -19,9 +19,9 @@ export const sinkingRepeats = ["none", "yearly"] as const;
 
 export type SinkingRepeat = (typeof sinkingRepeats)[number];
 
-/** The events that the user makes. The fill makes `cover` (decision 0059). */
+/** The events that the user makes. The fill makes `cover` (decision 0059) and `recede` (decision 0065). */
 export const manualEventKinds = ["fund", "move", "release"] as const;
-export const bucketEventKinds = [...manualEventKinds, "cover"] as const;
+export const bucketEventKinds = [...manualEventKinds, "cover", "recede"] as const;
 
 export type BucketEventKind = (typeof bucketEventKinds)[number];
 
@@ -72,7 +72,7 @@ const nameSchema = z.string().trim().min(1);
 const monthCount = z.number().int().min(1).max(120);
 
 /** The settings of a new emergency bucket (decision 0060). */
-export const emergencyDefaults = { months: 3, fillMonths: 12 } as const;
+export const emergencyDefaults = { months: 3 } as const;
 const bucketFields = {
   name: nameSchema,
   kind: z.enum(bucketKinds),
@@ -90,7 +90,6 @@ const bucketFields = {
   targetDate: isoDateSchema.nullable(),
   fixedAmount: money.nullable(),
   months: monthCount.nullable(),
-  fillMonths: monthCount.nullable(),
   schedule: scheduleSchema.nullable(),
 };
 
@@ -105,17 +104,14 @@ export function kindFieldsValid(value: {
   targetDate: string | null;
   fixedAmount: number | null;
   months: number | null;
-  fillMonths: number | null;
   schedule: Schedule | null;
 }): boolean {
-  const emergency = value.months !== null && value.fillMonths !== null;
   if (hasSchedule(value.kind)) {
     return (
       value.schedule !== null &&
       scheduleIssues(value.kind, value.schedule).length === 0 &&
       value.categoryIds.length === 0 &&
       value.months === null &&
-      value.fillMonths === null &&
       value.refillTo === null &&
       value.amount === null &&
       value.dueDate === null &&
@@ -130,7 +126,7 @@ export function kindFieldsValid(value: {
   }
   if (value.kind === "emergency") {
     return (
-      emergency &&
+      value.months !== null &&
       value.categoryIds.length === 0 &&
       value.refillTo === null &&
       value.amount === null &&
@@ -141,7 +137,7 @@ export function kindFieldsValid(value: {
       value.fixedAmount === null
     );
   }
-  if (value.months !== null || value.fillMonths !== null) {
+  if (value.months !== null) {
     return false;
   }
   if (value.kind === "spending") {
@@ -226,7 +222,6 @@ export const emergencyFundSchema = z.object({
   archived: z.boolean(),
   balance: z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER),
   months: monthCount,
-  fillMonths: monthCount,
   /** The median monthly essential spending, or the planned figure when fewer than 3 complete months have lines. */
   monthly: money,
   target: money,

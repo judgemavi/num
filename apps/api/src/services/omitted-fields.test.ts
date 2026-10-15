@@ -262,7 +262,6 @@ test("a bucket patch is checked with the stored kind fields", () => {
       targetDate: null,
       fixedAmount: null,
       months: null,
-      fillMonths: null,
       schedule: null,
       asOf: "2026-03-01",
       ...saved,

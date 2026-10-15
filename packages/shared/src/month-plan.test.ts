@@ -47,7 +47,6 @@ function goal(id: string, target: number, targetDate: string | null, fixedAmount
     target,
     targetDate,
     fixedAmount,
-    fillMonths: null,
     startDate: "2000-01-01",
     actualFunded: 0,
     commitment: null,
@@ -147,7 +146,6 @@ test("a shortfall shows a later date that fits and the amount to cut elsewhere",
     target: null,
     targetDate: null,
     fixedAmount: null,
-    fillMonths: null,
     startDate: "2000-01-01",
     actualFunded: 0,
     commitment: null,
@@ -179,7 +177,6 @@ test("a shortfall shows a later date that fits and the amount to cut elsewhere",
         target: null,
         targetDate: null,
         fixedAmount: null,
-        fillMonths: null,
         startDate: "2000-01-01",
         actualFunded: 0,
         commitment: null,
@@ -200,7 +197,7 @@ test("a shortfall shows a later date that fits and the amount to cut elsewhere",
   expect(month.funding.items.find((item) => item.bucketId === "steady")).toMatchObject({ planned: 200_000 });
 });
 
-test("the monthly surplus subtracts the emergency amount", () => {
+test("the monthly surplus does not subtract an emergency amount", () => {
   const month = buildMonthPlan({
     month: "2026-02",
     step: 10,
@@ -220,19 +217,17 @@ test("the monthly surplus subtracts the emergency amount", () => {
         amount: null,
         dueDate: null,
         repeat: null,
-        // 2 600 000 over 12 months is 216 666.67. It rounds up to 216 670.
         target: 2_600_000,
         targetDate: null,
         fixedAmount: null,
-        fillMonths: 12,
         startDate: "2000-01-01",
         actualFunded: 0,
         commitment: null,
       },
     ],
   });
-  expect(month.feasibility).toMatchObject({ income: 2_166_670, emergency: 216_670, surplus: 1_950_000, need: 0, shortfall: 0 });
-  expect(month.funding.items).toMatchObject([{ kind: "emergency", planned: 216_670 }]);
+  expect(month.feasibility).toMatchObject({ income: 2_166_670, surplus: 2_166_670, need: 0, shortfall: 0 });
+  expect(month.funding.items).toMatchObject([{ kind: "emergency", planned: 2_600_000 }]);
 });
 
 test("the current month compares planned amounts with linked actuals", () => {

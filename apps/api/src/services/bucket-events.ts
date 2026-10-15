@@ -107,6 +107,9 @@ export function undoBucketEvent(db: Db, bucketId: string, eventId: string, input
     if (existing.month) {
       throw new ServiceError("event_month_funding", 409);
     }
+    if (existing.kind === "recede") {
+      throw new ServiceError("event_recede", 409);
+    }
     const next = { ...existing, undoneAt: at };
     tx.update(bucketEvents).set({ undoneAt: at }).where(eq(bucketEvents.id, eventId)).run();
     tx.audit({

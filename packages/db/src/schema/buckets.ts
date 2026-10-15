@@ -22,7 +22,6 @@ export const buckets = sqliteTable(
     targetDate: text("target_date"),
     fixedAmount: integer("fixed_amount"),
     months: integer("months"),
-    fillMonths: integer("fill_months"),
     /** The folded name (`foldName`). The list sorts by it. */
     sortKey: text("sort_key").notNull(),
   },

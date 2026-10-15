@@ -33,7 +33,6 @@ export function createSchedule(db: Db, input: ScheduleInput & WriteInput): Bucke
     targetDate: null,
     fixedAmount: null,
     months: null,
-    fillMonths: null,
     schedule: {
       categoryId: null,
       transferAccountId: null,

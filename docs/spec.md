@@ -311,10 +311,9 @@ Settings for each kind:
 - `sinking`: `amount`, `dueDate`, `repeat` (`none | yearly`). The monthly amount is the shortfall over the months until the due date (§7.6).
 - `goal`: `target`, `targetDate?`, `fixedAmount?`. The monthly amount is the shortfall over the months until the target date.
   If there is no target date, the goal has a fixed amount for each month (§7.6).
-- `emergency`: `months` (default 3), `fillMonths` (default 12). A book has exactly one emergency bucket. It has no
-  categories. The setup makes it (§7.0). The fill makes it when a set-up book has none (§7.6). Target = `months` × the monthly
-  essential spending (§7.6). The user can change the name, the colour, the icon, the priority and the settings.
-  The user cannot make a second one. Decision 0060.
+- `emergency`: `months` (default 3). A book has exactly one emergency bucket. It has no categories. The setup makes it
+  (§7.0). Target = `months` × the monthly essential spending (§7.6). The user can change the name, the colour, the icon,
+  the priority and the settings. The user cannot make a second one. Decisions 0060, 0065.
 
 Bucket events (append only):
 - `fund`: money from Unassigned into the bucket.
@@ -322,6 +321,8 @@ Bucket events (append only):
 - `release`: money from the bucket back to Unassigned. A release cannot be more than the bucket balance.
 - `cover`: money that the fill adds to a bucket with a negative balance (§7.7). The user does not make it and cannot undo it.
   It has no `month`. It is not funding of a month (§5.9).
+- `recede`: money that the fill moves from the emergency bucket back to Unassigned for a cover (§7.7, decision 0065).
+  `otherBucketId` is the covered bucket. It has no `month`. The user does not make it and cannot undo it.
 - A manual `fund` cannot be more than Unassigned.
 - Each event has `amount` (positive), `date`, `note?`, `month?`, `undoneAt?`. `month` (YYYY-MM) is on a `fund` event that the
   fill paid (§5.9). A manual event has no `month`.
@@ -329,11 +330,11 @@ Bucket events (append only):
   The user can undo an event that has no `month`. The events of the fill are undone only with their month (§5.9).
 - To archive a bucket, its balance must be 0. Archive removes its category mappings (audited).
 
-Commitment balance = funds + covers + moves in − moves out − releases + the full amount of the transactions that are linked
+Commitment balance = funds + covers + moves in − moves out − releases − recedes + the full amount of the transactions that are linked
 to its occurrences (all lines; a loan payment includes the interest line). Count only the transactions with a date on or
 after `startDate`. A transaction that is linked to a commitment does not count in a category bucket (decision 0062).
 
-Bucket balance (other kinds) = funds + covers + moves in − moves out − releases + the sum of the lines in the bucket's categories.
+Bucket balance (other kinds) = funds + covers + moves in − moves out − releases − recedes + the sum of the lines in the bucket's categories.
 Count only the lines of transactions with a date on or after `startDate`. Count events on all dates.
 Do not count events with `undoneAt`.
 Spending lines are negative. Refund lines are positive.
@@ -348,7 +349,7 @@ Month hold: `month` (YYYY-MM), `createdAt`. A hold means that the user undid the
 
 - Funding of a month = the `fund` events with that `month` that are not undone.
 - Undo of a month sets `undoneAt` on the `fund` events of that month and makes the hold (audited, one write).
-  The money returns to Unassigned. The fill does not pay a held month. The covers stay.
+  The money returns to Unassigned. The fill does not pay a held month. The covers and the recedes stay.
 - The fill pays only the month of `asOf`. An older held month stays in the history as "Undone". It has no "Fund again".
 - "Fund again" removes the hold, then runs the fill (audited, one write). The fill pays the month by the current figures.
 - A manual `fund` event does not count as funding of a month.
@@ -477,7 +478,7 @@ When the database has no settings, the app shows the setup screen. The user:
 2. Selects the default category set, or starts with no categories.
 
 The setup makes the emergency bucket "Emergency fund": essential, a colour and an icon from the fixed set (decision 0009),
-`startDate` = the setup date, `months` 3, `fillMonths` 12 (decision 0060).
+`startDate` = the setup date, `months` 3 (decision 0060).
 
 The app does not create accounts at setup.
 
@@ -750,7 +751,8 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
      - Less often: `(the amount of the next occurrence − balance) /` the number of months from this month to the month of
        that occurrence, minimum 0. If it is due in this month: the whole shortfall.
    - Income: no monthly amount. It is not funded.
-   - Emergency: the smaller of `target / fillMonths` and `target − balance`, minimum 0.
+   - Emergency: `target − balance`, minimum 0. The balance is the balance on `asOf`, thus it includes the funding of
+     the month, and owed is this amount (decision 0065).
    Round each amount up to a whole minor unit of the currency (§4).
 2. **Emergency target.** Target = `months` × the monthly essential spending. The monthly essential spending is the median
    of the last 6 complete months before the date of the calculation. A month counts when it has expense lines in the
@@ -768,7 +770,8 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
    - It skips a held month. It pays only what is still owed, thus it is idempotent. When nothing is owed or Unassigned is 0,
      it writes nothing.
    - Before it pays, it covers the negative buckets (§7.7).
-   - If a set-up book has no emergency bucket, the fill makes it with `startDate` = `asOf` (decision 0060).
+   - The emergency bucket takes what is left, up to its owed amount. The buckets after it take the rest. An owed
+     amount that Unassigned cannot pay waits for income. It does not take money from the emergency bucket.
 5. **Paychecks.** A paycheck makes no funding. Its link, unlink or delete does not change funding.
 6. **Manual funding.** The user can fund, move or release money of a bucket at any time (§5.8). This does not count as
    the funding of a month.
@@ -783,6 +786,9 @@ from Unassigned (decision 0059). It does this in the same write, before it pays 
   Each covered bucket goes to 0. The last one can be covered in part. The buckets with the lowest priority keep S.
 - A cover is a `cover` event (§5.8). It is not funding of a month. The next monthly amount counts it in the start balance.
   A cover does not change Unassigned.
+- When a bucket stays short after N − S, the emergency bucket gives the missing part back to Unassigned with a `recede`
+  event, then the cover is written (decision 0065). A recede never makes the emergency balance less than 0. The
+  emergency bucket does not cover itself with a recede. A recede has no month. A month undo does not remove it.
 - When a bucket stays negative, Home and Buckets show the overspent buckets. The user moves money from a different bucket
   or releases money. The app does not move money between buckets. There is no review item for this.
 
@@ -794,7 +800,7 @@ For each goal and sinking bucket, the app calculates the monthly amount (§7.6).
 Buckets (goals) compares the total with the monthly surplus.
 
 Monthly surplus = the monthly income − the monthly amount of each other bucket (the commitments, the spending refills, the
-emergency bucket, the sinking and goal buckets).
+sinking and goal buckets). It does not subtract an emergency amount (decision 0065).
 The monthly income is the yearly amount of the active incomes (safe amounts) divided by 12. A commitment uses its yearly
 amount / 12 (safe amounts), thus the result does not change between months (decision 0062).
 
@@ -861,7 +867,9 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 
 | Check | The check passes when |
 |---|---|
-| Emergency fund | The emergency bucket balance ≥ its target (§7.6). Show the balance, the target, `months` and the monthly figure. No check when the bucket is archived or the target is 0. |
+| Emergency fund | The emergency bucket balance ≥ its target (§7.6). Show the balance, the target and `months`. No check when the bucket is archived or the target is 0. |
+| Emergency fund used | The emergency bucket has no recede that is not undone, dated in the month of `asOf` (§7.7). Show the total and, for each covered bucket, its name and amount. No check when the book has no active emergency bucket. Decision 0065. |
+| Emergency fund ahead | In the forecast (§8, 90 days), the projected pool on each date `d` after `asOf` is 0 or more: Unassigned(`asOf`) + income(`asOf`, `d`] − Σ over buckets max(0, outflow_b(`asOf`, `d`] − balance_b(`asOf`)) (a negative balance counts as 0) − other outflow(`asOf`, `d`]. `outflow_b` is the forecast spending of the schedules of a commitment bucket and the variable spending of a spending bucket. A commitment payment by transfer to an account that is not an open on-budget account (a loan payment, for example) is outflow of its bucket. A transfer between two open on-budget accounts is not outflow. Other outflow is forecast spending with no bucket. Show the first date below 0, the smaller of the lowest pool (positive) and the emergency balance, and the part that is not covered. Round to the step of the book currency. No check when the book has no active emergency bucket. Decision 0065. |
 | Imports are current | Each on-budget account has an import in the last `staleImportDays` days |
 | Review | No transaction has needed review for more than 7 days |
 | Savings rate | The savings rate of the last 3 complete months (§8) is 0% or more. Show the percentage. |

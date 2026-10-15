@@ -16,7 +16,7 @@ import "./index.css";
 // The promise is not returned, thus the mutation does not wait: a form closes when its write succeeds, and the
 // active queries load again in the background.
 //
-// The automatic fill (`meta.fill`, `AutoFill`) runs after each other write. It invalidates the reads only when it paid or made the emergency bucket,
+// The automatic fill (`meta.fill`, `AutoFill`) runs after each other write. It invalidates the reads only when it wrote an event or linked a transaction,
 // and it shows no error toast.
 //
 // The one error rule: a failed write shows an error toast. A form shows the error of its write in the form

@@ -119,7 +119,7 @@ test("an income has no balance and no events, and it is not in the monthly amoun
     linkOccurrence(book.db, pay.id, "2026-10-01", paid.id, saved);
     expect(readBucket(book.db, pay.id).balance).toBe(0);
     expectCode(() => createBucketEvent(book.db, pay.id, { kind: "fund", amount: 1_000, date: "2026-10-02", asOf: "2026-10-02", ...saved }), "bucket_fields_invalid");
-    expect(monthlyRows(book.db, "2026-10").map((row) => row.bucket.id)).toEqual([]);
+    expect(monthlyRows(book.db, "2026-10-01").map((row) => row.bucket.id)).toEqual([]);
     expect(archiveBucket(book.db, pay.id, saved).archivedAt).not.toBeNull();
   } finally {
     book.close();
@@ -162,7 +162,7 @@ test("the monthly amount of a commitment skips skipped occurrences and uses the 
     }
     // The payments took 12 500 from the bucket. A fund of 12 500 brings the balance back to 0.
     createBucketEvent(book.db, variable.id, { kind: "fund", amount: 12_500, date: "2026-09-30", asOf: "2026-09-30", ...saved });
-    const amounts = new Map(monthlyRows(book.db, "2026-10").map((row) => [row.bucket.id, row.monthly]));
+    const amounts = new Map(monthlyRows(book.db, "2026-10-01").map((row) => [row.bucket.id, row.monthly]));
     // Gym: five Fridays in October minus the skipped one. Power: the largest of the last payments, once.
     expect(amounts.get(weekly.id)).toBe(40_000);
     expect(amounts.get(variable.id)).toBe(9_000);
@@ -189,7 +189,7 @@ test("rent that is due on the 1st and was paid on the 30th is not asked for agai
     createBucketEvent(book.db, commitment.id, { kind: "fund", amount: 100_000, date: "2026-09-01", asOf: "2026-09-01", ...saved });
     const paid = money(book.db, cash.id, rent.id, "2026-09-30", -100_000, "Landlord");
     linkOccurrence(book.db, commitment.id, "2026-10-01", paid.id, saved);
-    const amount = (month: string) => monthlyRows(book.db, month).find((row) => row.bucket.id === commitment.id)?.monthly;
+    const amount = (month: string) => monthlyRows(book.db, `${month}-01`).find((row) => row.bucket.id === commitment.id)?.monthly;
     expect(amount("2026-10")).toBe(0);
     expect(amount("2026-11")).toBe(100_000);
   } finally {
@@ -201,7 +201,7 @@ test("buckets with the same priority are in the order: commitment first, then th
   const book = tempDatabase();
   try {
     const cash = account(book.db, "Cash", "chequing", 1_000_000);
-    const fund = emergency(book.db, 1, 12, { priority: 0, startDate: "2026-10-01" });
+    const fund = emergency(book.db, 1, { priority: 0, startDate: "2026-10-01" });
     const rent = addSchedule(book.db, {
       name: "Rent",
       kind: "commitment",
@@ -212,7 +212,7 @@ test("buckets with the same priority are in the order: commitment first, then th
       interval: 1,
       monthDay: 1,
     });
-    expect(monthlyRows(book.db, "2026-10").map((row) => row.bucket.id)).toEqual([rent.id, fund.id]);
+    expect(monthlyRows(book.db, "2026-10-01").map((row) => row.bucket.id)).toEqual([rent.id, fund.id]);
     const listed = listBuckets(book.db, { archived: false, sort: "priority", dir: "asc", page: 1, pageSize: 50 });
     expect(listed.items.map((item) => item.id)).toEqual([rent.id, fund.id]);
   } finally {

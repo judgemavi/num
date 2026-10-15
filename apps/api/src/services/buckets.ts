@@ -144,7 +144,6 @@ function rowValues(id: string, input: BucketWrite, archivedAt: string | null): B
     targetDate: input.targetDate,
     fixedAmount: input.fixedAmount,
     months: input.months,
-    fillMonths: input.fillMonths,
   };
 }
 
@@ -233,7 +232,7 @@ function insertBucket(tx: WriteTx, input: BucketCreate & { asOf: string }): stri
   return id;
 }
 
-/** The emergency bucket with the default settings (decision 0060). The setup and the fill make it. */
+/** The emergency bucket with the default settings (decision 0060). The setup makes it. */
 export function insertEmergencyBucket(tx: WriteTx, asOf: string): string {
   const last = tx
     .select({ priority: max(buckets.priority) })

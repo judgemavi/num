@@ -77,6 +77,7 @@ export const errorCodes = [
   "bucket_balance",
   "event_month_funding",
   "event_cover",
+  "event_recede",
   "funding_month_not_found",
   "funding_month_held",
   "funding_month_not_held",

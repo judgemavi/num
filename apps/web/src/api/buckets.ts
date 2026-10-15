@@ -78,7 +78,7 @@ export function useArchiveBucket() {
   );
 }
 
-const eventDone = { fund: "Money assigned.", release: "Money released.", move: "Money moved.", cover: "Covered from Unassigned." } as const;
+const eventDone = { fund: "Money assigned.", release: "Money released.", move: "Money moved.", cover: "Covered from Unassigned.", recede: "Money went back to Unassigned." } as const;
 
 /** Fund a bucket, release money from a bucket, or move money to a second bucket. */
 export function useAddBucketEvent() {

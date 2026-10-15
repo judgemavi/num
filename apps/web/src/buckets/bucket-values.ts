@@ -29,7 +29,6 @@ export function bucketValues(bucket: Bucket | null, nextColor: BucketColor, last
     /** A goal saves by a date, or a set amount each month. */
     goalMode: bucket?.fixedAmount !== null && bucket?.fixedAmount !== undefined ? "month" : "date",
     months: String(bucket?.months ?? emergencyDefaults.months),
-    fillMonths: String(bucket?.fillMonths ?? emergencyDefaults.fillMonths),
     priority: String(bucket?.priority ?? lastPriority + 1),
     essential: bucket?.essential ?? false,
   };
@@ -62,7 +61,6 @@ function bucketFields(currency: string, value: BucketValues, stored: Bucket | nu
     targetDate: value.kind === "goal" && value.goalMode === "date" ? value.targetDate : null,
     fixedAmount: value.kind === "goal" && value.goalMode === "month" ? read("fixedAmount") : null,
     months: value.kind === "emergency" ? Number(value.months) : null,
-    fillMonths: value.kind === "emergency" ? Number(value.fillMonths) : null,
     schedule: null,
   };
 }

@@ -106,7 +106,7 @@ export function GoalFeasibility() {
       </CardHeader>
       <CardContent className="grid gap-3 px-0 pb-5">
         <p className="px-5">
-          Income is <Amount value={item.income} /> a month. Commitments take <Amount value={item.commitments} />. Spending refills take <Amount value={item.refills} />.{item.emergency > 0 ? <> The emergency fund takes <Amount value={item.emergency} />.</> : null} <Amount value={item.surplus} /> is left for goals and sinking funds.
+          Income is <Amount value={item.income} /> a month. Commitments take <Amount value={item.commitments} />. Spending refills take <Amount value={item.refills} />. <Amount value={item.surplus} /> is left for goals and sinking funds.
         </p>
         {item.shortfall > 0 ? (
           <p className="px-5 font-semibold text-attn">

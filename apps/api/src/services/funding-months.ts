@@ -5,7 +5,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
 import { bucketBalances } from "./bucket-balance";
-import { monthlyEssential } from "./emergency-fund";
+import { readEmergencyFund } from "./emergency-fund";
 import { commitmentsOf } from "./schedules";
 import { withoutId, write, type Reader, type WriteInput } from "./write";
 
@@ -30,11 +30,13 @@ function fundedByBucket(db: Reader, month: string) {
 }
 
 /**
- * The monthly amount (from the balance at the start of the month, with the covers of the month), the funding of the month that is not undone, and the amount still owed, for each active bucket
- * that has started, in priority order (decision 0059). The calculation date of the emergency target is the first day
- * of the month, thus the same month always gives the same amounts.
+ * The monthly amount (from the balance at the start of the month, with the covers of the month), the funding of the
+ * month that is not undone, and the amount still owed, for each active bucket that has started, in priority order
+ * (decision 0059). The emergency bucket owes its target − its balance on `asOf`, minimum 0 (decision 0065). Its monthly
+ * amount is the funding of the month plus that amount.
  */
-export function monthlyRows(db: Reader, month: string): MonthlyRow[] {
+export function monthlyRows(db: Reader, asOf: string): MonthlyRow[] {
+  const month = asOf.slice(0, 7);
   const start = monthStart(month);
   const balances = bucketBalances(db, addDays(start, -1));
   // A cover of this month brings a negative balance back to 0 before the amounts are calculated. It is not funding.
@@ -55,12 +57,15 @@ export function monthlyRows(db: Reader, month: string): MonthlyRow[] {
     .all()
     .filter((bucket) => bucket.kind !== "income" && bucket.startDate.slice(0, 7) <= month)
     .sort(comparePriority);
-  const essential = rows.some((bucket) => bucket.kind === "emergency") ? monthlyEssential(db, start).monthly : 0;
+  const fund = rows.some((bucket) => bucket.kind === "emergency") ? readEmergencyFund(db, asOf) : null;
   const commitments = commitmentsOf(db, start);
   return rows.map((bucket) => {
-    const target = bucket.kind === "emergency" ? (bucket.months ?? 0) * essential : bucket.target;
-    const monthly = monthlyAmount({ ...bucket, target, commitment: commitments.get(bucket.id) ?? null }, balances.get(bucket.id) ?? 0, month, step);
     const paid = funded.get(bucket.id) ?? 0;
+    if (bucket.kind === "emergency") {
+      const owed = fund ? Math.max(0, fund.target - fund.balance) : 0;
+      return { bucket, monthly: paid + owed, funded: paid, owed };
+    }
+    const monthly = monthlyAmount({ ...bucket, commitment: commitments.get(bucket.id) ?? null }, balances.get(bucket.id) ?? 0, month, step);
     return { bucket, monthly, funded: paid, owed: Math.max(0, monthly - paid) };
   });
 }
@@ -77,7 +82,7 @@ export function readOwed(db: Db, asOf: string): Owed {
   return {
     month,
     held: heldMonths(db).has(month),
-    items: monthlyRows(db, month).map((row) => ({ bucketId: row.bucket.id, monthly: row.monthly, owed: row.owed })),
+    items: monthlyRows(db, asOf).map((row) => ({ bucketId: row.bucket.id, monthly: row.monthly, owed: row.owed })),
   };
 }
 

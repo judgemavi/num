@@ -13,7 +13,6 @@ const none: MonthlyBucket = {
   target: null,
   targetDate: null,
   fixedAmount: null,
-  fillMonths: null,
 };
 
 const month = "2026-10";
@@ -63,9 +62,9 @@ test("a goal uses its date, or its fixed amount when it has no date", () => {
   expect(monthlyAmount(steady, 60_000, month, 10)).toBe(0);
 });
 
-test("the emergency amount is the rate of the fill months, but not more than the shortfall", () => {
-  const fund = { ...none, kind: "emergency" as const, target: 1_000_000, fillMonths: 12 };
-  expect(monthlyAmount(fund, 0, month, 10)).toBe(83_340);
+test("the emergency amount is the whole shortfall to the target", () => {
+  const fund = { ...none, kind: "emergency" as const, target: 1_000_000 };
+  expect(monthlyAmount(fund, 0, month, 10)).toBe(1_000_000);
   expect(monthlyAmount(fund, 960_000, month, 10)).toBe(40_000);
   expect(monthlyAmount(fund, 1_200_000, month, 10)).toBe(0);
   expect(monthlyAmount({ ...fund, target: 0 }, 0, month, 10)).toBe(0);

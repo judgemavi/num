@@ -112,7 +112,6 @@ function spendBucket(db: Db, categoryId: string, essential: boolean, refillTo: n
     targetDate: null,
     fixedAmount: null,
     months: null,
-    fillMonths: null,
     schedule: null,
     asOf: "2000-01-01",
     ...saved,
@@ -124,7 +123,7 @@ function emergencyBook(db: Db) {
   const food = expense(db, "Food");
   spendBucket(db, food.id, true, 2_000);
   bill(db, cash.id, null, "monthly");
-  return emergency(db, 1, 12);
+  return emergency(db, 1);
 }
 
 test("the emergency fund passes when the bucket balance reaches its target", () => {
@@ -132,7 +131,7 @@ test("the emergency fund passes when the bucket balance reaches its target", () 
     const fund = emergencyBook(db);
     createBucketEvent(db, fund.id, { kind: "fund", amount: 12_000, date: "2026-06-15", asOf: "2026-06-15", ...saved });
     const row = check(db, "2026-06-15", "emergency_fund");
-    expect(row).toMatchObject({ pass: true, balance: 12_000, target: 12_000, months: 1, monthly: 12_000 });
+    expect(row).toMatchObject({ pass: true, balance: 12_000, target: 12_000, months: 1 });
   });
 });
 

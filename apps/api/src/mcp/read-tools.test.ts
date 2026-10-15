@@ -140,7 +140,6 @@ function seed(db: Db, dir: string) {
     targetDate: null,
     fixedAmount: null,
     months: null,
-    fillMonths: null,
     schedule: null,
     asOf: "2000-01-01",
     ...saved,

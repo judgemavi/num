@@ -70,11 +70,12 @@ export type ForecastDelta = {
   series: "known" | "estimated";
 };
 
-/** Income and spending of one forecast day. Spending is positive when money goes out. */
+/** Income and spending of one forecast day. Spending is positive when money goes out. `bucketId` is the bucket of the flow, or null. */
 export type ForecastFlow = {
   date: string;
   income: number;
   spending: number;
+  bucketId: string | null;
 };
 
 export type ForecastCard = {
@@ -130,9 +131,14 @@ export function unbucketedMonthly(months: readonly string[], lines: readonly { m
   return median < 0 ? -median : 0;
 }
 
-export function spendDeltas(dates: readonly string[], items: readonly { accountId: string; monthly: number }[], step: number): ForecastDelta[] {
+/** The daily deltas of each monthly spending item. Each delta keeps the bucket of its item. */
+export function spendDeltas(
+  dates: readonly string[],
+  items: readonly { accountId: string; monthly: number; bucketId: string | null }[],
+  step: number,
+): (ForecastDelta & { bucketId: string | null })[] {
   const shares = new Map<string, number[]>();
-  const deltas: ForecastDelta[] = [];
+  const deltas: (ForecastDelta & { bucketId: string | null })[] = [];
   for (const item of items) {
     if (item.monthly <= 0) {
       continue;
@@ -149,7 +155,7 @@ export function spendDeltas(dates: readonly string[], items: readonly { accountI
       if (share === 0) {
         continue;
       }
-      deltas.push({ date, accountId: item.accountId, amount: -share, series: "estimated" });
+      deltas.push({ date, accountId: item.accountId, amount: -share, series: "estimated", bucketId: item.bucketId });
     }
   }
   return deltas;

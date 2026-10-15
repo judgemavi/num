@@ -6,6 +6,7 @@ import { archiveBucket, readBucket, updateBucket } from "./buckets";
 import { readEmergencyFund } from "./emergency-fund";
 import { createAccount } from "./accounts";
 import { fillBuckets } from "./funding-fill";
+import { readOwed } from "./funding-months";
 import { createTransaction } from "./transactions";
 import { account, addSchedule, emergency, money, spend } from "./funding-test-book";
 import { linkOccurrence } from "./recurring-links";
@@ -46,7 +47,7 @@ function spendIn(book: ReturnType<typeof essentialBook>, month: string, grocerie
 test("the monthly essential spending is the median of the last 6 complete months", () => {
   const book = essentialBook();
   try {
-    const fund = emergency(book.db, 3, 12);
+    const fund = emergency(book.db, 3);
     // March is outside the 6 months. Hobby is not an essential category. October is not complete. The rent counts as a linked payment.
     spendIn(book, "2026-03", 9_999_000, 1_000_000);
     ["300", "310", "320", "330", "340", "350"].forEach((groceries, index) => {
@@ -58,7 +59,6 @@ test("the monthly essential spending is the median of the last 6 complete months
       archived: false,
       balance: 0,
       months: 3,
-      fillMonths: 12,
       monthly: 1_325_000,
       target: 3 * 1_325_000,
       basis: "history",
@@ -71,7 +71,7 @@ test("the monthly essential spending is the median of the last 6 complete months
 test("with fewer than 3 complete months the monthly figure is the plan: essential commitments (yearly / 12) plus essential refills", () => {
   const book = essentialBook();
   try {
-    emergency(book.db, 2, 12);
+    emergency(book.db, 2);
     spendIn(book, "2026-08", 100_000, 1_000_000);
     spendIn(book, "2026-09", 100_000, 1_000_000);
     expect(readEmergencyFund(book.db, asOf)).toMatchObject({ monthly: 1_400_000, target: 2_800_000, basis: "plan" });
@@ -98,7 +98,7 @@ function fill(book: ReturnType<typeof essentialBook>, day: string) {
 test("a payment is counted one time, a non-essential commitment is not counted, a transfer payment counts in full", () => {
   const book = essentialBook();
   try {
-    emergency(book.db, 1, 12);
+    emergency(book.db, 1);
     const stream = addSchedule(book.db, {
       name: "Streaming",
       kind: "commitment",
@@ -149,32 +149,35 @@ test("a payment is counted one time, a non-essential commitment is not counted, 
   }
 });
 
-test("each month funds the rate: the target over the fill months", () => {
-  const book = essentialBook();
+test("the emergency bucket takes the free pool up to its target, and a bucket after it gets the rest", () => {
+  // Rent takes 1 000 000. The target is the plan: rent 1 000 000 a month. 3 000 000 is left for Trip.
+  const book = essentialBook(5_000_000);
   try {
     updateBucket(book.db, book.food.id, { refillTo: 0, ...saved });
-    const fund = emergency(book.db, 1, 12, { startDate: "2026-10-01" });
+    const fund = emergency(book.db, 1, { priority: 2, startDate: "2026-10-01" });
+    const trip = spend(book.db, "Trip", 4_000_000, { priority: 3, startDate: "2026-10-01" });
     fill(book, "2026-10-08");
-    // 1 000 000 / 12, rounded up to a cent, is 83 340.
-    expect(fundedBy(book, fund.id)).toEqual([83_340]);
+    expect(fundedBy(book, fund.id)).toEqual([1_000_000]);
+    expect(fundedBy(book, trip.id)).toEqual([3_000_000]);
+    expect(readOwed(book.db, "2026-10-08").items.find((item) => item.bucketId === fund.id)).toEqual({ bucketId: fund.id, monthly: 1_000_000, owed: 0 });
   } finally {
     book.close();
   }
 });
 
-test("the amount is capped at the shortfall, and the bucket refills at the rate after a release", () => {
+test("the owed amount is the target minus the balance on asOf, thus a release is paid back in the same month", () => {
   const book = essentialBook();
   try {
     updateBucket(book.db, book.food.id, { refillTo: 0, ...saved });
-    const fund = emergency(book.db, 1, 12, { startDate: "2026-10-01" });
-    createBucketEvent(book.db, fund.id, { kind: "fund", amount: 960_000, date: "2026-09-30", asOf: "2026-09-30", ...saved });
-    fill(book, "2026-11-05");
-    expect(fundedBy(book, fund.id)).toEqual([960_000, 40_000]);
+    const fund = emergency(book.db, 1, { startDate: "2026-10-01" });
+    fill(book, "2026-10-08");
+    createBucketEvent(book.db, fund.id, { kind: "release", amount: 400_000, date: "2026-10-10", ...saved });
+    const owed = readOwed(book.db, "2026-10-12").items.find((item) => item.bucketId === fund.id);
+    expect(owed).toEqual({ bucketId: fund.id, monthly: 1_400_000, owed: 400_000 });
+    expect(readEmergencyFund(book.db, "2026-10-12")).toMatchObject({ balance: 600_000, target: 1_000_000 });
+    fill(book, "2026-10-12");
+    expect(fundedBy(book, fund.id)).toEqual([1_000_000, 400_000]);
     expect(readBucket(book.db, fund.id).balance).toBe(1_000_000);
-
-    createBucketEvent(book.db, fund.id, { kind: "release", amount: 500_000, date: "2026-11-10", ...saved });
-    fill(book, "2026-12-05");
-    expect(fundedBy(book, fund.id)).toEqual([960_000, 40_000, 83_340]);
   } finally {
     book.close();
   }
@@ -184,7 +187,7 @@ test("the emergency bucket is funded after the spending buckets and before the g
   // The rent commitment is first and takes 1 000 000. 450 000 is left: Food takes 400 000, and the emergency bucket gets the rest.
   const book = essentialBook(1_450_000);
   try {
-    const fund = emergency(book.db, 1, 12, { priority: 2, startDate: "2026-10-01" });
+    const fund = emergency(book.db, 1, { priority: 2, startDate: "2026-10-01" });
     fill(book, "2026-10-08");
     expect(fundedBy(book, book.food.id)).toEqual([400_000]);
     expect(fundedBy(book, fund.id)).toEqual([50_000]);
@@ -196,12 +199,12 @@ test("the emergency bucket is funded after the spending buckets and before the g
 test("a book has one emergency bucket, with no categories, and the kind does not change", () => {
   const book = essentialBook();
   try {
-    const fund = emergency(book.db, 3, 12);
-    expectCode(() => emergency(book.db, 3, 12), "bucket_emergency_exists");
+    const fund = emergency(book.db, 3);
+    expectCode(() => emergency(book.db, 3), "bucket_emergency_exists");
     archiveBucket(book.db, fund.id, saved);
-    expectCode(() => emergency(book.db, 3, 12), "bucket_emergency_exists");
+    expectCode(() => emergency(book.db, 3), "bucket_emergency_exists");
     expectCode(() => updateBucket(book.db, fund.id, { categoryIds: [book.hobby.id], ...saved }), "invalid_body");
-    expectCode(() => updateBucket(book.db, book.food.id, { kind: "emergency", months: 3, fillMonths: 12, refillTo: null, categoryIds: [], ...saved }), "bucket_fields_invalid");
+    expectCode(() => updateBucket(book.db, book.food.id, { kind: "emergency", months: 3, refillTo: null, categoryIds: [], ...saved }), "bucket_fields_invalid");
   } finally {
     book.close();
   }

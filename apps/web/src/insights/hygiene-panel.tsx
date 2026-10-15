@@ -1,18 +1,33 @@
-import { reviewAgeDays, type HygieneCheck } from "@num/shared";
+import { forecastDayCount, reviewAgeDays, type HygieneCheck } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { hygieneQuery } from "@/api/insights";
 import { localAsOf } from "@/as-of";
-import { useBookCurrency } from "@/editors/lookups";
+import { useBookCurrency, useBucketNames } from "@/editors/lookups";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { Badge } from "@/components/ui/badge";
 import { monthTitle, rateText, signedMoney } from "@/insights/format";
 import { formatMoney } from "@/money";
+import { formatDate } from "@/transactions/format";
 
 
-function detail(check: HygieneCheck, currency: string) {
+function detail(check: HygieneCheck, currency: string, nameOf: (id: string) => string) {
+  if (check.code === "recede_month") {
+    if (check.pass) {
+      return "No money went back from the emergency fund this month.";
+    }
+    const covered = check.items.map((item) => `${nameOf(item.bucketId)} ${formatMoney(currency, item.amount)}`).join(" · ");
+    return `${formatMoney(currency, check.total)} went back to Unassigned this month to cover: ${covered}`;
+  }
+  if (check.code === "recede_ahead") {
+    if (check.pass || check.date === null) {
+      return `Unassigned stays above zero in the next ${forecastDayCount} days.`;
+    }
+    const gives = `On ${formatDate(check.date)}, Unassigned can go below zero. The emergency fund may give ${formatMoney(currency, check.amount)}.`;
+    return check.uncovered > 0 ? `${gives} ${formatMoney(currency, check.uncovered)} is not covered.` : gives;
+  }
   if (check.code === "emergency_fund") {
-    return `${formatMoney(currency, check.balance)} saved · ${check.months} ${check.months === 1 ? "month" : "months"} of ${formatMoney(currency, check.monthly)} is ${formatMoney(currency, check.target)}`;
+    return `${formatMoney(currency, check.balance)} saved of ${formatMoney(currency, check.target)} · ${check.months} ${check.months === 1 ? "month" : "months"} of essential spending`;
   }
   if (check.code === "imports_current") {
     const stale = check.items.filter((item) => !item.pass);
@@ -57,6 +72,8 @@ function detail(check: HygieneCheck, currency: string) {
 
 const titles: Record<HygieneCheck["code"], string> = {
   emergency_fund: "Emergency fund",
+  recede_month: "Emergency fund used",
+  recede_ahead: "Emergency fund ahead",
   imports_current: "Imports are current",
   review: "Review",
   savings_rate: "Savings rate",
@@ -66,6 +83,8 @@ const titles: Record<HygieneCheck["code"], string> = {
 
 const places: Record<HygieneCheck["code"], string> = {
   emergency_fund: "Buckets",
+  recede_month: "Buckets",
+  recede_ahead: "Buckets",
   imports_current: "Imports",
   review: "Review",
   savings_rate: "Insights",
@@ -77,11 +96,13 @@ const places: Record<HygieneCheck["code"], string> = {
 export function HygienePanel() {
   const go = useNavigate();
   const currency = useBookCurrency();
+  const names = useBucketNames();
+  const nameOf = (id: string) => names.get(id) ?? "Bucket";
   const { data: hygiene } = useSuspenseQuery(hygieneQuery(localAsOf()));
   const failedCount = hygiene.checks.filter((item) => !item.pass).length;
 
   function open(check: HygieneCheck) {
-    if (check.code === "emergency_fund" || check.code === "overspent") {
+    if (check.code === "emergency_fund" || check.code === "recede_month" || check.code === "recede_ahead" || check.code === "overspent") {
       void go({ to: "/buckets" });
       return;
     }
@@ -114,7 +135,7 @@ export function HygienePanel() {
           <span className={listName}>
             {titles[check.code]}
             <small>
-              {detail(check, currency)} · {places[check.code]}
+              {detail(check, currency, nameOf)} · {places[check.code]}
             </small>
           </span>
           <Badge variant={check.pass ? "positive" : "attention"}>{check.pass ? "Pass" : "Needs you"}</Badge>

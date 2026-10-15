@@ -13,6 +13,7 @@ import { listOverspent } from "./buckets";
 import { lastCompleteMonths } from "./complete-months";
 import { emergencyBucket, readEmergencyFund } from "./emergency-fund";
 import { fundingPosition } from "./funding-book";
+import { recedeChecks } from "./recede-checks";
 import { importFreshness, settingNumber } from "./book-settings";
 import { spendTotals } from "./insights-spend";
 import { loadLedgerLines } from "./ledger-lines";
@@ -67,7 +68,6 @@ function emergencyFund(db: Db, asOf: string) {
       balance: fund.balance,
       target: fund.target,
       months: fund.months,
-      monthly: fund.monthly,
     },
   ];
 }
@@ -137,6 +137,7 @@ export function readHygiene(db: Db, asOf: string): Hygiene {
     asOf,
     checks: [
       ...emergencyFund(db, asOf),
+      ...recedeChecks(db, asOf),
       importsCurrent(db, asOf),
       reviewAge(state, asOf),
       savingsRate(db, asOf),

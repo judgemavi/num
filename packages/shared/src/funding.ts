@@ -73,7 +73,6 @@ export type MonthlyBucket = {
   target: number | null;
   targetDate: string | null;
   fixedAmount: number | null;
-  fillMonths: number | null;
 };
 
 /** The months from `month` (YYYY-MM) to the month of `date`. Zero or less when the date is in `month` or earlier. */
@@ -142,8 +141,7 @@ export function monthlyAmount(bucket: MonthlyBucket, balance: number, month: str
     return Math.max(0, (bucket.refillTo ?? 0) - balance);
   }
   if (bucket.kind === "emergency") {
-    const target = bucket.target ?? 0;
-    return Math.min(roundUpShare(target, bucket.fillMonths ?? 1, step), Math.max(0, target - balance));
+    return Math.max(0, (bucket.target ?? 0) - balance);
   }
   const goalDate = bucket.kind === "sinking" ? dueDateFor(bucket, month) : bucket.targetDate;
   if (bucket.kind === "goal" && goalDate === null) {
@@ -163,6 +161,7 @@ export const fundingPositionSchema = z.object({
 export const fillResultSchema = z.object({
   /** The total that this fill paid. 0 when nothing was owed or Unassigned was used. */
   paid: nonNegative,
+  /** The number of events that this fill wrote: covers, payments and money back from the emergency fund (decision 0065). */
   payments: nonNegative,
 });
 

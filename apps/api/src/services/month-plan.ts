@@ -46,7 +46,6 @@ function bucketOf(row: BucketRow, actualFunded: number, essentialMonthly: number
     target: row.kind === "emergency" ? (row.months ?? 0) * essentialMonthly : row.target,
     targetDate: row.targetDate,
     fixedAmount: row.fixedAmount,
-    fillMonths: row.fillMonths,
     startDate: row.startDate,
     actualFunded,
     commitment,

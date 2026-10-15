@@ -53,7 +53,6 @@ const noKindFields = {
   targetDate: null,
   fixedAmount: null,
   months: null,
-  fillMonths: null,
   schedule: null,
 } as const;
 
@@ -81,8 +80,8 @@ export function sinking(db: Db, name: string, amount: number, dueDate: string, o
   return createBucket(db, { ...bucket(name, options), ...noKindFields, kind: "sinking", amount, dueDate, repeat: "none" });
 }
 
-export function emergency(db: Db, months: number, fillMonths: number, options: BucketOptions = {}) {
-  return createBucket(db, { ...bucket("Emergency fund", { essential: true, ...options }), ...noKindFields, kind: "emergency", months, fillMonths });
+export function emergency(db: Db, months: number, options: BucketOptions = {}) {
+  return createBucket(db, { ...bucket("Emergency fund", { essential: true, ...options }), ...noKindFields, kind: "emergency", months });
 }
 
 export function money(db: Db, accountId: string, categoryId: string, date: string, amount: number, payeeRaw: string) {

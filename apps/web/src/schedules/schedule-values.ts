@@ -89,7 +89,6 @@ function scheduleFields(currency: string, kind: ScheduleKind, value: ScheduleFor
     targetDate: null,
     fixedAmount: null,
     months: null,
-    fillMonths: null,
     schedule: {
       accountId: value.accountId,
       expectedAmount,

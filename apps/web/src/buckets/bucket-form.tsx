@@ -147,30 +147,17 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
             </>
           ) : null}
           {kind === "emergency" ? (
-            <>
-              <form.AppField name="months">
-                {(field) => (
-                  <field.TextField
-                    id="bucket-months"
-                    label="Months to keep"
-                    inputMode="numeric"
-                    required
-                    description="The target is this number of months of your essential spending. The app calculates the spending."
-                  />
-                )}
-              </form.AppField>
-              <form.AppField name="fillMonths">
-                {(field) => (
-                  <field.TextField
-                    id="bucket-fill-months"
-                    label="Months to fill it"
-                    inputMode="numeric"
-                    required
-                    description="Each month adds an equal part, so an empty bucket is full after this many months."
-                  />
-                )}
-              </form.AppField>
-            </>
+            <form.AppField name="months">
+              {(field) => (
+                <field.TextField
+                  id="bucket-months"
+                  label="Months to keep"
+                  inputMode="numeric"
+                  required
+                  description="The target is this number of months of your essential spending. The app calculates the spending. The bucket takes money from Unassigned up to the target. It gives money back to cover an overspent bucket that comes before it."
+                />
+              )}
+            </form.AppField>
           ) : null}
           <form.Field name="color">{(field) => <ColorPicker value={field.state.value} onChange={field.handleChange} suggest={current === null} />}</form.Field>
           <form.Field name="icon">{(field) => <IconPicker value={field.state.value} color={color} onChange={field.handleChange} />}</form.Field>

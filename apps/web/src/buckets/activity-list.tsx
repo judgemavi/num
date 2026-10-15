@@ -16,6 +16,7 @@ const kindLabel = {
   move: "Move",
   release: "Release",
   cover: "Covered from Unassigned",
+  recede: "Back to Unassigned",
 } as const;
 
 export function ActivityList() {
@@ -56,7 +57,11 @@ function Activity() {
             const from = nameOf(event.bucketId);
             const to = event.otherBucketId ? nameOf(event.otherBucketId) : null;
             const detail =
-              event.kind === "move" && to ? `${from} to ${to} · ${formatDate(event.date)}` : `${from} · ${formatDate(event.date)}`;
+              event.kind === "move" && to
+                ? `${from} to ${to} · ${formatDate(event.date)}`
+                : event.kind === "recede" && to
+                  ? `${from} · To cover ${to} · ${formatDate(event.date)}`
+                  : `${from} · ${formatDate(event.date)}`;
             return (
               <ListRow key={event.id} simple>
                 <div className={listName}>
@@ -69,7 +74,7 @@ function Activity() {
                 <div className={listAmt}>
                   <Amount value={event.amount} />
                 </div>
-                {event.month || event.kind === "cover" ? null : (
+                {event.month || event.kind === "cover" || event.kind === "recede" ? null : (
                   <RowMenu label={`Actions for ${kindLabel[event.kind]}`}>
                     <DropdownMenuItem className="min-h-11" onSelect={() => void undo(event)}>
                       Undo

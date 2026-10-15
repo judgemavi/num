@@ -441,6 +441,7 @@ export {
   type Hygiene,
   type HygieneCheck,
 } from "./hygiene";
+export { recedeAhead, type RecedeAheadInput } from "./recede";
 export { reviewLevel, reviewLevels, type ReviewLevel } from "./review-level";
 export {
   approveResultSchema,

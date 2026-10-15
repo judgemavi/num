@@ -45,7 +45,6 @@ function body(accountId: string, kind: "commitment" | "income", schedule: Record
     targetDate: null,
     fixedAmount: null,
     months: null,
-    fillMonths: null,
     schedule: {
       accountId,
       expectedAmount: kind === "income" ? 500_000 : -100_000,

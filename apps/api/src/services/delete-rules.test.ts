@@ -109,7 +109,6 @@ function paycheck(db: Db) {
     targetDate: null,
     fixedAmount: null,
     months: null,
-    fillMonths: null,
     schedule: null,
     asOf: "2026-10-01",
     ...saved,

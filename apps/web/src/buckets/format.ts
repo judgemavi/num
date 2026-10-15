@@ -117,6 +117,9 @@ export function bucketError(code: ErrorCode | undefined): string {
   if (code === "event_cover") {
     return "A cover from Unassigned cannot be undone.";
   }
+  if (code === "event_recede") {
+    return "Money that went back to Unassigned to cover a bucket cannot be undone.";
+  }
   if (code === "event_month_funding") {
     return "This event is part of the funding of a month. Undo the month in the funding history.";
   }

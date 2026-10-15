@@ -48,8 +48,8 @@ test("setup runs only one time", () => {
       { key: "staleImportDays", value: "10" },
     ]);
 
-    expect(db.sqlite.query("select name, kind, essential, start_date, months, fill_months from buckets").all()).toEqual([
-      { name: "Emergency fund", kind: "emergency", essential: 1, start_date: "2026-10-07", months: 3, fill_months: 12 },
+    expect(db.sqlite.query("select name, kind, essential, start_date, months from buckets").all()).toEqual([
+      { name: "Emergency fund", kind: "emergency", essential: 1, start_date: "2026-10-07", months: 3 },
     ]);
 
     expect(() =>
