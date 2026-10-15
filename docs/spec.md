@@ -942,9 +942,11 @@ The forecast is daily, for 90 days. It shows each on-budget account and the tota
 
 Spending is a part of Home (§14). It has no screen of its own.
 
-- **Summary.** One muted line: the breakdown range, the spending of the income and the savings rate
-  (example: "October · $4,410 spent of $6,200 income · 29% saved"). It follows the selected period. One month shows
-  its name, with the year when it is not the year of `asOf`.
+- **Summary.** One muted line. It follows the selected period. One month shows its name, with the year when it is
+  not the year of `asOf`. A complete period (it ends before `asOf`) shows the breakdown range, the spending of the
+  income and the savings rate (example: "September · $4,410 spent of $6,200 income · 29% saved"). A period that is not
+  complete (it ends on or after `asOf`) shows only facts: the range with "so far", the spending and the income
+  (example: "October so far · $4,059 spent · $7,349 income"). It shows no savings rate.
 - **Increases.** The 3 largest increases by category in the month of `asOf`, compared with the median of the 3 months
   before it. They show in Needs you (§14). There are no decreases and no new merchants.
 - **Period.** One selector: 1 (default, "This month"), 3, 6 or 12 months, All, or Custom (From and To). "1" is the

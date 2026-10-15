@@ -7,7 +7,7 @@ import { PauseMenuItem } from "@/buckets/pause-menu-item";
 import { Amount } from "@/components/amount";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { IconTile } from "@/components/icon-tile";
-import { ListRow, listAmt, listName } from "@/components/list-card";
+import { ListRow, listAmt, listMid, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -31,7 +31,7 @@ export function BucketRow({ bucket }: { bucket: Bucket }) {
           {bucket.pausedAt ? <Badge variant="neutral">Paused</Badge> : null}
           <small>{detail}</small>
         </div>
-        <div className="w-36 shrink-0 max-md:basis-full">
+        <div className={listMid}>
           <BucketBar hue={bucket.color} balance={bucket.balance} target={target} label={label} />
         </div>
         <div className={`${listAmt} ${over ? "text-attn" : ""}`}>

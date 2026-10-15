@@ -10,7 +10,7 @@ import { PauseMenuItem } from "@/buckets/pause-menu-item";
 import { Amount } from "@/components/amount";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { IconTile } from "@/components/icon-tile";
-import { ListRow, listAmt, listName } from "@/components/list-card";
+import { ListRow, listAmt, listMid, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -46,7 +46,7 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
         {changed ? <Badge variant="attention">Amount changed</Badge> : null}
         <small>{need ? `Due ${formatDate(need.dueDate)}` : "No next payment"}</small>
       </div>
-      <div className="w-36 shrink-0 max-md:basis-full">
+      <div className={listMid}>
         <BucketBar hue={bucket.color} balance={bucket.balance} target={amount} label={barLabel(bucket, currency, amount)} />
       </div>
       <div className={`${listAmt} ${over ? "text-attn" : ""}`}>
@@ -61,11 +61,11 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
           of <Amount value={amount} />
         </small>
         {need && need.short > 0 ? (
-          <span className="block text-[13px] font-semibold text-attn">
+          <small className="text-attn">
             <Amount value={need.short} /> short
-          </span>
+          </small>
         ) : need && need.covered > 0 ? (
-          <span className="block text-[13px] text-muted-foreground">Fills {formatDate(billFillsOn(need.dueDate, asOf))}</span>
+          <small>Fills {formatDate(billFillsOn(need.dueDate, asOf))}</small>
         ) : null}
       </div>
       <RowMenu label={`Actions for ${bucket.name}`}>

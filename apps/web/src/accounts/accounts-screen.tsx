@@ -5,7 +5,7 @@ import { Plus, Upload } from "lucide-react";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
 import { AccountIcon } from "@/accounts/account-icon";
-import { accountCountLabel, accountDetail, formatBalance, formatMoney, kindLabel, owedToYou, owedToYouWarning } from "@/accounts/format";
+import { accountCountLabel, formatBalance, formatMoney, kindLabel, owedToYou, owedToYouWarning } from "@/accounts/format";
 import { accountLabel } from "@/accounts/label";
 import { groupAccounts, groupHue, groupLabel } from "@/accounts/groups";
 import { accountListQuery, useArchiveAccount } from "@/api/accounts";
@@ -20,13 +20,16 @@ import { Button } from "@/components/ui/button";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { IconTile } from "@/components/icon-tile";
 import { BalanceScaleIllustration } from "@/components/illustrations";
-import { ListCard, ListGroup, ListRow } from "@/components/list-card";
+import { ListCard, ListGroup, ListRow, listAmt, listMid, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { SplitBar } from "@/components/split-bar";
 import { hueColor } from "@/components/hue";
+
+const haveColor = "var(--primary)";
+const oweColor = hueColor.sky.glyph;
 
 export function AccountsScreen() {
   return (
@@ -84,10 +87,10 @@ function AccountsPage() {
         amount={<Amount value={worth.net} owed hero />}
         facts={
           <>
-            <Fact label="What you have">
+            <Fact label="What you have" dot={haveColor}>
               <Amount value={worth.have} className="text-lg" />
             </Fact>
-            <Fact label="What you owe">
+            <Fact label="What you owe" dot={oweColor}>
               <Amount value={worth.owe} className="text-lg" />
             </Fact>
           </>
@@ -96,8 +99,8 @@ function AccountsPage() {
           <SplitBar
             label={`You have ${formatMoney(bookCurrency, worth.have)} and owe ${formatMoney(bookCurrency, worth.owe)}`}
             segments={[
-              { key: "have", label: "What you have", color: "var(--primary)", value: Math.max(0, worth.have), amount: <Amount value={worth.have} /> },
-              { key: "owe", label: "What you owe", color: hueColor.sky.glyph, value: worth.owe, amount: <Amount value={worth.owe} /> },
+              { key: "have", color: haveColor, value: Math.max(0, worth.have) },
+              { key: "owe", color: oweColor, value: worth.owe },
             ]}
           />
         }
@@ -114,9 +117,7 @@ function AccountsPage() {
                   label={groupLabel[group.id]}
                   aside={<Amount value={group.total} owed={group.id === "loans"} />}
                 />
-                {group.items.map((account) => {
-                  const detail = accountDetail(account);
-                  return (
+                {group.items.map((account) => (
                     <ListRow
                       key={account.id}
                       onOpen={() => {
@@ -129,17 +130,16 @@ function AccountsPage() {
                       <IconTile hue={groupHue[group.id]}>
                         <AccountIcon kind={account.kind} />
                       </IconTile>
-                      <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
+                      <div className={listName}>
                         {accountLabel(account)}
-                      </div>
-                      <div className="hidden w-40 shrink-0 text-[13px] text-muted-foreground md:block">
-                        {account.archivedAt ? <Badge variant="attention">Archived</Badge> : kindLabel(account.kind)}
-                      </div>
-                      <div className="ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
-                        <Amount value={account.balance} owed={accountClass(account.kind) === "liability"} />
-                        {detail ? <small>{detail}</small> : null}
                         {owedToYou(account) ? <small className="text-attn">{owedToYouWarning}</small> : null}
                         <BankStatusLine accountId={account.id} />
+                      </div>
+                      <div className={`${listMid} text-[13px] text-muted-foreground max-md:hidden`}>
+                        {account.archivedAt ? <Badge variant="attention">Archived</Badge> : kindLabel(account.kind)}
+                      </div>
+                      <div className={listAmt}>
+                        <Amount value={account.balance} owed={accountClass(account.kind) === "liability"} />
                       </div>
                       <RowMenu label={`Actions for ${accountLabel(account)}`}>
                         <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("account", { id: account.id })}>
@@ -166,8 +166,7 @@ function AccountsPage() {
                         />
                       </RowMenu>
                     </ListRow>
-                  );
-                })}
+                ))}
               </div>
             ))
           )}

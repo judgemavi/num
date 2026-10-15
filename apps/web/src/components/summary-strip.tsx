@@ -49,10 +49,14 @@ export function SummaryStrip({ tint, label, amount, below, hint, facts, extra, i
   );
 }
 
-export function Fact({ label, children }: { label: string; children: ReactNode }) {
+/** A fact of the strip. `dot` is the colour of the bar segment that the fact names. */
+export function Fact({ label, dot, children }: { label: string; dot?: string; children: ReactNode }) {
   return (
     <div className="grid gap-0.5 border-l border-foreground/12 px-6">
-      <span className="text-[13px] text-muted-foreground">{label}</span>
+      <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        {dot ? <i className="size-2 rounded-full" style={{ background: dot }} /> : null}
+        {label}
+      </span>
       {children}
     </div>
   );

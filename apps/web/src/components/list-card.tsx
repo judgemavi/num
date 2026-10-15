@@ -67,7 +67,13 @@ export function ListRow({
   );
 }
 
-export const listName =
-  "list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground";
-export const listAmt =
-  "ml-auto text-right text-base max-md:ml-0 max-md:basis-full [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground";
+// Secondary lines (`<small>`) are 13px, normal weight and muted. The muted colour has a low priority, thus a line with
+// its own colour class (example: `text-attn`) keeps that colour.
+const smallLines = "[&_small]:block [&_small]:text-[13px] [&_small]:font-normal [:where(&)_small]:text-muted-foreground";
+
+export const listName = `list-name min-w-0 flex-1 font-semibold ${smallLines}`;
+
+// The columns after the name have fixed widths. Thus the columns of all rows in a card line up, also when the amounts
+// and their secondary lines have different lengths. On a phone each column takes a full line.
+export const listMid = "w-40 shrink-0 max-md:basis-full";
+export const listAmt = `w-40 shrink-0 text-right text-base max-md:w-auto max-md:basis-full ${smallLines}`;

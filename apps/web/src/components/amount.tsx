@@ -8,14 +8,17 @@ type AmountProps = {
   className?: string;
 };
 
-/** An amount of money in the book currency. It reads the currency itself. */
+/**
+ * An amount of money in the book currency. It reads the currency itself. Inside a secondary line (`<small>`) it takes
+ * the size and the weight of that line.
+ */
 export function Amount({ value, owed = false, hero = false, className }: AmountProps) {
   const currency = useBookCurrency();
   const showOwed = owed && value < 0;
   const signed = showOwed ? -value : value;
   if (!hero) {
     return (
-      <span className={`text-base font-semibold tabular-nums ${className ?? ""}`}>
+      <span className={`text-base font-semibold tabular-nums in-[small]:[font-size:inherit] in-[small]:[font-weight:inherit] in-[small]:[line-height:inherit] ${className ?? ""}`}>
         {showOwed ? <span className="mr-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Owed</span> : null}
         {formatMoney(currency, signed)}
       </span>

@@ -31,12 +31,19 @@ function rangeName(from: string, to: string) {
   return `${shortMonth(from)} – ${shortMonth(to)}`;
 }
 
-/** One muted line: the range, the spending of the income and the savings rate. It follows the selected period. */
+/**
+ * One muted line that follows the selected period. A complete period (it ends before today) shows the spending of the
+ * income and the savings rate. A period that is not complete shows only the spending and the income so far.
+ */
 function SpendingLine() {
   const currency = useBookCurrency();
   const { data } = useInsightsReport();
-  const parts = [rangeName(data.range.from, data.range.to), `${formatMoney(currency, data.spending)} spent of ${formatMoney(currency, data.income)} income`];
-  if (data.savingsRateMilliPct !== null) {
+  const name = rangeName(data.range.from, data.range.to);
+  const spent = formatMoney(currency, data.spending);
+  const income = formatMoney(currency, data.income);
+  const complete = Temporal.PlainDate.compare(data.range.to, localAsOf()) < 0;
+  const parts = complete ? [name, `${spent} spent of ${income} income`] : [`${name} so far`, `${spent} spent`, `${income} income`];
+  if (complete && data.savingsRateMilliPct !== null) {
     parts.push(`${rateText(data.savingsRateMilliPct)} saved`);
   }
   return <p className="text-sm text-muted-foreground">{parts.join(" · ")}</p>;

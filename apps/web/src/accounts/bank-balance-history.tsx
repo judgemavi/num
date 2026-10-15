@@ -6,7 +6,7 @@ import { BankStatusActions, BankStatusText } from "@/accounts/bank-status";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
-import { ListCard, ListRow } from "@/components/list-card";
+import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -63,11 +63,11 @@ function BankBalanceRows({ accountId }: { accountId: string }) {
       {list.status ? <BankStatusActions status={list.status} /> : null}
       {list.items.map((item) => (
         <ListRow key={item.id} simple>
-          <div className="list-name min-w-0 flex-1 font-semibold [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted-foreground">
+          <div className={listName}>
             {formatDate(item.date)}
             <small>{item.importBatchId ? "From an import" : "Added by you"}</small>
           </div>
-          <div className="ml-auto text-right">
+          <div className={listAmt}>
             <Amount value={item.balance} owed={owed} />
           </div>
           <RowMenu label={`Actions for the bank balance on ${formatDate(item.date)}`}>

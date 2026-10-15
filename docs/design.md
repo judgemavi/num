@@ -119,11 +119,11 @@ global component CSS (AGENTS.md).
 | Chip | Toggle choice in a row. Pill, 44px, `control` border. Selected: iris fill, white text. Can show a small secondary value. |
 | Pill | Status label, 24px high. Neutral, positive (pos-soft/pos) or attention (attn-soft/attn). |
 | Count | Tomato badge with ink text. Only for "needs you" counts. |
-| Amount | Formats with `Intl` in the browser. Tabular figures. "Owed" label for liabilities. |
-| ListCard | One card. Optional group header rows: 12px uppercase label on the left, the group total on the right. Rows: min height 60px (48px for simple lists), hairline between rows, `row-hover` on hover, the name in iris on hover. |
+| Amount | Formats with `Intl` in the browser. Tabular figures. "Owed" label for liabilities. 16px/600. In a secondary line (13px, normal weight) it has the size and the weight of the line. |
+| ListCard | One card. Optional group header rows: 12px uppercase label on the left, the group total on the right. Rows: min height 60px (48px for simple lists), hairline between rows, `row-hover` on hover, the name in iris on hover. The name column is flexible. The columns after it (a bar, a kind, the amount) have fixed widths, thus they line up in all rows of the card. Long secondary text goes below the name, not in the amount column. On a phone each column after the name takes a full line. |
 | IconTile | 36–40px tile with an identity hue: soft fill, deep glyph. |
 | Progress | 8px bar, round ends, `sunken` track. Fill = the identity glyph colour. Over budget: `attn-soft` track and tomato text, no fill. |
-| SplitBar | 8px bar in segments, with a key below (dot + label + amount). |
+| SplitBar | 8px bar in segments. It has no key. The facts of the summary strip name the segments: each fact has a dot in the colour of its segment. Thus the amounts do not show two times. |
 | SummaryStrip | §5. |
 | SidePanel | Card, 18–20px padding, title 16px/700, short text, one action. |
 | Dialog | shadcn Dialog. Radius 20px, `scrim` overlay, display title, footer with hairline and buttons on the right. |
