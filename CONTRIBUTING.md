@@ -17,7 +17,7 @@ Read these files before you change code:
 
 - `docs/spec.md`
 - `docs/roadmap.md`
-- `docs/decisions/` (open change requests only)
+- `docs/decisions/` (open change requests only; the folder is there only when a request is open)
 - `AGENTS.md`
 
 Do one roadmap slice in one pull request.

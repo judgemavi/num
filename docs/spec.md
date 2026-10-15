@@ -3,8 +3,9 @@
 Writing standard: ASD-STE100 (Simplified Technical English).
 
 Status: **approved baseline**. This file is the source of truth for the v2 rebuild. It tells what is true now.
-To change this file, write a decision record in `docs/decisions/`. The owner must approve it. Apply the change to this
-file (and to `docs/design.md` or `AGENTS.md`) in the same slice, then delete the record. Git history keeps it.
+To change this file, write a decision record in `docs/decisions/` (make the folder when it is not there). The owner
+must approve it. Apply the change to this file (and to `docs/design.md` or `AGENTS.md`) in the same slice, then delete
+the record. Git history keeps it.
 Do not cite decision numbers in this file.
 
 ## 1. Purpose
@@ -174,7 +175,7 @@ Rules:
   All other kinds are assets.
 - `onBudget` = true means that the user can assign the money in the account to buckets.
   The default is true for `chequing`, `savings`, `cash` and `credit_card`. The default is false for all other kinds.
-  The user can change it. The UI label is "Use this account's money in my budget", under "More details".
+  The user can change it. The UI label is "Use this account's money in my budget".
 - Card fields (only for `credit_card`): `paymentPolicy` (`full | fixed | manual`, UI label "How you pay"), `fixedPayment?`.
   They are for information. A card payment does not change the on-budget total, so the forecast has no card payments (§8).
 - Import fields: `importPreset?` (a preset ID) and `columnMap?` (JSON, §7.2). The app saves them after the first import.
@@ -965,8 +966,6 @@ Spending is a part of Home (§14). It has no screen of its own.
   list shows the categories of that group and has no toggle. With a category selected, the list shows the categories
   of its group, highlights the selected category and has no toggle. A click on a row opens its transactions for the
   period.
-- **Mortgage.** The page of the mortgage account shows the balance, rate, schedule and payoff date. Also, the effect of
-  an extra payment amount.
 
 ## 10. Needs you checks
 
@@ -1052,7 +1051,7 @@ do not change.
 | Home | The first screen, from top to bottom. 1. **Summary strip:** "Available to spend" (§6) and, below it, one row with three small amounts: "In your accounts" − "Saving buckets" − "Set aside for bills". No hint line. 2. **Needs you:** one list card with a count badge. It shows only the items that need the user, in this order: transactions need review (the count, and the count older than 7 days); each account that does not match its bank (§5.13); imports older than 10 days (§10); each missed payment (§7.4); overspent buckets (§7.7); goals that do not fit the monthly income, with the short amount (§7.8); each bill with a short part for its next payment, "<bill> is <short part> short for <date>" (§10 Bills); emergency fund below its target; savings used this month; the pool runs short, with the buckets to pause, the buckets that would give money back and the part that is not covered (§10); a savings rate below 0% in a complete month; each category that went up against its median (§9). Home is read-only: each row has no actions and opens the screen of its fix. When no item needs the user, the card shows one line: "All clear". 3. **Spending** (§9): a section title, the summary line, the period selector, the timeline, the spending donut and the list of groups and categories. |
 | Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers, row selection with Approve and the bulk editor. |
 | Buckets | Summary strip: the hero is Unassigned. Fact: "Saved" (the savings buckets). No hint line. Groups Income, Bills (the UI name of the commitments), Spending and Savings (sinking, goal, emergency). The Income and Spending groups have no group total. Each spending row shows "<amount> left". The Bills group shows its rows in fill order (§7.6). A bill row shows "Due <date>" of its next payment, a progress bar, "<balance> of <amount>" of that payment (§10 Bills) and one line for its gap (§6): when it has a short part, "<short part> short" in the attention colour; when Unassigned covers all of the gap, "Fills <date>" in the muted colour. The date is the first day of the month of the payment, or `asOf` when that day is before `asOf`. Each bucket except an income has "Pause" or "Resume" in its row menu, and a paused row shows "Paused". Balances, what is still owed this month, moves, goals (feasibility), settings. A bill or income row has its schedule, links, skips and "Amount changed". Side column: Upcoming (occurrences of all schedules in the next 30 days) and Detected (new schedule suggestions). |
-| Accounts | Summary strip with the net worth and no hint line. Facts: "What you have" and "What you owe". List with balances and the bank status of each account (§5.13), in three groups: Cash (chequing, savings, cash), Assets (investment, property, receivable, other asset) and Liabilities (credit card, mortgage, loan, other liability). The Liabilities group total shows as owed. Also import, bank balances, valuations, mortgage terms. The account page shows the balance in a summary strip (surface colour, no illustration). Facts: the last bank balance with its date, and the date of the last import. When the account does not match its bank, the hint line shows the difference. A mortgage account page has the mortgage panel (§9). An "Imports" view lists all imports and import problems (§7.2). |
+| Accounts | Summary strip with the net worth and no hint line. Facts: "What you have" and "What you owe". List with balances and the bank status of each account (§5.13), in three groups: Cash (chequing, savings, cash), Assets (investment, property, receivable, other asset) and Liabilities (credit card, mortgage, loan, other liability). The Liabilities group total shows as owed. Also import, bank balances, valuations, mortgage terms. The account page shows the balance in a summary strip (surface colour, no illustration). Facts: the last bank balance with its date, and the date of the last import. When the account does not match its bank, the hint line shows the difference. A mortgage account page has the mortgage panel: the balance, the rate, the payment schedule and the payoff date (§5.2), and the effect of an extra payment amount. An "Imports" view lists all imports and import problems (§7.2). |
 | Settings | Subpages: Groups, Categories, Tags, Merchants, Currency, AI access, Backup. |
 
 The first-run setup screen (§7.0) is not one of the 5 screens. It shows only one time.

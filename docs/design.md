@@ -3,14 +3,13 @@
 Writing standard: ASD-STE100.
 
 Status: **approved**. This file is the source of truth for the look of the web app.
-The visual reference is `docs/design/signal-reference.html`. Open it in a browser. It uses synthetic data.
 
 ## 1. Principles
 
 1. **Colour is a signal.** Strong colour tells the user one of three things:
    - Iris: "you can do this" (main buttons, selection, progress, links).
-   - Tomato: "this needs you" (needs-review count, over budget, old imports, lowest forecast point).
-   - Green: "this is on track" (paid, on track, net worth went up).
+   - Tomato: "this needs you" (needs-review count, over budget, old imports).
+   - Green: "this is on track" (paid, on track).
 2. **Pastel colour is identity.** Each bucket, account group and Home item kind has its own hue everywhere.
    Always a soft fill with a deep glyph.
 3. **Everything else is neutral:** text, borders, group labels, navigation.
@@ -73,7 +72,6 @@ Other screens use the surface colour.
   - Page title: 40px, uppercase.
   - Dialog title: 30px, uppercase.
   - Hero amount: 60px (44px in a side panel, 48px on a phone).
-  - Plan flow amounts: 34px.
 - All amounts: `font-variant-numeric: tabular-nums lining-nums`, weight 600.
 - Hero amount: the currency symbol at 0.5em, the fraction digits as superscript at 0.42em. Only in hero amounts.
 - Liabilities: a small uppercase "OWED" label (12px, weight 600, muted) before the amount.
