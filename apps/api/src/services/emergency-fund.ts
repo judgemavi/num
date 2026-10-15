@@ -15,13 +15,13 @@ export function emergencyBucket(db: Reader) {
   return db.select().from(buckets).where(eq(buckets.kind, "emergency")).get();
 }
 
-/** The expense categories of the active essential buckets. */
+/** The expense categories of the active essential spending buckets. Only a commitment or a spending bucket has `essential`. */
 function essentialCategoryIds(db: Reader): string[] {
   return db
     .select({ id: bucketCategories.categoryId })
     .from(bucketCategories)
     .innerJoin(buckets, eq(bucketCategories.bucketId, buckets.id))
-    .where(and(eq(buckets.essential, true), isNull(buckets.archivedAt)))
+    .where(and(eq(buckets.kind, "spending"), eq(buckets.essential, true), isNull(buckets.archivedAt)))
     .all()
     .map((row) => row.id);
 }

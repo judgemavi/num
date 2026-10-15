@@ -262,6 +262,7 @@ test("a bucket patch is checked with the stored kind fields", () => {
       targetDate: null,
       fixedAmount: null,
       months: null,
+      canRecede: null,
       schedule: null,
       asOf: "2026-03-01",
       ...saved,
@@ -270,7 +271,7 @@ test("a bucket patch is checked with the stored kind fields", () => {
     expect(() => updateBucket(db, bucket.id, { kind: "goal", ...saved })).toThrow(
       expect.objectContaining({ code: "invalid_body", params: { field: "kind" } }),
     );
-    const goal = updateBucket(db, bucket.id, { kind: "goal", refillTo: null, target: 1_000_000, fixedAmount: 50_000, ...saved });
-    expect(goal).toMatchObject({ kind: "goal", target: 1_000_000, refillTo: null, essential: true });
+    const goal = updateBucket(db, bucket.id, { kind: "goal", refillTo: null, target: 1_000_000, fixedAmount: 50_000, canRecede: true, essential: null, ...saved });
+    expect(goal).toMatchObject({ kind: "goal", target: 1_000_000, refillTo: null, essential: null });
   });
 });

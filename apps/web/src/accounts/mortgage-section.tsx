@@ -1,5 +1,4 @@
 import { compounding, mortgageFirstPaymentOffPeriod, paymentFrequencies, type Account, type Category } from "@num/shared";
-import { ChevronRight } from "lucide-react";
 import { useArchiveAccount } from "@/api/accounts";
 import { useArchiveCategory } from "@/api/categories";
 import { AccountForm } from "@/accounts/account-form";
@@ -8,8 +7,7 @@ import { compoundingLabels, frequencyLabels } from "@/accounts/mortgage-format";
 import { blankAccount } from "@/accounts/account-values";
 import { draftFromTerms, draftIsBlank, firstPaymentNotAfterOpening } from "@/accounts/mortgage-draft";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { useAccounts, useCategories } from "@/editors/lookups";
 import { withForm } from "@/forms/form-hook";
 import { fieldValue } from "@/forms/form-values";
@@ -61,102 +59,97 @@ export const MortgageSection = withForm({
       mortgageFirstPaymentOffPeriod(openingDate, draft.firstPaymentDate, draft.frequency);
 
     return (
-      <Collapsible defaultOpen>
-        <CollapsibleTrigger className="group flex min-h-11 items-center gap-1.5 font-semibold text-primary">
-          <ChevronRight className="size-5 transition-transform group-data-[state=open]:rotate-90" aria-hidden="true" strokeWidth={1.8} />
-          Mortgage terms
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="grid gap-4">
-            <p className="text-sm text-muted-foreground">{mortgageTermsHelp}</p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <form.AppField name="mortgage.rate">{(field) => <field.TextField inputMode="decimal" id="mortgage-rate" label="Interest rate (%)" placeholder="5" />}</form.AppField>
-              <form.AppField name="mortgage.compounding">
-                {(field) => <field.SelectField id="mortgage-compounding" label="Compounded" options={compoundingOptions} />}
-              </form.AppField>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <form.AppField name="mortgage.payment">{(field) => <field.MoneyField id="mortgage-payment" label="Payment" />}</form.AppField>
-              <form.AppField name="mortgage.frequency">
-                {(field) => <field.SelectField id="mortgage-frequency" label="How often" options={frequencyOptions} />}
-              </form.AppField>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <form.AppField name="mortgage.firstPaymentDate">{(field) => <field.DateInputField id="mortgage-first" label="First payment" />}</form.AppField>
-              <form.AppField name="mortgage.termEnd">{(field) => <field.DateInputField id="mortgage-term-end" label="Term ends" />}</form.AppField>
-            </div>
-            {beforeOpening ? <FieldError>The first payment must be after the opening date.</FieldError> : null}
-            {offPeriod ? (
-              <p className="text-sm" role="status">
-                {firstPaymentWarning}
-              </p>
-            ) : null}
-            <form.AppField name="mortgage.months">
-              {(field) => <field.TextField id="mortgage-months" label="Months left on the amortization" inputMode="numeric" autoComplete="off" />}
+      <FieldSet>
+        <FieldLegend variant="label">Mortgage terms</FieldLegend>
+        <div className="grid gap-4">
+          <p className="text-sm text-muted-foreground">{mortgageTermsHelp}</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <form.AppField name="mortgage.rate">{(field) => <field.TextField inputMode="decimal" id="mortgage-rate" label="Interest rate (%)" placeholder="5" />}</form.AppField>
+            <form.AppField name="mortgage.compounding">
+              {(field) => <field.SelectField id="mortgage-compounding" label="Compounded" options={compoundingOptions} />}
             </form.AppField>
-            <form.Field name="mortgage.paymentAccountId">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="mortgage-pay-from">Pay from</FieldLabel>
-                  <ManagedPicker
-                    id="mortgage-pay-from"
-                    value={field.state.value}
-                    options={accountOptions(open)}
-                    placeholder="Choose an account"
-                    noun="account"
-                    archived={accountOptions(archivedAccounts)}
-                    onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => field.handleChange(restored.id) })}
-                    onChange={field.handleChange}
-                    renderForm={(name) => <AccountForm inline account={null} initialName={name} />}
-                  />
-                </Field>
-              )}
-            </form.Field>
-            <form.Field name="mortgage.interestCategoryId">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="mortgage-interest">Interest category</FieldLabel>
-                  <ManagedPicker
-                    id="mortgage-interest"
-                    value={field.state.value}
-                    options={categoryOptions(interest)}
-                    placeholder="Choose a category"
-                    noun="category"
-                    archived={categoryOptions(archivedInterest)}
-                    onRestore={(id) => archiveCategory.mutate({ id, restore: true }, { onSuccess: (restored) => field.handleChange(restored.id) })}
-                    onChange={field.handleChange}
-                    renderForm={(name) => <CategoryForm inline depth={1} category={null} initialName={name} initialKind="expense" />}
-                  />
-                </Field>
-              )}
-            </form.Field>
-            <form.Field name="mortgage.propertyAccountId">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="mortgage-property">Property</FieldLabel>
-                  <ManagedPicker
-                    id="mortgage-property"
-                    value={field.state.value}
-                    options={accountOptions(properties)}
-                    placeholder="No property"
-                    emptyLabel="No property"
-                    noun="account"
-                    archived={accountOptions(archivedProperties)}
-                    onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => field.handleChange(restored.id) })}
-                    onChange={field.handleChange}
-                    renderForm={(name) => <AccountForm inline account={null} initialName={name} />}
-                  />
-                </Field>
-              )}
-            </form.Field>
-            {draftIsBlank(draft) ? null : (
-              <Button type="button" variant="outline" className="justify-self-start" onClick={() => form.setFieldValue("mortgage", draftFromTerms(null))}>
-                Remove
-              </Button>
-            )}
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <form.AppField name="mortgage.payment">{(field) => <field.MoneyField id="mortgage-payment" label="Payment" />}</form.AppField>
+            <form.AppField name="mortgage.frequency">
+              {(field) => <field.SelectField id="mortgage-frequency" label="How often" options={frequencyOptions} />}
+            </form.AppField>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <form.AppField name="mortgage.firstPaymentDate">{(field) => <field.DateInputField id="mortgage-first" label="First payment" />}</form.AppField>
+            <form.AppField name="mortgage.termEnd">{(field) => <field.DateInputField id="mortgage-term-end" label="Term ends" />}</form.AppField>
+          </div>
+          {beforeOpening ? <FieldError>The first payment must be after the opening date.</FieldError> : null}
+          {offPeriod ? (
+            <p className="text-sm" role="status">
+              {firstPaymentWarning}
+            </p>
+          ) : null}
+          <form.AppField name="mortgage.months">
+            {(field) => <field.TextField id="mortgage-months" label="Months left on the amortization" inputMode="numeric" autoComplete="off" />}
+          </form.AppField>
+          <form.Field name="mortgage.paymentAccountId">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="mortgage-pay-from">Pay from</FieldLabel>
+                <ManagedPicker
+                  id="mortgage-pay-from"
+                  value={field.state.value}
+                  options={accountOptions(open)}
+                  placeholder="Choose an account"
+                  noun="account"
+                  archived={accountOptions(archivedAccounts)}
+                  onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => field.handleChange(restored.id) })}
+                  onChange={field.handleChange}
+                  renderForm={(name) => <AccountForm inline account={null} initialName={name} />}
+                />
+              </Field>
+            )}
+          </form.Field>
+          <form.Field name="mortgage.interestCategoryId">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="mortgage-interest">Interest category</FieldLabel>
+                <ManagedPicker
+                  id="mortgage-interest"
+                  value={field.state.value}
+                  options={categoryOptions(interest)}
+                  placeholder="Choose a category"
+                  noun="category"
+                  archived={categoryOptions(archivedInterest)}
+                  onRestore={(id) => archiveCategory.mutate({ id, restore: true }, { onSuccess: (restored) => field.handleChange(restored.id) })}
+                  onChange={field.handleChange}
+                  renderForm={(name) => <CategoryForm inline depth={1} category={null} initialName={name} initialKind="expense" />}
+                />
+              </Field>
+            )}
+          </form.Field>
+          <form.Field name="mortgage.propertyAccountId">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="mortgage-property">Property</FieldLabel>
+                <ManagedPicker
+                  id="mortgage-property"
+                  value={field.state.value}
+                  options={accountOptions(properties)}
+                  placeholder="No property"
+                  emptyLabel="No property"
+                  noun="account"
+                  archived={accountOptions(archivedProperties)}
+                  onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => field.handleChange(restored.id) })}
+                  onChange={field.handleChange}
+                  renderForm={(name) => <AccountForm inline account={null} initialName={name} />}
+                />
+              </Field>
+            )}
+          </form.Field>
+          {draftIsBlank(draft) ? null : (
+            <Button type="button" variant="outline" className="justify-self-start" onClick={() => form.setFieldValue("mortgage", draftFromTerms(null))}>
+              Remove
+            </Button>
+          )}
+        </div>
+      </FieldSet>
     );
   },
 });

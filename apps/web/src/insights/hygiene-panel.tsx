@@ -10,21 +10,43 @@ import { monthTitle, rateText, signedMoney } from "@/insights/format";
 import { formatMoney } from "@/money";
 import { formatDate } from "@/transactions/format";
 
+type PoolShort = Extract<HygieneCheck, { code: "pool_short" }>;
+
+/** The date and the amount, the buckets to pause, the savings that would give money back and the part not covered. */
+function poolShortText(check: PoolShort, currency: string, nameOf: (id: string) => string) {
+  if (check.pass || check.date === null) {
+    return `Unassigned stays above zero in the next ${forecastDayCount} days.`;
+  }
+  const parts = [`Pool runs short on ${formatDate(check.date)} by ${formatMoney(currency, check.short)}.`];
+  if (check.pause.length > 0) {
+    parts.push(`Pause ${check.pause.map((item) => `${nameOf(item.bucketId)} (${formatMoney(currency, item.monthly)} a month)`).join(", ")}.`);
+  }
+  if (check.recede.length > 0) {
+    const gives = check.recede.map((item) => `${nameOf(item.bucketId)} gives back ${formatMoney(currency, item.amount)}`).join(", ");
+    parts.push(check.pause.length > 0 ? `Or ${gives}.` : `${gives.charAt(0).toUpperCase()}${gives.slice(1)}.`);
+  }
+  if (check.uncovered > 0) {
+    parts.push(`${formatMoney(currency, check.uncovered)} is not covered.`);
+  }
+  return parts.join(" ");
+}
 
 function detail(check: HygieneCheck, currency: string, nameOf: (id: string) => string) {
-  if (check.code === "recede_month") {
+  if (check.code === "bills_short") {
     if (check.pass) {
-      return "No money went back from the emergency fund this month.";
+      return "Each bill due in the next 30 days has its money.";
     }
-    const covered = check.items.map((item) => `${nameOf(item.bucketId)} ${formatMoney(currency, item.amount)}`).join(" · ");
-    return `${formatMoney(currency, check.total)} went back to Unassigned this month to cover: ${covered}`;
+    return check.items.map((item) => `${nameOf(item.bucketId)} is ${formatMoney(currency, item.short)} short for ${formatDate(item.dueDate)}`).join(" · ");
   }
-  if (check.code === "recede_ahead") {
-    if (check.pass || check.date === null) {
-      return `Unassigned stays above zero in the next ${forecastDayCount} days.`;
+  if (check.code === "savings_used") {
+    if (check.pass) {
+      return "No savings went back to Unassigned this month.";
     }
-    const gives = `On ${formatDate(check.date)}, Unassigned can go below zero. The emergency fund may give ${formatMoney(currency, check.amount)}.`;
-    return check.uncovered > 0 ? `${gives} ${formatMoney(currency, check.uncovered)} is not covered.` : gives;
+    const given = check.items.map((item) => `${nameOf(item.bucketId)} ${formatMoney(currency, item.amount)} to cover ${nameOf(item.coveredId)}`).join(" · ");
+    return `${formatMoney(currency, check.total)} went back to Unassigned this month: ${given}`;
+  }
+  if (check.code === "pool_short") {
+    return poolShortText(check, currency, nameOf);
   }
   if (check.code === "emergency_fund") {
     return `${formatMoney(currency, check.balance)} saved of ${formatMoney(currency, check.target)} · ${check.months} ${check.months === 1 ? "month" : "months"} of essential spending`;
@@ -72,8 +94,9 @@ function detail(check: HygieneCheck, currency: string, nameOf: (id: string) => s
 
 const titles: Record<HygieneCheck["code"], string> = {
   emergency_fund: "Emergency fund",
-  recede_month: "Emergency fund used",
-  recede_ahead: "Emergency fund ahead",
+  bills_short: "Bills",
+  savings_used: "Savings used",
+  pool_short: "Pool runs short",
   imports_current: "Imports are current",
   review: "Review",
   savings_rate: "Savings rate",
@@ -83,8 +106,9 @@ const titles: Record<HygieneCheck["code"], string> = {
 
 const places: Record<HygieneCheck["code"], string> = {
   emergency_fund: "Buckets",
-  recede_month: "Buckets",
-  recede_ahead: "Buckets",
+  bills_short: "Buckets",
+  savings_used: "Buckets",
+  pool_short: "Buckets",
   imports_current: "Imports",
   review: "Review",
   savings_rate: "Insights",
@@ -102,7 +126,11 @@ export function HygienePanel() {
   const failedCount = hygiene.checks.filter((item) => !item.pass).length;
 
   function open(check: HygieneCheck) {
-    if (check.code === "emergency_fund" || check.code === "recede_month" || check.code === "recede_ahead" || check.code === "overspent") {
+    if (check.code === "emergency_fund" ||
+      check.code === "bills_short" ||
+      check.code === "savings_used" ||
+      check.code === "pool_short" ||
+      check.code === "overspent") {
       void go({ to: "/buckets" });
       return;
     }

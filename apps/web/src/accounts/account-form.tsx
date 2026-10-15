@@ -1,5 +1,4 @@
 import { accountClass, accountKinds, allowsInterestRate, defaultOnBudget, paymentPolicies, type Account, type MortgageTerms } from "@num/shared";
-import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { accountBody, accountValues, automaticOpeningDate, blankAccount } from "@/accounts/account-values";
 import { accountError, owedToYou, owedToYouWarning, policyLabel } from "@/accounts/format";
@@ -12,7 +11,6 @@ import { errorCode } from "@/api/client";
 import { Boundary } from "@/components/boundary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DateField } from "@/components/date-field";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
@@ -121,29 +119,21 @@ export function AccountForm({ account, terms = null, initialName, inline = false
                   </Boundary>
                 ) : null}
                 {kind === "credit_card" ? <CardFields form={form} /> : null}
-                <Collapsible>
-                  <CollapsibleTrigger className="group flex min-h-11 items-center gap-1.5 font-semibold text-primary">
-                    <ChevronRight className="size-5 transition-transform group-data-[state=open]:rotate-90" aria-hidden="true" strokeWidth={1.8} />
-                    More details
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="grid gap-4">
-                      {allowsInterestRate(kind) ? (
-                        <form.AppField name="interestRate">
-                          {(field) => <field.TextField inputMode="decimal" id="interest-rate" label="Interest rate (%)" placeholder="6.875" />}
-                        </form.AppField>
-                      ) : null}
-                      <form.Field name="onBudget">
-                        {(field) => (
-                          <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                            <FieldLabel htmlFor="on-budget">Use this account's money in my budget</FieldLabel>
-                            <Switch id="on-budget" checked={field.state.value} onCheckedChange={field.handleChange} />
-                          </div>
-                        )}
-                      </form.Field>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
+                <div className="grid gap-4">
+                  {allowsInterestRate(kind) ? (
+                    <form.AppField name="interestRate">
+                      {(field) => <field.TextField inputMode="decimal" id="interest-rate" label="Interest rate (%)" placeholder="6.875" />}
+                    </form.AppField>
+                  ) : null}
+                  <form.Field name="onBudget">
+                    {(field) => (
+                      <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                        <FieldLabel htmlFor="on-budget">Use this account's money in my budget</FieldLabel>
+                        <Switch id="on-budget" checked={field.state.value} onCheckedChange={field.handleChange} />
+                      </div>
+                    )}
+                  </form.Field>
+                </div>
               </>
             )}
           </form.Subscribe>

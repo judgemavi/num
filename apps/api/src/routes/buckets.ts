@@ -9,12 +9,15 @@ import {
   bucketListSchema,
   bucketSchema,
   bucketUpdateSchema,
+  billNeedListSchema,
   emergencyFundSchema,
   overspentListSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { coverBucket, createBucketEvent, listBucketEvents, undoBucketEvent } from "../services/bucket-events";
+import { listBillNeeds } from "../services/bills";
+import { pauseBucket, resumeBucket } from "../services/bucket-pause";
 import { readEmergencyFund } from "../services/emergency-fund";
 import { archiveBucket, createBucket, listBuckets, listOverspent, readBucket, restoreBucket, updateBucket } from "../services/buckets";
 import { validationHook } from "../validation";
@@ -63,6 +66,21 @@ const emergencyRoute = createRoute({
     200: {
       description: "The emergency fund and its calculation, or null when the book has no emergency bucket",
       content: { "application/json": { schema: emergencyFundSchema.nullable() } },
+    },
+    400: errorResponse,
+  },
+});
+
+const billsRoute = createRoute({
+  operationId: "get_buckets_bills",
+  description: "Read the next payment of each active commitment (bill), in fill order: its due date, its amount (the sum of the payments of that month when it is due more than one time a month) and the part that the balance does not hold when it is due in the next 30 days. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  method: "get",
+  path: "/api/buckets/bills",
+  request: { query: asOfQuerySchema },
+  responses: {
+    200: {
+      description: "The next payment of each bill",
+      content: { "application/json": { schema: billNeedListSchema } },
     },
     400: errorResponse,
   },
@@ -153,6 +171,38 @@ const restoreRoute = createRoute({
   },
 });
 
+const pauseRoute = createRoute({
+  operationId: "post_buckets_id_pause",
+  description: "Pause buckets (pause). A paused bucket keeps its balance. The fill does not fund it: its monthly amount is 0. An income cannot be paused. This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  method: "post",
+  path: "/api/buckets/{id}/pause",
+  request: { params: idParams },
+  responses: {
+    200: {
+      description: "The paused bucket",
+      content: { "application/json": { schema: bucketSchema } },
+    },
+    404: errorResponse,
+    409: errorResponse,
+  },
+});
+
+const resumeRoute = createRoute({
+  operationId: "post_buckets_id_resume",
+  description: "Resume buckets (resume). The fill funds the bucket again. This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  method: "post",
+  path: "/api/buckets/{id}/resume",
+  request: { params: idParams },
+  responses: {
+    200: {
+      description: "The resumed bucket",
+      content: { "application/json": { schema: bucketSchema } },
+    },
+    404: errorResponse,
+    409: errorResponse,
+  },
+});
+
 const eventRoute = createRoute({
   operationId: "post_buckets_id_events",
   description: "Create or run buckets. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
@@ -227,6 +277,7 @@ export function bucketRoutes(db: Db) {
     .openapi(listRoute, (c) => c.json(listBuckets(db, c.req.valid("query")), 200))
     .openapi(eventsRoute, (c) => c.json(listBucketEvents(db), 200))
     .openapi(overspentRoute, (c) => c.json(listOverspent(db), 200))
+    .openapi(billsRoute, (c) => c.json(listBillNeeds(db, c.req.valid("query").asOf), 200))
     .openapi(emergencyRoute, (c) => c.json(readEmergencyFund(db, c.req.valid("query").asOf), 200))
     .openapi(readRoute, (c) => c.json(readBucket(db, c.req.valid("param").id), 200))
     .openapi(createRouteDef, (c) =>
@@ -243,6 +294,14 @@ export function bucketRoutes(db: Db) {
     .openapi(restoreRoute, (c) => {
       const { id } = c.req.valid("param");
       return c.json(restoreBucket(db, id, { source: "ui" }), 200);
+    })
+    .openapi(pauseRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(pauseBucket(db, id, { source: "ui" }), 200);
+    })
+    .openapi(resumeRoute, (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(resumeBucket(db, id, { source: "ui" }), 200);
     })
     .openapi(eventRoute, (c) => {
       const { id } = c.req.valid("param");

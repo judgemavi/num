@@ -76,7 +76,7 @@ function scheduleFields(currency: string, kind: ScheduleKind, value: ScheduleFor
     name: value.name.trim(),
     kind,
     priority: Number(value.priority),
-    essential: kind === "commitment" && value.essential,
+    essential: kind === "commitment" ? value.essential : null,
     color: value.color,
     icon: value.icon,
     categoryIds: [],
@@ -89,6 +89,7 @@ function scheduleFields(currency: string, kind: ScheduleKind, value: ScheduleFor
     targetDate: null,
     fixedAmount: null,
     months: null,
+    canRecede: null,
     schedule: {
       accountId: value.accountId,
       expectedAmount,

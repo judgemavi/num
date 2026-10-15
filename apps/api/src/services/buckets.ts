@@ -7,6 +7,7 @@ import {
   isIsoDate,
   kindFieldsValid,
   nextBucketColor,
+  recedeDefault,
   utcNow,
   type Bucket,
   type BucketCreate,
@@ -33,7 +34,7 @@ function assertKindFields(input: BucketCreate) {
   }
 }
 
-function categoryIdsFor(db: Reader, bucketId: string) {
+export function categoryIdsFor(db: Reader, bucketId: string) {
   return db
     .select({ categoryId: bucketCategories.categoryId })
     .from(bucketCategories)
@@ -59,7 +60,7 @@ function allCategoryIds(db: Reader) {
 type BucketFields = Omit<BucketRow, "sortKey">;
 
 /** The audit log keeps the bucket row without its id, the categories of the bucket and its schedule. */
-function snapshot(row: BucketFields, categoryIds: string[], schedule: Schedule | null) {
+export function snapshot(row: BucketFields, categoryIds: string[], schedule: Schedule | null) {
   return { ...withoutId(row), categoryIds, schedule };
 }
 
@@ -125,7 +126,7 @@ function replaceCategories(tx: WriteTx, bucketId: string, categoryIds: string[])
   return next;
 }
 
-function rowValues(id: string, input: BucketWrite, archivedAt: string | null): BucketFields {
+function rowValues(id: string, input: BucketWrite, state: Pick<BucketFields, "archivedAt" | "pausedAt">): BucketFields {
   return {
     id,
     name: input.name.trim(),
@@ -135,7 +136,7 @@ function rowValues(id: string, input: BucketWrite, archivedAt: string | null): B
     color: input.color,
     icon: input.icon,
     startDate: input.startDate,
-    archivedAt,
+    ...state,
     refillTo: input.refillTo,
     amount: input.amount,
     dueDate: input.dueDate,
@@ -144,6 +145,7 @@ function rowValues(id: string, input: BucketWrite, archivedAt: string | null): B
     targetDate: input.targetDate,
     fixedAmount: input.fixedAmount,
     months: input.months,
+    canRecede: input.canRecede,
   };
 }
 
@@ -215,7 +217,7 @@ function insertBucket(tx: WriteTx, input: BucketCreate & { asOf: string }): stri
     assertNoEmergency(tx);
   }
   const id = crypto.randomUUID();
-  const row = rowValues(id, { ...input, startDate: input.startDate ?? input.asOf }, null);
+  const row = rowValues(id, { ...input, startDate: input.startDate ?? input.asOf }, { archivedAt: null, pausedAt: null });
   tx.insert(buckets).values({ ...row, sortKey: foldName(row.name) }).run();
   const categoryIds = replaceCategories(tx, id, input.categoryIds);
   if (input.schedule && hasSchedule(input.kind)) {
@@ -244,7 +246,7 @@ export function insertEmergencyBucket(tx: WriteTx, asOf: string): string {
     kind: "emergency",
     // After the spending and sinking buckets, before the goals.
     priority: (last?.priority ?? -1) + 1,
-    essential: true,
+    essential: null,
     color: "sky",
     icon: "shield",
     categoryIds: [],
@@ -255,6 +257,7 @@ export function insertEmergencyBucket(tx: WriteTx, asOf: string): string {
     target: null,
     targetDate: null,
     fixedAmount: null,
+    canRecede: recedeDefault("emergency"),
     schedule: null,
     ...emergencyDefaults,
     asOf,
@@ -291,7 +294,7 @@ export function updateBucket(db: Db, id: string, input: BucketUpdate & WriteInpu
     if (!sameFamily(existing.kind, next.kind)) {
       throw new ServiceError("bucket_fields_invalid", 400, { field: "kind" });
     }
-    const row = rowValues(id, next, existing.archivedAt);
+    const row = rowValues(id, next, { archivedAt: existing.archivedAt, pausedAt: existing.pausedAt });
     tx.update(buckets).set({ ...withoutId(row), sortKey: foldName(row.name) }).where(eq(buckets.id, id)).run();
     const categoryIds = replaceCategories(tx, id, next.categoryIds);
     if (next.schedule && hasSchedule(next.kind)) {

@@ -9,7 +9,8 @@ export const buckets = sqliteTable(
     name: text("name").notNull(),
     kind: text("kind", { enum: bucketKinds }).notNull(),
     priority: integer("priority").notNull(),
-    essential: integer("essential", { mode: "boolean" }).notNull(),
+    /** Commitment and spending only. Null for the other kinds. */
+    essential: integer("essential", { mode: "boolean" }),
     color: text("color", { enum: bucketColors }).notNull(),
     icon: text("icon", { enum: bucketIcons }).notNull(),
     startDate: text("start_date").notNull(),
@@ -22,6 +23,10 @@ export const buckets = sqliteTable(
     targetDate: text("target_date"),
     fixedAmount: integer("fixed_amount"),
     months: integer("months"),
+    /** Sinking, goal and emergency only: the bucket gives money back for a cover. Null for other kinds. */
+    canRecede: integer("can_recede", { mode: "boolean" }),
+    /** The fill does not fund a paused bucket. Never set on an income. */
+    pausedAt: text("paused_at"),
     /** The folded name (`foldName`). The list sorts by it. */
     sortKey: text("sort_key").notNull(),
   },

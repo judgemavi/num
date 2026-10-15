@@ -35,6 +35,14 @@ export function overspentQuery() {
   });
 }
 
+/** The next payment of each active bill, in fill order, and the part that its balance does not hold. */
+export function billNeedsQuery(asOf: string) {
+  return queryOptions({
+    queryKey: ["buckets", "bills", asOf],
+    queryFn: async () => (await unwrap(api.buckets.bills.$get({ query: { asOf } }))).items,
+  });
+}
+
 /** The emergency fund: its balance, its target and the monthly essential spending. The target uses `asOf`. */
 export function emergencyFundQuery(asOf: string) {
   return queryOptions({
@@ -76,6 +84,15 @@ export function useArchiveBucket() {
   return useArchiveWrite("Bucket archived.", bucketError, ({ id, restore }) =>
     unwrap(restore ? api.buckets[":id"].restore.$post({ param: { id } }) : api.buckets[":id"].archive.$post({ param: { id } })),
   );
+}
+
+/** Pause or resume a bucket. The fill does not fund a paused bucket. */
+export function usePauseBucket() {
+  return useMutation({
+    meta: { errorText: bucketError },
+    mutationFn: ({ id, resume }: { id: string; resume: boolean }) =>
+      unwrap(resume ? api.buckets[":id"].resume.$post({ param: { id } }) : api.buckets[":id"].pause.$post({ param: { id } })),
+  });
 }
 
 const eventDone = { fund: "Money assigned.", release: "Money released.", move: "Money moved.", cover: "Covered from Unassigned.", recede: "Money went back to Unassigned." } as const;

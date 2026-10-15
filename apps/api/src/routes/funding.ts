@@ -57,7 +57,7 @@ const monthsRoute = createRoute({
 
 const fillRoute = createRoute({
   operationId: "post_funding_fill",
-  description: `Create or run funding. Cover the buckets below zero, then pay the amounts that buckets still owe from Unassigned for the month of asOf, in priority order. When Unassigned cannot cover a bucket below zero, money goes from the emergency fund back to Unassigned. It writes nothing when nothing is owed. This does not change records outside this action. ${units}`,
+  description: `Create or run funding. Cover the buckets below zero, then pay the amounts that buckets still owe from Unassigned for the month of asOf, in priority order. When Unassigned cannot cover a bucket below zero, the savings buckets that can give money back give it to Unassigned, the lowest priority first. A paused bucket is not funded. It writes nothing when nothing is owed. This does not change records outside this action. ${units}`,
   method: "post",
   path: "/api/funding/fill",
   request: { query: asOfQuerySchema },

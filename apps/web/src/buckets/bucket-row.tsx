@@ -3,6 +3,7 @@ import { useArchiveBucket } from "@/api/buckets";
 import { useBucketFigures } from "@/buckets/use-bucket-figures";
 import { BucketGlyph } from "@/buckets/icons";
 import { BucketBar } from "@/buckets/bucket-bar";
+import { PauseMenuItem } from "@/buckets/pause-menu-item";
 import { Amount } from "@/components/amount";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { IconTile } from "@/components/icon-tile";
@@ -27,7 +28,7 @@ export function BucketRow({ bucket }: { bucket: Bucket }) {
         </IconTile>
         <div className={listName}>
           {bucket.name}
-          {bucket.essential ? <Badge variant="neutral">Essential</Badge> : null}
+          {bucket.pausedAt ? <Badge variant="neutral">Paused</Badge> : null}
           <small>{detail}</small>
         </div>
         <div className="w-36 shrink-0 max-md:basis-full">
@@ -62,6 +63,7 @@ export function BucketRow({ bucket }: { bucket: Bucket }) {
               <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("moveMoney", { fromId: bucket.id })}>
                 Move money
               </DropdownMenuItem>
+              <PauseMenuItem bucket={bucket} />
             </>
           )}
           <ArchiveMenuItem

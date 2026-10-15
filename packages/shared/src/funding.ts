@@ -63,6 +63,8 @@ export type MonthlyCommitment = {
 
 export type MonthlyBucket = {
   kind: BucketKind;
+  /** A paused bucket has a monthly amount of 0. */
+  paused: boolean;
   startDate: string;
   commitment: MonthlyCommitment | null;
   refillTo: number | null;
@@ -131,7 +133,7 @@ function commitmentAmount(bucket: MonthlyBucket, commitment: MonthlyCommitment, 
 }
 
 export function monthlyAmount(bucket: MonthlyBucket, balance: number, month: string, step: number): number {
-  if (bucket.kind === "income") {
+  if (bucket.kind === "income" || bucket.paused) {
     return 0;
   }
   if (bucket.kind === "commitment") {
@@ -161,7 +163,7 @@ export const fundingPositionSchema = z.object({
 export const fillResultSchema = z.object({
   /** The total that this fill paid. 0 when nothing was owed or Unassigned was used. */
   paid: nonNegative,
-  /** The number of events that this fill wrote: covers, payments and money back from the emergency fund. */
+  /** The number of events that this fill wrote: covers, payments and money back from the savings buckets. */
   payments: nonNegative,
 });
 

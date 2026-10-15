@@ -102,6 +102,10 @@ export {
   bucketWriteSchema,
   comparePriority,
   hasSchedule,
+  isSavings,
+  hasEssential,
+  recedeDefault,
+  billNeedListSchema,
   emergencyDefaults,
   emergencyFundSchema,
   kindFieldsValid,
@@ -441,7 +445,7 @@ export {
   type Hygiene,
   type HygieneCheck,
 } from "./hygiene";
-export { recedeAhead, type RecedeAheadInput } from "./recede";
+export { billNeed, pausePlan, projectedPoolShort, recedeOrder, recedePlan } from "./pool";
 export { reviewLevel, reviewLevels, type ReviewLevel } from "./review-level";
 export {
   approveResultSchema,

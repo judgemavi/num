@@ -315,8 +315,8 @@ Fields:
   buckets.
 
 The name, `archivedAt`, `color`, `icon`, `priority`, `essential` and the `startDate` of the bucket are fields of the bucket (§5.8).
-The schedule `startDate` is the first occurrence. There is no `active` field. To pause a schedule, archive its bucket
-(the balance must be 0).
+The schedule `startDate` is the first occurrence. There is no `active` field. To stop a schedule, archive its bucket
+(the balance must be 0). A paused commitment keeps its schedule (§5.8).
 
 Rules:
 - A schedule is a commitment or an income. A transfer that is not a commitment has no schedule (example: a monthly move to savings).
@@ -340,7 +340,16 @@ A bucket is money that the user keeps for one purpose.
 Buckets are virtual. A bucket is a label on on-budget money. Buckets do not move money between accounts.
 
 Fields:
-- `name`, `kind` (`commitment | income | spending | sinking | goal | emergency`), `priority`, `essential` (boolean), `archivedAt?`
+- `name`, `kind` (`commitment | income | spending | sinking | goal | emergency`), `priority`, `archivedAt?`
+- `essential` (boolean; commitment and spending only): the money is for a cost that the user must pay. It is null for
+  the other kinds. Each kind has a maximum of one switch in its editor: "Essential" for a commitment and a spending
+  bucket, "Can give money back when the pool is short" for a savings bucket.
+- `canRecede` (boolean; sinking, goal and emergency only): the bucket gives money back to Unassigned when the pool is
+  short (§7.7). Default: goal true, sinking false, emergency true. The editor shows it as "Can give money back when the
+  pool is short". The other kinds do not have it.
+- `pausedAt?` (all kinds except `income`): a paused bucket keeps its balance. The fill does not fund it: its monthly
+  amount is 0 (§7.6). The user pauses and resumes it from the row menu ("Pause" / "Resume") (audited). A paused bucket
+  can still give money back (§7.7).
 - `color` (`sky | mint | lilac | butter | pink | teal`) and `icon` (a name from a fixed icon set).
 - `categoryIds[]`: each expense category is in a maximum of one bucket. A commitment and an income have no categories.
 - `startDate`: the first date of the lines that the bucket counts. A new bucket uses `asOf`. The user can change it
@@ -353,7 +362,8 @@ Settings for each kind:
   id. The fill, the month plan and the bucket list use this order. The monthly amount follows the schedule (§7.6).
 - `income`: a schedule with no balance (§5.7). It is not funded and holds no money. Income goes to Unassigned. It has no
   bucket events, and it is never in the fill or in the overspent list.
-- `spending`: `refillTo`. Each month, funding brings the balance up to this amount.
+- `spending`: `refillTo`. Each month, funding brings the balance up to this amount. `essential` is true by default. The
+  editor shows it. The pool check (§10) suggests a pause only for a spending bucket that is not essential.
 - `sinking`: `amount`, `dueDate`, `repeat` (`none | yearly`). The monthly amount is the shortfall over the months until the due date (§7.6).
 - `goal`: `target`, `targetDate?`, `fixedAmount?`. The monthly amount is the shortfall over the months until the target date.
   If there is no target date, the goal has a fixed amount for each month (§7.6).
@@ -367,7 +377,7 @@ Bucket events (append only):
 - `release`: money from the bucket back to Unassigned. A release cannot be more than the bucket balance.
 - `cover`: money that the fill adds to a bucket with a negative balance (§7.7). The user does not make it and cannot undo it.
   It has no `month`. It is not funding of a month (§5.9).
-- `recede`: money that the fill moves from the emergency bucket back to Unassigned for a cover (§7.7).
+- `recede`: money that the fill moves from a savings bucket with `canRecede` back to Unassigned for a cover (§7.7).
   `otherBucketId` is the covered bucket. It has no `month`. The user does not make it and cannot undo it.
 - A manual `fund` cannot be more than Unassigned.
 - Each event has `amount` (positive), `date`, `note?`, `month?`, `undoneAt?`. `month` (YYYY-MM) is on a `fund` event that the
@@ -515,7 +525,7 @@ When the database has no settings, the app shows the setup screen. The user:
 1. Selects the book currency.
 2. Selects the default category set, or starts with no categories.
 
-The setup makes the emergency bucket "Emergency fund": essential, a colour and an icon from the fixed set,
+The setup makes the emergency bucket "Emergency fund": a colour and an icon from the fixed set,
 `startDate` = the setup date, `months` 3.
 
 The app does not create accounts at setup.
@@ -811,14 +821,15 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
      - Less often: `(the amount of the next occurrence − balance) /` the number of months from this month to the month of
        that occurrence, minimum 0. If it is due in this month: the whole shortfall.
    - Income: no monthly amount. It is not funded.
+   - A paused bucket (§5.8): 0. It owes nothing. Its balance stays.
    - Emergency: `target − balance`, minimum 0. The balance is the balance on `asOf`, thus it includes the funding of
      the month, and owed is this amount.
    Round each amount up to a whole minor unit of the currency (§4).
 2. **Emergency target.** Target = `months` × the monthly essential spending. The monthly essential spending is the median
    of the last 6 complete months before the date of the calculation. A month counts when it has expense lines in the
    transactions that are linked to active essential commitments (the full amount) or expense lines in the categories of the active
-   essential buckets. Count each transaction one time. With fewer than 3 such months, use the planned figure: the
-   yearly amount / 12 of the essential commitments + the `refillTo` of the essential spending buckets.
+   essential spending buckets. Only commitments and spending buckets have `essential` (§5.8). Count each transaction one
+   time. With fewer than 3 such months, use the planned figure: the yearly amount / 12 of the essential commitments + the `refillTo` of the essential spending buckets.
    When the balance is more than the target, the money stays and funding stops.
 3. **Owed.** Owed for a month = the monthly amount − the funding of that month (§5.9).
 4. **Fill.** The fill pays the owed amounts from Unassigned in bucket priority order. It stops when Unassigned is used.
@@ -831,7 +842,9 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
      nothing is owed or Unassigned is 0, it writes nothing.
    - Before it pays, it covers the negative buckets (§7.7).
    - The emergency bucket takes what is left, up to its owed amount. The buckets after it take the rest. An owed
-     amount that Unassigned cannot pay waits for income. It does not take money from the emergency bucket.
+     amount that Unassigned cannot pay waits for income. It does not take money from a savings bucket.
+   - The commitments come first in the priority order (§5.8). When Unassigned is short, a commitment with a lower
+     priority waits.
 5. **Paychecks.** A paycheck makes no funding. Its link, unlink or delete does not change funding.
 6. **Manual funding.** The user can fund, move or release money of a bucket at any time (§5.8). This does not count as
    the funding of a month.
@@ -847,9 +860,11 @@ from Unassigned. It does this in the same write, before it pays the owed amounts
   Each covered bucket goes to 0. The last one can be covered in part. The buckets with the lowest priority keep S.
 - A cover is a `cover` event (§5.8). It is not funding of a month. The next monthly amount counts it in the start balance.
   A cover does not change Unassigned.
-- When a bucket stays short after N − S, the emergency bucket gives the missing part back to Unassigned with a `recede`
-  event, then the cover is written. A recede never makes the emergency balance less than 0. The
-  emergency bucket does not cover itself with a recede. A recede has no month. A month undo does not remove it.
+- When a bucket stays short after N − S, the savings buckets with `canRecede` give the missing part back to Unassigned
+  with `recede` events, then the cover is written. They give in priority order, the lowest
+  priority first. The emergency bucket is in this order by its priority. Each bucket gives down to 0, never less.
+  A bucket does not cover itself with a recede. A paused bucket can give. Commitments and spending buckets never give.
+  The recede is automatic. A recede has no month. A month undo does not remove it.
 - When a bucket stays negative, Home and Buckets show the overspent buckets. The user moves money from a different bucket
   or releases money. There is no review item for this.
 
@@ -933,8 +948,9 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 | Check | The check passes when |
 |---|---|
 | Emergency fund | The emergency bucket balance ≥ its target (§7.6). Show the balance, the target and `months`. No check when the bucket is archived or the target is 0. |
-| Emergency fund used | The emergency bucket has no recede that is not undone, dated in the month of `asOf` (§7.7). Show the total and, for each covered bucket, its name and amount. No check when the book has no active emergency bucket. |
-| Emergency fund ahead | In the forecast (§8, 90 days), the projected pool on each date `d` after `asOf` is 0 or more: Unassigned(`asOf`) + income(`asOf`, `d`] − Σ over buckets max(0, outflow_b(`asOf`, `d`] − balance_b(`asOf`)) (a negative balance counts as 0) − other outflow(`asOf`, `d`]. `outflow_b` is the forecast spending of the schedules of a commitment bucket and the variable spending of a spending bucket. A commitment payment by transfer to an account that is not an open on-budget account (a loan payment, for example) is outflow of its bucket. A transfer between two open on-budget accounts is not outflow. Other outflow is forecast spending with no bucket. Show the first date below 0, the smaller of the lowest pool (positive) and the emergency balance, and the part that is not covered. Round to the step of the book currency. No check when the book has no active emergency bucket. |
+| Bills | Each active commitment holds its next payment when that payment is due in the next 30 days after `asOf`. The next payment is the next occurrence on or after `asOf` that is not skipped and not linked; for a commitment due more than one time in a month, the sum of these occurrences in that month. A `variable` amount uses the safe amount (§5.7). For each short bill show "<bill> is <amount> short for <date>". A paused bill counts. |
+| Savings used | No savings bucket has a recede that is not undone, dated in the month of `asOf` (§7.7). Show the total and, for each savings bucket and covered bucket, the names and the amount. |
+| Pool runs short | In the forecast (§8, 90 days), the projected pool on each date `d` after `asOf` is 0 or more: Unassigned(`asOf`) + income(`asOf`, `d`] − Σ over buckets max(0, outflow_b(`asOf`, `d`] − balance_b(`asOf`)) (a negative balance counts as 0) − other outflow(`asOf`, `d`]. `outflow_b` is the forecast spending of the schedules of a commitment bucket and the variable spending of a spending bucket. A commitment payment by transfer to an account that is not an open on-budget account (a loan payment, for example) is outflow of its bucket. A transfer between two open on-budget accounts is not outflow. Other outflow is forecast spending with no bucket. Show "Pool runs short on <date> by <amount>" (the first date below 0 and the lowest pool as a positive amount, rounded to the step of the book currency). Then the buckets to pause with their monthly amounts, until the sum is equal to or more than the short amount: the buckets that are not paused and have a monthly amount (§7.6), first the spending buckets that are not essential, then the goal and sinking buckets, then the commitments that are not essential, the lowest priority first in each set. Then the buckets that would give money back (§7.7 order) with their amounts. Then the part that no bucket gives, when there is one. |
 | Imports are current | Each on-budget account has an import in the last `staleImportDays` days |
 | Review | No transaction has needed review for more than 7 days |
 | Savings rate | The savings rate of the last 3 complete months (§8) is 0% or more. Show the percentage. |
@@ -1008,7 +1024,7 @@ There are 6 screens.
 |---|---|
 | Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); each account that does not match its bank (§5.13); hygiene checks (§10); this month: income → commitments (the monthly amount of the commitment buckets, §7.6) → bucket funding (the monthly amount of the other buckets) → left to save, what buckets still owe this month, missed payments, overspent buckets (only when a bucket stays negative), goal status; spending changes this month; net worth. Each card links to its screen. |
 | Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers, row selection with Approve and the bulk editor. |
-| Buckets | Groups Income, Commitments, Spending and Savings (sinking, goal, emergency). Balances, what is still owed this month, funding history (by month, with Undo and Fund again), moves, goals (feasibility), settings. A commitment or income row has its schedule, links, skips and "Amount changed". Side column: Upcoming (occurrences of all schedules in the next 30 days) and Detected (new schedule suggestions). |
+| Buckets | Groups Income, Commitments, Spending and Savings (sinking, goal, emergency). The Commitments group shows its rows in fill order (§7.6). A commitment row shows "Due <date>" of its next payment, a progress bar, "<balance> of <amount>" of that payment (§10 Bills) and, when it is short, "<amount> short" in the attention colour. Each bucket except an income has "Pause" or "Resume" in its row menu, and a paused row shows "Paused". Balances, what is still owed this month, funding history (by month, with Undo and Fund again), moves, goals (feasibility), settings. A commitment or income row has its schedule, links, skips and "Amount changed". Side column: Upcoming (occurrences of all schedules in the next 30 days) and Detected (new schedule suggestions). |
 | Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups and categories in two rings), net worth, mortgage. |
 | Accounts | List with balances and the bank status of each account (§5.13), import, bank balances, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
 | Settings | Subpages: Groups, Categories, Tags, Merchants, Currency, AI access, Backup. |

@@ -10,7 +10,7 @@ export type ScheduleView = Omit<ScheduleRow, "bucketId"> & {
   id: string;
   name: string;
   kind: "commitment" | "income";
-  essential: boolean;
+  essential: boolean | null;
   archivedAt: string | null;
 };
 

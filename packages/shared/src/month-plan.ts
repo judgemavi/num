@@ -54,6 +54,8 @@ export type MonthPlanBucketSource = {
   priority: number;
   color: BucketColor;
   archived: boolean;
+  /** A paused bucket has a monthly amount of 0. */
+  paused: boolean;
   /** The balance at the start of the first month that the plan shows. It does not include the funding of that month. */
   balance: number;
   refillTo: number | null;

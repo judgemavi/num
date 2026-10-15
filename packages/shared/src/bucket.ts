@@ -15,6 +15,21 @@ export function hasSchedule(kind: BucketKind): kind is "commitment" | "income" {
   return kind === "commitment" || kind === "income";
 }
 
+/** A savings kind. Only a savings bucket can give money back when the pool is short. */
+export function isSavings(kind: BucketKind): kind is "sinking" | "goal" | "emergency" {
+  return kind === "sinking" || kind === "goal" || kind === "emergency";
+}
+
+/** Only a commitment and a spending bucket have `essential`. */
+export function hasEssential(kind: BucketKind): kind is "commitment" | "spending" {
+  return kind === "commitment" || kind === "spending";
+}
+
+/** The default of `canRecede` for a kind. Null for a kind that cannot recede. */
+export function recedeDefault(kind: BucketKind): boolean | null {
+  return isSavings(kind) ? kind !== "sinking" : null;
+}
+
 export const sinkingRepeats = ["none", "yearly"] as const;
 
 export type SinkingRepeat = (typeof sinkingRepeats)[number];
@@ -77,7 +92,7 @@ const bucketFields = {
   name: nameSchema,
   kind: z.enum(bucketKinds),
   priority: z.number().int().min(0).max(1_000_000),
-  essential: z.boolean(),
+  essential: z.boolean().nullable(),
   color: z.enum(bucketColors),
   icon: z.enum(bucketIcons),
   categoryIds: z.array(z.uuid()),
@@ -90,6 +105,7 @@ const bucketFields = {
   targetDate: isoDateSchema.nullable(),
   fixedAmount: money.nullable(),
   months: monthCount.nullable(),
+  canRecede: z.boolean().nullable(),
   schedule: scheduleSchema.nullable(),
 };
 
@@ -104,8 +120,13 @@ export function kindFieldsValid(value: {
   targetDate: string | null;
   fixedAmount: number | null;
   months: number | null;
+  essential: boolean | null;
+  canRecede: boolean | null;
   schedule: Schedule | null;
 }): boolean {
+  if (hasEssential(value.kind) !== (value.essential !== null) || isSavings(value.kind) !== (value.canRecede !== null)) {
+    return false;
+  }
   if (hasSchedule(value.kind)) {
     return (
       value.schedule !== null &&
@@ -200,6 +221,8 @@ export const bucketSchema = z.object({
   ...bucketFields,
   name: z.string(),
   archivedAt: z.string().refine(isUtcTimestamp).nullable(),
+  /** The fill does not fund a paused bucket: its monthly amount is 0. */
+  pausedAt: z.string().refine(isUtcTimestamp).nullable(),
   balance: z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER),
 });
 
@@ -226,6 +249,20 @@ export const emergencyFundSchema = z.object({
   monthly: money,
   target: money,
   basis: z.enum(["history", "plan"]),
+});
+
+/** The next payment of each active bill and the part that its balance does not hold. */
+export const billNeedListSchema = z.object({
+  items: z.array(
+    z.object({
+      bucketId: z.uuid(),
+      dueDate: isoDateSchema,
+      /** The next occurrence, or the sum of the occurrences of its month when the bill is due more than one time a month. */
+      amount: money,
+      /** The amount minus the balance when the next occurrence is due in the next 30 days. Otherwise 0. */
+      short: money,
+    }),
+  ),
 });
 
 export const overspentListSchema = z.object({

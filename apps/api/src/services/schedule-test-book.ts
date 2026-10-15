@@ -20,7 +20,7 @@ export function createSchedule(db: Db, input: ScheduleInput & WriteInput): Bucke
     name,
     kind,
     priority: priority ?? 0,
-    essential: essential ?? kind === "commitment",
+    essential: kind === "commitment" ? (essential ?? true) : null,
     color: "sky",
     icon: "wallet",
     categoryIds: [],
@@ -33,6 +33,7 @@ export function createSchedule(db: Db, input: ScheduleInput & WriteInput): Bucke
     targetDate: null,
     fixedAmount: null,
     months: null,
+    canRecede: null,
     schedule: {
       categoryId: null,
       transferAccountId: null,

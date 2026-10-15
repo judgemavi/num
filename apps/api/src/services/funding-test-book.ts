@@ -33,6 +33,7 @@ export function addSchedule(
     transferAccountId?: string;
     payday?: boolean;
     essential?: boolean;
+    priority?: number;
   },
 ) {
   return createSchedule(db, {
@@ -53,16 +54,17 @@ const noKindFields = {
   targetDate: null,
   fixedAmount: null,
   months: null,
+  canRecede: null,
   schedule: null,
 } as const;
 
-type BucketOptions = { priority?: number; startDate?: string; essential?: boolean; categoryIds?: string[] };
+type BucketOptions = { priority?: number; startDate?: string; essential?: boolean; categoryIds?: string[]; canRecede?: boolean };
 
 function bucket(name: string, options: BucketOptions) {
   return {
     name,
     priority: options.priority ?? 1,
-    essential: options.essential ?? false,
+    essential: options.essential ?? null,
     color: "mint" as const,
     icon: "shopping-cart" as const,
     categoryIds: options.categoryIds ?? [],
@@ -73,15 +75,20 @@ function bucket(name: string, options: BucketOptions) {
 }
 
 export function spend(db: Db, name: string, refillTo = 100_000, options: BucketOptions = {}) {
-  return createBucket(db, { ...bucket(name, options), ...noKindFields, kind: "spending", refillTo });
+  return createBucket(db, { ...bucket(name, options), essential: options.essential ?? false, ...noKindFields, kind: "spending", refillTo });
 }
 
 export function sinking(db: Db, name: string, amount: number, dueDate: string, options: BucketOptions = {}) {
-  return createBucket(db, { ...bucket(name, options), ...noKindFields, kind: "sinking", amount, dueDate, repeat: "none" });
+  return createBucket(db, { ...bucket(name, options), ...noKindFields, kind: "sinking", amount, dueDate, repeat: "none", canRecede: options.canRecede ?? false });
+}
+
+/** A goal with a set amount each month. */
+export function goal(db: Db, name: string, target: number, fixedAmount: number, options: BucketOptions = {}) {
+  return createBucket(db, { ...bucket(name, options), ...noKindFields, kind: "goal", target, fixedAmount, canRecede: options.canRecede ?? true });
 }
 
 export function emergency(db: Db, months: number, options: BucketOptions = {}) {
-  return createBucket(db, { ...bucket("Emergency fund", { essential: true, ...options }), ...noKindFields, kind: "emergency", months });
+  return createBucket(db, { ...bucket("Emergency fund", options), ...noKindFields, kind: "emergency", months, canRecede: options.canRecede ?? true });
 }
 
 export function money(db: Db, accountId: string, categoryId: string, date: string, amount: number, payeeRaw: string) {

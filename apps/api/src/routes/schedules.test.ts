@@ -33,7 +33,7 @@ function body(accountId: string, kind: "commitment" | "income", schedule: Record
     name: kind === "income" ? "Pay" : "Rent",
     kind,
     priority: 0,
-    essential: kind === "commitment",
+    essential: kind === "commitment" ? true : null,
     color: "sky",
     icon: "wallet",
     categoryIds: [],
@@ -45,6 +45,7 @@ function body(accountId: string, kind: "commitment" | "income", schedule: Record
     targetDate: null,
     fixedAmount: null,
     months: null,
+    canRecede: null,
     schedule: {
       accountId,
       expectedAmount: kind === "income" ? 500_000 : -100_000,

@@ -38,6 +38,7 @@ function bucketOf(row: BucketRow, actualFunded: number, essentialMonthly: number
     priority: row.priority,
     color: row.color,
     archived: row.archivedAt !== null,
+    paused: row.pausedAt !== null,
     balance: 0,
     refillTo: row.refillTo,
     amount: row.amount,

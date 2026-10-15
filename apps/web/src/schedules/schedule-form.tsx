@@ -1,7 +1,5 @@
 import type { Bucket } from "@num/shared";
 import { useStore } from "@tanstack/react-form";
-import { ChevronRight } from "lucide-react";
-import { useState } from "react";
 import { AccountForm } from "@/accounts/account-form";
 import { accountLabel } from "@/accounts/label";
 import { useCreateBucket, useUpdateBucket } from "@/api/buckets";
@@ -9,7 +7,6 @@ import { localAsOf } from "@/as-of";
 import { ColorPicker, IconPicker } from "@/buckets/bucket-pickers";
 import { requestError } from "@/buckets/format";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { useEditorFrame } from "@/editors/editor-api";
@@ -70,7 +67,6 @@ export function ScheduleForm({ kind, draft }: { kind: "commitment" | "income"; d
   const current = draft !== "new" && "id" in draft ? draft : null;
   const create = useCreateBucket();
   const update = useUpdateBucket();
-  const [more, setMore] = useState(Boolean(current?.schedule?.merchantId || current?.schedule?.categoryId || current?.schedule?.endDate));
   const form = useAppForm({
     defaultValues: scheduleValues(kind, draft, board.nextColor),
     validators: {
@@ -169,78 +165,74 @@ export function ScheduleForm({ kind, draft }: { kind: "commitment" | "income"; d
               {(field) => <field.SwitchField id="schedule-payday" label="Payday: safe to spend counts until this income" />}
             </form.AppField>
           ) : null}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <form.AppField name="shift">{(field) => <field.SelectField id="schedule-shift" label="Weekend" options={shiftOptions} />}</form.AppField>
+            <form.AppField name="endDate">{(field) => <field.DateInputField id="schedule-end" label="Ends" />}</form.AppField>
+          </div>
+          <form.AppField name="tolerance">
+            {(field) => <field.MoneyField id="schedule-tolerance" label="Match within" description="How far the amount can be and still match." />}
+          </form.AppField>
+          {transferAccountId === null ? (
+            <form.Field name="categoryId">
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="schedule-category">Category</FieldLabel>
+                  <ManagedPicker
+                    id="schedule-category"
+                    value={field.state.value}
+                    options={categoryOptions}
+                    placeholder="No category"
+                    emptyLabel="No category"
+                    noun="category"
+                    onChange={field.handleChange}
+                    renderForm={(name) => (
+                      <CategoryForm inline depth={1} category={null} initialName={name} initialKind={kind === "income" ? "income" : "expense"} />
+                    )}
+                  />
+                </Field>
+              )}
+            </form.Field>
+          ) : null}
+          <form.Field name="merchantId">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="schedule-merchant">Merchant</FieldLabel>
+                <ManagedPicker
+                  id="schedule-merchant"
+                  value={field.state.value}
+                  options={merchants.filter((item) => item.archivedAt === null || item.id === merchantId).map((item) => ({ id: item.id, label: item.name }))}
+                  placeholder="Any merchant"
+                  emptyLabel="Any merchant"
+                  noun="merchant"
+                  archived={merchants.filter((item) => item.archivedAt).map((item) => ({ id: item.id, label: item.name }))}
+                  onChange={field.handleChange}
+                  renderForm={(name) => <MerchantForm inline depth={1} merchant={null} initialName={name} />}
+                />
+              </Field>
+            )}
+          </form.Field>
+          {kind === "commitment" ? (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <form.AppField name="bucketStart">
+                  {(field) => (
+                    <field.DateInputField
+                      id="schedule-bucket-start"
+                      label="Count payments from"
+                      required
+                      description="The bucket funds payments from the month of this date. Earlier payments do not count."
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="priority">
+                  {(field) => <field.TextField id="schedule-priority" label="Priority" inputMode="numeric" required description="Lower numbers are funded first." />}
+                </form.AppField>
+              </div>
+              <form.AppField name="essential">{(field) => <field.SwitchField id="schedule-essential" label="Essential" />}</form.AppField>
+            </>
+          ) : null}
           <form.Field name="color">{(field) => <ColorPicker value={field.state.value} onChange={field.handleChange} suggest={current === null} />}</form.Field>
           <form.Field name="icon">{(field) => <IconPicker value={field.state.value} color={color} onChange={field.handleChange} />}</form.Field>
-          <Collapsible open={more} onOpenChange={setMore}>
-            <CollapsibleTrigger className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary">
-              <ChevronRight className={`size-4 transition-transform ${more ? "rotate-90" : ""}`} aria-hidden="true" />
-              {kind === "commitment" ? "More options: merchant, category, end date, essential, priority" : "More options: merchant, category, end date"}
-            </CollapsibleTrigger>
-            <CollapsibleContent className="grid gap-4 pt-3">
-              {transferAccountId === null ? (
-                <form.Field name="categoryId">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor="schedule-category">Category</FieldLabel>
-                      <ManagedPicker
-                        id="schedule-category"
-                        value={field.state.value}
-                        options={categoryOptions}
-                        placeholder="No category"
-                        emptyLabel="No category"
-                        noun="category"
-                        onChange={field.handleChange}
-                        renderForm={(name) => (
-                          <CategoryForm inline depth={1} category={null} initialName={name} initialKind={kind === "income" ? "income" : "expense"} />
-                        )}
-                      />
-                    </Field>
-                  )}
-                </form.Field>
-              ) : null}
-              <form.Field name="merchantId">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="schedule-merchant">Merchant</FieldLabel>
-                    <ManagedPicker
-                      id="schedule-merchant"
-                      value={field.state.value}
-                      options={merchants.filter((item) => item.archivedAt === null || item.id === merchantId).map((item) => ({ id: item.id, label: item.name }))}
-                      placeholder="Any merchant"
-                      emptyLabel="Any merchant"
-                      noun="merchant"
-                      archived={merchants.filter((item) => item.archivedAt).map((item) => ({ id: item.id, label: item.name }))}
-                      onChange={field.handleChange}
-                      renderForm={(name) => <MerchantForm inline depth={1} merchant={null} initialName={name} />}
-                    />
-                  </Field>
-                )}
-              </form.Field>
-              <form.AppField name="tolerance">
-                {(field) => <field.MoneyField id="schedule-tolerance" label="Match within" description="How far the amount can be and still match." />}
-              </form.AppField>
-              <form.AppField name="shift">{(field) => <field.SelectField id="schedule-shift" label="Weekend" options={shiftOptions} />}</form.AppField>
-              <form.AppField name="endDate">{(field) => <field.DateInputField id="schedule-end" label="Ends" />}</form.AppField>
-              {kind === "commitment" ? (
-                <>
-                  <form.AppField name="bucketStart">
-                    {(field) => (
-                      <field.DateInputField
-                        id="schedule-bucket-start"
-                        label="Count payments from"
-                        required
-                        description="The bucket funds payments from the month of this date. Earlier payments do not count."
-                      />
-                    )}
-                  </form.AppField>
-                  <form.AppField name="priority">
-                    {(field) => <field.TextField id="schedule-priority" label="Priority" inputMode="numeric" required description="Lower numbers are funded first." />}
-                  </form.AppField>
-                  <form.AppField name="essential">{(field) => <field.SwitchField id="schedule-essential" label="Essential" />}</form.AppField>
-                </>
-              ) : null}
-            </CollapsibleContent>
-          </Collapsible>
           <form.FormError invalid="Check the details and try again." />
         </DialogBody>
         <DialogFooter>

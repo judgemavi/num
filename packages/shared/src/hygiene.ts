@@ -15,22 +15,34 @@ const emergencyFundCheckSchema = z.object({
   months: nonNegative,
 });
 
-/** The money that went from the emergency fund back to Unassigned this month, for each covered bucket. */
-const recedeMonthCheckSchema = z.object({
-  code: z.literal("recede_month"),
+/** The money that the savings buckets gave back to Unassigned this month, for each pair of savings and covered bucket. */
+const savingsUsedCheckSchema = z.object({
+  code: z.literal("savings_used"),
   pass: z.boolean(),
   month: monthKeySchema,
   total: nonNegative,
-  items: z.array(z.object({ bucketId: z.uuid(), amount: nonNegative })),
+  items: z.array(z.object({ bucketId: z.uuid(), coveredId: z.uuid(), amount: nonNegative })),
 });
 
-/** The first date when the forecast pool goes below 0, and what the emergency fund would give. */
-const recedeAheadCheckSchema = z.object({
-  code: z.literal("recede_ahead"),
+/**
+ * The first date when the forecast pool goes below 0 and the short amount; the buckets to pause with their monthly
+ * amounts; the buckets that would give money back; and the part that no bucket gives.
+ */
+const poolShortCheckSchema = z.object({
+  code: z.literal("pool_short"),
   pass: z.boolean(),
   date: isoDateSchema.nullable(),
-  amount: nonNegative,
+  short: nonNegative,
+  pause: z.array(z.object({ bucketId: z.uuid(), monthly: nonNegative })),
+  recede: z.array(z.object({ bucketId: z.uuid(), amount: nonNegative })),
   uncovered: nonNegative,
+});
+
+/** The bills that do not hold their next payment, due in the next 30 days. */
+const billsShortCheckSchema = z.object({
+  code: z.literal("bills_short"),
+  pass: z.boolean(),
+  items: z.array(z.object({ bucketId: z.uuid(), dueDate: isoDateSchema, short: nonNegative })),
 });
 
 const importFreshSchema = z.object({
@@ -83,8 +95,9 @@ const overspentCheckSchema = z.object({
 
 export const hygieneCheckSchema = z.discriminatedUnion("code", [
   emergencyFundCheckSchema,
-  recedeMonthCheckSchema,
-  recedeAheadCheckSchema,
+  billsShortCheckSchema,
+  savingsUsedCheckSchema,
+  poolShortCheckSchema,
   importsCheckSchema,
   reviewCheckSchema,
   savingsRateCheckSchema,
@@ -94,7 +107,7 @@ export const hygieneCheckSchema = z.discriminatedUnion("code", [
 
 export const hygieneSchema = z.object({
   asOf: isoDateSchema,
-  /** The emergency fund and recede checks are left out when the book has no active emergency bucket. */
+  /** The emergency fund check is left out when the book has no active emergency bucket. */
   checks: z.array(hygieneCheckSchema),
 });
 

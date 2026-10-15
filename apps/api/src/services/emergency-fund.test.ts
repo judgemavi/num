@@ -204,7 +204,7 @@ test("a book has one emergency bucket, with no categories, and the kind does not
     archiveBucket(book.db, fund.id, saved);
     expectCode(() => emergency(book.db, 3), "bucket_emergency_exists");
     expectCode(() => updateBucket(book.db, fund.id, { categoryIds: [book.hobby.id], ...saved }), "invalid_body");
-    expectCode(() => updateBucket(book.db, book.food.id, { kind: "emergency", months: 3, refillTo: null, categoryIds: [], ...saved }), "bucket_fields_invalid");
+    expectCode(() => updateBucket(book.db, book.food.id, { kind: "emergency", months: 3, refillTo: null, categoryIds: [], canRecede: true, essential: null, ...saved }), "bucket_fields_invalid");
   } finally {
     book.close();
   }

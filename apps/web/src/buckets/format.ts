@@ -111,6 +111,15 @@ export function bucketError(code: ErrorCode | undefined): string {
   if (code === "bucket_short") {
     return "That bucket does not have enough to cover this.";
   }
+  if (code === "bucket_paused") {
+    return "That bucket is already paused.";
+  }
+  if (code === "bucket_not_paused") {
+    return "That bucket is not paused.";
+  }
+  if (code === "bucket_income_pause") {
+    return "An income cannot be paused.";
+  }
   if (code === "bucket_balance") {
     return "The balance must be zero before you archive this bucket.";
   }

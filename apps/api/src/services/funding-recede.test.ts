@@ -95,13 +95,19 @@ test("a month undo keeps the recede, and a recede cannot be undone alone", () =>
   }
 });
 
-test("the recede check fails in the month of a recede and shows each covered bucket", () => {
-  const { book, food } = poolBook(50_000);
+test("the savings used check fails in the month of a recede and shows each savings and covered bucket", () => {
+  const { book, food, fund } = poolBook(50_000);
   try {
-    const check = (asOf: string) => readHygiene(book.db, asOf).checks.find((item) => item.code === "recede_month");
-    expect(check("2026-10-21")).toEqual({ code: "recede_month", pass: true, month: "2026-10", total: 0, items: [] });
+    const check = (asOf: string) => readHygiene(book.db, asOf).checks.find((item) => item.code === "savings_used");
+    expect(check("2026-10-21")).toEqual({ code: "savings_used", pass: true, month: "2026-10", total: 0, items: [] });
     fill(book, "2026-10-21");
-    expect(check("2026-10-21")).toEqual({ code: "recede_month", pass: false, month: "2026-10", total: 30_000, items: [{ bucketId: food.id, amount: 30_000 }] });
+    expect(check("2026-10-21")).toEqual({
+      code: "savings_used",
+      pass: false,
+      month: "2026-10",
+      total: 30_000,
+      items: [{ bucketId: fund.id, coveredId: food.id, amount: 30_000 }],
+    });
     expect(check("2026-11-02")).toMatchObject({ pass: true, total: 0 });
   } finally {
     book.close();
@@ -120,8 +126,16 @@ test("a loan payment by transfer to an account that is not on budget lowers the 
     addSchedule(book.db, { ...monthly, name: "Loan", expectedAmount: -150_000, transferAccountId: house.id });
     addSchedule(book.db, { ...monthly, name: "To savings", expectedAmount: -500_000, transferAccountId: savings.id });
     // Unassigned 80 000. Three loan payments in 90 days: the lowest pool is 80 000 − 450 000 = −370 000.
-    const check = readHygiene(book.db, "2026-10-08").checks.find((item) => item.code === "recede_ahead");
-    expect(check).toEqual({ code: "recede_ahead", pass: false, date: "2026-10-15", amount: 20_000, uncovered: 350_000 });
+    const check = readHygiene(book.db, "2026-10-08").checks.find((item) => item.code === "pool_short");
+    expect(check).toEqual({
+      code: "pool_short",
+      pass: false,
+      date: "2026-10-15",
+      short: 370_000,
+      pause: [],
+      recede: [{ bucketId: fund.id, amount: 20_000 }],
+      uncovered: 350_000,
+    });
   } finally {
     book.close();
   }

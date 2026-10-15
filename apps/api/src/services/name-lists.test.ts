@@ -85,6 +85,7 @@ test("buckets sort by the folded name", () => {
         targetDate: null,
         fixedAmount: null,
         months: null,
+        canRecede: null,
         schedule: null,
         asOf: "2000-01-01",
         ...saved,

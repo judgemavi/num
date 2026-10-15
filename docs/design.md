@@ -126,7 +126,6 @@ global component CSS (AGENTS.md).
 | Field | Label above (14px/600), input 44px high, radius 12px, `control` border, 3px iris focus ring. Help text 13px muted below. |
 | Choice cards | Radio choices as cards with a title and a one-line description (example: account kind). Selected: iris border and `primary-soft` fill. |
 | Reveal | A sub-section that shows only after a choice (example: card details). `bg` fill, hairline border, radius 14px. |
-| Disclosure | "More options: …" link-style button that opens optional fields. |
 | ActionBar | Actions for the selected rows of a table. A floating `ink` pill with white text, bottom centre of the screen, with the dialog shadow. Left: "N selected". Then 44px buttons: an outline button on the dark fill (white text, white border at low opacity), one primary (iris) button, and a ghost "Clear". It shows only while one or more rows are selected. The page gets space at its end, thus the bar does not cover the last rows and the pager. |
 
 Use shadcn `Table` only for the Transactions list. All other record lists use ListCard rows.
@@ -255,6 +254,8 @@ The table has no group rows. The page header of `/transactions/review` has no "A
 - An editor loads its own data when it opens (by ID, through the query cache). List rows carry only what they show.
 - Editors do not stack. Only one top-level editor is open at a time.
 - One shared `confirm()` (AlertDialog) for every confirmation.
+- Editors show all their fields. Do not hide a control behind a disclosure. Put related fields together, and put two
+  short fields in one row (two columns from `sm`).
 - The URL shows the open single-record editor (`?edit=transaction:<id>`). Back closes it.
 
 **Create on the spot:** the first option of every picker of user-managed things (categories, groups, tags,
@@ -263,7 +264,7 @@ with the typed text. Save creates, selects and collapses; Cancel collapses. Inli
 form → "+ Create new group"). An archived match shows "Restore 'X'".
 
 **Account editor, mortgage:** when the kind is mortgage, the Account form has a "Mortgage terms" section
-under the amount owed. It is open by default, with the help line "Add the terms to see the payment schedule and the
+under the amount owed. It always shows, with the help line "Add the terms to see the payment schedule and the
 interest and principal of each payment." The opening date has the help line "Use the date of the last payment before the first payment in Num. Use the amount
 owed after that payment." When the first payment date is not one payment period after the opening date, the form
 shows the warning "The first payment is not one payment period after the opening date. The first payment gets more
@@ -292,9 +293,9 @@ give each one an accessible label, or `aria-hidden` when the text already says t
 
 ## 9. Account kind picker
 
-Show 6 common kinds as choice cards with plain descriptions:
-Everyday (chequing), Savings, Credit card, Loan or mortgage, Investment, Something you own (property).
-"More kinds" shows Cash, Money lent to someone (receivable), Other asset, Other debt.
+Show all kinds as choice cards with plain descriptions:
+Everyday (chequing), Savings, Credit card, Loan or mortgage, Investment, Something you own (property), Cash, Money lent
+to someone (receivable), Other asset, Other debt.
 "Loan or mortgage" then asks "Is it a mortgage?".
 
 ## 10. Accessibility

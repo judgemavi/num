@@ -1,5 +1,5 @@
 import { bucketEvents, buckets, monthHolds, settings } from "@num/db";
-import { comparePriority, floorToStep, isIsoDate, positiveBalances, unassigned, utcNow, type FillResult } from "@num/shared";
+import { comparePriority, floorToStep, isIsoDate, positiveBalances, recedeOrder, unassigned, utcNow, type FillResult } from "@num/shared";
 import { eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -37,22 +37,27 @@ function pool(db: Reader, asOf: string) {
 
 /**
  * The covers: N − S in total, in priority order. S is the part of the negative
- * balances that cash did not cover (the negative Unassigned). When a bucket stays short, a recede gives the missing part
- * from the emergency bucket, down to 0, then the cover is written. The emergency bucket does not cover itself.
+ * balances that cash did not cover (the negative Unassigned). When a bucket stays short, the savings buckets with
+ * `canRecede` give the missing part, the lowest priority first, each down to 0. Then the cover is written. A bucket
+ * does not cover itself.
  */
 function coverEvents(db: Reader, asOf: string): FillEvent[] {
   const state = pool(db, asOf);
   const active = db.select().from(buckets).where(isNull(buckets.archivedAt)).all().sort(comparePriority);
-  const reserve = active.find((bucket) => bucket.kind === "emergency");
+  const givers = recedeOrder(active);
   const recede = (bucketId: string, short: number) => {
-    if (!reserve || reserve.id === bucketId) {
-      return 0;
+    let given = 0;
+    for (const giver of givers) {
+      if (given >= short) {
+        break;
+      }
+      const amount = giver.id === bucketId ? 0 : Math.min(short - given, Math.max(0, state.balanceOf(giver.id)));
+      if (amount > 0) {
+        state.add({ kind: "recede", bucketId: giver.id, otherBucketId: bucketId, amount, month: null });
+        given += amount;
+      }
     }
-    const amount = Math.min(short, Math.max(0, state.balanceOf(reserve.id)));
-    if (amount > 0) {
-      state.add({ kind: "recede", bucketId: reserve.id, otherBucketId: bucketId, amount, month: null });
-    }
-    return amount;
+    return given;
   };
   const negative = active.flatMap((bucket) => (state.balanceOf(bucket.id) < 0 ? [{ bucket, need: -state.balanceOf(bucket.id) }] : []));
   const needs = negative.reduce((sum, item) => sum + item.need, 0);

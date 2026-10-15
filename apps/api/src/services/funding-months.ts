@@ -31,9 +31,9 @@ function fundedByBucket(db: Reader, month: string) {
 
 /**
  * The monthly amount (from the balance at the start of the month, with the covers of the month), the funding of the
- * month that is not undone, and the amount still owed, for each active bucket that has started, in priority order
- *. The emergency bucket owes its target − its balance on `asOf`, minimum 0. Its monthly
- * amount is the funding of the month plus that amount.
+ * month that is not undone, and the amount still owed, for each active bucket that has started, in priority order.
+ * The emergency bucket owes its target − its balance on `asOf`, minimum 0. Its monthly amount is the funding of the
+ * month plus that amount. A paused bucket has a monthly amount of 0 and owes nothing.
  */
 export function monthlyRows(db: Reader, asOf: string): MonthlyRow[] {
   const month = asOf.slice(0, 7);
@@ -61,11 +61,14 @@ export function monthlyRows(db: Reader, asOf: string): MonthlyRow[] {
   const commitments = commitmentsOf(db, start);
   return rows.map((bucket) => {
     const paid = funded.get(bucket.id) ?? 0;
+    if (bucket.pausedAt !== null) {
+      return { bucket, monthly: 0, funded: paid, owed: 0 };
+    }
     if (bucket.kind === "emergency") {
       const owed = fund ? Math.max(0, fund.target - fund.balance) : 0;
       return { bucket, monthly: paid + owed, funded: paid, owed };
     }
-    const monthly = monthlyAmount({ ...bucket, commitment: commitments.get(bucket.id) ?? null }, balances.get(bucket.id) ?? 0, month, step);
+    const monthly = monthlyAmount({ ...bucket, paused: false, commitment: commitments.get(bucket.id) ?? null }, balances.get(bucket.id) ?? 0, month, step);
     return { bucket, monthly, funded: paid, owed: Math.max(0, monthly - paid) };
   });
 }

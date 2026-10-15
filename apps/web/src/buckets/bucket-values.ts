@@ -1,4 +1,4 @@
-import { bucketWriteSchema, amountText, emergencyDefaults, parseAmount, type Bucket, type BucketColor } from "@num/shared";
+import { bucketWriteSchema, amountText, emergencyDefaults, isSavings, parseAmount, type Bucket, type BucketColor } from "@num/shared";
 import { localAsOf } from "@/as-of";
 import { editPatch, keptAmount } from "@/forms/form-values";
 import { decimalsError } from "@/money";
@@ -30,7 +30,10 @@ export function bucketValues(bucket: Bucket | null, nextColor: BucketColor, last
     goalMode: bucket?.fixedAmount !== null && bucket?.fixedAmount !== undefined ? "month" : "date",
     months: String(bucket?.months ?? emergencyDefaults.months),
     priority: String(bucket?.priority ?? lastPriority + 1),
-    essential: bucket?.essential ?? false,
+    /** The value for a spending bucket, essential by default. The body sends null for the other kinds. */
+    essential: bucket?.essential ?? true,
+    /** The value for a savings kind. The body sends null for the other kinds. */
+    canRecede: bucket?.canRecede ?? false,
   };
 }
 
@@ -48,7 +51,7 @@ function bucketFields(currency: string, value: BucketValues, stored: Bucket | nu
     name: value.name.trim(),
     kind: value.kind,
     priority: Number(value.priority),
-    essential: value.essential,
+    essential: value.kind === "spending" ? value.essential : null,
     color: value.color,
     icon: value.icon,
     categoryIds: value.kind === "emergency" ? [] : value.categoryIds,
@@ -61,6 +64,7 @@ function bucketFields(currency: string, value: BucketValues, stored: Bucket | nu
     targetDate: value.kind === "goal" && value.goalMode === "date" ? value.targetDate : null,
     fixedAmount: value.kind === "goal" && value.goalMode === "month" ? read("fixedAmount") : null,
     months: value.kind === "emergency" ? Number(value.months) : null,
+    canRecede: isSavings(value.kind) ? value.canRecede : null,
     schedule: null,
   };
 }

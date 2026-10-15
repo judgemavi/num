@@ -1,7 +1,7 @@
-import type { Bucket } from "@num/shared";
+import { isSavings, recedeDefault, type Bucket } from "@num/shared";
 import { useStore } from "@tanstack/react-form";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { ChevronRight, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useState } from "react";
 import { ColorPicker, IconPicker } from "@/buckets/bucket-pickers";
 import { bucketBody, bucketValues } from "@/buckets/bucket-values";
@@ -11,7 +11,6 @@ import { bucketOptionsQuery, useCreateBucket, useUpdateBucket } from "@/api/buck
 import { choiceIn } from "@/components/choice";
 import { ChoiceCard } from "@/components/choice-card";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Command,
   CommandEmpty,
@@ -53,7 +52,6 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
   const currency = useBookCurrency();
   const board = useActiveBuckets();
   const current = draft === "new" ? null : draft;
-  const [more, setMore] = useState(Boolean(current?.essential));
   const create = useCreateBucket();
   const update = useUpdateBucket();
   const form = useAppForm({
@@ -94,7 +92,15 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
         <DialogBody>
           <form.AppField name="name">{(field) => <field.TextField id="bucket-name" label="Name" required />}</form.AppField>
           {kind === "emergency" ? null : (
-            <form.Field name="kind">
+            <form.Field
+              name="kind"
+              listeners={{
+                // A new kind takes its default: a goal can give money back, a saving for a bill cannot.
+                onChange: ({ value, fieldApi }) => {
+                  fieldApi.form.setFieldValue("canRecede", recedeDefault(value) === true);
+                },
+              }}
+            >
               {(field) => (
                 <Field>
                   <FieldLabel>Kind</FieldLabel>
@@ -128,6 +134,7 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
               )}
             </form.AppField>
           ) : null}
+          {kind === "spending" ? <form.AppField name="essential">{(field) => <field.SwitchField id="bucket-essential" label="Essential" />}</form.AppField> : null}
           {kind === "sinking" ? (
             <>
               <form.AppField name="amount">{(field) => <field.MoneyField id="bucket-amount" label="Amount to save" required />}</form.AppField>
@@ -154,9 +161,14 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
                   label="Months to keep"
                   inputMode="numeric"
                   required
-                  description="The target is this number of months of your essential spending. The app calculates the spending. The bucket takes money from Unassigned up to the target. It gives money back to cover an overspent bucket that comes before it."
+                  description="The target is this number of months of your essential spending. The app calculates the spending. The bucket takes money from Unassigned up to the target."
                 />
               )}
+            </form.AppField>
+          ) : null}
+          {isSavings(kind) ? (
+            <form.AppField name="canRecede">
+              {(field) => <field.SwitchField id="bucket-can-recede" label="Can give money back when the pool is short" />}
             </form.AppField>
           ) : null}
           <form.Field name="color">{(field) => <ColorPicker value={field.state.value} onChange={field.handleChange} suggest={current === null} />}</form.Field>
@@ -166,28 +178,21 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
               {(field) => <CategoryField bucketId={current?.id ?? null} selected={field.state.value} onChange={field.handleChange} />}
             </form.Field>
           )}
-          <form.AppField name="startDate">
-            {(field) => (
-              <field.DateInputField
-                id="bucket-start"
-                label="Start date"
-                required
-                description={kind === "emergency" ? "The bucket is funded from the month of this date." : "The bucket is funded from the month of this date. Spending in these categories counts from this date."}
-              />
-            )}
-          </form.AppField>
-          <Collapsible open={more} onOpenChange={setMore}>
-            <CollapsibleTrigger className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary">
-              <ChevronRight className={`size-4 transition-transform ${more ? "rotate-90" : ""}`} aria-hidden="true" />
-              {kind === "emergency" ? "More options: priority" : "More options: priority, essential"}
-            </CollapsibleTrigger>
-            <CollapsibleContent className="grid gap-4 pt-3">
-              <form.AppField name="priority">
-                {(field) => <field.TextField id="bucket-priority" label="Priority" inputMode="numeric" required description="Lower numbers are funded first." />}
-              </form.AppField>
-              {kind === "emergency" ? null : <form.AppField name="essential">{(field) => <field.SwitchField id="bucket-essential" label="Essential" />}</form.AppField>}
-            </CollapsibleContent>
-          </Collapsible>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <form.AppField name="startDate">
+              {(field) => (
+                <field.DateInputField
+                  id="bucket-start"
+                  label="Start date"
+                  required
+                  description={kind === "emergency" ? "The bucket is funded from the month of this date." : "The bucket is funded from the month of this date. Spending in these categories counts from this date."}
+                />
+              )}
+            </form.AppField>
+            <form.AppField name="priority">
+              {(field) => <field.TextField id="bucket-priority" label="Priority" inputMode="numeric" required description="Lower numbers are funded first." />}
+            </form.AppField>
+          </div>
           <form.FormError />
         </DialogBody>
         <DialogFooter>

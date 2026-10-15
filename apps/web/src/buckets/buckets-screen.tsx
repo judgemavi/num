@@ -1,12 +1,13 @@
-import type { BucketKind } from "@num/shared";
+import { comparePriority, type BucketKind } from "@num/shared";
 import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { bucketEventsQuery, bucketListQuery, emergencyFundQuery, overspentQuery } from "@/api/buckets";
+import { billNeedsQuery, bucketEventsQuery, bucketListQuery, emergencyFundQuery, overspentQuery } from "@/api/buckets";
 import { fundingMonthsQuery, fundingOwedQuery, fundingPositionQuery } from "@/api/funding";
 import { monthPlanQuery } from "@/api/plan";
 import { upcomingQuery } from "@/api/schedules";
 import { localAsOf } from "@/as-of";
 import { ActivityList } from "@/buckets/activity-list";
+import { BillRow } from "@/buckets/bill-row";
 import { BucketRow } from "@/buckets/bucket-row";
 import { BucketFilterBar } from "@/buckets/filters";
 import { FundingHistory } from "@/buckets/funding-history";
@@ -26,7 +27,7 @@ import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
 import { GoalFeasibility } from "@/plan/month-board";
 import { DetectedList } from "@/schedules/detected-list";
-import { ScheduleRow } from "@/schedules/schedule-row";
+import { IncomeRow } from "@/schedules/schedule-row";
 import { UpcomingOccurrences } from "@/schedules/upcoming-list";
 
 const groupOrder: { id: string; kinds: BucketKind[]; label: string }[] = [
@@ -47,6 +48,7 @@ export function BucketsScreen() {
   usePrefetchQuery(fundingOwedQuery(asOf));
   usePrefetchQuery(fundingMonthsQuery());
   usePrefetchQuery(bucketEventsQuery());
+  usePrefetchQuery(billNeedsQuery(asOf));
   return (
     <Boundary loading="Loading buckets." failed="The buckets did not load.">
       <BucketsHeader />
@@ -160,7 +162,9 @@ function BucketList() {
         <p className="px-5 py-5 text-muted-foreground">{shown.archived ? "No archived buckets." : "No buckets yet."}</p>
       ) : (
         groupOrder.map((group) => {
-          const items = rows.filter((bucket) => group.kinds.includes(bucket.kind));
+          const kept = rows.filter((bucket) => group.kinds.includes(bucket.kind));
+          // The bills show in fill order.
+          const items = group.id === "commitments" ? [...kept].sort(comparePriority) : kept;
           if (items.length === 0) {
             return null;
           }
@@ -188,7 +192,13 @@ function BucketList() {
                 }
               />
               {items.map((bucket) =>
-                bucket.schedule ? <ScheduleRow key={bucket.id} bucket={bucket} /> : <BucketRow key={bucket.id} bucket={bucket} />,
+                bucket.kind === "income" ? (
+                  <IncomeRow key={bucket.id} bucket={bucket} />
+                ) : bucket.kind === "commitment" ? (
+                  <BillRow key={bucket.id} bucket={bucket} />
+                ) : (
+                  <BucketRow key={bucket.id} bucket={bucket} />
+                ),
               )}
             </div>
           );
