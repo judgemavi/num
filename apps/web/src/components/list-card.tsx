@@ -100,7 +100,7 @@ export function ListRow({
 }: RowTarget & {
   size?: keyof typeof rowSize;
   current?: boolean;
-  /** The `RowMenu` of the row. */
+  /** The `RowMenu` of the row. `null`: the row has no menu, but other rows of the list have one. Its columns line up. */
   menu?: ReactNode;
   children: ReactNode;
 }) {
@@ -121,6 +121,7 @@ export function ListRow({
       ) : null}
       {children}
       {menu ? <ItemActions className={rowMenu}>{menu}</ItemActions> : null}
+      {menu === null ? <div aria-hidden="true" className="-mx-1.5 w-7 shrink-0 pointer-coarse:w-9" /> : null}
     </Item>
   );
 }
