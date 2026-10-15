@@ -59,7 +59,7 @@ const emergencyRoute = createRoute({
 
 const billsRoute = createRoute({
   operationId: "get_buckets_bills",
-  description: "Read the next payment of each active commitment (bill), in fill order: its due date, its amount (the sum of the payments of that month when it is due more than one time a month) and the part that the balance does not hold when it is due in the next 30 days. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read the next payment of each active commitment (bill), in fill order: its due date, its amount (the sum of the payments of that month when it is due more than one time a month), the gap (the part that the balance does not hold when it is due in the next 30 days), the part of the gap that Unassigned covers in fill order (covered) and the rest (short). The next payment is the earliest occurrence that is not skipped, not linked and whose window has not ended on asOf. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/buckets/bills",
   request: { query: asOfQuerySchema },

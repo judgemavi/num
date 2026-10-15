@@ -360,11 +360,7 @@ export {
   applyBusinessDayShift,
   businessDayShifts,
   dayDistance,
-  isLinkCandidate,
-  isInboxMissed,
-  isMissed,
   linkWindowStart,
-  matchLinks,
   medianAmount,
   occurrenceAt,
   occurrenceDates,
@@ -373,11 +369,11 @@ export {
   withinTolerance,
   type AmountMode,
   type BusinessDayShift,
-  type LinkTransaction,
-  type OpenOccurrence,
   type PlanFrequency,
   type PlanSchedule,
 } from "./recurring-calc";
+export { isInboxMissed, missedCandidates, occurrenceWindows, windowEnded, type OccurrenceWindow } from "./recurring-window";
+export { linkDateRange, matchLinks, openOccurrences, type LinkTransaction, type OpenOccurrence } from "./recurring-match";
 export type { Schedule } from "./schedule";
 export { detectPlans, type DetectionTransaction } from "./recurring-detect";
 export {
@@ -425,7 +421,7 @@ export {
   type Hygiene,
   type HygieneCheck,
 } from "./hygiene";
-export { billNeed, pausePlan, projectedPoolShort, recedeOrder, recedePlan } from "./pool";
+export { billFillsOn, billNeed, coverBills, pausePlan, projectedPoolShort, recedeOrder, recedePlan } from "./pool";
 export { needsYouSchema, type NeedsYou, type NeedsYouItem } from "./needs-you";
 export { reviewLevel, reviewLevels, type ReviewLevel } from "./review-level";
 export {

@@ -135,8 +135,8 @@ test("when the pool is short, the fill pays the bills in priority order and the 
     expect(readBucket(book.db, rent.id).balance).toBe(100_000);
     expect(readBucket(book.db, gym.id).balance).toBe(10_000);
     expect(listBillNeeds(book.db, "2026-10-08").items).toEqual([
-      { bucketId: rent.id, dueDate: "2026-10-25", amount: 100_000, short: 0 },
-      { bucketId: gym.id, dueDate: "2026-10-25", amount: 20_000, short: 10_000 },
+      { bucketId: rent.id, dueDate: "2026-10-25", amount: 100_000, gap: 0, covered: 0, short: 0 },
+      { bucketId: gym.id, dueDate: "2026-10-25", amount: 20_000, gap: 10_000, covered: 0, short: 10_000 },
     ]);
     const check = readHygiene(book.db, "2026-10-08").checks.find((item) => item.code === "bills_short");
     expect(check).toEqual({ code: "bills_short", pass: false, items: [{ bucketId: gym.id, dueDate: "2026-10-25", short: 10_000 }] });
@@ -145,7 +145,7 @@ test("when the pool is short, the fill pays the bills in priority order and the 
   }
 });
 
-test("a paused bill gets no money and shows its short amount", () => {
+test("a paused bill gets no money: Unassigned does not cover its gap, thus it is short", () => {
   const book = tempDatabase();
   try {
     const cash = account(book.db, "Cash", "chequing", 200_000);
@@ -162,7 +162,7 @@ test("a paused bill gets no money and shows its short amount", () => {
     });
     pauseBucket(book.db, gym.id, saved);
     expect(fill(book, "2026-10-08")).toEqual({ paid: 0, payments: 0 });
-    expect(listBillNeeds(book.db, "2026-10-08").items).toEqual([{ bucketId: gym.id, dueDate: "2026-10-25", amount: 20_000, short: 20_000 }]);
+    expect(listBillNeeds(book.db, "2026-10-08").items).toEqual([{ bucketId: gym.id, dueDate: "2026-10-25", amount: 20_000, gap: 20_000, covered: 0, short: 20_000 }]);
   } finally {
     book.close();
   }

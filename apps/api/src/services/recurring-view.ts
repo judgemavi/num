@@ -1,23 +1,25 @@
-import { occurrenceLinks, settings, transactionLines, transactions, type OccurrenceLinkRow } from "@num/db";
+import { occurrenceLinks, transactionLines, transactions, type OccurrenceLinkRow } from "@num/db";
 import {
   Temporal,
   planProposalKey,
   detectPlans,
   isInboxMissed,
-  linkWindowStart,
+  linkDateRange,
   matchLinks,
-  occurrenceDates,
+  missedCandidates,
+  occurrenceWindows,
+  openOccurrences,
   variableAmounts,
   withinTolerance,
   type DetectionTransaction,
   type Occurrence,
   type OccurrenceStatus,
-  type OpenOccurrence,
+  type OccurrenceWindow,
   type PlanProposal,
   type RecurringSignals,
   type UpcomingList,
 } from "@num/shared";
-import { and, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { bookStep } from "./book-step";
 import { decidedKeys } from "./decision-keys";
@@ -34,15 +36,6 @@ type TxnRow = {
 };
 
 const horizonDays = 400;
-
-function graceDays(db: { select: Db["select"] }) {
-  const row = db.select().from(settings).where(eq(settings.key, "recurringGraceDays")).get();
-  const value = Number(row?.value ?? "3");
-  if (!Number.isInteger(value) || value < 0) {
-    return 3;
-  }
-  return value;
-}
 
 function horizon(asOf: string) {
   return Temporal.PlainDate.from(asOf).add({ days: horizonDays }).toString();
@@ -73,7 +66,8 @@ function transactionsByIds(db: Db, ids: readonly string[]) {
   return found;
 }
 
-function transactionsForAccounts(db: Db, accountIds: readonly string[], from: string, to: string) {
+/** The transactions of the accounts from `from` (included) to `before` (not included). */
+function transactionsForAccounts(db: Db, accountIds: readonly string[], from: string, before: string) {
   const rows: TxnRow[] = [];
   for (const accountId of accountIds) {
     rows.push(
@@ -90,7 +84,7 @@ function transactionsForAccounts(db: Db, accountIds: readonly string[], from: st
           and(
             eq(transactions.accountId, accountId),
             gte(transactions.date, from),
-            lte(transactions.date, to),
+            lt(transactions.date, before),
           ),
         )
         .all(),
@@ -178,9 +172,8 @@ function amountsByDue(links: OccurrenceLinkRow[], txns: Map<string, TxnRow>, asO
 
 function statusFor(
   row: ScheduleView,
-  dueDate: string,
+  window: OccurrenceWindow,
   asOf: string,
-  grace: number,
   link: OccurrenceLinkRow | undefined,
   actual: number | null,
 ): OccurrenceStatus {
@@ -193,7 +186,7 @@ function statusFor(
     }
     return "linked";
   }
-  if (row.archivedAt === null && isInboxMissed(dueDate, asOf, grace)) {
+  if (row.archivedAt === null && isInboxMissed(window, asOf)) {
     return "missed";
   }
   return "open";
@@ -201,7 +194,6 @@ function statusFor(
 
 export function listOccurrences(db: Db, bucketId: string, asOf: string) {
   const row = requireSchedule(db, bucketId);
-  const grace = graceDays(db);
   const links = db.select().from(occurrenceLinks).where(eq(occurrenceLinks.bucketId, bucketId)).all();
   const byDue = new Map(links.map((link) => [link.dueDate, link]));
   const txns = transactionsByIds(
@@ -211,14 +203,14 @@ export function listOccurrences(db: Db, bucketId: string, asOf: string) {
   const actuals = amountsByDue(links, txns, asOf);
   const amounts =
     row.amountMode === "variable" ? variableAmounts(actuals, row.expectedAmount, bookStep(db)) : { forecast: row.expectedAmount, safe: row.expectedAmount };
-  const items: Occurrence[] = occurrenceDates(row, horizon(asOf)).map((date) => {
-    const link = byDue.get(date.dueDate);
+  const items: Occurrence[] = occurrenceWindows(row, horizon(asOf)).map((window) => {
+    const link = byDue.get(window.dueDate);
     const txn = link?.transactionId ? txns.get(link.transactionId) : undefined;
     const actual = txn ? txn.amount : null;
     return {
-      dueDate: date.dueDate,
-      nominalDate: date.nominalDate,
-      status: statusFor(row, date.dueDate, asOf, grace, link, actual),
+      dueDate: window.dueDate,
+      nominalDate: window.nominalDate,
+      status: statusFor(row, window, asOf, link, actual),
       transactionId: link?.transactionId ?? null,
       actualAmount: actual,
       reason: link?.reason ?? null,
@@ -242,45 +234,23 @@ export function listUpcoming(db: Db, asOf: string): UpcomingList {
   return { items };
 }
 
-function openOccurrences(rows: ScheduleView[], links: OccurrenceLinkRow[], asOf: string, grace: number) {
-  const linked = new Set(links.map((link) => `${link.bucketId}|${link.dueDate}`));
-  const limit = Temporal.PlainDate.from(asOf).add({ days: grace }).toString();
-  const occurrences: OpenOccurrence[] = [];
-  for (const row of rows) {
-    const from = linkWindowStart(row.startDate, asOf);
-    for (const date of occurrenceDates(row, limit, from)) {
-      if (linked.has(`${row.id}|${date.dueDate}`)) {
-        continue;
-      }
-      occurrences.push({
-        bucketId: row.id,
-        dueDate: date.dueDate,
-        accountId: row.accountId,
-        merchantId: row.merchantId,
-        expectedAmount: row.expectedAmount,
-        tolerance: row.tolerance,
-      });
-    }
-  }
-  return occurrences;
-}
-
-function linkTransactions(db: Db, schedules: ScheduleView[], asOf: string, grace: number) {
-  const accountIds = [...new Set(schedules.map((row) => row.accountId))];
-  const from = Temporal.PlainDate.from(asOf).subtract({ months: 13 }).subtract({ days: grace }).toString();
-  const to = Temporal.PlainDate.from(asOf).add({ days: grace * 2 }).toString();
-  return transactionsForAccounts(db, accountIds, from, to);
+/** The occurrences with no link or skip that a transaction can match on `asOf`, and the transactions in their windows. */
+function linkInput(db: Db, schedules: ScheduleView[], links: OccurrenceLinkRow[], asOf: string) {
+  const occurrences = openOccurrences(schedules, new Set(links.map((link) => `${link.bucketId}|${link.dueDate}`)), asOf);
+  const range = linkDateRange(occurrences);
+  const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
+  const accountIds = [...new Set(occurrences.map((item) => item.accountId))];
+  const candidates = range ? transactionsForAccounts(db, accountIds, range.from, range.before).filter((txn) => !taken.has(txn.id)) : [];
+  return { occurrences, candidates };
 }
 
 export function recurringSignals(db: Db, asOf: string): RecurringSignals {
   const schedules = activeSchedules(db);
   const links = db.select().from(occurrenceLinks).all();
-  const grace = graceDays(db);
   const linkedIds = links.flatMap((link) => (link.transactionId ? [link.transactionId] : []));
   const txnById = transactionsByIds(db, linkedIds);
   const changed: RecurringSignals["changed"] = [];
   const missed: RecurringSignals["missed"] = [];
-  const missedFrom = Temporal.PlainDate.from(asOf).subtract({ days: 35 }).toString();
   for (const row of schedules) {
     const scheduleLinks = links.filter((link) => link.bucketId === row.id);
     const byDue = new Map(scheduleLinks.map((link) => [link.dueDate, link]));
@@ -302,16 +272,14 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
         });
       }
     }
-    for (const date of occurrenceDates(row, asOf, missedFrom)) {
-      if (byDue.has(date.dueDate) || !isInboxMissed(date.dueDate, asOf, grace)) {
-        continue;
+    for (const window of missedCandidates(row, asOf)) {
+      if (!byDue.has(window.dueDate)) {
+        missed.push({ bucketId: row.id, dueDate: window.dueDate });
       }
-      missed.push({ bucketId: row.id, dueDate: date.dueDate });
     }
   }
-  const taken = new Set(linkedIds);
-  const candidates = linkTransactions(db, schedules, asOf, grace).filter((txn) => !taken.has(txn.id));
-  const ambiguous = matchLinks(openOccurrences(schedules, links, asOf, grace), candidates, grace).ambiguous;
+  const open = linkInput(db, schedules, links, asOf);
+  const ambiguous = matchLinks(open.occurrences, open.candidates).ambiguous;
   const declined = decidedKeys(db, "plan_proposal");
   const proposals = detectPlans(detectionTransactions(db, asOf), bookStep(db), asOf).filter((proposal) => {
     return !schedules.some((schedule) => covers(schedule, proposal)) && !declined.has(planProposalKey(proposal));
@@ -321,14 +289,8 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
 
 export function autoLink(db: Db, asOf: string, input: WriteInput & { accountId?: string }): { linked: number } {
   const schedules = activeSchedules(db).filter((row) => !input.accountId || row.accountId === input.accountId);
-  const links = db.select().from(occurrenceLinks).all();
-  const grace = graceDays(db);
-  const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
-  const unique = matchLinks(
-    openOccurrences(schedules, links, asOf, grace),
-    linkTransactions(db, schedules, asOf, grace).filter((txn) => !taken.has(txn.id)),
-    grace,
-  ).unique;
+  const open = linkInput(db, schedules, db.select().from(occurrenceLinks).all(), asOf);
+  const unique = matchLinks(open.occurrences, open.candidates).unique;
   if (unique.length === 0) {
     return { linked: 0 };
   }

@@ -3,8 +3,8 @@ import { forecastDates, monthLastDay, pausePlan, projectedPoolShort, recedeOrder
 import { and, eq, gte, isNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { bookStep } from "./book-step";
-import { positionOn } from "./available";
 import { forecastInput } from "./forecast";
+import { positionOn } from "./funding-book";
 import { monthlyRows } from "./funding-months";
 
 /** The recedes in the month of `asOf` that are not undone, for each pair of savings and covered bucket. */

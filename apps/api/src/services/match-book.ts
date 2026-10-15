@@ -1,6 +1,5 @@
-import { accounts, occurrenceLinks, settings, transactions, type TransactionRow } from "@num/db";
+import { accounts, occurrenceLinks, transactions, type TransactionRow } from "@num/db";
 import {
-  Temporal,
   amountGuardFor,
   bandSignals,
   buildPayeeIndex,
@@ -10,9 +9,9 @@ import {
   fitLabels,
   learnedConfidence,
   learnedLabels,
-  linkWindowStart,
+  linkDateRange,
   matchLinks,
-  occurrenceDates,
+  openOccurrences,
   scoreMatch,
   similarFactor,
   type LearnedLabel,
@@ -24,7 +23,7 @@ import {
   type PayeeIndex,
   type RecurringSignal,
 } from "@num/shared";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { keepPrefix } from "./decision-keep";
 import { loadMortgageLearned, type MortgageHit, type MortgageLearned } from "./mortgage-learned";
 import { activeSchedules } from "./schedules";
@@ -267,12 +266,6 @@ export function scorePayee(
   });
 }
 
-function graceDays(db: Reader) {
-  const row = db.select({ value: settings.value }).from(settings).where(eq(settings.key, "recurringGraceDays")).get();
-  const parsed = Number(row?.value ?? "3");
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 3;
-}
-
 export type RecurringHit = RecurringSignal & { dueDate: string };
 
 export function recurringForRows(db: Reader, pending: readonly LinkTransaction[], asOf: string): Map<string, RecurringHit> {
@@ -284,52 +277,30 @@ export function recurringForRows(db: Reader, pending: readonly LinkTransaction[]
   if (schedules.length === 0) {
     return hits;
   }
-  const grace = graceDays(db);
   const links = db
     .select({ bucketId: occurrenceLinks.bucketId, dueDate: occurrenceLinks.dueDate, transactionId: occurrenceLinks.transactionId })
     .from(occurrenceLinks)
     .all();
-  const linked = new Set(links.map((link) => `${link.bucketId}|${link.dueDate}`));
+  const occurrences = openOccurrences(schedules, new Set(links.map((link) => `${link.bucketId}|${link.dueDate}`)), asOf);
   const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
-  const limit = Temporal.PlainDate.from(asOf).add({ days: grace }).toString();
-  const occurrences = schedules.flatMap((schedule) => {
-    const from = linkWindowStart(schedule.startDate, asOf);
-    return occurrenceDates(schedule, limit, from).flatMap((date) =>
-      linked.has(`${schedule.id}|${date.dueDate}`)
-        ? []
-        : [
-            {
-              bucketId: schedule.id,
-              dueDate: date.dueDate,
-              accountId: schedule.accountId,
-              merchantId: schedule.merchantId,
-              expectedAmount: schedule.expectedAmount,
-              tolerance: schedule.tolerance,
-            },
-          ],
-    );
-  });
   const accountIds = new Set(schedules.map((schedule) => schedule.accountId));
-  const from = Temporal.PlainDate.from(asOf).subtract({ months: 13 }).subtract({ days: grace }).toString();
-  const to = Temporal.PlainDate.from(asOf).add({ days: grace * 2 }).toString();
-  const existing = db
-    .select({
-      id: transactions.id,
-      accountId: transactions.accountId,
-      date: transactions.date,
-      amount: transactions.amount,
-      merchantId: transactions.merchantId,
-    })
-    .from(transactions)
-    .where(and(gte(transactions.date, from), lte(transactions.date, to)))
-    .all()
-    .filter((row) => accountIds.has(row.accountId) && !taken.has(row.id));
+  const range = linkDateRange(occurrences);
+  const existing = range
+    ? db
+        .select({
+          id: transactions.id,
+          accountId: transactions.accountId,
+          date: transactions.date,
+          amount: transactions.amount,
+          merchantId: transactions.merchantId,
+        })
+        .from(transactions)
+        .where(and(gte(transactions.date, range.from), lt(transactions.date, range.before)))
+        .all()
+        .filter((row) => accountIds.has(row.accountId) && !taken.has(row.id))
+    : [];
   const pendingIds = new Set(pending.map((row) => row.id));
-  const unique = matchLinks(
-    occurrences,
-    [...existing.filter((row) => !pendingIds.has(row.id)), ...pending],
-    grace,
-  ).unique;
+  const unique = matchLinks(occurrences, [...existing.filter((row) => !pendingIds.has(row.id)), ...pending]).unique;
   const mortgages = new Set(
     db
       .select({ id: accounts.id })

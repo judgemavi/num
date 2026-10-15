@@ -111,7 +111,8 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
       endDate: "2026-03-20",
       ...saved,
     });
-    const phoneA = pay(db, savings.id, "2026-03-20", -10_000, "Phone a", food.id);
+    // One day before and one day after the due date: the same distance.
+    const phoneA = pay(db, savings.id, "2026-03-19", -10_000, "Phone a", food.id);
     const phoneB = pay(db, savings.id, "2026-03-21", -10_000, "Phone b", food.id);
 
     const questions = new Map(listNeedsReview(db, asOf).map((hit) => [hit.id, hit.review.question]));

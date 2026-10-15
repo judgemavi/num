@@ -1,15 +1,10 @@
 import { expect, test } from "bun:test";
 import {
   applyBusinessDayShift,
-  isInboxMissed,
-  isLinkCandidate,
-  matchLinks,
   medianOf,
   occurrenceAt,
   occurrenceDates,
   variableAmounts,
-  type LinkTransaction,
-  type OpenOccurrence,
   type PlanSchedule,
 } from "./recurring-calc";
 import { detectPlans, type DetectionTransaction } from "./recurring-detect";
@@ -161,54 +156,6 @@ test("detection uses the latest run and ignores history older than 18 months", (
       "2026-10-07",
     ),
   ).toEqual([]);
-});
-
-function occurrence(bucketId: string, dueDate: string, merchantId: string | null = null): OpenOccurrence {
-  return {
-    bucketId,
-    dueDate,
-    accountId: "account-1",
-    merchantId,
-    expectedAmount: -16990,
-    tolerance: 1000,
-  };
-}
-
-function payment(id: string, date: string, amount = -16990, merchantId: string | null = "merchant-1"): LinkTransaction {
-  return { id, accountId: "account-1", date, amount, merchantId };
-}
-
-test("an old unlinked occurrence is not missed", () => {
-  expect(isInboxMissed("2024-01-15", "2026-10-07", 3)).toBe(false);
-  expect(isInboxMissed("2026-09-01", "2026-10-07", 3)).toBe(false);
-  expect(isInboxMissed("2026-09-10", "2026-10-07", 3)).toBe(true);
-  expect(isInboxMissed("2026-10-05", "2026-10-07", 3)).toBe(false);
-});
-
-test("auto-link matches one candidate and leaves every other case open", () => {
-  const plan = occurrence("plan-1", "2026-03-02", "merchant-1");
-  expect(isLinkCandidate(plan, payment("txn-1", "2026-03-05"), 3)).toBe(true);
-  expect(isLinkCandidate(plan, payment("txn-1", "2026-03-06"), 3)).toBe(false);
-  expect(isLinkCandidate(plan, payment("txn-1", "2026-03-02", -16990, "other"), 3)).toBe(false);
-  expect(isLinkCandidate(plan, payment("txn-1", "2026-03-02", -19000), 3)).toBe(false);
-  expect(isLinkCandidate(plan, { ...payment("txn-1", "2026-03-02"), accountId: "account-2" }, 3)).toBe(false);
-  expect(isLinkCandidate({ ...plan, merchantId: null }, payment("txn-1", "2026-03-02", -16990, null), 3)).toBe(true);
-
-  const one = matchLinks([plan], [payment("txn-1", "2026-03-02")], 3);
-  expect(one.unique).toEqual([{ bucketId: "plan-1", dueDate: "2026-03-02", transactionId: "txn-1" }]);
-  expect(one.ambiguous).toEqual([]);
-
-  const twoPayments = matchLinks([plan], [payment("txn-1", "2026-03-02"), payment("txn-2", "2026-03-03")], 3);
-  expect(twoPayments.unique).toEqual([]);
-  expect(twoPayments.ambiguous[0]?.transactionIds).toEqual(["txn-1", "txn-2"]);
-
-  const shared = matchLinks(
-    [plan, occurrence("plan-2", "2026-03-02", "merchant-1")],
-    [payment("txn-1", "2026-03-02")],
-    3,
-  );
-  expect(shared.unique).toEqual([]);
-  expect(shared.ambiguous).toHaveLength(2);
 });
 
 test("an old amount outside the band does not stop the later regular run", () => {

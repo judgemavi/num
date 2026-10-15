@@ -7,10 +7,7 @@ import { insertEmergencyBucket } from "./buckets";
 import { defaultCategoryGroups } from "./default-categories";
 import { write, type AuditSource, type WriteTx } from "./write";
 
-const settingDefaults = [
-  ["staleImportDays", "10"],
-  ["recurringGraceDays", "3"],
-] as const;
+const settingDefaults = [["staleImportDays", "10"]] as const;
 
 type SetupInput = {
   currency: string;

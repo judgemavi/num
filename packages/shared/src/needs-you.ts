@@ -27,7 +27,7 @@ const needsYouItemSchema = z.discriminatedUnion("code", [
   z.object({ code: z.literal("overspent"), count: nonNegative, balance: z.number().int().max(0) }),
   /** The goals and sinking funds need more each month than the monthly income has (spec §7.8). */
   z.object({ code: z.literal("goals_short"), shortfall: nonNegative }),
-  /** One bill that does not hold its next payment, due in the next 30 days (spec §10 Bills). */
+  /** One bill with a short part: the part of its gap that Unassigned does not cover (spec §10 Bills). */
   z.object({ code: z.literal("bills_short"), bucketId: z.uuid(), dueDate: isoDateSchema, short: nonNegative }),
   /** The emergency fund is below its target. `months` is the number of months of essential spending of the target. */
   z.object({ code: z.literal("emergency_fund"), balance: money, target: nonNegative, months: nonNegative }),

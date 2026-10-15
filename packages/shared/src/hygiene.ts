@@ -38,7 +38,7 @@ const poolShortCheckSchema = z.object({
   uncovered: nonNegative,
 });
 
-/** The bills that do not hold their next payment, due in the next 30 days. */
+/** The bills with a short part: the part of the gap of the next payment that Unassigned does not cover. */
 const billsShortCheckSchema = z.object({
   code: z.literal("bills_short"),
   pass: z.boolean(),

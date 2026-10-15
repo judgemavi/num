@@ -1,4 +1,4 @@
-import type { Bucket } from "@num/shared";
+import { billFillsOn, type Bucket } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { billNeedsQuery, useArchiveBucket } from "@/api/buckets";
 import { scheduleSignalsQuery } from "@/api/schedules";
@@ -20,7 +20,8 @@ import { formatDate } from "@/transactions/format";
 
 /**
  * One bill (a commitment) of the Buckets list: the next due date, and how much of the next payment the balance holds.
- * When the payment is due in the next 30 days and the balance is less, the row shows the short amount.
+ * When the payment is due in the next 30 days and the balance is less, Unassigned covers the gap in fill order. The row
+ * shows the part that Unassigned does not cover ("short"), else the date when the fill gives the covered part.
  */
 export function BillRow({ bucket }: { bucket: Bucket }) {
   const { openEditor } = useEditors();
@@ -31,7 +32,6 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
   const { data: signals } = useSuspenseQuery(scheduleSignalsQuery(asOf));
   const need = needs.find((item) => item.bucketId === bucket.id);
   const amount = need?.amount ?? 0;
-  const short = need?.short ?? 0;
   const changed = signals.changed.some((item) => item.bucketId === bucket.id);
   const over = bucket.balance < 0;
 
@@ -60,10 +60,12 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
         <small>
           of <Amount value={amount} />
         </small>
-        {short > 0 ? (
+        {need && need.short > 0 ? (
           <span className="block text-[13px] font-semibold text-attn">
-            <Amount value={short} /> short
+            <Amount value={need.short} /> short
           </span>
+        ) : need && need.covered > 0 ? (
+          <span className="block text-[13px] text-muted-foreground">Fills {formatDate(billFillsOn(need.dueDate, asOf))}</span>
         ) : null}
       </div>
       <RowMenu label={`Actions for ${bucket.name}`}>

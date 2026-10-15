@@ -13,6 +13,14 @@ function onBudgetTotal(db: Reader) {
   return balancesOf(db, rows).reduce((total, item) => total + item.balance, 0);
 }
 
+/** The on-budget total, the bucket balances and Unassigned, all on `asOf`. */
+export function positionOn(db: Reader, asOf: string) {
+  const onBudget = db.select().from(accounts).where(eq(accounts.onBudget, true)).all();
+  const onBudgetTotal = balancesOf(db, onBudget, asOf).reduce((total, item) => total + item.balance, 0);
+  const balances = bucketBalances(db, asOf);
+  return { onBudgetTotal, balances, unassigned: unassigned(onBudgetTotal, positiveBalances([...balances.values()])) };
+}
+
 export function fundingPosition(db: Reader, asOf: string): FundingPosition {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });

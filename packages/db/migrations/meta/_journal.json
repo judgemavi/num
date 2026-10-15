@@ -36,6 +36,13 @@
       "when": 1792077813777,
       "tag": "0004_abandoned_eternity",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792080297704,
+      "tag": "0005_remove_recurring_grace_days",
+      "breakpoints": true
     }
   ]
 }

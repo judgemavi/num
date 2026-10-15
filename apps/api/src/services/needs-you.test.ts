@@ -30,10 +30,10 @@ test("each check that fails is an item, in the order of Home", () => {
       kind: "commitment",
       accountId: cash.id,
       expectedAmount: -500,
-      startDate: "2026-10-01",
+      startDate: "2026-09-15",
       freq: "monthly",
       interval: 1,
-      monthDay: 1,
+      monthDay: 15,
     });
     money(db, cash.id, groceries.id, "2026-10-02", -3_000, "Market");
     createTransaction(db, { accountId: cash.id, date: "2026-10-03", amount: -100, payeeRaw: "Kiosk", lines: [{ amount: -100 }], ...saved });
@@ -45,9 +45,10 @@ test("each check that fails is an item, in the order of Home", () => {
     expect(items.filter((item) => item.code !== "pool_short")).toEqual([
       { code: "review", count: 1, oldCount: 0 },
       { code: "bank_mismatch", accountId: cash.id, difference: -2_100 },
-      { code: "missed", bucketId: rent.id, dueDate: "2026-10-01" },
+      // The window of 2026-09-15 ended on 2026-09-30.
+      { code: "missed", bucketId: rent.id, dueDate: "2026-09-15" },
       { code: "overspent", count: 1, balance: -2_100 },
-      { code: "bills_short", bucketId: rent.id, dueDate: "2026-11-01", short: 500 },
+      { code: "bills_short", bucketId: rent.id, dueDate: "2026-10-15", short: 500 },
       { code: "spending_up", categoryId: groceries.id, month: "2026-10", amount: 3_000, median: 0, delta: 3_000 },
     ]);
   } finally {

@@ -234,7 +234,7 @@ test("each review source appears and leaves after its action", () => {
     expect(dueKeys(recurringSignals(sample.db, asOf).missed)).not.toContain(`${missedPlan.id}:2026-02-15`);
 
     const ambiguousPlan = createSchedule(sample.db, { ...planFields(savings.id, null, -10000, "2026-03-15"), name: "Phone", ...saved });
-    const first = pay(sample.db, savings.id, "2026-03-15", -10000, "Phone a", food.id);
+    const first = pay(sample.db, savings.id, "2026-03-14", -10000, "Phone a", food.id);
     const second = pay(sample.db, savings.id, "2026-03-16", -10000, "Phone b", food.id);
     expect(dueKeys(recurringSignals(sample.db, asOf).ambiguous)).toEqual([`${ambiguousPlan.id}:2026-03-15`]);
     linkOccurrence(sample.db, ambiguousPlan.id, "2026-03-15", first.id, saved);

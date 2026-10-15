@@ -146,7 +146,7 @@ test("one transaction can link to one occurrence only", () => {
   }
 });
 
-test("auto-link saves the one candidate and leaves two candidates open", () => {
+test("auto-link saves a late payment in the window and the nearest candidate, and leaves two at the same distance open", () => {
   const { db, close } = tempDatabase();
   try {
     const chequing = account(db);
@@ -167,16 +167,19 @@ test("auto-link saves the one candidate and leaves two candidates open", () => {
       source: "ui",
       at,
     });
-    payment(db, chequing.id, "2026-03-06", -16990, shop);
-    expect(autoLink(db, "2026-03-10", { source: "ui", at }).linked).toBe(0);
-    const inside = payment(db, chequing.id, "2026-03-04", -16990, shop);
+    // 5 days late: in the window of 2026-03-02 (to 2026-03-18).
+    const late = payment(db, chequing.id, "2026-03-07", -16990, shop);
     expect(autoLink(db, "2026-03-10", { source: "ui", at }).linked).toBe(1);
     const linked = listOccurrences(db, plan.id, "2026-03-10").items.find((item) => item.dueDate === "2026-03-02");
-    expect(linked?.transactionId).toBe(inside);
-    payment(db, chequing.id, "2026-04-02", -16990, shop);
+    expect(linked?.transactionId).toBe(late);
+    payment(db, chequing.id, "2026-04-01", -16990, shop);
     payment(db, chequing.id, "2026-04-03", -17000, shop);
     expect(autoLink(db, "2026-04-10", { source: "ui", at }).linked).toBe(0);
     expect(recurringSignals(db, "2026-04-10").ambiguous.some((item) => item.dueDate === "2026-04-02")).toBe(true);
+    const nearest = payment(db, chequing.id, "2026-05-03", -16990, shop);
+    payment(db, chequing.id, "2026-05-09", -16990, shop);
+    expect(autoLink(db, "2026-05-10", { source: "ui", at }).linked).toBe(1);
+    expect(listOccurrences(db, plan.id, "2026-05-10").items.find((item) => item.dueDate === "2026-05-02")?.transactionId).toBe(nearest);
   } finally {
     close();
   }

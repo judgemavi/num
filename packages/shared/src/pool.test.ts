@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { forecastDates } from "./forecast";
-import { billNeed, pausePlan, projectedPoolShort, recedeOrder, recedePlan } from "./pool";
+import { billFillsOn, billNeed, coverBills, pausePlan, projectedPoolShort, recedeOrder, recedePlan } from "./pool";
 
 const asOf = "2026-10-01";
 const dates = forecastDates(asOf);
@@ -95,32 +95,87 @@ test("the pause suggestion stops when the monthly amounts meet the short amount"
 const monthly = { startDate: "2026-01-15", endDate: null, freq: "monthly" as const, interval: 1, monthDay: 15, businessDayShift: "none" as const };
 const bill = { schedule: monthly, amount: 1_000, startDate: "2026-01-01", closed: new Set<string>(), balance: 400, asOf: "2026-10-01" };
 
-test("a bill is short when its next payment is due in the next 30 days and the balance is less than its amount", () => {
-  expect(billNeed(bill)).toEqual({ dueDate: "2026-10-15", amount: 1_000, short: 600 });
-  expect(billNeed({ ...bill, balance: 1_200 })).toEqual({ dueDate: "2026-10-15", amount: 1_000, short: 0 });
-  expect(billNeed({ ...bill, balance: -300 })).toEqual({ dueDate: "2026-10-15", amount: 1_000, short: 1_000 });
+test("a bill has a gap when its next payment is due in the next 30 days and the balance is less than its amount", () => {
+  expect(billNeed(bill)).toEqual({ dueDate: "2026-10-15", amount: 1_000, gap: 600 });
+  expect(billNeed({ ...bill, balance: 1_200 })).toEqual({ dueDate: "2026-10-15", amount: 1_000, gap: 0 });
+  expect(billNeed({ ...bill, balance: -300 })).toEqual({ dueDate: "2026-10-15", amount: 1_000, gap: 1_000 });
 });
 
-test("a bill due more than 30 days after asOf is not short", () => {
-  expect(billNeed({ ...bill, asOf: "2026-09-15", closed: new Set(["2026-09-15"]) })).toEqual({ dueDate: "2026-10-15", amount: 1_000, short: 600 });
-  expect(billNeed({ ...bill, asOf: "2026-09-14", closed: new Set(["2026-09-15"]) })).toEqual({ dueDate: "2026-10-15", amount: 1_000, short: 0 });
+test("a bill due more than 30 days after asOf has no gap", () => {
+  expect(billNeed({ ...bill, asOf: "2026-09-15", closed: new Set(["2026-09-15"]) })).toEqual({ dueDate: "2026-10-15", amount: 1_000, gap: 600 });
+  expect(billNeed({ ...bill, asOf: "2026-09-14", closed: new Set(["2026-09-15"]) })).toEqual({ dueDate: "2026-10-15", amount: 1_000, gap: 0 });
   const yearly = { ...monthly, freq: "yearly" as const, startDate: "2026-12-15" };
-  expect(billNeed({ ...bill, schedule: yearly })).toEqual({ dueDate: "2026-12-15", amount: 1_000, short: 0 });
+  expect(billNeed({ ...bill, schedule: yearly })).toEqual({ dueDate: "2026-12-15", amount: 1_000, gap: 0 });
 });
 
 test("skipped and linked occurrences are not counted: the next open occurrence counts", () => {
-  expect(billNeed({ ...bill, closed: new Set(["2026-10-15"]) })).toEqual({ dueDate: "2026-11-15", amount: 1_000, short: 0 });
-  expect(billNeed({ ...bill, asOf: "2026-10-20", closed: new Set(["2026-11-15"]) })).toEqual({ dueDate: "2026-12-15", amount: 1_000, short: 0 });
+  expect(billNeed({ ...bill, closed: new Set(["2026-10-15"]) })).toEqual({ dueDate: "2026-11-15", amount: 1_000, gap: 0 });
+  expect(billNeed({ ...bill, asOf: "2026-10-20", closed: new Set(["2026-10-15", "2026-11-15"]) })).toEqual({ dueDate: "2026-12-15", amount: 1_000, gap: 0 });
 });
 
 test("a bill due more than one time in a month needs the open occurrences of that month", () => {
   const weekly = { startDate: "2026-10-02", endDate: null, freq: "weekly" as const, interval: 1, monthDay: null, businessDayShift: "none" as const };
   // Fridays in October 2026: 2, 9, 16, 23, 30. The 2nd is linked.
-  expect(billNeed({ ...bill, schedule: weekly, amount: 100, closed: new Set(["2026-10-02"]) })).toEqual({ dueDate: "2026-10-09", amount: 400, short: 0 });
-  expect(billNeed({ ...bill, schedule: weekly, amount: 200, closed: new Set(["2026-10-02"]) })).toEqual({ dueDate: "2026-10-09", amount: 800, short: 400 });
+  expect(billNeed({ ...bill, schedule: weekly, amount: 100, closed: new Set(["2026-10-02"]) })).toEqual({ dueDate: "2026-10-09", amount: 400, gap: 0 });
+  expect(billNeed({ ...bill, schedule: weekly, amount: 200, closed: new Set(["2026-10-02"]) })).toEqual({ dueDate: "2026-10-09", amount: 800, gap: 400 });
 });
 
 test("a bill starts at the start date of its bucket, and an ended schedule has no next payment", () => {
-  expect(billNeed({ ...bill, startDate: "2026-10-20" })).toEqual({ dueDate: "2026-11-15", amount: 1_000, short: 0 });
+  expect(billNeed({ ...bill, startDate: "2026-10-20" })).toEqual({ dueDate: "2026-11-15", amount: 1_000, gap: 0 });
   expect(billNeed({ ...bill, schedule: { ...monthly, endDate: "2026-09-30" } })).toBeNull();
+});
+
+test("the next payment is an earlier occurrence while its window is open", () => {
+  // The window of 2026-10-15 is from 2026-09-30 to 2026-10-31 (not included).
+  expect(billNeed({ ...bill, asOf: "2026-10-20" })).toEqual({ dueDate: "2026-10-15", amount: 1_000, gap: 600 });
+  expect(billNeed({ ...bill, asOf: "2026-10-30" })).toEqual({ dueDate: "2026-10-15", amount: 1_000, gap: 600 });
+  expect(billNeed({ ...bill, asOf: "2026-10-31" })).toEqual({ dueDate: "2026-11-15", amount: 1_000, gap: 600 });
+  // A linked occurrence is not the next payment, also when its window is open.
+  expect(billNeed({ ...bill, asOf: "2026-10-20", closed: new Set(["2026-10-15"]) })).toEqual({ dueDate: "2026-11-15", amount: 1_000, gap: 600 });
+});
+
+const coverOrder = [
+  { bucketId: "rent", bill: { gap: 2_000, dueDate: "2026-11-02", paused: false } },
+  { bucketId: "food", bill: null },
+  { bucketId: "phone", bill: { gap: 500, dueDate: "2026-10-20", paused: false } },
+  { bucketId: "gym", bill: { gap: 300, dueDate: "2026-11-05", paused: false } },
+];
+const owed = (bucketId: string, month: string) => (bucketId === "food" ? (month === "2026-10" ? 100 : 1_000) : 0);
+
+test("Unassigned covers the gaps of the bills in fill order", () => {
+  const parts = coverBills({ unassigned: 2_700, order: coverOrder, owed: () => 0 });
+  expect(parts).toEqual(
+    new Map([
+      ["rent", { covered: 2_000, short: 0 }],
+      ["phone", { covered: 500, short: 0 }],
+      ["gym", { covered: 200, short: 100 }],
+    ]),
+  );
+  expect(coverBills({ unassigned: 0, order: coverOrder, owed: () => 0 }).get("rent")).toEqual({ covered: 0, short: 2_000 });
+  expect(coverBills({ unassigned: -500, order: coverOrder, owed: () => 0 }).get("rent")).toEqual({ covered: 0, short: 2_000 });
+});
+
+test("a bucket that is not a bill and comes first takes its owed amount of the month of the bill's payment first", () => {
+  const parts = coverBills({ unassigned: 3_000, order: coverOrder, owed });
+  // Rent comes before Food. Phone (October): Food takes 100 of October. Gym (November): Food takes 1 000 of November.
+  expect(parts.get("rent")).toEqual({ covered: 2_000, short: 0 });
+  expect(parts.get("phone")).toEqual({ covered: 500, short: 0 });
+  expect(parts.get("gym")).toEqual({ covered: 0, short: 300 });
+  expect(coverBills({ unassigned: 2_500, order: coverOrder, owed }).get("phone")).toEqual({ covered: 400, short: 100 });
+});
+
+test("a paused bill gets no money and does not take Unassigned from the bills after it", () => {
+  const order = [{ bucketId: "gym", bill: { gap: 300, dueDate: "2026-10-20", paused: true } }, ...coverOrder.slice(0, 1)];
+  expect(coverBills({ unassigned: 2_000, order, owed })).toEqual(
+    new Map([
+      ["gym", { covered: 0, short: 300 }],
+      ["rent", { covered: 2_000, short: 0 }],
+    ]),
+  );
+});
+
+test("the covered part fills on the first day of the month of the payment, or on asOf in that month", () => {
+  expect(billFillsOn("2026-11-02", "2026-10-15")).toBe("2026-11-01");
+  expect(billFillsOn("2026-10-20", "2026-10-15")).toBe("2026-10-15");
+  expect(billFillsOn("2026-09-30", "2026-10-03")).toBe("2026-10-03");
 });

@@ -34,11 +34,12 @@ function fundedByBucket(db: Reader, month: string) {
  * month that is not undone, and the amount still owed, for each active bucket that has started, in priority order.
  * The emergency bucket owes its target − its balance on `asOf`, minimum 0. Its monthly amount is the funding of the
  * month plus that amount. A paused bucket has a monthly amount of 0 and owes nothing.
+ * For a `month` after the month of `asOf`, the start balance is the balance on `asOf`: the app does not know the
+ * balance at the start of that month yet.
  */
-export function monthlyRows(db: Reader, asOf: string): MonthlyRow[] {
-  const month = asOf.slice(0, 7);
+export function monthlyRows(db: Reader, asOf: string, month = asOf.slice(0, 7)): MonthlyRow[] {
   const start = monthStart(month);
-  const balances = bucketBalances(db, addDays(start, -1));
+  const balances = bucketBalances(db, month > asOf.slice(0, 7) ? asOf : addDays(start, -1));
   // A cover of this month brings a negative balance back to 0 before the amounts are calculated. It is not funding.
   const covers = db
     .select({ bucketId: bucketEvents.bucketId, amount: bucketEvents.amount })

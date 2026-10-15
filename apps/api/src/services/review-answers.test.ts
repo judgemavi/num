@@ -125,7 +125,8 @@ function bill(db: Db, accountId: string, name: string, day: number, categoryId: 
 test("Save with Payment for links the transaction to the occurrence", () => {
   withBook((db, ids) => {
     const plan = bill(db, ids.cash, "Phone", 20, null);
-    const first = pay(db, ids.cash, "2026-03-20", -10_000, "Phone a", ids.food);
+    // One day before and one day after the due date: the same distance.
+    const first = pay(db, ids.cash, "2026-03-19", -10_000, "Phone a", ids.food);
     const second = pay(db, ids.cash, "2026-03-21", -10_000, "Phone b", ids.food);
     expect(questionOf(db, first.id)).toBe("recurring_ambiguous");
     updateTransaction(db, first.id, { answer: { question: "recurring_ambiguous", bucketId: plan.id, dueDate: "2026-03-20" }, ...saved });

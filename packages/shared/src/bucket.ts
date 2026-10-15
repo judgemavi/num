@@ -251,7 +251,7 @@ export const emergencyFundSchema = z.object({
   basis: z.enum(["history", "plan"]),
 });
 
-/** The next payment of each active bill and the part that its balance does not hold. */
+/** The next payment of each active bill, the part that its balance does not hold, and how Unassigned covers it. */
 export const billNeedListSchema = z.object({
   items: z.array(
     z.object({
@@ -259,7 +259,11 @@ export const billNeedListSchema = z.object({
       dueDate: isoDateSchema,
       /** The next occurrence, or the sum of the occurrences of its month when the bill is due more than one time a month. */
       amount: money,
-      /** The amount minus the balance when the next occurrence is due in the next 30 days. Otherwise 0. */
+      /** The amount minus the balance when the next occurrence is due in the next 30 days. Otherwise 0. gap = covered + short. */
+      gap: money,
+      /** The part of the gap that Unassigned covers in fill order. */
+      covered: money,
+      /** The part of the gap that Unassigned does not cover. */
       short: money,
     }),
   ),

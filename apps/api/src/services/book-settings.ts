@@ -3,11 +3,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { decidedKeys } from "./decision-keys";
 
-export function settingNumber(
-  db: Db,
-  key: "staleImportDays" | "recurringGraceDays",
-  fallback: number,
-): number {
+export function settingNumber(db: Db, key: "staleImportDays", fallback: number): number {
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
   const value = Number(row?.value ?? String(fallback));
   if (!Number.isInteger(value) || value < 0) {
