@@ -40,7 +40,7 @@ function tempBook() {
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
-  runSetup(db, { currency: "CAD", categorySet: "default", ...saved });
+  runSetup(db, { asOf: "2026-10-07", currency: "CAD", categorySet: "default", ...saved });
   return {
     dir,
     db,

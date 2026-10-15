@@ -5,15 +5,15 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { removeImportBankBalance } from "./bank-balances";
 import { presentBatch } from "./import-read";
-import { hasActiveFundingRun, removeTransaction } from "./transaction-erase";
+import { removeTransaction } from "./transaction-erase";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource } from "./write";
 
-function blockReason(db: Db, txn: TransactionRow | undefined): UndoBlockReason | "removed" | null {
+function blockReason(txn: TransactionRow | undefined): UndoBlockReason | "removed" | null {
   if (!txn) {
     return "removed";
   }
-  if (txn.editedAt !== null || hasActiveFundingRun(db, txn.id)) {
+  if (txn.editedAt !== null) {
     return "edited";
   }
   return null;
@@ -42,7 +42,7 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
       const txn = row.transactionId
         ? db.select().from(transactions).where(eq(transactions.id, row.transactionId)).get()
         : undefined;
-      const reason = blockReason(db, txn);
+      const reason = blockReason(txn);
       if (reason === "removed") {
         dropIds.push(row.id);
       } else if (reason) {

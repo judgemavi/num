@@ -12,7 +12,8 @@ import { createAccount } from "./accounts";
 import { createBucketEvent } from "./bucket-events";
 import { archiveBucket, createBucket } from "./buckets";
 import { createCategory } from "./categories";
-import { createFundingRun, undoFundingRun } from "./funding-runs";
+import { fillBuckets } from "./funding-fill";
+import { undoMonthFunding } from "./funding-months";
 import { readMonthPlan } from "./month-plan";
 import { linkOccurrence } from "./recurring-links";
 import { createPlan } from "./recurring-plans";
@@ -89,11 +90,13 @@ test("funding and spending inside the month do not change the plan", () => {
       target: null,
       targetDate: null,
       fixedAmount: null,
-      asOf: "2000-01-01",
+      months: null,
+      fillMonths: null,
+      asOf: "2026-03-01",
       ...saved,
     });
     const before = readMonthPlan(book.db, "2026-03-20", "2026-03");
-    createBucketEvent(book.db, food.id, { kind: "fund", amount: 150_000, date: "2026-03-05", asOf: "2026-03-20", ...saved });
+    fillBuckets(book.db, { asOf: "2026-03-20", ...saved });
     createTransaction(book.db, {
       accountId: cash.id,
       date: "2026-03-12",
@@ -105,8 +108,8 @@ test("funding and spending inside the month do not change the plan", () => {
     const after = readMonthPlan(book.db, "2026-03-20", "2026-03");
     expect(after.funding.planned).toBe(before.funding.planned);
     expect(after.funding.items.find((item) => item.bucketId === food.id)?.planned).toBe(400_000);
-    expect(after.feasibility?.refillsEach).toBe(before.feasibility?.refillsEach);
-    expect(after.funding.actual).toBe(150_000);
+    expect(after.feasibility?.refills).toBe(before.feasibility?.refills);
+    expect(after.funding.actual).toBe(400_000);
   } finally {
     book.close();
   }
@@ -154,18 +157,20 @@ test("a future month includes planned funding from earlier months", () => {
       target: 3_000,
       targetDate: "2026-04-01",
       fixedAmount: null,
+      months: null,
+      fillMonths: null,
       asOf: "2000-01-01",
       ...saved,
     });
     const march = readMonthPlan(book.db, "2026-01-15", "2026-03");
-    expect(march.funding.items.find((item) => item.bucketId === trip.id)).toMatchObject({ perPaycheck: 1_000, planned: 1_000 });
-    expect(march.feasibility).toMatchObject({ need: 1_000, refillsEach: 0, shortfall: 0 });
+    expect(march.funding.items.find((item) => item.bucketId === trip.id)).toMatchObject({ planned: 1_000 });
+    expect(march.feasibility).toMatchObject({ need: 1_000, refills: 0, shortfall: 0 });
   } finally {
     book.close();
   }
 });
 
-test("readMonthPlan ignores an undone run, a deleted transaction, and an archived bucket", () => {
+test("readMonthPlan ignores an undone month, a deleted transaction, and an archived bucket", () => {
   const book = tempDatabase();
   try {
     const cash = createAccount(book.db, {
@@ -224,7 +229,9 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       target: 100_000,
       targetDate: null,
       fixedAmount: 10_000,
-      asOf: "2000-01-01",
+      months: null,
+      fillMonths: null,
+      asOf: "2026-03-01",
       ...saved,
     });
     const marchPay = createTransaction(book.db, {
@@ -236,13 +243,9 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       ...saved,
     });
     linkOccurrence(book.db, plan.id, "2026-03-01", marchPay.id, saved);
-    const run = createFundingRun(book.db, {
-      incomeTransactionId: marchPay.id,
-      lines: [{ bucketId: trip.id, amount: 10_000 }],
-      asOf: "2026-03-20",
-      ...saved,
-    });
-    undoFundingRun(book.db, run.id, saved);
+    fillBuckets(book.db, { asOf: "2026-03-20", ...saved });
+    expect(readMonthPlan(book.db, "2026-03-20", "2026-03").funding.actual).toBe(10_000);
+    undoMonthFunding(book.db, "2026-03", saved);
     const old = createBucket(book.db, {
       name: "Old",
       kind: "spending",
@@ -258,6 +261,8 @@ test("readMonthPlan ignores an undone run, a deleted transaction, and an archive
       target: null,
       targetDate: null,
       fixedAmount: null,
+      months: null,
+      fillMonths: null,
       asOf: "2000-01-01",
       ...saved,
     });

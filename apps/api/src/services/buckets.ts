@@ -1,6 +1,7 @@
 import { bucketCategories, buckets, categories, type BucketRow } from "@num/db";
 import {
   bucketWriteSchema,
+  emergencyDefaults,
   foldName,
   isIsoDate,
   kindFieldsValid,
@@ -13,7 +14,7 @@ import {
   type BucketWrite,
   type OverspentBucket,
 } from "@num/shared";
-import { eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { eq, inArray, isNotNull, isNull, max } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
@@ -125,6 +126,8 @@ function rowValues(id: string, input: BucketWrite, archivedAt: string | null): B
     target: input.target,
     targetDate: input.targetDate,
     fixedAmount: input.fixedAmount,
+    months: input.months,
+    fillMonths: input.fillMonths,
   };
 }
 
@@ -175,26 +178,67 @@ export function listOverspent(db: Db): { items: OverspentBucket[] } {
   return { items };
 }
 
+/** One emergency bucket in a book, also an archived one (decision 0060). */
+function assertNoEmergency(tx: WriteTx) {
+  if (tx.select({ id: buckets.id }).from(buckets).where(eq(buckets.kind, "emergency")).get()) {
+    throw new ServiceError("bucket_emergency_exists", 409);
+  }
+}
+
+/** The insert and the audit entry of a new bucket. Part of a write. */
+function insertBucket(tx: WriteTx, input: BucketCreate & { asOf: string }): string {
+  if (input.kind === "emergency") {
+    assertNoEmergency(tx);
+  }
+  const id = crypto.randomUUID();
+  const row = rowValues(id, { ...input, startDate: input.startDate ?? input.asOf }, null);
+  tx.insert(buckets).values({ ...row, sortKey: foldName(row.name) }).run();
+  const categoryIds = replaceCategories(tx, id, input.categoryIds);
+  tx.audit({
+    entity: "buckets",
+    entityId: id,
+    action: "create",
+    before: null,
+    after: snapshot(row, categoryIds),
+  });
+  return id;
+}
+
+/** The emergency bucket with the default settings (decision 0060). The setup and the fill make it. */
+export function insertEmergencyBucket(tx: WriteTx, asOf: string): string {
+  const last = tx
+    .select({ priority: max(buckets.priority) })
+    .from(buckets)
+    .where(inArray(buckets.kind, ["spending", "sinking"]))
+    .get();
+  return insertBucket(tx, {
+    name: "Emergency fund",
+    kind: "emergency",
+    // After the spending and sinking buckets, before the goals (decision 0060).
+    priority: (last?.priority ?? -1) + 1,
+    essential: true,
+    color: "sky",
+    icon: "shield",
+    categoryIds: [],
+    refillTo: null,
+    amount: null,
+    dueDate: null,
+    repeat: null,
+    target: null,
+    targetDate: null,
+    fixedAmount: null,
+    ...emergencyDefaults,
+    asOf,
+  });
+}
+
 export function createBucket(db: Db, input: BucketCreate & WriteInput & { asOf: string }): Bucket {
   assertKindFields(input);
   requireWholeAmounts(db, [input.refillTo, input.amount, input.target, input.fixedAmount]);
   if (!isIsoDate(input.asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
   }
-  const id = crypto.randomUUID();
-  return write(db, { source: input.source, at: input.at }, (tx) => {
-    const row = rowValues(id, { ...input, startDate: input.startDate ?? input.asOf }, null);
-    tx.insert(buckets).values({ ...row, sortKey: foldName(row.name) }).run();
-    const categoryIds = replaceCategories(tx, id, input.categoryIds);
-    tx.audit({
-      entity: "buckets",
-      entityId: id,
-      action: "create",
-      before: null,
-      after: snapshot(row, categoryIds),
-    });
-    return readBucket(tx, id);
-  });
+  return write(db, { source: input.source, at: input.at }, (tx) => readBucket(tx, insertBucket(tx, input)));
 }
 
 /** A PATCH: a field that the patch leaves out keeps its stored value. The kind fields are checked on the result. */
@@ -208,6 +252,9 @@ export function updateBucket(db: Db, id: string, input: BucketUpdate & WriteInpu
     }
     const beforeIds = categoryIdsFor(tx, id);
     const next = mergedWrite(bucketWriteSchema, { ...existing, categoryIds: beforeIds }, input);
+    if ((next.kind === "emergency") !== (existing.kind === "emergency")) {
+      throw new ServiceError("bucket_fields_invalid", 400);
+    }
     const row = rowValues(id, next, existing.archivedAt);
     tx.update(buckets).set({ ...withoutId(row), sortKey: foldName(row.name) }).where(eq(buckets.id, id)).run();
     const categoryIds = replaceCategories(tx, id, next.categoryIds);

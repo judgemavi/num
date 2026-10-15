@@ -1,7 +1,7 @@
 export { accounts, mortgageTerms } from "./accounts";
 export type { AccountRow, MortgageTermRow } from "./accounts";
-export { bucketCategories, bucketEvents, buckets, fundingRuns } from "./buckets";
-export type { BucketEventRow, BucketRow, FundingRunRow } from "./buckets";
+export { bucketCategories, bucketEvents, buckets, monthHolds } from "./buckets";
+export type { BucketEventRow, BucketRow } from "./buckets";
 export { categories, categoryGroups, merchants, tags } from "./categories";
 export type { CategoryGroupRow, CategoryRow, MerchantRow, TagRow } from "./categories";
 export { bankBalances, documents, importBatches, importRows, valuations } from "./imports";

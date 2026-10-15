@@ -1,6 +1,6 @@
 import type { Bucket } from "@num/shared";
 import { useArchiveBucket } from "@/api/buckets";
-import { barLabel, bucketDetail, bucketTarget } from "@/buckets/format";
+import { useBucketFigures } from "@/buckets/use-bucket-figures";
 import { BucketGlyph } from "@/buckets/icons";
 import { BucketBar } from "@/buckets/bucket-bar";
 import { Amount } from "@/components/amount";
@@ -11,15 +11,13 @@ import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useEditors } from "@/editors/editor-api";
-import { useBookCurrency } from "@/editors/lookups";
 
 /** One bucket of the list. The row opens the editors of the bucket and archives or restores the bucket. */
 export function BucketRow({ bucket }: { bucket: Bucket }) {
   const { openEditor } = useEditors();
-  const currency = useBookCurrency();
   const archive = useArchiveBucket();
+  const { target, detail, label } = useBucketFigures(bucket);
   const over = bucket.balance < 0;
-  const target = bucketTarget(bucket);
 
   return (
     <>
@@ -30,10 +28,10 @@ export function BucketRow({ bucket }: { bucket: Bucket }) {
         <div className={listName}>
           {bucket.name}
           {bucket.essential ? <Badge variant="neutral">Essential</Badge> : null}
-          <small>{bucketDetail(bucket, currency)}</small>
+          <small>{detail}</small>
         </div>
         <div className="w-36 shrink-0 max-md:basis-full">
-          <BucketBar hue={bucket.color} balance={bucket.balance} target={target} label={barLabel(bucket, currency)} />
+          <BucketBar hue={bucket.color} balance={bucket.balance} target={target} label={label} />
         </div>
         <div className={`${listAmt} ${over ? "text-attn" : ""}`}>
           {over ? (

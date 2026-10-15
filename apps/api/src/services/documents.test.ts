@@ -23,7 +23,7 @@ function withBook(run: (db: Db, dir: string, accountId: string) => void | Promis
     const sqlite = openDatabase(join(dir, "num.sqlite"));
     migrateDatabase(sqlite);
     const db = createDb(sqlite);
-    runSetup(db, { currency: "CAD", categorySet: "none", ...saved });
+    runSetup(db, { asOf: "2026-10-07", currency: "CAD", categorySet: "none", ...saved });
     const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
     try {
       await run(db, dir, account.id);

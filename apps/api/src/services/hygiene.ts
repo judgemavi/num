@@ -13,7 +13,8 @@ import { ServiceError } from "../service-error";
 import { listAccounts } from "./accounts";
 import { listBuckets, listOverspent } from "./buckets";
 import { lastCompleteMonths } from "./complete-months";
-import { monthlyBills } from "./funding-book";
+import { emergencyBucket, readEmergencyFund } from "./emergency-fund";
+import { fundingPosition } from "./funding-book";
 import { importFreshness, settingNumber } from "./book-settings";
 import { spendTotals } from "./insights-spend";
 import { loadLedgerLines } from "./ledger-lines";
@@ -64,30 +65,24 @@ function ageDays(asOf: string, day: string) {
 }
 
 function emergencyFund(db: Db, asOf: string) {
-  const months = settingNumber(db, "emergencyFundMonths", 3);
-  const rows = buckets(db);
-  const goals = rows.filter((bucket) => bucket.kind === "goal" && bucket.essential);
-  const refills = rows
-    .filter((bucket) => bucket.kind === "spending" && bucket.essential)
-    .reduce((sum, bucket) => sum + (bucket.refillTo ?? 0), 0);
-  const monthly = monthlyBills(db, asOf);
-  const need = months * (monthly + refills);
-  const held =
-    goals.length > 0
-      ? goals.reduce((sum, bucket) => sum + bucket.balance, 0)
-      : accounts(db)
-          .filter((account) => account.kind === "savings")
-          .reduce((sum, account) => sum + account.balance, 0);
-  return {
-    code: "emergency_fund" as const,
-    pass: held >= need,
-    source: goals.length > 0 ? ("goals" as const) : ("savings" as const),
-    held,
-    months,
-    monthlyBills: monthly,
-    monthlyRefills: refills,
-    need,
-  };
+  const bucket = emergencyBucket(db);
+  if (!bucket || bucket.archivedAt) {
+    return [];
+  }
+  const fund = readEmergencyFund(db, asOf);
+  if (!fund || fund.target === 0) {
+    return [];
+  }
+  return [
+    {
+      code: "emergency_fund" as const,
+      pass: fund.balance >= fund.target,
+      balance: fund.balance,
+      target: fund.target,
+      months: fund.months,
+      monthly: fund.monthly,
+    },
+  ];
 }
 
 function importsCurrent(db: Db, asOf: string) {
@@ -153,10 +148,12 @@ function recurring(state: ReviewState) {
   return { code: "recurring" as const, pass: missed === 0, missed };
 }
 
-function overspent(db: Db) {
+/** The fill covers a negative bucket from Unassigned. The check fails when a bucket stays negative (decision 0059). */
+function overspent(db: Db, asOf: string) {
   const items = listOverspent(db).items;
   const balance = items.reduce((sum, item) => sum + item.balance, 0);
-  return { code: "overspent" as const, pass: items.length === 0, count: items.length, balance };
+  const free = fundingPosition(db, asOf).unassigned;
+  return { code: "overspent" as const, pass: items.length === 0, unassigned: free, count: items.length, balance };
 }
 
 export function readHygiene(db: Db, asOf: string): Hygiene {
@@ -165,13 +162,13 @@ export function readHygiene(db: Db, asOf: string): Hygiene {
   return {
     asOf,
     checks: [
-      emergencyFund(db, asOf),
+      ...emergencyFund(db, asOf),
       importsCurrent(db, asOf),
       reviewAge(state, asOf),
       sinkingFunds(db),
       savingsRate(db, asOf),
       recurring(state),
-      overspent(db),
+      overspent(db, asOf),
     ],
   };
 }

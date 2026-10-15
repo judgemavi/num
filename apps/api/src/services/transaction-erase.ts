@@ -1,62 +1,10 @@
-import { bucketEvents, fundingRuns, importRows, inboxDecisions, lineTags, occurrenceLinks, transactionLines, transactions, type TransactionRow } from "@num/db";
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { importRows, inboxDecisions, lineTags, occurrenceLinks, transactionLines, transactions, type TransactionRow } from "@num/db";
+import { eq, inArray } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import { clearRefundLinks } from "./refund-link";
 import { loadLines, replaceLines } from "./transaction-lines";
 import { auditTransaction, automaticPair, readTransaction, toTransaction } from "./transaction-record";
-import type { WriteTx, Reader } from "./write";
-
-function activeFundingRun(tx: Reader, incomeTransactionId: string) {
-  return tx
-    .select({ id: fundingRuns.id })
-    .from(fundingRuns)
-    .where(and(eq(fundingRuns.incomeTransactionId, incomeTransactionId), isNull(fundingRuns.undoneAt)))
-    .get();
-}
-
-export function hasActiveFundingRun(tx: Reader, incomeTransactionId: string): boolean {
-  return activeFundingRun(tx, incomeTransactionId) !== undefined;
-}
-
-function assertDeletableFunding(tx: WriteTx, id: string): void {
-  if (activeFundingRun(tx, id)) {
-    throw new ServiceError("paycheck_funded", 409);
-  }
-}
-
-function deleteUndoneFunding(tx: WriteTx, incomeTransactionId: string): void {
-  const runs = tx
-    .select()
-    .from(fundingRuns)
-    .where(and(eq(fundingRuns.incomeTransactionId, incomeTransactionId), isNotNull(fundingRuns.undoneAt)))
-    .all();
-  for (const run of runs) {
-    const events = tx.select().from(bucketEvents).where(eq(bucketEvents.fundingRunId, run.id)).all();
-    for (const event of events) {
-      tx.delete(bucketEvents).where(eq(bucketEvents.id, event.id)).run();
-      tx.audit({
-        entity: "bucket_events",
-        entityId: event.id,
-        action: "delete",
-        before: event,
-        after: null,
-      });
-    }
-    tx.delete(fundingRuns).where(eq(fundingRuns.id, run.id)).run();
-    tx.audit({
-      entity: "funding_runs",
-      entityId: run.id,
-      action: "delete",
-      before: {
-        incomeTransactionId: run.incomeTransactionId,
-        date: run.date,
-        createdAt: run.createdAt,
-        undoneAt: run.undoneAt,
-      },
-      after: null,
-    });
-  }
-}
+import type { WriteTx } from "./write";
 
 function deleteOccurrenceLinks(tx: WriteTx, transactionId: string): void {
   const links = tx.select().from(occurrenceLinks).where(eq(occurrenceLinks.transactionId, transactionId)).all();
@@ -100,7 +48,6 @@ function deleteInboxDecisions(tx: WriteTx, ids: readonly string[]): void {
 }
 
 export function eraseTransaction(tx: WriteTx, id: string): void {
-  assertDeletableFunding(tx, id);
   const lineIds = tx
     .select({ id: transactionLines.id })
     .from(transactionLines)
@@ -110,7 +57,6 @@ export function eraseTransaction(tx: WriteTx, id: string): void {
   clearRefundLinks(tx, id);
   deleteOccurrenceLinks(tx, id);
   deleteInboxDecisions(tx, [id, ...lineIds]);
-  deleteUndoneFunding(tx, id);
   if (lineIds.length > 0) {
     tx.delete(lineTags).where(inArray(lineTags.lineId, lineIds)).run();
     tx.delete(transactionLines).where(eq(transactionLines.transactionId, id)).run();
@@ -152,10 +98,6 @@ export function removeTransaction(tx: WriteTx, id: string, at: string) {
   const peer = existing.transferPeerId
     ? tx.select().from(transactions).where(eq(transactions.id, existing.transferPeerId)).get()
     : undefined;
-  assertDeletableFunding(tx, existing.id);
-  if (peer?.mirror) {
-    assertDeletableFunding(tx, peer.id);
-  }
   const before = toTransaction(tx, existing, loadLines(tx, existing.id));
   if (peer?.mirror) {
     const peerBefore = toTransaction(tx, peer, loadLines(tx, peer.id));

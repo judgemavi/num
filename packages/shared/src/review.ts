@@ -64,7 +64,6 @@ export const inboxDecisionCodes = [
   "not_transfer",
   "keep_plan_amount",
   "not_recurring",
-  "keep_unassigned",
   "not_a_transaction",
   "not_linked",
   "keep_uncategorized",

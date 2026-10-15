@@ -1,33 +1,27 @@
-import { accounts, buckets, fundingRuns, occurrenceLinks, recurringPlans, transactions, type BucketRow, type OccurrenceLinkRow, type RecurringPlanRow } from "@num/db";
+import { accounts, buckets, occurrenceLinks, recurringPlans, transactions, type BucketRow, type OccurrenceLinkRow, type RecurringPlanRow } from "@num/db";
 import {
   addDays,
   billReserveDays,
   Temporal,
   billsReserved,
-  fundingLimit,
-  fundingProposal,
   isIsoDate,
   nextIncomeDate,
   divideAmount,
-  floorToStep,
   occurrenceDates,
   positiveBalances,
   unassigned,
   variableAmounts,
-  type FundingIncome,
-  type FundingPaycheck,
   type ReservedBill,
   type FundingPosition,
-  type FundingProposal,
 } from "@num/shared";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import { balancesOf } from "./account-balance";
 import { bookStep } from "./book-step";
 import { bucketBalances } from "./bucket-balance";
 import type { Reader } from "./write";
 
-type Book = {
+export type Book = {
   plans: RecurringPlanRow[];
   links: OccurrenceLinkRow[];
   skipped: Set<string>;
@@ -35,12 +29,11 @@ type Book = {
   buckets: BucketRow[];
   balances: Map<string, number>;
   amounts: Map<string, number>;
-  payees: Map<string, { date: string; payee: string; amount: number }>;
   /** The milliunits in one minor unit of the book currency. */
   step: number;
 };
 
-function loadBook(db: Reader): Book {
+export function loadBook(db: Reader): Book {
   const plans = db.select().from(recurringPlans).all();
   const links = db.select().from(occurrenceLinks).all();
   const skipped = new Set<string>();
@@ -57,21 +50,17 @@ function loadBook(db: Reader): Book {
     }
   }
   const amounts = new Map<string, number>();
-  const payees = new Map<string, { date: string; payee: string; amount: number }>();
   if (txnIds.length > 0) {
     const rows = db
       .select({
         id: transactions.id,
         amount: transactions.amount,
-        date: transactions.date,
-        payeeRaw: transactions.payeeRaw,
       })
       .from(transactions)
       .where(inArray(transactions.id, txnIds))
       .all();
     for (const row of rows) {
       amounts.set(row.id, row.amount);
-      payees.set(row.id, { date: row.date, payee: row.payeeRaw, amount: row.amount });
     }
   }
   return {
@@ -82,7 +71,6 @@ function loadBook(db: Reader): Book {
     buckets: db.select().from(buckets).all(),
     balances: bucketBalances(db),
     amounts,
-    payees,
     step: bookStep(db),
   };
 }
@@ -117,24 +105,8 @@ function billAmount(plan: RecurringPlanRow, book: Book, asOf: string) {
   return variableAmounts(actuals, plan.expectedAmount, book.step).safe;
 }
 
-function incomePlans(rows: RecurringPlanRow[]): RecurringPlanRow[] {
+export function incomePlans(rows: RecurringPlanRow[]): RecurringPlanRow[] {
   return rows.filter((row) => row.kind === "income" && row.fundsBuckets && row.active && row.archivedAt === null);
-}
-
-function hits(plans: RecurringPlanRow[], from: string, to: string, skipped: Set<string>) {
-  if (to < from) {
-    return [];
-  }
-  const items: FundingIncome[] = [];
-  for (const plan of plans) {
-    for (const date of occurrenceDates(plan, to, from)) {
-      if (skipped.has(`${plan.id}|${date.dueDate}`)) {
-        continue;
-      }
-      items.push({ planId: plan.id, dueDate: date.dueDate });
-    }
-  }
-  return items;
 }
 
 function onBudgetTotal(db: Reader) {
@@ -142,7 +114,7 @@ function onBudgetTotal(db: Reader) {
   return balancesOf(db, rows).reduce((total, item) => total + item.balance, 0);
 }
 
-function positionFrom(db: Reader, asOf: string, book: Book) {
+export function positionFrom(db: Reader, asOf: string, book: Book) {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
@@ -195,115 +167,4 @@ export function monthlyBills(db: Reader, asOf: string): number {
     total += Math.abs(billAmount(plan, book, asOf)) * count;
   }
   return divideAmount(total, 12, book.step);
-}
-
-export function requirePaycheck(db: Reader, incomeTransactionId: string): FundingPaycheck & { planId: string } {
-  const txn = db.select().from(transactions).where(eq(transactions.id, incomeTransactionId)).get();
-  if (!txn || txn.amount <= 0) {
-    throw new ServiceError("paycheck_not_found", 404);
-  }
-  const link = db.select().from(occurrenceLinks).where(eq(occurrenceLinks.transactionId, incomeTransactionId)).get();
-  if (!link || link.skipped || link.transactionId === null) {
-    throw new ServiceError("paycheck_not_found", 404);
-  }
-  const plan = db.select().from(recurringPlans).where(eq(recurringPlans.id, link.planId)).get();
-  if (!plan || plan.kind !== "income" || !plan.fundsBuckets) {
-    throw new ServiceError("paycheck_not_found", 404);
-  }
-  return {
-    incomeTransactionId: txn.id,
-    date: txn.date,
-    dueDate: link.dueDate,
-    amount: txn.amount,
-    payee: txn.payeeRaw,
-    amountMode: plan.amountMode,
-    planId: plan.id,
-  };
-}
-
-export function activeFundingRun(db: Reader, incomeTransactionId: string) {
-  return db
-    .select()
-    .from(fundingRuns)
-    .where(and(eq(fundingRuns.incomeTransactionId, incomeTransactionId), isNull(fundingRuns.undoneAt)))
-    .get();
-}
-
-function proposalIncomes(book: Book, dueDate: string) {
-  const month = Temporal.PlainDate.from(dueDate).with({ day: 1 });
-  const start = month.toString();
-  let end = month.add({ months: 1 }).subtract({ days: 1 }).toString();
-  for (const bucket of book.buckets) {
-    const date = bucket.dueDate ?? bucket.targetDate;
-    if (date && date > end) {
-      end = date;
-    }
-  }
-  return hits(incomePlans(book.plans), start, end, book.skipped);
-}
-
-function paycheckFromBook(book: Book, incomeTransactionId: string): FundingPaycheck & { planId: string } {
-  const link = book.links.find((row) => row.transactionId === incomeTransactionId);
-  const txn = book.payees.get(incomeTransactionId);
-  if (!link || link.skipped || link.transactionId === null || !txn || txn.amount <= 0) {
-    throw new ServiceError("paycheck_not_found", 404);
-  }
-  const plan = book.plans.find((row) => row.id === link.planId);
-  if (!plan || plan.kind !== "income" || !plan.fundsBuckets) {
-    throw new ServiceError("paycheck_not_found", 404);
-  }
-  return {
-    incomeTransactionId,
-    date: txn.date,
-    dueDate: link.dueDate,
-    amount: txn.amount,
-    payee: txn.payee,
-    amountMode: plan.amountMode,
-    planId: plan.id,
-  };
-}
-
-export function fundingProposalFor(db: Reader, incomeTransactionId: string, asOf: string): FundingProposal {
-  const book = loadBook(db);
-  const paycheck = paycheckFromBook(book, incomeTransactionId);
-  if (activeFundingRun(db, paycheck.incomeTransactionId)) {
-    throw new ServiceError("funding_run_exists", 409);
-  }
-  const position = positionFrom(db, asOf, book);
-  const lines = fundingProposal({
-    paycheckPlanId: paycheck.planId,
-    paycheckDate: paycheck.dueDate,
-    paycheckAmount: paycheck.amount,
-    unassigned: position.unassigned,
-    step: book.step,
-    incomes: proposalIncomes(book, paycheck.dueDate),
-    buckets: book.buckets.map((row) => ({
-      id: row.id,
-      kind: row.kind,
-      priority: row.priority,
-      balance: book.balances.get(row.id) ?? 0,
-      archived: row.archivedAt !== null,
-      refillTo: row.refillTo,
-      amount: row.amount,
-      dueDate: row.dueDate,
-      target: row.target,
-      targetDate: row.targetDate,
-      fixedAmount: row.fixedAmount,
-    })),
-  });
-  const names = new Map(book.buckets.map((row) => [row.id, row.name]));
-  return {
-    incomeTransactionId: paycheck.incomeTransactionId,
-    date: paycheck.date,
-    dueDate: paycheck.dueDate,
-    payee: paycheck.payee,
-    paycheckAmount: paycheck.amount,
-    unassigned: position.unassigned,
-    limit: floorToStep(fundingLimit(paycheck.amount, position.unassigned), book.step),
-    lines: lines.map((line) => ({
-      bucketId: line.bucketId,
-      name: names.get(line.bucketId) ?? "",
-      amount: line.amount,
-    })),
-  };
 }

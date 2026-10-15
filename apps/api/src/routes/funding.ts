@@ -1,24 +1,26 @@
 import {
   asOfQuerySchema,
-  fundingPaycheckListSchema,
+  fillResultSchema,
   fundingPositionSchema,
-  fundingProposalQuerySchema,
-  fundingProposalSchema,
-  fundingRunCreateSchema,
-  fundingRunListSchema,
-  fundingRunSchema,
+  monthFundingListSchema,
+  monthFundingSchema,
+  monthParamSchema,
+  owedSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { fundingPosition, fundingProposalFor } from "../services/funding-book";
-import { listFundingPaychecks } from "../services/funding-paychecks";
-import { createFundingRun, listFundingRuns, undoFundingRun } from "../services/funding-runs";
+import { fundingPosition } from "../services/funding-book";
+import { fillBuckets, fundMonthAgain } from "../services/funding-fill";
+import { listMonthFunding, readOwed, undoMonthFunding } from "../services/funding-months";
 import { validationHook } from "../validation";
-import { errorResponse, idParams } from "./common";
+import { errorResponse } from "./common";
+
+const units = "Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.";
+const readOnly = `Read funding. This does not create, change or delete a record. ${units}`;
 
 const positionRoute = createRoute({
   operationId: "get_funding_position",
-  description: "Read funding. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: readOnly,
   method: "get",
   path: "/api/funding/position",
   request: { query: asOfQuerySchema },
@@ -31,81 +33,63 @@ const positionRoute = createRoute({
   },
 });
 
-const paychecksRoute = createRoute({
-  operationId: "get_funding_paychecks",
-  description: "Read funding. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+const owedRoute = createRoute({
+  operationId: "get_funding_owed",
+  description: `${readOnly} For the month of asOf: the monthly amount of each bucket and the amount that is still owed.`,
   method: "get",
-  path: "/api/funding/paychecks",
+  path: "/api/funding/owed",
+  request: { query: asOfQuerySchema },
   responses: {
-    200: {
-      description: "Income deposits that can fund buckets",
-      content: { "application/json": { schema: fundingPaycheckListSchema } },
-    },
-  },
-});
-
-const proposalRoute = createRoute({
-  operationId: "get_funding_proposal",
-  description: "Read funding. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
-  method: "get",
-  path: "/api/funding/proposal",
-  request: { query: fundingProposalQuerySchema },
-  responses: {
-    200: {
-      description: "A paycheck funding proposal",
-      content: { "application/json": { schema: fundingProposalSchema } },
-    },
+    200: { description: "The monthly amounts and the amounts still owed", content: { "application/json": { schema: owedSchema } } },
     400: errorResponse,
-    404: errorResponse,
-    409: errorResponse,
   },
 });
 
-const listRoute = createRoute({
-  operationId: "get_funding_runs",
-  description: "Read funding. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+const monthsRoute = createRoute({
+  operationId: "get_funding_months",
+  description: readOnly,
   method: "get",
-  path: "/api/funding/runs",
+  path: "/api/funding/months",
   responses: {
-    200: {
-      description: "Funding runs",
-      content: { "application/json": { schema: fundingRunListSchema } },
-    },
+    200: { description: "The funding of each month", content: { "application/json": { schema: monthFundingListSchema } } },
   },
 });
 
-const createRouteDef = createRoute({
-  operationId: "post_funding_runs",
-  description: "Create or run funding. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+const fillRoute = createRoute({
+  operationId: "post_funding_fill",
+  description: `Create or run funding. Pay the amounts that buckets still owe from Unassigned, month by month up to the month of asOf, in priority order. It writes nothing when nothing is owed. This does not change records outside this action. ${units}`,
   method: "post",
-  path: "/api/funding/runs",
-  request: {
-    query: asOfQuerySchema,
-    body: { required: true, content: { "application/json": { schema: fundingRunCreateSchema } } },
-  },
+  path: "/api/funding/fill",
+  request: { query: asOfQuerySchema },
   responses: {
-    200: {
-      description: "The funding run",
-      content: { "application/json": { schema: fundingRunSchema } },
-    },
+    200: { description: "The total that was paid", content: { "application/json": { schema: fillResultSchema } } },
     400: errorResponse,
-    404: errorResponse,
     409: errorResponse,
   },
 });
 
 const undoRoute = createRoute({
-  operationId: "post_funding_runs_id_undo",
-  description: "Undo funding (undo). This reverses that change. It does not remove the audit log. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  operationId: "post_funding_months_month_undo",
+  description: `Undo funding (undo) of one month. The money goes back to Unassigned, and the month is held: the fill does not pay it again. This reverses that change. It does not remove the audit log. ${units}`,
   method: "post",
-  path: "/api/funding/runs/{id}/undo",
-  request: { params: idParams },
+  path: "/api/funding/months/{month}/undo",
+  request: { params: monthParamSchema },
   responses: {
-    200: {
-      description: "The undone funding run",
-      content: { "application/json": { schema: fundingRunSchema } },
-    },
+    200: { description: "The held month", content: { "application/json": { schema: monthFundingSchema } } },
     404: errorResponse,
+    409: errorResponse,
+  },
+});
+
+const againRoute = createRoute({
+  operationId: "post_funding_months_month_again",
+  description: `Create or run funding. Remove the hold of a month whose funding was undone, then fill. This does not change records outside this action. ${units}`,
+  method: "post",
+  path: "/api/funding/months/{month}/again",
+  request: { params: monthParamSchema, query: asOfQuerySchema },
+  responses: {
+    200: { description: "The total that was paid", content: { "application/json": { schema: fillResultSchema } } },
+    400: errorResponse,
     409: errorResponse,
   },
 });
@@ -113,16 +97,13 @@ const undoRoute = createRoute({
 export function fundingRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook })
     .openapi(positionRoute, (c) => c.json(fundingPosition(db, c.req.valid("query").asOf), 200))
-    .openapi(paychecksRoute, (c) => c.json(listFundingPaychecks(db), 200))
-    .openapi(proposalRoute, (c) => {
-      const query = c.req.valid("query");
-      return c.json(fundingProposalFor(db, query.incomeTransactionId, query.asOf), 200);
-    })
-    .openapi(listRoute, (c) => c.json(listFundingRuns(db), 200))
-    .openapi(createRouteDef, (c) =>
-      c.json(createFundingRun(db, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200),
-    )
-    .openapi(undoRoute, (c) => c.json(undoFundingRun(db, c.req.valid("param").id, { source: "ui" }), 200));
+    .openapi(owedRoute, (c) => c.json(readOwed(db, c.req.valid("query").asOf), 200))
+    .openapi(monthsRoute, (c) => c.json(listMonthFunding(db), 200))
+    .openapi(fillRoute, (c) => c.json(fillBuckets(db, { asOf: c.req.valid("query").asOf, source: "ui" }), 200))
+    .openapi(undoRoute, (c) => c.json(undoMonthFunding(db, c.req.valid("param").month, { source: "ui" }), 200))
+    .openapi(againRoute, (c) =>
+      c.json(fundMonthAgain(db, c.req.valid("param").month, { asOf: c.req.valid("query").asOf, source: "ui" }), 200),
+    );
 }
 
 export type FundingRoutes = ReturnType<typeof fundingRoutes>;

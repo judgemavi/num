@@ -98,6 +98,8 @@ test("forecast months: unlinked income, bills and variable spending; card paymen
       target: null,
       targetDate: null,
       fixedAmount: null,
+      months: null,
+      fillMonths: null,
       asOf: "2000-01-01",
       ...saved,
     });

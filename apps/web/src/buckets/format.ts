@@ -50,7 +50,11 @@ export function formatDate(iso: string): string {
   });
 }
 
-export function bucketDetail(bucket: Bucket, currency: string): string {
+export function bucketDetail(bucket: Bucket, currency: string, essentialMonthly: number): string {
+  if (bucket.kind === "emergency") {
+    const months = bucket.months ?? 0;
+    return `${months} ${months === 1 ? "month" : "months"} of essential spending · ${formatMoney(currency, essentialMonthly)} a month`;
+  }
   if (bucket.kind === "spending") {
     return `${formatMoney(currency, bucket.refillTo ?? 0)} a month`;
   }
@@ -61,18 +65,18 @@ export function bucketDetail(bucket: Bucket, currency: string): string {
   if (bucket.targetDate) {
     return `By ${formatDate(bucket.targetDate)}`;
   }
-  return `${formatMoney(currency, bucket.fixedAmount ?? 0)} each paycheck`;
+  return `${formatMoney(currency, bucket.fixedAmount ?? 0)} each month`;
 }
 
-export function barLabel(bucket: Bucket, currency: string): string {
+export function barLabel(bucket: Bucket, currency: string, target: number): string {
   if (bucket.balance < 0) {
     return `Over by ${formatMoney(currency, -bucket.balance)}`;
   }
-  const target = bucketTarget(bucket);
   const percent = target <= 0 ? 100 : Math.min(100, Math.max(0, Math.round((bucket.balance * 100) / target)));
   return `${percent} percent`;
 }
 
+/** The target of a bucket that stores it. The target of the emergency bucket is calculated (`useBucketFigures`). */
 export function bucketTarget(bucket: Bucket): number {
   if (bucket.kind === "spending") {
     return bucket.refillTo ?? 0;
@@ -117,29 +121,23 @@ export function bucketError(code: ErrorCode | undefined): string {
   if (code === "bucket_balance") {
     return "The balance must be zero before you archive this bucket.";
   }
-  if (code === "event_funding_run") {
-    return "This event belongs to a paycheck. Undo the paycheck to undo it.";
+  if (code === "event_cover") {
+    return "A cover from Unassigned cannot be undone.";
   }
-  if (code === "paycheck_funded") {
-    return "Undo the funding first.";
+  if (code === "event_month_funding") {
+    return "This event is part of the funding of a month. Undo the month in the funding history.";
   }
-  if (code === "paycheck_not_found") {
-    return "That paycheck is not ready to fund.";
+  if (code === "bucket_emergency_exists") {
+    return "The book has one emergency fund already.";
   }
-  if (code === "funding_run_exists") {
-    return "This paycheck is already funded. Undo that funding first.";
+  if (code === "funding_month_not_found") {
+    return "That month has no funding to undo.";
   }
-  if (code === "funding_over_limit") {
-    return "That is more than this paycheck can assign.";
+  if (code === "funding_month_held") {
+    return "The funding of that month is already undone.";
   }
-  if (code === "funding_lines_invalid") {
-    return "Check the amounts.";
-  }
-  if (code === "funding_run_not_found") {
-    return "That funding was not found. Refresh the page.";
-  }
-  if (code === "funding_run_undone") {
-    return "That funding is already undone.";
+  if (code === "funding_month_not_held") {
+    return "That month was not undone.";
   }
   if (code === "fund_over_unassigned") {
     return "That is more than Unassigned.";

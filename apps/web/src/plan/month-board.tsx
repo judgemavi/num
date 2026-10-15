@@ -97,7 +97,7 @@ export function MonthFlow({ plan }: { plan: MonthPlan }) {
   );
 }
 
-/** The check that the goals and the sinking funds fit in a paycheck. It reads the plan of this month. */
+/** The check that the goals and the sinking funds fit in the income of the month. It reads the plan of this month. */
 export function GoalFeasibility() {
   const { openEditor } = useEditors();
   const item = useSuspenseQuery(monthPlanQuery(localAsOf())).data.feasibility;
@@ -111,14 +111,14 @@ export function GoalFeasibility() {
       </CardHeader>
       <CardContent className="grid gap-3 px-0 pb-5">
         <p className="px-5">
-          Each paycheck is <Amount value={item.expectedPaycheck} />. Bills take <Amount value={item.billsEach} />. Spending refills take <Amount value={item.refillsEach} />. <Amount value={item.surplus} /> is left for goals and sinking funds.
+          Income is <Amount value={item.income} /> a month. Bills take <Amount value={item.bills} />. Spending refills take <Amount value={item.refills} />.{item.emergency > 0 ? <> The emergency fund takes <Amount value={item.emergency} />.</> : null} <Amount value={item.surplus} /> is left for goals and sinking funds.
         </p>
         {item.shortfall > 0 ? (
           <p className="px-5 font-semibold text-attn">
-            Goals and sinking funds need <Amount value={item.need} className="text-attn" /> each paycheck. That is <Amount value={item.shortfall} className="text-attn" /> short. Cut <Amount value={item.shortfall} className="text-attn" /> from other buckets each paycheck.
+            Goals and sinking funds need <Amount value={item.need} className="text-attn" /> a month. That is <Amount value={item.shortfall} className="text-attn" /> short. Cut <Amount value={item.shortfall} className="text-attn" /> from other buckets each month.
           </p>
         ) : (
-          <p className="px-5">These amounts fit in the paycheck.</p>
+          <p className="px-5">These amounts fit in your monthly income.</p>
         )}
         {item.buckets.map((bucket) => (
           <ListRow key={bucket.bucketId} simple onOpen={() => void openEditor("bucket", { id: bucket.bucketId })}>
@@ -127,8 +127,8 @@ export function GoalFeasibility() {
               {bucket.laterDate ? <small>A date of {longDate(bucket.laterDate)} fits.</small> : null}
             </span>
             <span className={listAmt}>
-              <Amount value={bucket.perPaycheck} />
-              <small>each paycheck</small>
+              <Amount value={bucket.monthly} />
+              <small>a month</small>
             </span>
           </ListRow>
         ))}
@@ -172,11 +172,6 @@ export function MonthDetails({ plan }: { plan: MonthPlan }) {
               <span className="size-2.5 shrink-0 rounded-full" style={{ background: hueColor[item.color].glyph }} aria-hidden="true" />
               <span className={listName}>
                 {item.name}
-                {item.kind === "spending" ? null : (
-                  <small>
-                    {formatMoney(currency, item.perPaycheck)} × {countLabel(item.paychecks, "paycheck", "paychecks")}
-                  </small>
-                )}
               </span>
               <span className={listAmt}>
                 <Amount value={item.planned} />

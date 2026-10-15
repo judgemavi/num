@@ -2,14 +2,12 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { BankStatusText } from "@/accounts/bank-status";
 import { useBankMismatches } from "@/accounts/bank-status-reads";
-import { overspentQuery } from "@/api/buckets";
-import { fundingPaychecksQuery } from "@/api/funding";
+import { fundingOwedQuery } from "@/api/funding";
 import { insightsQuery } from "@/api/insights";
 import { forecastQuery, monthPlanQuery } from "@/api/plan";
 import { recurringSignalsQuery } from "@/api/recurring";
-import { reviewSummaryQuery, useDecideItem } from "@/api/review";
+import { reviewSummaryQuery } from "@/api/review";
 import { localAsOf } from "@/as-of";
-import { OverspentPanel } from "@/buckets/overspent-panel";
 import { Amount } from "@/components/amount";
 import { PaydayIllustration } from "@/components/illustrations";
 import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
@@ -18,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEditors } from "@/editors/editor-api";
-import { useAccountLabels, useAccounts, useActivePlans, useBookCurrency, useCategoryNames } from "@/editors/lookups";
+import { useAccountLabels, useAccounts, useActivePlans, useBookCurrency, useBucketNames, useCategoryNames } from "@/editors/lookups";
 import { homeInsights } from "@/home/home-reads";
 import { signedMoney } from "@/insights/format";
 import { formatMoney } from "@/money";
@@ -87,8 +85,8 @@ export function MonthPlanCards() {
           <CardContent className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
             <p className={feasibility.shortfall > 0 ? "font-semibold text-attn" : "font-semibold"}>
               {feasibility.shortfall > 0
-                ? `Goals need ${formatMoney(currency, feasibility.shortfall)} more each paycheck than you have`
-                : "Your goals fit your paychecks"}
+                ? `Goals need ${formatMoney(currency, feasibility.shortfall)} more each month than you have`
+                : "Your goals fit your monthly income"}
             </p>
             <Button type="button" variant="secondary" asChild>
               <Link to="/buckets">
@@ -102,41 +100,36 @@ export function MonthPlanCards() {
   );
 }
 
-/** The paychecks that are not assigned to buckets. The card shows only when there is one. */
-export function PaychecksCard() {
-  const { openEditor } = useEditors();
-  const { data: paychecks } = useSuspenseQuery(fundingPaychecksQuery());
-  const decide = useDecideItem();
-  const open = paychecks.filter((item) => !item.kept);
-  if (open.length === 0) {
+/** The amount that each bucket still owes for this month. The card shows only when a bucket is owed money. */
+export function StillOwedCard() {
+  const { data: owed } = useSuspenseQuery(fundingOwedQuery(localAsOf()));
+  const names = useBucketNames();
+  const rows = owed.items.filter((item) => item.owed > 0);
+  if (rows.length === 0) {
     return null;
   }
   return (
-    <>
-      <ListCard label="Fund this paycheck" title="Fund this paycheck">
-        {open.map((item) => (
-          <ListRow key={item.incomeTransactionId} onOpen={() => void openEditor("fundPaycheck", { incomeTransactionId: item.incomeTransactionId })}>
-            <span className={listName}>
-              {item.payee}
-              <small>Fund buckets, or keep it unassigned</small>
-            </span>
-            <span className={listAmt}>
-              <Amount value={item.amount} />
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={(event) => {
-                event.stopPropagation();
-                decide.mutate({ asOf: localAsOf(), itemKey: `paycheck_funding:${item.incomeTransactionId}`, decision: "keep_unassigned" });
-              }}
-            >
-              Keep it unassigned
-            </Button>
-          </ListRow>
-        ))}
-      </ListCard>
-    </>
+    <ListCard
+      label="Still owed this month"
+      title="Still owed this month"
+      actions={
+        <Button type="button" variant="secondary" asChild>
+          <Link to="/buckets">Buckets</Link>
+        </Button>
+      }
+    >
+      {rows.map((item) => (
+        <ListRow key={item.bucketId} simple>
+          <span className={listName}>
+            {names.get(item.bucketId) ?? "Bucket"}
+            <small>{owed.held ? "Funding undone. Choose Fund again on Buckets." : "Waits for money in Unassigned"}</small>
+          </span>
+          <span className={listAmt}>
+            <Amount value={item.owed} />
+          </span>
+        </ListRow>
+      ))}
+    </ListCard>
   );
 }
 
@@ -202,12 +195,6 @@ export function BankMismatchCard() {
       })}
     </ListCard>
   );
-}
-
-/** The overspent buckets. The card shows only when there is one. */
-export function OverspentCard() {
-  const { data: overspent } = useSuspenseQuery(overspentQuery());
-  return overspent.length > 0 ? <OverspentPanel /> : null;
 }
 
 function useHomeInsights() {

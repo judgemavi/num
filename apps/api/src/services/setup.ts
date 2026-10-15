@@ -1,14 +1,14 @@
 import { categories, categoryGroups, settings } from "@num/db";
-import { foldName, currencyDigits, type CategorySet, type CurrencyCode } from "@num/shared";
+import { foldName, currencyDigits, isIsoDate, type CategorySet, type CurrencyCode } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { insertEmergencyBucket } from "./buckets";
 import { defaultCategoryGroups } from "./default-categories";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 const settingDefaults = [
   ["bufferAmount", "0"],
-  ["emergencyFundMonths", "3"],
   ["staleImportDays", "10"],
   ["recurringGraceDays", "3"],
 ] as const;
@@ -16,6 +16,8 @@ const settingDefaults = [
 type SetupInput = {
   currency: string;
   categorySet: CategorySet;
+  /** The date of the setup: the start date of the emergency bucket. */
+  asOf: string;
   source: AuditSource;
   at?: string;
 };
@@ -107,6 +109,9 @@ export function setupStatus(db: Db): { complete: boolean } {
 
 export function runSetup(db: Db, input: SetupInput): { currency: CurrencyCode; categorySet: CategorySet } {
   assertCurrency(input.currency);
+  if (!isIsoDate(input.asOf)) {
+    throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
+  }
   const currency = input.currency;
   write(db, { source: input.source, at: input.at }, (tx) => {
     if (currencyRow(tx)) {
@@ -119,6 +124,7 @@ export function runSetup(db: Db, input: SetupInput): { currency: CurrencyCode; c
     if (input.categorySet === "default") {
       insertDefaultCategories(tx);
     }
+    insertEmergencyBucket(tx, input.asOf);
   });
   return { currency, categorySet: input.categorySet };
 }

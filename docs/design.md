@@ -279,7 +279,7 @@ give each one an accessible label, or `aria-hidden` when the text already says t
 - **Account groups:** Cash & cards = sky, Savings = mint, Investments & property = butter, Loans & mortgage = lilac.
   Group by kind: chequing, cash, credit card → Cash & cards. Savings → Savings. Investment, property, receivable,
   other asset → Investments & property. Mortgage, loan, other liability → Loans & mortgage.
-- **Review and Home item kinds:** paycheck funding = mint, categorize = sky, recurring change = lilac, transfer = butter,
+- **Review and Home item kinds:** categorize = sky, recurring change = lilac, transfer = butter,
   over budget = attention (tomato).
 - **Buckets:** each bucket has a `color` (one identity hue) and an `icon` (from a fixed lucide set). The user picks them.
   The app suggests a hue in rotation for a new bucket.

@@ -1,5 +1,5 @@
-import { bucketCategories, bucketEvents, buckets, fundingRuns, transactionLines, transactions } from "@num/db";
-import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { bucketCategories, bucketEvents, buckets, transactionLines, transactions } from "@num/db";
+import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import type { Reader } from "./write";
 
 function add(balances: Map<string, number>, id: string, amount: number) {
@@ -17,18 +17,16 @@ export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
       amount: bucketEvents.amount,
     })
     .from(bucketEvents)
-    .leftJoin(fundingRuns, eq(bucketEvents.fundingRunId, fundingRuns.id))
     .where(
       and(
         isNull(bucketEvents.undoneAt),
         asOf ? lte(bucketEvents.date, asOf) : undefined,
-        or(isNull(bucketEvents.fundingRunId), isNull(fundingRuns.undoneAt)),
       ),
     )
     .all();
 
   for (const event of events) {
-    if (event.kind === "fund") {
+    if (event.kind === "fund" || event.kind === "cover") {
       add(balances, event.bucketId, event.amount);
     } else if (event.kind === "release") {
       add(balances, event.bucketId, -event.amount);

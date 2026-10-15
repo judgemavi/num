@@ -35,6 +35,14 @@ export function overspentQuery() {
   });
 }
 
+/** The emergency fund: its balance, its target and the monthly essential spending. The target uses `asOf`. */
+export function emergencyFundQuery(asOf: string) {
+  return queryOptions({
+    queryKey: ["buckets", "emergency", asOf],
+    queryFn: () => unwrap(api.buckets.emergency.$get({ query: { asOf } })),
+  });
+}
+
 export function bucketEventsQuery() {
   return queryOptions({
     queryKey: ["bucket-events"],
@@ -70,7 +78,7 @@ export function useArchiveBucket() {
   );
 }
 
-const eventDone = { fund: "Money assigned.", release: "Money released.", move: "Money moved." } as const;
+const eventDone = { fund: "Money assigned.", release: "Money released.", move: "Money moved.", cover: "Covered from Unassigned." } as const;
 
 /** Fund a bucket, release money from a bucket, or move money to a second bucket. */
 export function useAddBucketEvent() {
@@ -97,7 +105,6 @@ export function useCoverBucket() {
   return useMutation({
     meta: { errorText: bucketError },
     onSuccess: (event) => undoToast("Bucket covered.", () => undo.mutate({ bucketId: event.bucketId, eventId: event.id })),
-    mutationFn: ({ id, asOf, body }: { id: string; asOf: string; body: BucketCover }) =>
-      unwrap(api.buckets[":id"].cover.$post({ param: { id }, query: { asOf }, json: body })),
+    mutationFn: ({ id, body }: { id: string; body: BucketCover }) => unwrap(api.buckets[":id"].cover.$post({ param: { id }, json: body })),
   });
 }

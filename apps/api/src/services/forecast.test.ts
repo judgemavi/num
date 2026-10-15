@@ -119,6 +119,8 @@ test("bucket spending is not counted two times", () => {
       target: null,
       targetDate: null,
       fixedAmount: null,
+      months: null,
+      fillMonths: null,
       asOf: "2000-01-01",
       ...saved,
     });

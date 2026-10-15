@@ -2,16 +2,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { auditLog, migrateDatabase, openDatabase, settings, transactionLines, transactions } from "@num/db";
-import { columnMapSchema, type ColumnMap, type ErrorCode } from "@num/shared";
+import { columnMapSchema, type ColumnMap } from "@num/shared";
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
-import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { createBucket, readBucket } from "./buckets";
 import { createCategory } from "./categories";
-import { createFundingRun, undoFundingRun } from "./funding-runs";
+import { fillBuckets } from "./funding-fill";
 import { importStatement } from "./imports";
 import { undoImportBatch } from "./import-undo";
 import { linkOccurrence } from "./recurring-links";
@@ -46,17 +45,6 @@ function book() {
       rmSync(dir, { recursive: true, force: true });
     },
   };
-}
-
-function expectCode(run: () => void, code: ErrorCode) {
-  try {
-    run();
-  } catch (error) {
-    expect(error).toBeInstanceOf(ServiceError);
-    expect((error as ServiceError).code).toBe(code);
-    return;
-  }
-  throw new Error(`Expected ${code}`);
 }
 
 function assertLedger(sqlite: Database) {
@@ -121,46 +109,23 @@ function paycheck(db: Db) {
     target: null,
     targetDate: null,
     fixedAmount: null,
-    asOf: "2000-01-01",
+    months: null,
+    fillMonths: null,
+    asOf: "2026-10-01",
     ...saved,
   });
   return { cash, deposit, food };
 }
 
-test("delete of a funded paycheck is refused", () => {
+test("delete of a paycheck does not change the funding of the buckets", () => {
   const sample = book();
   try {
     const { deposit, food } = paycheck(sample.db);
-    createFundingRun(sample.db, {
-      incomeTransactionId: deposit.id,
-      lines: [{ bucketId: food.id, amount: 10_000 }],
-      asOf: "2026-10-01",
-      ...saved,
-    });
-    expectCode(() => deleteTransaction(sample.db, deposit.id, saved), "paycheck_funded");
-    expect(getTransaction(sample.db, deposit.id)?.amount).toBe(500_000);
-    expect(readBucket(sample.db, food.id).balance).toBe(10_000);
-    assertLedger(sample.sqlite);
-  } finally {
-    sample.close();
-  }
-});
-
-test("delete of a paycheck with an undone run leaves bucket balances unchanged", () => {
-  const sample = book();
-  try {
-    const { deposit, food } = paycheck(sample.db);
-    const run = createFundingRun(sample.db, {
-      incomeTransactionId: deposit.id,
-      lines: [{ bucketId: food.id, amount: 10_000 }],
-      asOf: "2026-10-01",
-      ...saved,
-    });
-    undoFundingRun(sample.db, run.id, saved);
-    expect(readBucket(sample.db, food.id).balance).toBe(0);
+    fillBuckets(sample.db, { asOf: "2026-10-02", ...saved });
+    expect(readBucket(sample.db, food.id).balance).toBe(100_000);
     deleteTransaction(sample.db, deposit.id, saved);
     expect(getTransaction(sample.db, deposit.id)).toBeNull();
-    expect(readBucket(sample.db, food.id).balance).toBe(0);
+    expect(readBucket(sample.db, food.id).balance).toBe(100_000);
     assertLedger(sample.sqlite);
   } finally {
     sample.close();

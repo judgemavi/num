@@ -1,4 +1,4 @@
-import { bucketEvents, buckets, fundingRuns, occurrenceLinks, recurringPlans, transactions, type BucketRow, type RecurringPlanRow } from "@num/db";
+import { bucketEvents, buckets, occurrenceLinks, recurringPlans, transactions, type BucketRow, type RecurringPlanRow } from "@num/db";
 import {
   buildMonthPlan,
   isIsoDate,
@@ -9,11 +9,12 @@ import {
   type MonthPlanLink,
   type MonthPlanSource,
 } from "@num/shared";
-import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { bookStep } from "./book-step";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
+import { monthlyEssential } from "./emergency-fund";
 import { literal } from "./transaction-sql";
 
 function planOf(row: RecurringPlanRow): MonthPlanSource {
@@ -30,7 +31,7 @@ function planOf(row: RecurringPlanRow): MonthPlanSource {
   };
 }
 
-function bucketOf(row: BucketRow, actualFunded: number): MonthPlanBucketSource {
+function bucketOf(row: BucketRow, actualFunded: number, essentialMonthly: number): MonthPlanBucketSource {
   return {
     id: row.id,
     name: row.name,
@@ -42,9 +43,12 @@ function bucketOf(row: BucketRow, actualFunded: number): MonthPlanBucketSource {
     refillTo: row.refillTo,
     amount: row.amount,
     dueDate: row.dueDate,
-    target: row.target,
+    repeat: row.repeat,
+    target: row.kind === "emergency" ? (row.months ?? 0) * essentialMonthly : row.target,
     targetDate: row.targetDate,
     fixedAmount: row.fixedAmount,
+    fillMonths: row.fillMonths,
+    startDate: row.startDate,
     actualFunded,
   };
 }
@@ -71,30 +75,19 @@ export function readMonthPlan(db: Db, asOf: string, month: string | undefined): 
   const events = db
     .select({ bucketId: bucketEvents.bucketId, amount: bucketEvents.amount })
     .from(bucketEvents)
-    .leftJoin(fundingRuns, eq(bucketEvents.fundingRunId, fundingRuns.id))
-    .where(
-      and(
-        eq(bucketEvents.kind, "fund"),
-        gte(bucketEvents.date, range.start),
-        lte(bucketEvents.date, range.end),
-        isNull(bucketEvents.undoneAt),
-        or(isNull(bucketEvents.fundingRunId), isNull(fundingRuns.undoneAt)),
-      ),
-    )
+    .where(and(eq(bucketEvents.kind, "fund"), eq(bucketEvents.month, selected), isNull(bucketEvents.undoneAt)))
     .all();
   for (const event of events) {
     funded.set(event.bucketId, (funded.get(event.bucketId) ?? 0) + event.amount);
   }
   const balances = bucketBalances(db, Temporal.PlainDate.from(originStart).subtract({ days: 1 }).toString());
-  const sources = db
-    .select()
-    .from(buckets)
-    .all()
-    .map((row) => {
-      const source = bucketOf(row, funded.get(row.id) ?? 0);
-      source.balance = balances.get(row.id) ?? 0;
-      return source;
-    });
+  const rows = db.select().from(buckets).all();
+  const essentialMonthly = rows.some((row) => row.kind === "emergency" && row.archivedAt === null) ? monthlyEssential(db, originStart).monthly : 0;
+  const sources = rows.map((row) => {
+    const source = bucketOf(row, funded.get(row.id) ?? 0, essentialMonthly);
+    source.balance = balances.get(row.id) ?? 0;
+    return source;
+  });
   return buildMonthPlan({ month: selected, asOf, plans, links, buckets: sources, step: bookStep(db) });
 }
 

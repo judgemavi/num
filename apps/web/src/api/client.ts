@@ -23,6 +23,8 @@ export const api = hc<AppType>("/").api;
 type WriteMeta = {
   /** The hook of a form. The form shows the error of the write, thus the rule shows no toast. */
   form?: boolean;
+  /** The automatic fill. It shows no error toast, it does not start a fill, and its answer invalidates the reads only when it paid or made the emergency bucket. */
+  fill?: boolean;
   /** The text of the error toast for the error code of a write that has no form. */
   errorText?: (code: ErrorCode | undefined) => string;
 };

@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
+import { monthKeySchema } from "./month";
 import { archivedQuery, listQuerySchema, pagedResponseSchema } from "./list";
 import { isUtcTimestamp } from "./time";
 import { nonNegativeAmountSchema as money, positiveAmountSchema } from "./money";
 
-export const bucketKinds = ["spending", "sinking", "goal"] as const;
+export const bucketKinds = ["spending", "sinking", "goal", "emergency"] as const;
 
 export type BucketKind = (typeof bucketKinds)[number];
 
@@ -12,7 +13,9 @@ export const sinkingRepeats = ["none", "yearly"] as const;
 
 export type SinkingRepeat = (typeof sinkingRepeats)[number];
 
-export const bucketEventKinds = ["fund", "move", "release"] as const;
+/** The events that the user makes. The fill makes `cover` (decision 0059). */
+export const manualEventKinds = ["fund", "move", "release"] as const;
+export const bucketEventKinds = [...manualEventKinds, "cover"] as const;
 
 export type BucketEventKind = (typeof bucketEventKinds)[number];
 
@@ -46,6 +49,10 @@ export const bucketIcons = [
 export type BucketIcon = (typeof bucketIcons)[number];
 
 const nameSchema = z.string().trim().min(1);
+const monthCount = z.number().int().min(1).max(120);
+
+/** The settings of a new emergency bucket (decision 0060). */
+export const emergencyDefaults = { months: 3, fillMonths: 12 } as const;
 const bucketFields = {
   name: nameSchema,
   kind: z.enum(bucketKinds),
@@ -62,10 +69,13 @@ const bucketFields = {
   target: money.nullable(),
   targetDate: isoDateSchema.nullable(),
   fixedAmount: money.nullable(),
+  months: monthCount.nullable(),
+  fillMonths: monthCount.nullable(),
 };
 
 export function kindFieldsValid(value: {
   kind: BucketKind;
+  categoryIds: readonly string[];
   refillTo: number | null;
   amount: number | null;
   dueDate: string | null;
@@ -73,7 +83,26 @@ export function kindFieldsValid(value: {
   target: number | null;
   targetDate: string | null;
   fixedAmount: number | null;
+  months: number | null;
+  fillMonths: number | null;
 }): boolean {
+  const emergency = value.months !== null && value.fillMonths !== null;
+  if (value.kind === "emergency") {
+    return (
+      emergency &&
+      value.categoryIds.length === 0 &&
+      value.refillTo === null &&
+      value.amount === null &&
+      value.dueDate === null &&
+      value.repeat === null &&
+      value.target === null &&
+      value.targetDate === null &&
+      value.fixedAmount === null
+    );
+  }
+  if (value.months !== null || value.fillMonths !== null) {
+    return false;
+  }
   if (value.kind === "spending") {
     return (
       value.refillTo !== null &&
@@ -142,6 +171,18 @@ export const overspentBucketSchema = z.object({
   balance: z.number().int().negative(),
 });
 
+export const emergencyFundSchema = z.object({
+  bucketId: z.uuid(),
+  archived: z.boolean(),
+  balance: z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER),
+  months: monthCount,
+  fillMonths: monthCount,
+  /** The median monthly essential spending, or the planned figure when fewer than 3 complete months have lines. */
+  monthly: money,
+  target: money,
+  basis: z.enum(["history", "plan"]),
+});
+
 export const overspentListSchema = z.object({
   items: z.array(overspentBucketSchema),
 });
@@ -156,7 +197,7 @@ export const bucketEventSchema = z.object({
   amount: positiveAmountSchema,
   date: isoDateSchema,
   note: z.string().nullable(),
-  fundingRunId: z.uuid().nullable(),
+  month: monthKeySchema.nullable(),
   undoneAt: z.string().refine(isUtcTimestamp).nullable(),
 });
 
@@ -166,7 +207,7 @@ export const bucketEventListSchema = z.object({
 
 export const bucketEventCreateSchema = z
   .object({
-    kind: z.enum(bucketEventKinds),
+    kind: z.enum(manualEventKinds),
     amount: positiveAmountSchema,
     date: isoDateSchema,
     note: noteSchema,
@@ -175,8 +216,8 @@ export const bucketEventCreateSchema = z
   .refine((value) => (value.kind === "move") === (value.otherBucketId != null), { path: ["otherBucketId"] });
 
 export const bucketCoverSchema = z.object({
-  /** The bucket that gives the money. Null takes the money from Unassigned. */
-  fromBucketId: z.uuid().nullable().meta({ description: "The bucket that gives the money. null takes it from Unassigned." }),
+  /** The bucket that gives the money. */
+  fromBucketId: z.uuid(),
   date: isoDateSchema,
 });
 
@@ -193,4 +234,5 @@ export type BucketListQuery = z.output<typeof bucketListQuerySchema>;
 export type BucketEvent = z.infer<typeof bucketEventSchema>;
 export type BucketEventCreate = z.infer<typeof bucketEventCreateSchema>;
 export type BucketCover = z.infer<typeof bucketCoverSchema>;
+export type EmergencyFund = z.infer<typeof emergencyFundSchema>;
 export type OverspentBucket = z.infer<typeof overspentBucketSchema>;

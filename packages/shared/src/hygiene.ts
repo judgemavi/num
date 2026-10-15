@@ -10,12 +10,10 @@ export const reviewAgeDays = 7 as const;
 const emergencyFundCheckSchema = z.object({
   code: z.literal("emergency_fund"),
   pass: z.boolean(),
-  source: z.enum(["goals", "savings"]),
-  held: money,
+  balance: money,
+  target: nonNegative,
   months: nonNegative,
-  monthlyBills: nonNegative,
-  monthlyRefills: nonNegative,
-  need: nonNegative,
+  monthly: nonNegative,
 });
 
 const importFreshSchema = z.object({
@@ -73,6 +71,7 @@ const recurringCheckSchema = z.object({
 const overspentCheckSchema = z.object({
   code: z.literal("overspent"),
   pass: z.boolean(),
+  unassigned: money,
   count: nonNegative,
   balance: z.number().int().max(0),
 });
@@ -89,15 +88,8 @@ export const hygieneCheckSchema = z.discriminatedUnion("code", [
 
 export const hygieneSchema = z.object({
   asOf: isoDateSchema,
-  checks: z.tuple([
-    emergencyFundCheckSchema,
-      importsCheckSchema,
-    reviewCheckSchema,
-    sinkingCheckSchema,
-    savingsRateCheckSchema,
-    recurringCheckSchema,
-    overspentCheckSchema,
-  ]),
+  /** The emergency fund check is left out when the emergency bucket is archived. */
+  checks: z.array(hygieneCheckSchema),
 });
 
 export type Hygiene = z.infer<typeof hygieneSchema>;

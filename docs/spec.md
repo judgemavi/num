@@ -19,7 +19,7 @@ All features must support one of these three loops:
 | Loop | When | Time | Result |
 |---|---|---|---|
 | Weekly review | One time each week | 10 min | Statements are imported. Nothing needs review. Home is all clear. |
-| Paycheck funding | At each paycheck | 2 min | The paycheck is assigned to buckets with one click. |
+| Monthly funding | Each month | 0 min | The app fills the buckets from Unassigned. The user sees what is still owed. |
 | Monthly check | At the start of each month | 15 min | Each account matches its bank (§5.13). Insights shows the changes of the month. |
 
 If a screen or feature does not support one of these loops, do not add it.
@@ -74,7 +74,7 @@ The owner finds information about unknown merchants with Claude through MCP.
     10 milliunits for CAD, 1000 for JPY, 1 for KWD.
   - The API refuses an amount that a person or an AI gives when it is not a whole number of steps
     (`amount_too_precise`). An import refuses a statement amount with more decimal places than the currency has.
-  - An amount that the app calculates (interest, a share of a paycheck, a median, a daily spread) is rounded to a whole
+  - An amount that the app calculates (interest, a share of a shortfall, a median, a daily spread) is rounded to a whole
     number of steps. A half goes away from zero. Funding shares round up (§7.6).
   - The browser formats an amount with `Intl` and the number of digits of the currency.
 - **Sign:** The sign of an amount is from the view of the account.
@@ -263,7 +263,7 @@ Fields:
 - `monthDay?`: 1–31, or −1 for the last day of the month.
 - `businessDayShift`: `none | next | previous`
 - `endDate?`, `active`
-- `fundsBuckets` (boolean, only for income)
+- `fundsBuckets` (boolean, only for income): the income occurrence ends the window of bills reserved (§6). It does not fund buckets (decision 0059).
 
 Rules:
 - Kind fields:
@@ -286,7 +286,7 @@ A bucket is money that the user keeps for one purpose.
 Buckets are virtual. A bucket is a label on on-budget money. Buckets do not move money between accounts.
 
 Fields:
-- `name`, `kind` (`spending | sinking | goal`), `priority`, `essential` (boolean), `archivedAt?`
+- `name`, `kind` (`spending | sinking | goal | emergency`), `priority`, `essential` (boolean), `archivedAt?`
 - `color` (`sky | mint | lilac | butter | pink | teal`) and `icon` (a name from a fixed icon set). Decision 0009.
 - `categoryIds[]`: each expense category is in a maximum of one bucket.
 - `startDate`: the first date of the lines that the bucket counts. A new bucket uses `asOf`. The user can change it
@@ -294,34 +294,46 @@ Fields:
 
 Settings for each kind:
 - `spending`: `refillTo`. Each month, funding brings the balance up to this amount.
-- `sinking`: `amount`, `dueDate`, `repeat` (`none | yearly`). Funding is equal at each paycheck until the due date.
-- `goal`: `target`, `targetDate?`. Funding is equal at each paycheck until the target date.
-  If there is no target date, the goal has a fixed amount for each paycheck.
+- `sinking`: `amount`, `dueDate`, `repeat` (`none | yearly`). The monthly amount is the shortfall over the months until the due date (§7.6).
+- `goal`: `target`, `targetDate?`, `fixedAmount?`. The monthly amount is the shortfall over the months until the target date.
+  If there is no target date, the goal has a fixed amount for each month (§7.6).
+- `emergency`: `months` (default 3), `fillMonths` (default 12). A book has exactly one emergency bucket. It has no
+  categories. The setup makes it (§7.0). The fill makes it when a set-up book has none (§7.6). Target = `months` × the monthly
+  essential spending (§7.6). The user can change the name, the colour, the icon, the priority and the settings.
+  The user cannot make a second one. Decision 0060.
 
 Bucket events (append only):
 - `fund`: money from Unassigned into the bucket.
 - `move`: money from one bucket to a different bucket.
 - `release`: money from the bucket back to Unassigned. A release cannot be more than the bucket balance.
+- `cover`: money that the fill adds to a bucket with a negative balance (§7.7). The user does not make it and cannot undo it.
+  It has no `month`. It is not funding of a month (§5.9).
 - A manual `fund` cannot be more than Unassigned.
-- Each event has `amount` (positive), `date`, `note?`, `fundingRunId?`, `undoneAt?`.
+- Each event has `amount` (positive), `date`, `note?`, `month?`, `undoneAt?`. `month` (YYYY-MM) is on a `fund` event that the
+  fill paid (§5.9). A manual event has no `month`.
 - Undo of an event sets `undoneAt`. The app does not delete events.
-  The user can undo an event that has no `fundingRunId`. Events of a funding run are undone only with the run (§5.9).
+  The user can undo an event that has no `month`. The events of the fill are undone only with their month (§5.9).
 - To archive a bucket, its balance must be 0. Archive removes its category mappings (audited).
 
-Bucket balance = funds + moves in − moves out − releases + the sum of the lines in the bucket's categories.
+Bucket balance = funds + covers + moves in − moves out − releases + the sum of the lines in the bucket's categories.
 Count only the lines of transactions with a date on or after `startDate`. Count events on all dates.
-Do not count events with `undoneAt`. Do not count events of a funding run with `undoneAt`.
+Do not count events with `undoneAt`.
 Spending lines are negative. Refund lines are positive.
 The balance carries over. There is no reset at the end of a cycle.
 
-### 5.9 Funding run
+### 5.9 Month funding
 
-A funding run is one confirmed assignment of a paycheck.
+The fill (§7.6, decision 0059) pays the amounts that the buckets owe, month by month. A payment is a `fund` event with
+its `month`. The event has the date of the first day of the month. A funding record does not belong to a transaction.
 
-Fields: `incomeTransactionId`, `date`, `createdAt`, `undoneAt?`.
+Month hold: `month` (YYYY-MM), `createdAt`. A hold means that the user undid the funding of that month.
 
-The funding run owns its `fund` events. Undo of the run sets `undoneAt` on the run. Then its events do not count.
-An income transaction has a maximum of one funding run that is not undone.
+- Funding of a month = the `fund` events with that `month` that are not undone.
+- Undo of a month sets `undoneAt` on the `fund` events of that month and makes the hold (audited, one write).
+  The money returns to Unassigned. The fill does not pay a held month. The covers stay.
+- The fill pays only the month of `asOf`. An older held month stays in the history as "Undone". It has no "Fund again".
+- "Fund again" removes the hold, then runs the fill (audited, one write). The fill pays the month by the current figures.
+- A manual `fund` event does not count as funding of a month.
 
 ### 5.10 Valuation
 
@@ -403,8 +415,6 @@ app records, so the same question does not come back:
 | Recurring amount changed | update the plan | `keep_plan_amount` |
 | Missed payment | link a transaction | `skipped` (+ reason, as a plan skip) |
 | Plan proposal | create the plan | `not_recurring` |
-| Overspent bucket | cover from a bucket or Unassigned | none (must be fixed) |
-| Fund this paycheck | fund buckets | `keep_unassigned` |
 | Unreadable import row | add it by hand | `not_a_transaction` |
 
 The user can see and undo decisions on the record they belong to (for example the import detail page).
@@ -425,7 +435,6 @@ The forecast snapshot is removed. A read never writes.
 |---|---|---|
 | `currency` | Set at setup | Book currency (§4) |
 | `bufferAmount` | 0 | Lowest safe balance for "safe to spend" |
-| `emergencyFundMonths` | 3 | Hygiene check |
 | `staleImportDays` | 10 | Hygiene check |
 | `recurringGraceDays` | 3 | Date window for recurring links |
 | `aiCanWrite` | false | MCP write tools are listed only when true (§12) |
@@ -438,6 +447,7 @@ The forecast snapshot is removed. A read never writes.
   The next income occurrence is not included. If there is no income plan, use the next 30 days.
   A `variable` bill reserves its safe amount (the largest outflow of the last 6 actuals, §5.7).
 - **Unassigned** = on-budget total − the sum of the positive bucket balances − bills reserved.
+  A negative bucket balance is not in the sum. Thus an overspent bucket already decreases Unassigned (§7.7).
 - **Credit cards do not need a special bucket.** The on-budget total includes the card balances.
   A card purchase decreases its bucket and the total by the same amount. Thus, Unassigned does not change.
   A card payment is a transfer between two on-budget accounts. It does not change Unassigned.
@@ -451,6 +461,9 @@ The forecast snapshot is removed. A read never writes.
 When the database has no settings, the app shows the setup screen. The user:
 1. Selects the book currency.
 2. Selects the default category set, or starts with no categories.
+
+The setup makes the emergency bucket "Emergency fund": essential, a colour and an icon from the fixed set (decision 0009),
+`startDate` = the setup date, `months` 3, `fillMonths` 12 (decision 0060).
 
 The app does not create accounts at setup.
 
@@ -705,33 +718,63 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
    its bank.
 3. The user can change or delete a bank balance. A bank balance does not lock a transaction.
 
-### 7.6 Paycheck funding
+### 7.6 Monthly funding
 
-1. A transaction links to a `fundsBuckets` income occurrence. Home shows "Fund this paycheck".
-2. The app calculates a proposal. It uses bucket priority order. It stops when the paycheck amount or Unassigned is used,
-   whichever is smaller.
-   - Spending: `refillTo − balance` at the first paycheck of the month. At other paychecks: 0.
-   - Sinking: `(amount − balance) / the number of remaining fundsBuckets income occurrences before dueDate`.
-   - Goal: `(target − balance) / the number of remaining occurrences before targetDate`. If there is no date, use the fixed amount.
-   - If no paycheck remains before the due date or target date, propose the whole shortfall.
-3. The user confirms with one click, or edits the amounts. The app creates a funding run.
+1. **Monthly amount.** Each active bucket has a monthly amount for each calendar month, from the month of its `startDate`
+   (decision 0029). The app calculates it from the bucket balance on the day before the month starts. That balance does
+   not include the funding of that month. It includes the covers of that month (§7.7).
+   - Spending: `refillTo − balance`, minimum 0.
+   - Sinking: `(amount − balance) /` the number of months from this month to the month of `dueDate`, minimum 0.
+     For a yearly bucket, a `dueDate` before this month moves forward by whole years until it is not before this month.
+   - Goal: `(target − balance) /` the number of months from this month to the month of `targetDate`, minimum 0.
+     If there is no target date, the smaller of the fixed amount and `target − balance`, minimum 0.
+   - If the due date or target date is in this month or earlier, the whole shortfall.
+   - Emergency: the smaller of `target / fillMonths` and `target − balance`, minimum 0.
    Round each amount up to a whole minor unit of the currency (§4).
-4. The user can also fund a bucket from Unassigned at any time. This is a manual fund event.
+2. **Emergency target.** Target = `months` × the monthly essential spending. The monthly essential spending is the median
+   of the last 6 complete months before the date of the calculation. A month counts when it has expense lines in the
+   categories of the essential buckets or of the active `bill` plans. With fewer than 3 such months, use the planned
+   figure: the monthly amount of the active `bill` plans + the `refillTo` of the essential spending buckets.
+   When the balance is more than the target, the money stays and funding stops.
+3. **Owed.** Owed for a month = the monthly amount − the funding of that month (§5.9).
+4. **Fill.** The fill pays the owed amounts from Unassigned in bucket priority order. It stops when Unassigned is used.
+   A bucket with a lower priority waits for more money. The user does not confirm or edit a payment.
+   - The fill is one write with `asOf` from the request. The browser sends it when the app opens and after each
+     successful write. A read never writes.
+   - It funds only the month of `asOf`. It never pays a past month. A month that the app did not fill is not paid later:
+     the next month's amount corrects spending, sinking and dated goals, and a goal with no date skips that month.
+   - It skips a held month. It pays only what is still owed, thus it is idempotent. When nothing is owed or Unassigned is 0,
+     it writes nothing.
+   - Before it pays, it covers the negative buckets (§7.7).
+   - If a set-up book has no emergency bucket, the fill makes it with `startDate` = `asOf` (decision 0060).
+5. **Paychecks.** A paycheck makes no funding. Its link, unlink or delete does not change funding.
+6. **Manual funding.** The user can fund, move or release money of a bucket at any time (§5.8). This does not count as
+   the funding of a month.
+7. **Still owed.** Home and Buckets show the amount that is still owed for the month of `asOf`, for each bucket.
 
 ### 7.7 Overspending
 
-If a bucket balance is less than zero, Home and Buckets show it.
-Example: "Groceries is −$42. Cover from…".
-The user can move money with one click, from Unassigned or from a different bucket.
+An overspend already decreases Unassigned (§6: a negative balance is not in the sum). The fill covers each negative bucket
+from Unassigned (decision 0059). It does this in the same write, before it pays the owed amounts.
+- N = the sum of the negative balances (as positive numbers). S = the smaller of N and the negative of Unassigned
+  (0 when Unassigned is 0 or more). The fill covers N − S in total, in priority order (the highest priority first).
+  Each covered bucket goes to 0. The last one can be covered in part. The buckets with the lowest priority keep S.
+- A cover is a `cover` event (§5.8). It is not funding of a month. The next monthly amount counts it in the start balance.
+  A cover does not change Unassigned.
+- When a bucket stays negative, Home and Buckets show the overspent buckets. The user moves money from a different bucket
+  or releases money. The app does not move money between buckets. There is no review item for this.
 
 Expense lines in categories without a bucket decrease Unassigned directly.
 
 ### 7.8 Goal feasibility
 
-For each goal and sinking bucket, the app calculates the amount for each paycheck (§7.6).
-Buckets (goals) compares the total with the paycheck surplus.
+For each goal and sinking bucket, the app calculates the monthly amount (§7.6).
+Buckets (goals) compares the total with the monthly surplus.
 
-Paycheck surplus = expected paycheck − bills for each paycheck − spending refills for each paycheck.
+Monthly surplus = the monthly income − the monthly bills − the spending refills − the monthly amount of the emergency
+bucket − the monthly amounts of the sinking and goal buckets.
+The monthly income is the yearly amount of the active income plans (safe amounts) divided by 12. The monthly bills are the
+bill occurrences of the month.
 
 If the surplus is too small, the app shows the shortfall. It also shows two fixes:
 - A later date that is possible.
@@ -796,13 +839,13 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 
 | Check | The check passes when |
 |---|---|
-| Emergency fund | Essential goal buckets (or savings accounts, if there are no essential goal buckets) ≥ `emergencyFundMonths` × (monthly bills + monthly essential refills) |
+| Emergency fund | The emergency bucket balance ≥ its target (§7.6). Show the balance, the target, `months` and the monthly figure. No check when the bucket is archived or the target is 0. |
 | Imports are current | Each on-budget account has an import in the last `staleImportDays` days |
 | Review | No transaction has needed review for more than 7 days |
 | Sinking funds | Each yearly `bill` plan has a sinking bucket for its category |
 | Savings rate | The savings rate of the last 3 complete months (§8) is 0% or more. Show the percentage. |
 | Recurring | There are no missed occurrences (decision 0047) |
-| Overspent | No bucket has a negative balance |
+| Overspent | No bucket has a negative balance (§7.7) |
 
 ## 11. Audit and undo
 
@@ -810,7 +853,7 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 
 Undo is available for:
 - Import batch.
-- Funding run.
+- Funding of a month (§5.9).
 - Bucket move.
 
 To correct other records, the user edits them. The audit log records each edit.
@@ -876,9 +919,9 @@ There are 7 screens (decision 0021).
 
 | Screen | Contents |
 |---|---|
-| Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); each account that does not match its bank (§5.13); hygiene checks (§10); this month: income → bills → bucket funding → left to save, "Fund this paycheck", missed payments, overspent buckets, goal status; spending changes this month; net worth. Each card links to its screen. |
+| Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); each account that does not match its bank (§5.13); hygiene checks (§10); this month: income → bills → bucket funding → left to save, what buckets still owe this month, missed payments, overspent buckets (only when a bucket stays negative), goal status; spending changes this month; net worth. Each card links to its screen. |
 | Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers, row selection with Approve and the bulk editor (decision 0051) |
-| Buckets | Balances, funding history, moves, goals (feasibility), settings |
+| Buckets | Balances, what is still owed this month, funding history (by month, with Undo and Fund again), moves, goals (feasibility), settings |
 | Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups and categories in two rings), net worth, mortgage. Decisions 0030, 0058. |
 | Accounts | List with balances and the bank status of each account (§5.13), import, bank balances, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
 | Recurring | Plans, Upcoming (occurrences of all plans in the next 30 days, decision 0055), links, skips, Detected (new plan suggestions) |

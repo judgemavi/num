@@ -3,7 +3,6 @@ import { Boundary } from "@/components/boundary";
 import { BankBalanceEditor } from "@/accounts/bank-balance-editor";
 import { ImportForm } from "@/accounts/import-dialog";
 import { AccountEditor, ImportInfoEditor } from "@/editors/account-editors";
-import { FundPaycheck } from "@/buckets/fund-paycheck";
 import { MoveMoney } from "@/buckets/move-money";
 import { AssignEditor, BucketEditor } from "@/editors/bucket-editors";
 import type { EditorFrame, EditorInput, EditorKind } from "@/editors/editor-types";
@@ -26,7 +25,6 @@ const editors: { [K in EditorKind]: (input: EditorInput[K]) => ReactNode } = {
   plan: PlanEditor,
   import: ImportForm,
   bankBalance: BankBalanceEditor,
-  fundPaycheck: FundPaycheck,
   assignMoney: AssignEditor,
   moveMoney: MoveMoney,
   importInfo: ImportInfoEditor,
@@ -49,7 +47,6 @@ const loadText: { [K in EditorKind]: { loading: string; failed: string } } = {
   plan: { loading: "Loading recurring.", failed: "Recurring did not load." },
   import: { loading: "Loading the import.", failed: "The import did not load." },
   bankBalance: { loading: "Loading the account.", failed: "The account did not load." },
-  fundPaycheck: { loading: "Loading paychecks.", failed: "The paychecks did not load." },
   assignMoney: { loading: "Loading the bucket.", failed: "The bucket did not load." },
   moveMoney: { loading: "Loading buckets.", failed: "The buckets did not load." },
   importInfo: { loading: "Loading the import.", failed: "The import did not load." },

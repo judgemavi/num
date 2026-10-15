@@ -1,14 +1,12 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import type { BucketKind } from "./bucket";
-import { divideAmount, floorToStep } from "./currency";
-import { isoDateSchema, asOfQuerySchema } from "./date";
-import { amountModes } from "./recurring-calc";
-import { isUtcTimestamp } from "./time";
-import { amountSchema as money, positiveAmountSchema } from "./money";
+import { divideAmount } from "./currency";
+import { isoDateSchema } from "./date";
+import { monthKeySchema } from "./month";
+import { amountSchema as money } from "./money";
 
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
-const positive = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
 
 export const billReserveDays = 30;
 
@@ -61,132 +59,67 @@ export function unassigned(onBudgetTotal: number, positiveBucketBalances: number
   return onBudgetTotal - positiveBucketBalances - reserved;
 }
 
-export function fundingLimit(paycheckAmount: number, free: number): number {
-  const paycheck = paycheckAmount > 0 ? paycheckAmount : 0;
-  const available = free > 0 ? free : 0;
-  return Math.min(paycheck, available);
-}
-
-/** The share of a shortfall for one paycheck, rounded up to a whole number of minor units (`step`). */
-export function roundUpShare(shortfall: number, paychecks: number, step: number): number {
+/** The share of a shortfall for one month, rounded up to a whole number of minor units (`step`). */
+export function roundUpShare(shortfall: number, months: number, step: number): number {
   if (shortfall <= 0) {
     return 0;
   }
-  if (paychecks <= 0) {
+  if (months <= 0) {
     return shortfall;
   }
-  return divideAmount(shortfall, paychecks, step, "up");
+  return divideAmount(shortfall, months, step, "up");
 }
 
-export type FundingBucketInput = {
-  id: string;
+export type MonthlyBucket = {
   kind: BucketKind;
-  priority: number;
-  balance: number;
-  archived: boolean;
   refillTo: number | null;
   amount: number | null;
   dueDate: string | null;
+  repeat: "none" | "yearly" | null;
+  /** The target of the bucket. For the emergency kind, the calculated target (decision 0060). */
   target: number | null;
   targetDate: string | null;
   fixedAmount: number | null;
+  fillMonths: number | null;
 };
 
-export type FundingIncome = {
-  planId: string;
-  dueDate: string;
-};
-
-function monthOf(iso: string) {
-  return iso.slice(0, 7);
+/** The months from `month` (YYYY-MM) to the month of `date`. Zero or less when the date is in `month` or earlier. */
+export function monthsUntil(month: string, date: string): number {
+  const from = Temporal.PlainDate.from(`${month}-01`);
+  const to = Temporal.PlainDate.from(`${date.slice(0, 7)}-01`);
+  return from.until(to, { largestUnit: "month" }).months;
 }
 
-export function isFirstPaycheckOfMonth(paycheckDate: string, incomes: readonly FundingIncome[]): boolean {
-  const month = monthOf(paycheckDate);
-  let earliest = paycheckDate;
-  for (const income of incomes) {
-    if (monthOf(income.dueDate) === month && income.dueDate < earliest) {
-      earliest = income.dueDate;
-    }
+/**
+ * The monthly amount of a bucket (decision 0059 item 1). `balance` is the balance at the start of `month`, without the
+ * funding of that month. Each amount is rounded up to a whole minor unit (`step`).
+ */
+/** The due date that counts for `month`. A yearly bucket rolls a past due date forward by whole years. */
+function dueDateFor(bucket: MonthlyBucket, month: string): string | null {
+  let due = bucket.dueDate;
+  if (due === null || bucket.repeat !== "yearly") {
+    return due;
   }
-  return paycheckDate === earliest;
+  while (due.slice(0, 7) < month) {
+    due = Temporal.PlainDate.from(due).add({ years: 1 }).toString();
+  }
+  return due;
 }
 
-function withCurrent(incomes: readonly FundingIncome[], planId: string, dueDate: string) {
-  if (incomes.some((income) => income.planId === planId && income.dueDate === dueDate)) {
-    return [...incomes];
-  }
-  return [...incomes, { planId, dueDate }];
-}
-
-function remainingPaychecks(paycheckDate: string, due: string, incomes: readonly FundingIncome[]) {
-  let count = 0;
-  for (const income of incomes) {
-    if (income.dueDate >= paycheckDate && income.dueDate < due) {
-      count += 1;
-    }
-  }
-  return count;
-}
-
-function idealAmount(bucket: FundingBucketInput, paycheckDate: string, incomes: readonly FundingIncome[], step: number) {
-  if (bucket.archived) {
-    return 0;
-  }
+export function monthlyAmount(bucket: MonthlyBucket, balance: number, month: string, step: number): number {
   if (bucket.kind === "spending") {
-    if (!isFirstPaycheckOfMonth(paycheckDate, incomes)) {
-      return 0;
-    }
-    return Math.max(0, (bucket.refillTo ?? 0) - bucket.balance);
+    return Math.max(0, (bucket.refillTo ?? 0) - balance);
   }
-  if (bucket.kind === "sinking") {
-    if (bucket.dueDate === null || bucket.amount === null) {
-      return 0;
-    }
-    return roundUpShare(bucket.amount - bucket.balance, remainingPaychecks(paycheckDate, bucket.dueDate, incomes), step);
+  if (bucket.kind === "emergency") {
+    const target = bucket.target ?? 0;
+    return Math.min(roundUpShare(target, bucket.fillMonths ?? 1, step), Math.max(0, target - balance));
   }
-  if (bucket.targetDate !== null) {
-    return roundUpShare((bucket.target ?? 0) - bucket.balance, remainingPaychecks(paycheckDate, bucket.targetDate, incomes), step);
+  const goalDate = bucket.kind === "sinking" ? dueDateFor(bucket, month) : bucket.targetDate;
+  if (bucket.kind === "goal" && goalDate === null) {
+    return Math.min(Math.max(0, bucket.fixedAmount ?? 0), Math.max(0, (bucket.target ?? 0) - balance));
   }
-  return Math.max(0, bucket.fixedAmount ?? 0);
-}
-
-export function fundingProposal(input: {
-  paycheckPlanId: string;
-  paycheckDate: string;
-  paycheckAmount: number;
-  unassigned: number;
-  buckets: readonly FundingBucketInput[];
-  incomes: readonly FundingIncome[];
-  step: number;
-}): { bucketId: string; amount: number }[] {
-  const incomes = withCurrent(input.incomes, input.paycheckPlanId, input.paycheckDate);
-  const ordered = [...input.buckets].sort((left, right) => {
-    if (left.priority !== right.priority) {
-      return left.priority - right.priority;
-    }
-    if (left.id < right.id) {
-      return -1;
-    }
-    if (left.id > right.id) {
-      return 1;
-    }
-    return 0;
-  });
-  let room = floorToStep(fundingLimit(input.paycheckAmount, input.unassigned), input.step);
-  const lines: { bucketId: string; amount: number }[] = [];
-  for (const bucket of ordered) {
-    if (room <= 0) {
-      break;
-    }
-    const amount = Math.min(idealAmount(bucket, input.paycheckDate, incomes, input.step), room);
-    if (amount <= 0) {
-      continue;
-    }
-    lines.push({ bucketId: bucket.id, amount });
-    room -= amount;
-  }
-  return lines;
+  const total = bucket.kind === "sinking" ? (bucket.amount ?? 0) : (bucket.target ?? 0);
+  return roundUpShare(total - balance, goalDate === null ? 0 : monthsUntil(month, goalDate), step);
 }
 
 export const fundingPositionSchema = z.object({
@@ -197,68 +130,41 @@ export const fundingPositionSchema = z.object({
   nextIncomeDate: isoDateSchema.nullable(),
 });
 
-export const fundingPaycheckSchema = z.object({
-  incomeTransactionId: z.uuid(),
-  date: isoDateSchema,
-  dueDate: isoDateSchema,
-  amount: positive,
-  payee: z.string(),
-  amountMode: z.enum(amountModes),
+export const fillResultSchema = z.object({
+  /** The total that this fill paid. 0 when nothing was owed or Unassigned was used. */
+  paid: nonNegative,
+  payments: nonNegative,
+  /** True when this fill made the emergency bucket. */
+  madeBucket: z.boolean(),
 });
 
-export const fundingPaycheckListSchema = z.object({
-  items: z.array(fundingPaycheckSchema.extend({ kept: z.boolean() })),
+export const owedSchema = z.object({
+  month: monthKeySchema,
+  /** True when the user undid the funding of this month. The fill does not pay a held month. */
+  held: z.boolean(),
+  items: z.array(
+    z.object({
+      bucketId: z.uuid(),
+      monthly: nonNegative,
+      owed: nonNegative,
+    }),
+  ),
 });
 
-export const fundingProposalQuerySchema = asOfQuerySchema.extend({
-  incomeTransactionId: z.uuid(),
-});
-
-export const fundingProposalLineSchema = z.object({
-  bucketId: z.uuid(),
-  name: z.string(),
-  amount: positive,
-});
-
-export const fundingProposalSchema = z.object({
-  incomeTransactionId: z.uuid(),
-  date: isoDateSchema,
-  dueDate: isoDateSchema,
-  payee: z.string(),
-  paycheckAmount: positive,
-  unassigned: money,
-  limit: nonNegative,
-  lines: z.array(fundingProposalLineSchema),
-});
-
-export const fundingRunCreateSchema = z.object({
-  incomeTransactionId: z.uuid(),
-  lines: z
-    .array(
-      z.object({
-        bucketId: z.uuid(),
-        amount: positiveAmountSchema,
-      }),
-    )
-    .min(1),
-});
-
-export const fundingRunSchema = z.object({
-  id: z.uuid(),
-  incomeTransactionId: z.uuid(),
-  date: isoDateSchema,
-  payee: z.string(),
+export const monthFundingSchema = z.object({
+  month: monthKeySchema,
+  /** The funding of the month that is not undone. */
   total: nonNegative,
-  createdAt: z.string().refine(isUtcTimestamp),
-  undoneAt: z.string().refine(isUtcTimestamp).nullable(),
+  held: z.boolean(),
 });
 
-export const fundingRunListSchema = z.object({
-  items: z.array(fundingRunSchema),
+export const monthFundingListSchema = z.object({
+  items: z.array(monthFundingSchema),
 });
+
+export const monthParamSchema = z.object({ month: monthKeySchema });
 
 export type FundingPosition = z.infer<typeof fundingPositionSchema>;
-export type FundingPaycheck = z.infer<typeof fundingPaycheckSchema>;
-export type FundingProposal = z.infer<typeof fundingProposalSchema>;
-export type FundingRunCreate = z.infer<typeof fundingRunCreateSchema>;
-export type FundingRun = z.infer<typeof fundingRunSchema>;
+export type FillResult = z.infer<typeof fillResultSchema>;
+export type Owed = z.infer<typeof owedSchema>;
+export type MonthFunding = z.infer<typeof monthFundingSchema>;

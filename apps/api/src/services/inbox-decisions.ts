@@ -7,7 +7,6 @@ import { openUnreadableKeys } from "./book-settings";
 import { answerNoCategory, isUncategorized, keepPrefix, teachesLabel } from "./decision-keep";
 import { decidedKeys, pairKey } from "./decision-keys";
 import { spreadSureLabels } from "./match-apply";
-import { openFundingPaychecks } from "./funding-paychecks";
 import { refundQuestions } from "./refund-auto";
 import { recurringSignals } from "./recurring-view";
 import { listTransferPairs } from "./suggestions";
@@ -18,7 +17,6 @@ const codeForKind: Record<string, InboxDecisionCode | undefined> = {
   transfer_pair: "not_transfer",
   recurring_changed: "keep_plan_amount",
   plan_proposal: "not_recurring",
-  paycheck_funding: "keep_unassigned",
   import_unreadable: "not_a_transaction",
   refund_link: "not_linked",
   uncategorized: "keep_uncategorized",
@@ -47,8 +45,6 @@ function isOpen(db: Db, asOf: string, itemKey: string) {
       return recurringSignals(db, asOf).changed.some((item) => `recurring_changed:${item.planId}:${item.dueDate}` === itemKey);
     case "plan_proposal":
       return recurringSignals(db, asOf).proposals.some((item) => planProposalKey(item) === itemKey);
-    case "paycheck_funding":
-      return openFundingPaychecks(db).some((item) => `paycheck_funding:${item.incomeTransactionId}` === itemKey);
     case "import_unreadable":
       return openUnreadableKeys(db).includes(itemKey);
     case "refund_link":

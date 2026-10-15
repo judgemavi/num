@@ -9,11 +9,13 @@ import {
   bucketListSchema,
   bucketSchema,
   bucketUpdateSchema,
+  emergencyFundSchema,
   overspentListSchema,
 } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { coverBucket, createBucketEvent, listBucketEvents, undoBucketEvent } from "../services/bucket-events";
+import { readEmergencyFund } from "../services/emergency-fund";
 import { archiveBucket, createBucket, listBuckets, listOverspent, readBucket, restoreBucket, updateBucket } from "../services/buckets";
 import { validationHook } from "../validation";
 import { errorResponse, idParams } from "./common";
@@ -48,6 +50,21 @@ const eventsRoute = createRoute({
       description: "Bucket events that still count",
       content: { "application/json": { schema: bucketEventListSchema } },
     },
+  },
+});
+
+const emergencyRoute = createRoute({
+  operationId: "get_buckets_emergency",
+  description: "Read the emergency fund bucket: its balance, the months to keep, the monthly essential spending and the target (months times monthly). This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  method: "get",
+  path: "/api/buckets/emergency",
+  request: { query: asOfQuerySchema },
+  responses: {
+    200: {
+      description: "The emergency fund and its calculation, or null when the book has no emergency bucket",
+      content: { "application/json": { schema: emergencyFundSchema.nullable() } },
+    },
+    400: errorResponse,
   },
 });
 
@@ -175,17 +192,16 @@ const undoRoute = createRoute({
 
 const coverRoute = createRoute({
   operationId: "post_buckets_id_cover",
-  description: "Cover an overspent bucket with the amount that it is over, from a second bucket (fromBucketId) or from Unassigned (fromBucketId null). The source must have the whole amount. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Cover an overspent bucket with the amount that it is over, with a move from a second bucket (fromBucketId). The source must have the whole amount. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/buckets/{id}/cover",
   request: {
     params: idParams,
-    query: asOfQuerySchema,
     body: { required: true, content: { "application/json": { schema: bucketCoverSchema } } },
   },
   responses: {
     200: {
-      description: "The move or the fund event that covers the bucket",
+      description: "The move that covers the bucket",
       content: { "application/json": { schema: bucketEventSchema } },
     },
     400: errorResponse,
@@ -211,6 +227,7 @@ export function bucketRoutes(db: Db) {
     .openapi(listRoute, (c) => c.json(listBuckets(db, c.req.valid("query")), 200))
     .openapi(eventsRoute, (c) => c.json(listBucketEvents(db), 200))
     .openapi(overspentRoute, (c) => c.json(listOverspent(db), 200))
+    .openapi(emergencyRoute, (c) => c.json(readEmergencyFund(db, c.req.valid("query").asOf), 200))
     .openapi(readRoute, (c) => c.json(readBucket(db, c.req.valid("param").id), 200))
     .openapi(createRouteDef, (c) =>
       c.json(createBucket(db, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200),
@@ -237,7 +254,7 @@ export function bucketRoutes(db: Db) {
     })
     .openapi(coverRoute, (c) => {
       const { id } = c.req.valid("param");
-      return c.json(coverBucket(db, id, { ...c.req.valid("json"), asOf: c.req.valid("query").asOf, source: "ui" }), 200);
+      return c.json(coverBucket(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
     });
 }
 

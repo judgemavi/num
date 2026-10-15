@@ -11,7 +11,6 @@ import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { importStatement } from "./imports";
 import { openUnreadableKeys } from "./book-settings";
-import { openFundingPaychecks } from "./funding-paychecks";
 import { decideInboxItem, undoInboxDecision } from "./inbox-decisions";
 import { decidedKeys } from "./decision-keys";
 import { listNeedsReview } from "./needs-review";
@@ -88,9 +87,6 @@ function hasKey(db: Db, asOfDate: string, itemKey: string): boolean {
     return true;
   }
   if (signals.proposals.some((item) => planProposalKey(item) === itemKey)) {
-    return true;
-  }
-  if (openFundingPaychecks(db).some((item) => `paycheck_funding:${item.incomeTransactionId}` === itemKey)) {
     return true;
   }
   return openUnreadableKeys(db).includes(itemKey);
@@ -176,31 +172,6 @@ test("each no decision hides its review item until undo", () => {
     if (proposal) {
       roundTrip(sample.db, asOf, planProposalKey(proposal), "not_recurring");
     }
-
-    const payCategory = createCategory(sample.db, { name: "Pay", kind: "income", essential: false, ...saved });
-    const paycheckPlan = createPlan(sample.db, {
-      name: "Pay",
-      kind: "income",
-      accountId: cash.id,
-      expectedAmount: 500_000,
-      tolerance: 0,
-      amountMode: "fixed",
-      categoryId: payCategory.id,
-      transferAccountId: null,
-      merchantId: null,
-      startDate: "2026-03-01",
-      freq: "monthly",
-      interval: 1,
-      monthDay: 1,
-      businessDayShift: "none",
-      endDate: "2026-03-01",
-      active: true,
-      fundsBuckets: true,
-      ...saved,
-    });
-    const deposit = pay(sample.db, cash.id, "2026-03-01", 500_000, "Payroll", payCategory.id);
-    linkOccurrence(sample.db, paycheckPlan.id, "2026-03-01", deposit.id, saved);
-    roundTrip(sample.db, asOf, `paycheck_funding:${deposit.id}`, "keep_unassigned");
 
     importStatement(sample.db, sample.dir, {
       source: "import",

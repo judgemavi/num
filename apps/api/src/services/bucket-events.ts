@@ -72,7 +72,7 @@ export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCr
       amount: input.amount,
       date: input.date,
       note: cleanNote(input.note),
-      fundingRunId: null,
+      month: null,
       undoneAt: null,
     };
     tx.insert(bucketEvents).values(row).run();
@@ -97,8 +97,11 @@ export function undoBucketEvent(db: Db, bucketId: string, eventId: string, input
     if (existing.undoneAt) {
       throw new ServiceError("event_undone", 409);
     }
-    if (existing.fundingRunId) {
-      throw new ServiceError("event_funding_run", 409);
+    if (existing.kind === "cover") {
+      throw new ServiceError("event_cover", 409);
+    }
+    if (existing.month) {
+      throw new ServiceError("event_month_funding", 409);
     }
     const next = { ...existing, undoneAt: at };
     tx.update(bucketEvents).set({ undoneAt: at }).where(eq(bucketEvents.id, eventId)).run();
@@ -123,45 +126,39 @@ export function listBucketEvents(db: Db): { items: BucketEvent[] } {
   return { items: rows };
 }
 
-/**
- * Cover an overspent bucket with the amount that it is over: a move from a second bucket, or money from Unassigned
- * (a fund event). The source must have the whole amount.
- */
-export function coverBucket(db: Db, bucketId: string, input: BucketCover & WriteInput & { asOf: string }): BucketEvent {
+/** Cover an overspent bucket with the amount that it is over: a move from a second bucket. The source must have the whole amount. */
+export function coverBucket(db: Db, bucketId: string, input: BucketCover & WriteInput): BucketEvent {
   if (!isIsoDate(input.date)) {
     throw new ServiceError("bucket_fields_invalid", 400);
   }
-  if (!isIsoDate(input.asOf)) {
-    throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
-  }
-  const fromBucketId = input.fromBucketId;
+  const { fromBucketId } = input;
   if (fromBucketId === bucketId) {
     throw new ServiceError("bucket_same", 400);
   }
   const id = crypto.randomUUID();
   return write(db, { source: input.source, at: input.at }, (tx) => {
     requireActiveBucket(tx, bucketId);
+    requireActiveBucket(tx, fromBucketId);
     const balances = bucketBalances(tx);
     const balance = balances.get(bucketId) ?? 0;
     if (balance >= 0) {
       throw new ServiceError("bucket_not_overspent", 409);
     }
     const need = -balance;
-    if (fromBucketId === null) {
-      if (fundingPosition(tx, input.asOf).unassigned < need) {
-        throw new ServiceError("fund_over_unassigned", 409);
-      }
-    } else {
-      requireActiveBucket(tx, fromBucketId);
-      if ((balances.get(fromBucketId) ?? 0) < need) {
-        throw new ServiceError("bucket_short", 409);
-      }
+    if ((balances.get(fromBucketId) ?? 0) < need) {
+      throw new ServiceError("bucket_short", 409);
     }
-    const event = { id, amount: need, date: input.date, note: null, fundingRunId: null, undoneAt: null };
-    const row: BucketEventRow =
-      fromBucketId === null
-        ? { ...event, kind: "fund", bucketId, otherBucketId: null }
-        : { ...event, kind: "move", bucketId: fromBucketId, otherBucketId: bucketId };
+    const row: BucketEventRow = {
+      id,
+      kind: "move",
+      bucketId: fromBucketId,
+      otherBucketId: bucketId,
+      amount: need,
+      date: input.date,
+      note: null,
+      month: null,
+      undoneAt: null,
+    };
     tx.insert(bucketEvents).values(row).run();
     tx.audit({
       entity: "bucket_events",

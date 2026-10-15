@@ -1,102 +1,78 @@
 import { expect, test } from "bun:test";
-import {
-  fundingProposal,
-  roundUpShare,
-  unassigned,
-  type FundingBucketInput,
-  type FundingIncome,
-} from "./funding";
+import { monthlyAmount, monthsUntil, roundUpShare, unassigned, type MonthlyBucket } from "./funding";
 
-function income(planId: string, dueDate: string): FundingIncome {
-  return { planId, dueDate };
-}
+const none: MonthlyBucket = {
+  kind: "spending",
+  refillTo: null,
+  amount: null,
+  dueDate: null,
+  repeat: null,
+  target: null,
+  targetDate: null,
+  fixedAmount: null,
+  fillMonths: null,
+};
 
-function spending(id: string, priority: number, balance: number, refillTo: number): FundingBucketInput {
-  return {
-    id,
-    kind: "spending",
-    priority,
-    balance,
-    archived: false,
-    refillTo,
-    amount: null,
-    dueDate: null,
-    target: null,
-    targetDate: null,
-    fixedAmount: null,
-  };
-}
+const month = "2026-10";
 
-function sinking(id: string, priority: number, balance: number, amount: number, dueDate: string): FundingBucketInput {
-  return {
-    id,
-    kind: "sinking",
-    priority,
-    balance,
-    archived: false,
-    refillTo: null,
-    amount,
-    dueDate,
-    target: null,
-    targetDate: null,
-    fixedAmount: null,
-  };
-}
+test("months to a date count calendar months", () => {
+  expect(monthsUntil("2026-10", "2026-12-15")).toBe(2);
+  expect(monthsUntil("2026-10", "2026-10-31")).toBe(0);
+  expect(monthsUntil("2026-10", "2026-03-01")).toBe(-7);
+  expect(monthsUntil("2026-10", "2027-10-01")).toBe(12);
+});
 
-function goal(
-  id: string,
-  priority: number,
-  balance: number,
-  target: number,
-  targetDate: string | null,
-  fixedAmount: number | null,
-): FundingBucketInput {
-  return {
-    id,
-    kind: "goal",
-    priority,
-    balance,
-    archived: false,
-    refillTo: null,
-    amount: null,
-    dueDate: null,
-    target,
-    targetDate,
-    fixedAmount,
-  };
-}
+test("a spending bucket refills to its level and never goes below 0", () => {
+  const food = { ...none, refillTo: 100_000 };
+  expect(monthlyAmount(food, 40_000, month, 10)).toBe(60_000);
+  expect(monthlyAmount(food, -30_000, month, 10)).toBe(130_000);
+  expect(monthlyAmount(food, 150_000, month, 10)).toBe(0);
+});
 
-const october = [income("pay", "2026-10-01"), income("pay", "2026-10-15"), income("pay", "2026-10-29")];
+test("a sinking bucket spreads its shortfall over the months to the due month, rounded up", () => {
+  const tax = { ...none, kind: "sinking" as const, amount: 10_000, dueDate: "2026-12-20" };
+  expect(monthlyAmount(tax, 1_000, month, 10)).toBe(4_500);
+  expect(monthlyAmount(tax, 1_001, "2026-10", 10)).toBe(4_500);
+  expect(monthlyAmount({ ...tax, amount: 100 }, 0, month, 10)).toBe(50);
+  expect(monthlyAmount({ ...tax, amount: 10_000 }, 10_000, month, 10)).toBe(0);
+  expect(monthlyAmount({ ...tax, amount: 10_000 }, 12_000, month, 10)).toBe(0);
+});
 
-test("zero remaining paychecks proposes the whole shortfall", () => {
+test("a due date in this month or earlier asks for the whole shortfall", () => {
+  const tax = { ...none, kind: "sinking" as const, amount: 10_000, dueDate: "2026-10-31" };
+  expect(monthlyAmount(tax, 1_000, month, 10)).toBe(9_000);
+  expect(monthlyAmount({ ...tax, dueDate: "2026-03-01" }, 1_000, month, 10)).toBe(9_000);
+});
+
+test("a yearly sinking bucket rolls a past due date forward by whole years", () => {
+  const insurance = { ...none, kind: "sinking" as const, amount: 12_000, dueDate: "2026-03-10", repeat: "yearly" as const };
+  expect(monthlyAmount(insurance, 0, month, 10)).toBe(2_400);
+  expect(monthlyAmount(insurance, 0, "2026-03", 10)).toBe(12_000);
+  expect(monthlyAmount({ ...insurance, repeat: "none" }, 0, month, 10)).toBe(12_000);
+});
+
+test("a goal uses its date, or its fixed amount when it has no date", () => {
+  const trip = { ...none, kind: "goal" as const, target: 10_000, targetDate: "2026-12-01" };
+  expect(monthlyAmount(trip, 10, month, 10)).toBe(5_000);
+  const steady = { ...none, kind: "goal" as const, target: 50_000, fixedAmount: 2_500 };
+  expect(monthlyAmount(steady, 40_000, month, 10)).toBe(2_500);
+  expect(monthlyAmount(steady, 49_000, month, 10)).toBe(1_000);
+  expect(monthlyAmount(steady, 60_000, month, 10)).toBe(0);
+});
+
+test("the emergency amount is the rate of the fill months, but not more than the shortfall", () => {
+  const fund = { ...none, kind: "emergency" as const, target: 1_000_000, fillMonths: 12 };
+  expect(monthlyAmount(fund, 0, month, 10)).toBe(83_340);
+  expect(monthlyAmount(fund, 960_000, month, 10)).toBe(40_000);
+  expect(monthlyAmount(fund, 1_200_000, month, 10)).toBe(0);
+  expect(monthlyAmount({ ...fund, target: 0 }, 0, month, 10)).toBe(0);
+});
+
+test("the share of a shortfall rounds up to a whole minor unit", () => {
   expect(roundUpShare(9_000, 0, 10)).toBe(9_000);
-  const incomes = [income("pay", "2026-10-01")];
-  const buckets = [sinking("tax", 1, 1_000, 10_000, "2026-10-01"), goal("trip", 2, 0, 5_000, "2026-10-01", null)];
-  expect(
-    fundingProposal({
-      paycheckPlanId: "pay",
-      step: 10,
-      paycheckDate: "2026-10-01",
-      paycheckAmount: 100_000,
-      unassigned: 100_000,
-      incomes,
-      buckets,
-    }),
-  ).toEqual([
-    { bucketId: "tax", amount: 9_000 },
-    { bucketId: "trip", amount: 5_000 },
-  ]);
-  expect(
-    fundingProposal({
-      paycheckPlanId: "pay",
-      step: 10,
-      paycheckDate: "2026-10-01",
-      paycheckAmount: 100_000,
-      unassigned: 4_000,
-      incomes,
-      buckets: [buckets[0]!],
-    }),
-  ).toEqual([{ bucketId: "tax", amount: 4_000 }]);
+  expect(roundUpShare(9_000, 3, 10)).toBe(3_000);
+  expect(roundUpShare(100, 3, 10)).toBe(40);
+  expect(roundUpShare(-5, 3, 10)).toBe(0);
 });
 
 test("a card purchase does not change Unassigned while the bucket stays positive", () => {
@@ -104,106 +80,4 @@ test("a card purchase does not change Unassigned while the bucket stays positive
   const afterPurchase = unassigned(200_000 - 20_000, 50_000 - 20_000, 0);
   expect(afterPurchase).toBe(before);
   expect(unassigned(200_000, 50_000, 0) - unassigned(180_000, 50_000, 0)).toBe(20_000);
-});
-
-test("the proposal funds the lower priority number first", () => {
-  const lines = fundingProposal({
-    paycheckPlanId: "pay",
-    step: 10,
-    paycheckDate: "2026-10-01",
-    paycheckAmount: 100_000,
-    unassigned: 100_000,
-    incomes: october,
-    buckets: [spending("later", 5, 0, 40_000), spending("sooner", 1, 0, 30_000), spending("tie-b", 1, 0, 10_000), spending("tie-a", 1, 0, 10_000)],
-  });
-  expect(lines.map((line) => line.bucketId)).toEqual(["sooner", "tie-a", "tie-b", "later"]);
-});
-
-test("sinking and goal amounts use the remaining paychecks and round up", () => {
-  expect(roundUpShare(9_000, 3, 10)).toBe(3_000);
-  expect(roundUpShare(100, 3, 10)).toBe(40);
-  const first = fundingProposal({
-    paycheckPlanId: "pay",
-    step: 10,
-    paycheckDate: "2026-10-01",
-    paycheckAmount: 1_000_000,
-    unassigned: 1_000_000,
-    incomes: october,
-    buckets: [
-      sinking("tax", 1, 1_000, 10_000, "2026-11-01"),
-      goal("trip", 2, 10, 10_000, "2026-11-01", null),
-      goal("steady", 3, 0, 50_000, null, 2_500),
-    ],
-  });
-  expect(first).toEqual([
-    { bucketId: "tax", amount: 3_000 },
-    { bucketId: "trip", amount: 3_330 },
-    { bucketId: "steady", amount: 2_500 },
-  ]);
-  const second = fundingProposal({
-    paycheckPlanId: "pay",
-    step: 10,
-    paycheckDate: "2026-10-15",
-    paycheckAmount: 1_000_000,
-    unassigned: 1_000_000,
-    incomes: october,
-    buckets: [
-      spending("food", 0, 400, 1_000),
-      sinking("tax", 1, 1_000, 10_000, "2026-11-01"),
-      goal("trip", 2, 10, 10_000, "2026-11-01", null),
-    ],
-  });
-  expect(second).toEqual([
-    { bucketId: "tax", amount: 4_500 },
-    { bucketId: "trip", amount: 5_000 },
-  ]);
-  expect(
-    fundingProposal({
-      paycheckPlanId: "pay",
-      step: 10,
-      paycheckDate: "2026-10-01",
-      paycheckAmount: 1_000_000,
-      unassigned: 1_000_000,
-      incomes: october,
-      buckets: [spending("food", 0, 400, 1_000)],
-    }),
-  ).toEqual([{ bucketId: "food", amount: 600 }]);
-});
-
-test("the proposal stops at the smaller of the paycheck and Unassigned", () => {
-  const buckets = [spending("food", 1, 0, 3_000), spending("fuel", 2, 0, 3_000)];
-  const byPaycheck = fundingProposal({
-    paycheckPlanId: "pay",
-    step: 10,
-    paycheckDate: "2026-10-01",
-    paycheckAmount: 4_000,
-    unassigned: 10_000,
-    incomes: october,
-    buckets,
-  });
-  const byFree = fundingProposal({
-    paycheckPlanId: "pay",
-    step: 10,
-    paycheckDate: "2026-10-01",
-    paycheckAmount: 10_000,
-    unassigned: 4_000,
-    incomes: october,
-    buckets,
-  });
-  expect(byPaycheck).toEqual([
-    { bucketId: "food", amount: 3_000 },
-    { bucketId: "fuel", amount: 1_000 },
-  ]);
-  expect(byFree).toEqual(byPaycheck);
-  expect(
-    fundingProposal({
-      paycheckPlanId: "pay",
-      step: 10,
-      paycheckDate: "2026-10-01",
-      paycheckAmount: 5_000,
-      unassigned: 0,
-      incomes: october,
-      buckets,
-    }),
-  ).toEqual([]);
 });

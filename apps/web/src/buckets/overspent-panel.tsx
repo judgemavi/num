@@ -1,7 +1,6 @@
 import type { OverspentBucket } from "@num/shared";
-import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { overspentQuery, useCoverBucket } from "@/api/buckets";
-import { fundingPositionQuery } from "@/api/funding";
+import { useOverspent } from "@/buckets/use-overspent";
+import { useCoverBucket } from "@/api/buckets";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
 import { SidePanel } from "@/components/side-panel";
@@ -11,16 +10,17 @@ import { useActiveBuckets } from "@/editors/lookups";
 import { useAppForm } from "@/forms/form-hook";
 
 /**
- * The overspent buckets, and the control that covers each one with money from a second bucket.
- * The panel reads the overspent buckets. Each row keeps its choice and does the write.
+ * The buckets that stay below zero after the fill, and the control that covers each one with money from a second
+ * bucket. The fill covers a negative bucket from Unassigned, thus the panel shows only what Unassigned could not
+ * cover (decision 0059).
  */
 export function OverspentPanel() {
-  // Each row reads Unassigned. That read starts here, together with the read of the overspent buckets.
-  usePrefetchQuery(fundingPositionQuery(localAsOf()));
-  const { data: items } = useSuspenseQuery(overspentQuery());
+  const items = useOverspent();
+  if (items.length === 0) {
+    return null;
+  }
   return (
-    <SidePanel title="Overspent" text="Cover it from another bucket or from Unassigned.">
-      {items.length === 0 ? <p className="text-sm text-muted-foreground">No bucket is overspent.</p> : null}
+    <SidePanel title="Overspent" text="Unassigned could not cover these buckets. Move money from another bucket, or release money from a bucket to Unassigned.">
       {items.map((item) => (
         <CoverRow key={item.id} item={item} />
       ))}
@@ -28,21 +28,14 @@ export function OverspentPanel() {
   );
 }
 
-/** The choice of the select that takes the money from Unassigned. A bucket choice is a bucket id. */
-const unassigned = "unassigned";
-
 /** One overspent bucket. The row does its own write. A cover that fails shows an error toast. */
 function CoverRow({ item }: { item: OverspentBucket }) {
   const cover = useCoverBucket();
-  const asOf = localAsOf();
-  const { data: position } = useSuspenseQuery(fundingPositionQuery(asOf));
   const need = -item.balance;
-  const fromUnassigned = position.unassigned >= need;
   const options = useActiveBuckets().items.filter((bucket) => bucket.id !== item.id && bucket.balance >= need);
   const form = useAppForm({
     defaultValues: { fromBucketId: "" },
-    onSubmit: ({ value }) =>
-      cover.mutate({ id: item.id, asOf, body: { fromBucketId: value.fromBucketId === unassigned ? null : value.fromBucketId, date: asOf } }),
+    onSubmit: ({ value }) => cover.mutate({ id: item.id, body: { fromBucketId: value.fromBucketId, date: localAsOf() } }),
   });
   return (
     <div className="grid gap-2 border-t pt-3 first:border-t-0 first:pt-0">
@@ -52,8 +45,8 @@ function CoverRow({ item }: { item: OverspentBucket }) {
           Over by <Amount value={need} />
         </span>
       </p>
-      {options.length === 0 && !fromUnassigned ? (
-        <p className="text-sm text-muted-foreground">No other bucket and not enough Unassigned money can cover this.</p>
+      {options.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No other bucket has enough to cover this.</p>
       ) : (
         <form.Field name="fromBucketId">
           {(field) => (
@@ -63,7 +56,6 @@ function CoverRow({ item }: { item: OverspentBucket }) {
                   <SelectValue placeholder="Cover from" />
                 </SelectTrigger>
                 <SelectContent>
-                  {fromUnassigned ? <SelectItem value={unassigned}>Unassigned</SelectItem> : null}
                   {options.map((bucket) => (
                     <SelectItem key={bucket.id} value={bucket.id}>
                       {bucket.name}

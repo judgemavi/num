@@ -1,4 +1,4 @@
-import { bucketCategories, bucketEvents, fundingRuns } from "@num/db";
+import { bucketCategories, bucketEvents } from "@num/db";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
 import { createAccount } from "./accounts";
@@ -19,7 +19,6 @@ test("bucket balance is funds, moves, releases and category lines", () => {
       ...saved,
     });
     const groceries = expense(book.db, "Groceries");
-    const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
     const food = spending(book.db, "Groceries", [groceries.id]);
     const other = spending(book.db, "Other", []);
     createBucketEvent(book.db, food.id, { kind: "fund", amount: 100_000, date: "2026-03-01", asOf: "2026-03-01", ...saved });
@@ -45,42 +44,19 @@ test("bucket balance is funds, moves, releases and category lines", () => {
     const removed = purchase(book.db, account.id, groceries.id, -5_000, "2026-03-08");
     deleteTransaction(book.db, removed.id, saved);
 
-    const income = purchase(book.db, account.id, pay.id, 1_000, "2026-03-09");
-    const activeRun = crypto.randomUUID();
-    const undoneRun = crypto.randomUUID();
-    book.db
-      .insert(fundingRuns)
-      .values([
-        { id: activeRun, incomeTransactionId: income.id, date: "2026-03-09", createdAt: at, undoneAt: null },
-        { id: undoneRun, incomeTransactionId: income.id, date: "2026-03-10", createdAt: at, undoneAt: at },
-      ])
-      .run();
     book.db
       .insert(bucketEvents)
-      .values([
-        {
-          id: crypto.randomUUID(),
-          kind: "fund",
-          bucketId: food.id,
-          otherBucketId: null,
-          amount: 1_000,
-          date: "2026-03-09",
-          note: null,
-          fundingRunId: activeRun,
-          undoneAt: null,
-        },
-        {
-          id: crypto.randomUUID(),
-          kind: "fund",
-          bucketId: food.id,
-          otherBucketId: null,
-          amount: 88_880,
-          date: "2026-03-10",
-          note: null,
-          fundingRunId: undoneRun,
-          undoneAt: null,
-        },
-      ])
+      .values({
+        id: crypto.randomUUID(),
+        kind: "fund",
+        bucketId: food.id,
+        otherBucketId: null,
+        amount: 1_000,
+        date: "2026-03-09",
+        note: null,
+        month: "2026-03",
+        undoneAt: null,
+      })
       .run();
 
     expect(readBucket(book.db, food.id).balance).toBe(49_000 + 1_000);
@@ -147,6 +123,8 @@ test("each expense category is in one bucket only", () => {
       target: null,
       targetDate: null,
       fixedAmount: null,
+      months: null,
+      fillMonths: null,
       startDate: "2000-01-01",
       ...saved,
     });
@@ -165,6 +143,8 @@ test("each expense category is in one bucket only", () => {
       target: null,
       targetDate: null,
       fixedAmount: null,
+      months: null,
+      fillMonths: null,
       startDate: "2000-01-01",
       ...saved,
     });
@@ -230,6 +210,8 @@ test("kind fields that do not match the kind are rejected", () => {
           target: null,
           targetDate: null,
           fixedAmount: null,
+          months: null,
+          fillMonths: null,
           asOf: "2000-01-01",
           ...saved,
         }),
@@ -252,6 +234,8 @@ test("kind fields that do not match the kind are rejected", () => {
           target: 1_000,
           targetDate: "2027-06-01",
           fixedAmount: 200,
+          months: null,
+          fillMonths: null,
           asOf: "2000-01-01",
           ...saved,
         }),

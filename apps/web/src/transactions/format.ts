@@ -55,8 +55,6 @@ export function transactionError(code: ErrorCode | undefined): string {
       return "Change this amount on the other side of the transfer.";
     case "mirror_one_line":
       return "This side of the transfer has one line.";
-    case "paycheck_funded":
-      return "Undo the funding first.";
     case "payee_raw_locked":
       return "The description of an imported transaction does not change.";
     case "account_archived":

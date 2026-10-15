@@ -1,8 +1,8 @@
 import type { BucketKind } from "@num/shared";
 import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { bucketEventsQuery, bucketListQuery, overspentQuery } from "@/api/buckets";
-import { fundingPositionQuery, fundingRunsQuery } from "@/api/funding";
+import { bucketEventsQuery, bucketListQuery, emergencyFundQuery, overspentQuery } from "@/api/buckets";
+import { fundingMonthsQuery, fundingOwedQuery, fundingPositionQuery } from "@/api/funding";
 import { monthPlanQuery } from "@/api/plan";
 import { localAsOf } from "@/as-of";
 import { ActivityList } from "@/buckets/activity-list";
@@ -10,6 +10,7 @@ import { BucketRow } from "@/buckets/bucket-row";
 import { BucketFilterBar } from "@/buckets/filters";
 import { FundingHistory } from "@/buckets/funding-history";
 import { OverspentPanel } from "@/buckets/overspent-panel";
+import { useOverspent } from "@/buckets/use-overspent";
 import { useBucketBoard, useBucketSearch } from "@/buckets/use-board";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
@@ -26,6 +27,7 @@ import { GoalFeasibility } from "@/plan/month-board";
 const groupOrder: { kind: BucketKind; label: string }[] = [
   { kind: "spending", label: "Spending" },
   { kind: "sinking", label: "Saving for bills" },
+  { kind: "emergency", label: "Emergency fund" },
   { kind: "goal", label: "Goals" },
 ];
 
@@ -36,7 +38,9 @@ export function BucketsScreen() {
   usePrefetchQuery(fundingPositionQuery(asOf));
   usePrefetchQuery(monthPlanQuery(asOf));
   usePrefetchQuery(overspentQuery());
-  usePrefetchQuery(fundingRunsQuery());
+  usePrefetchQuery(emergencyFundQuery(asOf));
+  usePrefetchQuery(fundingOwedQuery(asOf));
+  usePrefetchQuery(fundingMonthsQuery());
   usePrefetchQuery(bucketEventsQuery());
   return (
     <Boundary loading="Loading buckets." failed="The buckets did not load.">
@@ -44,17 +48,23 @@ export function BucketsScreen() {
       <BucketFilterBar />
       <BucketsSummary />
       <GoalFeasibility />
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
-        <div className="grid gap-5">
-          <BucketList />
-          <FundingHistory />
-          <ActivityList />
-        </div>
-        <Boundary loading="Loading the overspent buckets." failed="The overspent buckets did not load.">
-          <OverspentPanel />
-        </Boundary>
-      </div>
+      <BucketsBody />
     </Boundary>
+  );
+}
+
+/** The lists. The Overspent panel has a column only while Unassigned is below zero and a bucket is overspent. */
+function BucketsBody() {
+  const overspent = useOverspent();
+  return (
+    <div className={`grid items-start gap-5 ${overspent.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_336px]" : ""}`}>
+      <div className="grid gap-5">
+        <BucketList />
+        <FundingHistory />
+        <ActivityList />
+      </div>
+      <OverspentPanel />
+    </div>
   );
 }
 
@@ -67,9 +77,6 @@ function BucketsHeader() {
       title="Buckets"
       actions={
         <>
-          <Button type="button" variant="secondary" onClick={() => void openEditor("fundPaycheck", {})}>
-            Fund this paycheck
-          </Button>
           <Button type="button" variant="secondary" onClick={() => void openEditor("moveMoney", { fromId: null })}>
             Move money
           </Button>
@@ -87,7 +94,7 @@ function BucketsSummary() {
   const currency = useBookCurrency();
   const rows = useBucketBoard().board.items;
   const { data: position } = useSuspenseQuery(fundingPositionQuery(localAsOf()));
-  const { data: overspent } = useSuspenseQuery(overspentQuery());
+  const overspent = useOverspent();
   const spending = rows.filter((bucket) => bucket.kind === "spending");
   const spendingLeft = spending.reduce((sum, bucket) => sum + bucket.balance, 0);
   const spendingTarget = spending.reduce((sum, bucket) => sum + (bucket.refillTo ?? 0), 0);

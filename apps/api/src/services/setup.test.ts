@@ -37,23 +37,26 @@ function names(sqlite: ReturnType<typeof tempDatabase>["sqlite"], table: string)
 test("setup runs only one time", () => {
   const db = tempDatabase();
   try {
-    const first = runSetup(db.db, { currency: "CAD", categorySet: "default", source: "ui", at });
+    const first = runSetup(db.db, { asOf: "2026-10-07", currency: "CAD", categorySet: "default", source: "ui", at });
     expect(first).toEqual({ currency: "CAD", categorySet: "default" });
     expect(names(db.sqlite, "categories").sort()).toEqual(categoryNames().sort());
     expect(db.sqlite.query("select id from accounts").all()).toEqual([]);
     expect(db.sqlite.query("select key, value from settings order by key").all()).toEqual([
       { key: "bufferAmount", value: "0" },
       { key: "currency", value: "CAD" },
-      { key: "emergencyFundMonths", value: "3" },
       { key: "recurringGraceDays", value: "3" },
       { key: "staleImportDays", value: "10" },
     ]);
 
+    expect(db.sqlite.query("select name, kind, essential, start_date, months, fill_months from buckets").all()).toEqual([
+      { name: "Emergency fund", kind: "emergency", essential: 1, start_date: "2026-10-07", months: 3, fill_months: 12 },
+    ]);
+
     expect(() =>
-      runSetup(db.db, { currency: "JPY", categorySet: "none", source: "ui", at }),
+      runSetup(db.db, { asOf: "2026-10-07", currency: "JPY", categorySet: "none", source: "ui", at }),
     ).toThrow(ServiceError);
     try {
-      runSetup(db.db, { currency: "JPY", categorySet: "none", source: "ui", at });
+      runSetup(db.db, { asOf: "2026-10-07", currency: "JPY", categorySet: "none", source: "ui", at });
     } catch (error) {
       expect(error).toBeInstanceOf(ServiceError);
       if (error instanceof ServiceError) {
@@ -72,7 +75,7 @@ test("setup runs only one time", () => {
 test("a book can start with no categories", () => {
   const db = tempDatabase();
   try {
-    runSetup(db.db, { currency: "JPY", categorySet: "none", source: "ui", at });
+    runSetup(db.db, { asOf: "2026-10-07", currency: "JPY", categorySet: "none", source: "ui", at });
     expect(db.sqlite.query("select id from categories").all()).toEqual([]);
     expect(db.sqlite.query("select id from category_groups").all()).toEqual([]);
     expect(db.sqlite.query("select id from accounts").all()).toEqual([]);
@@ -84,7 +87,7 @@ test("a book can start with no categories", () => {
 test("a currency change after the first transaction is a relabel and keeps the stored amounts", () => {
   const db = tempDatabase();
   try {
-    runSetup(db.db, { currency: "JPY", categorySet: "none", source: "ui", at });
+    runSetup(db.db, { asOf: "2026-10-07", currency: "JPY", categorySet: "none", source: "ui", at });
     expect(changeCurrency(db.db, { currency: "CAD", source: "ui", at })).toEqual({ currency: "CAD" });
 
     const accountId = crypto.randomUUID();

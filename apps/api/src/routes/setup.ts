@@ -1,5 +1,6 @@
 import {
   aiAccessSettingSchema,
+  asOfQuerySchema,
   aiAccessUpdateSchema,
   currencyUpdateSchema,
   setupRequestSchema,
@@ -36,6 +37,7 @@ const setupRoute = createRoute({
   method: "post",
   path: "/api/setup",
   request: {
+    query: asOfQuerySchema,
     body: {
       required: true,
       content: {
@@ -144,7 +146,7 @@ export function setupRoutes(db: Db) {
     .openapi(setupStatusRoute, (c) => c.json(setupStatus(db), 200))
     .openapi(setupRoute, (c) => {
       const body = c.req.valid("json");
-      return c.json(runSetup(db, { ...body, source: "ui" }), 200);
+      return c.json(runSetup(db, { ...body, asOf: c.req.valid("query").asOf, source: "ui" }), 200);
     })
     .openapi(currencyReadRoute, (c) => c.json(bookCurrency(db), 200))
     .openapi(currencyRoute, (c) => {

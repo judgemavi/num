@@ -44,7 +44,7 @@ function tempBook() {
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
-  runSetup(db, { currency: "CAD", categorySet: "default", ...saved });
+  runSetup(db, { asOf: "2026-10-07", currency: "CAD", categorySet: "default", ...saved });
   const app = createApp(db, { dataDir: dir });
   return {
     dir,
@@ -139,6 +139,8 @@ function seed(db: Db, dir: string) {
     target: null,
     targetDate: null,
     fixedAmount: null,
+    months: null,
+    fillMonths: null,
     asOf: "2000-01-01",
     ...saved,
   });

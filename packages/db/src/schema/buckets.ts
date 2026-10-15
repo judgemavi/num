@@ -1,8 +1,6 @@
-import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { bucketColors, bucketEventKinds, bucketIcons, bucketKinds, sinkingRepeats } from "@num/shared";
 import { categories } from "./categories";
-import { transactions } from "./ledger";
 
 export const buckets = sqliteTable(
   "buckets",
@@ -23,6 +21,8 @@ export const buckets = sqliteTable(
     target: integer("target"),
     targetDate: text("target_date"),
     fixedAmount: integer("fixed_amount"),
+    months: integer("months"),
+    fillMonths: integer("fill_months"),
     /** The folded name (`foldName`). The list sorts by it. */
     sortKey: text("sort_key").notNull(),
   },
@@ -39,24 +39,11 @@ export const bucketCategories = sqliteTable("bucket_categories", {
     .references(() => buckets.id),
 });
 
-export const fundingRuns = sqliteTable(
-  "funding_runs",
-  {
-    id: text("id").primaryKey(),
-    incomeTransactionId: text("income_transaction_id")
-      .notNull()
-      .references(() => transactions.id),
-    date: text("date").notNull(),
-    createdAt: text("created_at").notNull(),
-    undoneAt: text("undone_at"),
-  },
-  (table) => [
-    uniqueIndex("funding_runs_income_active")
-      .on(table.incomeTransactionId)
-      .where(sql`${table.undoneAt} is null`),
-  ],
-);
-export type FundingRunRow = typeof fundingRuns.$inferSelect;
+/** A month whose funding the user undid. The fill does not pay a held month (decision 0059). */
+export const monthHolds = sqliteTable("month_holds", {
+  month: text("month").primaryKey(),
+  createdAt: text("created_at").notNull(),
+});
 
 export const bucketEvents = sqliteTable(
   "bucket_events",
@@ -70,7 +57,8 @@ export const bucketEvents = sqliteTable(
     amount: integer("amount").notNull(),
     date: text("date").notNull(),
     note: text("note"),
-    fundingRunId: text("funding_run_id").references(() => fundingRuns.id),
+    /** The month (YYYY-MM) that the fill paid. Null for an event of the user. */
+    month: text("month"),
     undoneAt: text("undone_at"),
   },
   (table) => [index("bucket_events_bucket").on(table.bucketId)],

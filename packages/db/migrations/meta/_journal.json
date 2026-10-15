@@ -92,6 +92,13 @@
       "when": 1792021510030,
       "tag": "0012_bank_balances",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1792033696710,
+      "tag": "0013_monthly_funding",
+      "breakpoints": true
     }
   ]
 }

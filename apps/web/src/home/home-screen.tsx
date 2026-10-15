@@ -1,15 +1,14 @@
 import { notifyManager, useQueryClient, useSuspenseQueries } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import { bankStatusesQuery } from "@/api/bank-balances";
-import { overspentQuery } from "@/api/buckets";
-import { fundingPaychecksQuery } from "@/api/funding";
 import { hygieneQuery } from "@/api/insights";
 import { recurringSignalsQuery } from "@/api/recurring";
 import { reviewSummaryQuery } from "@/api/review";
 import { localAsOf } from "@/as-of";
 import { Boundary } from "@/components/boundary";
 import { PageHeader } from "@/components/page-header";
-import { BankMismatchCard, ForecastStrip, MissedPaymentsCard, MonthPlanCards, NetWorthCard, OverspentCard, PaychecksCard, ReviewCard, SpendingChangesCard } from "@/home/home-cards";
+import { OverspentPanel } from "@/buckets/overspent-panel";
+import { BankMismatchCard, ForecastStrip, MissedPaymentsCard, MonthPlanCards, NetWorthCard, ReviewCard, SpendingChangesCard, StillOwedCard } from "@/home/home-cards";
 import { HygienePanel } from "@/insights/hygiene-panel";
 
 /**
@@ -38,14 +37,14 @@ export function HomeScreen() {
       <Boundary loading="Loading the plan of the month." failed="The plan of the month did not load.">
         <MonthPlanCards />
       </Boundary>
-      <Boundary loading={null} failed="The paychecks did not load.">
-        <PaychecksCard />
+      <Boundary loading={null} failed="The amounts that buckets still owe did not load.">
+        <StillOwedCard />
       </Boundary>
       <Boundary loading={null} failed="The missed payments did not load.">
         <MissedPaymentsCard />
       </Boundary>
       <Boundary loading={null} failed="The overspent buckets did not load.">
-        <OverspentCard />
+        <OverspentPanel />
       </Boundary>
       <Boundary loading="Loading the spending changes." failed="The spending changes did not load.">
         <SpendingChangesCard />
@@ -59,7 +58,7 @@ export function HomeScreen() {
 
 /** The reads of the kicker. The cards do the same reads. */
 function kickerReads(asOf: string) {
-  return [hygieneQuery(asOf), reviewSummaryQuery(asOf), fundingPaychecksQuery(), recurringSignalsQuery(asOf), overspentQuery(), bankStatusesQuery()] as const;
+  return [hygieneQuery(asOf), reviewSummaryQuery(asOf), recurringSignalsQuery(asOf), bankStatusesQuery()] as const;
 }
 
 /**
@@ -83,10 +82,10 @@ function HomeKickerPlace() {
 
 /** "All clear" when no card needs the person. It reads the same data as the cards, from the cache. */
 function HomeKicker() {
-  const [{ data: hygiene }, { data: review }, { data: paychecks }, { data: signals }, { data: overspent }, { data: bank }] = useSuspenseQueries({
+  const [{ data: hygiene }, { data: review }, { data: signals }, { data: bank }] = useSuspenseQueries({
     queries: kickerReads(localAsOf()),
   });
   const clear =
-    review.total === 0 && hygiene.checks.every((item) => item.pass) && paychecks.every((item) => item.kept) && signals.missed.length === 0 && overspent.length === 0 && bank.items.every((item) => item.difference === 0);
+    review.total === 0 && hygiene.checks.every((item) => item.pass) && signals.missed.length === 0 && bank.items.every((item) => item.difference === 0);
   return clear ? "All clear" : "This week";
 }

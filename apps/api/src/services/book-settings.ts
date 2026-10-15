@@ -5,7 +5,7 @@ import { decidedKeys } from "./decision-keys";
 
 export function settingNumber(
   db: Db,
-  key: "staleImportDays" | "recurringGraceDays" | "emergencyFundMonths",
+  key: "staleImportDays" | "recurringGraceDays",
   fallback: number,
 ): number {
   const row = db.select().from(settings).where(eq(settings.key, key)).get();

@@ -206,7 +206,7 @@ export function PlanForm({ draft, initialKind = "bill" }: { draft: Plan | PlanSe
               </form.AppField>
               <form.AppField name="shift">{(field) => <field.SelectField id="plan-shift" label="Weekend" options={shiftOptions} />}</form.AppField>
               <form.AppField name="endDate">{(field) => <field.DateInputField id="plan-end" label="Ends" />}</form.AppField>
-              {kind === "income" ? <form.AppField name="fundsBuckets">{(field) => <field.SwitchField id="plan-funds" label="This paycheck funds buckets" />}</form.AppField> : null}
+              {kind === "income" ? <form.AppField name="fundsBuckets">{(field) => <field.SwitchField id="plan-funds" label="Reserve bills until this paycheck" />}</form.AppField> : null}
             </CollapsibleContent>
           </Collapsible>
           <form.FormError invalid="Check the details and try again." />

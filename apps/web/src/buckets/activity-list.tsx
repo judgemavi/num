@@ -15,6 +15,7 @@ const kindLabel = {
   fund: "Fund",
   move: "Move",
   release: "Release",
+  cover: "Covered from Unassigned",
 } as const;
 
 export function ActivityList() {
@@ -62,13 +63,13 @@ function Activity() {
                   {kindLabel[event.kind]}
                   <small>
                     {detail}
-                    {event.fundingRunId ? " · Undo is with the paycheck" : ""}
+                    {event.month ? " · Undo is in the funding history" : ""}
                   </small>
                 </div>
                 <div className={listAmt}>
                   <Amount value={event.amount} />
                 </div>
-                {event.fundingRunId ? null : (
+                {event.month || event.kind === "cover" ? null : (
                   <RowMenu label={`Actions for ${kindLabel[event.kind]}`}>
                     <DropdownMenuItem className="min-h-11" onSelect={() => void undo(event)}>
                       Undo

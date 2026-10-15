@@ -17,6 +17,7 @@ export function tempDatabase() {
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   return {
+    dir,
     db,
     close() {
       sqlite.close();
@@ -59,6 +60,8 @@ export function spending(db: Db, name: string, categoryIds: string[], refillTo =
     target: null,
     targetDate: null,
     fixedAmount: null,
+    months: null,
+    fillMonths: null,
     asOf: "2000-01-01",
     ...saved,
   });

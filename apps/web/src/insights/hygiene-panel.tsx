@@ -12,8 +12,7 @@ import { formatMoney } from "@/money";
 
 function detail(check: HygieneCheck, currency: string) {
   if (check.code === "emergency_fund") {
-    const place = check.source === "goals" ? "essential goals" : "savings accounts";
-    return `${formatMoney(currency, check.held)} in ${place} · ${check.months} months needs ${formatMoney(currency, check.need)}`;
+    return `${formatMoney(currency, check.balance)} saved · ${check.months} ${check.months === 1 ? "month" : "months"} of ${formatMoney(currency, check.monthly)} is ${formatMoney(currency, check.target)}`;
   }
   if (check.code === "imports_current") {
     const stale = check.items.filter((item) => !item.pass);
@@ -59,10 +58,10 @@ function detail(check: HygieneCheck, currency: string) {
     }
     return `${check.missed} missed ${check.missed === 1 ? "payment" : "payments"} under This month on Home.`;
   }
-  if (check.count === 0) {
-    return "No bucket is below zero.";
+  if (check.pass) {
+    return check.count === 0 ? "No bucket is below zero." : `${check.count} below zero · Unassigned covers it.`;
   }
-  return `${check.count} below zero · ${signedMoney(currency, check.balance)}`;
+  return `Unassigned is ${signedMoney(currency, check.unassigned)}. It cannot cover ${check.count} ${check.count === 1 ? "bucket" : "buckets"} below zero.`;
 }
 
 const titles: Record<HygieneCheck["code"], string> = {

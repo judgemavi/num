@@ -42,7 +42,7 @@ const repeatOptions = [
 
 const goalOptions = [
   { value: "date", label: "By a date" },
-  { value: "paycheck", label: "A set amount each paycheck" },
+  { value: "month", label: "A set amount each month" },
 ] as const;
 
 /** The form of a bucket. A new bucket gets the next colour of the rotation and the priority after the last active bucket. */
@@ -90,27 +90,29 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
         </DialogHeader>
         <DialogBody>
           <form.AppField name="name">{(field) => <field.TextField id="bucket-name" label="Name" required />}</form.AppField>
-          <form.Field name="kind">
-            {(field) => (
-              <Field>
-                <FieldLabel>Kind</FieldLabel>
-                <RadioGroup
-                  value={field.state.value}
-                  className="grid gap-2"
-                  onValueChange={(value) => {
-                    const next = choiceIn(bucketKinds, value);
-                    if (next) {
-                      field.handleChange(next);
-                    }
-                  }}
-                >
-                  {kindChoices.map((choice) => (
-                    <ChoiceCard key={choice.value} value={choice.value} title={choice.title} description={choice.description} />
-                  ))}
-                </RadioGroup>
-              </Field>
-            )}
-          </form.Field>
+          {kind === "emergency" ? null : (
+            <form.Field name="kind">
+              {(field) => (
+                <Field>
+                  <FieldLabel>Kind</FieldLabel>
+                  <RadioGroup
+                    value={field.state.value}
+                    className="grid gap-2"
+                    onValueChange={(value) => {
+                      const next = choiceIn(bucketKinds, value);
+                      if (next) {
+                        field.handleChange(next);
+                      }
+                    }}
+                  >
+                    {kindChoices.map((choice) => (
+                      <ChoiceCard key={choice.value} value={choice.value} title={choice.title} description={choice.description} />
+                    ))}
+                  </RadioGroup>
+                </Field>
+              )}
+            </form.Field>
+          )}
           {kind === "spending" ? (
             <form.AppField name="refillTo">
               {(field) => (
@@ -137,27 +139,62 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
               {goalMode === "date" ? (
                 <form.AppField name="targetDate">{(field) => <field.DateInputField id="bucket-target-date" label="Target date" required />}</form.AppField>
               ) : (
-                <form.AppField name="fixedAmount">{(field) => <field.MoneyField id="bucket-fixed" label="Each paycheck" required />}</form.AppField>
+                <form.AppField name="fixedAmount">{(field) => <field.MoneyField id="bucket-fixed" label="Each month" required />}</form.AppField>
               )}
             </>
           ) : null}
+          {kind === "emergency" ? (
+            <>
+              <form.AppField name="months">
+                {(field) => (
+                  <field.TextField
+                    id="bucket-months"
+                    label="Months to keep"
+                    inputMode="numeric"
+                    required
+                    description="The target is this number of months of your essential spending. The app calculates the spending."
+                  />
+                )}
+              </form.AppField>
+              <form.AppField name="fillMonths">
+                {(field) => (
+                  <field.TextField
+                    id="bucket-fill-months"
+                    label="Months to fill it"
+                    inputMode="numeric"
+                    required
+                    description="Each month adds an equal part, so an empty bucket is full after this many months."
+                  />
+                )}
+              </form.AppField>
+            </>
+          ) : null}
           <BucketPickers form={form} suggest={current === null} />
-          <form.Field name="categoryIds">
-            {(field) => <CategoryField bucketId={current?.id ?? null} selected={field.state.value} onChange={field.handleChange} />}
-          </form.Field>
+          {kind === "emergency" ? null : (
+            <form.Field name="categoryIds">
+              {(field) => <CategoryField bucketId={current?.id ?? null} selected={field.state.value} onChange={field.handleChange} />}
+            </form.Field>
+          )}
           <form.AppField name="startDate">
-            {(field) => <field.DateInputField id="bucket-start" label="Start date" required description="Spending in these categories counts from this date." />}
+            {(field) => (
+              <field.DateInputField
+                id="bucket-start"
+                label="Start date"
+                required
+                description={kind === "emergency" ? "The bucket is funded from the month of this date." : "The bucket is funded from the month of this date. Spending in these categories counts from this date."}
+              />
+            )}
           </form.AppField>
           <Collapsible open={more} onOpenChange={setMore}>
             <CollapsibleTrigger className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary">
               <ChevronRight className={`size-4 transition-transform ${more ? "rotate-90" : ""}`} aria-hidden="true" />
-              More options: priority, essential
+              {kind === "emergency" ? "More options: priority" : "More options: priority, essential"}
             </CollapsibleTrigger>
             <CollapsibleContent className="grid gap-4 pt-3">
               <form.AppField name="priority">
                 {(field) => <field.TextField id="bucket-priority" label="Priority" inputMode="numeric" required description="Lower numbers are funded first." />}
               </form.AppField>
-              <form.AppField name="essential">{(field) => <field.SwitchField id="bucket-essential" label="Essential" />}</form.AppField>
+              {kind === "emergency" ? null : <form.AppField name="essential">{(field) => <field.SwitchField id="bucket-essential" label="Essential" />}</form.AppField>}
             </CollapsibleContent>
           </Collapsible>
           <form.FormError />

@@ -184,7 +184,6 @@ export function DecisionNotes({ transactionId }: { transactionId: string }) {
       rows.filter(
         (row) =>
           (row.decision === "not_transfer" && row.itemKey.split(":").includes(transactionId)) ||
-          (row.decision === "keep_unassigned" && row.itemKey === `paycheck_funding:${transactionId}`) ||
           (row.decision === "keep_uncategorized" && row.itemKey === `uncategorized:${transactionId}`) ||
           (row.decision === "not_linked" && row.itemKey === `refund_link:${transactionId}`),
       ),

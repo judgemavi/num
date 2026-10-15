@@ -1,7 +1,6 @@
-import type { FundingRunCreate } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
-import { undoToast } from "@/components/undo-toast";
-import { api, formWrite, unwrap } from "@/api/client";
+import { api, unwrap } from "@/api/client";
+import { localAsOf } from "@/as-of";
 import { bucketError } from "@/buckets/format";
 
 /** The money that is not in a bucket. */
@@ -12,42 +11,46 @@ export function fundingPositionQuery(asOf: string) {
   });
 }
 
-/** The income deposits that can fund buckets. */
-export function fundingPaychecksQuery() {
+/** The monthly amount of each bucket for the month of `asOf`, and the amount that is still owed. */
+export function fundingOwedQuery(asOf: string) {
   return queryOptions({
-    queryKey: ["funding-paychecks"],
-    queryFn: async () => (await unwrap(api.funding.paychecks.$get())).items,
+    queryKey: ["funding-owed", asOf],
+    queryFn: () => unwrap(api.funding.owed.$get({ query: { asOf } })),
   });
 }
 
-/** The proposed amounts for one paycheck. */
-export function fundingProposalQuery(incomeTransactionId: string, asOf: string) {
+/** The funding of each month, with the months that the user undid. */
+export function fundingMonthsQuery() {
   return queryOptions({
-    queryKey: ["funding-proposal", incomeTransactionId, asOf],
-    queryFn: () => unwrap(api.funding.proposal.$get({ query: { asOf, incomeTransactionId } })),
+    queryKey: ["funding-months"],
+    queryFn: async () => (await unwrap(api.funding.months.$get())).items,
   });
 }
 
-export function fundingRunsQuery() {
-  return queryOptions({
-    queryKey: ["funding-runs"],
-    queryFn: async () => (await unwrap(api.funding.runs.$get())).items,
-  });
+/** True when the answer of a fill shows a payment or a new emergency bucket. The rule in `main.tsx` reads only such a fill. */
+export function fillPaid(result: unknown): boolean {
+  return typeof result === "object" && result !== null && "payments" in result && "madeBucket" in result && (result.payments !== 0 || result.madeBucket === true);
 }
 
-/** Assign a paycheck to buckets. */
-export function useFundPaycheck() {
-  const undo = useUndoFundingRun();
+/** The automatic fill (decision 0059). The browser sends the date of today. */
+export function useFill() {
   return useMutation({
-    meta: formWrite,
-    mutationFn: ({ asOf, body }: { asOf: string; body: FundingRunCreate }) => unwrap(api.funding.runs.$post({ query: { asOf }, json: body })),
-    onSuccess: (run) => undoToast("Paycheck funded.", () => undo.mutate(run.id)),
+    meta: { fill: true },
+    mutationFn: () => unwrap(api.funding.fill.$post({ query: { asOf: localAsOf() } })),
   });
 }
 
-export function useUndoFundingRun() {
+/** Pay a month again after the user undid its funding. */
+export function useFundAgain() {
   return useMutation({
     meta: { errorText: bucketError },
-    mutationFn: (id: string) => unwrap(api.funding.runs[":id"].undo.$post({ param: { id } })),
+    mutationFn: (month: string) => unwrap(api.funding.months[":month"].again.$post({ param: { month }, query: { asOf: localAsOf() } })),
+  });
+}
+
+export function useUndoMonthFunding() {
+  return useMutation({
+    meta: { errorText: bucketError },
+    mutationFn: (month: string) => unwrap(api.funding.months[":month"].undo.$post({ param: { month } })),
   });
 }

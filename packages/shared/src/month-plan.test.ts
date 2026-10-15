@@ -46,9 +46,12 @@ function goal(id: string, target: number, targetDate: string | null, fixedAmount
     refillTo: null,
     amount: null,
     dueDate: null,
+    repeat: null,
     target,
     targetDate,
     fixedAmount,
+    fillMonths: null,
+    startDate: "2000-01-01",
     actualFunded: 0,
   };
 }
@@ -69,9 +72,8 @@ test("monthly totals count weekly, biweekly and monthly occurrences, including a
       income("other", 500, schedule("2026-01-20", "monthly", 1, 20), false),
     ],
   });
-  expect(january.paycheckCount).toBe(5 + 3 + 1);
   expect(january.income.planned).toBe(1_000 * 5 + 1_000 * 3 + 1_000 + 500);
-  expect(january.funding.items.find((item) => item.bucketId === "save")).toMatchObject({ perPaycheck: 100, paychecks: 9, planned: 900 });
+  expect(january.funding.items.find((item) => item.bucketId === "save")).toMatchObject({ planned: 100 });
 
   const february = buildMonthPlan({
     month: "2026-02",
@@ -81,7 +83,6 @@ test("monthly totals count weekly, biweekly and monthly occurrences, including a
     buckets: [],
     plans: [income("two-weeks", 1_000, biweekly)],
   });
-  expect(february.paycheckCount).toBe(2);
   expect(february.income.planned).toBe(2_000);
 });
 
@@ -104,7 +105,8 @@ test("variable income uses the median of the last 6, and the plan amount when fe
     plans: [income("pay", 10_000, biweekly, true, "variable")],
   });
   expect(month.income.planned).toBe(2_500 * 3);
-  expect(month.feasibility?.expectedPaycheck).toBe(500);
+  // 26 safe amounts of 500 in 12 months, divided by 12, rounded to a cent.
+  expect(month.feasibility?.income).toBe(1_080);
 
   const few = buildMonthPlan({
     month: "2026-01",
@@ -129,7 +131,7 @@ test("variable income uses the median of the last 6, and the plan amount when fe
     plans: [income("pay", 100_000, biweekly), bill("power", 10_000, schedule("2026-02-15", "monthly", 1, 15), "variable")],
   });
   expect(power.bills.planned).toBe(3_000);
-  expect(power.feasibility?.billsEach).toBe(2_500);
+  expect(power.feasibility?.bills).toBe(5_000);
 });
 
 test("a shortfall shows a later date that fits and the amount to cut elsewhere", () => {
@@ -142,11 +144,14 @@ test("a shortfall shows a later date that fits and the amount to cut elsewhere",
     archived: false,
     balance: 0,
     refillTo: null,
-    amount: 800_000,
+    amount: 1_200_000,
     dueDate: "2026-02-28",
+    repeat: null,
     target: null,
     targetDate: null,
     fixedAmount: null,
+    fillMonths: null,
+    startDate: "2000-01-01",
     actualFunded: 0,
   };
   const month = buildMonthPlan({
@@ -172,26 +177,62 @@ test("a shortfall shows a later date that fits and the amount to cut elsewhere",
         refillTo: 400_000,
         amount: null,
         dueDate: null,
+        repeat: null,
         target: null,
         targetDate: null,
         fixedAmount: null,
+        fillMonths: null,
+        startDate: "2000-01-01",
         actualFunded: 0,
       },
     ],
   });
-  expect(month.paycheckCount).toBe(2);
   expect(month.feasibility).toMatchObject({
-    expectedPaycheck: 1_000_000,
-    billsEach: 300_000,
-    refillsEach: 200_000,
-    surplus: 500_000,
-    need: 600_000,
-    shortfall: 100_000,
+    income: 2_166_670,
+    bills: 600_000,
+    refills: 400_000,
+    surplus: 1_166_670,
+    need: 1_400_000,
+    shortfall: 233_330,
   });
   const tax = month.feasibility?.buckets.find((bucket) => bucket.bucketId === "tax");
-  expect(tax).toMatchObject({ perPaycheck: 400_000, laterDate: "2026-03-14" });
-  expect(month.funding.items.find((item) => item.bucketId === "tax")).toMatchObject({ planned: 800_000, paychecks: 2 });
-  expect(month.funding.items.find((item) => item.bucketId === "steady")).toMatchObject({ perPaycheck: 200_000, planned: 400_000 });
+  expect(tax).toMatchObject({ monthly: 1_200_000, laterDate: "2026-04-01" });
+  expect(month.funding.items.find((item) => item.bucketId === "tax")).toMatchObject({ planned: 1_200_000 });
+  expect(month.funding.items.find((item) => item.bucketId === "steady")).toMatchObject({ planned: 200_000 });
+});
+
+test("the monthly surplus subtracts the emergency amount", () => {
+  const month = buildMonthPlan({
+    month: "2026-02",
+    step: 10,
+    asOf: "2026-02-01",
+    links: [],
+    plans: [income("pay", 1_000_000, biweekly)],
+    buckets: [
+      {
+        id: "fund",
+        name: "Emergency fund",
+        kind: "emergency",
+        priority: 1,
+        color: "sky",
+        archived: false,
+        balance: 0,
+        refillTo: null,
+        amount: null,
+        dueDate: null,
+        repeat: null,
+        // 2 600 000 over 12 months is 216 666.67. It rounds up to 216 670.
+        target: 2_600_000,
+        targetDate: null,
+        fixedAmount: null,
+        fillMonths: 12,
+        startDate: "2000-01-01",
+        actualFunded: 0,
+      },
+    ],
+  });
+  expect(month.feasibility).toMatchObject({ income: 2_166_670, emergency: 216_670, surplus: 1_950_000, need: 0, shortfall: 0 });
+  expect(month.funding.items).toMatchObject([{ kind: "emergency", planned: 216_670 }]);
 });
 
 test("the current month compares planned amounts with linked actuals", () => {
@@ -256,8 +297,8 @@ test("a future month uses planned funding from earlier months, not today's balan
     buckets: [trip],
     plans: [income("pay", 1_000_000, schedule("2026-01-01", "monthly", 1, 1))],
   });
-  expect(january.funding.items.find((item) => item.bucketId === "trip")?.perPaycheck).toBe(1_000);
-  expect(march.funding.items.find((item) => item.bucketId === "trip")?.perPaycheck).toBe(1_000);
+  expect(january.funding.items.find((item) => item.bucketId === "trip")?.planned).toBe(1_000);
+  expect(march.funding.items.find((item) => item.bucketId === "trip")?.planned).toBe(1_000);
   expect(march.feasibility?.need).toBe(1_000);
 });
 
@@ -273,23 +314,32 @@ test("goals that are short together each get a later date from a share of the su
       { ...goal("south", 800_000, "2026-02-28", null), priority: 2, name: "South" },
     ],
   });
-  expect(month.feasibility?.surplus).toBe(100_000);
-  expect(month.feasibility?.shortfall).toBe(700_000);
+  expect(month.feasibility?.surplus).toBe(216_670);
+  expect(month.feasibility?.shortfall).toBe(1_383_330);
   const dates = month.feasibility?.buckets.map((bucket) => bucket.laterDate) ?? [];
   expect(dates.every((date) => date !== null)).toBe(true);
   expect(new Set(dates).size).toBe(1);
 });
 
-test("the share of each paycheck is a whole number of the currency's minor unit", () => {
+test("the monthly amount of a goal is a whole number of the currency's minor unit", () => {
   const plan = (step: number) =>
     buildMonthPlan({
       month: "2026-01",
       step,
       asOf: "2026-01-01",
       links: [],
-      buckets: [],
-      plans: [income("pay", 3_000_000, biweekly), bill("rent", 1_000_000, schedule("2026-01-10", "monthly", 1, 10))],
+      buckets: [goal("trip", 10_000, "2026-04-15", null)],
+      plans: [income("pay", 3_000_000, biweekly)],
     });
-  expect(plan(10).feasibility?.billsEach).toBe(333_340);
-  expect(plan(1000).feasibility?.billsEach).toBe(334_000);
+  expect(plan(10).funding.items[0]?.planned).toBe(3_340);
+  expect(plan(1000).funding.items[0]?.planned).toBe(4_000);
+});
+
+test("feasibility income is the yearly amount of the income plans divided by 12, not the paychecks of the month", () => {
+  const plans = [income("week", 1_000, schedule("2026-01-02", "weekly", 1))];
+  const january = buildMonthPlan({ month: "2026-01", step: 10, asOf: "2026-01-15", links: [], buckets: [], plans });
+  const february = buildMonthPlan({ month: "2026-02", step: 10, asOf: "2026-02-01", links: [], buckets: [], plans });
+  expect(january.income.planned).toBe(5_000);
+  expect(january.feasibility?.income).toBe(4_330);
+  expect(february.feasibility?.income).toBe(4_330);
 });

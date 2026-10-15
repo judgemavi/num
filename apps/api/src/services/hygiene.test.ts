@@ -6,8 +6,11 @@ import { columnMapSchema, type ColumnMap, type HygieneCheck } from "@num/shared"
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
-import { createBucket } from "./buckets";
+import { createBucketEvent } from "./bucket-events";
+import { archiveBucket, createBucket } from "./buckets";
 import { createCategory } from "./categories";
+import { fillBuckets } from "./funding-fill";
+import { emergency } from "./funding-test-book";
 import { readHygiene } from "./hygiene";
 import { importStatement } from "./imports";
 import { createPlan } from "./recurring-plans";
@@ -109,52 +112,43 @@ function spendBucket(db: Db, categoryId: string, essential: boolean, refillTo: n
     target: null,
     targetDate: null,
     fixedAmount: null,
+    months: null,
+    fillMonths: null,
     asOf: "2000-01-01",
     ...saved,
   });
 }
 
-test("the emergency fund passes when savings cover one month of bills and essential refills", () => {
+function emergencyBook(db: Db) {
+  const cash = account(db, "chequing", "Cash", 50_000);
+  const food = expense(db, "Food");
+  spendBucket(db, food.id, true, 2_000);
+  bill(db, cash.id, null, "monthly");
+  return emergency(db, 1, 12);
+}
+
+test("the emergency fund passes when the bucket balance reaches its target", () => {
   withBook((db) => {
-    db.insert(settings).values({ key: "emergencyFundMonths", value: "1" }).run();
-    const cash = account(db, "chequing", "Cash", 0);
-    account(db, "savings", "Reserve", 12_000);
-    const food = expense(db, "Food");
-    spendBucket(db, food.id, true, 2_000);
-    bill(db, cash.id, null, "monthly");
+    const fund = emergencyBook(db);
+    createBucketEvent(db, fund.id, { kind: "fund", amount: 12_000, date: "2026-06-15", asOf: "2026-06-15", ...saved });
     const row = check(db, "2026-06-15", "emergency_fund");
-    expect(row).toMatchObject({ pass: true, source: "savings", held: 12_000, months: 1, monthlyBills: 10_000, monthlyRefills: 2_000, need: 12_000 });
+    expect(row).toMatchObject({ pass: true, balance: 12_000, target: 12_000, months: 1, monthly: 12_000 });
   });
 });
 
-test("the emergency fund fails when an essential goal is short, even if savings are large", () => {
+test("the emergency fund fails when the bucket balance is below its target", () => {
   withBook((db) => {
-    db.insert(settings).values({ key: "emergencyFundMonths", value: "1" }).run();
-    const cash = account(db, "chequing", "Cash", 0);
-    account(db, "savings", "Reserve", 500_000);
-    const food = expense(db, "Food");
-    spendBucket(db, food.id, true, 2_000);
-    bill(db, cash.id, null, "monthly");
-    createBucket(db, {
-      name: "Reserve goal",
-      kind: "goal",
-      priority: 1,
-      essential: true,
-      color: "teal",
-      icon: "shield",
-      categoryIds: [],
-      refillTo: null,
-      amount: null,
-      dueDate: null,
-      repeat: null,
-      target: 100_000,
-      targetDate: "2027-01-01",
-      fixedAmount: null,
-      asOf: "2000-01-01",
-      ...saved,
-    });
-    const row = check(db, "2026-06-15", "emergency_fund");
-    expect(row).toMatchObject({ pass: false, source: "goals", held: 0, need: 12_000 });
+    const fund = emergencyBook(db);
+    createBucketEvent(db, fund.id, { kind: "fund", amount: 11_990, date: "2026-06-15", asOf: "2026-06-15", ...saved });
+    expect(check(db, "2026-06-15", "emergency_fund")).toMatchObject({ pass: false, balance: 11_990, target: 12_000 });
+  });
+});
+
+test("an archived emergency bucket has no emergency fund check", () => {
+  withBook((db) => {
+    const fund = emergencyBook(db);
+    archiveBucket(db, fund.id, saved);
+    expect(readHygiene(db, "2026-06-15").checks.map((item) => item.code)).not.toContain("emergency_fund");
   });
 });
 
@@ -256,6 +250,8 @@ test("sinking funds pass when each yearly bill has a sinking bucket for its cate
       target: null,
       targetDate: null,
       fixedAmount: null,
+      months: null,
+      fillMonths: null,
       asOf: "2000-01-01",
       ...saved,
     });
@@ -351,12 +347,36 @@ test("overspent passes when every bucket balance is zero or more", () => {
   });
 });
 
-test("overspent fails when a bucket balance is below zero", () => {
+test("overspent fails while a bucket is negative, and passes after the fill covers it from Unassigned", () => {
   withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 5_000);
+    const cash = account(db, "chequing", "Cash", 500);
+    const food = expense(db, "Food");
+    spendBucket(db, food.id, false, 10_000);
+    post(db, cash.id, "2026-03-02", -400, food.id);
+    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: false, count: 1, balance: -400, unassigned: 100 });
+    fillBuckets(db, { asOf: "2026-04-02", source: "ui", at: "2026-04-02T10:00:00Z" });
+    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: true, count: 0 });
+  });
+});
+
+test("overspent still fails after the fill when cash does not cover the bucket", () => {
+  withBook((db) => {
+    const cash = account(db, "chequing", "Cash", 500);
     const food = expense(db, "Food");
     spendBucket(db, food.id, false, 10_000);
     post(db, cash.id, "2026-03-02", -1_000, food.id);
-    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: false, count: 1, balance: -1_000 });
+    fillBuckets(db, { asOf: "2026-04-02", source: "ui", at: "2026-04-02T10:00:00Z" });
+    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: false, count: 1, balance: -500, unassigned: -500 });
+  });
+});
+
+test("overspent passes when Unassigned is below zero but no bucket is negative", () => {
+  withBook((db) => {
+    const cash = account(db, "chequing", "Cash", 500);
+    const food = expense(db, "Food");
+    const other = expense(db, "Other");
+    spendBucket(db, food.id, false, 10_000);
+    post(db, cash.id, "2026-03-02", -900, other.id);
+    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: true, count: 0, unassigned: -400 });
   });
 });

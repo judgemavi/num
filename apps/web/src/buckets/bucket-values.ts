@@ -1,4 +1,4 @@
-import { bucketWriteSchema, amountText, parseAmount, type Bucket, type BucketColor } from "@num/shared";
+import { bucketWriteSchema, amountText, emergencyDefaults, parseAmount, type Bucket, type BucketColor } from "@num/shared";
 import { localAsOf } from "@/as-of";
 import { editPatch, keptAmount } from "@/forms/form-values";
 import { decimalsError } from "@/money";
@@ -26,8 +26,10 @@ export function bucketValues(bucket: Bucket | null, nextColor: BucketColor, last
     target: money(bucket?.target ?? null),
     targetDate: bucket?.targetDate ?? "",
     fixedAmount: money(bucket?.fixedAmount ?? null),
-    /** A goal saves by a date, or a set amount from each paycheck. */
-    goalMode: bucket?.fixedAmount !== null && bucket?.fixedAmount !== undefined ? "paycheck" : "date",
+    /** A goal saves by a date, or a set amount each month. */
+    goalMode: bucket?.fixedAmount !== null && bucket?.fixedAmount !== undefined ? "month" : "date",
+    months: String(bucket?.months ?? emergencyDefaults.months),
+    fillMonths: String(bucket?.fillMonths ?? emergencyDefaults.fillMonths),
     priority: String(bucket?.priority ?? lastPriority + 1),
     essential: bucket?.essential ?? false,
   };
@@ -53,7 +55,7 @@ function bucketFields(currency: string, value: BucketValues, stored: Bucket | nu
     essential: value.essential,
     color: value.color,
     icon: value.icon,
-    categoryIds: value.categoryIds,
+    categoryIds: value.kind === "emergency" ? [] : value.categoryIds,
     startDate: value.startDate,
     refillTo: value.kind === "spending" ? read("refillTo") : null,
     amount: value.kind === "sinking" ? read("amount") : null,
@@ -61,7 +63,9 @@ function bucketFields(currency: string, value: BucketValues, stored: Bucket | nu
     repeat: value.kind === "sinking" ? value.repeat : null,
     target: value.kind === "goal" ? read("target") : null,
     targetDate: value.kind === "goal" && value.goalMode === "date" ? value.targetDate : null,
-    fixedAmount: value.kind === "goal" && value.goalMode === "paycheck" ? read("fixedAmount") : null,
+    fixedAmount: value.kind === "goal" && value.goalMode === "month" ? read("fixedAmount") : null,
+    months: value.kind === "emergency" ? Number(value.months) : null,
+    fillMonths: value.kind === "emergency" ? Number(value.fillMonths) : null,
   };
 }
 
