@@ -59,18 +59,18 @@ function useSpendSelection() {
     return arc.ring === "category" ? arc.row.id === category : !category && search.group === idOrNone(arc.row);
   }
 
-  return { search, patchSearch, arcs, colors, category, selectedGroup, groupName, categoryName, parentName, openTransactions, selectArc, isLit, isPressed };
+  return { data, search, patchSearch, arcs, colors, category, selectedGroup, groupName, categoryName, parentName, openTransactions, selectArc, isLit, isPressed };
 }
 
 export function SpendDonutCard() {
-  const { search, patchSearch, arcs, groupName, categoryName, parentName, selectArc, isLit, isPressed } = useSpendSelection();
+  const { arcs, groupName, categoryName, parentName, selectArc, isLit, isPressed } = useSpendSelection();
   return (
     <Card>
       <CardHeader className="px-5 pt-5">
         <CardTitle className="text-base font-bold">Spending by group and category</CardTitle>
         <p className="text-sm text-muted-foreground">Inner ring: groups. Outer ring: categories. Select a slice to see its categories.</p>
       </CardHeader>
-      <CardContent className="grid gap-3 px-5 pb-5">
+      <CardContent className="px-5 pb-5">
         <SpendDonut
           arcs={arcs}
           nameOf={(arc) => ({ name: arc.ring === "group" ? groupName(arc.row) : categoryName(arc.row), group: parentName(arc) })}
@@ -80,35 +80,35 @@ export function SpendDonutCard() {
           canSelect={(arc) => arc.row.kind !== "uncategorized"}
           onSelect={selectArc}
         />
-        {search.month ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span className="font-semibold">{monthTitle(search.month)}</span>
-            <Button type="button" variant="ghost" onClick={() => patchSearch({ month: undefined })}>
-              Show the whole period
-            </Button>
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   );
 }
 
-/** The selected group with its categories. It shows only when a slice is selected. */
+/**
+ * The drill-down under the timeline and the donut. It opens when a month bar or a slice is selected.
+ * It shows the groups of the month, or only the selected group or category.
+ */
 export function SelectedSpendList() {
-  const { patchSearch, colors, category, selectedGroup, groupName, categoryName, openTransactions } = useSpendSelection();
-  if (!selectedGroup) {
+  const { data, search, patchSearch, colors, category, selectedGroup, groupName, categoryName, openTransactions } = useSpendSelection();
+  if (!selectedGroup && !search.month) {
     return null;
   }
+  const groups = selectedGroup
+    ? [{ ...selectedGroup, categories: selectedGroup.categories.filter((row) => category === null || row.id === category) }]
+    : data.groups;
+  const title = [search.month ? monthTitle(search.month) : null, selectedGroup ? groupName(selectedGroup) : null].filter(Boolean).join(": ");
   return (
     <CategorySpendList
-      group={{ ...selectedGroup, categories: selectedGroup.categories.filter((row) => category === null || row.id === category) }}
+      title={title}
+      groups={groups}
       colors={colors}
-      groupName={groupName(selectedGroup)}
+      groupName={groupName}
       categoryName={categoryName}
-      onOpenGroup={() => openTransactions({ groupId: idOrNone(selectedGroup) })}
+      onOpenGroup={(row) => openTransactions(row.kind === "uncategorized" ? { uncategorized: true } : { groupId: idOrNone(row) })}
       onOpenCategory={(row) => openTransactions({ categoryId: row.id ?? undefined })}
       actions={
-        <Button type="button" variant="ghost" onClick={() => patchSearch({ group: undefined, category: undefined })}>
+        <Button type="button" variant="ghost" onClick={() => patchSearch({ month: undefined, group: undefined, category: undefined })}>
           Clear
         </Button>
       }

@@ -784,7 +784,7 @@ After 90 days, show only the monthly net values (Home, this month). Do not show 
 - **Spending donut.** Two rings. The inner ring is the groups. The outer ring is the categories, each inside the arc
   of its group. A click on a group highlights it and limits the list to it. A click on a category limits the timeline
   and the list to that category. On a wide screen, the timeline and the donut are in one row. The list is under
-  them. It shows only when a slice is selected.
+  them. It opens when a month bar or a slice is selected.
   Decisions 0030 and 0058.
 - There is no list of spending by merchant or by tag (decision 0058).
 - **Net worth.** Assets − liabilities at the end of each month. Show a chart for 24 months.

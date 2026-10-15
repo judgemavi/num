@@ -2,14 +2,17 @@ import type { InsightGroupRow, InsightRow } from "@num/shared";
 import type { ReactNode } from "react";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
+import { useBookCurrency } from "@/editors/lookups";
 import { rowKey, type SliceColor } from "@/insights/spend-arcs";
+import { formatMoney } from "@/money";
 
 type CategorySpendListProps = {
-  group: InsightGroupRow;
+  title: string;
+  groups: InsightGroupRow[];
   colors: Map<string, SliceColor>;
-  groupName: string;
+  groupName: (row: InsightRow) => string;
   categoryName: (row: InsightRow) => string;
-  onOpenGroup: () => void;
+  onOpenGroup: (row: InsightGroupRow) => void;
   onOpenCategory: (row: InsightRow) => void;
   actions: ReactNode;
 };
@@ -24,26 +27,33 @@ function Dot({ color }: { color: SliceColor | undefined }) {
   );
 }
 
-/** The selected group with its categories. */
-export function CategorySpendList({ group, colors, groupName, categoryName, onOpenGroup, onOpenCategory, actions }: CategorySpendListProps) {
+/** Groups with their categories under them. */
+export function CategorySpendList({ title, groups, colors, groupName, categoryName, onOpenGroup, onOpenCategory, actions }: CategorySpendListProps) {
+  const currency = useBookCurrency();
   return (
-    <ListCard label={groupName} title={groupName} actions={actions}>
-      <ListRow simple onOpen={onOpenGroup}>
-        <Dot color={colors.get(rowKey(group))} />
-        <span className={listName}>All of {groupName}</span>
-        <span className={listAmt}>
-          <Amount value={group.amount} />
-        </span>
-      </ListRow>
-      {group.categories.map((category) => (
-        <ListRow key={rowKey(category)} simple onOpen={() => onOpenCategory(category)}>
-          <span className="w-5 shrink-0" aria-hidden="true" />
-          <Dot color={colors.get(rowKey(category))} />
-          <span className={listName}>{categoryName(category)}</span>
-          <span className={listAmt}>
-            <Amount value={category.amount} />
-          </span>
-        </ListRow>
+    <ListCard label={title} title={title} actions={actions}>
+      {groups.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">No spending in this period.</p> : null}
+      {groups.map((group) => (
+        <div key={rowKey(group)}>
+          <ListRow simple onOpen={() => onOpenGroup(group)}>
+            <Dot color={colors.get(rowKey(group))} />
+            <span className={listName}>{groupName(group)}</span>
+            <span className={listAmt}>
+              <Amount value={group.amount} />
+              {group.kind === "uncategorized" ? <small>In {formatMoney(currency, group.inflow ?? 0)}</small> : null}
+            </span>
+          </ListRow>
+          {group.categories.map((category) => (
+            <ListRow key={rowKey(category)} simple onOpen={() => onOpenCategory(category)}>
+              <span className="w-5 shrink-0" aria-hidden="true" />
+              <Dot color={colors.get(rowKey(category))} />
+              <span className={listName}>{categoryName(category)}</span>
+              <span className={listAmt}>
+                <Amount value={category.amount} />
+              </span>
+            </ListRow>
+          ))}
+        </div>
       ))}
     </ListCard>
   );
