@@ -54,7 +54,6 @@ export const bucketEvents = sqliteTable(
     otherBucketId: text("other_bucket_id").references(() => buckets.id),
     amount: integer("amount").notNull(),
     date: text("date").notNull(),
-    note: text("note"),
     /** The month (YYYY-MM) that the fill paid. Null for an event of the user. */
     month: text("month"),
     undoneAt: text("undone_at"),

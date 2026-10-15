@@ -53,7 +53,6 @@ test("bucket balance is funds, moves, releases and category lines", () => {
         otherBucketId: null,
         amount: 1_000,
         date: "2026-03-09",
-        note: null,
         month: "2026-03",
         undoneAt: null,
       })

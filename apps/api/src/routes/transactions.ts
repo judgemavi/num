@@ -302,5 +302,3 @@ export function transactionRoutes(db: Db) {
       return c.json(deleteTransaction(db, id, { source: "ui" }), 200);
     });
 }
-
-export type TransactionRoutes = ReturnType<typeof transactionRoutes>;

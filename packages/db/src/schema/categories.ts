@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { categoryKinds } from "@num/shared";
 
 export const categoryGroups = sqliteTable(
@@ -24,7 +24,6 @@ export const categories = sqliteTable(
     name: text("name").notNull(),
     kind: text("kind", { enum: categoryKinds }).notNull(),
     groupId: text("group_id").references(() => categoryGroups.id),
-    essential: integer("essential", { mode: "boolean" }).notNull(),
     archivedAt: text("archived_at"),
     /** The folded name (`foldName`). The list sorts by it. */
     sortKey: text("sort_key").notNull(),

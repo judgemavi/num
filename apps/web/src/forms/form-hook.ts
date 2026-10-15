@@ -1,7 +1,6 @@
 import { createFormHook } from "@tanstack/react-form";
 import { fieldContext, formContext } from "@/forms/form-context";
 import {
-  CheckboxField,
   ComboboxField,
   DateInputField,
   MoneyField,
@@ -26,7 +25,6 @@ export const { useAppForm, withForm } = createFormHook({
     SelectField,
     ComboboxField,
     SwitchField,
-    CheckboxField,
   },
   formComponents: {
     FormShell,

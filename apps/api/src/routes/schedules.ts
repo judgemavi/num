@@ -154,5 +154,3 @@ export function scheduleRoutes(db: Db) {
       return c.json(restoreSkip(db, id, dueDate, { source: "ui" }), 200);
     });
 }
-
-export type ScheduleRoutes = ReturnType<typeof scheduleRoutes>;

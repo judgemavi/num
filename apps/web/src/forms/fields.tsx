@@ -1,8 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import { ChoiceSelect } from "@/components/choice-select";
 import { DateField } from "@/components/date-field";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useBookCurrency } from "@/editors/lookups";
@@ -145,20 +144,6 @@ export function SwitchField({ id, label }: Pick<FieldFrame, "id" | "label">) {
     <Field orientation="horizontal">
       <Switch id={id} checked={field.state.value} onCheckedChange={field.handleChange} />
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-    </Field>
-  );
-}
-
-/** A yes/no choice with the label and the help text after the box. */
-export function CheckboxField({ id, label, description, disabled }: Pick<FieldFrame, "id" | "label" | "description"> & { disabled?: boolean }) {
-  const field = useFieldContext<boolean>();
-  return (
-    <Field orientation="horizontal">
-      <Checkbox id={id} checked={field.state.value} disabled={disabled} onCheckedChange={(checked) => field.handleChange(checked === true)} />
-      <FieldContent>
-        <FieldLabel htmlFor={id}>{label}</FieldLabel>
-        {description ? <FieldDescription>{description}</FieldDescription> : null}
-      </FieldContent>
     </Field>
   );
 }

@@ -258,7 +258,7 @@ test("a payment with no merchant is detected by its category until a plan with t
   const { db, close } = tempDatabase();
   try {
     const chequing = account(db);
-    const rent = createCategory(db, { name: "Rent", kind: "expense", essential: true, source: "ui", at });
+    const rent = createCategory(db, { name: "Rent", kind: "expense", source: "ui", at });
     for (const date of ["2026-07-02", "2026-08-04", "2026-09-01", "2026-10-01"]) {
       createTransaction(db, {
         accountId: chequing.id,

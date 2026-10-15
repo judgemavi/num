@@ -31,7 +31,7 @@ function savingsUsed(db: Db, asOf: string) {
     }
   }
   const total = rows.reduce((sum, row) => sum + row.amount, 0);
-  return { code: "savings_used" as const, pass: rows.length === 0, month, total, items: [...pairs.values()] };
+  return { code: "savings_used" as const, pass: rows.length === 0, total, items: [...pairs.values()] };
 }
 
 /**

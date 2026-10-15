@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
-import { readHygiene } from "./hygiene";
+import { needsYouChecks } from "./needs-you-checks";
 import { decideInboxItem, decisionRows, undoInboxDecision } from "./inbox-decisions";
 import { listNeedsReview } from "./needs-review";
 import { approveSelected } from "./review-approve";
@@ -190,7 +190,7 @@ test("approve skips a row with a question, a row with no suggestion and a row th
   });
 });
 
-test("keeping a row uncategorized removes it from Needs review and Hygiene until it gets a category or the user undoes it", () => {
+test("keeping a row uncategorized removes it from Needs review and Needs you until it gets a category or the user undoes it", () => {
   withBook((db) => {
     const bank = account(db, "Bank");
     const category = createCategory(db, { name: "Food", kind: "expense", groupId: null, ...saved });
@@ -204,7 +204,7 @@ test("keeping a row uncategorized removes it from Needs review and Hygiene until
       ...saved,
     };
     const oldCount = () => {
-      const check = readHygiene(db, asOf).checks.find((item) => item.code === "review");
+      const check = needsYouChecks(db, asOf).find((item) => item.code === "review");
       return check && "oldCount" in check ? check.oldCount : -1;
     };
     const keyOf = `uncategorized:${row.id}`;

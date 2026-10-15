@@ -187,5 +187,3 @@ export function accountRoutes(db: Db) {
       return c.json(restoreAccount(db, id, { source: "ui" }), 200);
     });
 }
-
-export type AccountRoutes = ReturnType<typeof accountRoutes>;

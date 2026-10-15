@@ -301,5 +301,3 @@ export function bucketRoutes(db: Db) {
       return c.json(coverBucket(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
     });
 }
-
-export type BucketRoutes = ReturnType<typeof bucketRoutes>;

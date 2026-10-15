@@ -58,7 +58,7 @@ test("a category rename writes the new sort key", () => {
   try {
     const moved = createCategory(db, { name: "Zed", kind: "expense", ...saved });
     createCategory(db, { name: "Eagle", kind: "expense", ...saved });
-    updateCategory(db, moved.id, { name: "Émile", kind: "expense", groupId: null, essential: false, ...saved });
+    updateCategory(db, moved.id, { name: "Émile", kind: "expense", groupId: null, ...saved });
     expect(listCategories(db, first).items.map((item) => item.name)).toEqual(["Eagle", "Émile"]);
   } finally {
     close();

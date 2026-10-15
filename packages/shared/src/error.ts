@@ -31,7 +31,6 @@ export const errorCodes = [
   "category_not_archived",
   "category_name_taken",
   "category_kind_locked",
-  "essential_expense_only",
   "group_not_found",
   "group_name_taken",
   "tag_not_found",

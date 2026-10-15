@@ -65,7 +65,7 @@ function account(db: Db, name: string) {
 }
 
 function category(db: Db, name: string) {
-  return createCategory(db, { name, kind: "expense", essential: false, ...saved });
+  return createCategory(db, { name, kind: "expense", ...saved });
 }
 
 function merchant(db: Db, name: string) {

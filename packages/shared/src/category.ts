@@ -32,23 +32,17 @@ export const categorySchema = z.object({
   name: z.string(),
   kind: z.enum(categoryKinds),
   groupId: z.uuid().nullable(),
-  essential: z.boolean(),
   archivedAt: z.string().refine(isUtcTimestamp).nullable(),
 });
 
-const categoryFields = z.object({
+export const categoryCreateSchema = z.object({
   name: nameSchema,
   kind: z.enum(categoryKinds),
   groupId: z.uuid().nullable().optional(),
-  essential: z.boolean().optional(),
-});
-
-export const categoryCreateSchema = categoryFields.refine((value) => value.kind === "expense" || value.essential !== true, {
-  path: ["essential"],
 });
 
 /** A PATCH body: only the fields that change. The API checks the fields together on the stored category with the patch. */
-export const categoryUpdateSchema = categoryFields.partial();
+export const categoryUpdateSchema = categoryCreateSchema.partial();
 
 export const categoryListQuerySchema = listQuerySchema(["name", "kind"]).extend({
   ...archivedQuery,

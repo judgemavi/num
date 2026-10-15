@@ -18,7 +18,7 @@ export function MoveMoney({ fromId }: EditorInput["moveMoney"]) {
   const save = useAddBucketEvent();
   const startFrom = fromId ?? active[0]?.id ?? "";
   const form = useAppForm({
-    defaultValues: { from: startFrom, to: active.find((bucket) => bucket.id !== startFrom)?.id ?? "", amount: "", date: localAsOf(), note: "" },
+    defaultValues: { from: startFrom, to: active.find((bucket) => bucket.id !== startFrom)?.id ?? "", amount: "", date: localAsOf() },
     validators: {
       onSubmit: ({ value }) => {
         if (!value.from || !value.to || value.from === value.to) {
@@ -37,7 +37,7 @@ export function MoveMoney({ fromId }: EditorInput["moveMoney"]) {
         await save.mutateAsync({
           bucketId: value.from,
           asOf: localAsOf(),
-          body: { kind: "move", amount: amount.milli, date: value.date, otherBucketId: value.to, note: value.note.trim() === "" ? null : value.note.trim() },
+          body: { kind: "move", amount: amount.milli, date: value.date, otherBucketId: value.to },
         });
         close("ok");
       } catch (error) {
@@ -69,7 +69,6 @@ export function MoveMoney({ fromId }: EditorInput["moveMoney"]) {
           </form.Subscribe>
           <form.AppField name="amount">{(field) => <field.MoneyField id="move-amount" label="Amount" required />}</form.AppField>
           <form.AppField name="date">{(field) => <field.DateInputField id="move-date" label="Date" required />}</form.AppField>
-          <form.AppField name="note">{(field) => <field.TextField id="move-note" label="Note" />}</form.AppField>
           <form.FormError />
         </DialogBody>
         <DialogFooter>

@@ -130,5 +130,3 @@ export function tagRoutes(db: Db) {
       return c.json(restoreTag(db, id, { source: "ui" }), 200);
     });
 }
-
-export type TagRoutes = ReturnType<typeof tagRoutes>;

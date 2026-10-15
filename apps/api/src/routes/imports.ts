@@ -212,5 +212,3 @@ export function importRoutes(db: Db, dataDir: string) {
       return c.json(undoImportBatch(db, id, { source: "import" }), 200);
     });
 }
-
-export type ImportRoutes = ReturnType<typeof importRoutes>;

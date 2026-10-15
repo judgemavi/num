@@ -10,7 +10,7 @@ import { documentRoutes } from "./routes/documents";
 import { forecastRoutes } from "./routes/forecast";
 import { fundingRoutes } from "./routes/funding";
 import { healthRoutes } from "./routes/health";
-import { hygieneRoutes } from "./routes/hygiene";
+import { needsYouRoutes } from "./routes/needs-you";
 import { importRoutes } from "./routes/imports";
 import { inboxRoutes } from "./routes/inbox";
 import { insightsRoutes } from "./routes/insights";
@@ -57,7 +57,7 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
     .route("/", bucketRoutes(db))
     .route("/", fundingRoutes(db))
     .route("/", forecastRoutes(db))
-    .route("/", hygieneRoutes(db))
+    .route("/", needsYouRoutes(db))
     .route("/", feasibilityRoutes(db))
     .route("/", categoryRoutes(db))
     .route("/", tagRoutes(db))

@@ -1,4 +1,4 @@
-import { reviewAgeDays, type NeedsYouItem } from "@num/shared";
+import { reviewAgeDays, staleImportDays, type NeedsYouItem } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
@@ -65,7 +65,7 @@ function useRows(items: readonly NeedsYouItem[]): Row[] {
           key: item.code,
           hue: "teal",
           icon: Upload,
-          title: `Imports are older than ${item.staleImportDays} days`,
+          title: `Imports are older than ${staleImportDays} days`,
           detail: item.items.map((row) => `${accountLabels.get(row.accountId) ?? "Account"} · ${plural(row.ageDays, "day", "days")}`).join(", "),
           open: () => void go({ to: "/accounts/imports" }),
         }];

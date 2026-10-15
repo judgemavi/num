@@ -39,7 +39,7 @@ export function MergeDialog({ source }: { source: Merchant }) {
         <DialogHeader>
           <DialogTitle>Merge this merchant?</DialogTitle>
           <DialogDescription>
-            Move transactions, commitments and incomes from {source.name} to the merchant you choose. {source.name} is then archived.
+            Move transactions, bills and incomes from {source.name} to the merchant you choose. {source.name} is then archived.
           </DialogDescription>
         </DialogHeader>
         <DialogBody>

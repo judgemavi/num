@@ -71,5 +71,3 @@ export function suggestionRoutes(db: Db) {
       return c.json(acceptTransferPair(db, c.req.valid("query").asOf, body.leftId, body.rightId, { source: "ui" }), 200);
     });
 }
-
-export type SuggestionRoutes = ReturnType<typeof suggestionRoutes>;

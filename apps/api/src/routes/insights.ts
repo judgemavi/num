@@ -25,5 +25,3 @@ export function insightsRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook })
     .openapi(insightsRoute, (c) => c.json(readInsights(db, c.req.valid("query")), 200));
 }
-
-export type InsightsRoutes = ReturnType<typeof insightsRoutes>;

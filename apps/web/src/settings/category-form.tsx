@@ -40,7 +40,6 @@ export function CategoryForm({ category, initialName, initialKind, inline = fals
       name: category?.name ?? initialName ?? "",
       kind: category?.kind ?? initialKind ?? "expense",
       groupId: category?.groupId ?? null,
-      essential: category?.essential ?? false,
       /** A new expense category can go in a bucket. */
       bucketId: fieldValue<string | null>(null),
     },
@@ -48,8 +47,8 @@ export function CategoryForm({ category, initialName, initialKind, inline = fals
       onSubmit: ({ value }) => (categoryCreateSchema.safeParse(value).success ? undefined : "Check the fields."),
     },
     onSubmit: async ({ value, formApi }) => {
-      const body = { name: value.name.trim(), kind: value.kind, groupId: value.groupId, essential: value.essential };
-      const start = category ? { name: category.name, kind: category.kind, groupId: category.groupId, essential: category.essential } : null;
+      const body = { name: value.name.trim(), kind: value.kind, groupId: value.groupId };
+      const start = category ? { name: category.name, kind: category.kind, groupId: category.groupId } : null;
       const patch = start ? editPatch(body, start) : null;
       const request = category ? (patch ? { id: category.id, body: patch } : null) : { id: null, body };
       // An edit with no change closes without a write.
@@ -81,24 +80,12 @@ export function CategoryForm({ category, initialName, initialKind, inline = fals
       <FormHeading
         inline={inline}
         title={category ? "Edit category" : "New category"}
-        description={
-          category ? "Change the name, the kind, the group, or whether it is essential." : "Add a category for income or expenses."
-        }
+        description={category ? "Change the name, the kind or the group." : "Add a category for income or expenses."}
       />
       <form.FormShell inline={inline} className={inline ? "flex flex-col gap-4" : undefined}>
         <DialogBody className={inline ? "contents flex-none overflow-visible p-0" : undefined}>
           <form.AppField name="name">{(field) => <field.TextField id={`${fieldId}-name`} label="Name" autoComplete="off" />}</form.AppField>
-          <form.AppField
-            name="kind"
-            listeners={{
-              // An income category is never essential.
-              onChange: ({ value, fieldApi }) => {
-                if (value === "income") {
-                  fieldApi.form.setFieldValue("essential", false);
-                }
-              },
-            }}
-          >
+          <form.AppField name="kind">
             {(field) => <field.SelectField id={`${fieldId}-kind`} label="Kind" options={kindOptions} />}
           </form.AppField>
           <form.Field name="groupId">
@@ -119,36 +106,25 @@ export function CategoryForm({ category, initialName, initialKind, inline = fals
               </Field>
             )}
           </form.Field>
-          <form.Subscribe selector={(state) => state.values.kind === "expense"}>
-            {(expense) =>
-              expense ? (
-                <>
-                  {category ? null : (
-                    <form.AppField name="bucketId">
-                      {(field) => (
-                        <field.ComboboxField
-                          id={`${fieldId}-bucket`}
-                          label="Add to a bucket"
-                          options={buckets.map((bucket) => ({ id: bucket.id, label: bucket.name }))}
-                          placeholder="No bucket"
-                          emptyLabel="No bucket"
-                        />
-                      )}
-                    </form.AppField>
-                  )}
-                  <form.AppField name="essential">
+          {category ? null : (
+            <form.Subscribe selector={(state) => state.values.kind === "expense"}>
+              {(expense) =>
+                expense ? (
+                  <form.AppField name="bucketId">
                     {(field) => (
-                      <field.CheckboxField
-                        id={`${fieldId}-essential`}
-                        label="Essential"
-                        description="A cost you must pay. The emergency fund check uses this flag."
+                      <field.ComboboxField
+                        id={`${fieldId}-bucket`}
+                        label="Add to a bucket"
+                        options={buckets.map((bucket) => ({ id: bucket.id, label: bucket.name }))}
+                        placeholder="No bucket"
+                        emptyLabel="No bucket"
                       />
                     )}
                   </form.AppField>
-                </>
-              ) : null
-            }
-          </form.Subscribe>
+                ) : null
+              }
+            </form.Subscribe>
+          )}
           <form.FormError />
         </DialogBody>
         <FormActions inline={inline}>

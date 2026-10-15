@@ -159,5 +159,3 @@ export function setupRoutes(db: Db) {
       return c.json(changeAiAccess(db, { ...body, source: "ui" }), 200);
     });
 }
-
-export type SetupRoutes = ReturnType<typeof setupRoutes>;

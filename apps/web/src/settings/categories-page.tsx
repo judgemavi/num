@@ -9,7 +9,6 @@ import { FilterBar } from "@/components/filter-bar";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAppForm } from "@/forms/form-hook";
 import { SortSelect } from "@/lists/sort-select";
@@ -116,7 +115,6 @@ function Categories() {
                 {category.name}
                 <small>{category.groupId ? (groupName.get(category.groupId) ?? "No group") : "No group"}</small>
               </div>
-              {category.kind === "expense" && category.essential ? <Badge variant="neutral">Essential</Badge> : null}
               <RowMenu label={`Actions for ${category.name}`}>
                 <ArchiveMenuItem
                   archived={category.archivedAt !== null}

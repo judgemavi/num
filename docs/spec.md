@@ -219,7 +219,7 @@ The terms do not create transactions.
 
 ### 5.3 Category and category group
 
-- Category fields: `name`, `kind` (`income | expense`), `groupId?`, `essential` (boolean, only for expense), `archivedAt?`.
+- Category fields: `name`, `kind` (`income | expense`), `groupId?`, `archivedAt?`.
   The name is unique. The comparison ignores case.
 - Group fields: `name`. The name is unique. The comparison ignores case. Groups are only for display.
 - Lists of groups and categories sort by name, without case. There is no manual order.
@@ -381,7 +381,7 @@ Bucket events (append only):
 - `recede`: money that the fill moves from a savings bucket with `canRecede` back to Unassigned for a cover (§7.7).
   `otherBucketId` is the covered bucket. It has no `month`. The user does not make it and cannot undo it.
 - A manual `fund` cannot be more than Unassigned.
-- Each event has `amount` (positive), `date`, `note?`, `month?`, `undoneAt?`. `month` (YYYY-MM) is on a `fund` event that the
+- Each event has `amount` (positive), `date`, `month?`, `undoneAt?`. `month` (YYYY-MM) is on a `fund` event that the
   fill paid (§5.9). A manual event has no `month`.
 - Undo of an event sets `undoneAt`. The app does not delete events.
   The user can undo an event that has no `month`. The events of the fill cannot be undone (§5.9).
@@ -498,7 +498,6 @@ decision of that item, as a save in the editor does.
 | Key | Default | Use |
 |---|---|---|
 | `currency` | Set at setup | Book currency (§4) |
-| `staleImportDays` | 10 | Hygiene check |
 | `aiCanWrite` | false | MCP write tools are listed only when true (§12) |
 
 ## 6. Calculated values
@@ -972,10 +971,10 @@ Spending is a part of Home (§14). It has no screen of its own.
 - **Mortgage.** The page of the mortgage account shows the balance, rate, schedule and payoff date. Also, the effect of
   an extra payment amount.
 
-## 10. Hygiene checks
+## 10. Needs you checks
 
 Each check is deterministic. The UI shows a check only when it fails, as an item in Home "Needs you" (§14), with its
-numbers. The row opens the screen of its fix.
+numbers. The row opens the screen of its fix. The day limits of the checks are fixed values, not settings.
 
 | Check | The check passes when |
 |---|---|
@@ -983,8 +982,8 @@ numbers. The row opens the screen of its fix.
 | Bills | No active commitment is short for its next payment. The next payment is the earliest occurrence from the start date of the bucket that is not skipped, not linked and whose window (§7.4) has not ended on `asOf`. Thus a payment that is late is still the next payment while its window is open. For a commitment due more than one time in a month, the amount is the sum of these occurrences in that month. A `variable` amount uses the safe amount (§5.7). The gap = the amount − the balance (a negative balance counts as 0), minimum 0, when the next payment is due in the next 30 days after `asOf`; otherwise 0. Unassigned covers the gaps in fill order (§6). The short part is the part that Unassigned does not cover. For each bill with a short part more than 0 show "<bill> is <short part> short for <date>". A paused bill counts. |
 | Savings used | No savings bucket has a recede that is not undone, dated in the month of `asOf` (§7.7). Show the total and, for each savings bucket and covered bucket, the names and the amount. |
 | Pool runs short | In the forecast (§8, 90 days), the projected pool on each date `d` after `asOf` is 0 or more: Unassigned(`asOf`) + income(`asOf`, `d`] − Σ over buckets max(0, outflow_b(`asOf`, `d`] − balance_b(`asOf`)) (a negative balance counts as 0) − other outflow(`asOf`, `d`]. `outflow_b` is the forecast spending of the schedules of a commitment bucket and the variable spending of a spending bucket. A commitment payment by transfer to an account that is not an open on-budget account (a loan payment, for example) is outflow of its bucket. A transfer between two open on-budget accounts is not outflow. Other outflow is forecast spending with no bucket. Show "Pool runs short on <date> by <amount>" (the first date below 0 and the lowest pool as a positive amount, rounded to the step of the book currency). Then the buckets to pause with their monthly amounts, until the sum is equal to or more than the short amount: the buckets that are not paused and have a monthly amount (§7.6), first the spending buckets that are not essential, then the goal and sinking buckets, then the commitments that are not essential, the lowest priority first in each set. Then the buckets that would give money back (§7.7 order) with their amounts. Then the part that no bucket gives, when there is one. |
-| Imports are current | Each on-budget account has an import in the last `staleImportDays` days |
-| Review | No transaction has needed review for more than 7 days |
+| Imports are current | Each on-budget account that has an import has its last import in the last 10 days (`staleImportDays`). An account with no import passes. |
+| Review | No transaction needs review. Show the count, and the count of transactions that need review for more than 7 days (`reviewAgeDays`). |
 | Savings rate | The savings rate of the last 3 complete months (§8) is 0% or more. Show the percentage. |
 | Overspent | No bucket has a negative balance (§7.7) |
 
@@ -1053,7 +1052,7 @@ do not change.
 
 | Screen | Contents |
 |---|---|
-| Home | The first screen, from top to bottom. 1. **Summary strip:** "Available to spend" (§6) and, below it, one row with three small amounts: "In your accounts" − "Saving buckets" − "Set aside for bills". No hint line. 2. **Needs you:** one list card with a count badge. It shows only the items that need the user, in this order: transactions need review (the count, and the count older than 7 days); each account that does not match its bank (§5.13); imports older than `staleImportDays`; each missed payment (§7.4); overspent buckets (§7.7); goals that do not fit the monthly income, with the short amount (§7.8); each bill with a short part for its next payment, "<bill> is <short part> short for <date>" (§10 Bills); emergency fund below its target; savings used this month; the pool runs short, with the buckets to pause, the buckets that would give money back and the part that is not covered (§10); a savings rate below 0% in a complete month; each category that went up against its median (§9). Home is read-only: each row has no actions and opens the screen of its fix. When no item needs the user, the card shows one line: "All clear". 3. **Spending** (§9): a section title, the summary line, the period selector, the timeline, the spending donut and the list of groups and categories. |
+| Home | The first screen, from top to bottom. 1. **Summary strip:** "Available to spend" (§6) and, below it, one row with three small amounts: "In your accounts" − "Saving buckets" − "Set aside for bills". No hint line. 2. **Needs you:** one list card with a count badge. It shows only the items that need the user, in this order: transactions need review (the count, and the count older than 7 days); each account that does not match its bank (§5.13); imports older than 10 days (§10); each missed payment (§7.4); overspent buckets (§7.7); goals that do not fit the monthly income, with the short amount (§7.8); each bill with a short part for its next payment, "<bill> is <short part> short for <date>" (§10 Bills); emergency fund below its target; savings used this month; the pool runs short, with the buckets to pause, the buckets that would give money back and the part that is not covered (§10); a savings rate below 0% in a complete month; each category that went up against its median (§9). Home is read-only: each row has no actions and opens the screen of its fix. When no item needs the user, the card shows one line: "All clear". 3. **Spending** (§9): a section title, the summary line, the period selector, the timeline, the spending donut and the list of groups and categories. |
 | Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers, row selection with Approve and the bulk editor. |
 | Buckets | Summary strip: the hero is Unassigned. Fact: "Saved" (the savings buckets). No hint line. Groups Income, Bills (the UI name of the commitments), Spending and Savings (sinking, goal, emergency). The Income and Spending groups have no group total. Each spending row shows "<amount> left". The Bills group shows its rows in fill order (§7.6). A bill row shows "Due <date>" of its next payment, a progress bar, "<balance> of <amount>" of that payment (§10 Bills) and one line for its gap (§6): when it has a short part, "<short part> short" in the attention colour; when Unassigned covers all of the gap, "Fills <date>" in the muted colour. The date is the first day of the month of the payment, or `asOf` when that day is before `asOf`. Each bucket except an income has "Pause" or "Resume" in its row menu, and a paused row shows "Paused". Balances, what is still owed this month, moves, goals (feasibility), settings. A bill or income row has its schedule, links, skips and "Amount changed". Side column: Upcoming (occurrences of all schedules in the next 30 days) and Detected (new schedule suggestions). |
 | Accounts | Summary strip with the net worth and no hint line. Facts: "What you have" and "What you owe". List with balances and the bank status of each account (§5.13), in three groups: Cash (chequing, savings, cash), Assets (investment, property, receivable, other asset) and Liabilities (credit card, mortgage, loan, other liability). The Liabilities group total shows as owed. Also import, bank balances, valuations, mortgage terms. The account page shows the balance in a summary strip (surface colour, no illustration). Facts: the last bank balance with its date, and the date of the last import. When the account does not match its bank, the hint line shows the difference. A mortgage account page has the mortgage panel (§9). An "Imports" view lists all imports and import problems (§7.2). |

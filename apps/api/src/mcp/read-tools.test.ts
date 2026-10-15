@@ -194,7 +194,7 @@ test("a read tool returns the same data as REST", async () => {
       ["list_occurrences", { id: bucketId, asOf }, `/api/buckets/${bucketId}/occurrences?asOf=${asOf}`],
       ["get_forecast", { asOf }, `/api/forecast?asOf=${asOf}`],
       ["get_insights", { asOf, window: "3" }, `/api/insights?asOf=${asOf}&window=3`],
-      ["get_hygiene", { asOf }, `/api/hygiene?asOf=${asOf}`],
+      ["get_needs_you", { asOf }, `/api/needs-you?asOf=${asOf}`],
       ["list_imports", { accountId, from: "2026-01-01" }, `/api/imports?accountId=${accountId}&from=2026-01-01`],
     ];
     for (const [name, args, path] of cases) {
@@ -210,7 +210,7 @@ test("tools that need today require asOf", async () => {
   try {
     const listed = await post(book.app, "tools/list", {});
     const tools = listed.body.result?.tools ?? [];
-    for (const name of ["list_occurrences", "get_forecast", "get_insights", "get_hygiene"]) {
+    for (const name of ["list_occurrences", "get_forecast", "get_insights", "get_needs_you"]) {
       const schema = tools.find((tool) => tool.name === name)?.inputSchema;
       expect(schema?.required).toContain("asOf");
       expect(schema?.properties?.asOf).toMatchObject({ format: "date", pattern: String.raw`^\d{4}-\d{2}-\d{2}$` });
@@ -226,7 +226,7 @@ test("date tools reject a call without asOf", async () => {
   const book = tempBook();
   try {
     const { bucketId } = seed(book.db, book.dir);
-    for (const name of ["list_occurrences", "get_forecast", "get_insights", "get_hygiene"] as const) {
+    for (const name of ["list_occurrences", "get_forecast", "get_insights", "get_needs_you"] as const) {
       const missing = await callTool(book.app, name, name === "list_occurrences" ? { id: bucketId } : {});
       expect(missing.result?.isError).toBe(true);
       expect(missing.result?.structuredContent).toEqual({ code: "as_of_required", params: {} });

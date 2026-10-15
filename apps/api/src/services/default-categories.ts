@@ -1,7 +1,6 @@
 export type CategorySeed = {
   name: string;
   kind: "income" | "expense";
-  essential: boolean;
 };
 
 export type CategoryGroupSeed = {
@@ -10,11 +9,11 @@ export type CategoryGroupSeed = {
 };
 
 function income(name: string): CategorySeed {
-  return { name, kind: "income", essential: false };
+  return { name, kind: "income" };
 }
 
-function expense(name: string, essential = false): CategorySeed {
-  return { name, kind: "expense", essential };
+function expense(name: string): CategorySeed {
+  return { name, kind: "expense" };
 }
 
 export const defaultCategoryGroups: CategoryGroupSeed[] = [
@@ -24,37 +23,37 @@ export const defaultCategoryGroups: CategoryGroupSeed[] = [
   },
   {
     name: "Home",
-    categories: [expense("Rent", true), expense("Property tax", true), expense("Home maintenance")],
+    categories: [expense("Rent"), expense("Property tax"), expense("Home maintenance")],
   },
   {
     name: "Bills",
     categories: [
-      expense("Utilities", true),
-      expense("Phone and internet", true),
-      expense("Insurance", true),
+      expense("Utilities"),
+      expense("Phone and internet"),
+      expense("Insurance"),
       expense("Subscriptions"),
     ],
   },
   {
     name: "Food",
-    categories: [expense("Groceries", true), expense("Eating out")],
+    categories: [expense("Groceries"), expense("Eating out")],
   },
   {
     name: "Transport",
     categories: [
-      expense("Fuel", true),
-      expense("Public transit", true),
+      expense("Fuel"),
+      expense("Public transit"),
       expense("Vehicle maintenance"),
       expense("Parking"),
     ],
   },
   {
     name: "Health",
-    categories: [expense("Medical", true), expense("Fitness")],
+    categories: [expense("Medical"), expense("Fitness")],
   },
   {
     name: "Family",
-    categories: [expense("Childcare", true), expense("Pets")],
+    categories: [expense("Childcare"), expense("Pets")],
   },
   {
     name: "Lifestyle",
@@ -70,7 +69,7 @@ export const defaultCategoryGroups: CategoryGroupSeed[] = [
   },
   {
     name: "Financial",
-    categories: [expense("Interest", true), expense("Bank fees"), expense("Taxes", true)],
+    categories: [expense("Interest"), expense("Bank fees"), expense("Taxes")],
   },
   {
     name: "Other",

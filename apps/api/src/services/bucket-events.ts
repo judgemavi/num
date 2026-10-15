@@ -27,11 +27,6 @@ function requireActiveBucket(tx: WriteTx, id: string) {
   return row;
 }
 
-function cleanNote(note: string | null | undefined) {
-  const value = note?.trim() ?? "";
-  return value.length > 0 ? value : null;
-}
-
 export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCreate & EventWriteInput): BucketEvent {
   if (!isIsoDate(input.date) || !Number.isSafeInteger(input.amount) || input.amount < 1) {
     throw new ServiceError("bucket_fields_invalid", 400);
@@ -75,7 +70,6 @@ export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCr
       otherBucketId,
       amount: input.amount,
       date: input.date,
-      note: cleanNote(input.note),
       month: null,
       undoneAt: null,
     };
@@ -152,7 +146,6 @@ export function coverBucket(db: Db, bucketId: string, input: BucketCover & Write
       otherBucketId: bucketId,
       amount: need,
       date: input.date,
-      note: null,
       month: null,
       undoneAt: null,
     };

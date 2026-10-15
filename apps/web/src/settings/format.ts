@@ -4,8 +4,6 @@ export function categoryError(code: ErrorCode | undefined): string {
   switch (code) {
     case "category_name_taken":
       return "A category already uses this name.";
-    case "essential_expense_only":
-      return "Only an expense category can be essential.";
     case "category_kind_locked":
       return "You cannot change this kind. A transaction or a bucket uses this category. Make a new category.";
     case "group_not_found":

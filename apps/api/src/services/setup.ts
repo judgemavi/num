@@ -7,8 +7,6 @@ import { insertEmergencyBucket } from "./buckets";
 import { defaultCategoryGroups } from "./default-categories";
 import { write, type AuditSource, type WriteTx } from "./write";
 
-const settingDefaults = [["staleImportDays", "10"]] as const;
-
 type SetupInput = {
   currency: string;
   categorySet: CategorySet;
@@ -70,7 +68,6 @@ function insertDefaultCategories(tx: WriteTx) {
           sortKey: foldName(category.name),
           kind: category.kind,
           groupId,
-          essential: category.essential,
         })
         .run();
       tx.audit({
@@ -82,7 +79,6 @@ function insertDefaultCategories(tx: WriteTx) {
           name: category.name,
           kind: category.kind,
           groupId,
-          essential: category.essential,
         },
       });
     }
@@ -114,9 +110,6 @@ export function runSetup(db: Db, input: SetupInput): { currency: CurrencyCode; c
       throw new ServiceError("setup_already_complete", 409);
     }
     insertSetting(tx, "currency", currency);
-    for (const [key, value] of settingDefaults) {
-      insertSetting(tx, key, value);
-    }
     if (input.categorySet === "default") {
       insertDefaultCategories(tx);
     }

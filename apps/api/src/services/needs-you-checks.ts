@@ -1,32 +1,17 @@
-import {
-  isIsoDate,
-  monthLastDay,
-  reviewAgeDays,
-  Temporal,
-  type AccountListQuery,
-  type Hygiene,
-} from "@num/shared";
+import { monthLastDay, reviewAgeDays, staleImportDays, Temporal, type AccountListQuery } from "@num/shared";
 import type { Db } from "../db";
-import { ServiceError } from "../service-error";
 import { listAccounts } from "./accounts";
 import { listOverspent } from "./buckets";
 import { lastCompleteMonths } from "./complete-months";
 import { emergencyBucket, readEmergencyFund } from "./emergency-fund";
-import { fundingPosition } from "./funding-book";
 import { poolChecks } from "./pool-checks";
 import { billsShortCheck } from "./bills";
-import { importFreshness, settingNumber } from "./book-settings";
+import { importFreshness } from "./book-settings";
 import { spendTotals } from "./insights-spend";
 import { loadLedgerLines } from "./ledger-lines";
 import { loadReviewState, type ReviewState } from "./needs-review";
 
 const pageSize = 200;
-
-function requireAsOf(asOf: string) {
-  if (!isIsoDate(asOf)) {
-    throw new ServiceError("as_of_invalid", 400, { asOf });
-  }
-}
 
 function pagesOf<T>(load: (page: number) => { items: T[]; total: number }) {
   const first = load(1);
@@ -74,34 +59,21 @@ function emergencyFund(db: Db, asOf: string) {
 }
 
 function importsCurrent(db: Db, asOf: string) {
-  const staleImportDays = settingNumber(db, "staleImportDays", 10);
   const imported = new Map(importFreshness(db, asOf).map((row) => [row.accountId, row.lastImportAt]));
   const items = accounts(db)
     .filter((account) => account.onBudget)
     .map((account) => {
       const at = imported.get(account.id) ?? null;
-      const lastImportDate = at && at.slice(0, 10) <= asOf ? at.slice(0, 10) : null;
-      const age = lastImportDate ? ageDays(asOf, lastImportDate) : null;
-      return {
-        accountId: account.id,
-        lastImportDate,
-        ageDays: age,
-        pass: age === null || age <= staleImportDays,
-      };
+      const age = at && at.slice(0, 10) <= asOf ? ageDays(asOf, at.slice(0, 10)) : null;
+      return { accountId: account.id, ageDays: age, pass: age === null || age <= staleImportDays };
     });
-  return { code: "imports_current" as const, pass: items.every((item) => item.pass), staleImportDays, items };
+  return { code: "imports_current" as const, pass: items.every((item) => item.pass), items };
 }
 
 function reviewAge(state: ReviewState, asOf: string) {
   const limit = Temporal.PlainDate.from(asOf).subtract({ days: reviewAgeDays }).toString();
-  const old = state.hits.filter((item) => item.date < limit);
-  let oldestDate: string | null = null;
-  for (const item of old) {
-    if (oldestDate === null || item.date < oldestDate) {
-      oldestDate = item.date;
-    }
-  }
-  return { code: "review" as const, pass: old.length === 0, limitDays: reviewAgeDays, oldCount: old.length, oldestDate };
+  const oldCount = state.hits.filter((item) => item.date < limit).length;
+  return { code: "review" as const, pass: oldCount === 0, oldCount };
 }
 
 /** The last 3 complete months, newest first. */
@@ -118,15 +90,17 @@ function savingsRate(db: Db, asOf: string) {
 }
 
 /** The fill covers a negative bucket from Unassigned. The check fails when a bucket stays negative. */
-function overspent(db: Db, asOf: string) {
+function overspent(db: Db) {
   const items = listOverspent(db).items;
   const balance = items.reduce((sum, item) => sum + item.balance, 0);
-  const free = fundingPosition(db, asOf).unassigned;
-  return { code: "overspent" as const, pass: items.length === 0, unassigned: free, count: items.length, balance };
+  return { code: "overspent" as const, pass: items.length === 0, count: items.length, balance };
 }
 
-/** The checks of §10 with the review state that the caller already read. */
-export function hygieneChecks(db: Db, asOf: string, state: ReviewState): Hygiene["checks"] {
+/**
+ * The checks of Needs you (§10). Needs you shows a check only when it fails. `state` is the review state that the
+ * caller already read.
+ */
+export function needsYouChecks(db: Db, asOf: string, state: ReviewState = loadReviewState(db, asOf)) {
   return [
     ...emergencyFund(db, asOf),
     billsShortCheck(db, asOf),
@@ -134,11 +108,8 @@ export function hygieneChecks(db: Db, asOf: string, state: ReviewState): Hygiene
     importsCurrent(db, asOf),
     reviewAge(state, asOf),
     savingsRate(db, asOf),
-    overspent(db, asOf),
+    overspent(db),
   ];
 }
 
-export function readHygiene(db: Db, asOf: string): Hygiene {
-  requireAsOf(asOf);
-  return { asOf, checks: hygieneChecks(db, asOf, loadReviewState(db, asOf)) };
-}
+export type NeedsYouCheck = ReturnType<typeof needsYouChecks>[number];

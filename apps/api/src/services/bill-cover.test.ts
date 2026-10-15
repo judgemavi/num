@@ -3,7 +3,7 @@ import { readAvailable } from "./available";
 import { listBillNeeds } from "./bills";
 import { expense, saved, tempDatabase } from "./bucket-test-book";
 import { account, addSchedule, money, spend } from "./funding-test-book";
-import { readHygiene } from "./hygiene";
+import { needsYouChecks } from "./needs-you-checks";
 import { autoLink, recurringSignals } from "./recurring-view";
 
 const asOf = "2026-10-15";
@@ -28,7 +28,7 @@ function book(cash: number, rentFirst: boolean) {
 }
 
 function billsShort(db: ReturnType<typeof tempDatabase>["db"]) {
-  return readHygiene(db, asOf).checks.find((check) => check.code === "bills_short");
+  return needsYouChecks(db, asOf).find((check) => check.code === "bills_short");
 }
 
 test("Unassigned covers the gap of a bill due next month: the bill is not short", () => {

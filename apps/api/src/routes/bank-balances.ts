@@ -123,5 +123,3 @@ export function bankBalanceRoutes(db: Db) {
       return c.json(deleteBankBalance(db, id, balanceId, { source: "ui" }), 200);
     });
 }
-
-export type BankBalanceRoutes = ReturnType<typeof bankBalanceRoutes>;

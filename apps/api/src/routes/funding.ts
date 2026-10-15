@@ -73,5 +73,3 @@ export function fundingRoutes(db: Db) {
     .openapi(availableRoute, (c) => c.json(readAvailable(db, c.req.valid("query").asOf), 200))
     .openapi(fillRoute, (c) => c.json(fillBuckets(db, { asOf: c.req.valid("query").asOf, source: "ui" }), 200));
 }
-
-export type FundingRoutes = ReturnType<typeof fundingRoutes>;

@@ -61,5 +61,3 @@ export function inboxRoutes(db: Db) {
     })
     .openapi(undoRoute, (c) => c.json(undoInboxDecision(db, c.req.valid("json").itemKey, { source: "ui" }), 200));
 }
-
-export type InboxRoutes = ReturnType<typeof inboxRoutes>;

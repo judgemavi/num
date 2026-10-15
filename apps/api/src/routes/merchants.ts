@@ -127,5 +127,3 @@ export function merchantRoutes(db: Db) {
       return c.json(mergeMerchants(db, id, c.req.valid("json").targetId, { source: "ui" }), 200);
     });
 }
-
-export type MerchantRoutes = ReturnType<typeof merchantRoutes>;

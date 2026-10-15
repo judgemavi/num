@@ -416,15 +416,8 @@ export {
   spendingIncreases,
   type SpendingIncrease,
 } from "./insights-changes";
-export {
-  hygieneCheckSchema,
-  hygieneSchema,
-  reviewAgeDays,
-  type Hygiene,
-  type HygieneCheck,
-} from "./hygiene";
 export { billFillsOn, billNeed, coverBills, pausePlan, projectedPoolShort, recedeOrder, recedePlan } from "./pool";
-export { needsYouSchema, type NeedsYou, type NeedsYouItem } from "./needs-you";
+export { needsYouSchema, reviewAgeDays, staleImportDays, type NeedsYou, type NeedsYouItem } from "./needs-you";
 export { reviewLevel, reviewLevels, type ReviewLevel } from "./review-level";
 export {
   approveResultSchema,

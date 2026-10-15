@@ -20,7 +20,6 @@ test("undo is rejected for an event of the monthly fill", () => {
         otherBucketId: null,
         amount: 1_000,
         date: "2026-03-01",
-        note: null,
         month: "2026-03",
         undoneAt: null,
       })

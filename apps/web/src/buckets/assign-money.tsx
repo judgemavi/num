@@ -33,7 +33,7 @@ export function AssignMoney({ bucket, kind }: AssignMoneyProps) {
   const save = useAddBucketEvent();
   const labels = copy[kind];
   const form = useAppForm({
-    defaultValues: { amount: "", date: localAsOf(), note: "" },
+    defaultValues: { amount: "", date: localAsOf() },
     validators: {
       onSubmit: ({ value }) => {
         const amount = moveAmount(currency, value.amount);
@@ -49,7 +49,7 @@ export function AssignMoney({ bucket, kind }: AssignMoneyProps) {
         await save.mutateAsync({
           bucketId: bucket.id,
           asOf: localAsOf(),
-          body: { kind, amount: amount.milli, date: value.date, note: value.note.trim() === "" ? null : value.note.trim() },
+          body: { kind, amount: amount.milli, date: value.date },
         });
         close("ok");
       } catch (error) {
@@ -70,7 +70,6 @@ export function AssignMoney({ bucket, kind }: AssignMoneyProps) {
         <DialogBody>
           <form.AppField name="amount">{(field) => <field.MoneyField id="assign-amount" label="Amount" required />}</form.AppField>
           <form.AppField name="date">{(field) => <field.DateInputField id="assign-date" label="Date" required />}</form.AppField>
-          <form.AppField name="note">{(field) => <field.TextField id="assign-note" label="Note" />}</form.AppField>
           <form.FormError />
         </DialogBody>
         <DialogFooter>

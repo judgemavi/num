@@ -8,7 +8,7 @@ import { expectCode, expense, saved, tempDatabase } from "./bucket-test-book";
 import { readBucket } from "./buckets";
 import { fillBuckets } from "./funding-fill";
 import { readOwed } from "./funding-months";
-import { readHygiene } from "./hygiene";
+import { needsYouChecks } from "./needs-you-checks";
 import { account, addSchedule, goal, money, sinking, spend } from "./funding-test-book";
 
 type Book = ReturnType<typeof tempDatabase>;
@@ -138,7 +138,7 @@ test("when the pool is short, the fill pays the bills in priority order and the 
       { bucketId: rent.id, dueDate: "2026-10-25", amount: 100_000, gap: 0, covered: 0, short: 0 },
       { bucketId: gym.id, dueDate: "2026-10-25", amount: 20_000, gap: 10_000, covered: 0, short: 10_000 },
     ]);
-    const check = readHygiene(book.db, "2026-10-08").checks.find((item) => item.code === "bills_short");
+    const check = needsYouChecks(book.db, "2026-10-08").find((item) => item.code === "bills_short");
     expect(check).toEqual({ code: "bills_short", pass: false, items: [{ bucketId: gym.id, dueDate: "2026-10-25", short: 10_000 }] });
   } finally {
     book.close();
@@ -178,7 +178,7 @@ test("the pool check suggests the non-essential spending first and lists the sav
     give(book, trip.id, 30_000);
     const rent = { kind: "commitment" as const, accountId: cash.id, startDate: "2026-10-25", freq: "monthly" as const, interval: 1, monthDay: 25 };
     addSchedule(book.db, { ...rent, name: "Rent", expectedAmount: -50_000 });
-    const check = readHygiene(book.db, "2026-10-08").checks.find((item) => item.code === "pool_short");
+    const check = needsYouChecks(book.db, "2026-10-08").find((item) => item.code === "pool_short");
     // Unassigned 0. Three rent payments in 90 days: the pool goes to −150 000.
     expect(check).toEqual({
       code: "pool_short",

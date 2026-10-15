@@ -94,7 +94,7 @@ function fundEvents(db: Reader, asOf: string): FillEvent[] {
 function writeEvents(tx: WriteTx, asOf: string, events: readonly FillEvent[]) {
   const date = monthStart(asOf.slice(0, 7));
   for (const planned of events) {
-    const event = { id: crypto.randomUUID(), ...planned, date, note: null, undoneAt: null };
+    const event = { id: crypto.randomUUID(), ...planned, date, undoneAt: null };
     tx.insert(bucketEvents).values(event).run();
     tx.audit({ entity: "bucket_events", entityId: event.id, action: "create", before: null, after: withoutId(event) });
   }

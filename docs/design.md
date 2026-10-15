@@ -140,7 +140,7 @@ Use shadcn `Table` only for the Transactions list. All other record lists use Li
 - Group headers have no visible buttons. Their actions (rename, delete) go in the group's "More" menu.
 - Archive, delete and other destructive actions are neutral menu items. Confirm them with `AlertDialog`.
   Do not use tomato for destructive actions. Tomato means "this needs you" only.
-- Show a status only when it is not the default. Example: show an "Essential" badge; do not show "Not essential".
+- Show a status only when it is not the default. Example: show a "Paused" badge on a bucket; do not show "Active".
 - Do not repeat information that the group already gives. Example: no "Income" label on rows in the Income group.
 - A button uses only the verb when the dialog, card, page or row already names the record: "Save", "Add", "New",
   "Delete". Keep the noun only when the verb alone is not clear: a menu item that opens a different record ("Add bank

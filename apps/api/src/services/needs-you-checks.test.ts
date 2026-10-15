@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrateDatabase, openDatabase, settings } from "@num/db";
-import { columnMapSchema, type ColumnMap, type HygieneCheck } from "@num/shared";
+import { columnMapSchema, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
@@ -11,8 +11,8 @@ import { archiveBucket, createBucket } from "./buckets";
 import { createCategory } from "./categories";
 import { fillBuckets } from "./funding-fill";
 import { emergency } from "./funding-test-book";
-import { readHygiene } from "./hygiene";
 import { importStatement } from "./imports";
+import { needsYouChecks, type NeedsYouCheck } from "./needs-you-checks";
 import { createSchedule } from "./schedule-test-book";
 import { createTransaction } from "./transactions";
 
@@ -29,7 +29,7 @@ const map: ColumnMap = columnMapSchema.parse({
 });
 
 function withBook(run: (db: Db, dir: string) => void) {
-  const dir = mkdtempSync(join(tmpdir(), "num-hygiene-"));
+  const dir = mkdtempSync(join(tmpdir(), "num-needs-you-checks-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
@@ -57,12 +57,12 @@ function expense(db: Db, name: string) {
   return createCategory(db, { name, kind: "expense", ...saved });
 }
 
-function check<T extends HygieneCheck["code"]>(db: Db, asOf: string, code: T): Extract<HygieneCheck, { code: T }> {
-  const found = readHygiene(db, asOf).checks.find((item) => item.code === code);
-  if (!found || found.code !== code) {
+function check<T extends NeedsYouCheck["code"]>(db: Db, asOf: string, code: T) {
+  const found = needsYouChecks(db, asOf).find((item): item is Extract<NeedsYouCheck, { code: T }> => item.code === code);
+  if (!found) {
     throw new Error(code);
   }
-  return found as Extract<HygieneCheck, { code: T }>;
+  return found;
 }
 
 function bill(db: Db, accountId: string, categoryId: string | null, freq: "monthly" | "yearly") {
@@ -147,7 +147,7 @@ test("an archived emergency bucket has no emergency fund check", () => {
   withBook((db) => {
     const fund = emergencyBook(db);
     archiveBucket(db, fund.id, saved);
-    expect(readHygiene(db, "2026-06-15").checks.map((item) => item.code)).not.toContain("emergency_fund");
+    expect(needsYouChecks(db, "2026-06-15").map((item) => item.code)).not.toContain("emergency_fund");
   });
 });
 
@@ -167,7 +167,7 @@ test("imports pass when each on-budget account was imported inside the stale win
     expect(result.kind).toBe("batch");
     const row = check(db, "2026-10-08", "imports_current");
     expect(row.pass).toBe(true);
-    expect(row.items).toEqual([{ accountId: cash.id, lastImportDate: "2026-10-08", ageDays: 0, pass: true }]);
+    expect(row.items).toEqual([{ accountId: cash.id, ageDays: 0, pass: true }]);
   });
 });
 
@@ -194,12 +194,11 @@ test("imports fail when an on-budget account has no recent import", () => {
     });
     const row = check(db, "2026-10-08", "imports_current");
     expect(row.pass).toBe(false);
-    expect(row.staleImportDays).toBe(10);
     expect(row.items[0]?.pass).toBe(false);
     expect(row.items[0]?.ageDays).toBe(37);
   });
 });
-test("the inbox passes when every item is within 7 days", () => {
+test("review passes when each transaction that needs review is 7 days old or less", () => {
   withBook((db) => {
     const cash = account(db, "chequing", "Cash", 1_000);
     createTransaction(db, {
@@ -210,11 +209,11 @@ test("the inbox passes when every item is within 7 days", () => {
       lines: [{ amount: -100 }],
       ...saved,
     });
-    expect(check(db, "2026-02-01", "review")).toMatchObject({ pass: true, limitDays: 7, oldCount: 0, oldestDate: null });
+    expect(check(db, "2026-02-01", "review")).toMatchObject({ pass: true, oldCount: 0 });
   });
 });
 
-test("the inbox fails when an item is older than 7 days", () => {
+test("review fails when a transaction needs review for more than 7 days", () => {
   withBook((db) => {
     const cash = account(db, "chequing", "Cash", 1_000);
     createTransaction(db, {
@@ -225,7 +224,7 @@ test("the inbox fails when an item is older than 7 days", () => {
       lines: [{ amount: -100 }],
       ...saved,
     });
-    expect(check(db, "2026-02-01", "review")).toMatchObject({ pass: false, oldCount: 1, oldestDate: "2026-01-01" });
+    expect(check(db, "2026-02-01", "review")).toMatchObject({ pass: false, oldCount: 1 });
   });
 });
 
@@ -295,7 +294,7 @@ test("overspent fails while a bucket is negative, and passes after the fill cove
     const food = expense(db, "Food");
     spendBucket(db, food.id, false, 10_000);
     post(db, cash.id, "2026-03-02", -400, food.id);
-    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: false, count: 1, balance: -400, unassigned: 100 });
+    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: false, count: 1, balance: -400 });
     fillBuckets(db, { asOf: "2026-04-02", source: "ui", at: "2026-04-02T10:00:00Z" });
     expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: true, count: 0 });
   });
@@ -308,7 +307,7 @@ test("overspent still fails after the fill when cash does not cover the bucket",
     spendBucket(db, food.id, false, 10_000);
     post(db, cash.id, "2026-03-02", -1_000, food.id);
     fillBuckets(db, { asOf: "2026-04-02", source: "ui", at: "2026-04-02T10:00:00Z" });
-    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: false, count: 1, balance: -500, unassigned: -500 });
+    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: false, count: 1, balance: -500 });
   });
 });
 
@@ -319,6 +318,15 @@ test("overspent passes when Unassigned is below zero but no bucket is negative",
     const other = expense(db, "Other");
     spendBucket(db, food.id, false, 10_000);
     post(db, cash.id, "2026-03-02", -900, other.id);
-    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: true, count: 0, unassigned: -400 });
+    expect(check(db, "2026-04-02", "overspent")).toMatchObject({ pass: true, count: 0 });
+  });
+});
+
+test("a cash account that was never imported does not fail", () => {
+  withBook((db) => {
+    const cash = account(db, "chequing", "Cash", 5_000);
+    const row = check(db, "2026-10-08", "imports_current");
+    expect(row.pass).toBe(true);
+    expect(row.items).toEqual([{ accountId: cash.id, ageDays: null, pass: true }]);
   });
 });

@@ -23,5 +23,3 @@ const feasibilityRoute = createRoute({
 export function feasibilityRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook }).openapi(feasibilityRoute, (c) => c.json(readFeasibility(db, c.req.valid("query").asOf), 200));
 }
-
-export type FeasibilityRoutes = ReturnType<typeof feasibilityRoutes>;

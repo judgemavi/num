@@ -89,7 +89,7 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
         <ArchiveMenuItem
           archived={bucket.archivedAt !== null}
           question={(restore) => ({
-            title: restore ? "Restore this commitment?" : "Archive this commitment?",
+            title: restore ? "Restore this bill?" : "Archive this bill?",
             description: restore
               ? `Restore ${bucket.name}. It returns to the active list.`
               : `Archive ${bucket.name}. The balance must be zero. It leaves the active list. You can restore it later.`,

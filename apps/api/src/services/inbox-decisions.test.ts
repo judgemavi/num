@@ -105,7 +105,7 @@ test("each no decision hides its review item until undo", () => {
   try {
     const cash = account(sample.db, "Cash");
     const savings = account(sample.db, "Savings");
-    const food = createCategory(sample.db, { name: "Food", kind: "expense", essential: false, ...saved });
+    const food = createCategory(sample.db, { name: "Food", kind: "expense", ...saved });
     const left = pay(sample.db, cash.id, "2026-03-05", -500_000, "Move", food.id);
     sample.db.update(transactions).set({ source: "import" }).where(eq(transactions.id, left.id)).run();
     const right = pay(sample.db, savings.id, "2026-03-06", 500_000, "Move", food.id);

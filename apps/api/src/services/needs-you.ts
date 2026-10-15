@@ -1,13 +1,13 @@
-import type { HygieneCheck, NeedsYou, NeedsYouItem } from "@num/shared";
+import type { NeedsYou, NeedsYouItem } from "@num/shared";
 import type { Db } from "../db";
 import { listBankStatuses } from "./bank-balances";
-import { hygieneChecks } from "./hygiene";
+import { needsYouChecks, type NeedsYouCheck } from "./needs-you-checks";
 import { readSpendingIncreases } from "./insights-changes";
 import { readFeasibility } from "./feasibility";
 import { loadReviewState, requireAsOf } from "./needs-review";
 
 /** The emergency fund below its target, the savings used this month, and the pool short ahead. */
-function poolItems(failed: readonly HygieneCheck[]): NeedsYouItem[] {
+function poolItems(failed: readonly NeedsYouCheck[]): NeedsYouItem[] {
   const items: NeedsYouItem[] = [];
   const fund = failed.find((check) => check.code === "emergency_fund");
   if (fund) {
@@ -25,13 +25,13 @@ function poolItems(failed: readonly HygieneCheck[]): NeedsYouItem[] {
 }
 
 /**
- * Home "Needs you": only the items that need the user, in the order of Home. The hygiene checks
- * (§10) stay as calculations. A check shows here only when it fails.
+ * Home "Needs you": only the items that need the user, in the order of Home. A check (§10) shows here only when it
+ * fails.
  */
 export function readNeedsYou(db: Db, asOf: string): NeedsYou {
   requireAsOf(asOf);
   const state = loadReviewState(db, asOf);
-  const failed = hygieneChecks(db, asOf, state).filter((check) => !check.pass);
+  const failed = needsYouChecks(db, asOf, state).filter((check) => !check.pass);
   const items: NeedsYouItem[] = [];
   if (state.hits.length > 0) {
     const old = failed.find((check) => check.code === "review");
@@ -45,7 +45,7 @@ export function readNeedsYou(db: Db, asOf: string): NeedsYou {
   const imports = failed.find((check) => check.code === "imports_current");
   if (imports) {
     const stale = imports.items.flatMap((item) => (!item.pass && item.ageDays !== null ? [{ accountId: item.accountId, ageDays: item.ageDays }] : []));
-    items.push({ code: "imports_stale", staleImportDays: imports.staleImportDays, items: stale });
+    items.push({ code: "imports_stale", items: stale });
   }
   for (const missed of state.signals.missed) {
     items.push({ code: "missed", bucketId: missed.bucketId, dueDate: missed.dueDate });

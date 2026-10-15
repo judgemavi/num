@@ -254,5 +254,3 @@ export function categoryRoutes(db: Db) {
       return c.json(restoreCategory(db, id, { source: "ui" }), 200);
     });
 }
-
-export type CategoryRoutes = ReturnType<typeof categoryRoutes>;

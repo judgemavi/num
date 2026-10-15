@@ -60,7 +60,6 @@ test("category and tag names stay unique when the case differs", () => {
     const category = createCategory(book.db, {
       name: "Groceries",
       kind: "expense",
-      essential: true,
       source: "ui",
       at,
     });
@@ -72,7 +71,6 @@ test("category and tag names stay unique when the case differs", () => {
       name: "GROCERIES",
       kind: "expense",
       groupId: null,
-      essential: true,
       source: "ui",
       at,
     });
@@ -81,25 +79,6 @@ test("category and tag names stay unique when the case differs", () => {
     const tag = createTag(book.db, { name: "Trip", source: "ui", at });
     expectCode(() => createTag(book.db, { name: "trip", source: "ui", at }), "tag_name_taken");
     expect(updateTag(book.db, tag.id, { name: "TRIP", source: "ui", at }).name).toBe("TRIP");
-  } finally {
-    book.close();
-  }
-});
-
-test("only an expense category can be essential", () => {
-  const book = tempDatabase();
-  try {
-    expectCode(
-      () => createCategory(book.db, { name: "Pay", kind: "income", essential: true, source: "ui", at }),
-      "essential_expense_only",
-    );
-    const pay = createCategory(book.db, { name: "Pay", kind: "income", source: "ui", at });
-    expect(pay.essential).toBe(false);
-    // A patch is checked on the stored category with the patch.
-    expectCode(() => updateCategory(book.db, pay.id, { essential: true, source: "ui", at }), "invalid_body");
-    const food = createCategory(book.db, { name: "Food", kind: "expense", essential: true, source: "ui", at });
-    expectCode(() => updateCategory(book.db, food.id, { kind: "income", source: "ui", at }), "invalid_body");
-    expect(updateCategory(book.db, food.id, { name: "Groceries", source: "ui", at })).toMatchObject({ name: "Groceries", essential: true });
   } finally {
     book.close();
   }
@@ -170,11 +149,9 @@ test("a kind change is allowed only when no line and no bucket use the category"
       name: "Pay",
       kind: "expense",
       groupId: null,
-      essential: true,
       ...write,
     });
     expect(changed.kind).toBe("expense");
-    expect(changed.essential).toBe(true);
 
     const used = createCategory(book.db, { name: "Groceries", kind: "expense", ...write });
     addLine(book.db, used.id);
@@ -184,7 +161,6 @@ test("a kind change is allowed only when no line and no bucket use the category"
           name: "Groceries",
           kind: "income",
           groupId: null,
-          essential: false,
           ...write,
         }),
       "category_kind_locked",
@@ -198,7 +174,6 @@ test("a kind change is allowed only when no line and no bucket use the category"
           name: "Fuel",
           kind: "income",
           groupId: null,
-          essential: false,
           ...write,
         }),
       "category_kind_locked",

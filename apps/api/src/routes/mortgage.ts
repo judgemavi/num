@@ -79,5 +79,3 @@ export function mortgageRoutes(db: Db) {
       return c.json(loanPaymentDefaults(db, query.accountId, query.date), 200);
     });
 }
-
-export type MortgageRoutes = ReturnType<typeof mortgageRoutes>;

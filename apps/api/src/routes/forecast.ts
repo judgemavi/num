@@ -27,5 +27,3 @@ export function forecastRoutes(db: Db) {
       return c.json(readForecast(db, asOf), 200);
     });
 }
-
-export type ForecastRoutes = ReturnType<typeof forecastRoutes>;

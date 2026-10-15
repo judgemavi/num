@@ -65,5 +65,3 @@ export function documentRoutes(db: Db, dataDir: string) {
       return c.json(eraseDocument(db, dataDir, id, { source: "ui" }), 200);
     });
 }
-
-export type DocumentRoutes = ReturnType<typeof documentRoutes>;

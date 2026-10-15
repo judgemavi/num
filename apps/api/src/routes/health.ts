@@ -25,5 +25,3 @@ const healthRoute = createRoute({
 export function healthRoutes() {
   return new OpenAPIHono({ defaultHook: validationHook }).openapi(healthRoute, (c) => c.json({ ok: true as const }, 200));
 }
-
-export type HealthRoutes = ReturnType<typeof healthRoutes>;

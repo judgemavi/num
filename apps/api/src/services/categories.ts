@@ -52,12 +52,6 @@ function assertCategoryName(tx: WriteTx, name: string, exceptId?: string) {
   }
 }
 
-function assertEssential(kind: CategoryKind, essential: boolean) {
-  if (kind === "income" && essential) {
-    throw new ServiceError("essential_expense_only", 400);
-  }
-}
-
 function assertKindChange(tx: WriteTx, id: string, current: CategoryKind, next: CategoryKind) {
   if (current === next) {
     return;
@@ -175,15 +169,12 @@ export function listCategories(db: Db, query: CategoryListQuery) {
 }
 
 export function createCategory(db: Db, input: CategoryCreate & WriteInput): Category {
-  const essential = input.essential ?? false;
-  assertEssential(input.kind, essential);
   const id = crypto.randomUUID();
   const row = {
     id,
     name: input.name.trim(),
     kind: input.kind,
     groupId: input.groupId ?? null,
-    essential,
     archivedAt: null,
   };
   write(db, { source: input.source, at: input.at }, (tx) => {
@@ -212,15 +203,13 @@ export function updateCategory(db: Db, id: string, input: CategoryUpdate & Write
       name: merged.name,
       kind: merged.kind,
       groupId: merged.groupId ?? null,
-      essential: merged.essential ?? false,
       archivedAt: existing.archivedAt,
     };
     assertKindChange(tx, id, existing.kind, next.kind);
-    assertEssential(next.kind, next.essential);
     assertGroup(tx, next.groupId);
     assertCategoryName(tx, next.name, id);
     tx.update(categories)
-      .set({ name: next.name, sortKey: foldName(next.name), kind: next.kind, groupId: next.groupId, essential: next.essential })
+      .set({ name: next.name, sortKey: foldName(next.name), kind: next.kind, groupId: next.groupId })
       .where(eq(categories.id, id))
       .run();
     tx.audit({

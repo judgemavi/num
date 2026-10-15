@@ -273,8 +273,6 @@ export const overspentListSchema = z.object({
   items: z.array(overspentBucketSchema),
 });
 
-const noteSchema = z.string().trim().min(1).nullable().optional();
-
 export const bucketEventSchema = z.object({
   id: z.uuid(),
   kind: z.enum(bucketEventKinds),
@@ -282,7 +280,6 @@ export const bucketEventSchema = z.object({
   otherBucketId: z.uuid().nullable(),
   amount: positiveAmountSchema,
   date: isoDateSchema,
-  note: z.string().nullable(),
   month: monthKeySchema.nullable(),
   undoneAt: z.string().refine(isUtcTimestamp).nullable(),
 });
@@ -292,7 +289,6 @@ export const bucketEventCreateSchema = z
     kind: z.enum(manualEventKinds),
     amount: positiveAmountSchema,
     date: isoDateSchema,
-    note: noteSchema,
     otherBucketId: z.uuid().nullable().optional(),
   })
   .refine((value) => (value.kind === "move") === (value.otherBucketId != null), { path: ["otherBucketId"] });
