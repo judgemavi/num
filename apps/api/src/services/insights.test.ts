@@ -109,11 +109,10 @@ test("group totals: refunds reduce spending, transfers are excluded, No group an
     const repairs = createCategory(book.db, { name: "Repairs", kind: "expense", groupId: home.id, ...saved });
     const fun = createCategory(book.db, { name: "Fun", kind: "expense", ...saved });
     const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
-    const shop = createMerchant(book.db, { name: "Shop", ...saved });
     const trip = createTag(book.db, { name: "Trip", ...saved });
     const gift = createTag(book.db, { name: "Gift", ...saved });
-    spend(book.db, { accountId: chequing.id, date: "2026-06-02", amount: -100_000, categoryId: groceries.id, merchantId: shop.id });
-    spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: 25_000, categoryId: groceries.id, merchantId: shop.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-02", amount: -100_000, categoryId: groceries.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: 25_000, categoryId: groceries.id });
     spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: 10_000, categoryId: repairs.id });
     spend(book.db, { accountId: chequing.id, date: "2026-06-04", amount: 400_000, categoryId: pay.id });
     spend(book.db, { accountId: chequing.id, date: "2026-06-05", amount: -80_000, transferAccountId: savings.id });
@@ -133,31 +132,55 @@ test("group totals: refunds reduce spending, transfers are excluded, No group an
     expect(report.spending).toBe(sums.spending);
     expect(report.income).toBe(sums.income);
     expect(report.spending).toBe(85_000);
-    expect(report.donut).toEqual([
-      { id: home.id, kind: "item", amount: 65_000, inflow: null },
-      { id: null, kind: "none", amount: 20_000, inflow: null },
-      { id: null, kind: "uncategorized", amount: 30_000, inflow: 0 },
+    expect(report.groups).toEqual([
+      {
+        id: home.id,
+        kind: "item",
+        amount: 65_000,
+        inflow: null,
+        categories: [
+          { id: groceries.id, kind: "item", amount: 75_000, inflow: null },
+          { id: repairs.id, kind: "item", amount: -10_000, inflow: null },
+        ],
+      },
+      { id: null, kind: "none", amount: 20_000, inflow: null, categories: [{ id: fun.id, kind: "item", amount: 20_000, inflow: null }] },
+      { id: null, kind: "uncategorized", amount: 30_000, inflow: 0, categories: [] },
     ]);
     expect(sums.uncategorized).toBe(-30_000);
+    expect(readInsights(book.db, { ...query, category: groceries.id }).groups).toEqual(report.groups);
 
-    const homeLevel = readInsights(book.db, { ...query, group: home.id });
-    expect(homeLevel.donut).toEqual([
-      { id: groceries.id, kind: "item", amount: 75_000, inflow: null },
-      { id: repairs.id, kind: "item", amount: -10_000, inflow: null },
-    ]);
-    const noGroup = readInsights(book.db, { ...query, group: "none" });
-    expect(noGroup.donut).toEqual([{ id: fun.id, kind: "item", amount: 20_000, inflow: null }]);
-    const oneCategory = readInsights(book.db, { ...query, group: home.id, category: groceries.id });
-    expect(oneCategory.donut).toEqual(homeLevel.donut);
-    expect(oneCategory.rows).toEqual([{ id: groceries.id, kind: "item", amount: 75_000, inflow: null }]);
-
-    expect(report.merchants).toEqual([
-      { id: shop.id, kind: "item", amount: 75_000, inflow: null },
-      { id: null, kind: "none", amount: 10_000, inflow: null },
-    ]);
     expect(report.tags).toHaveLength(2);
     expect(report.tags).toContainEqual({ id: trip.id, kind: "item", amount: 20_000, inflow: null });
     expect(report.tags).toContainEqual({ id: gift.id, kind: "item", amount: 20_000, inflow: null });
+  } finally {
+    book.close();
+  }
+});
+
+test("groups and their categories are largest first, and the order does not depend on the line order", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db, "Chequing", "chequing", "2026-01-01");
+    const bills = createCategoryGroup(book.db, { name: "Bills", ...saved });
+    const food = createCategoryGroup(book.db, { name: "Food", ...saved });
+    const rent = createCategory(book.db, { name: "Rent", kind: "expense", groupId: bills.id, ...saved });
+    const power = createCategory(book.db, { name: "Power", kind: "expense", groupId: bills.id, ...saved });
+    const dining = createCategory(book.db, { name: "Dining", kind: "expense", groupId: food.id, ...saved });
+    const refunded = createCategory(book.db, { name: "Refunded", kind: "expense", groupId: food.id, ...saved });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-02", amount: -20_000, categoryId: power.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: -50_000, categoryId: dining.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-04", amount: -90_000, categoryId: rent.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-05", amount: 5_000, categoryId: refunded.id });
+    const { groups } = readInsights(book.db, { asOf: "2026-06-30", window: "1" });
+    expect(groups.map((row) => [row.id, row.amount])).toEqual([
+      [bills.id, 110_000],
+      [food.id, 45_000],
+    ]);
+    expect(groups[0]?.categories.map((row) => row.id)).toEqual([rent.id, power.id]);
+    expect(groups[1]?.categories).toEqual([
+      { id: dining.id, kind: "item", amount: 50_000, inflow: null },
+      { id: refunded.id, kind: "item", amount: -5_000, inflow: null },
+    ]);
   } finally {
     book.close();
   }

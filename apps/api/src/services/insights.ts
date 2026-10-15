@@ -1,4 +1,4 @@
-import { categories, categoryGroups } from "@num/db";
+import { categories } from "@num/db";
 import { defaultInsightWindow, Temporal, type Insights, type InsightsQuery } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
@@ -6,7 +6,7 @@ import { ServiceError } from "../service-error";
 import { changeMonth, readInsightChanges } from "./insights-changes";
 import { loadLedgerLines } from "./ledger-lines";
 import { breakdownRange, firstTransactionDate, windowPeriod } from "./insights-period";
-import { categoryRow, donutRows, spendRows, spendTotals } from "./insights-spend";
+import { groupRows, spendTotals, tagRows } from "./insights-spend";
 import { readTimeline } from "./insights-timeline";
 import { netWorthSeries, type MonthPoint } from "./insights-worth";
 
@@ -26,11 +26,6 @@ function monthEnds(asOf: string, count: number) {
 }
 
 function assertFilters(db: Db, query: InsightsQuery) {
-  if (query.group && query.group !== "none") {
-    if (!db.select({ id: categoryGroups.id }).from(categoryGroups).where(eq(categoryGroups.id, query.group)).get()) {
-      throw new ServiceError("group_not_found", 404);
-    }
-  }
   if (query.category) {
     if (!db.select({ id: categories.id }).from(categories).where(eq(categories.id, query.category)).get()) {
       throw new ServiceError("category_not_found", 404);
@@ -45,7 +40,6 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
   const range = breakdownRange(period, query.month);
   const facts = loadLedgerLines(db);
   const category = query.category ?? null;
-  const donut = donutRows(facts, range, { group: query.group ?? null });
   const totals = spendTotals(facts, range);
   return {
     asOf: query.asOf,
@@ -58,10 +52,8 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
     savings: totals.savings,
     savingsRateMilliPct: totals.savingsRateMilliPct,
     changes: readInsightChanges(db, facts, changeMonth(period, query.month), query.asOf),
-    donut,
-    rows: category === null ? donut : [categoryRow(facts, range, category)],
-    merchants: spendRows(facts, range, (fact) => (fact.merchantId ? [fact.merchantId] : []), true),
-    tags: spendRows(facts, range, (fact) => fact.tagIds, false),
+    groups: groupRows(facts, range),
+    tags: tagRows(facts, range),
     timeline: readTimeline(db, facts, period, query.asOf, category),
     netWorth: netWorthSeries(db, monthEnds(query.asOf, 24)),
   };

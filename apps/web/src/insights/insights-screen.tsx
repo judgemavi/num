@@ -19,7 +19,6 @@ import { ForecastChart } from "@/plan/forecast-chart";
 const errorText: Partial<Record<ErrorCode, string>> = {
   period_invalid: "The start date is after the end date, or the month is not in the period.",
   category_not_found: "That category is not in the book.",
-  group_not_found: "That group is not in the book.",
   as_of_invalid: "The date is not valid.",
 };
 

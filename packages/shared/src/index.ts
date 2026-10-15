@@ -168,6 +168,7 @@ export {
   insightsSchema,
   insightsSearchSchema,
   type InsightFlow,
+  type InsightGroupRow,
   type InsightRow,
   type InsightRowKind,
   type InsightTimeline,

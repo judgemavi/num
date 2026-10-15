@@ -24,6 +24,8 @@ const insightsSearchFields = z.object({
   category: queryId,
 });
 
+const insightsRequestFields = insightsSearchFields.omit({ group: true });
+
 function checkPeriod(value: { window?: InsightWindow; from?: string; to?: string }, context: z.RefinementCtx) {
   const custom = value.window === "custom";
   if (custom && (value.from === undefined || value.to === undefined)) {
@@ -36,7 +38,7 @@ function checkPeriod(value: { window?: InsightWindow; from?: string; to?: string
 
 export const insightsSearchSchema = insightsSearchFields.superRefine(checkPeriod);
 
-export const insightsQuerySchema = insightsSearchFields.extend({ asOf: isoDateSchema }).superRefine(checkPeriod);
+export const insightsQuerySchema = insightsRequestFields.extend({ asOf: isoDateSchema }).superRefine(checkPeriod);
 
 export type InsightsSearch = z.output<typeof insightsSearchSchema>;
 export type InsightsQuery = z.output<typeof insightsQuerySchema>;
@@ -47,6 +49,8 @@ const rowSchema = z.object({
   amount: money,
   inflow: money.nullable(),
 });
+
+const groupRowSchema = rowSchema.extend({ categories: z.array(rowSchema) });
 
 const flowSchema = z.object({
   income: money,
@@ -89,9 +93,7 @@ export const insightsSchema = z.object({
   savings: money,
   savingsRateMilliPct: z.number().int().nullable(),
   changes: insightChangesSchema,
-  donut: z.array(rowSchema),
-  rows: z.array(rowSchema),
-  merchants: z.array(rowSchema),
+  groups: z.array(groupRowSchema),
   tags: z.array(rowSchema),
   timeline: timelineSchema,
   netWorth: z
@@ -108,6 +110,7 @@ export const insightsSchema = z.object({
 });
 
 export type InsightRow = z.infer<typeof rowSchema>;
+export type InsightGroupRow = z.infer<typeof groupRowSchema>;
 export type InsightFlow = z.infer<typeof flowSchema>;
 export type InsightTimelineMonth = z.infer<typeof timelineMonthSchema>;
 export type InsightTimeline = z.infer<typeof timelineSchema>;

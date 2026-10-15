@@ -1,0 +1,77 @@
+import type { InsightGroupRow, InsightRow } from "@num/shared";
+
+type Tone = { fill: string; stroke: string; dot: string };
+
+const palette: Tone[] = [
+  { fill: "fill-chart-1", stroke: "stroke-chart-1", dot: "bg-chart-1" },
+  { fill: "fill-chart-2", stroke: "stroke-chart-2", dot: "bg-chart-2" },
+  { fill: "fill-chart-3", stroke: "stroke-chart-3", dot: "bg-chart-3" },
+  { fill: "fill-chart-4", stroke: "stroke-chart-4", dot: "bg-chart-4" },
+  { fill: "fill-chart-5", stroke: "stroke-chart-5", dot: "bg-chart-5" },
+];
+
+export const neutralTone: Tone = { fill: "fill-est", stroke: "stroke-est", dot: "bg-est" };
+
+export type SliceColor = Tone & { opacity: number };
+
+export type Arc = {
+  key: string;
+  ring: "group" | "category";
+  groupKey: string;
+  row: InsightRow;
+  /** Start and end of the arc as a share of the full turn. */
+  start: number;
+  end: number;
+  /** The share of the category in the positive categories of its group. It is null for a group. */
+  ofGroup: number | null;
+  color: SliceColor;
+};
+
+export function rowKey(row: InsightRow): string {
+  return `${row.kind}-${row.id ?? ""}`;
+}
+
+function groupColor(kind: InsightRow["kind"], next: number): SliceColor {
+  if (kind === "uncategorized") {
+    return { ...neutralTone, opacity: 1 };
+  }
+  const round = Math.floor(next / palette.length);
+  return { ...(palette[next % palette.length] ?? neutralTone), opacity: round === 0 ? 1 : round === 1 ? 0.6 : 0.35 };
+}
+
+function categoryColor(group: SliceColor, index: number): SliceColor {
+  return { ...group, opacity: group.opacity * Math.max(0.35, 0.8 - 0.1 * index) };
+}
+
+/**
+ * The arcs of the two rings and the colour of each row with spending above zero.
+ * A category arc lies inside the arc of its group. A group with a refund can have positive categories
+ * that add up to more than its net spending. Thus the category arcs share the span of the group in proportion
+ * to the positive amounts of the categories. Rows at zero or less are not arcs.
+ */
+export function spendArcs(groups: readonly InsightGroupRow[]) {
+  const shown = groups.filter((group) => group.amount > 0);
+  const total = shown.reduce((sum, group) => sum + group.amount, 0);
+  const arcs: Arc[] = [];
+  let used = 0;
+  let next = 0;
+  for (const group of shown) {
+    const key = rowKey(group);
+    const color = groupColor(group.kind, next);
+    next += group.kind === "uncategorized" ? 0 : 1;
+    const start = used / total;
+    used += group.amount;
+    const end = used / total;
+    arcs.push({ key, ring: "group", groupKey: key, row: group, start, end, ofGroup: null, color });
+    const positive = group.categories.filter((category) => category.amount > 0);
+    const sum = positive.reduce((acc, category) => acc + category.amount, 0);
+    let inside = 0;
+    positive.forEach((category, index) => {
+      const from = start + ((end - start) * inside) / sum;
+      inside += category.amount;
+      const to = start + ((end - start) * inside) / sum;
+      arcs.push({ key: rowKey(category), ring: "category", groupKey: key, row: category, start: from, end: to, ofGroup: category.amount / sum, color: categoryColor(color, index) });
+    });
+  }
+  return { arcs, colors: new Map(arcs.map((arc) => [arc.key, arc.color])) };
+}
