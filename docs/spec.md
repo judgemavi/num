@@ -956,6 +956,9 @@ Spending is a part of Home (§14). It has no screen of its own.
   Transfers are not spending. The URL keeps the tag (`tagId`), as it keeps the period. A tag id that is not valid goes
   back to the default. The spending report query of the API takes an optional `tagId`. With a tag, the report has no
   income, no savings and no savings rate. Increases and the Needs you checks (§10) do not use the tag.
+- **Clear.** One "Clear" button in the row of the period selector and the tag selector. It shows only when a month
+  bar, a donut slice (a group or a category) or a tag is selected. A click removes the month, the group, the category
+  and the tag. It does not change the period or the "Groups | Categories" choice of the list.
 - **Timeline.** One chart: monthly income and spending bars.
   After `asOf`, it shows the forecast (§8, 90 days): the bar of the month of `asOf` has an actual part and a forecast
   part. Forecast income is the unlinked income occurrences. Forecast spending is the unlinked commitments and the

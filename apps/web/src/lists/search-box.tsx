@@ -42,7 +42,7 @@ export function SearchBox({ id, placeholder, label, query, onQuery }: SearchBoxP
       }}
     >
       {(field) => (
-        <InputGroup className="max-w-80 min-w-0 flex-1">
+        <InputGroup className="max-w-80 min-w-36 flex-1">
           <InputGroupAddon>
             <Search size={18} aria-hidden="true" />
           </InputGroupAddon>

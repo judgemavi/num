@@ -74,7 +74,7 @@ export function FilterBar({
 
   return (
     <div className="grid gap-3">
-      <div className="flex min-w-0 flex-nowrap items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         {search}
         {phone ? (
           <Sheet open={open} onOpenChange={changeOpen}>
@@ -107,6 +107,11 @@ export function FilterBar({
             </PopoverContent>
           </Popover>
         )}
+        {badges.length > 0 ? (
+          <Button type="button" variant="ghost" onClick={onClearAll}>
+            Clear
+          </Button>
+        ) : null}
         {sort ? (
           <div className="ml-auto shrink-0">{sort}</div>
         ) : null}
@@ -121,9 +126,6 @@ export function FilterBar({
               </Button>
             </Badge>
           ))}
-          <Button type="button" variant="ghost" onClick={onClearAll}>
-            Clear all
-          </Button>
         </div>
       ) : null}
     </div>

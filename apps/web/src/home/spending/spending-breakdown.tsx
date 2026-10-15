@@ -1,6 +1,5 @@
 import { defaultInsightListMode, insightListModes, type InsightGroupRow, type InsightRow, type TransactionFilter } from "@num/shared";
 import { useNavigate } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
 import { choiceIn } from "@/components/choice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -116,7 +115,7 @@ function ListModeToggle() {
  * and highlights the selected category. A month bar limits it to that month.
  */
 export function SelectedSpendList() {
-  const { data, search, patchSearch, colors, category, selectedGroup, groupName, categoryName, openTransactions } = useSpendSelection();
+  const { data, search, colors, category, selectedGroup, groupName, categoryName, openTransactions } = useSpendSelection();
   // A category of the selected group has the colour of its slice. In the flat list it has the colour of its group.
   const categoryRow = (row: InsightRow, colorOf: InsightRow) => ({
     key: rowKey(row),
@@ -146,21 +145,11 @@ export function SelectedSpendList() {
           .sort((a, b) => b.amount - a.amount)
       : data.groups.map(groupRow);
   const title = [search.month ? monthTitle(search.month) : null, selectedGroup ? groupName(selectedGroup) : null].filter(Boolean).join(": ") || "Groups and categories";
-  const filtered = Boolean(selectedGroup || search.month);
   return (
     <CategorySpendList
       title={title}
       rows={rows}
-      actions={
-        <>
-          {selectedGroup ? null : <ListModeToggle />}
-          {filtered ? (
-            <Button type="button" variant="ghost" onClick={() => patchSearch({ month: undefined, group: undefined, category: undefined })}>
-              Clear
-            </Button>
-          ) : null}
-        </>
-      }
+      actions={selectedGroup ? null : <ListModeToggle />}
     />
   );
 }

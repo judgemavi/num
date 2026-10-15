@@ -8,6 +8,7 @@ import { useBookCurrency, useCategoryNames, useTagNames } from "@/editors/lookup
 import { monthTitle, rateText } from "@/home/spending/format";
 import { SelectedSpendList, SpendDonutCard } from "@/home/spending/spending-breakdown";
 import { PeriodSelect } from "@/home/spending/period-select";
+import { SelectionClear } from "@/home/spending/selection-clear";
 import { TagSelect } from "@/home/spending/tag-select";
 import { TimelineChart } from "@/home/spending/timeline-chart";
 import { useSpendingReport } from "@/home/spending/use-spending";
@@ -82,8 +83,8 @@ function TimelineCard() {
 
 /**
  * Spending on Home: the period (default this month), the tag (default all spending), the timeline, the spending donut
- * and the list of groups and categories. The period and the tag selectors stay outside the boundary, thus the person
- * can change a period or a tag that does not load.
+ * and the list of groups and categories. The period and the tag selectors and "Clear" stay outside the boundary, thus
+ * the person can change a period or a tag that does not load.
  */
 export function SpendingSection() {
   return (
@@ -101,6 +102,7 @@ export function SpendingSection() {
         <Boundary loading={null} failed={() => null}>
           <TagSelect />
         </Boundary>
+        <SelectionClear />
       </div>
       <Boundary
         loading="Loading spending."

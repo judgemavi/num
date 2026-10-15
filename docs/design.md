@@ -171,9 +171,12 @@ page header: a muted chevron and the name of the parent page.
 - Left: search field (max 320px) with a search icon.
 - Then a "Filters" button (secondary). Its count badge shows the number of active filters.
   It opens a `Popover` on desktop and a `Sheet` on the phone with all filter fields and "Apply" / "Clear".
+- Then, only when filters are active: a "Clear" ghost button. A click removes all filters.
 - Right: the sort control (`Select` or `DropdownMenu`).
-- Below the bar, only when filters are active: one `Badge` for each active filter ("Account: Visa Card ×")
-  and a "Clear all" ghost button. A click on × removes that filter.
+- On the phone, the search field becomes narrower. When the row has no space, the sort control goes to a second
+  line. The bar does not scroll sideways.
+- Below the bar, only when filters are active: one `Badge` for each active filter ("Account: Visa Card ×").
+  The row has only the badges. A click on × removes that filter.
 - Do not show all filter fields on the page.
 
 **Focus:** one focus style for each control: a 3px iris ring (`ring`, full opacity). Do not add an outline as well.
