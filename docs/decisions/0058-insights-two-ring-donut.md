@@ -31,12 +31,14 @@ Status: approved (owner, 2026-10-14)
    the share of the total spending. A category slice shows the name, the group, the amount, the share of its group
    and the share of the total spending. The browser formats all values.
 7. **List (amends 0030 item 11).** On a wide screen (`lg` and wider), the timeline and the donut are in one row.
-   On a narrow screen, the donut is under the timeline. The list is under the timeline and the donut. It is hidden
-   when no month bar and no slice is selected. A selected month shows all groups of that month. A selected slice
-   shows only its group or category. "Clear" clears the month and the slice. The donut card has no month control. It shows the selected group: one row for the group total, and its categories
-   under it, each with a colour dot. When a category is selected, the list shows only that category under its group.
-   A row opens Transactions with the filter of the group or the category. A "Clear" control clears the selection.
-   Exact values without a selection are in the tooltips.
+   On a narrow screen, the donut is under the timeline. The list is under the timeline and the donut.
+   - The list is hidden when no month bar and no slice is selected. Exact values are then in the tooltips.
+   - A selected month bar opens the list with all groups of that month. Each group row has its total and a colour
+     dot. Its categories are rows under it, each with a colour dot.
+   - A selected group shows only that group with its categories. A selected category shows only that category
+     under its group.
+   - A row opens Transactions with the filter of the group, the category, or the uncategorized lines.
+   - "Clear" clears the month and the slice, and closes the list. The donut card has no month control.
 8. **Merchants and tags (amends 0030 items 16 and 18).** The list of spending by merchant is removed from the screen and from
    the API. The list of spending by tag is also removed from the screen and from the API.
    "New merchants" in Changes does not change.
