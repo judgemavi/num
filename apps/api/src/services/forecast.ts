@@ -1,7 +1,6 @@
 import { accounts, bucketCategories, buckets, categories, occurrenceLinks, transactionLines, transactions } from "@num/db";
 import {
   buildForecast,
-  cardPaymentDay,
   forecastDates,
   isIsoDate,
   occurrenceDates,
@@ -12,36 +11,13 @@ import {
   type ForecastFlow,
   type ForecastInput,
 } from "@num/shared";
-import { and, asc, eq, gt, isNotNull, isNull, lte } from "drizzle-orm";
-import { alias } from "drizzle-orm/sqlite-core";
+import { and, eq, gt, isNotNull, isNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { balancesOf } from "./account-balance";
 import { lastCompleteMonths } from "./complete-months";
 import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
 import { activeSchedules, scheduleAmounts, type ScheduleView } from "./schedules";
-import { literal } from "./transaction-sql";
-
-const peer = alias(transactions, "peer");
-
-function usualAccount(rows: readonly { accountId: string; date: string }[]) {
-  const counts = new Map<string, { count: number; latest: string }>();
-  for (const row of rows) {
-    const current = counts.get(row.accountId) ?? { count: 0, latest: "" };
-    current.count += 1;
-    if (row.date > current.latest) {
-      current.latest = row.date;
-    }
-    counts.set(row.accountId, current);
-  }
-  let best: { id: string; count: number; latest: string } | null = null;
-  for (const [id, current] of counts) {
-    if (!best || current.count > best.count || (current.count === best.count && current.latest > best.latest)) {
-      best = { id, ...current };
-    }
-  }
-  return best?.id ?? null;
-}
 
 function scheduleFlows(schedule: ScheduleView, date: string, amount: number): ForecastFlow[] {
   if (schedule.kind === "income") {
@@ -70,7 +46,6 @@ export function forecastInput(db: Db, asOf: string): ForecastInput & { transfers
     .select()
     .from(accounts)
     .where(and(eq(accounts.onBudget, true), isNull(accounts.archivedAt)))
-    .orderBy(asc(accounts.name))
     .all();
   const accountIds = new Set(openAccounts.map((row) => row.id));
   const schedules = activeSchedules(db);
@@ -89,14 +64,14 @@ export function forecastInput(db: Db, asOf: string): ForecastInput & { transfers
         continue;
       }
       if (accountIds.has(schedule.accountId)) {
-        deltas.push({ date: date.dueDate, accountId: schedule.accountId, amount, series: "known" });
+        deltas.push({ date: date.dueDate, amount, series: "known" });
         flows.push(...scheduleFlows(schedule, date.dueDate, amount));
         if (schedule.kind === "commitment" && schedule.transferAccountId && !accountIds.has(schedule.transferAccountId)) {
           transfersOut.push({ date: date.dueDate, income: 0, spending: -amount, bucketId: schedule.id });
         }
       }
       if (schedule.transferAccountId && accountIds.has(schedule.transferAccountId)) {
-        deltas.push({ date: date.dueDate, accountId: schedule.transferAccountId, amount: -amount, series: "known" });
+        deltas.push({ date: date.dueDate, amount: -amount, series: "known" });
       }
     }
   }
@@ -106,7 +81,7 @@ export function forecastInput(db: Db, asOf: string): ForecastInput & { transfers
     .where(and(gt(transactions.date, asOf), lte(transactions.date, horizonEnd)))
     .all()) {
     if (accountIds.has(row.accountId)) {
-      deltas.push({ date: row.date, accountId: row.accountId, amount: row.amount, series: "known" });
+      deltas.push({ date: row.date, amount: row.amount, series: "known" });
     }
   }
 
@@ -137,13 +112,13 @@ export function forecastInput(db: Db, asOf: string): ForecastInput & { transfers
     .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
     .where(and(isNotNull(transactionLines.categoryId)))
     .all();
-  const monthly: { accountId: string; monthly: number; bucketId: string | null }[] = [];
+  const monthly: { monthly: number; bucketId: string | null }[] = [];
   for (const bucket of spending) {
     const categoryIds = new Set([...bucketOf].filter(([, bucketId]) => bucketId === bucket.id).map(([categoryId]) => categoryId));
-    const rows = lines.filter((line) => line.categoryId !== null && categoryIds.has(line.categoryId) && accountIds.has(line.accountId));
-    const accountId = usualAccount(rows);
-    if (accountId && bucket.refillTo) {
-      monthly.push({ accountId, monthly: bucket.refillTo, bucketId: bucket.id });
+    // A spending bucket counts only when an open on-budget account has a line in its categories.
+    const used = lines.some((line) => line.categoryId !== null && categoryIds.has(line.categoryId) && accountIds.has(line.accountId));
+    if (used && bucket.refillTo) {
+      monthly.push({ monthly: bucket.refillTo, bucketId: bucket.id });
     }
   }
   for (const categoryId of expenseIds) {
@@ -162,50 +137,19 @@ export function forecastInput(db: Db, asOf: string): ForecastInput & { transfers
       rows.flatMap((line) => (line.categoryId ? [{ month: line.date.slice(0, 7), amount: line.amount }] : [])),
       step,
     );
-    const accountId = usualAccount(rows.filter((line) => accountIds.has(line.accountId)));
-    if (accountId && amount > 0) {
-      monthly.push({ accountId, monthly: amount, bucketId: null });
+    if (amount > 0) {
+      monthly.push({ monthly: amount, bucketId: null });
     }
   }
   const variable = spendDeltas(dates, monthly, step);
   deltas.push(...variable);
   flows.push(...variable.map((delta) => ({ date: delta.date, income: 0, spending: -delta.amount, bucketId: delta.bucketId })));
 
-  const warnings: Forecast["warnings"] = [];
-  const cards = [];
-  for (const account of openAccounts) {
-    const policy = account.paymentPolicy;
-    if (account.kind !== "credit_card" || policy === null) {
-      continue;
-    }
-    const payments = db
-      .select({ date: transactions.date, accountId: peer.accountId })
-      .from(transactions)
-      .innerJoin(peer, eq(peer.id, transactions.transferPeerId))
-      .where(and(eq(transactions.accountId, account.id), gt(transactions.amount, literal(0))))
-      .all();
-    const paymentDay = cardPaymentDay(
-      payments.map((row) => row.date),
-      asOf,
-    );
-    if (policy === "manual" || paymentDay === null) {
-      warnings.push({ code: "manual_card", accountId: account.id });
-    }
-    const paymentAccountId = usualAccount(payments);
-    cards.push({ accountId: account.id, paymentAccountId, policy, fixedPayment: account.fixedPayment, paymentDay });
-  }
-
   return {
     asOf,
-    warnings,
-    accounts: balancesOf(db, openAccounts, asOf).map(({ account, balance }) => ({
-      id: account.id,
-      kind: account.kind,
-      balance,
-    })),
+    balance: balancesOf(db, openAccounts, asOf).reduce((sum, row) => sum + row.balance, 0),
     deltas,
     flows,
-    cards,
     transfersOut,
   };
 }

@@ -1,6 +1,5 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
-import type { AccountKind, PaymentPolicy } from "./account";
 import { isoDateSchema } from "./date";
 import { isMonthKey } from "./month";
 import { roundToStep } from "./currency";
@@ -9,18 +8,9 @@ import { amountSchema } from "./money";
 
 export const forecastDayCount = 90;
 
-export const forecastWarningCodes = ["manual_card"] as const;
-
-export const forecastRisks = ["below_zero"] as const;
-
 const seriesSchema = z.object({
   known: z.array(amountSchema).length(forecastDayCount),
   estimated: z.array(amountSchema).length(forecastDayCount),
-});
-
-const pointSchema = z.object({
-  date: isoDateSchema,
-  amount: amountSchema,
 });
 
 const monthFlowSchema = z.object({
@@ -32,34 +22,17 @@ const monthFlowSchema = z.object({
 export const forecastSchema = z.object({
   asOf: isoDateSchema,
   dates: z.array(isoDateSchema).length(forecastDayCount),
-  lowest: pointSchema,
-  warnings: z.array(
-    z.object({
-      code: z.enum(forecastWarningCodes),
-      accountId: z.uuid(),
-    }),
-  ),
-  accounts: z.array(
-    z.object({
-      accountId: z.uuid(),
-      known: z.array(amountSchema).length(forecastDayCount),
-      estimated: z.array(amountSchema).length(forecastDayCount),
-      lowest: pointSchema,
-      risk: z.enum(forecastRisks).nullable(),
-    }),
-  ),
+  /** The total balance of the open on-budget accounts at the end of each day. */
   total: seriesSchema,
   months: z.array(monthFlowSchema),
 });
 
 export type Forecast = z.infer<typeof forecastSchema>;
 export type ForecastMonth = z.infer<typeof monthFlowSchema>;
-export type ForecastWarningCode = (typeof forecastWarningCodes)[number];
-export type ForecastRisk = (typeof forecastRisks)[number];
 
+/** A change of the on-budget total on one day. */
 export type ForecastDelta = {
   date: string;
-  accountId: string;
   amount: number;
   series: "known" | "estimated";
 };
@@ -72,23 +45,12 @@ export type ForecastFlow = {
   bucketId: string | null;
 };
 
-export type ForecastCard = {
-  accountId: string;
-  paymentAccountId: string | null;
-  policy: PaymentPolicy;
-  fixedPayment: number | null;
-  paymentDay: number | null;
-};
-
-const riskKinds = new Set<AccountKind>(["chequing", "savings", "cash"]);
-
+/** `balance` is the on-budget total on `asOf`. */
 export type ForecastInput = {
   asOf: string;
-  warnings: { code: ForecastWarningCode; accountId: string }[];
-  accounts: { id: string; kind: AccountKind; balance: number }[];
+  balance: number;
   deltas: ForecastDelta[];
   flows: ForecastFlow[];
-  cards: ForecastCard[];
 };
 
 export function forecastDates(asOf: string): string[] {
@@ -121,7 +83,7 @@ export function unbucketedMonthly(months: readonly string[], lines: readonly { m
 /** The daily deltas of each monthly spending item. Each delta keeps the bucket of its item. */
 export function spendDeltas(
   dates: readonly string[],
-  items: readonly { accountId: string; monthly: number; bucketId: string | null }[],
+  items: readonly { monthly: number; bucketId: string | null }[],
   step: number,
 ): (ForecastDelta & { bucketId: string | null })[] {
   const shares = new Map<string, number[]>();
@@ -142,7 +104,7 @@ export function spendDeltas(
       if (share === 0) {
         continue;
       }
-      deltas.push({ date, accountId: item.accountId, amount: -share, series: "estimated", bucketId: item.bucketId });
+      deltas.push({ date, amount: -share, series: "estimated", bucketId: item.bucketId });
     }
   }
   return deltas;
@@ -176,121 +138,32 @@ function dailyShares(total: number, daysInMonth: number, step: number) {
   return Array.from({ length: daysInMonth }, (_, index) => (index < extra ? base + 1 : base) * step);
 }
 
-/** The usual day of the month of the payments into a card in the last 12 months before `asOf`. */
-export function cardPaymentDay(paymentDates: readonly string[], asOf: string): number | null {
-  const from = Temporal.PlainDate.from(asOf).subtract({ months: 12 }).toString();
-  const days = paymentDates
-    .filter((date) => date > from && date <= asOf)
-    .map((date) => Temporal.PlainDate.from(date).day);
-  return days.length === 0 ? null : medianOf(days);
-}
-
-function isPaymentDay(date: string, paymentDay: number) {
-  const plain = Temporal.PlainDate.from(date);
-  return plain.day === Math.min(paymentDay, plain.daysInMonth);
-}
-
-function lowestPoint(dates: readonly string[], values: readonly number[]) {
-  let index = 0;
-  for (let cursor = 1; cursor < values.length; cursor += 1) {
-    if ((values[cursor] ?? 0) < (values[index] ?? 0)) {
-      index = cursor;
-    }
-  }
-  return { date: dates[index] ?? dates[0] ?? "", amount: values[index] ?? 0 };
-}
-
-function addTo(bucket: Map<string, number>, accountId: string, amount: number) {
-  bucket.set(accountId, (bucket.get(accountId) ?? 0) + amount);
-}
-
-function pay(series: Map<string, number>, cardId: string, paymentAccountId: string | null, scheduled: number) {
-  if (scheduled <= 0 || paymentAccountId === null || !series.has(cardId) || !series.has(paymentAccountId)) {
-    return;
-  }
-  const balance = series.get(cardId) ?? 0;
-  const amount = Math.min(scheduled, Math.max(0, -balance));
-  if (amount === 0) {
-    return;
-  }
-  series.set(cardId, balance + amount);
-  series.set(paymentAccountId, (series.get(paymentAccountId) ?? 0) - amount);
-}
-
-function applyDay(series: Map<string, number>, deltas: Map<string, number>) {
-  for (const [accountId, amount] of deltas) {
-    if (!series.has(accountId)) {
-      continue;
-    }
-    series.set(accountId, (series.get(accountId) ?? 0) + amount);
-  }
-}
-
 export function buildForecast(input: ForecastInput): Forecast {
   const dates = forecastDates(input.asOf);
   const indexOf = new Map(dates.map((date, index) => [date, index]));
-  const ids = input.accounts.map((account) => account.id);
-  const kinds = new Map(input.accounts.map((account) => [account.id, account.kind]));
-  const known = new Map(input.accounts.map((account) => [account.id, account.balance]));
-  const estimated = new Map(known);
-  const knownDeltas = Array.from({ length: forecastDayCount }, () => new Map<string, number>());
-  const estimatedDeltas = Array.from({ length: forecastDayCount }, () => new Map<string, number>());
+  const knownDeltas = dates.map(() => 0);
+  const estimatedDeltas = dates.map(() => 0);
   for (const delta of input.deltas) {
     const index = indexOf.get(delta.date);
     if (index === undefined) {
       continue;
     }
-    addTo(delta.series === "known" ? knownDeltas[index]! : estimatedDeltas[index]!, delta.accountId, delta.amount);
+    const target = delta.series === "known" ? knownDeltas : estimatedDeltas;
+    target[index] = (target[index] ?? 0) + delta.amount;
   }
-
-  const knownSeries = new Map<string, number[]>(ids.map((id) => [id, []]));
-  const estimatedSeries = new Map<string, number[]>(ids.map((id) => [id, []]));
-  const cutOff = new Map(input.cards.map((card) => [card.accountId, Math.max(0, -(known.get(card.accountId) ?? 0))]));
-  const paid = new Set<string>();
+  let known = input.balance;
+  let estimated = input.balance;
+  const totalKnown: number[] = [];
+  const totalEstimated: number[] = [];
   for (let day = 0; day < dates.length; day += 1) {
-    const date = dates[day] ?? "";
-    applyDay(known, knownDeltas[day] ?? new Map());
-    applyDay(estimated, knownDeltas[day] ?? new Map());
-    applyDay(estimated, estimatedDeltas[day] ?? new Map());
-    for (const card of input.cards) {
-      if (card.policy === "manual" || card.paymentDay === null || !isPaymentDay(date, card.paymentDay)) {
-        continue;
-      }
-      const owed = cutOff.get(card.accountId) ?? 0;
-      const scheduled = card.policy === "fixed" ? (card.fixedPayment ?? 0) : owed;
-      if (!paid.has(card.accountId)) {
-        pay(known, card.accountId, card.paymentAccountId, scheduled);
-        paid.add(card.accountId);
-      }
-      pay(estimated, card.accountId, card.paymentAccountId, scheduled);
-      cutOff.set(card.accountId, Math.max(0, -(estimated.get(card.accountId) ?? 0)));
-    }
-    for (const id of ids) {
-      knownSeries.get(id)?.push(known.get(id) ?? 0);
-      estimatedSeries.get(id)?.push(estimated.get(id) ?? 0);
-    }
+    known += knownDeltas[day] ?? 0;
+    estimated += (knownDeltas[day] ?? 0) + (estimatedDeltas[day] ?? 0);
+    totalKnown.push(known);
+    totalEstimated.push(estimated);
   }
-
-  const totalKnown = dates.map((_, day) => ids.reduce((sum, id) => sum + (knownSeries.get(id)?.[day] ?? 0), 0));
-  const totalEstimated = dates.map((_, day) => ids.reduce((sum, id) => sum + (estimatedSeries.get(id)?.[day] ?? 0), 0));
   return {
     asOf: input.asOf,
     dates,
-    lowest: lowestPoint(dates, totalEstimated),
-    warnings: input.warnings,
-    accounts: ids.map((id) => {
-      const estimatedValues = estimatedSeries.get(id) ?? [];
-      const low = estimatedValues.length === 0 ? 0 : Math.min(...estimatedValues);
-      const kind = kinds.get(id);
-      const risk: ForecastRisk | null = kind && riskKinds.has(kind) && low < 0 ? "below_zero" : null;
-      return {
-        accountId: id,
-        known: knownSeries.get(id) ?? [],
-        estimated: estimatedValues,
-        lowest: lowestPoint(dates, estimatedValues),
-        risk,
-      };
-    }),
     total: { known: totalKnown, estimated: totalEstimated },
     months: forecastMonths(dates, input.flows),
   };

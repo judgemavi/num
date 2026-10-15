@@ -34,18 +34,6 @@ function cashAccount(db: Db, name: string, openingBalance: number) {
   return createAccount(db, { name, kind: "chequing", openingDate: "2026-01-01", openingBalance, ...saved });
 }
 
-function cardAccount(db: Db, policy: "full" | "manual" | "fixed", fixedPayment: number | null = null) {
-  return createAccount(db, {
-    name: "Card",
-    kind: "credit_card",
-    openingDate: "2026-01-01",
-    openingBalance: 0,
-    paymentPolicy: policy,
-    fixedPayment,
-    ...saved,
-  });
-}
-
 function expense(db: Db, name: string) {
   return createCategory(db, { name, kind: "expense", ...saved });
 }
@@ -60,44 +48,6 @@ function spend(db: Db, accountId: string, categoryId: string, date: string, amou
     ...saved,
   });
 }
-
-function payCard(db: Db, fromId: string, cardId: string, date: string, amount: number) {
-  return createTransaction(db, {
-    accountId: fromId,
-    date,
-    amount: -amount,
-    payeeRaw: "Card payment",
-    lines: [{ amount: -amount, transferAccountId: cardId }],
-    ...saved,
-  });
-}
-
-test("a card purchase moves cash on the payment day only", () => {
-  const book = tempDatabase();
-  try {
-    const cash = cashAccount(book.db, "Cash", 500_000);
-    const card = cardAccount(book.db, "full");
-    const groceries = expense(book.db, "Groceries");
-    spend(book.db, card.id, groceries.id, "2026-08-01", -10_000);
-    payCard(book.db, cash.id, card.id, "2026-08-22", 10_000);
-    spend(book.db, card.id, groceries.id, "2026-09-01", -10_000);
-    payCard(book.db, cash.id, card.id, "2026-09-22", 10_000);
-    spend(book.db, card.id, groceries.id, "2026-10-01", -20_000);
-
-    const forecast = readForecast(book.db, "2026-10-08");
-    const cashRow = forecast.accounts.find((row) => row.accountId === cash.id);
-    const cardRow = forecast.accounts.find((row) => row.accountId === card.id);
-    const before = forecast.dates.indexOf("2026-10-21");
-    const due = forecast.dates.indexOf("2026-10-22");
-    expect(cashRow?.known[before]).toBe(480_000);
-    expect(cashRow?.known[due]).toBe(460_000);
-    expect(cardRow?.known[before]).toBe(-20_000);
-    expect(cardRow?.known[due]).toBe(0);
-    expect(forecast.total.known[before]).toBe(forecast.total.known[due]);
-  } finally {
-    book.close();
-  }
-});
 
 test("bucket spending is not counted two times", () => {
   const book = tempDatabase();
@@ -129,8 +79,7 @@ test("bucket spending is not counted two times", () => {
       spend(book.db, cash.id, groceries.id, `${month}-15`, -90_000);
     }
     const forecast = readForecast(book.db, "2026-10-01");
-    const row = forecast.accounts.find((item) => item.accountId === cash.id);
-    expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 1_000);
+    expect(forecast.total.estimated[0]).toBe((forecast.total.known[0] ?? 0) - 1_000);
   } finally {
     book.close();
   }
@@ -147,8 +96,7 @@ test("outlier lines are not included in category spending", () => {
     spend(book.db, cash.id, snacks.id, "2026-02-16", -100_000);
     spend(book.db, cash.id, snacks.id, "2026-03-16", -100_000);
     const forecast = readForecast(book.db, "2026-04-01");
-    const row = forecast.accounts.find((item) => item.accountId === cash.id);
-    expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 40);
+    expect(forecast.total.estimated[0]).toBe((forecast.total.known[0] ?? 0) - 40);
   } finally {
     book.close();
   }
@@ -189,7 +137,7 @@ test("variable income uses the median of the last 6 actuals", () => {
   try {
     const cash = cashAccount(book.db, "Cash", 0);
     const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
-    const plan = createSchedule(book.db, {
+    const salary = createSchedule(book.db, {
       name: "Pay",
       kind: "income",
       accountId: cash.id,
@@ -216,11 +164,10 @@ test("variable income uses the median of the last 6 actuals", () => {
         lines: [{ amount, categoryId: pay.id }],
         ...saved,
       });
-      linkOccurrence(book.db, plan.id, date, txn.id, saved);
+      linkOccurrence(book.db, salary.id, date, txn.id, saved);
     }
     const forecast = readForecast(book.db, "2026-07-01");
-    const row = forecast.accounts.find((item) => item.accountId === cash.id);
-    expect(row?.known[0]).toBe(21_000 + 3_500);
+    expect(forecast.total.known[0]).toBe(21_000 + 3_500);
   } finally {
     book.close();
   }

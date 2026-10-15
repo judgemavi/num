@@ -112,10 +112,6 @@ test("forecast months: unlinked income, bills and variable spending; card paymen
     record(book.db, card.id, "2026-10-01", -20_000, {});
 
     const forecast = readForecast(book.db, "2026-10-01");
-    const cashRow = forecast.accounts.find((row) => row.accountId === cash.id);
-    const due = forecast.dates.indexOf("2026-10-22");
-    expect((cashRow?.known[due] ?? 0) - (cashRow?.known[due - 1] ?? 0)).toBe(-20_000);
-
     expect(forecast.months).toEqual([
       { month: "2026-10", income: 0, spending: 30_000 + 93_000 + 31_000 },
       { month: "2026-11", income: 50_000, spending: 30_000 + 93_000 + 31_000 },

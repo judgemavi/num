@@ -33,18 +33,6 @@ function cashAccount(db: Db, name: string, openingBalance: number) {
   return createAccount(db, { name, kind: "chequing", openingDate: "2026-01-01", openingBalance, ...saved });
 }
 
-function cardAccount(db: Db, policy: "full" | "manual" | "fixed", fixedPayment: number | null = null) {
-  return createAccount(db, {
-    name: "Card",
-    kind: "credit_card",
-    openingDate: "2026-01-01",
-    openingBalance: 0,
-    paymentPolicy: policy,
-    fixedPayment,
-    ...saved,
-  });
-}
-
 function expense(db: Db, name: string) {
   return createCategory(db, { name, kind: "expense", ...saved });
 }
@@ -56,17 +44,6 @@ function spend(db: Db, accountId: string, categoryId: string, date: string, amou
     amount,
     payeeRaw: "Shop",
     lines: [{ amount, categoryId }],
-    ...saved,
-  });
-}
-
-function payCard(db: Db, fromId: string, cardId: string, date: string, amount: number) {
-  return createTransaction(db, {
-    accountId: fromId,
-    date,
-    amount: -amount,
-    payeeRaw: "Card payment",
-    lines: [{ amount: -amount, transferAccountId: cardId }],
     ...saved,
   });
 }
@@ -97,79 +74,6 @@ function bill(
   });
 }
 
-test("a card has no below-zero risk", () => {
-  const book = tempDatabase();
-  try {
-    const cash = cashAccount(book.db, "Cash", 1_000);
-    const card = cardAccount(book.db, "manual");
-    spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -5_000);
-    bill(book.db, cash.id, -2_000, "2026-10-15");
-    const forecast = readForecast(book.db, "2026-10-08");
-    expect(forecast.accounts.find((row) => row.accountId === card.id)?.risk).toBeNull();
-    expect(forecast.accounts.find((row) => row.accountId === cash.id)?.known[forecast.dates.indexOf("2026-10-14")]).toBe(1_000);
-    expect(forecast.accounts.find((row) => row.accountId === cash.id)?.risk).toBe("below_zero");
-    expect(forecast.warnings).toEqual([{ code: "manual_card", accountId: card.id }]);
-  } finally {
-    book.close();
-  }
-});
-
-test("a full card with no payment history has no payment and gets the manual warning", () => {
-  const book = tempDatabase();
-  try {
-    const cash = cashAccount(book.db, "Cash", 100_000);
-    const card = cardAccount(book.db, "full");
-    spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -20_000);
-    const forecast = readForecast(book.db, "2026-10-08");
-    expect(forecast.warnings).toEqual([{ code: "manual_card", accountId: card.id }]);
-    expect(forecast.accounts.find((row) => row.accountId === cash.id)?.estimated.at(-1)).toBe(100_000);
-  } finally {
-    book.close();
-  }
-});
-
-test("a full card pays its balance on asOf on the median payment day, from the usual payment account", () => {
-  const book = tempDatabase();
-  try {
-    const cash = cashAccount(book.db, "Cash", 100_000);
-    const other = cashAccount(book.db, "Other", 100_000);
-    const card = cardAccount(book.db, "full");
-    spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -30_000);
-    payCard(book.db, cash.id, card.id, "2026-08-21", 5_000);
-    payCard(book.db, cash.id, card.id, "2026-09-23", 5_000);
-    const forecast = readForecast(book.db, "2026-10-08");
-    const due = forecast.dates.indexOf("2026-10-22");
-    const before = forecast.dates.indexOf("2026-10-21");
-    const cashRow = forecast.accounts.find((row) => row.accountId === cash.id);
-    const cardRow = forecast.accounts.find((row) => row.accountId === card.id);
-    expect(forecast.warnings).toEqual([]);
-    expect(cashRow?.known[before]).toBe(90_000);
-    expect(cashRow?.known[due]).toBe(70_000);
-    expect(cardRow?.estimated[due]).toBe(0);
-    expect(forecast.accounts.find((row) => row.accountId === other.id)?.known[due]).toBe(100_000);
-    expect(forecast.total.known[before]).toBe(forecast.total.known[due]);
-  } finally {
-    book.close();
-  }
-});
-
-test("a fixed card pays its fixed payment and a manual card has no payment", () => {
-  const book = tempDatabase();
-  try {
-    const cash = cashAccount(book.db, "Cash", 100_000);
-    const card = cardAccount(book.db, "fixed", 10_000);
-    payCard(book.db, cash.id, card.id, "2026-09-22", 5_000);
-    spend(book.db, card.id, expense(book.db, "Shop").id, "2026-10-01", -40_000);
-    const forecast = readForecast(book.db, "2026-10-08");
-    const due = forecast.dates.indexOf("2026-10-22");
-    expect(forecast.accounts.find((row) => row.accountId === cash.id)?.known[due]).toBe(85_000);
-    expect(forecast.accounts.find((row) => row.accountId === card.id)?.known[due]).toBe(-25_000);
-    expect(forecast.accounts.find((row) => row.accountId === card.id)?.risk).toBeNull();
-  } finally {
-    book.close();
-  }
-});
-
 test("off-budget lines are excluded from category medians", () => {
   const book = tempDatabase();
   try {
@@ -188,8 +92,7 @@ test("off-budget lines are excluded from category medians", () => {
       spend(book.db, outside.id, snacks.id, `${month}-11`, -100_000);
     }
     const forecast = readForecast(book.db, "2026-04-01");
-    const row = forecast.accounts.find((item) => item.accountId === cash.id);
-    expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 40);
+    expect(forecast.total.estimated[0]).toBe((forecast.total.known[0] ?? 0) - 40);
   } finally {
     book.close();
   }
@@ -200,13 +103,12 @@ test("a business-day shift moves the bill, and skipped or linked occurrences are
   try {
     const cash = cashAccount(book.db, "Cash", 100_000);
     bill(book.db, cash.id, -4_000, "2026-10-10", "next", 10, "2026-10-10");
-    const plan = bill(book.db, cash.id, -10_000, "2026-10-15");
+    const rent = bill(book.db, cash.id, -10_000, "2026-10-15");
     const linked = spend(book.db, cash.id, expense(book.db, "Rent").id, "2026-10-15", -10_000);
-    linkOccurrence(book.db, plan.id, "2026-10-15", linked.id, saved);
-    skipOccurrence(book.db, plan.id, "2026-11-15", "Away", saved);
+    linkOccurrence(book.db, rent.id, "2026-10-15", linked.id, saved);
+    skipOccurrence(book.db, rent.id, "2026-11-15", "Away", saved);
     const forecast = readForecast(book.db, "2026-10-01");
-    const row = forecast.accounts.find((item) => item.accountId === cash.id);
-    const atDate = (iso: string) => row?.known[forecast.dates.indexOf(iso)];
+    const atDate = (iso: string) => forecast.total.known[forecast.dates.indexOf(iso)];
     expect(atDate("2026-10-10")).toBe(100_000);
     expect(atDate("2026-10-12")).toBe(96_000);
     expect(atDate("2026-10-15")).toBe(86_000);
@@ -217,20 +119,19 @@ test("a business-day shift moves the bill, and skipped or linked occurrences are
   }
 });
 
-test("a bill linked to a plan is not in the category median", () => {
+test("a payment linked to a bill is not in the category median", () => {
   const book = tempDatabase();
   try {
     const cash = cashAccount(book.db, "Cash", 1_000_000);
     const snacks = expense(book.db, "Snacks");
-    const plan = bill(book.db, cash.id, -4_000, "2026-01-12", "none", 12);
+    const rent = bill(book.db, cash.id, -4_000, "2026-01-12", "none", 12);
     for (const month of ["2026-01", "2026-02", "2026-03"]) {
       spend(book.db, cash.id, snacks.id, `${month}-10`, -1_000);
       const linked = spend(book.db, cash.id, snacks.id, `${month}-12`, -4_000);
-      linkOccurrence(book.db, plan.id, `${month}-12`, linked.id, saved);
+      linkOccurrence(book.db, rent.id, `${month}-12`, linked.id, saved);
     }
     const forecast = readForecast(book.db, "2026-04-01");
-    const row = forecast.accounts.find((item) => item.accountId === cash.id);
-    expect(row?.estimated[0]).toBe((row?.known[0] ?? 0) - 40);
+    expect(forecast.total.estimated[0]).toBe((forecast.total.known[0] ?? 0) - 40);
   } finally {
     book.close();
   }

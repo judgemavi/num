@@ -7,7 +7,7 @@ import { errorResponse } from "./common";
 
 const forecastRoute = createRoute({
   operationId: "get_forecast",
-  description: "Read the 90-day forecast. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read the 90-day forecast: for each day, the known and the estimated total of the open on-budget accounts; for each month, the forecast income and spending. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "get",
   path: "/api/forecast",
   request: { query: asOfQuerySchema },

@@ -85,7 +85,7 @@ The owner tried or examined these ideas and refused them. Do not propose them ag
 | A split editor or lines that are not a loan payment | Lines are only for loan payments (§5.4). |
 | A lock on reconciled transactions, an unlock | Extra state, blocked actions and special cases. A bank balance does not lock (§5.13). |
 | Possible causes of a balance difference | The guesses are often wrong. People delete real transactions. |
-| Card statement day, due day, credit limit, card interest | Exports in the middle of a cycle break them. The app learns the payment day (§8). |
+| Card statement day, due day, credit limit, card interest | Exports in the middle of a cycle break them. |
 | Month close, a month story | The mark adds no data. Values depended on a manual step. |
 | Inbox, Plan screen, Recurring screen | They repeat Transactions and split the health picture. Schedules are in Buckets. |
 | Funding from a paycheck, "bills reserved" | Money is assigned from the accounts. Commitment buckets hold the money for bills. |
@@ -176,7 +176,7 @@ Rules:
   The default is true for `chequing`, `savings`, `cash` and `credit_card`. The default is false for all other kinds.
   The user can change it. The UI label is "Use this account's money in my budget", under "More details".
 - Card fields (only for `credit_card`): `paymentPolicy` (`full | fixed | manual`, UI label "How you pay"), `fixedPayment?`.
-  The app learns the payment day from the payments (§8).
+  They are for information. A card payment does not change the on-budget total, so the forecast has no card payments (§8).
 - Import fields: `importPreset?` (a preset ID) and `columnMap?` (JSON, §7.2). The app saves them after the first import.
 - `interestRateMilliPct?` is for savings and loans (not for credit cards). It is for information and for payoff calculations.
 - Balance of a transaction account = `openingBalance` + the sum of the transaction amounts in the account.
@@ -907,34 +907,29 @@ If the surplus is too small, the app shows the shortfall. It also shows two fixe
 
 ## 8. Forecast
 
-The forecast is daily, for 90 days. It shows each on-budget account and the total. It has two series.
+The forecast is daily, for 90 days from `asOf`. It is the total of the open on-budget accounts. It has two series.
 
 **Known series:**
-- Today's balances.
+- The on-budget total on `asOf`.
+- Transactions in the open on-budget accounts dated after `asOf`.
 - Unlinked occurrences of commitments (a commitment with a transfer account moves money between the accounts) and incomes. Apply the business-day shift.
-- Card payments.
+
+A card payment is a transfer between two on-budget accounts. It does not change the total.
 
 **Estimated series:** the known series + variable spending.
-- Spending buckets: `refillTo`, divided equally across the days of each month.
-  Use the account that usually pays for the bucket's categories.
+- Spending buckets: `refillTo`, divided equally across the days of each month. Only a bucket with a line in its
+  categories in an open on-budget account.
 - Expense categories without a bucket: the median of the last 3 complete months, divided equally across the days.
   A complete month is a calendar month whose last day is before `asOf` and that is not before the month of the first
   transaction in the book.
   Do not include transactions that link to a commitment or an income.
   Do not include lines larger than 3 × the median line of that category.
 
-**Card payments:**
-- **Payment day.** The median day of the month of the transfers into the card in the last 12 months before `asOf`. With
-  one payment, the day of that payment. With no payment, the forecast has no payment for the card and shows the warning of `manual`.
-- `full`: the balance of the card on `asOf`, on the next payment day, from the usual payment account of the card. The
-  amount can be larger than the real payment, because it includes spending after the cut-off.
-- `fixed`: `fixedPayment` on the next payment day.
-- `manual`: no payment. The app shows a warning.
-
 **Output:**
-- The lowest point and its date.
-- Each chequing, savings or cash account that goes below zero.
+- The known and the estimated total of each day.
 - The monthly income and spending of the 90 days. Do not show daily values after 90 days.
+
+The timeline (§9) shows the forecast. The pool check (§10) uses the same occurrences and variable spending.
 
 ## 9. Spending
 

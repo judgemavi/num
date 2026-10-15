@@ -380,21 +380,15 @@ export type { Schedule } from "./schedule";
 export { detectPlans, type DetectionTransaction } from "./recurring-detect";
 export {
   buildForecast,
-  cardPaymentDay,
   forecastDates,
-  forecastRisks,
   forecastSchema,
-  forecastWarningCodes,
   spendDeltas,
   unbucketedMonthly,
   type Forecast,
-  type ForecastCard,
   type ForecastDelta,
   type ForecastFlow,
   type ForecastInput,
   type ForecastMonth,
-  type ForecastRisk,
-  type ForecastWarningCode,
 } from "./forecast";
 export { isUtcTimestamp, utcNow } from "./time";
 export {
