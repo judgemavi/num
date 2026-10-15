@@ -284,6 +284,9 @@ export const bucketEventSchema = z.object({
   undoneAt: z.string().refine(isUtcTimestamp).nullable(),
 });
 
+/** An event that the user makes: fund, move or release. */
+export const manualBucketEventSchema = bucketEventSchema.extend({ kind: z.enum(manualEventKinds) });
+
 export const bucketEventCreateSchema = z
   .object({
     kind: z.enum(manualEventKinds),

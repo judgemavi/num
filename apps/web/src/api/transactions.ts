@@ -33,9 +33,9 @@ export function transactionReviewQuery(id: string, asOf: string) {
 }
 
 /** The transactions of an account that an occurrence can link to. */
-export function linkCandidatesQuery(accountId: string, dueDate: string) {
+export function linkCandidatesQuery(accountId: string) {
   return queryOptions({
-    queryKey: ["plan-transactions", accountId, dueDate],
+    queryKey: ["transactions", "link-candidates", accountId],
     queryFn: async () => (await unwrap(api.transactions.$get({ query: { accountId, pageSize: 200 } }))).items,
   });
 }

@@ -5,7 +5,7 @@ import { localAsOf } from "@/as-of";
 import { ChoiceSelect } from "@/components/choice-select";
 import { DateField } from "@/components/date-field";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { useInsightsSearch } from "@/insights/use-report";
+import { useSpendingSearch } from "@/home/spending/use-spending";
 
 const windows = [
   { value: "1", label: "This month" },
@@ -18,7 +18,7 @@ const windows = [
 
 /** The period of Spending on Home. It reads the period from the URL and changes it there. */
 export function PeriodSelect() {
-  const { search, patchSearch } = useInsightsSearch();
+  const { search, patchSearch } = useSpendingSearch();
   const queryClient = useQueryClient();
   const current = search.window ?? defaultInsightWindow;
   const { from, to } = search;
@@ -37,18 +37,18 @@ export function PeriodSelect() {
   return (
     <div className="flex flex-wrap items-end gap-3">
       <Field className="w-44">
-        <FieldLabel htmlFor="insights-period">Period</FieldLabel>
-        <ChoiceSelect id="insights-period" aria-label="Period" value={current} options={windows} onValueChange={chooseWindow} />
+        <FieldLabel htmlFor="spending-period">Period</FieldLabel>
+        <ChoiceSelect id="spending-period" aria-label="Period" value={current} options={windows} onValueChange={chooseWindow} />
       </Field>
       {current === "custom" ? (
         <>
           <Field className="w-44">
-            <FieldLabel htmlFor="insights-from">From</FieldLabel>
-            <DateField id="insights-from" value={from ?? ""} required onChange={(value) => patchSearch({ from: value || undefined })} />
+            <FieldLabel htmlFor="spending-from">From</FieldLabel>
+            <DateField id="spending-from" value={from ?? ""} required onChange={(value) => patchSearch({ from: value || undefined })} />
           </Field>
           <Field className="w-44">
-            <FieldLabel htmlFor="insights-to">To</FieldLabel>
-            <DateField id="insights-to" value={to ?? ""} required onChange={(value) => patchSearch({ to: value || undefined })} />
+            <FieldLabel htmlFor="spending-to">To</FieldLabel>
+            <DateField id="spending-to" value={to ?? ""} required onChange={(value) => patchSearch({ to: value || undefined })} />
           </Field>
         </>
       ) : null}

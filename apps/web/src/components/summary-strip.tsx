@@ -15,7 +15,6 @@ type SummaryStripProps = {
   below?: ReactNode;
   hint?: ReactNode;
   facts?: ReactNode;
-  extra?: ReactNode;
   illustration?: ReactNode;
 };
 
@@ -23,7 +22,7 @@ type SummaryStripProps = {
  * The summary strip of a screen (`docs/design.md` §5). On a phone the illustration is small, in the top right corner next
  * to the hero amount.
  */
-export function SummaryStrip({ tint, label, amount, below, hint, facts, extra, illustration }: SummaryStripProps) {
+export function SummaryStrip({ tint, label, amount, below, hint, facts, illustration }: SummaryStripProps) {
   return (
     <Card aria-label={label} className={`relative ${tint ? `border-transparent ${tints[tint]}` : ""}`}>
       <CardContent className={`grid items-center gap-6 p-5 md:gap-8 md:px-6 ${illustration ? "md:grid-cols-[auto_minmax(0,1fr)_auto]" : "md:grid-cols-[auto_minmax(0,1fr)]"}`}>
@@ -35,11 +34,8 @@ export function SummaryStrip({ tint, label, amount, below, hint, facts, extra, i
           {below}
           {hint ? <p className="mt-2.5 text-sm text-muted-foreground">{hint}</p> : null}
         </div>
-        {facts || extra ? (
-          <div>
-            {facts ? <div className="flex flex-wrap gap-y-3">{facts}</div> : null}
-            {extra}
-          </div>
+        {facts ? (
+          <div className="flex flex-wrap gap-y-3">{facts}</div>
         ) : (
           <span className="max-md:hidden" />
         )}

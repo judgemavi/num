@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
-import type { Arc } from "@/insights/spend-arcs";
+import type { Arc } from "@/home/spending/spend-arcs";
 
 const size = 240;
 const center = size / 2;

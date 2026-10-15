@@ -25,12 +25,6 @@ export function inboxError(code: ErrorCode | undefined): string {
       return "That import row is already decided.";
     case "transfer_pair_not_found":
       return "That transfer is no longer available.";
-    case "bucket_not_overspent":
-      return "That bucket is no longer over.";
-    case "bucket_short":
-      return "That bucket does not have enough to cover this.";
-    case "fund_over_unassigned":
-      return "Unassigned does not have enough to cover this.";
     case "inbox_item_not_found":
       return "That item no longer needs an answer.";
     case "decision_not_found":

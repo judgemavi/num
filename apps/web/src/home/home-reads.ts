@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { availableQuery } from "@/api/funding";
-import { insightsQuery, needsYouQuery } from "@/api/insights";
+import { insightsQuery } from "@/api/insights";
+import { needsYouQuery } from "@/api/needs-you";
 import { localAsOf } from "@/as-of";
 
 /**

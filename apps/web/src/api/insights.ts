@@ -8,11 +8,3 @@ export function insightsQuery(asOf: string, { group: _group, by: _by, ...request
     queryFn: () => unwrap(api.insights.$get({ query: { ...request, asOf } })),
   });
 }
-
-/** The items of Home "Needs you": only the checks that fail. */
-export function needsYouQuery(asOf: string) {
-  return queryOptions({
-    queryKey: ["needs-you", asOf],
-    queryFn: () => unwrap(api["needs-you"].$get({ query: { asOf } })),
-  });
-}

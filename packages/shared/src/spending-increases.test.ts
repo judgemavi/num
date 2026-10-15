@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { savingsRateMilliPct, spendingIncreases } from "./insights-changes";
+import { savingsRateMilliPct, spendingIncreases } from "./spending-increases";
 import type { FlowLine } from "./month";
 
 const groceries = "11111111-1111-4111-8111-111111111111";

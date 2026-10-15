@@ -102,9 +102,6 @@ export function bucketError(code: ErrorCode | undefined): string {
   if (code === "bucket_not_archived") {
     return "That bucket is not archived.";
   }
-  if (code === "bucket_same") {
-    return "Choose two different buckets.";
-  }
   if (code === "bucket_not_overspent") {
     return "This bucket is no longer overspent.";
   }
@@ -117,23 +114,8 @@ export function bucketError(code: ErrorCode | undefined): string {
   if (code === "bucket_not_paused") {
     return "That bucket is not paused.";
   }
-  if (code === "bucket_income_pause") {
-    return "An income cannot be paused.";
-  }
   if (code === "bucket_balance") {
     return "The balance must be zero before you archive this bucket.";
-  }
-  if (code === "event_cover") {
-    return "A cover from Unassigned cannot be undone.";
-  }
-  if (code === "event_recede") {
-    return "Money that went back to Unassigned to cover a bucket cannot be undone.";
-  }
-  if (code === "event_month_funding") {
-    return "Funding of a month cannot be undone.";
-  }
-  if (code === "bucket_emergency_exists") {
-    return "The book has one emergency fund already.";
   }
   if (code === "fund_over_unassigned") {
     return "That is more than Unassigned.";

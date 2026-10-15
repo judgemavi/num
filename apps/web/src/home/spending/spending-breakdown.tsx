@@ -5,11 +5,11 @@ import { choiceIn } from "@/components/choice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCategoryNames, useGroupNames } from "@/editors/lookups";
-import { CategorySpendList } from "@/insights/category-spend-list";
-import { monthTitle } from "@/insights/format";
-import { rowKey, spendArcs, type Arc } from "@/insights/spend-arcs";
-import { SpendDonut } from "@/insights/spend-donut";
-import { useInsightsReport, useInsightsSearch } from "@/insights/use-report";
+import { CategorySpendList } from "@/home/spending/category-spend-list";
+import { monthTitle } from "@/home/spending/format";
+import { rowKey, spendArcs, type Arc } from "@/home/spending/spend-arcs";
+import { SpendDonut } from "@/home/spending/spend-donut";
+import { useSpendingReport, useSpendingSearch } from "@/home/spending/use-spending";
 
 function idOrNone(row: InsightRow) {
   return row.kind === "none" ? "none" : (row.id ?? undefined);
@@ -18,7 +18,7 @@ function idOrNone(row: InsightRow) {
 /** The arcs, the selected group and the actions of the spending donut. The donut card and the list call this hook. */
 function useSpendSelection() {
   const navigate = useNavigate();
-  const { data, search, patchSearch } = useInsightsReport();
+  const { data, search, patchSearch } = useSpendingReport();
   const groupNames = useGroupNames();
   const categoryNames = useCategoryNames();
   const category = search.category ?? null;
@@ -89,7 +89,7 @@ export function SpendDonutCard() {
 
 /** Groups or categories when no slice is selected. The choice is in the URL. */
 function ListModeToggle() {
-  const { search, patchSearch } = useInsightsSearch();
+  const { search, patchSearch } = useSpendingSearch();
   return (
     <ToggleGroup
       type="single"

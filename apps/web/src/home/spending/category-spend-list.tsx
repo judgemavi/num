@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Amount } from "@/components/amount";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { useBookCurrency } from "@/editors/lookups";
-import type { SliceColor } from "@/insights/spend-arcs";
+import type { SliceColor } from "@/home/spending/spend-arcs";
 import { formatMoney } from "@/money";
 
 /** One row of the spending list: a group or a category. `inflow` is the money in of the uncategorized lines. */

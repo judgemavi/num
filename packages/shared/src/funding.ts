@@ -71,10 +71,6 @@ export function monthsUntil(month: string, date: string): number {
   return from.until(to, { largestUnit: "month" }).months;
 }
 
-/**
- * The monthly amount of a bucket. `balance` is the balance at the start of `month`, without the
- * funding of that month. Each amount is rounded up to a whole minor unit (`step`).
- */
 /** The due date that counts for `month`. A yearly bucket rolls a past due date forward by whole years. */
 function dueDateFor(bucket: MonthlyBucket, month: string): string | null {
   let due = bucket.dueDate;
@@ -119,6 +115,10 @@ function commitmentAmount(bucket: MonthlyBucket, commitment: MonthlyCommitment, 
   return roundUpShare(commitment.amount - balance, monthsUntil(month, next.dueDate), step);
 }
 
+/**
+ * The monthly amount of a bucket. `balance` is the balance at the start of `month`, without the
+ * funding of that month. Each amount is rounded up to a whole minor unit (`step`).
+ */
 export function monthlyAmount(bucket: MonthlyBucket, balance: number, month: string, step: number): number {
   if (bucket.kind === "income" || bucket.paused) {
     return 0;

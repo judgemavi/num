@@ -27,7 +27,7 @@ function requireActiveBucket(tx: WriteTx, id: string) {
   return row;
 }
 
-export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCreate & EventWriteInput): BucketEvent {
+export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCreate & EventWriteInput) {
   if (!isIsoDate(input.date) || !Number.isSafeInteger(input.amount) || input.amount < 1) {
     throw new ServiceError("bucket_fields_invalid", 400);
   }
@@ -63,7 +63,7 @@ export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCr
         throw new ServiceError("release_over_balance", 409);
       }
     }
-    const row: BucketEventRow = {
+    const row = {
       id,
       kind: input.kind,
       bucketId,
@@ -99,7 +99,7 @@ export function undoBucketEvent(db: Db, bucketId: string, eventId: string, input
       throw new ServiceError("event_cover", 409);
     }
     if (existing.month) {
-      throw new ServiceError("event_month_funding", 409);
+      throw new ServiceError("event_fill", 409);
     }
     if (existing.kind === "recede") {
       throw new ServiceError("event_recede", 409);

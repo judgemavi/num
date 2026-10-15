@@ -30,7 +30,7 @@ function tempDatabase() {
   };
 }
 
-test("merge moves transactions and plans, then archives the source", () => {
+test("merge moves transactions, bills and incomes, then archives the source", () => {
   const { db, close } = tempDatabase();
   try {
     const account = createAccount(db, {

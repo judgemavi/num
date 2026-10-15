@@ -16,9 +16,9 @@ export function readFeasibility(db: Reader, asOf: string) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
   const month = asOf.slice(0, 7);
-  const schedules = activeSchedules(db);
-  const amounts = scheduleAmounts(db, schedules, asOf);
-  const plans = schedules.map((schedule) => ({ kind: schedule.kind, safe: Math.abs(amounts.get(schedule.id)?.safe ?? 0), schedule }));
+  const active = activeSchedules(db);
+  const amounts = scheduleAmounts(db, active, asOf);
+  const schedules = active.map((schedule) => ({ kind: schedule.kind, safe: Math.abs(amounts.get(schedule.id)?.safe ?? 0), schedule }));
   const balances = bucketBalances(db, addDays(`${month}-01`, -1));
   const rows = db
     .select()
@@ -27,5 +27,5 @@ export function readFeasibility(db: Reader, asOf: string) {
     .all()
     .filter((row) => row.kind === "spending" || row.kind === "sinking" || row.kind === "goal")
     .map((row) => ({ ...row, paused: row.pausedAt !== null, commitment: null, balance: balances.get(row.id) ?? 0 }));
-  return { asOf, feasibility: buildFeasibility({ month, plans, buckets: rows, step: bookStep(db) }) };
+  return { asOf, feasibility: buildFeasibility({ month, schedules, buckets: rows, step: bookStep(db) }) };
 }

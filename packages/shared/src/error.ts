@@ -77,7 +77,7 @@ export const errorCodes = [
   "bucket_paused",
   "bucket_not_paused",
   "bucket_income_pause",
-  "event_month_funding",
+  "event_fill",
   "event_cover",
   "event_recede",
   "category_not_expense",

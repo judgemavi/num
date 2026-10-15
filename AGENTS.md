@@ -118,7 +118,7 @@ in docs or code. Git history keeps the records. An idea that the owner refuses g
   - Get a name from an id with the hooks in `editors/lookups.ts` (`useCategoryNames()` and the others). Do not make a
     `Map` of names in a component.
   - When more than one part of a screen shows the same read, each part calls the same hook for it
-    (`useInsightsReport()`). The screen starts the reads of its parts with `usePrefetchQuery`.
+    (`useSpendingReport()`). The screen starts the reads of its parts with `usePrefetchQuery`.
 - Use `Temporal.PlainDate` for calendar dates. Do not use `Date` for calendar dates.
 - Lists: one shared Zod query schema for the URL and the API. The list rules are in spec §4 (Lists).
   - A route gives its shared schema to `validateSearch` through `searchWithDefaults(...)`. A value in the URL that is

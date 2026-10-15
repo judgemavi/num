@@ -5,11 +5,11 @@ import { Boundary } from "@/components/boundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBookCurrency, useCategoryNames } from "@/editors/lookups";
-import { monthTitle, rateText } from "@/insights/format";
-import { SelectedSpendList, SpendDonutCard } from "@/insights/insights-breakdown";
-import { PeriodSelect } from "@/insights/period-select";
-import { TimelineChart } from "@/insights/timeline-chart";
-import { useInsightsReport } from "@/insights/use-report";
+import { monthTitle, rateText } from "@/home/spending/format";
+import { SelectedSpendList, SpendDonutCard } from "@/home/spending/spending-breakdown";
+import { PeriodSelect } from "@/home/spending/period-select";
+import { TimelineChart } from "@/home/spending/timeline-chart";
+import { useSpendingReport } from "@/home/spending/use-spending";
 import { formatMoney } from "@/money";
 
 const errorText: Partial<Record<ErrorCode, string>> = {
@@ -37,7 +37,7 @@ function rangeName(from: string, to: string) {
  */
 function SpendingLine() {
   const currency = useBookCurrency();
-  const { data } = useInsightsReport();
+  const { data } = useSpendingReport();
   const name = rangeName(data.range.from, data.range.to);
   const spent = formatMoney(currency, data.spending);
   const income = formatMoney(currency, data.income);
@@ -50,7 +50,7 @@ function SpendingLine() {
 }
 
 function TimelineCard() {
-  const { search, patchSearch } = useInsightsReport();
+  const { search, patchSearch } = useSpendingReport();
   const categoryName = useCategoryNames().get(search.category ?? "");
   return (
     <Card>

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
-import { spendingIncreaseSchema } from "./insights-changes";
+import { spendingIncreaseSchema } from "./spending-increases";
 import { monthKeySchema } from "./month";
 import { amountSchema as money } from "./money";
 

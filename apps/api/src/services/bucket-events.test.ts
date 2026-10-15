@@ -24,7 +24,7 @@ test("undo is rejected for an event of the monthly fill", () => {
         undoneAt: null,
       })
       .run();
-    expectCode(() => undoBucketEvent(book.db, food.id, eventId, saved), "event_month_funding");
+    expectCode(() => undoBucketEvent(book.db, food.id, eventId, saved), "event_fill");
     expect(book.db.select().from(bucketEvents).where(eq(bucketEvents.id, eventId)).get()?.undoneAt).toBeNull();
     expect(readBucket(book.db, food.id).balance).toBe(1_000);
   } finally {

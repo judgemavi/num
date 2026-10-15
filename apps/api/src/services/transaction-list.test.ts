@@ -309,7 +309,7 @@ test("running balance is null for an investment account and present for a chequi
   }
 });
 
-test("group, no merchant and no tag filters match the insights drill-down", () => {
+test("group, no merchant and no tag filters match the drill-down of Spending on Home", () => {
   const fixture = book();
   try {
     const home = createCategoryGroup(fixture.db, { name: "Home", ...saved });

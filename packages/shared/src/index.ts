@@ -91,6 +91,7 @@ export {
   bucketEventCreateSchema,
   bucketEventKinds,
   bucketEventSchema,
+  manualBucketEventSchema,
   bucketIcons,
   bucketKinds,
   bucketListQuerySchema,
@@ -407,7 +408,7 @@ export {
   savingsRateMilliPct,
   spendingIncreases,
   type SpendingIncrease,
-} from "./insights-changes";
+} from "./spending-increases";
 export { billFillsOn, billNeed, coverBills, pausePlan, projectedPoolShort, recedeOrder, recedePlan } from "./pool";
 export { needsYouSchema, reviewAgeDays, staleImportDays, type NeedsYou, type NeedsYouItem } from "./needs-you";
 export { reviewLevel, reviewLevels, type ReviewLevel } from "./review-level";

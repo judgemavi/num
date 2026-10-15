@@ -76,7 +76,7 @@ export function SkipOccurrenceEditor({ bucketId, dueDate }: EditorInput["skipOcc
 
 export function LinkOccurrenceEditor({ bucketId, accountId, dueDate }: EditorInput["linkOccurrence"]) {
   const { close } = useEditorFrame();
-  const { data: candidates } = useSuspenseQuery(linkCandidatesQuery(accountId, dueDate));
+  const { data: candidates } = useSuspenseQuery(linkCandidatesQuery(accountId));
   const linkOccurrence = useLinkOccurrence();
   const form = useAppForm({
     defaultValues: { transactionId: fieldValue<string | null>(null) },

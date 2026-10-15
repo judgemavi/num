@@ -248,7 +248,7 @@ test("an event of the fill cannot be undone", () => {
     const food = spend(book.db, "Food", 100_000, october);
     fill(book, "2026-10-08");
     const [event] = book.db.select().from(bucketEvents).all();
-    expectCode(() => undoBucketEvent(book.db, food.id, event?.id ?? "", saved), "event_month_funding");
+    expectCode(() => undoBucketEvent(book.db, food.id, event?.id ?? "", saved), "event_fill");
   } finally {
     book.close();
   }

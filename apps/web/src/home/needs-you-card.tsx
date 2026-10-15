@@ -3,14 +3,14 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import { CalendarX, ChevronRight, CircleAlert, Landmark, LifeBuoy, ListChecks, PiggyBank, ReceiptText, Target, TrendingUp, Upload } from "lucide-react";
-import { needsYouQuery } from "@/api/insights";
+import { needsYouQuery } from "@/api/needs-you";
 import { localAsOf } from "@/as-of";
 import type { Hue } from "@/components/hue";
 import { IconTile } from "@/components/icon-tile";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { Badge } from "@/components/ui/badge";
 import { useAccountLabels, useActiveSchedules, useBookCurrency, useBucketNames, useCategoryNames } from "@/editors/lookups";
-import { monthTitle, rateText } from "@/insights/format";
+import { monthTitle, rateText } from "@/home/spending/format";
 import { formatMoney } from "@/money";
 import { formatDate } from "@/transactions/format";
 

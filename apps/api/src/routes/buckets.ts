@@ -4,6 +4,7 @@ import {
   bucketCreateSchema,
   bucketEventCreateSchema,
   bucketEventSchema,
+  manualBucketEventSchema,
   bucketListQuerySchema,
   bucketListSchema,
   bucketSchema,
@@ -202,7 +203,7 @@ const eventRoute = createRoute({
   responses: {
     200: {
       description: "The created event",
-      content: { "application/json": { schema: bucketEventSchema } },
+      content: { "application/json": { schema: manualBucketEventSchema } },
     },
     400: errorResponse,
     404: errorResponse,

@@ -2,7 +2,7 @@ import type { NeedsYou, NeedsYouItem } from "@num/shared";
 import type { Db } from "../db";
 import { listBankStatuses } from "./bank-balances";
 import { needsYouChecks, type NeedsYouCheck } from "./needs-you-checks";
-import { readSpendingIncreases } from "./insights-changes";
+import { readSpendingIncreases } from "./spending-increases";
 import { readFeasibility } from "./feasibility";
 import { loadReviewState, requireAsOf } from "./needs-review";
 

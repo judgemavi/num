@@ -2,9 +2,9 @@ import { Temporal, type InsightFlow, type InsightTimeline, type InsightTimelineM
 import { useState } from "react";
 import { localAsOf } from "@/as-of";
 import { useBookCurrency, useCategoryNames } from "@/editors/lookups";
-import { monthTitle } from "@/insights/format";
-import { chart, flowTotal, forecastPoints, shortDay, shortMonth, timelineScale } from "@/insights/timeline-scale";
-import { useInsightsReport } from "@/insights/use-report";
+import { monthTitle } from "@/home/spending/format";
+import { chart, flowTotal, forecastPoints, shortDay, shortMonth, timelineScale } from "@/home/spending/timeline-scale";
+import { useSpendingReport } from "@/home/spending/use-spending";
 import { formatMoney } from "@/money";
 
 type Scale = ReturnType<typeof timelineScale>;
@@ -153,7 +153,7 @@ function Legend({ kinds, balance }: { kinds: typeof barKinds; balance: boolean }
 /** The timeline of the report: income, spending and the balance for each month. It shows the Today marker only when the period ends today. */
 export function TimelineChart() {
   const currency = useBookCurrency();
-  const { data, search, patchSearch } = useInsightsReport();
+  const { data, search, patchSearch } = useSpendingReport();
   const categoryName = useCategoryNames().get(search.category ?? "");
   const [hover, setHover] = useState<number | null>(null);
   const asOf = localAsOf();

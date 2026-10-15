@@ -148,7 +148,7 @@ export function scheduleAmounts(db: Reader, views: readonly ScheduleView[], asOf
 /**
  * The schedule data of each active commitment for its monthly amount: the skipped occurrences,
  * the date of the payment of each paid occurrence, and the safe amount from the links before the month `start`
- * (YYYY-MM-DD, the first day of the month). One function gives the funding and the month plan the same figures.
+ * (YYYY-MM-DD, the first day of the month). The monthly amounts of the fill (§7.6) use it.
  */
 export function commitmentsOf(db: Reader, start: string): Map<string, MonthlyCommitment> {
   const views = activeSchedules(db).filter((view) => view.kind === "commitment");

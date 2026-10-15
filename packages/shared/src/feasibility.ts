@@ -9,7 +9,7 @@ import { occurrenceDates, type PlanSchedule } from "./recurring-calc";
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
 /** An active commitment or income. `safe` is its safe amount (spec §5.7) as a positive number. */
-export type FeasibilityPlan = {
+export type FeasibilitySchedule = {
   kind: "commitment" | "income";
   safe: number;
   schedule: PlanSchedule;
@@ -25,7 +25,7 @@ export type FeasibilityBucket = MonthlyBucket & {
 type FeasibilityInput = {
   /** YYYY-MM: the month of `asOf`. */
   month: string;
-  plans: readonly FeasibilityPlan[];
+  schedules: readonly FeasibilitySchedule[];
   buckets: readonly FeasibilityBucket[];
   /** The milliunits in one minor unit of the book currency. */
   step: number;
@@ -86,9 +86,9 @@ function goalDateOf(bucket: FeasibilityBucket) {
 export function buildFeasibility(input: FeasibilityInput): Feasibility | null {
   const start = `${input.month}-01`;
   const yearEnd = Temporal.PlainDate.from(start).add({ months: 12 }).subtract({ days: 1 }).toString();
-  const yearly = (kind: FeasibilityPlan["kind"]) =>
-    input.plans.filter((plan) => plan.kind === kind).reduce((sum, plan) => sum + plan.safe * occurrenceDates(plan.schedule, yearEnd, start).length, 0);
-  if (!input.plans.some((plan) => plan.kind === "income")) {
+  const yearly = (kind: FeasibilitySchedule["kind"]) =>
+    input.schedules.filter((item) => item.kind === kind).reduce((sum, item) => sum + item.safe * occurrenceDates(item.schedule, yearEnd, start).length, 0);
+  if (!input.schedules.some((item) => item.kind === "income")) {
     return null;
   }
   let refills = 0;
