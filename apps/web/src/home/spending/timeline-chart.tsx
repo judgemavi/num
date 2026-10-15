@@ -28,7 +28,10 @@ function forecastShape(color: string) {
   };
 }
 
-/** The timeline of the report: income and spending for each month. It shows the Today marker only when the period ends today. */
+/**
+ * The timeline of the report: income and spending for each month, or only spending with a category or a tag. It shows the
+ * Today marker only when the period ends today.
+ */
 export function TimelineChart() {
   const currency = useBookCurrency();
   const { data, search, patchSearch } = useSpendingReport();
@@ -36,12 +39,14 @@ export function TimelineChart() {
   const timeline = data.timeline;
   const rows = monthRows(timeline);
   const ranges = timelineRanges(timeline);
-  const kinds: BarKind[] = timeline.categoryId
-    ? [{ key: "spending", label: categoryName ?? "Spending" }]
-    : [
-        { key: "income", label: "Income" },
-        { key: "spending", label: "Spending" },
-      ];
+  // With a category or a tag, the timeline has only spending bars.
+  const kinds: BarKind[] =
+    timeline.categoryId || data.tagId
+      ? [{ key: "spending", label: categoryName ?? "Spending" }]
+      : [
+          { key: "income", label: "Income" },
+          { key: "spending", label: "Spending" },
+        ];
   const asOf = localAsOf();
   const todayX = data.to === asOf ? dayPosition(timeline.months, asOf) : null;
   const money = (value: number) => formatMoney(currency, value);

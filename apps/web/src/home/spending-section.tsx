@@ -4,10 +4,11 @@ import { localAsOf } from "@/as-of";
 import { Boundary } from "@/components/boundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useBookCurrency, useCategoryNames } from "@/editors/lookups";
+import { useBookCurrency, useCategoryNames, useTagNames } from "@/editors/lookups";
 import { monthTitle, rateText } from "@/home/spending/format";
 import { SelectedSpendList, SpendDonutCard } from "@/home/spending/spending-breakdown";
 import { PeriodSelect } from "@/home/spending/period-select";
+import { TagSelect } from "@/home/spending/tag-select";
 import { TimelineChart } from "@/home/spending/timeline-chart";
 import { useSpendingReport } from "@/home/spending/use-spending";
 import { formatMoney } from "@/money";
@@ -15,6 +16,7 @@ import { formatMoney } from "@/money";
 const errorText: Partial<Record<ErrorCode, string>> = {
   period_invalid: "The start date is after the end date, or the month is not in the period.",
   category_not_found: "That category is not in the book.",
+  tag_not_found: "That tag is not in the book.",
   as_of_invalid: "The date is not valid.",
 };
 
@@ -34,15 +36,22 @@ function rangeName(from: string, to: string) {
 /**
  * One muted line that follows the selected period. A complete period (it ends before today) shows the spending of the
  * income and the savings rate. A period that is not complete shows only the spending and the income so far.
+ * With a tag, the line shows only the range and the spending of the tag.
  */
 function SpendingLine() {
   const currency = useBookCurrency();
+  const tagNames = useTagNames();
   const { data } = useSpendingReport();
   const name = rangeName(data.range.from, data.range.to);
   const spent = formatMoney(currency, data.spending);
-  const income = formatMoney(currency, data.income);
   const complete = Temporal.PlainDate.compare(data.range.to, localAsOf()) < 0;
-  const parts = complete ? [name, `${spent} spent of ${income} income`] : [`${name} so far`, `${spent} spent`, `${income} income`];
+  const range = complete ? name : `${name} so far`;
+  // The report of a tag has no income.
+  if (data.income === null) {
+    return <p className="text-sm text-muted-foreground">{`${range} · ${spent} spent on ${tagNames.get(data.tagId ?? "") ?? "Unknown"}`}</p>;
+  }
+  const income = formatMoney(currency, data.income);
+  const parts = complete ? [name, `${spent} spent of ${income} income`] : [range, `${spent} spent`, `${income} income`];
   if (complete && data.savingsRateMilliPct !== null) {
     parts.push(`${rateText(data.savingsRateMilliPct)} saved`);
   }
@@ -50,12 +59,14 @@ function SpendingLine() {
 }
 
 function TimelineCard() {
-  const { search, patchSearch } = useSpendingReport();
+  const { data, search, patchSearch } = useSpendingReport();
   const categoryName = useCategoryNames().get(search.category ?? "");
+  const tagName = useTagNames().get(data.tagId ?? "");
+  const scope = categoryName ?? tagName;
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 px-5 pt-5 md:px-6">
-        <CardTitle className="text-base font-bold">{categoryName ? `${categoryName} spending` : "Income, spending and balance"}</CardTitle>
+        <CardTitle className="text-base font-bold">{scope ? `${scope} spending` : "Income, spending and balance"}</CardTitle>
         {search.category ? (
           <Button type="button" variant="ghost" onClick={() => patchSearch({ category: undefined })}>
             Show all
@@ -70,8 +81,9 @@ function TimelineCard() {
 }
 
 /**
- * Spending on Home: the period (default this month), the timeline, the spending donut and the list of groups and
- * categories. The period selector stays outside the boundary, thus the person can change a period that does not load.
+ * Spending on Home: the period (default this month), the tag (default all spending), the timeline, the spending donut
+ * and the list of groups and categories. The period and the tag selectors stay outside the boundary, thus the person
+ * can change a period or a tag that does not load.
  */
 export function SpendingSection() {
   return (
@@ -84,7 +96,12 @@ export function SpendingSection() {
           <SpendingLine />
         </Boundary>
       </div>
-      <PeriodSelect />
+      <div className="flex flex-wrap items-end gap-3">
+        <PeriodSelect />
+        <Boundary loading={null} failed={() => null}>
+          <TagSelect />
+        </Boundary>
+      </div>
       <Boundary
         loading="Loading spending."
         failed={({ error }) => {

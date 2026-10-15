@@ -32,9 +32,9 @@ function useSpendSelection() {
   const categoryName = (row: InsightRow) => categoryNames.get(row.id ?? "") ?? "Unknown";
   const parentName = (arc: Arc) => groupName(data.groups.find((group) => `${group.kind}-${group.id ?? ""}` === arc.groupKey) ?? arc.row);
 
-  /** Open the transactions of the period of the report that match the filter. */
+  /** Open the transactions of the period and the tag of the report that match the filter. */
   function openTransactions(filter: Partial<TransactionFilter>) {
-    void navigate({ to: "/transactions", search: { ...filter, from: data.range.from, to: data.range.to } });
+    void navigate({ to: "/transactions", search: { ...filter, tagId: data.tagId ?? undefined, from: data.range.from, to: data.range.to } });
   }
 
   function selectArc(arc: Arc) {

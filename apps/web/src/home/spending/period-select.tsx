@@ -35,7 +35,7 @@ export function PeriodSelect() {
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
+    <>
       <Field className="w-44">
         <FieldLabel htmlFor="spending-period">Period</FieldLabel>
         <ChoiceSelect id="spending-period" aria-label="Period" value={current} options={windows} onValueChange={chooseWindow} />
@@ -52,6 +52,6 @@ export function PeriodSelect() {
           </Field>
         </>
       ) : null}
-    </div>
+    </>
   );
 }

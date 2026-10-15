@@ -12,18 +12,22 @@ import { readForecast } from "./forecast";
 import { periodMonths, type Period } from "./insights-period";
 import type { LedgerLine } from "./ledger-lines";
 
-/** Actual income and spending of each month in the period. With a category, only that category's spending. */
-export function actualMonths(facts: readonly LedgerLine[], period: Period, categoryId: string | null): Map<string, InsightFlow> {
+/** What the timeline shows. A category limits it to that category. With a category or a tag, it shows only spending. */
+export type TimelineScope = { categoryId: string | null; tagged: boolean };
+
+/** Actual income and spending of each month in the period. With a category or a tag, only the spending. */
+export function actualMonths(facts: readonly LedgerLine[], period: Period, scope: TimelineScope): Map<string, InsightFlow> {
   const months = new Map<string, InsightFlow>(periodMonths(period.from, period.to).map((month) => [month, { income: 0, spending: 0 }]));
+  const spendingOnly = scope.categoryId !== null || scope.tagged;
   for (const fact of facts) {
     const flow = months.get(fact.month);
     if (!flow || fact.date < period.from || fact.date > period.to) {
       continue;
     }
-    if (isExpenseLine(fact) && (categoryId === null || fact.categoryId === categoryId)) {
+    if (isExpenseLine(fact) && (scope.categoryId === null || fact.categoryId === scope.categoryId)) {
       flow.spending += expenseSpending(fact.amount);
     }
-    if (categoryId === null && isIncomeLine(fact)) {
+    if (!spendingOnly && isIncomeLine(fact)) {
       flow.income += fact.amount;
     }
   }
@@ -48,15 +52,13 @@ export function timelineMonths(period: Period, actual: Map<string, InsightFlow>,
 /**
  * The timeline: actual months of the period, then the 90-day forecast (§8).
  * The forecast is only for a period that ends on asOf. A period that ends before asOf shows only its own months.
- * With a category, the timeline shows only the actual spending of that category.
+ * With a category or a tag, the timeline shows only the actual spending. A forecast has no category and no tag.
  */
-export function readTimeline(db: Db, facts: readonly LedgerLine[], period: Period, asOf: string, categoryId: string | null): InsightTimeline {
-  const actual = actualMonths(facts, period, categoryId);
-  if (categoryId !== null) {
+export function readTimeline(db: Db, facts: readonly LedgerLine[], period: Period, asOf: string, scope: TimelineScope): InsightTimeline {
+  const actual = actualMonths(facts, period, scope);
+  const categoryId = scope.categoryId;
+  if (categoryId !== null || scope.tagged || period.to !== asOf) {
     return { categoryId, months: timelineMonths(period, actual, []), forecastEnd: null };
-  }
-  if (period.to !== asOf) {
-    return { categoryId: null, months: timelineMonths(period, actual, []), forecastEnd: null };
   }
   const forecast = readForecast(db, asOf);
   return {

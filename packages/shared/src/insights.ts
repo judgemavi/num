@@ -28,6 +28,7 @@ const insightsSearchFields = z.object({
   month: optionalQuery(z.string().refine(isMonthKey)),
   group: queryIdOrNone,
   category: queryId,
+  tagId: queryId,
   by: optionalQuery(z.enum(insightListModes)),
 });
 
@@ -83,9 +84,12 @@ export const insightsSchema = z.object({
   from: isoDateSchema,
   to: isoDateSchema,
   range: z.object({ from: isoDateSchema, to: isoDateSchema }),
-  income: money,
+  /** The tag of the report, or null for all spending. With a tag, the report has only the spending lines with that tag. */
+  tagId: z.uuid().nullable(),
+  /** Null with a tag: the report of a tag has no income and no savings. */
+  income: money.nullable(),
   spending: money,
-  savings: money,
+  savings: money.nullable(),
   savingsRateMilliPct: z.number().int().nullable(),
   groups: z.array(groupRowSchema),
   timeline: timelineSchema,

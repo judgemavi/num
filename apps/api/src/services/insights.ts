@@ -1,4 +1,4 @@
-import { categories } from "@num/db";
+import { categories, tags } from "@num/db";
 import { defaultInsightWindow, type Insights, type InsightsQuery } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
@@ -14,15 +14,24 @@ function assertFilters(db: Db, query: InsightsQuery) {
       throw new ServiceError("category_not_found", 404);
     }
   }
+  if (query.tagId) {
+    if (!db.select({ id: tags.id }).from(tags).where(eq(tags.id, query.tagId)).get()) {
+      throw new ServiceError("tag_not_found", 404);
+    }
+  }
 }
 
+/**
+ * The spending report of a period. With a tag, each part uses only the lines that have the tag. A line with more than
+ * one tag counts in full for each tag. The report of a tag has no income, no savings and no forecast.
+ */
 export function readInsights(db: Db, query: InsightsQuery): Insights {
   assertFilters(db, query);
   const window = query.window ?? defaultInsightWindow;
   const period = windowPeriod(query.asOf, window, query, firstTransactionDate(db));
   const range = breakdownRange(period, query.month);
-  const facts = loadLedgerLines(db);
-  const category = query.category ?? null;
+  const tagId = query.tagId ?? null;
+  const facts = loadLedgerLines(db, { tagId: query.tagId });
   const totals = spendTotals(facts, range);
   return {
     asOf: query.asOf,
@@ -30,11 +39,12 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
     from: period.from,
     to: period.to,
     range,
-    income: totals.income,
+    tagId,
+    income: tagId ? null : totals.income,
     spending: totals.spending,
-    savings: totals.savings,
-    savingsRateMilliPct: totals.savingsRateMilliPct,
+    savings: tagId ? null : totals.savings,
+    savingsRateMilliPct: tagId ? null : totals.savingsRateMilliPct,
     groups: groupRows(facts, range),
-    timeline: readTimeline(db, facts, period, query.asOf, category),
+    timeline: readTimeline(db, facts, period, query.asOf, { categoryId: query.category ?? null, tagged: tagId !== null }),
   };
 }

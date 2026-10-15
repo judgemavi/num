@@ -1,6 +1,6 @@
-import { categories, transactionLines, transactions } from "@num/db";
+import { categories, lineTags, transactionLines, transactions } from "@num/db";
 import { flowLineKind, type FlowLine } from "@num/shared";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import type { Db } from "../db";
 
 export type LedgerLine = {
@@ -15,7 +15,11 @@ export type LedgerLine = {
   transfer: boolean;
 };
 
-export function loadLedgerLines(db: Db, range?: { from: string; through: string }): LedgerLine[] {
+type LineFilter = { from?: string; through?: string; tagId?: string };
+
+/** The lines of the book. A filter can limit them to a range of dates and to the lines that have one tag. */
+export function loadLedgerLines(db: Db, filter: LineFilter = {}): LedgerLine[] {
+  const tagged = filter.tagId ? db.select({ id: lineTags.lineId }).from(lineTags).where(eq(lineTags.tagId, filter.tagId)) : undefined;
   const rows = db
     .select({
       lineId: transactionLines.id,
@@ -32,8 +36,9 @@ export function loadLedgerLines(db: Db, range?: { from: string; through: string 
     .leftJoin(categories, eq(transactionLines.categoryId, categories.id))
     .where(
       and(
-        range ? gte(transactions.date, range.from) : undefined,
-        range ? lte(transactions.date, range.through) : undefined,
+        filter.from ? gte(transactions.date, filter.from) : undefined,
+        filter.through ? lte(transactions.date, filter.through) : undefined,
+        tagged ? inArray(transactionLines.id, tagged) : undefined,
       ),
     )
     .all();

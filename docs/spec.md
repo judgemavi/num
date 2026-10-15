@@ -941,16 +941,27 @@ Spending is a part of Home (§14). It has no screen of its own.
   not the year of `asOf`. A complete period (it ends before `asOf`) shows the breakdown range, the spending of the
   income and the savings rate (example: "September · $4,410 spent of $6,200 income · 29% saved"). A period that is not
   complete (it ends on or after `asOf`) shows only facts: the range with "so far", the spending and the income
-  (example: "October so far · $4,059 spent · $7,349 income"). It shows no savings rate.
+  (example: "October so far · $4,059 spent · $7,349 income"). It shows no savings rate. With a tag selected, the
+  summary shows only the range and the spending of the tag (example: "Jun 2026 – Sep 2026 · $3,240 spent on Italy
+  Vacation 2026"). It shows no income and no savings rate.
 - **Increases.** The 3 largest increases by category in the month of `asOf`, compared with the median of the 3 months
   before it. They show in Needs you (§14). There are no decreases and no new merchants.
 - **Period.** One selector: 1 (default, "This month"), 3, 6 or 12 months, All, or Custom (From and To). "1" is the
   month of `asOf`.
   "All" starts at the first transaction. The breakdowns use the period up to `asOf`.
+- **Tag.** One selector next to the period selector, the one Combobox. The default is "All spending": no filter. The
+  list has the active tags, then the archived tags with "(archived)" after the name. With a tag selected, the summary,
+  the timeline, the donut and the list of groups and categories use only the spending lines that have that tag. A line
+  with more than one tag counts in full for each of its tags. A refund line with the tag decreases the spending.
+  Transfers are not spending. The URL keeps the tag (`tagId`), as it keeps the period. A tag id that is not valid goes
+  back to the default. The spending report query of the API takes an optional `tagId`. With a tag, the report has no
+  income, no savings and no savings rate. Increases and the Needs you checks (§10) do not use the tag.
 - **Timeline.** One chart: monthly income and spending bars.
   After `asOf`, it shows the forecast (§8, 90 days): the bar of the month of `asOf` has an actual part and a forecast
   part. Forecast income is the unlinked income occurrences. Forecast spending is the unlinked commitments and the
   variable spending. Card payments are not spending. A click on a month bar limits the breakdowns to that month.
+  With a tag selected, the timeline shows only the spending bars. It shows no income bars and no forecast part. A
+  forecast has no tags.
 - **Spending donut.** Two rings. The inner ring is the groups. The outer ring is the categories, each inside the arc
   of its group. Groups and categories go largest first. Categories with no group are one inner slice, "No group".
   Uncategorized lines are one inner slice, "Uncategorized", that cannot be selected. A group or category with spending
@@ -963,7 +974,7 @@ Spending is a part of Home (§14). It has no screen of its own.
   colour of its group. Uncategorized is one row in both lists. The URL keeps the choice. With a group selected, the
   list shows the categories of that group and has no toggle. With a category selected, the list shows the categories
   of its group, highlights the selected category and has no toggle. A click on a row opens its transactions for the
-  period.
+  period: Transactions opens with the period, the category (or the group) and the selected tag as filters.
 
 ## 10. Needs you checks
 
@@ -1046,7 +1057,7 @@ do not change.
 
 | Screen | Contents |
 |---|---|
-| Home | The first screen, from top to bottom. 1. **Summary strip:** "Available to spend" (§6) and, below it, one row with three small amounts: "In your accounts" − "Saving buckets" − "Set aside for bills". No hint line. 2. **Needs you:** one list card with a count badge. It shows only the items that need the user, in this order: transactions need review (the count, and the count older than 7 days); each account that does not match its bank (§5.13); imports older than 10 days (§10); each missed payment (§7.4); overspent buckets (§7.7); goals that do not fit the monthly income, with the short amount (§7.8); each bill with a short part for its next payment, "<bill> is <short part> short for <date>" (§10 Bills); emergency fund below its target; savings used this month; the pool runs short, with the buckets to pause, the buckets that would give money back and the part that is not covered (§10); a savings rate below 0% in a complete month; each category that went up against its median (§9). Home is read-only: each row has no actions and opens the screen of its fix. When no item needs the user, the card shows one line: "All clear". 3. **Spending** (§9): a section title, the summary line, the period selector, the timeline, the spending donut and the list of groups and categories. |
+| Home | The first screen, from top to bottom. 1. **Summary strip:** "Available to spend" (§6) and, below it, one row with three small amounts: "In your accounts" − "Saving buckets" − "Set aside for bills". No hint line. 2. **Needs you:** one list card with a count badge. It shows only the items that need the user, in this order: transactions need review (the count, and the count older than 7 days); each account that does not match its bank (§5.13); imports older than 10 days (§10); each missed payment (§7.4); overspent buckets (§7.7); goals that do not fit the monthly income, with the short amount (§7.8); each bill with a short part for its next payment, "<bill> is <short part> short for <date>" (§10 Bills); emergency fund below its target; savings used this month; the pool runs short, with the buckets to pause, the buckets that would give money back and the part that is not covered (§10); a savings rate below 0% in a complete month; each category that went up against its median (§9). Home is read-only: each row has no actions and opens the screen of its fix. When no item needs the user, the card shows one line: "All clear". 3. **Spending** (§9): a section title, the summary line, the period selector and the tag selector, the timeline, the spending donut and the list of groups and categories. |
 | Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers, row selection with Approve and the bulk editor. |
 | Buckets | Summary strip: the hero is Unassigned. Fact: "Saved" (the savings buckets). No hint line. Groups Income, Bills (the UI name of the commitments), Spending and Savings (sinking, goal, emergency). The Income and Spending groups have no group total. Each spending row shows "<amount> left". The Bills group shows its rows in fill order (§7.6). A bill row shows "Due <date>" of its next payment, a progress bar, "<balance> of <amount>" of that payment (§10 Bills) and one line for its gap (§6): when it has a short part, "<short part> short" in the attention colour; when Unassigned covers all of the gap, "Fills <date>" in the muted colour. The date is the first day of the month of the payment, or `asOf` when that day is before `asOf`. Each bucket except an income has "Pause" or "Resume" in its row menu, and a paused row shows "Paused". Balances, what is still owed this month, moves, goals (feasibility), settings. A bill or income row has its schedule, links, skips and "Amount changed". Side column: Upcoming (occurrences of all schedules in the next 30 days) and Detected (new schedule suggestions). |
 | Accounts | Summary strip with the net worth and no hint line. Facts: "What you have" and "What you owe". List with balances and the bank status of each account (§5.13), in three groups: Cash (chequing, savings, cash), Assets (investment, property, receivable, other asset) and Liabilities (credit card, mortgage, loan, other liability). The Liabilities group total shows as owed. Also import, bank balances, valuations, mortgage terms. The account page shows the balance in a summary strip (surface colour, no illustration). Facts: the last bank balance with its date, and the date of the last import. When the account does not match its bank, the hint line shows the difference. A mortgage account page has the mortgage panel: the balance, the rate, the payment schedule and the payoff date (§5.2), and the effect of an extra payment amount. An "Imports" view lists all imports and import problems (§7.2). |

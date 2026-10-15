@@ -8,6 +8,7 @@ import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory, createCategoryGroup } from "./categories";
+import { createTag } from "./tags";
 import { readInsights } from "./insights";
 import { createTransaction } from "./transactions";
 
@@ -41,6 +42,7 @@ function spend(
     categoryId?: string | null;
     merchantId?: string | null;
     transferAccountId?: string | null;
+    tagIds?: string[];
   },
 ) {
   const line = {
@@ -48,7 +50,7 @@ function spend(
     memo: null,
     categoryId: input.transferAccountId ? null : (input.categoryId ?? null),
     transferAccountId: input.transferAccountId ?? null,
-    tagIds: [],
+    tagIds: input.tagIds ?? [],
   };
   const body: TransactionCreate & typeof saved = {
     accountId: input.accountId,
@@ -215,6 +217,49 @@ test("the savings rate is for the breakdown range, and it is null when income is
     expect(readInsights(book.db, { asOf, window: "6" })).toMatchObject({ income: 100_000, spending: 40_000, savingsRateMilliPct: 60_000 });
     expect(readInsights(book.db, { asOf, window: "6", month: "2026-02" }).savingsRateMilliPct).toBe(75_000);
     expect(readInsights(book.db, { asOf, window: "6", month: "2026-03" })).toMatchObject({ income: 0, savingsRateMilliPct: null });
+  } finally {
+    book.close();
+  }
+});
+
+test("a tag limits the report to its spending lines: two tags count in full for each, refunds reduce, transfers and income do not count", () => {
+  const book = tempDatabase();
+  try {
+    const chequing = account(book.db, "Chequing", "chequing", "2026-01-01");
+    const savings = account(book.db, "Savings", "savings", "2026-01-01");
+    const travel = createCategoryGroup(book.db, { name: "Travel", ...saved });
+    const hotels = createCategory(book.db, { name: "Hotels", kind: "expense", groupId: travel.id, ...saved });
+    const dining = createCategory(book.db, { name: "Dining", kind: "expense", ...saved });
+    const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
+    const trip = createTag(book.db, { name: "Trip", ...saved });
+    const work = createTag(book.db, { name: "Work", ...saved });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-02", amount: -100_000, categoryId: hotels.id, tagIds: [trip.id] });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-03", amount: -40_000, categoryId: dining.id, tagIds: [trip.id, work.id] });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-04", amount: 15_000, categoryId: hotels.id, tagIds: [trip.id] });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-05", amount: -70_000, categoryId: dining.id });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-06", amount: -50_000, transferAccountId: savings.id, tagIds: [trip.id] });
+    spend(book.db, { accountId: chequing.id, date: "2026-06-07", amount: 300_000, categoryId: pay.id, tagIds: [trip.id] });
+    const query = { asOf: "2026-06-30", window: "1" } as const;
+    const all = readInsights(book.db, query);
+    expect(all).toMatchObject({ tagId: null, spending: 195_000, income: 300_000 });
+
+    const onTrip = readInsights(book.db, { ...query, tagId: trip.id });
+    expect(onTrip).toMatchObject({ tagId: trip.id, spending: 125_000, income: null, savings: null, savingsRateMilliPct: null });
+    expect(onTrip.groups.map((row) => [row.id, row.amount])).toEqual([
+      [travel.id, 85_000],
+      [null, 40_000],
+    ]);
+    expect(onTrip.timeline.months).toEqual([{ month: "2026-06", actual: { income: 0, spending: 125_000 }, forecast: null }]);
+    expect(onTrip.timeline.forecastEnd).toBeNull();
+
+    const atWork = readInsights(book.db, { ...query, tagId: work.id });
+    expect(atWork.spending).toBe(40_000);
+    expect(atWork.groups).toEqual([{ id: null, kind: "none", amount: 40_000, inflow: null, categories: [{ id: dining.id, kind: "item", amount: 40_000, inflow: null }] }]);
+
+    const tripDining = readInsights(book.db, { ...query, tagId: trip.id, category: dining.id });
+    expect(tripDining.timeline).toMatchObject({ categoryId: dining.id, forecastEnd: null });
+    expect(tripDining.timeline.months[0]?.actual).toEqual({ income: 0, spending: 40_000 });
+    expect(() => readInsights(book.db, { ...query, tagId: crypto.randomUUID() })).toThrow("tag_not_found");
   } finally {
     book.close();
   }
