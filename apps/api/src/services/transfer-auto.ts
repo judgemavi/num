@@ -168,7 +168,7 @@ export function recordPairNo(tx: WriteTx, leftId: string, rightId: string, at: s
   if (tx.select().from(inboxDecisions).where(eq(inboxDecisions.itemKey, itemKey)).get()) {
     return;
   }
-  const row = { itemKey, decision: "not_transfer" as const, reason: null, decidedAt: at };
+  const row = { itemKey, decision: "not_transfer" as const, decidedAt: at };
   tx.insert(inboxDecisions).values(row).run();
   tx.audit({ entity: "inbox_decisions", entityId: itemKey, action: "create", before: null, after: row });
 }

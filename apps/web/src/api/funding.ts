@@ -27,15 +27,14 @@ export function fundingMonthsQuery() {
   });
 }
 
-/** True when the answer of a fill shows a payment, a new emergency bucket or a new link. The rule in `main.tsx` reads only such a fill. */
+/** True when the answer of a fill shows a payment or a new link. The rule in `main.tsx` reads only such a fill. */
 export function fillPaid(result: unknown): boolean {
   return (
     typeof result === "object" &&
     result !== null &&
     "payments" in result &&
-    "madeBucket" in result &&
     "linked" in result &&
-    (result.payments !== 0 || result.madeBucket === true || result.linked !== 0)
+    (result.payments !== 0 || result.linked !== 0)
   );
 }
 

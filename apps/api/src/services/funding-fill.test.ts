@@ -32,7 +32,7 @@ test("the fill pays the owed amounts in priority order and stops when Unassigned
     const food = spend(book.db, "Food", 100_000, { priority: 1, ...october });
     const fuel = spend(book.db, "Fuel", 50_000, { priority: 2, ...october });
     const trip = spend(book.db, "Trip", 400_000, { priority: 3, ...october });
-    expect(fill(book, "2026-10-08")).toEqual({ paid: 120_000, payments: 2, madeBucket: true });
+    expect(fill(book, "2026-10-08")).toEqual({ paid: 120_000, payments: 2 });
     expect(funding(book)).toEqual([
       { bucketId: food.id, amount: 100_000, date: "2026-10-01", month: "2026-10", undone: false },
       { bucketId: fuel.id, amount: 20_000, date: "2026-10-01", month: "2026-10", undone: false },
@@ -57,7 +57,7 @@ test("more money later pays only what is still owed", () => {
     const fuel = spend(book.db, "Fuel", 50_000, { priority: 2, ...october });
     fill(book, "2026-10-08");
     money(book.db, cash.id, pay.id, "2026-10-09", 500_000, "Payroll");
-    expect(fill(book, "2026-10-10")).toEqual({ paid: 30_000, payments: 1, madeBucket: false });
+    expect(fill(book, "2026-10-10")).toEqual({ paid: 30_000, payments: 1 });
     expect(readBucket(book.db, food.id).balance).toBe(100_000);
     expect(readBucket(book.db, fuel.id).balance).toBe(50_000);
     expect(readOwed(book.db, "2026-10-10").items.every((item) => item.owed === 0)).toBe(true);
@@ -111,8 +111,8 @@ test("the fill is idempotent", () => {
     expect(fill(book, "2026-10-08").payments).toBe(1);
     const events = funding(book);
     const bucketCount = book.db.select().from(buckets).all().length;
-    expect(fill(book, "2026-10-08")).toEqual({ paid: 0, payments: 0, madeBucket: false });
-    expect(fill(book, "2026-10-20")).toEqual({ paid: 0, payments: 0, madeBucket: false });
+    expect(fill(book, "2026-10-08")).toEqual({ paid: 0, payments: 0 });
+    expect(fill(book, "2026-10-20")).toEqual({ paid: 0, payments: 0 });
     expect(funding(book)).toEqual(events);
     expect(book.db.select().from(buckets).all()).toHaveLength(bucketCount);
   } finally {
@@ -147,7 +147,7 @@ test("the fill covers a negative bucket back to 0 from Unassigned, and writes no
     fill(book, "2026-10-21");
     expect(covers(book)).toEqual([{ bucketId: food.id, amount: 30_000, date: "2026-10-01", month: null, undone: false }]);
     expect(readBucket(book.db, food.id).balance).toBe(0);
-    expect(fill(book, "2026-10-22")).toEqual({ paid: 0, payments: 0, madeBucket: false });
+    expect(fill(book, "2026-10-22")).toEqual({ paid: 0, payments: 0 });
     expect(covers(book)).toHaveLength(1);
     expect(funding(book)).toHaveLength(1);
   } finally {
@@ -234,11 +234,11 @@ test("undo of a month returns the money and holds the month until Fund again", (
     expect(undoMonthFunding(book.db, "2026-10", saved)).toEqual({ month: "2026-10", total: 0, held: true });
     expect(readBucket(book.db, food.id).balance).toBe(0);
     expect(listMonthFunding(book.db).items).toEqual([{ month: "2026-10", total: 0, held: true }]);
-    expect(fill(book, "2026-10-09")).toEqual({ paid: 0, payments: 0, madeBucket: false });
+    expect(fill(book, "2026-10-09")).toEqual({ paid: 0, payments: 0 });
     expect(readBucket(book.db, food.id).balance).toBe(0);
     expectCode(() => undoMonthFunding(book.db, "2026-10", saved), "funding_month_held");
 
-    expect(fundMonthAgain(book.db, "2026-10", { asOf: "2026-10-10", ...saved })).toEqual({ paid: 100_000, payments: 1, madeBucket: false });
+    expect(fundMonthAgain(book.db, "2026-10", { asOf: "2026-10-10", ...saved })).toEqual({ paid: 100_000, payments: 1 });
     expect(readBucket(book.db, food.id).balance).toBe(100_000);
     expect(listMonthFunding(book.db).items).toEqual([{ month: "2026-10", total: 100_000, held: false }]);
     expectCode(() => fundMonthAgain(book.db, "2026-10", { asOf: "2026-10-10", ...saved }), "funding_month_not_held");
@@ -290,20 +290,6 @@ test("a month without funding cannot be undone, and one event of the fill cannot
     fill(book, "2026-10-08");
     const [event] = book.db.select().from(bucketEvents).all();
     expectCode(() => undoBucketEvent(book.db, food.id, event?.id ?? "", saved), "event_month_funding");
-  } finally {
-    book.close();
-  }
-});
-
-test("the fill makes the emergency bucket of a set-up book that has none, once", () => {
-  const book = tempDatabase();
-  try {
-    expect(book.db.select().from(buckets).all()).toEqual([]);
-    expect(fill(book, "2026-10-08")).toEqual({ paid: 0, payments: 0, madeBucket: true });
-    expect(fill(book, "2026-10-09").madeBucket).toBe(false);
-    expect(book.db.select().from(buckets).all()).toMatchObject([
-      { name: "Emergency fund", kind: "emergency", startDate: "2026-10-08", months: 3, fillMonths: 12 },
-    ]);
   } finally {
     book.close();
   }

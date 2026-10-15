@@ -34,7 +34,7 @@ export function recordKeep(tx: WriteTx, transactionId: string, at: string): void
   if (tx.select().from(inboxDecisions).where(eq(inboxDecisions.itemKey, itemKey)).get()) {
     return;
   }
-  const row = { itemKey, decision: "keep_uncategorized" as const, reason: null, decidedAt: at };
+  const row = { itemKey, decision: "keep_uncategorized" as const, decidedAt: at };
   tx.insert(inboxDecisions).values(row).run();
   tx.audit({ entity: "inbox_decisions", entityId: itemKey, action: "create", before: null, after: row });
 }

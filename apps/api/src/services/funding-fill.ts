@@ -4,7 +4,6 @@ import { eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
-import { insertEmergencyBucket } from "./buckets";
 import { bucketBalances } from "./bucket-balance";
 import { fundingPosition } from "./funding-book";
 import { heldMonths, monthStart, monthlyRows } from "./funding-months";
@@ -14,10 +13,6 @@ function requireSetup(db: Reader) {
   if (!db.select().from(settings).where(eq(settings.key, "currency")).get()) {
     throw new ServiceError("setup_required", 409);
   }
-}
-
-function hasEmergency(db: Reader) {
-  return db.select({ id: buckets.id }).from(buckets).where(eq(buckets.kind, "emergency")).get() !== undefined;
 }
 
 /** The active buckets with a negative balance, in priority order. */
@@ -40,12 +35,9 @@ function coverTotal(db: Reader, asOf: string, needs: number): number {
   return needs - Math.min(needs, Math.max(0, -fundingPosition(db, asOf).unassigned));
 }
 
-/** True when a fill would write: the emergency bucket is missing, or the month of `asOf` is not held, has an owed amount and Unassigned has room. */
+/** True when a fill would write: a negative bucket needs cover, or the month of `asOf` is not held, has an owed amount and Unassigned has room. */
 function fillNeeded(db: Db, asOf: string): boolean {
   requireSetup(db);
-  if (!hasEmergency(db)) {
-    return true;
-  }
   const negative = negativeBuckets(db);
   if (coverTotal(db, asOf, negative.reduce((sum, item) => sum + item.need, 0)) > 0) {
     return true;
@@ -63,10 +55,6 @@ function fillNeeded(db: Db, asOf: string): boolean {
  */
 function fillInTx(tx: WriteTx, asOf: string): FillResult {
   requireSetup(tx);
-  const madeBucket = !hasEmergency(tx);
-  if (madeBucket) {
-    insertEmergencyBucket(tx, asOf);
-  }
   const month = asOf.slice(0, 7);
   const step = bookStep(tx);
   let paid = 0;
@@ -122,7 +110,7 @@ function fillInTx(tx: WriteTx, asOf: string): FillResult {
       }
     }
   }
-  return { paid, payments, madeBucket };
+  return { paid, payments };
 }
 
 /** The fill: one write with `asOf` from the request. It writes nothing when nothing is owed or Unassigned is used. */
@@ -131,7 +119,7 @@ export function fillBuckets(db: Db, input: WriteInput & { asOf: string }): FillR
     throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
   }
   if (!fillNeeded(db, input.asOf)) {
-    return { paid: 0, payments: 0, madeBucket: false };
+    return { paid: 0, payments: 0 };
   }
   return write(db, { source: input.source, at: input.at }, (tx) => fillInTx(tx, input.asOf));
 }

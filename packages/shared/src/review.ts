@@ -74,7 +74,6 @@ export type InboxDecisionCode = (typeof inboxDecisionCodes)[number];
 export const inboxDecisionSchema = z.object({
   itemKey,
   decision: z.enum(inboxDecisionCodes),
-  reason: z.string().nullable(),
   decidedAt: z.string().refine(isUtcTimestamp),
 });
 

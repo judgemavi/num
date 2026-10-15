@@ -112,7 +112,6 @@ test("the import list filters by account, status and date", () => {
       .values({
         itemKey: `import_unreadable:${dismissed}:2`,
         decision: "not_a_transaction",
-        reason: null,
         decidedAt: "2026-04-05T12:00:00Z",
       })
       .run();

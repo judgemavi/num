@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5cd9bf6a-ecf7-4a1f-bcab-9d46cbc44bdd",
+  "id": "18ce9d96-836f-4a1d-8698-586561b56c6b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "accounts": {
@@ -46,7 +46,7 @@
           "name": "opening_date",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "opening_balance": {
@@ -97,9 +97,33 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_key": {
+          "name": "sort_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "accounts_sort_key_idx": {
+          "name": "accounts_sort_key_idx",
+          "columns": [
+            "sort_key",
+            "name",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -176,6 +200,94 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "bank_balances": {
+      "name": "bank_balances",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "balance": {
+          "name": "balance",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "import_batch_id": {
+          "name": "import_batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "bank_balances_account_date": {
+          "name": "bank_balances_account_date",
+          "columns": [
+            "account_id",
+            "date"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "bank_balances_account_id_accounts_id_fk": {
+          "name": "bank_balances_account_id_accounts_id_fk",
+          "tableFrom": "bank_balances",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "bank_balances_import_batch_id_import_batches_id_fk": {
+          "name": "bank_balances_import_batch_id_import_batches_id_fk",
+          "tableFrom": "bank_balances",
+          "tableTo": "import_batches",
+          "columnsFrom": [
+            "import_batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -283,8 +395,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "funding_run_id": {
-          "name": "funding_run_id",
+        "month": {
+          "name": "month",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -327,19 +439,6 @@
           "tableTo": "buckets",
           "columnsFrom": [
             "other_bucket_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "bucket_events_funding_run_id_funding_runs_id_fk": {
-          "name": "bucket_events_funding_run_id_funding_runs_id_fk",
-          "tableFrom": "bucket_events",
-          "tableTo": "funding_runs",
-          "columnsFrom": [
-            "funding_run_id"
           ],
           "columnsTo": [
             "id"
@@ -404,6 +503,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "start_date": {
+          "name": "start_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "archived_at": {
           "name": "archived_at",
           "type": "text",
@@ -459,9 +565,40 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "months": {
+          "name": "months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fill_months": {
+          "name": "fill_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sort_key": {
+          "name": "sort_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "buckets_sort_key_idx": {
+          "name": "buckets_sort_key_idx",
+          "columns": [
+            "sort_key",
+            "name",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -511,6 +648,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "sort_key": {
+          "name": "sort_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -520,6 +664,15 @@
             "lower(\"name\")"
           ],
           "isUnique": true
+        },
+        "categories_sort_key_idx": {
+          "name": "categories_sort_key_idx",
+          "columns": [
+            "sort_key",
+            "name",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -557,6 +710,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "sort_key": {
+          "name": "sort_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -566,84 +726,18 @@
             "lower(\"name\")"
           ],
           "isUnique": true
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "checkpoints": {
-      "name": "checkpoints",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
         },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "date": {
-          "name": "date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "statement_balance": {
-          "name": "statement_balance",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "unlocked_at": {
-          "name": "unlocked_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "checkpoints_account_date": {
-          "name": "checkpoints_account_date",
+        "category_groups_sort_key_idx": {
+          "name": "category_groups_sort_key_idx",
           "columns": [
-            "account_id",
-            "date"
+            "sort_key",
+            "name",
+            "id"
           ],
           "isUnique": false
         }
       },
-      "foreignKeys": {
-        "checkpoints_account_id_accounts_id_fk": {
-          "name": "checkpoints_account_id_accounts_id_fk",
-          "tableFrom": "checkpoints",
-          "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -711,74 +805,6 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "funding_runs": {
-      "name": "funding_runs",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "income_transaction_id": {
-          "name": "income_transaction_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "date": {
-          "name": "date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "undone_at": {
-          "name": "undone_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "funding_runs_income_active": {
-          "name": "funding_runs_income_active",
-          "columns": [
-            "income_transaction_id"
-          ],
-          "isUnique": true,
-          "where": "\"funding_runs\".\"undone_at\" is null"
-        }
-      },
-      "foreignKeys": {
-        "funding_runs_income_transaction_id_transactions_id_fk": {
-          "name": "funding_runs_income_transaction_id_transactions_id_fk",
-          "tableFrom": "funding_runs",
-          "tableTo": "transactions",
-          "columnsFrom": [
-            "income_transaction_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -985,6 +1011,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": true
+        },
+        "previous_status": {
+          "name": "previous_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -1073,13 +1106,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "reason": {
-          "name": "reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "decided_at": {
@@ -1180,18 +1206,18 @@
           "notNull": true,
           "autoincrement": false
         },
-        "default_category_id": {
-          "name": "default_category_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "archived_at": {
           "name": "archived_at",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
+          "autoincrement": false
+        },
+        "sort_key": {
+          "name": "sort_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
           "autoincrement": false
         }
       },
@@ -1202,29 +1228,24 @@
             "lower(\"name\")"
           ],
           "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "merchants_default_category_id_categories_id_fk": {
-          "name": "merchants_default_category_id_categories_id_fk",
-          "tableFrom": "merchants",
-          "tableTo": "categories",
-          "columnsFrom": [
-            "default_category_id"
-          ],
-          "columnsTo": [
+        },
+        "merchants_sort_key_idx": {
+          "name": "merchants_sort_key_idx",
+          "columns": [
+            "sort_key",
+            "name",
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "isUnique": false
         }
       },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "month_closes": {
-      "name": "month_closes",
+    "month_holds": {
+      "name": "month_holds",
       "columns": {
         "month": {
           "name": "month",
@@ -1233,8 +1254,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "closed_at": {
-          "name": "closed_at",
+        "created_at": {
+          "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -1254,20 +1275,6 @@
           "name": "account_id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "principal": {
-          "name": "principal",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "principal_as_of": {
-          "name": "principal_as_of",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -1411,8 +1418,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "plan_id": {
-          "name": "plan_id",
+        "bucket_id": {
+          "name": "bucket_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -1455,25 +1462,25 @@
           ],
           "isUnique": true
         },
-        "occurrence_links_plan_due_date": {
-          "name": "occurrence_links_plan_due_date",
+        "occurrence_links_bucket_due_date": {
+          "name": "occurrence_links_bucket_due_date",
           "columns": [
-            "plan_id",
+            "bucket_id",
             "due_date"
           ],
           "isUnique": true
         }
       },
       "foreignKeys": {
-        "occurrence_links_plan_id_recurring_plans_id_fk": {
-          "name": "occurrence_links_plan_id_recurring_plans_id_fk",
+        "occurrence_links_bucket_id_schedules_bucket_id_fk": {
+          "name": "occurrence_links_bucket_id_schedules_bucket_id_fk",
           "tableFrom": "occurrence_links",
-          "tableTo": "recurring_plans",
+          "tableTo": "schedules",
           "columnsFrom": [
-            "plan_id"
+            "bucket_id"
           ],
           "columnsTo": [
-            "id"
+            "bucket_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -1496,27 +1503,13 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "recurring_plans": {
-      "name": "recurring_plans",
+    "schedules": {
+      "name": "schedules",
       "columns": {
-        "id": {
-          "name": "id",
+        "bucket_id": {
+          "name": "bucket_id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -1611,33 +1604,32 @@
           "notNull": false,
           "autoincrement": false
         },
-        "active": {
-          "name": "active",
+        "payday": {
+          "name": "payday",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "funds_buckets": {
-          "name": "funds_buckets",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "archived_at": {
-          "name": "archived_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         }
       },
       "indexes": {},
       "foreignKeys": {
-        "recurring_plans_account_id_accounts_id_fk": {
-          "name": "recurring_plans_account_id_accounts_id_fk",
-          "tableFrom": "recurring_plans",
+        "schedules_bucket_id_buckets_id_fk": {
+          "name": "schedules_bucket_id_buckets_id_fk",
+          "tableFrom": "schedules",
+          "tableTo": "buckets",
+          "columnsFrom": [
+            "bucket_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "schedules_account_id_accounts_id_fk": {
+          "name": "schedules_account_id_accounts_id_fk",
+          "tableFrom": "schedules",
           "tableTo": "accounts",
           "columnsFrom": [
             "account_id"
@@ -1648,9 +1640,9 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "recurring_plans_category_id_categories_id_fk": {
-          "name": "recurring_plans_category_id_categories_id_fk",
-          "tableFrom": "recurring_plans",
+        "schedules_category_id_categories_id_fk": {
+          "name": "schedules_category_id_categories_id_fk",
+          "tableFrom": "schedules",
           "tableTo": "categories",
           "columnsFrom": [
             "category_id"
@@ -1661,9 +1653,9 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "recurring_plans_transfer_account_id_accounts_id_fk": {
-          "name": "recurring_plans_transfer_account_id_accounts_id_fk",
-          "tableFrom": "recurring_plans",
+        "schedules_transfer_account_id_accounts_id_fk": {
+          "name": "schedules_transfer_account_id_accounts_id_fk",
+          "tableFrom": "schedules",
           "tableTo": "accounts",
           "columnsFrom": [
             "transfer_account_id"
@@ -1674,9 +1666,9 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "recurring_plans_merchant_id_merchants_id_fk": {
-          "name": "recurring_plans_merchant_id_merchants_id_fk",
-          "tableFrom": "recurring_plans",
+        "schedules_merchant_id_merchants_id_fk": {
+          "name": "schedules_merchant_id_merchants_id_fk",
+          "tableFrom": "schedules",
           "tableTo": "merchants",
           "columnsFrom": [
             "merchant_id"
@@ -1739,6 +1731,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "sort_key": {
+          "name": "sort_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -1748,6 +1747,15 @@
             "lower(\"name\")"
           ],
           "isUnique": true
+        },
+        "tags_sort_key_idx": {
+          "name": "tags_sort_key_idx",
+          "columns": [
+            "sort_key",
+            "name",
+            "id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -1911,13 +1919,6 @@
         },
         "merchant_id": {
           "name": "merchant_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "notes": {
-          "name": "notes",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

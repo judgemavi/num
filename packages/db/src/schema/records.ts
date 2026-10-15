@@ -5,7 +5,6 @@ import { auditSources } from "./codes";
 export const inboxDecisions = sqliteTable("inbox_decisions", {
   itemKey: text("item_key").primaryKey(),
   decision: text("decision", { enum: inboxDecisionCodes }).notNull(),
-  reason: text("reason"),
   decidedAt: text("decided_at").notNull(),
 });
 

@@ -17,7 +17,6 @@ export const errorCodes = [
   "kind_class_mismatch",
   "archive_confirmation_required",
   "card_fields_invalid",
-  "not_credit_card",
   "interest_rate_invalid",
   "not_mortgage",
   "mortgage_terms_not_found",
@@ -92,7 +91,6 @@ export const errorCodes = [
   "import_review_not_found",
   "import_match_invalid",
   "transfer_pair_not_found",
-  "month_invalid",
   "period_invalid",
   "internal_error",
 ] as const;

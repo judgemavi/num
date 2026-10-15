@@ -66,7 +66,7 @@ test("the window of payday ends at the next occurrence of an income with payday"
   }
 });
 
-test("Unassigned has no bills reserved: a commitment lowers it only through its balance", () => {
+test("a commitment lowers Unassigned only through its balance", () => {
   const book = tempDatabase();
   try {
     const cash = account(book.db, "Cash", "chequing", 100_000);

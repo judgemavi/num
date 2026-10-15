@@ -71,7 +71,7 @@ export function decideInboxItem(
     throw new ServiceError("inbox_item_not_found", 404);
   }
   const at = input.at ?? utcNow();
-  const row = { itemKey, decision, reason: null, decidedAt: at };
+  const row = { itemKey, decision, decidedAt: at };
   write(db, { source: input.source, at }, (tx) => {
     if (kind === "uncategorized") {
       keepAnswer(tx, itemKey.slice(keepPrefix.length), at);

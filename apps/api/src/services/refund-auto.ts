@@ -245,7 +245,7 @@ export function recordRefundNo(tx: WriteTx, transactionId: string, at: string): 
   if (tx.select().from(inboxDecisions).where(eq(inboxDecisions.itemKey, itemKey)).get()) {
     return;
   }
-  const row = { itemKey, decision: "not_linked" as const, reason: null, decidedAt: at };
+  const row = { itemKey, decision: "not_linked" as const, decidedAt: at };
   tx.insert(inboxDecisions).values(row).run();
   tx.audit({ entity: "inbox_decisions", entityId: itemKey, action: "create", before: null, after: row });
 }

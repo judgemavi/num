@@ -4,16 +4,19 @@ CREATE TABLE `accounts` (
 	`institution` text,
 	`kind` text NOT NULL,
 	`on_budget` integer NOT NULL,
-	`opening_date` text NOT NULL,
+	`opening_date` text,
 	`opening_balance` integer NOT NULL,
 	`archived_at` text,
 	`payment_policy` text,
 	`fixed_payment` integer,
 	`interest_rate_milli_pct` integer,
 	`import_preset` text,
-	`column_map` text
+	`column_map` text,
+	`created_at` text NOT NULL,
+	`sort_key` text NOT NULL
 );
 --> statement-breakpoint
+CREATE INDEX `accounts_sort_key_idx` ON `accounts` (`sort_key`,`name`,`id`);--> statement-breakpoint
 CREATE TABLE `audit_log` (
 	`id` text PRIMARY KEY NOT NULL,
 	`entity` text NOT NULL,
@@ -26,6 +29,18 @@ CREATE TABLE `audit_log` (
 );
 --> statement-breakpoint
 CREATE INDEX `audit_log_entity` ON `audit_log` (`entity`,`entity_id`);--> statement-breakpoint
+CREATE TABLE `bank_balances` (
+	`id` text PRIMARY KEY NOT NULL,
+	`account_id` text NOT NULL,
+	`date` text NOT NULL,
+	`balance` integer NOT NULL,
+	`import_batch_id` text,
+	`created_at` text NOT NULL,
+	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`import_batch_id`) REFERENCES `import_batches`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `bank_balances_account_date` ON `bank_balances` (`account_id`,`date`);--> statement-breakpoint
 CREATE TABLE `bucket_categories` (
 	`category_id` text PRIMARY KEY NOT NULL,
 	`bucket_id` text NOT NULL,
@@ -41,11 +56,10 @@ CREATE TABLE `bucket_events` (
 	`amount` integer NOT NULL,
 	`date` text NOT NULL,
 	`note` text,
-	`funding_run_id` text,
+	`month` text,
 	`undone_at` text,
 	FOREIGN KEY (`bucket_id`) REFERENCES `buckets`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`other_bucket_id`) REFERENCES `buckets`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`funding_run_id`) REFERENCES `funding_runs`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`other_bucket_id`) REFERENCES `buckets`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE INDEX `bucket_events_bucket` ON `bucket_events` (`bucket_id`);--> statement-breakpoint
@@ -57,6 +71,7 @@ CREATE TABLE `buckets` (
 	`essential` integer NOT NULL,
 	`color` text NOT NULL,
 	`icon` text NOT NULL,
+	`start_date` text NOT NULL,
 	`archived_at` text,
 	`refill_to` integer,
 	`amount` integer,
@@ -64,9 +79,13 @@ CREATE TABLE `buckets` (
 	`repeat` text,
 	`target` integer,
 	`target_date` text,
-	`fixed_amount` integer
+	`fixed_amount` integer,
+	`months` integer,
+	`fill_months` integer,
+	`sort_key` text NOT NULL
 );
 --> statement-breakpoint
+CREATE INDEX `buckets_sort_key_idx` ON `buckets` (`sort_key`,`name`,`id`);--> statement-breakpoint
 CREATE TABLE `categories` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
@@ -74,27 +93,20 @@ CREATE TABLE `categories` (
 	`group_id` text,
 	`essential` integer NOT NULL,
 	`archived_at` text,
+	`sort_key` text NOT NULL,
 	FOREIGN KEY (`group_id`) REFERENCES `category_groups`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `categories_name_lower_unique` ON `categories` (lower("name"));--> statement-breakpoint
+CREATE INDEX `categories_sort_key_idx` ON `categories` (`sort_key`,`name`,`id`);--> statement-breakpoint
 CREATE TABLE `category_groups` (
 	`id` text PRIMARY KEY NOT NULL,
-	`name` text NOT NULL
+	`name` text NOT NULL,
+	`sort_key` text NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `category_groups_name_lower_unique` ON `category_groups` (lower("name"));--> statement-breakpoint
-CREATE TABLE `checkpoints` (
-	`id` text PRIMARY KEY NOT NULL,
-	`account_id` text NOT NULL,
-	`date` text NOT NULL,
-	`statement_balance` integer NOT NULL,
-	`created_at` text NOT NULL,
-	`unlocked_at` text,
-	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action
-);
---> statement-breakpoint
-CREATE INDEX `checkpoints_account_date` ON `checkpoints` (`account_id`,`date`);--> statement-breakpoint
+CREATE INDEX `category_groups_sort_key_idx` ON `category_groups` (`sort_key`,`name`,`id`);--> statement-breakpoint
 CREATE TABLE `documents` (
 	`id` text PRIMARY KEY NOT NULL,
 	`filename` text NOT NULL,
@@ -106,16 +118,6 @@ CREATE TABLE `documents` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `documents_hash_unique` ON `documents` (`hash`);--> statement-breakpoint
-CREATE TABLE `funding_runs` (
-	`id` text PRIMARY KEY NOT NULL,
-	`income_transaction_id` text NOT NULL,
-	`date` text NOT NULL,
-	`created_at` text NOT NULL,
-	`undone_at` text,
-	FOREIGN KEY (`income_transaction_id`) REFERENCES `transactions`(`id`) ON UPDATE no action ON DELETE no action
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `funding_runs_income_active` ON `funding_runs` (`income_transaction_id`) WHERE "funding_runs"."undone_at" is null;--> statement-breakpoint
 CREATE TABLE `import_batches` (
 	`id` text PRIMARY KEY NOT NULL,
 	`account_id` text NOT NULL,
@@ -145,6 +147,7 @@ CREATE TABLE `import_rows` (
 	`outcome` text NOT NULL,
 	`transaction_id` text,
 	`active` integer DEFAULT true NOT NULL,
+	`previous_status` text,
 	FOREIGN KEY (`batch_id`) REFERENCES `import_batches`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`transaction_id`) REFERENCES `transactions`(`id`) ON UPDATE no action ON DELETE no action
@@ -156,7 +159,6 @@ CREATE INDEX `import_rows_batch` ON `import_rows` (`batch_id`);--> statement-bre
 CREATE TABLE `inbox_decisions` (
 	`item_key` text PRIMARY KEY NOT NULL,
 	`decision` text NOT NULL,
-	`reason` text,
 	`decided_at` text NOT NULL
 );
 --> statement-breakpoint
@@ -172,21 +174,19 @@ CREATE INDEX `line_tags_tag` ON `line_tags` (`tag_id`);--> statement-breakpoint
 CREATE TABLE `merchants` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`default_category_id` text,
 	`archived_at` text,
-	FOREIGN KEY (`default_category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE no action
+	`sort_key` text NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `merchants_name_lower_unique` ON `merchants` (lower("name"));--> statement-breakpoint
-CREATE TABLE `month_closes` (
+CREATE INDEX `merchants_sort_key_idx` ON `merchants` (`sort_key`,`name`,`id`);--> statement-breakpoint
+CREATE TABLE `month_holds` (
 	`month` text PRIMARY KEY NOT NULL,
-	`closed_at` text NOT NULL
+	`created_at` text NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE `mortgage_terms` (
 	`account_id` text PRIMARY KEY NOT NULL,
-	`principal` integer NOT NULL,
-	`principal_as_of` text NOT NULL,
 	`rate_milli_pct` integer NOT NULL,
 	`compounding` text NOT NULL,
 	`payment_amount` integer NOT NULL,
@@ -205,21 +205,19 @@ CREATE TABLE `mortgage_terms` (
 --> statement-breakpoint
 CREATE TABLE `occurrence_links` (
 	`id` text PRIMARY KEY NOT NULL,
-	`plan_id` text NOT NULL,
+	`bucket_id` text NOT NULL,
 	`due_date` text NOT NULL,
 	`transaction_id` text,
 	`skipped` integer NOT NULL,
 	`reason` text,
-	FOREIGN KEY (`plan_id`) REFERENCES `recurring_plans`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`bucket_id`) REFERENCES `schedules`(`bucket_id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`transaction_id`) REFERENCES `transactions`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `occurrence_links_transaction_id_unique` ON `occurrence_links` (`transaction_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `occurrence_links_plan_due_date` ON `occurrence_links` (`plan_id`,`due_date`);--> statement-breakpoint
-CREATE TABLE `recurring_plans` (
-	`id` text PRIMARY KEY NOT NULL,
-	`name` text NOT NULL,
-	`kind` text NOT NULL,
+CREATE UNIQUE INDEX `occurrence_links_bucket_due_date` ON `occurrence_links` (`bucket_id`,`due_date`);--> statement-breakpoint
+CREATE TABLE `schedules` (
+	`bucket_id` text PRIMARY KEY NOT NULL,
 	`account_id` text NOT NULL,
 	`expected_amount` integer NOT NULL,
 	`tolerance` integer NOT NULL,
@@ -233,9 +231,8 @@ CREATE TABLE `recurring_plans` (
 	`month_day` integer,
 	`business_day_shift` text NOT NULL,
 	`end_date` text,
-	`active` integer NOT NULL,
-	`funds_buckets` integer NOT NULL,
-	`archived_at` text,
+	`payday` integer NOT NULL,
+	FOREIGN KEY (`bucket_id`) REFERENCES `buckets`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`transfer_account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
@@ -250,10 +247,12 @@ CREATE TABLE `settings` (
 CREATE TABLE `tags` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`archived_at` text
+	`archived_at` text,
+	`sort_key` text NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `tags_name_lower_unique` ON `tags` (lower("name"));--> statement-breakpoint
+CREATE INDEX `tags_sort_key_idx` ON `tags` (`sort_key`,`name`,`id`);--> statement-breakpoint
 CREATE TABLE `transaction_lines` (
 	`id` text PRIMARY KEY NOT NULL,
 	`transaction_id` text NOT NULL,
@@ -276,7 +275,6 @@ CREATE TABLE `transactions` (
 	`date` text NOT NULL,
 	`amount` integer NOT NULL,
 	`merchant_id` text,
-	`notes` text,
 	`payee_raw` text NOT NULL,
 	`payee_normalized` text NOT NULL,
 	`status` text NOT NULL,
@@ -314,5 +312,4 @@ CREATE TABLE `valuations` (
 	FOREIGN KEY (`document_id`) REFERENCES `documents`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `valuations_account_date` ON `valuations` (`account_id`,`date`);--> statement-breakpoint
-INSERT INTO `settings` ("key", "value") SELECT 'autoConfidence', 'balanced' WHERE NOT EXISTS (SELECT 1 FROM `settings` WHERE `key` = 'autoConfidence');
+CREATE UNIQUE INDEX `valuations_account_date` ON `valuations` (`account_id`,`date`);

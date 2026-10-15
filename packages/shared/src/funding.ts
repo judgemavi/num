@@ -164,8 +164,6 @@ export const fillResultSchema = z.object({
   /** The total that this fill paid. 0 when nothing was owed or Unassigned was used. */
   paid: nonNegative,
   payments: nonNegative,
-  /** True when this fill made the emergency bucket. */
-  madeBucket: z.boolean(),
 });
 
 export const owedSchema = z.object({
