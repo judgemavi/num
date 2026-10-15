@@ -52,7 +52,7 @@ function Groups() {
           <p className="px-5 py-5 text-muted-foreground">No groups.</p>
         ) : (
           rows.map((group) => (
-            <ListRow key={group.id} simple onOpen={() => void openEditor("group", { id: group.id })}>
+            <ListRow key={group.id} size="simple" onOpen={() => void openEditor("group", { id: group.id })}>
               <div className={listName}>
                 {group.name}
                 <small>{countLabel(counts.get(group.id) ?? 0)}</small>

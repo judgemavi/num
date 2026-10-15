@@ -1,13 +1,15 @@
-import type { InsightRow, TransactionFilter } from "@num/shared";
+import { defaultInsightListMode, insightListModes, type InsightGroupRow, type InsightRow, type TransactionFilter } from "@num/shared";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { choiceIn } from "@/components/choice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCategoryNames, useGroupNames } from "@/editors/lookups";
 import { CategorySpendList } from "@/insights/category-spend-list";
 import { monthTitle } from "@/insights/format";
-import { spendArcs, type Arc } from "@/insights/spend-arcs";
+import { rowKey, spendArcs, type Arc } from "@/insights/spend-arcs";
 import { SpendDonut } from "@/insights/spend-donut";
-import { useInsightsReport } from "@/insights/use-report";
+import { useInsightsReport, useInsightsSearch } from "@/insights/use-report";
 
 function idOrNone(row: InsightRow) {
   return row.kind === "none" ? "none" : (row.id ?? undefined);
@@ -85,32 +87,80 @@ export function SpendDonutCard() {
   );
 }
 
+/** Groups or categories when no slice is selected. The choice is in the URL. */
+function ListModeToggle() {
+  const { search, patchSearch } = useInsightsSearch();
+  return (
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="sm"
+      spacing={0}
+      aria-label="Show"
+      value={search.by ?? defaultInsightListMode}
+      onValueChange={(value) => {
+        const next = choiceIn(insightListModes, value);
+        if (next) {
+          patchSearch({ by: next === defaultInsightListMode ? undefined : next });
+        }
+      }}
+    >
+      <ToggleGroupItem value="groups">Groups</ToggleGroupItem>
+      <ToggleGroupItem value="categories">Categories</ToggleGroupItem>
+    </ToggleGroup>
+  );
+}
+
 /**
- * The list of groups and categories under the timeline and the donut. It is always open. A month bar or a slice limits
- * it to that month, group or category.
+ * The list under the timeline and the donut. It is always open. With no slice selected, it shows one row for each
+ * group, or all categories, largest first. With a group or a category selected, it shows the categories of that group
+ * and highlights the selected category. A month bar limits it to that month.
  */
 export function SelectedSpendList() {
   const { data, search, patchSearch, colors, category, selectedGroup, groupName, categoryName, openTransactions } = useSpendSelection();
-  const groups = selectedGroup
-    ? [{ ...selectedGroup, categories: selectedGroup.categories.filter((row) => category === null || row.id === category) }]
-    : data.groups;
+  // A category of the selected group has the colour of its slice. In the flat list it has the colour of its group.
+  const categoryRow = (row: InsightRow, colorOf: InsightRow) => ({
+    key: rowKey(row),
+    name: categoryName(row),
+    amount: row.amount,
+    inflow: null,
+    color: colors.get(rowKey(colorOf)),
+    current: category !== null && row.id === category,
+    onOpen: () => openTransactions({ categoryId: row.id ?? undefined }),
+  });
+  const groupRow = (row: InsightGroupRow) => ({
+    key: rowKey(row),
+    name: groupName(row),
+    amount: row.amount,
+    inflow: row.kind === "uncategorized" ? (row.inflow ?? 0) : null,
+    color: colors.get(rowKey(row)),
+    current: false,
+    onOpen: () => openTransactions(row.kind === "uncategorized" ? { uncategorized: true } : { groupId: idOrNone(row) }),
+  });
+  const byCategory = (search.by ?? defaultInsightListMode) === "categories";
+  // Uncategorized has no categories. It stays in the flat list as one row, thus the list shows all spending.
+  const rows = selectedGroup
+    ? selectedGroup.categories.map((row) => categoryRow(row, row))
+    : byCategory
+      ? data.groups
+          .flatMap((group) => (group.kind === "uncategorized" ? [groupRow(group)] : group.categories.map((row) => categoryRow(row, group))))
+          .sort((a, b) => b.amount - a.amount)
+      : data.groups.map(groupRow);
   const title = [search.month ? monthTitle(search.month) : null, selectedGroup ? groupName(selectedGroup) : null].filter(Boolean).join(": ") || "Groups and categories";
   const filtered = Boolean(selectedGroup || search.month);
   return (
     <CategorySpendList
       title={title}
-      groups={groups}
-      colors={colors}
-      groupName={groupName}
-      categoryName={categoryName}
-      onOpenGroup={(row) => openTransactions(row.kind === "uncategorized" ? { uncategorized: true } : { groupId: idOrNone(row) })}
-      onOpenCategory={(row) => openTransactions({ categoryId: row.id ?? undefined })}
+      rows={rows}
       actions={
-        filtered ? (
-          <Button type="button" variant="ghost" onClick={() => patchSearch({ month: undefined, group: undefined, category: undefined })}>
-            Clear
-          </Button>
-        ) : null
+        <>
+          {selectedGroup ? null : <ListModeToggle />}
+          {filtered ? (
+            <Button type="button" variant="ghost" onClick={() => patchSearch({ month: undefined, group: undefined, category: undefined })}>
+              Clear
+            </Button>
+          ) : null}
+        </>
       }
     />
   );

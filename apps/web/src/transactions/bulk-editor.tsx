@@ -134,7 +134,7 @@ function SelectedRows({ rows }: { rows: Transaction[] }) {
       <h3 className="text-sm font-semibold">Selected transactions</h3>
       <div className="overflow-hidden rounded-xl border">
         {rows.map((row) => (
-          <ListRow key={row.id} simple>
+          <ListRow key={row.id} size="simple">
             <span className="w-24 shrink-0 text-sm text-muted-foreground">{formatDate(row.date)}</span>
             <span className="min-w-0 flex-1 truncate text-sm">{row.payeeRaw}</span>
             <span className="min-w-0 truncate text-sm text-muted-foreground">{targetText(row.lines[0] ?? { categoryId: null, transferAccountId: null }, row.amount)}</span>

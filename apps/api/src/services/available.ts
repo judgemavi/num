@@ -14,13 +14,11 @@ export function readAvailable(db: Reader, asOf: string): Available {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
   const { onBudgetTotal, balances, unassigned: free } = positionOn(db, asOf);
-  const totals = { savings: 0, spending: 0, held: 0 };
+  const totals = { savings: 0, held: 0 };
   for (const row of db.select({ id: buckets.id, kind: buckets.kind }).from(buckets).all()) {
     const positive = Math.max(0, balances.get(row.id) ?? 0);
     if (row.kind === "sinking" || row.kind === "goal" || row.kind === "emergency") {
       totals.savings += positive;
-    } else if (row.kind === "spending") {
-      totals.spending += positive;
     } else if (row.kind === "commitment") {
       totals.held += positive;
     }
@@ -33,7 +31,6 @@ export function readAvailable(db: Reader, asOf: string): Available {
     onBudgetTotal,
     unassigned: free,
     savings: totals.savings,
-    spending: totals.spending,
     billsSetAside,
     available: onBudgetTotal - totals.savings - billsSetAside,
   };

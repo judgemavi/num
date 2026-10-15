@@ -47,12 +47,13 @@ test("available to spend subtracts the savings buckets and the bills set aside, 
       onBudgetTotal: 1_000_000,
       unassigned: 810_000,
       savings: 150_000,
-      spending: 30_000,
       billsSetAside: 40_000,
       available: 810_000,
     });
     // The same result: Unassigned + the spending buckets − the short amount of the bills (40 000 − 10 000).
-    expect(result.unassigned + result.spending - 30_000).toBe(result.available);
+    const spendingBuckets = 30_000;
+    const billGaps = 40_000 - 10_000;
+    expect(result.unassigned + spendingBuckets - billGaps).toBe(result.available);
   } finally {
     close();
   }

@@ -17,7 +17,7 @@ export function SettingsIndex() {
         {settingsAreas.map((area) => (
           <ListRow
             key={area.to}
-            simple
+            size="simple"
             onOpen={() => void navigate({ to: area.to })}
           >
             <div className={listName}>{area.label}</div>

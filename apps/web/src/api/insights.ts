@@ -2,7 +2,7 @@ import type { InsightsSearch } from "@num/shared";
 import { queryOptions } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 
-export function insightsQuery(asOf: string, { group: _group, ...request }: InsightsSearch) {
+export function insightsQuery(asOf: string, { group: _group, by: _by, ...request }: InsightsSearch) {
   return queryOptions({
     queryKey: ["insights", asOf, request],
     queryFn: () => unwrap(api.insights.$get({ query: { ...request, asOf } })),

@@ -111,7 +111,7 @@ function BucketsHeader() {
   );
 }
 
-/** Unassigned, the money left in the spending buckets and the money in the savings buckets, on `asOf`, over all buckets. */
+/** Unassigned and the money in the savings buckets, on `asOf`, over all buckets. Each spending row shows what is left. */
 function BucketsSummary() {
   const { data } = useSuspenseQuery(availableQuery(localAsOf()));
   return (
@@ -120,14 +120,9 @@ function BucketsSummary() {
       label="Unassigned"
       amount={<Amount value={data.unassigned} hero />}
       facts={
-        <>
-          <Fact label="Left to spend">
-            <Amount value={data.spending} className="text-lg" />
-          </Fact>
-          <Fact label="Saved">
-            <Amount value={data.savings} className="text-lg" />
-          </Fact>
-        </>
+        <Fact label="Saved">
+          <Amount value={data.savings} className="text-lg" />
+        </Fact>
       }
       illustration={<JarsIllustration />}
     />
@@ -155,17 +150,7 @@ function BucketList() {
               <ListGroup
                 label={group.label}
                 aside={
-                  group.id === "income" ? undefined : group.id === "spending" ? (
-                    total < 0 ? (
-                      <>
-                        Over by <Amount value={-total} />
-                      </>
-                    ) : (
-                      <>
-                        <Amount value={total} /> left
-                      </>
-                    )
-                  ) : (
+                  group.id === "income" || group.id === "spending" ? undefined : (
                     <>
                       <Amount value={total} /> saved
                     </>

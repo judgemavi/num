@@ -5,7 +5,7 @@ import { Plus, Upload } from "lucide-react";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
 import { AccountIcon } from "@/accounts/account-icon";
-import { accountCountLabel, formatBalance, formatMoney, kindLabel, owedToYou, owedToYouWarning } from "@/accounts/format";
+import { accountCountLabel, formatBalance, kindLabel, owedToYou, owedToYouWarning } from "@/accounts/format";
 import { accountLabel } from "@/accounts/label";
 import { groupAccounts, groupHue, groupLabel } from "@/accounts/groups";
 import { accountListQuery, useArchiveAccount } from "@/api/accounts";
@@ -25,11 +25,6 @@ import { PageHeader } from "@/components/page-header";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
-import { SplitBar } from "@/components/split-bar";
-import { hueColor } from "@/components/hue";
-
-const haveColor = "var(--primary)";
-const oweColor = hueColor.sky.glyph;
 
 export function AccountsScreen() {
   return (
@@ -87,22 +82,13 @@ function AccountsPage() {
         amount={<Amount value={worth.net} owed hero />}
         facts={
           <>
-            <Fact label="What you have" dot={haveColor}>
+            <Fact label="What you have">
               <Amount value={worth.have} className="text-lg" />
             </Fact>
-            <Fact label="What you owe" dot={oweColor}>
+            <Fact label="What you owe">
               <Amount value={worth.owe} className="text-lg" />
             </Fact>
           </>
-        }
-        extra={
-          <SplitBar
-            label={`You have ${formatMoney(bookCurrency, worth.have)} and owe ${formatMoney(bookCurrency, worth.owe)}`}
-            segments={[
-              { key: "have", color: haveColor, value: Math.max(0, worth.have) },
-              { key: "owe", color: oweColor, value: worth.owe },
-            ]}
-          />
         }
         illustration={<BalanceScaleIllustration />}
       />
@@ -115,7 +101,7 @@ function AccountsPage() {
               <div key={group.id}>
                 <ListGroup
                   label={groupLabel[group.id]}
-                  aside={<Amount value={group.total} owed={group.id === "loans"} />}
+                  aside={<Amount value={group.total} owed={group.id === "liabilities"} />}
                 />
                 {group.items.map((account) => (
                     <ListRow

@@ -49,7 +49,7 @@ function Tags() {
           <p className="px-5 py-5 text-muted-foreground">{list.shown.archived ? "No archived tags." : "No tags yet."}</p>
         ) : (
           rows.map((tag) => (
-            <ListRow key={tag.id} simple onOpen={() => void openEditor("tag", { id: tag.id })}>
+            <ListRow key={tag.id} size="simple" onOpen={() => void openEditor("tag", { id: tag.id })}>
               <div className={listName}>{tag.name}</div>
               <RowMenu label={`Actions for ${tag.name}`}>
                 <ArchiveMenuItem

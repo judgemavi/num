@@ -80,7 +80,7 @@ function ImportRows({ accountId, onUndo }: { accountId: string; onUndo: (item: I
   return imports.map((item) => (
     <ListRow
       key={item.id}
-      simple
+      size="simple"
       onOpen={() => void openEditor("importInfo", { filename: item.filename, counts: item.counts, unreadable: item.unreadable })}
     >
       <div className="min-w-0 flex-1">

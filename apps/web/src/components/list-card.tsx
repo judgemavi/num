@@ -31,13 +31,20 @@ export function ListGroup({ label, aside }: { label: string; aside?: ReactNode }
   );
 }
 
+// A simple row is 48px high. A dense row is 36px high, with a lighter hairline. On a touch screen it is 44px high.
+const rowSize = {
+  default: "min-h-[60px] py-2 max-md:flex-wrap",
+  simple: "min-h-12 py-2 max-md:flex-wrap",
+  dense: "min-h-9 py-1 border-border/50 pointer-coarse:min-h-11",
+} as const;
+
 export function ListRow({
-  simple = false,
+  size = "default",
   current = false,
   onOpen,
   children,
 }: {
-  simple?: boolean;
+  size?: keyof typeof rowSize;
   current?: boolean;
   onOpen?: () => void;
   children: ReactNode;
@@ -45,7 +52,7 @@ export function ListRow({
   return (
     <div
       aria-current={current ? "true" : undefined}
-      className={`flex items-center gap-3.5 border-t px-5 py-2 first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary max-md:flex-wrap ${simple ? "min-h-12" : "min-h-[60px]"} ${onOpen ? "cursor-pointer" : ""} ${current ? "bg-primary-soft" : ""}`}
+      className={`flex items-center gap-3.5 border-t px-5 first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary ${rowSize[size]} ${onOpen ? "cursor-pointer" : ""} ${current ? "bg-primary-soft" : ""}`}
       tabIndex={onOpen ? 0 : undefined}
       onClick={onOpen}
       onKeyDown={

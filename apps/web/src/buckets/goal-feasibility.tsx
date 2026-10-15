@@ -35,7 +35,7 @@ export function GoalFeasibility() {
           <p className="px-5">These amounts fit in your monthly income.</p>
         )}
         {item.buckets.map((bucket) => (
-          <ListRow key={bucket.bucketId} simple onOpen={() => void openEditor("bucket", { id: bucket.bucketId })}>
+          <ListRow key={bucket.bucketId} size="simple" onOpen={() => void openEditor("bucket", { id: bucket.bucketId })}>
             <span className={listName}>
               {bucket.name}
               {bucket.laterDate ? <small>A date of {longDate(bucket.laterDate)} fits.</small> : null}

@@ -522,9 +522,8 @@ decision of that item, as a save in the editor does.
   A paused bill gets no money from the fill, thus Unassigned does not cover its gap: all of its gap is short.
 - Thus Available to spend = Unassigned + the positive balances of the spending buckets − the gaps of the bills.
   The app shows no time window and no payday.
-- Available to spend, its parts, Unassigned on Home and Buckets, and the facts of the Buckets summary strip ("Left to
-  spend" = the positive balances of the spending buckets; "Saved" = the positive balances of the savings buckets) use
-  the balances on `asOf`: the transactions and the bucket events dated on or before `asOf`, over all active buckets.
+- Available to spend, its parts, Unassigned on Home and Buckets, and the "Saved" fact of the Buckets summary strip
+  (the positive balances of the savings buckets) use the balances on `asOf`: the transactions and the bucket events dated on or before `asOf`, over all active buckets.
 
 ## 7. Workflows
 
@@ -960,10 +959,16 @@ Spending is a part of Home (§14). It has no screen of its own.
 - **Spending donut.** Two rings. The inner ring is the groups. The outer ring is the categories, each inside the arc
   of its group. Groups and categories go largest first. Categories with no group are one inner slice, "No group".
   Uncategorized lines are one inner slice, "Uncategorized", that cannot be selected. A group or category with spending
-  of 0 or less is not a slice, but it stays in the list. A click on a group highlights it and limits the list to it.
-  A click on a category limits the timeline and the list to that category. On a wide screen, the timeline and the
-  donut are in one row. The list of groups and categories is under them. It is always open. A month bar or a slice
-  limits it.
+  of 0 or less is not a slice, but it stays in the list. A click on a group highlights it and limits the list to its
+  categories.
+  A click on a category limits the timeline to that category. On a wide screen, the timeline and the
+  donut are in one row. The list of groups and categories is under them. It is always open. A month bar limits it to
+  that month. With no slice selected, a "Groups | Categories" toggle shows in the header of the list. "Groups" (the
+  default) shows one row for each group. "Categories" shows all categories in one list, largest first, each with the
+  colour of its group. Uncategorized is one row in both lists. The URL keeps the choice. With a group selected, the
+  list shows the categories of that group and has no toggle. With a category selected, the list shows the categories
+  of its group, highlights the selected category and has no toggle. A click on a row opens its transactions for the
+  period.
 - **Mortgage.** The page of the mortgage account shows the balance, rate, schedule and payoff date. Also, the effect of
   an extra payment amount.
 
@@ -1050,8 +1055,8 @@ do not change.
 |---|---|
 | Home | The first screen, from top to bottom. 1. **Summary strip:** "Available to spend" (§6) and, below it, one row with three small amounts: "In your accounts" − "Saving buckets" − "Set aside for bills". No hint line. 2. **Needs you:** one list card with a count badge. It shows only the items that need the user, in this order: transactions need review (the count, and the count older than 7 days); each account that does not match its bank (§5.13); imports older than `staleImportDays`; each missed payment (§7.4); overspent buckets (§7.7); goals that do not fit the monthly income, with the short amount (§7.8); each bill with a short part for its next payment, "<bill> is <short part> short for <date>" (§10 Bills); emergency fund below its target; savings used this month; the pool runs short, with the buckets to pause, the buckets that would give money back and the part that is not covered (§10); a savings rate below 0% in a complete month; each category that went up against its median (§9). Home is read-only: each row has no actions and opens the screen of its fix. When no item needs the user, the card shows one line: "All clear". 3. **Spending** (§9): a section title, the summary line, the period selector, the timeline, the spending donut and the list of groups and categories. |
 | Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers, row selection with Approve and the bulk editor. |
-| Buckets | Summary strip: the hero is Unassigned. Facts: "Left to spend" (the spending buckets) and "Saved" (the savings buckets). No hint line. Groups Income, Bills (the UI name of the commitments), Spending and Savings (sinking, goal, emergency). The Bills group shows its rows in fill order (§7.6). A bill row shows "Due <date>" of its next payment, a progress bar, "<balance> of <amount>" of that payment (§10 Bills) and one line for its gap (§6): when it has a short part, "<short part> short" in the attention colour; when Unassigned covers all of the gap, "Fills <date>" in the muted colour. The date is the first day of the month of the payment, or `asOf` when that day is before `asOf`. Each bucket except an income has "Pause" or "Resume" in its row menu, and a paused row shows "Paused". Balances, what is still owed this month, moves, goals (feasibility), settings. A bill or income row has its schedule, links, skips and "Amount changed". Side column: Upcoming (occurrences of all schedules in the next 30 days) and Detected (new schedule suggestions). |
-| Accounts | Summary strip with the net worth and no hint line. List with balances and the bank status of each account (§5.13), import, bank balances, valuations, mortgage terms. The account page shows the balance in a summary strip (surface colour, no illustration). Facts: the last bank balance with its date, and the date of the last import. When the account does not match its bank, the hint line shows the difference. A mortgage account page has the mortgage panel (§9). An "Imports" view lists all imports and import problems (§7.2). |
+| Buckets | Summary strip: the hero is Unassigned. Fact: "Saved" (the savings buckets). No hint line. Groups Income, Bills (the UI name of the commitments), Spending and Savings (sinking, goal, emergency). The Income and Spending groups have no group total. Each spending row shows "<amount> left". The Bills group shows its rows in fill order (§7.6). A bill row shows "Due <date>" of its next payment, a progress bar, "<balance> of <amount>" of that payment (§10 Bills) and one line for its gap (§6): when it has a short part, "<short part> short" in the attention colour; when Unassigned covers all of the gap, "Fills <date>" in the muted colour. The date is the first day of the month of the payment, or `asOf` when that day is before `asOf`. Each bucket except an income has "Pause" or "Resume" in its row menu, and a paused row shows "Paused". Balances, what is still owed this month, moves, goals (feasibility), settings. A bill or income row has its schedule, links, skips and "Amount changed". Side column: Upcoming (occurrences of all schedules in the next 30 days) and Detected (new schedule suggestions). |
+| Accounts | Summary strip with the net worth and no hint line. Facts: "What you have" and "What you owe". List with balances and the bank status of each account (§5.13), in three groups: Cash (chequing, savings, cash), Assets (investment, property, receivable, other asset) and Liabilities (credit card, mortgage, loan, other liability). The Liabilities group total shows as owed. Also import, bank balances, valuations, mortgage terms. The account page shows the balance in a summary strip (surface colour, no illustration). Facts: the last bank balance with its date, and the date of the last import. When the account does not match its bank, the hint line shows the difference. A mortgage account page has the mortgage panel (§9). An "Imports" view lists all imports and import problems (§7.2). |
 | Settings | Subpages: Groups, Categories, Tags, Merchants, Currency, AI access, Backup. |
 
 The first-run setup screen (§7.0) is not one of the 5 screens. It shows only one time.

@@ -148,6 +148,8 @@ export {
   defaultInsightWindow,
   insightRowKinds,
   insightWindows,
+  insightListModes,
+  defaultInsightListMode,
   insightsQuerySchema,
   insightsSchema,
   insightsSearchSchema,

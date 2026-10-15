@@ -111,7 +111,7 @@ function Categories() {
           <p className="px-5 py-5 text-muted-foreground">{shown.archived ? "No archived categories." : "No categories."}</p>
         ) : (
           rows.map((category) => (
-            <ListRow key={category.id} simple onOpen={() => void openEditor("category", { id: category.id })}>
+            <ListRow key={category.id} size="simple" onOpen={() => void openEditor("category", { id: category.id })}>
               <div className={listName}>
                 {category.name}
                 <small>{category.groupId ? (groupName.get(category.groupId) ?? "No group") : "No group"}</small>

@@ -50,7 +50,7 @@ function Merchants() {
           <p className="px-5 py-5 text-muted-foreground">{list.shown.archived ? "No archived merchants." : "No merchants yet."}</p>
         ) : (
           rows.map((merchant) => (
-            <ListRow key={merchant.id} simple onOpen={() => void openEditor("merchant", { id: merchant.id })}>
+            <ListRow key={merchant.id} size="simple" onOpen={() => void openEditor("merchant", { id: merchant.id })}>
               <div className={listName}>{merchant.name}</div>
               <RowMenu label={`Actions for ${merchant.name}`}>
                 <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("mergeMerchant", { merchantId: merchant.id })}>

@@ -1,22 +1,20 @@
 import { accountClass, accountKinds, type Account, type AccountKind } from "@num/shared";
 import type { Hue } from "@/components/hue";
 
-export const groupOrder = ["cash", "savings", "investments", "loans"] as const;
+export const groupOrder = ["cash", "assets", "liabilities"] as const;
 
 export type AccountGroupId = (typeof groupOrder)[number];
 
 export const groupLabel: Record<AccountGroupId, string> = {
-  cash: "Cash & cards",
-  savings: "Savings",
-  investments: "Investments & property",
-  loans: "Loans & mortgage",
+  cash: "Cash",
+  assets: "Assets",
+  liabilities: "Liabilities",
 };
 
 export const groupHue: Record<AccountGroupId, Hue> = {
   cash: "sky",
-  savings: "mint",
-  investments: "butter",
-  loans: "lilac",
+  assets: "butter",
+  liabilities: "lilac",
 };
 
 export function sameClassKinds(kind: AccountKind): AccountKind[] {
@@ -27,20 +25,19 @@ export function sameClassKinds(kind: AccountKind): AccountKind[] {
 export function accountGroup(kind: AccountKind): AccountGroupId {
   switch (kind) {
     case "chequing":
-    case "cash":
-    case "credit_card":
-      return "cash";
     case "savings":
-      return "savings";
+    case "cash":
+      return "cash";
     case "investment":
     case "property":
     case "receivable":
     case "other_asset":
-      return "investments";
+      return "assets";
+    case "credit_card":
     case "mortgage":
     case "loan":
     case "other_liability":
-      return "loans";
+      return "liabilities";
   }
 }
 

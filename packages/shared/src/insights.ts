@@ -10,6 +10,13 @@ export type InsightWindow = (typeof insightWindows)[number];
 
 export const defaultInsightWindow: InsightWindow = "1";
 
+/** The rows of the spending list when no group or category is selected: one row for each group, or all categories. */
+export const insightListModes = ["groups", "categories"] as const;
+
+export type InsightListMode = (typeof insightListModes)[number];
+
+export const defaultInsightListMode: InsightListMode = "groups";
+
 export const insightRowKinds = ["item", "none", "uncategorized"] as const;
 
 export type InsightRowKind = (typeof insightRowKinds)[number];
@@ -21,9 +28,10 @@ const insightsSearchFields = z.object({
   month: optionalQuery(z.string().refine(isMonthKey)),
   group: queryIdOrNone,
   category: queryId,
+  by: optionalQuery(z.enum(insightListModes)),
 });
 
-const insightsRequestFields = insightsSearchFields.omit({ group: true });
+const insightsRequestFields = insightsSearchFields.omit({ group: true, by: true });
 
 function checkPeriod(value: { window?: InsightWindow; from?: string; to?: string }, context: z.RefinementCtx) {
   const custom = value.window === "custom";

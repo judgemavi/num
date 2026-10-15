@@ -62,7 +62,7 @@ function BankBalanceRows({ accountId }: { accountId: string }) {
       ) : null}
       {list.status ? <BankStatusActions status={list.status} /> : null}
       {list.items.map((item) => (
-        <ListRow key={item.id} simple>
+        <ListRow key={item.id} size="simple">
           <div className={listName}>
             {formatDate(item.date)}
             <small>{item.importBatchId ? "From an import" : "Added by you"}</small>
