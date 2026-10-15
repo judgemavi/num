@@ -6,7 +6,7 @@ import { flowText, type BarKind, type MonthRow } from "@/home/spending/timeline-
 type TargetsProps = { rows: MonthRow[]; kinds: BarKind[]; selected: string | null; onSelect: (month: string) => void };
 
 /**
- * A button over each month that has actual data, in front of the bars and the lines. A click or Enter selects the
+ * A button over each month that has actual data, in front of the bars. A click or Enter selects the
  * month; a second time clears it. The tooltip follows the pointer on the chart below the buttons.
  */
 export function MonthTargets({ rows, kinds, selected, onSelect }: TargetsProps) {
@@ -67,14 +67,7 @@ export function TimelineLegend({ kinds, forecast }: { kinds: BarKind[]; forecast
       {kinds.map((kind) => (
         <Key key={kind.key} swatch={`size-2.5 rounded-sm ${kind.key === "income" ? "bg-chart-3" : "bg-chart-2"}`} label={kind.label} />
       ))}
-      {forecast ? (
-        <>
-          <Key swatch="size-2.5 rounded-sm bg-chart-2/35" label="Forecast (lighter)" />
-          <Key swatch="h-0.5 w-4 bg-chart-5" label="Balance" />
-          <Key swatch="h-0.5 w-4 bg-chart-5/45" label="Balance forecast" />
-          <Key swatch="h-0.5 w-4 border-t-2 border-dashed border-est" label="Known payments only" />
-        </>
-      ) : null}
+      {forecast ? <Key swatch="size-2.5 rounded-sm bg-chart-2/35" label="Forecast (lighter)" /> : null}
     </div>
   );
 }

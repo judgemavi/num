@@ -92,7 +92,7 @@ test("off-budget lines are excluded from category medians", () => {
       spend(book.db, outside.id, snacks.id, `${month}-11`, -100_000);
     }
     const forecast = readForecast(book.db, "2026-04-01");
-    expect(forecast.total.estimated[0]).toBe((forecast.total.known[0] ?? 0) - 40);
+    expect(forecast.total[0]).toBe(1_000_000 - 3_000 - 40);
   } finally {
     book.close();
   }
@@ -108,7 +108,7 @@ test("a business-day shift moves the bill, and skipped or linked occurrences are
     linkOccurrence(book.db, rent.id, "2026-10-15", linked.id, saved);
     skipOccurrence(book.db, rent.id, "2026-11-15", "Away", saved);
     const forecast = readForecast(book.db, "2026-10-01");
-    const atDate = (iso: string) => forecast.total.known[forecast.dates.indexOf(iso)];
+    const atDate = (iso: string) => forecast.total[forecast.dates.indexOf(iso)];
     expect(atDate("2026-10-10")).toBe(100_000);
     expect(atDate("2026-10-12")).toBe(96_000);
     expect(atDate("2026-10-15")).toBe(86_000);
@@ -131,7 +131,7 @@ test("a payment linked to a bill is not in the category median", () => {
       linkOccurrence(book.db, rent.id, `${month}-12`, linked.id, saved);
     }
     const forecast = readForecast(book.db, "2026-04-01");
-    expect(forecast.total.estimated[0]).toBe((forecast.total.known[0] ?? 0) - 40);
+    expect(forecast.total[0]).toBe(1_000_000 - 15_000 - 40);
   } finally {
     book.close();
   }

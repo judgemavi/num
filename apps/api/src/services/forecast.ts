@@ -64,14 +64,14 @@ export function forecastInput(db: Db, asOf: string): ForecastInput & { transfers
         continue;
       }
       if (accountIds.has(schedule.accountId)) {
-        deltas.push({ date: date.dueDate, amount, series: "known" });
+        deltas.push({ date: date.dueDate, amount });
         flows.push(...scheduleFlows(schedule, date.dueDate, amount));
         if (schedule.kind === "commitment" && schedule.transferAccountId && !accountIds.has(schedule.transferAccountId)) {
           transfersOut.push({ date: date.dueDate, income: 0, spending: -amount, bucketId: schedule.id });
         }
       }
       if (schedule.transferAccountId && accountIds.has(schedule.transferAccountId)) {
-        deltas.push({ date: date.dueDate, amount: -amount, series: "known" });
+        deltas.push({ date: date.dueDate, amount: -amount });
       }
     }
   }
@@ -81,7 +81,7 @@ export function forecastInput(db: Db, asOf: string): ForecastInput & { transfers
     .where(and(gt(transactions.date, asOf), lte(transactions.date, horizonEnd)))
     .all()) {
     if (accountIds.has(row.accountId)) {
-      deltas.push({ date: row.date, amount: row.amount, series: "known" });
+      deltas.push({ date: row.date, amount: row.amount });
     }
   }
 

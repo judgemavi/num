@@ -79,7 +79,7 @@ test("bucket spending is not counted two times", () => {
       spend(book.db, cash.id, groceries.id, `${month}-15`, -90_000);
     }
     const forecast = readForecast(book.db, "2026-10-01");
-    expect(forecast.total.estimated[0]).toBe((forecast.total.known[0] ?? 0) - 1_000);
+    expect(forecast.total[0]).toBe(1_000_000 - 270_000 - 1_000);
   } finally {
     book.close();
   }
@@ -96,7 +96,7 @@ test("outlier lines are not included in category spending", () => {
     spend(book.db, cash.id, snacks.id, "2026-02-16", -100_000);
     spend(book.db, cash.id, snacks.id, "2026-03-16", -100_000);
     const forecast = readForecast(book.db, "2026-04-01");
-    expect(forecast.total.estimated[0]).toBe((forecast.total.known[0] ?? 0) - 40);
+    expect(forecast.total[0]).toBe(1_000_000 - 203_000 - 40);
   } finally {
     book.close();
   }
@@ -123,7 +123,7 @@ test("a forecast read does not write a snapshot", () => {
     const before = book.db.select().from(auditLog).all().length;
     const first = readForecast(book.db, "2026-10-08");
     const end = first.dates.indexOf("2026-10-31");
-    expect(first.total.estimated[end]).toBe(6_000);
+    expect(first.total[end]).toBe(6_000);
     expect(book.db.select().from(auditLog).all()).toHaveLength(before);
     readForecast(book.db, "2026-10-20");
     expect(book.db.select().from(auditLog).all()).toHaveLength(before);
@@ -167,7 +167,7 @@ test("variable income uses the median of the last 6 actuals", () => {
       linkOccurrence(book.db, salary.id, date, txn.id, saved);
     }
     const forecast = readForecast(book.db, "2026-07-01");
-    expect(forecast.total.known[0]).toBe(21_000 + 3_500);
+    expect(forecast.total[0]).toBe(21_000 + 3_500);
   } finally {
     book.close();
   }

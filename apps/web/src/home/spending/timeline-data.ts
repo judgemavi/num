@@ -20,8 +20,8 @@ function flowTotal(month: InsightTimelineMonth, key: keyof InsightFlow): number 
 
 /** The last forecast day when the forecast stops inside a month. */
 function partialEnd(timeline: InsightTimeline) {
-  const last = timeline.forecast?.dates.at(-1);
-  if (!last) {
+  const last = timeline.forecastEnd;
+  if (last === null) {
     return null;
   }
   const day = Temporal.PlainDate.from(last);
@@ -57,45 +57,12 @@ export function dayPosition(months: readonly InsightTimelineMonth[], date: strin
   return index + (day.day - 0.5) / day.daysInMonth;
 }
 
-function linePoints(months: readonly InsightTimelineMonth[], dates: readonly string[], amounts: readonly number[]) {
-  return dates.flatMap((date, position) => {
-    const x = dayPosition(months, date);
-    return x === null ? [] : [{ x, amount: amounts[position] ?? 0 }];
-  });
-}
-
-/** The points of the balance line, of the estimated forecast line and of the known-only forecast line. */
-export function balanceLines(timeline: InsightTimeline) {
-  const { months, balances, forecast } = timeline;
-  return {
-    actual: linePoints(
-      months,
-      balances.map((point) => point.date),
-      balances.map((point) => point.amount),
-    ),
-    estimated: forecast ? linePoints(months, forecast.dates, forecast.estimated) : [],
-    known: forecast ? linePoints(months, forecast.dates, forecast.known) : [],
-  };
-}
-
-/** The ranges and the three ticks of the bar axis and of the balance axis. */
+/** The range and the three ticks of the bar axis, and the highest monthly spending. */
 export function timelineRanges(timeline: InsightTimeline) {
   const barPeak = Math.max(1, ...timeline.months.flatMap((item) => [flowTotal(item, "income"), flowTotal(item, "spending")]));
   const barTop = roundOut(Math.ceil(barPeak * 1.1));
-  const balanceValues = [
-    ...timeline.balances.map((point) => point.amount),
-    ...(timeline.forecast?.estimated ?? []),
-    ...(timeline.forecast?.known ?? []),
-  ];
-  const high = Math.max(0, ...balanceValues);
-  const low = Math.min(0, ...balanceValues);
-  const pad = Math.max(Math.round((high - low) * 0.08), 1);
-  const balanceTop = roundOut(high + pad);
-  const balanceBottom = low < 0 ? roundOut(low - pad) : 0;
   return {
     barTicks: [0, Math.round(barTop / 2), barTop],
-    balanceTicks: [balanceBottom, Math.round((balanceBottom + balanceTop) / 2), balanceTop],
-    hasBalance: balanceValues.length > 0,
     peakSpending: Math.max(0, ...timeline.months.map((item) => flowTotal(item, "spending"))),
   };
 }

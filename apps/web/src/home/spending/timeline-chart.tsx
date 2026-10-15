@@ -1,10 +1,10 @@
-import { Bar, CartesianGrid, ComposedChart, Line, Rectangle, ReferenceArea, ReferenceLine, XAxis, YAxis, type BarShapeProps } from "recharts";
+import { Bar, CartesianGrid, ComposedChart, Rectangle, ReferenceArea, ReferenceLine, XAxis, YAxis, type BarShapeProps } from "recharts";
 import { localAsOf } from "@/as-of";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { useBookCurrency, useCategoryNames } from "@/editors/lookups";
 import { ChartTip } from "@/home/spending/chart-tip";
 import { monthTitle } from "@/home/spending/format";
-import { balanceLines, dayPosition, flowText, monthRows, shortMonth, timelineRanges, type BarKind, type MonthRow } from "@/home/spending/timeline-data";
+import { dayPosition, flowText, monthRows, shortMonth, timelineRanges, type BarKind, type MonthRow } from "@/home/spending/timeline-data";
 import { MonthTargets, TimelineLegend } from "@/home/spending/timeline-parts";
 import { useSpendingReport } from "@/home/spending/use-spending";
 import { formatMoney } from "@/money";
@@ -13,8 +13,6 @@ import { formatMoney } from "@/money";
 const config = {
   income: { label: "Income", color: "var(--chart-3)" },
   spending: { label: "Spending", color: "var(--chart-2)" },
-  balance: { label: "Balance", color: "var(--chart-5)" },
-  known: { label: "Known payments only", color: "var(--est)" },
 } satisfies ChartConfig;
 
 const forecastOpacity = 0.35;
@@ -30,14 +28,13 @@ function forecastShape(color: string) {
   };
 }
 
-/** The timeline of the report: income, spending and the balance for each month. It shows the Today marker only when the period ends today. */
+/** The timeline of the report: income and spending for each month. It shows the Today marker only when the period ends today. */
 export function TimelineChart() {
   const currency = useBookCurrency();
   const { data, search, patchSearch } = useSpendingReport();
   const categoryName = useCategoryNames().get(search.category ?? "");
   const timeline = data.timeline;
   const rows = monthRows(timeline);
-  const lines = balanceLines(timeline);
   const ranges = timelineRanges(timeline);
   const kinds: BarKind[] = timeline.categoryId
     ? [{ key: "spending", label: categoryName ?? "Spending" }]
@@ -62,19 +59,6 @@ export function TimelineChart() {
           <XAxis xAxisId="month" dataKey="month" tickFormatter={shortMonth} tick={tick} tickLine={false} axisLine={false} tickMargin={8} minTickGap={12} />
           <XAxis xAxisId="day" type="number" dataKey="x" domain={[0, rows.length]} allowDataOverflow hide height={0} />
           <YAxis yAxisId="flow" domain={[0, ranges.barTicks.at(-1) ?? 0]} ticks={ranges.barTicks} tickFormatter={money} tick={tick} width="auto" tickLine={false} axisLine={false} />
-          {ranges.hasBalance ? (
-            <YAxis
-              yAxisId="balance"
-              orientation="right"
-              domain={[ranges.balanceTicks[0] ?? 0, ranges.balanceTicks.at(-1) ?? 0]}
-              ticks={ranges.balanceTicks}
-              tickFormatter={money}
-              tick={tick}
-              width="auto"
-              tickLine={false}
-              axisLine={false}
-            />
-          ) : null}
           {selectedMonth ? <ReferenceArea xAxisId="month" yAxisId="flow" x1={selectedMonth} x2={selectedMonth} fill="var(--primary-soft)" fillOpacity={1} /> : null}
           <ChartTooltip
             axisId="month"
@@ -106,24 +90,6 @@ export function TimelineChart() {
               shape={forecastShape(`var(--color-${kind.key})`)}
             />,
           ])}
-          {ranges.hasBalance ? (
-            <>
-              <Line data={lines.actual} xAxisId="day" yAxisId="balance" dataKey="amount" stroke="var(--color-balance)" strokeWidth={2.5} dot={false} activeDot={false} tooltipType="none" />
-              <Line data={lines.known} xAxisId="day" yAxisId="balance" dataKey="amount" stroke="var(--color-known)" strokeWidth={2} strokeDasharray="7 5" dot={false} activeDot={false} tooltipType="none" />
-              <Line
-                data={lines.estimated}
-                xAxisId="day"
-                yAxisId="balance"
-                dataKey="amount"
-                stroke="var(--color-balance)"
-                strokeOpacity={0.45}
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={false}
-                tooltipType="none"
-              />
-            </>
-          ) : null}
           {todayX !== null ? (
             <ReferenceLine
               xAxisId="day"
@@ -137,7 +103,7 @@ export function TimelineChart() {
           <MonthTargets rows={rows} kinds={kinds} selected={selectedMonth} onSelect={(month) => patchSearch({ month: search.month === month ? undefined : month })} />
         </ComposedChart>
       </ChartContainer>
-      <TimelineLegend kinds={kinds} forecast={timeline.forecast !== null} />
+      <TimelineLegend kinds={kinds} forecast={timeline.forecastEnd !== null} />
     </>
   );
 }

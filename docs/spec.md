@@ -910,26 +910,25 @@ If the surplus is too small, the app shows the shortfall. It also shows two fixe
 
 ## 8. Forecast
 
-The forecast is daily, for 90 days from `asOf`. It is the total of the open on-budget accounts. It has two series.
+The forecast is daily, for 90 days from `asOf`. It is the total of the open on-budget accounts. It has one series: the total of each day.
 
-**Known series:**
+**Series:**
 - The on-budget total on `asOf`.
 - Transactions in the open on-budget accounts dated after `asOf`.
 - Unlinked occurrences of commitments (a commitment with a transfer account moves money between the accounts) and incomes. Apply the business-day shift.
+- Variable spending:
+  - Spending buckets: `refillTo`, divided equally across the days of each month. Only a bucket with a line in its
+    categories in an open on-budget account.
+  - Expense categories without a bucket: the median of the last 3 complete months, divided equally across the days.
+    A complete month is a calendar month whose last day is before `asOf` and that is not before the month of the first
+    transaction in the book.
+    Do not include transactions that link to a commitment or an income.
+    Do not include lines larger than 3 × the median line of that category.
 
 A card payment is a transfer between two on-budget accounts. It does not change the total.
 
-**Estimated series:** the known series + variable spending.
-- Spending buckets: `refillTo`, divided equally across the days of each month. Only a bucket with a line in its
-  categories in an open on-budget account.
-- Expense categories without a bucket: the median of the last 3 complete months, divided equally across the days.
-  A complete month is a calendar month whose last day is before `asOf` and that is not before the month of the first
-  transaction in the book.
-  Do not include transactions that link to a commitment or an income.
-  Do not include lines larger than 3 × the median line of that category.
-
 **Output:**
-- The known and the estimated total of each day.
+- The total of each day.
 - The monthly income and spending of the 90 days. Do not show daily values after 90 days.
 
 The timeline (§9) shows the forecast. The pool check (§10) uses the same occurrences and variable spending.
@@ -948,11 +947,10 @@ Spending is a part of Home (§14). It has no screen of its own.
 - **Period.** One selector: 1 (default, "This month"), 3, 6 or 12 months, All, or Custom (From and To). "1" is the
   month of `asOf`.
   "All" starts at the first transaction. The breakdowns use the period up to `asOf`.
-- **Timeline.** One chart: monthly income and spending bars, and the daily on-budget balance line.
+- **Timeline.** One chart: monthly income and spending bars.
   After `asOf`, it shows the forecast (§8, 90 days): the bar of the month of `asOf` has an actual part and a forecast
   part. Forecast income is the unlinked income occurrences. Forecast spending is the unlinked commitments and the
-  variable spending of the estimated series. Card payments are not spending. The balance line after `asOf` is the
-  estimated series; the known series is a second line. A click on a month bar limits the breakdowns to that month.
+  variable spending. Card payments are not spending. A click on a month bar limits the breakdowns to that month.
 - **Spending donut.** Two rings. The inner ring is the groups. The outer ring is the categories, each inside the arc
   of its group. Groups and categories go largest first. Categories with no group are one inner slice, "No group".
   Uncategorized lines are one inner slice, "Uncategorized", that cannot be selected. A group or category with spending

@@ -70,22 +70,11 @@ const timelineMonthSchema = z.object({
   forecast: flowSchema.nullable(),
 });
 
-const pointSchema = z.object({
-  date: isoDateSchema,
-  amount: money,
-});
-
 const timelineSchema = z.object({
   categoryId: z.uuid().nullable(),
   months: z.array(timelineMonthSchema),
-  balances: z.array(pointSchema),
-  forecast: z
-    .object({
-      dates: z.array(isoDateSchema),
-      known: z.array(money),
-      estimated: z.array(money),
-    })
-    .nullable(),
+  /** The last day of the forecast, or null when the timeline has no forecast. */
+  forecastEnd: isoDateSchema.nullable(),
 });
 
 export const insightsSchema = z.object({

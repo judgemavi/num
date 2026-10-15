@@ -40,7 +40,7 @@ Put these in `apps/web/src/index.css` as CSS variables. Map them to the shadcn v
 | attn-soft | `#FDEBE4` | attention tile and pill fill |
 | pos (green) | `#2B7A4E` | — |
 | pos-soft | `#E4F2E9` | positive pill fill |
-| est | `#7C7B88` | estimated forecast line |
+| est | `#7C7B88` | neutral chart colour (Uncategorized) |
 | row-hover | `#EFEFFC` | list row hover |
 | scrim | `rgb(23 23 28 / .45)` | dialog overlay |
 | shadow | `0 1px 2px rgb(0 0 0/.05), 0 16px 40px rgb(23 23 28/.14)` | dialogs, popovers, the action bar |
@@ -182,10 +182,10 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 **Full height:** the app shell fills the viewport height. The desktop sidebar is full height and stays in place when the page scrolls.
 
 **Charts:** use only the chart tokens `chart-1` to `chart-5`, `est` and `attn`.
-- Spending timeline (Home): income bars `chart-3`, spending bars `chart-2`, balance line `chart-5`.
-  Forecast bars and the balance forecast line use the same colour at a lower opacity (lighter tone).
+- Spending timeline (Home): income bars `chart-3`, spending bars `chart-2`.
+  Forecast bars use the same colour at a lower opacity (lighter tone).
   When the forecast ends inside a month, the forecast part of that bar also has a dashed outline in the same colour.
-  The known-only forecast line is `est`, dashed. The `asOf` marker is `muted`, dashed.
+  The `asOf` marker is `muted`, dashed.
 - Spending donut: two rings. The inner ring is the groups: slices take `chart-1` to `chart-5` in order.
   After 5 slices, the colours repeat at a lower opacity. "Uncategorized" is `est`. The outer ring is the categories.
   A category takes the colour of its group at a lower opacity. The opacity is lower for each next category of the group.

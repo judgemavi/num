@@ -8,11 +8,6 @@ import { amountSchema } from "./money";
 
 export const forecastDayCount = 90;
 
-const seriesSchema = z.object({
-  known: z.array(amountSchema).length(forecastDayCount),
-  estimated: z.array(amountSchema).length(forecastDayCount),
-});
-
 const monthFlowSchema = z.object({
   month: z.string().refine(isMonthKey),
   income: amountSchema,
@@ -23,7 +18,7 @@ export const forecastSchema = z.object({
   asOf: isoDateSchema,
   dates: z.array(isoDateSchema).length(forecastDayCount),
   /** The total balance of the open on-budget accounts at the end of each day. */
-  total: seriesSchema,
+  total: z.array(amountSchema).length(forecastDayCount),
   months: z.array(monthFlowSchema),
 });
 
@@ -34,7 +29,6 @@ export type ForecastMonth = z.infer<typeof monthFlowSchema>;
 export type ForecastDelta = {
   date: string;
   amount: number;
-  series: "known" | "estimated";
 };
 
 /** Income and spending of one forecast day. Spending is positive when money goes out. `bucketId` is the bucket of the flow, or null. */
@@ -104,7 +98,7 @@ export function spendDeltas(
       if (share === 0) {
         continue;
       }
-      deltas.push({ date, amount: -share, series: "estimated", bucketId: item.bucketId });
+      deltas.push({ date, amount: -share, bucketId: item.bucketId });
     }
   }
   return deltas;
@@ -141,30 +135,19 @@ function dailyShares(total: number, daysInMonth: number, step: number) {
 export function buildForecast(input: ForecastInput): Forecast {
   const dates = forecastDates(input.asOf);
   const indexOf = new Map(dates.map((date, index) => [date, index]));
-  const knownDeltas = dates.map(() => 0);
-  const estimatedDeltas = dates.map(() => 0);
+  const dayDeltas = dates.map(() => 0);
   for (const delta of input.deltas) {
     const index = indexOf.get(delta.date);
-    if (index === undefined) {
-      continue;
+    if (index !== undefined) {
+      dayDeltas[index] = (dayDeltas[index] ?? 0) + delta.amount;
     }
-    const target = delta.series === "known" ? knownDeltas : estimatedDeltas;
-    target[index] = (target[index] ?? 0) + delta.amount;
   }
-  let known = input.balance;
-  let estimated = input.balance;
-  const totalKnown: number[] = [];
-  const totalEstimated: number[] = [];
-  for (let day = 0; day < dates.length; day += 1) {
-    known += knownDeltas[day] ?? 0;
-    estimated += (knownDeltas[day] ?? 0) + (estimatedDeltas[day] ?? 0);
-    totalKnown.push(known);
-    totalEstimated.push(estimated);
-  }
+  let running = input.balance;
+  const total = dayDeltas.map((amount) => (running += amount));
   return {
     asOf: input.asOf,
     dates,
-    total: { known: totalKnown, estimated: totalEstimated },
+    total,
     months: forecastMonths(dates, input.flows),
   };
 }
