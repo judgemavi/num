@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBookCurrency, useCategoryNames } from "@/editors/lookups";
 import { ChangesCard } from "@/insights/changes-card";
 import { monthTitle, rateText } from "@/insights/format";
-import { InsightsBreakdown } from "@/insights/insights-breakdown";
+import { SelectedSpendList, SpendDonutCard } from "@/insights/insights-breakdown";
 import { PeriodSelect } from "@/insights/period-select";
 import { TimelineChart } from "@/insights/timeline-chart";
 import { useInsightsReport } from "@/insights/use-report";
@@ -41,8 +41,11 @@ export function InsightsScreen() {
         }}
       >
         <SpendingSummary />
-        <TimelineCard />
-        <InsightsBreakdown />
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <TimelineCard />
+          <SpendDonutCard />
+        </div>
+        <SelectedSpendList />
         <ChangesCard />
         <NetWorthCard />
       </Boundary>

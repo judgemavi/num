@@ -30,8 +30,9 @@ Status: approved (owner, 2026-10-14)
 6. **Tooltip.** A slice shows a tooltip on hover and on keyboard focus. A group slice shows the name, the amount and
    the share of the total spending. A category slice shows the name, the group, the amount, the share of its group
    and the share of the total spending. The browser formats all values.
-7. **List (amends 0030 item 11).** The list is hidden when no slice is selected. When a slice is selected, the
-   list is to the right of the donut. It shows the selected group: one row for the group total, and its categories
+7. **List (amends 0030 item 11).** On a wide screen (`lg` and wider), the timeline and the donut are in one row.
+   On a narrow screen, the donut is under the timeline. The list is hidden when no slice is selected. When a slice
+   is selected, the list is under the timeline and the donut. It shows the selected group: one row for the group total, and its categories
    under it, each with a colour dot. When a category is selected, the list shows only that category under its group.
    A row opens Transactions with the filter of the group or the category. A "Clear" control clears the selection.
    Exact values without a selection are in the tooltips.

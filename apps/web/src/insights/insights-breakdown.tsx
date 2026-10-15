@@ -13,7 +13,8 @@ function idOrNone(row: InsightRow) {
   return row.kind === "none" ? "none" : (row.id ?? undefined);
 }
 
-export function InsightsBreakdown() {
+/** The arcs, the selected group and the actions of the spending donut. The donut card and the list call this hook. */
+function useSpendSelection() {
   const navigate = useNavigate();
   const { data, search, patchSearch } = useInsightsReport();
   const groupNames = useGroupNames();
@@ -28,7 +29,6 @@ export function InsightsBreakdown() {
     row.kind === "uncategorized" ? "Uncategorized" : row.kind === "none" ? "No group" : (groupNames.get(row.id ?? "") ?? "Unknown");
   const categoryName = (row: InsightRow) => categoryNames.get(row.id ?? "") ?? "Unknown";
   const parentName = (arc: Arc) => groupName(data.groups.find((group) => `${group.kind}-${group.id ?? ""}` === arc.groupKey) ?? arc.row);
-
 
   /** Open the transactions of the period of the report that match the filter. */
   function openTransactions(filter: Partial<TransactionFilter>) {
@@ -59,48 +59,59 @@ export function InsightsBreakdown() {
     return arc.ring === "category" ? arc.row.id === category : !category && search.group === idOrNone(arc.row);
   }
 
+  return { search, patchSearch, arcs, colors, category, selectedGroup, groupName, categoryName, parentName, openTransactions, selectArc, isLit, isPressed };
+}
+
+export function SpendDonutCard() {
+  const { search, patchSearch, arcs, groupName, categoryName, parentName, selectArc, isLit, isPressed } = useSpendSelection();
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[336px_minmax(0,1fr)]">
-      <Card>
-        <CardHeader className="px-5 pt-5">
-          <CardTitle className="text-base font-bold">Spending by group and category</CardTitle>
-          <p className="text-sm text-muted-foreground">Inner ring: groups. Outer ring: categories. Select a slice to see its categories.</p>
-        </CardHeader>
-        <CardContent className="grid gap-3 px-5 pb-5">
-          <SpendDonut
-            arcs={arcs}
-            nameOf={(arc) => ({ name: arc.ring === "group" ? groupName(arc.row) : categoryName(arc.row), group: parentName(arc) })}
-            centerLabel="Spending"
-            isLit={isLit}
-            isPressed={isPressed}
-            canSelect={(arc) => arc.row.kind !== "uncategorized"}
-            onSelect={selectArc}
-          />
-          {search.month ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-              <span className="font-semibold">{monthTitle(search.month)}</span>
-              <Button type="button" variant="ghost" onClick={() => patchSearch({ month: undefined })}>
-                Show the whole period
-              </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-      {selectedGroup ? (
-        <CategorySpendList
-          group={{ ...selectedGroup, categories: selectedGroup.categories.filter((row) => category === null || row.id === category) }}
-          colors={colors}
-          groupName={groupName(selectedGroup)}
-          categoryName={categoryName}
-          onOpenGroup={() => openTransactions({ groupId: idOrNone(selectedGroup) })}
-          onOpenCategory={(row) => openTransactions({ categoryId: row.id ?? undefined })}
-          actions={
-            <Button type="button" variant="ghost" onClick={() => patchSearch({ group: undefined, category: undefined })}>
-              Clear
-            </Button>
-          }
+    <Card>
+      <CardHeader className="px-5 pt-5">
+        <CardTitle className="text-base font-bold">Spending by group and category</CardTitle>
+        <p className="text-sm text-muted-foreground">Inner ring: groups. Outer ring: categories. Select a slice to see its categories.</p>
+      </CardHeader>
+      <CardContent className="grid gap-3 px-5 pb-5">
+        <SpendDonut
+          arcs={arcs}
+          nameOf={(arc) => ({ name: arc.ring === "group" ? groupName(arc.row) : categoryName(arc.row), group: parentName(arc) })}
+          centerLabel="Spending"
+          isLit={isLit}
+          isPressed={isPressed}
+          canSelect={(arc) => arc.row.kind !== "uncategorized"}
+          onSelect={selectArc}
         />
-      ) : null}
-    </div>
+        {search.month ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="font-semibold">{monthTitle(search.month)}</span>
+            <Button type="button" variant="ghost" onClick={() => patchSearch({ month: undefined })}>
+              Show the whole period
+            </Button>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** The selected group with its categories. It shows only when a slice is selected. */
+export function SelectedSpendList() {
+  const { patchSearch, colors, category, selectedGroup, groupName, categoryName, openTransactions } = useSpendSelection();
+  if (!selectedGroup) {
+    return null;
+  }
+  return (
+    <CategorySpendList
+      group={{ ...selectedGroup, categories: selectedGroup.categories.filter((row) => category === null || row.id === category) }}
+      colors={colors}
+      groupName={groupName(selectedGroup)}
+      categoryName={categoryName}
+      onOpenGroup={() => openTransactions({ groupId: idOrNone(selectedGroup) })}
+      onOpenCategory={(row) => openTransactions({ categoryId: row.id ?? undefined })}
+      actions={
+        <Button type="button" variant="ghost" onClick={() => patchSearch({ group: undefined, category: undefined })}>
+          Clear
+        </Button>
+      }
+    />
   );
 }
