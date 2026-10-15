@@ -1,6 +1,7 @@
 import { accountClass, type TransactionListItem, type TransactionListQuery, type TransactionReviewListQuery } from "@num/shared";
 import { cn } from "cn";
 import { Amount } from "@/components/amount";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -44,11 +45,13 @@ type SortHeadProps<Column extends string> = {
   className?: string;
 };
 
-/** The button of a header that sorts the table by its column. */
-function SortButton<Column extends string>({ column, label, onSort }: { column: Column; label: string; onSort: (column: Column) => void }) {
+/** The button of a header that sorts the table by its column. The sorted button shows an arrow for the direction. */
+function SortButton<Column extends string>({ column, label, sort, onSort }: Omit<SortHeadProps<Column>, "className">) {
+  const Arrow = sort.sort !== column ? null : sort.dir === "asc" ? ArrowUp : ArrowDown;
   return (
-    <Button type="button" variant="ghost" size="sm" className="-mx-2 px-2 text-xs font-bold tracking-wider uppercase" onClick={() => onSort(column)}>
+    <Button type="button" variant="ghost" size="sm" className="-mx-2 gap-1 px-2 text-xs font-bold tracking-wider uppercase" onClick={() => onSort(column)}>
       {label}
+      {Arrow ? <Arrow className="size-3.5" strokeWidth={2.2} aria-hidden="true" /> : null}
     </Button>
   );
 }
@@ -62,7 +65,7 @@ function ariaSort(sort: TableSort, columns: readonly string[]) {
 function SortHead<Column extends string>({ column, label, sort, onSort, className }: SortHeadProps<Column>) {
   return (
     <TableHead aria-sort={ariaSort(sort, [column])} className={className}>
-      <SortButton column={column} label={label} onSort={onSort} />
+      <SortButton column={column} label={label} sort={sort} onSort={onSort} />
     </TableHead>
   );
 }
@@ -140,9 +143,10 @@ export function TransactionsTable(props: Props) {
     const balance =
       showBalance && row.runningBalance !== null ? <Amount value={row.runningBalance} owed={accountClass(row.accountKind) === "liability"} /> : null;
     const review = reviewText(row.review, onReview);
-    // A row that needs review has a stripe in the attention colour at its left edge: on the checkbox cell, or with no
-    // checkbox on the first cell of the narrow table and of the wide table.
-    const stripe = row.review ? "shadow-[inset_3px_0_0_var(--color-attn)]" : null;
+    // On the All page and on the page of an account, a row that needs review has a stripe in the attention colour at
+    // its left edge: on the checkbox cell, or with no checkbox on the first cell of the narrow and of the wide table.
+    // The Needs review page has no stripe: all its rows need review.
+    const stripe = row.review && !onReview ? "shadow-[inset_3px_0_0_var(--color-attn)]" : null;
     const edge = selection ? null : stripe;
     return (
       <TableRow
@@ -200,10 +204,10 @@ export function TransactionsTable(props: Props) {
             {/* A narrow table has one header cell with the sort buttons of its two lines. */}
             <TableHead aria-sort={ariaSort(sort, ["payeeRaw", "date", "amount"])} className={narrow}>
               <div className="flex items-center gap-4">
-                <SortButton column="payeeRaw" label="Payee" onSort={onSort} />
-                <SortButton column="date" label="Date" onSort={onSort} />
+                <SortButton column="payeeRaw" label="Payee" sort={sort} onSort={onSort} />
+                <SortButton column="date" label="Date" sort={sort} onSort={onSort} />
                 <span className="ml-auto">
-                  <SortButton column="amount" label="Amount" onSort={onSort} />
+                  <SortButton column="amount" label="Amount" sort={sort} onSort={onSort} />
                 </span>
               </div>
             </TableHead>

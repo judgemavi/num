@@ -59,7 +59,8 @@ const rowSize = {
 
 // The target of the row covers the whole row. The other controls of the row are above it (`ItemActions`).
 // The menu of a row is in the top-right corner of the row. It has no column: a row with a menu has more space at the
-// top, and the content of the row uses the full width. The 44px hit area goes into the padding of the row.
+// top, and the content of the row uses the full width. The hit area stays above the content of the row: 28px with a
+// mouse, 44px on a touch screen (that row has more space at the top).
 const rowTarget = "absolute inset-0 cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset";
 
 /**
@@ -93,7 +94,7 @@ export function ListRow({
       className={cn(
         "@container relative flex-wrap gap-3.5 rounded-none border-0 border-t border-border px-5 text-[15px] first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary [.list-group+&]:border-t-0",
         rowSize[size],
-        menu ? "pt-5" : null,
+        menu ? "pt-9 pointer-fine:pt-6" : null,
         current && "bg-primary-soft",
       )}
     >
@@ -104,7 +105,9 @@ export function ListRow({
         </Slot.Root>
       ) : null}
       {children}
-      {menu ? <ItemActions className="absolute -top-2.5 right-1.5 z-10">{menu}</ItemActions> : null}
+      {menu ? (
+        <ItemActions className="absolute -top-2 right-1.5 z-10 pointer-fine:-top-1 pointer-fine:right-3.5 *:pointer-fine:size-7">{menu}</ItemActions>
+      ) : null}
     </Item>
   );
 }
