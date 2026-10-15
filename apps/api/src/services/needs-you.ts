@@ -11,11 +11,11 @@ function poolItems(failed: readonly HygieneCheck[]): NeedsYouItem[] {
   const items: NeedsYouItem[] = [];
   const fund = failed.find((check) => check.code === "emergency_fund");
   if (fund) {
-    items.push({ code: "emergency_fund", balance: fund.balance, target: fund.target });
+    items.push({ code: "emergency_fund", balance: fund.balance, target: fund.target, months: fund.months });
   }
   const used = failed.find((check) => check.code === "savings_used");
   if (used) {
-    items.push({ code: "savings_used", total: used.total });
+    items.push({ code: "savings_used", total: used.total, items: used.items });
   }
   const pool = failed.find((check) => check.code === "pool_short");
   if (pool && pool.date !== null) {
@@ -50,9 +50,6 @@ export function readNeedsYou(db: Db, asOf: string): NeedsYou {
   for (const missed of state.signals.missed) {
     items.push({ code: "missed", bucketId: missed.bucketId, dueDate: missed.dueDate });
   }
-  for (const bill of failed.find((check) => check.code === "bills_short")?.items ?? []) {
-    items.push({ code: "bills_short", ...bill });
-  }
   const overspent = failed.find((check) => check.code === "overspent");
   if (overspent) {
     items.push({ code: "overspent", count: overspent.count, balance: overspent.balance });
@@ -60,6 +57,9 @@ export function readNeedsYou(db: Db, asOf: string): NeedsYou {
   const shortfall = readFeasibility(db, asOf).feasibility?.shortfall ?? 0;
   if (shortfall > 0) {
     items.push({ code: "goals_short", shortfall });
+  }
+  for (const bill of failed.find((check) => check.code === "bills_short")?.items ?? []) {
+    items.push({ code: "bills_short", ...bill });
   }
   items.push(...poolItems(failed));
   const savings = failed.find((check) => check.code === "savings_rate");

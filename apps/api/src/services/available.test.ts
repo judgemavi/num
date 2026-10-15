@@ -2,14 +2,13 @@ import { expect, test } from "bun:test";
 import { readAvailable } from "./available";
 import { createBucketEvent } from "./bucket-events";
 import { expense, saved, tempDatabase } from "./bucket-test-book";
-import { fundingPosition } from "./funding-book";
 import { account, addSchedule, emergency, money, sinking, spend } from "./funding-test-book";
 import { linkOccurrence, skipOccurrence } from "./recurring-links";
 
 const asOf = "2026-10-08";
 
 function fund(db: ReturnType<typeof tempDatabase>["db"], bucketId: string, amount: number) {
-  createBucketEvent(db, bucketId, { kind: "fund", amount, date: asOf, asOf, ...saved });
+  createBucketEvent(db, bucketId, { kind: "fund", amount, date: "2026-09-01", asOf, ...saved });
 }
 
 /**
@@ -42,15 +41,18 @@ function book() {
 test("available to spend subtracts the savings buckets and the bills set aside, with the short amount of a bill due in 30 days", () => {
   const { db, close } = book();
   try {
-    expect(readAvailable(db, asOf)).toEqual({
+    const result = readAvailable(db, asOf);
+    expect(result).toEqual({
       asOf,
       onBudgetTotal: 1_000_000,
+      unassigned: 810_000,
       savings: 150_000,
+      spending: 30_000,
       billsSetAside: 40_000,
       available: 810_000,
     });
-    // The same result: Unassigned + the spending buckets − the short amount of the bills.
-    expect(fundingPosition(db, asOf).unassigned + 30_000 - 30_000).toBe(810_000);
+    // The same result: Unassigned + the spending buckets − the short amount of the bills (40 000 − 10 000).
+    expect(result.unassigned + result.spending - 30_000).toBe(result.available);
   } finally {
     close();
   }
@@ -75,13 +77,22 @@ test("a linked occurrence is not short, and a negative bucket is not subtracted"
     const paid = money(db, cash.id, housing.id, "2026-10-08", -40_000, "Landlord");
     linkOccurrence(db, rent.id, "2026-10-15", paid.id, saved);
     // Rent is 10 000 − 40 000 = −30 000. It is not a bill set aside, and it is not added back.
-    expect(readAvailable(db, asOf)).toEqual({
-      asOf,
-      onBudgetTotal: 960_000,
-      savings: 150_000,
-      billsSetAside: 0,
-      available: 810_000,
-    });
+    expect(readAvailable(db, asOf)).toMatchObject({ onBudgetTotal: 960_000, savings: 150_000, billsSetAside: 0, available: 810_000 });
+  } finally {
+    close();
+  }
+});
+
+test("a transaction and a bucket event dated after asOf are not in the balances on asOf", () => {
+  const { db, close, cash } = book();
+  try {
+    const before = readAvailable(db, asOf);
+    const housing = expense(db, "Housing");
+    money(db, cash.id, housing.id, "2026-10-20", -500_000, "Later");
+    const trip = sinking(db, "Later trip", 100_000, "2027-06-01");
+    createBucketEvent(db, trip.id, { kind: "fund", amount: 5_000, date: "2026-10-21", asOf: "2026-10-21", ...saved });
+    expect(readAvailable(db, asOf)).toEqual(before);
+    expect(readAvailable(db, "2026-10-21")).toMatchObject({ onBudgetTotal: 500_000, savings: 155_000 });
   } finally {
     close();
   }

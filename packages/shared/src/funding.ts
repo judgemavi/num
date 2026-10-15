@@ -147,14 +147,17 @@ export const fundingPositionSchema = z.object({
 });
 
 /**
- * Available to spend: the on-budget total − the savings buckets − the bills set aside. `savings` is the
- * sum of the positive balances of the sinking, goal and emergency buckets. `billsSetAside` is, for each commitment
- * bucket, its positive balance + the amount that it is short for its occurrences in the next 30 days.
+ * Available to spend and its parts, all from the balances on `asOf` (spec §6). `savings` is the sum of the positive
+ * balances of the sinking, goal and emergency buckets. `spending` is the sum of the positive balances of the spending
+ * buckets. `billsSetAside` is the positive balance of each bill + the short amount of its next payment (spec §10 Bills).
+ * available = onBudgetTotal − savings − billsSetAside = unassigned + spending − the short amount of the bills.
  */
 export const availableSchema = z.object({
   asOf: isoDateSchema,
   onBudgetTotal: money,
+  unassigned: money,
   savings: nonNegative,
+  spending: nonNegative,
   billsSetAside: nonNegative,
   available: money,
 });

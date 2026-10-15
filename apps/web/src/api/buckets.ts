@@ -101,7 +101,7 @@ export function useAddBucketEvent() {
   });
 }
 
-export function useUndoBucketEvent() {
+function useUndoBucketEvent() {
   return useMutation({
     meta: { errorText: bucketError },
     mutationFn: ({ bucketId, eventId }: { bucketId: string; eventId: string }) =>

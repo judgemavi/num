@@ -56,7 +56,7 @@ export const feasibilitySchema = z.object({
     .nullable(),
 });
 
-export type Feasibility = NonNullable<z.infer<typeof feasibilitySchema>["feasibility"]>;
+type Feasibility = NonNullable<z.infer<typeof feasibilitySchema>["feasibility"]>;
 
 /** The share of the surplus for each dated goal that does not fit alone. */
 function surplusShares(surplus: number, buckets: readonly { bucketId: string; monthly: number; dueDate: string | null }[], step: number) {

@@ -36,6 +36,7 @@ function useRows(items: readonly NeedsYouItem[]): Row[] {
   const categoryNames = useCategoryNames();
   const schedules = useActiveSchedules();
   const bucketNames = useBucketNames();
+  const bucketName = (id: string) => bucketNames.get(id) ?? "Bucket";
   const asOf = localAsOf();
   const toBuckets = () => void go({ to: "/buckets" });
 
@@ -87,7 +88,7 @@ function useRows(items: readonly NeedsYouItem[]): Row[] {
           key: `${item.code}-${item.bucketId}`,
           hue: "attention",
           icon: ReceiptText,
-          title: `${bucketNames.get(item.bucketId) ?? "Bill"} is ${money(item.short)} short for ${formatDate(item.dueDate)}`,
+          title: `${bucketName(item.bucketId)} is ${money(item.short)} short for ${formatDate(item.dueDate)}`,
           detail: null,
           open: toBuckets,
         }];
@@ -115,7 +116,7 @@ function useRows(items: readonly NeedsYouItem[]): Row[] {
           hue: "pink",
           icon: LifeBuoy,
           title: "Emergency fund below its target",
-          detail: `${money(item.balance)} of ${money(item.target)}`,
+          detail: `${money(item.balance)} of ${money(item.target)} · ${plural(item.months, "month", "months")} of essential spending`,
           open: toBuckets,
         }];
       case "savings_used":
@@ -124,14 +125,13 @@ function useRows(items: readonly NeedsYouItem[]): Row[] {
           hue: "pink",
           icon: LifeBuoy,
           title: "Savings used",
-          detail: `${money(item.total)} went back to Unassigned this month`,
+          detail: [`${money(item.total)} went back to Unassigned this month`, ...item.items.map((row) => `${bucketName(row.bucketId)} to ${bucketName(row.coveredId)} ${money(row.amount)}`)].join(" · "),
           open: toBuckets,
         }];
       case "pool_short": {
-        const name = (id: string) => bucketNames.get(id) ?? "Bucket";
         const parts = [
-          ...item.pause.map((row) => `Pause ${name(row.bucketId)} (${money(row.monthly)} a month)`),
-          ...item.recede.map((row) => `${name(row.bucketId)} gives ${money(row.amount)}`),
+          ...item.pause.map((row) => `Pause ${bucketName(row.bucketId)} (${money(row.monthly)} a month)`),
+          ...item.recede.map((row) => `${bucketName(row.bucketId)} gives ${money(row.amount)}`),
           ...(item.uncovered > 0 ? [`${money(item.uncovered)} not covered`] : []),
         ];
         return [{

@@ -102,7 +102,6 @@ export {
   comparePriority,
   hasSchedule,
   isSavings,
-  hasEssential,
   recedeDefault,
   billNeedListSchema,
   emergencyDefaults,
@@ -143,7 +142,7 @@ export {
   type MonthlyCommitment,
   type Owed,
 } from "./funding";
-export { buildFeasibility, feasibilitySchema, type Feasibility, type FeasibilityBucket, type FeasibilityPlan } from "./feasibility";
+export { buildFeasibility, feasibilitySchema } from "./feasibility";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
 export {
   defaultInsightWindow,
@@ -388,7 +387,6 @@ export {
   forecastRisks,
   forecastSchema,
   forecastWarningCodes,
-  monthEnd,
   spendDeltas,
   unbucketedMonthly,
   type Forecast,
@@ -428,7 +426,7 @@ export {
   type HygieneCheck,
 } from "./hygiene";
 export { billNeed, pausePlan, projectedPoolShort, recedeOrder, recedePlan } from "./pool";
-export { needsYouItemSchema, needsYouSchema, type NeedsYou, type NeedsYouItem } from "./needs-you";
+export { needsYouSchema, type NeedsYou, type NeedsYouItem } from "./needs-you";
 export { reviewLevel, reviewLevels, type ReviewLevel } from "./review-level";
 export {
   approveResultSchema,

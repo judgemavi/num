@@ -10,7 +10,7 @@ const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
  * The items of Home "Needs you". The list has only the items that need the user: each item is a
  * check that fails. The order is the order of the list on Home.
  */
-export const needsYouItemSchema = z.discriminatedUnion("code", [
+const needsYouItemSchema = z.discriminatedUnion("code", [
   /** Transactions need review. `oldCount` is the number older than 7 days. */
   z.object({ code: z.literal("review"), count: nonNegative, oldCount: nonNegative }),
   /** One account that does not match its bank (spec §5.13). */
@@ -23,16 +23,20 @@ export const needsYouItemSchema = z.discriminatedUnion("code", [
   }),
   /** One missed occurrence of a commitment or an income (spec §7.4). */
   z.object({ code: z.literal("missed"), bucketId: z.uuid(), dueDate: isoDateSchema }),
-  /** One bill that does not hold its next payment, due in the next 30 days (spec §10 Bills). */
-  z.object({ code: z.literal("bills_short"), bucketId: z.uuid(), dueDate: isoDateSchema, short: nonNegative }),
   /** Buckets that stay below zero after the fill (spec §7.7). */
   z.object({ code: z.literal("overspent"), count: nonNegative, balance: z.number().int().max(0) }),
   /** The goals and sinking funds need more each month than the monthly income has (spec §7.8). */
   z.object({ code: z.literal("goals_short"), shortfall: nonNegative }),
-  /** The emergency fund is below its target. */
-  z.object({ code: z.literal("emergency_fund"), balance: money, target: nonNegative }),
-  /** The savings buckets gave money back to Unassigned this month. */
-  z.object({ code: z.literal("savings_used"), total: nonNegative }),
+  /** One bill that does not hold its next payment, due in the next 30 days (spec §10 Bills). */
+  z.object({ code: z.literal("bills_short"), bucketId: z.uuid(), dueDate: isoDateSchema, short: nonNegative }),
+  /** The emergency fund is below its target. `months` is the number of months of essential spending of the target. */
+  z.object({ code: z.literal("emergency_fund"), balance: money, target: nonNegative, months: nonNegative }),
+  /** The savings buckets gave money back to Unassigned this month: the total, and each savings and covered bucket. */
+  z.object({
+    code: z.literal("savings_used"),
+    total: nonNegative,
+    items: z.array(z.object({ bucketId: z.uuid(), coveredId: z.uuid(), amount: nonNegative })),
+  }),
   /**
    * The forecast pool goes below zero on `date` by `short`. The buckets to pause, the buckets that would give money
    * back, and the part that no bucket gives.

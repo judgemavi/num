@@ -2,7 +2,7 @@ import { comparePriority, type BucketKind } from "@num/shared";
 import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { billNeedsQuery, bucketListQuery, emergencyFundQuery, overspentQuery } from "@/api/buckets";
-import { fundingOwedQuery, fundingPositionQuery } from "@/api/funding";
+import { availableQuery, fundingOwedQuery } from "@/api/funding";
 import { feasibilityQuery } from "@/api/feasibility";
 import { upcomingQuery } from "@/api/schedules";
 import { localAsOf } from "@/as-of";
@@ -36,7 +36,7 @@ const groupOrder: { id: string; kinds: BucketKind[]; label: string }[] = [
 export function BucketsScreen() {
   const asOf = localAsOf();
   usePrefetchQuery(bucketListQuery(useBucketSearch().shown));
-  usePrefetchQuery(fundingPositionQuery(asOf));
+  usePrefetchQuery(availableQuery(asOf));
   usePrefetchQuery(feasibilityQuery(asOf));
   usePrefetchQuery(overspentQuery());
   usePrefetchQuery(emergencyFundQuery(asOf));
@@ -111,23 +111,21 @@ function BucketsHeader() {
   );
 }
 
-/** Unassigned, with the money left in the spending buckets and the money in the savings buckets. */
+/** Unassigned, the money left in the spending buckets and the money in the savings buckets, on `asOf`, over all buckets. */
 function BucketsSummary() {
-  const rows = useBucketBoard().board.items;
-  const { data: position } = useSuspenseQuery(fundingPositionQuery(localAsOf()));
-  const total = (kinds: readonly BucketKind[]) => rows.filter((bucket) => kinds.includes(bucket.kind)).reduce((sum, bucket) => sum + bucket.balance, 0);
+  const { data } = useSuspenseQuery(availableQuery(localAsOf()));
   return (
     <SummaryStrip
       tint="buckets"
       label="Unassigned"
-      amount={<Amount value={position.unassigned} hero />}
+      amount={<Amount value={data.unassigned} hero />}
       facts={
         <>
           <Fact label="Left to spend">
-            <Amount value={total(["spending"])} className="text-lg" />
+            <Amount value={data.spending} className="text-lg" />
           </Fact>
           <Fact label="Saved">
-            <Amount value={total(["sinking", "emergency", "goal"])} className="text-lg" />
+            <Amount value={data.savings} className="text-lg" />
           </Fact>
         </>
       }

@@ -2,14 +2,6 @@ import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { localAsOf } from "@/as-of";
 
-/** The money that is not in a bucket. */
-export function fundingPositionQuery(asOf: string) {
-  return queryOptions({
-    queryKey: ["funding-position", asOf],
-    queryFn: () => unwrap(api.funding.position.$get({ query: { asOf } })),
-  });
-}
-
 /** The monthly amount of each bucket for the month of `asOf`, and the amount that is still owed. */
 export function fundingOwedQuery(asOf: string) {
   return queryOptions({

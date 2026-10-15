@@ -41,13 +41,13 @@ test("each check that fails is an item, in the order of Home", () => {
     fillBuckets(db, { asOf, ...saved });
 
     const items = readNeedsYou(db, asOf).items;
-    expect(items.map((item) => item.code)).toEqual(["review", "bank_mismatch", "missed", "bills_short", "overspent", "pool_short", "spending_up"]);
+    expect(items.map((item) => item.code)).toEqual(["review", "bank_mismatch", "missed", "overspent", "bills_short", "pool_short", "spending_up"]);
     expect(items.filter((item) => item.code !== "pool_short")).toEqual([
       { code: "review", count: 1, oldCount: 0 },
       { code: "bank_mismatch", accountId: cash.id, difference: -2_100 },
       { code: "missed", bucketId: rent.id, dueDate: "2026-10-01" },
-      { code: "bills_short", bucketId: rent.id, dueDate: "2026-11-01", short: 500 },
       { code: "overspent", count: 1, balance: -2_100 },
+      { code: "bills_short", bucketId: rent.id, dueDate: "2026-11-01", short: 500 },
       { code: "spending_up", categoryId: groceries.id, month: "2026-10", amount: 3_000, median: 0, delta: 3_000 },
     ]);
   } finally {

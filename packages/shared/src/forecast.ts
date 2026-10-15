@@ -13,7 +13,6 @@ export const forecastWarningCodes = ["manual_card"] as const;
 
 export const forecastRisks = ["below_zero"] as const;
 
-
 const seriesSchema = z.object({
   known: z.array(amountSchema).length(forecastDayCount),
   estimated: z.array(amountSchema).length(forecastDayCount),
@@ -95,11 +94,6 @@ export type ForecastInput = {
 export function forecastDates(asOf: string): string[] {
   const start = Temporal.PlainDate.from(asOf);
   return Array.from({ length: forecastDayCount }, (_, index) => start.add({ days: index }).toString());
-}
-
-export function monthEnd(asOf: string): string {
-  const date = Temporal.PlainDate.from(asOf);
-  return date.with({ day: date.daysInMonth }).toString();
 }
 
 /** `step` is the milliunits in one minor unit of the book currency. The result is a whole number of minor units. */

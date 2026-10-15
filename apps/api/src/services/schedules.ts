@@ -36,11 +36,6 @@ function selectViews(db: Reader, id?: string) {
   return rows.map((row) => viewOf(row.bucket, row.schedule));
 }
 
-/** The schedules of all buckets, also the archived ones. */
-export function loadSchedules(db: Reader): ScheduleView[] {
-  return selectViews(db);
-}
-
 /** The schedules of the buckets that are not archived. */
 export function activeSchedules(db: Reader): ScheduleView[] {
   return selectViews(db).filter((row) => row.archivedAt === null);

@@ -107,7 +107,7 @@ function plannedMonthly(db: Reader, asOf: string) {
  * The monthly essential spending: the median of the last 6 complete months before `asOf`. With fewer
  * than 3 complete months that have lines, the planned figure.
  */
-export function monthlyEssential(db: Reader, asOf: string): { monthly: number; basis: EmergencyFund["basis"] } {
+function monthlyEssential(db: Reader, asOf: string): { monthly: number; basis: EmergencyFund["basis"] } {
   const months = lastCompleteMonths(db, asOf, historyMonths);
   const first = months[0];
   const last = months[months.length - 1];

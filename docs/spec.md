@@ -517,6 +517,9 @@ decision of that item, as a save in the editor does.
   Available to spend, the bill row on Buckets and the Bills check use this one calculation.
 - Thus Available to spend = Unassigned + the positive balances of the spending buckets − the short amount of the bills.
   The app shows no time window and no payday.
+- Available to spend, its parts, Unassigned on Home and Buckets, and the facts of the Buckets summary strip ("Left to
+  spend" = the positive balances of the spending buckets; "Saved" = the positive balances of the savings buckets) use
+  the balances on `asOf`: the transactions and the bucket events dated on or before `asOf`, over all active buckets.
 
 ## 7. Workflows
 

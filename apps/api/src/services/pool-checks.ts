@@ -3,9 +3,8 @@ import { forecastDates, monthLastDay, pausePlan, projectedPoolShort, recedeOrder
 import { and, eq, gte, isNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { bookStep } from "./book-step";
-import { bucketBalances } from "./bucket-balance";
+import { positionOn } from "./available";
 import { forecastInput } from "./forecast";
-import { fundingPosition } from "./funding-book";
 import { monthlyRows } from "./funding-months";
 
 /** The recedes in the month of `asOf` that are not undone, for each pair of savings and covered bucket. */
@@ -41,12 +40,12 @@ function savingsUsed(db: Db, asOf: string) {
  */
 function poolShort(db: Db, asOf: string) {
   const step = bookStep(db);
-  const balances = bucketBalances(db, asOf);
+  const { balances, unassigned } = positionOn(db, asOf);
   const input = forecastInput(db, asOf);
   const { date, short } = projectedPoolShort({
     asOf,
     dates: forecastDates(asOf),
-    unassigned: fundingPosition(db, asOf).unassigned,
+    unassigned,
     flows: [...input.flows, ...input.transfersOut],
     balances,
     step,

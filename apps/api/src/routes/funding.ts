@@ -40,7 +40,7 @@ const owedRoute = createRoute({
 
 const availableRoute = createRoute({
   operationId: "get_funding_available",
-  description: `${readOnly} Available to spend: the on-budget total, minus the positive balances of the savings buckets (sinking, goal, emergency), minus the bills set aside. Bills set aside: for each commitment bucket, its positive balance plus the amount that it is short for its occurrences in the next 30 days after asOf.`,
+  description: `${readOnly} Available to spend and its parts, all from the balances on asOf. Available to spend = the on-budget total − savings (the positive balances of the sinking, goal and emergency buckets) − bills set aside. Bills set aside = for each active commitment bucket, its positive balance + the short amount of its next payment. The next payment is the next occurrence on or after asOf that is not skipped and not linked, with the other open occurrences of the same month. It is short only when it is due in the next 30 days after asOf: the payment − the balance, minimum 0. Also returns Unassigned and spending (the positive balances of the spending buckets): available = unassigned + spending − the short amounts.`,
   method: "get",
   path: "/api/funding/available",
   request: { query: asOfQuerySchema },

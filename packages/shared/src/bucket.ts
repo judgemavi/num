@@ -21,7 +21,7 @@ export function isSavings(kind: BucketKind): kind is "sinking" | "goal" | "emerg
 }
 
 /** Only a commitment and a spending bucket have `essential`. */
-export function hasEssential(kind: BucketKind): kind is "commitment" | "spending" {
+function hasEssential(kind: BucketKind): kind is "commitment" | "spending" {
   return kind === "commitment" || kind === "spending";
 }
 
