@@ -77,7 +77,6 @@ const timelineSchema = z.object({
       dates: z.array(isoDateSchema),
       known: z.array(money),
       estimated: z.array(money),
-      lowest: pointSchema,
     })
     .nullable(),
 });

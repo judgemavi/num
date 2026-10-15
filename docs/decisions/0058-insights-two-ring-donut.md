@@ -44,6 +44,8 @@ Status: approved (owner, 2026-10-14)
    "New merchants" in Changes does not change.
 9. **API.** The report has `groups`. Each group row has `categories`. The report does not depend on the selection.
    The query has no `group` field. The page keeps `group` in its search only. `donut`, `rows`, `merchants` and `tags` are removed.
+10. **Lowest point (amends 0030 item 6).** The timeline has no marker on the lowest point of the forecast.
+    The insights report does not have `lowest`.
 
 ## Consequences
 

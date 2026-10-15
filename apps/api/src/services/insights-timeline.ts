@@ -139,7 +139,6 @@ export function readTimeline(db: Db, facts: readonly LedgerLine[], period: Perio
       dates: forecast.dates,
       known: forecast.total.known,
       estimated: forecast.total.estimated,
-      lowest: forecast.lowest,
     },
   };
 }

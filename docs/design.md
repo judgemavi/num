@@ -171,7 +171,7 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 - Insights timeline: income bars `chart-3`, spending bars `chart-2`, balance line `chart-5`.
   Forecast bars and the balance forecast line use the same colour at a lower opacity (lighter tone).
   When the forecast ends inside a month, the forecast part of that bar also has a dashed outline in the same colour.
-  The known-only forecast line is `est`, dashed. The lowest forecast point is `attn`. The `asOf` marker is `muted`, dashed.
+  The known-only forecast line is `est`, dashed. The `asOf` marker is `muted`, dashed.
 - Spending donut (decision 0058): two rings. The inner ring is the groups: slices take `chart-1` to `chart-5` in order.
   After 5 slices, the colours repeat at a lower opacity. "Uncategorized" is `est`. The outer ring is the categories.
   A category takes the colour of its group at a lower opacity. The opacity is lower for each next category of the group.

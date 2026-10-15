@@ -109,11 +109,7 @@ function Axes({ scale, months }: { scale: Scale; months: InsightTimelineMonth[] 
 }
 
 function BalanceLines({ scale, timeline }: { scale: Scale; timeline: InsightTimeline }) {
-  const currency = useBookCurrency();
   const forecast = timeline.forecast;
-  const lowX = forecast ? scale.dateX(forecast.lowest.date) : null;
-  const lowY = forecast ? scale.balanceY(forecast.lowest.amount) : 0;
-  const labelLeft = lowX !== null && lowX > chart.width * 0.7;
   return (
     <g fill="none" strokeLinejoin="round" strokeWidth="2.5">
       <path d={scale.linePath(timeline.balances)} className="stroke-chart-5" />
@@ -121,19 +117,6 @@ function BalanceLines({ scale, timeline }: { scale: Scale; timeline: InsightTime
         <>
           <path d={scale.linePath(forecastPoints(forecast.dates, forecast.known))} className="stroke-est" strokeDasharray="7 5" strokeWidth="2" />
           <path d={scale.linePath(forecastPoints(forecast.dates, forecast.estimated))} className="stroke-chart-5" strokeOpacity="0.45" />
-        </>
-      ) : null}
-      {forecast && lowX !== null ? (
-        <>
-          <circle cx={lowX} cy={lowY} r="6" className="fill-card stroke-attn" strokeWidth="3" />
-          <text
-            x={labelLeft ? lowX - 10 : lowX + 10}
-            y={Math.min(lowY + 22, scale.bottom - 4)}
-            textAnchor={labelLeft ? "end" : "start"}
-            className="fill-attn stroke-none text-[13px] font-semibold"
-          >
-            {`Lowest ${formatMoney(currency, forecast.lowest.amount)} on ${shortDay(forecast.lowest.date)}`}
-          </text>
         </>
       ) : null}
     </g>
