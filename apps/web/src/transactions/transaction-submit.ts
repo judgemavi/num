@@ -55,7 +55,7 @@ export function reviewAnswer(review: TransactionReview | null, paymentFor: strin
       return { question: "refund_purchase" };
     case "recurring_ambiguous":
       return review.recurring && paymentFor !== null
-        ? { question: "recurring_ambiguous", planId: review.recurring.planId, dueDate: review.recurring.dueDate }
+        ? { question: "recurring_ambiguous", bucketId: review.recurring.bucketId, dueDate: review.recurring.dueDate }
         : undefined;
     default:
       return undefined;

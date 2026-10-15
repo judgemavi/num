@@ -12,7 +12,7 @@ import { decideInboxItem, decisionRows, undoInboxDecision } from "./inbox-decisi
 import { listNeedsReview } from "./needs-review";
 import { approveSelected } from "./review-approve";
 import { linkOccurrence } from "./recurring-links";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at: "2026-04-02T16:00:00Z" };
@@ -73,9 +73,9 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
     db.update(transactions).set({ source: "import" }).where(eq(transactions.id, left.id)).run();
     const right = pay(db, savings.id, "2026-03-06", 50_000, "Savings deposit", food.id);
     const pairKey = left.id < right.id ? `transfer_pair:${left.id}:${right.id}` : `transfer_pair:${right.id}:${left.id}`;
-    const changedPlan = createPlan(db, {
+    const changedPlan = createSchedule(db, {
       name: "Stream",
-      kind: "bill",
+      kind: "commitment",
       accountId: cash.id,
       expectedAmount: -10_000,
       tolerance: 0,
@@ -89,15 +89,14 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
       monthDay: 15,
       businessDayShift: "none",
       endDate: "2026-03-15",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       ...saved,
     });
     const changedPay = pay(db, cash.id, "2026-03-15", -19_990, "Stream", food.id);
     linkOccurrence(db, changedPlan.id, "2026-03-15", changedPay.id, saved);
-    createPlan(db, {
+    createSchedule(db, {
       name: "Phone",
-      kind: "bill",
+      kind: "commitment",
       accountId: savings.id,
       expectedAmount: -10_000,
       tolerance: 0,
@@ -111,8 +110,7 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
       monthDay: 20,
       businessDayShift: "none",
       endDate: "2026-03-20",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       ...saved,
     });
     const phoneA = pay(db, savings.id, "2026-03-20", -10_000, "Phone a", food.id);

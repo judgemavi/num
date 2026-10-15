@@ -32,7 +32,7 @@ If a screen or feature does not support one of these loops, do not add it.
    transfers, loan payments) without a user action. Labels (category and merchant) can be automatic when the app is sure
    (§7.3). An automatic label always shows its level (Sure) and is easy to correct (decision 0037).
 4. **Reversible.** The user can undo imports and funding.
-   The user can restore archived accounts, categories, tags, merchants, recurring items and buckets.
+   The user can restore archived accounts, categories, tags, merchants, commitments, incomes and buckets.
    The audit log records each of these actions.
 5. **Exceptions only.** Home shows only what needs the user. The user selects rows, approves their labels and
    suggestions together, one page at a time, and answers the rest (decision 0051). The user does not examine each
@@ -102,7 +102,7 @@ The owner finds information about unknown merchants with Claude through MCP.
   changes. A list field (for example the lines of a transaction) replaces the stored list (decision 0040).
 - **IDs:** Use UUID text.
 - **Delete:** A delete removes the record (hard delete). The audit log keeps the record as it was (§11). A document
-  keeps its record when the user removes its file (§5.12). You can archive configuration records (recurring items, buckets).
+  keeps its record when the user removes its file (§5.12). You can archive configuration records (commitments, incomes, buckets).
 - **Validation:** The app validates codes and values with the shared Zod schemas. The database enforces only foreign keys
   and unique indexes (no CHECK constraints).
 - **Audit:** Each change writes one `audit_log` row (§11).
@@ -250,35 +250,43 @@ Fields: `name`, `archivedAt?`. The name is unique. The comparison ignores case.
 
 There are no rules (decision 0017). A merchant has no default category (decision 0028). Matching uses recurring items, learning, similarity and confidence (§7.3).
 
-### 5.7 Recurring item
+### 5.7 Schedule of a commitment or an income
 
-A recurring plan is a payment or deposit that the user expects on a schedule.
+A schedule is a payment or a deposit that the user expects on a calendar. It is part of a bucket of the kind `commitment`
+or `income` (§5.8, decision 0062). The user sees one record. The app can keep the schedule in its own table, with one
+bucket for each schedule.
 
 Fields:
-- `name`, `kind` (`income | bill | transfer`), `accountId`, `expectedAmount`, `tolerance` (milliunits)
+- `accountId`, `expectedAmount`, `tolerance` (milliunits)
 - `amountMode`: `fixed | variable`. Use `variable` when the amount changes each time (example: a paycheck).
-- `categoryId?` for income and bill. `transferAccountId?` for transfer.
-- `merchantId?`
+- `categoryId?`, `merchantId?`
 - `startDate`, `freq` (`weekly | monthly | yearly`), `interval`. Example: interval 2 with weekly = biweekly.
 - `monthDay?`: 1–31, or −1 for the last day of the month.
 - `businessDayShift`: `none | next | previous`
-- `endDate?`, `active`
-- `fundsBuckets` (boolean, only for income): the income occurrence ends the window of bills reserved (§6). It does not fund buckets (decision 0059).
+- `endDate?`
+- `transferAccountId?` (a commitment only): the payment is a transfer to that account (example: the mortgage).
+- `payday` (boolean, an income only): the income occurrence ends the window of safe to spend (§6). It does not fund
+  buckets (decision 0059).
+
+The name, `archivedAt`, `color`, `icon`, `priority`, `essential` and the `startDate` of the bucket are fields of the bucket (§5.8).
+The schedule `startDate` is the first occurrence. There is no `active` field. To pause a schedule, archive its bucket
+(the balance must be 0).
 
 Rules:
-- Kind fields:
-  - `transfer`: `transferAccountId` is necessary. It must not be `accountId`. `categoryId` is empty.
-  - `income` and `bill`: `transferAccountId` is empty.
+- A schedule is a commitment or an income. A transfer that is not a commitment has no schedule (example: a monthly move to savings).
+- `transferAccountId` is for a commitment only. It must not be `accountId`. Then `categoryId` is empty.
+- `payday` is for an income only.
+- A commitment is money out (`expectedAmount` is 0 or less). An income is money in (0 or more).
 - `monthDay` is only for `monthly` and `yearly`. For `yearly`, the month comes from `startDate`.
 - The app calculates occurrences. It does not store occurrences as transactions.
 - If a month has fewer days than `monthDay`, use the last day of the month.
-- `occurrence_link` fields: `planId`, `dueDate`, and `transactionId` or `skipped` + `reason`.
+- `occurrence_link` fields: `bucketId` (the schedule), `dueDate`, and `transactionId` or `skipped` + `reason`.
 - An occurrence has a maximum of one link. A transaction has a maximum of one occurrence.
-- **Expected amount of a `variable` plan:**
+- **Expected amount of a `variable` schedule:**
   - For the forecast: the median of the last 6 linked actual amounts.
-  - For goal feasibility (§7.8): the lowest of the last 6 linked actual amounts. This is the safe value.
+  - For goal feasibility (§7.8) and the monthly amount of a commitment (§7.6): the lowest of the last 6 linked actual amounts. This is the safe value.
   - If there are fewer than 3 linked actuals, use `expectedAmount` for both.
-  - A `variable` plan does not create "changed amount" questions. `tolerance` applies only to linking.
+  - A `variable` schedule does not create "changed amount" questions. `tolerance` applies only to linking.
 
 ### 5.8 Bucket
 
@@ -286,13 +294,19 @@ A bucket is money that the user keeps for one purpose.
 Buckets are virtual. A bucket is a label on on-budget money. Buckets do not move money between accounts.
 
 Fields:
-- `name`, `kind` (`spending | sinking | goal | emergency`), `priority`, `essential` (boolean), `archivedAt?`
+- `name`, `kind` (`commitment | income | spending | sinking | goal | emergency`), `priority`, `essential` (boolean), `archivedAt?`
 - `color` (`sky | mint | lilac | butter | pink | teal`) and `icon` (a name from a fixed icon set). Decision 0009.
-- `categoryIds[]`: each expense category is in a maximum of one bucket.
+- `categoryIds[]`: each expense category is in a maximum of one bucket. A commitment and an income have no categories.
 - `startDate`: the first date of the lines that the bucket counts. A new bucket uses `asOf`. The user can change it
   (audited). Decision 0029.
 
 Settings for each kind:
+- `commitment`: a bucket with a schedule (§5.7). It holds money for the payments of the schedule. `essential` is true by
+  default (example of false: a streaming service). A new commitment has priority 0, thus it comes before the other buckets.
+  The user can change the order. When two buckets have the same priority, a commitment comes first, then the order of the
+  id. The fill, the month plan and the bucket list use this order. The monthly amount follows the schedule (§7.6). Decision 0062.
+- `income`: a schedule with no balance (§5.7). It is not funded and holds no money. Income goes to Unassigned. It has no
+  bucket events, and it is never in the fill or in the overspent list. Decision 0062.
 - `spending`: `refillTo`. Each month, funding brings the balance up to this amount.
 - `sinking`: `amount`, `dueDate`, `repeat` (`none | yearly`). The monthly amount is the shortfall over the months until the due date (§7.6).
 - `goal`: `target`, `targetDate?`, `fixedAmount?`. The monthly amount is the shortfall over the months until the target date.
@@ -315,7 +329,11 @@ Bucket events (append only):
   The user can undo an event that has no `month`. The events of the fill are undone only with their month (§5.9).
 - To archive a bucket, its balance must be 0. Archive removes its category mappings (audited).
 
-Bucket balance = funds + covers + moves in − moves out − releases + the sum of the lines in the bucket's categories.
+Commitment balance = funds + covers + moves in − moves out − releases + the full amount of the transactions that are linked
+to its occurrences (all lines; a loan payment includes the interest line). Count only the transactions with a date on or
+after `startDate`. A transaction that is linked to a commitment does not count in a category bucket (decision 0062).
+
+Bucket balance (other kinds) = funds + covers + moves in − moves out − releases + the sum of the lines in the bucket's categories.
 Count only the lines of transactions with a date on or after `startDate`. Count events on all dates.
 Do not count events with `undoneAt`.
 Spending lines are negative. Refund lines are positive.
@@ -412,9 +430,9 @@ app records, so the same question does not come back:
 |---|---|---|
 | Uncategorized | category, transfer or loan payment | `keep_uncategorized` (Save with no category; decision 0024) |
 | Possible transfer | link | `not_transfer` |
-| Recurring amount changed | update the plan | `keep_plan_amount` |
-| Missed payment | link a transaction | `skipped` (+ reason, as a plan skip) |
-| Plan proposal | create the plan | `not_recurring` |
+| Recurring amount changed | update the commitment or income | `keep_plan_amount` |
+| Missed payment | link a transaction | `skipped` (+ reason, as a schedule skip) |
+| Plan proposal | add as commitment or as income | `not_recurring` |
 | Unreadable import row | add it by hand | `not_a_transaction` |
 
 The user can see and undo decisions on the record they belong to (for example the import detail page).
@@ -442,16 +460,12 @@ The forecast snapshot is removed. A read never writes.
 ## 6. Calculated values
 
 - **On-budget total** = the sum of the balances of all on-budget accounts. Card balances are negative.
-- **Bills reserved** = the sum of the unlinked `bill` occurrences from today until the next `fundsBuckets` income occurrence
-  after today. An income occurrence on today is the current paycheck, not the end of the window.
-  The next income occurrence is not included. If there is no income plan, use the next 30 days.
-  A `variable` bill reserves its safe amount (the largest outflow of the last 6 actuals, §5.7).
-- **Unassigned** = on-budget total − the sum of the positive bucket balances − bills reserved.
+- **Unassigned** = on-budget total − the sum of the positive bucket balances.
   A negative bucket balance is not in the sum. Thus an overspent bucket already decreases Unassigned (§7.7).
 - **Credit cards do not need a special bucket.** The on-budget total includes the card balances.
   A card purchase decreases its bucket and the total by the same amount. Thus, Unassigned does not change.
   A card payment is a transfer between two on-budget accounts. It does not change Unassigned.
-- **Safe to spend (today)** = the lowest projected on-budget total until the next paycheck (§8) − `bufferAmount`.
+- **Safe to spend (today)** = the lowest projected on-budget total until the next occurrence of an income with `payday` (§5.7, §8) − `bufferAmount`.
   Show the balance of each spending bucket with it.
 
 ## 7. Workflows
@@ -632,7 +646,7 @@ The best candidate (§7.3) preselects the choice: a category, or a learned trans
 
 **Needs review (decisions 0021, 0047).** A transaction needs review when it has an automatic label, a suggestion,
 no category, or an open question (possible transfer, more than one recurring candidate, refund of which purchase).
-A changed recurring amount is not in Needs review: the Recurring plan screen shows it (§7.4).
+A changed recurring amount is not in Needs review: the Buckets screen shows it (§7.4).
 Needs review is its own page, `/transactions/review`, with the same table and pages as `/transactions`.
 It has the same sort orders, and also a sort by confidence (decision 0049). The page has only the transactions that need review. Both pages show two tabs: "All" and
 "Needs review · N".
@@ -649,7 +663,7 @@ It has the same sort orders, and also a sort by confidence (decision 0049). The 
     transfer links the pair. Save as another choice records `not_transfer`.
   - Refund of which purchase: "Refund of…" shows the candidate purchases first. Save with a purchase links it.
     Save with "No purchase" records `not_linked`.
-  - More than one recurring candidate: "Payment for…" shows the plan and the due date. It starts empty. Save with the
+  - More than one recurring candidate: "Payment for…" shows the commitment or income and the due date. It starts empty. Save with the
     payment links the transaction to it.
 - **Selection (decision 0051):** the table on `/transactions` and `/transactions/review` has a checkbox column. A click
   on the checkbox selects the row; a click on another part of the row opens the editor. Shift and click selects a
@@ -682,17 +696,17 @@ within ±3 days. Then the transaction needs review with a transfer pair question
 If exactly one pair exists and its payee is a learned transfer, the app links the pair automatically (Sure; decision 0023).
 Look only at unlinked, not deleted transactions from the last 90 days. Each transaction is in a maximum of one pair.
 
-### 7.4 Recurring
+### 7.4 Recurring schedules
 
 - **Link.** A transaction can match an unlinked occurrence. A match must have:
-  the plan's account, a date within ±`recurringGraceDays`, the plan's merchant (if set),
+  the account of the schedule, a date within ±`recurringGraceDays`, the merchant of the schedule (if set),
   and an amount within the tolerance.
   - One candidate: the app links it automatically.
   - More than one candidate: the transaction needs review.
-- **Changed amount.** If a linked amount is outside the tolerance, the Recurring screen shows "Amount changed" on the
-  plan row (decisions 0047, 0055). The person opens the plan and updates the amount.
+- **Changed amount.** If a linked amount is outside the tolerance, the Buckets screen shows "Amount changed" on the
+  commitment or income row (decisions 0047, 0055, 0062). The person opens it and updates the amount.
 - **Missed.** If an occurrence is older than the grace period, has no link and is not skipped, Home shows it (This month).
-- **Detection.** Recurring → "Detected" suggests a new plan (Home shows a count) when a group of transactions in one
+- **Detection.** Buckets → "Detected" suggests a new schedule (Home shows a count). Each suggestion offers "Add as commitment" or "Add as income" (decision 0062) when a group of transactions in one
   account has:
   - 3 or more transactions.
   - Gaps that agree with weekly, biweekly, monthly or yearly, within ±3 days.
@@ -701,7 +715,7 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
   - The group is the merchant. A transaction with no merchant and one line that is not a transfer goes in the group
     of its category. With no category, it goes in the group of its exact amount (decision 0054).
   - With no merchant, money out with one transfer line (a transfer or a loan payment) goes in the group of the
-    transfer target. The proposal is a transfer plan to that account (decision 0056).
+    transfer target. The proposal is a commitment with that account as `transferAccountId` (decisions 0056, 0062).
 - **Time windows** (they keep the work small and Home calm):
   - Link candidates: occurrences from the later of `startDate` and `asOf` − 13 months.
   - Missed: only occurrences in the last 35 days. Home does not show older unlinked occurrences. The app has no
@@ -709,7 +723,7 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
   - Detection: only transactions from the last 18 months. Look only for the most recent run of regular
     transactions for each merchant (the run that ends at the merchant's latest transaction).
   - Read only the transactions inside these windows from the database. Do not load all transactions.
-- Plans do not create transactions.
+- Schedules do not create transactions.
 
 ### 7.5 Bank balance
 
@@ -729,12 +743,20 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
    - Goal: `(target − balance) /` the number of months from this month to the month of `targetDate`, minimum 0.
      If there is no target date, the smaller of the fixed amount and `target − balance`, minimum 0.
    - If the due date or target date is in this month or earlier, the whole shortfall.
+   - Commitment (decision 0062), from the occurrences on or after the `startDate` of the bucket. A skipped occurrence is not counted, and an occurrence whose linked payment is dated before the month is not counted.
+     A `variable` amount uses the safe amount (§5.7).
+     - Monthly or more often (`weekly` with `interval` 1–4, or `monthly` with `interval` 1): the sum of the occurrences due
+       in this month − balance, minimum 0.
+     - Less often: `(the amount of the next occurrence − balance) /` the number of months from this month to the month of
+       that occurrence, minimum 0. If it is due in this month: the whole shortfall.
+   - Income: no monthly amount. It is not funded.
    - Emergency: the smaller of `target / fillMonths` and `target − balance`, minimum 0.
    Round each amount up to a whole minor unit of the currency (§4).
 2. **Emergency target.** Target = `months` × the monthly essential spending. The monthly essential spending is the median
    of the last 6 complete months before the date of the calculation. A month counts when it has expense lines in the
-   categories of the essential buckets or of the active `bill` plans. With fewer than 3 such months, use the planned
-   figure: the monthly amount of the active `bill` plans + the `refillTo` of the essential spending buckets.
+   transactions that are linked to active essential commitments (the full amount) or expense lines in the categories of the active
+   essential buckets. Count each transaction one time. With fewer than 3 such months, use the planned figure: the
+   yearly amount / 12 of the essential commitments + the `refillTo` of the essential spending buckets (decision 0062).
    When the balance is more than the target, the money stays and funding stops.
 3. **Owed.** Owed for a month = the monthly amount − the funding of that month (§5.9).
 4. **Fill.** The fill pays the owed amounts from Unassigned in bucket priority order. It stops when Unassigned is used.
@@ -771,10 +793,10 @@ Expense lines in categories without a bucket decrease Unassigned directly.
 For each goal and sinking bucket, the app calculates the monthly amount (§7.6).
 Buckets (goals) compares the total with the monthly surplus.
 
-Monthly surplus = the monthly income − the monthly bills − the spending refills − the monthly amount of the emergency
-bucket − the monthly amounts of the sinking and goal buckets.
-The monthly income is the yearly amount of the active income plans (safe amounts) divided by 12. The monthly bills are the
-bill occurrences of the month.
+Monthly surplus = the monthly income − the monthly amount of each other bucket (the commitments, the spending refills, the
+emergency bucket, the sinking and goal buckets).
+The monthly income is the yearly amount of the active incomes (safe amounts) divided by 12. A commitment uses its yearly
+amount / 12 (safe amounts), thus the result does not change between months (decision 0062).
 
 If the surplus is too small, the app shows the shortfall. It also shows two fixes:
 - A later date that is possible.
@@ -786,7 +808,7 @@ The forecast is daily, for 90 days. It shows each on-budget account and the tota
 
 **Known series:**
 - Today's balances.
-- Unlinked recurring occurrences: income, bills and transfers. Apply the business-day shift.
+- Unlinked occurrences of commitments (a commitment with a transfer account moves money between the accounts) and incomes. Apply the business-day shift.
 - Card payments.
 
 **Estimated series:** the known series + variable spending.
@@ -795,7 +817,7 @@ The forecast is daily, for 90 days. It shows each on-budget account and the tota
 - Expense categories without a bucket: the median of the last 3 complete months, divided equally across the days.
   A complete month is a calendar month whose last day is before `asOf` and that is not before the month of the first
   transaction in the book (decision 0031).
-  Do not include transactions that link to a plan.
+  Do not include transactions that link to a commitment or an income.
   Do not include lines larger than 3 × the median line of that category.
 
 **Card payments:**
@@ -842,7 +864,6 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 | Emergency fund | The emergency bucket balance ≥ its target (§7.6). Show the balance, the target, `months` and the monthly figure. No check when the bucket is archived or the target is 0. |
 | Imports are current | Each on-budget account has an import in the last `staleImportDays` days |
 | Review | No transaction has needed review for more than 7 days |
-| Sinking funds | Each yearly `bill` plan has a sinking bucket for its category |
 | Savings rate | The savings rate of the last 3 complete months (§8) is 0% or more. Show the percentage. |
 | Recurring | There are no missed occurrences (decision 0047) |
 | Overspent | No bucket has a negative balance (§7.7) |
@@ -915,16 +936,15 @@ To correct other records, the user edits them. The audit log records each edit.
 
 ## 14. Screens
 
-There are 7 screens (decision 0021).
+There are 6 screens (decisions 0021, 0062).
 
 | Screen | Contents |
 |---|---|
-| Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); each account that does not match its bank (§5.13); hygiene checks (§10); this month: income → bills → bucket funding → left to save, what buckets still owe this month, missed payments, overspent buckets (only when a bucket stays negative), goal status; spending changes this month; net worth. Each card links to its screen. |
+| Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); each account that does not match its bank (§5.13); hygiene checks (§10); this month: income → commitments (the monthly amount of the commitment buckets, §7.6) → bucket funding (the monthly amount of the other buckets) → left to save, what buckets still owe this month, missed payments, overspent buckets (only when a bucket stays negative), goal status; spending changes this month; net worth. Each card links to its screen. |
 | Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers, row selection with Approve and the bulk editor (decision 0051) |
-| Buckets | Balances, what is still owed this month, funding history (by month, with Undo and Fund again), moves, goals (feasibility), settings |
+| Buckets | Groups Income, Commitments, Spending and Savings (sinking, goal, emergency). Balances, what is still owed this month, funding history (by month, with Undo and Fund again), moves, goals (feasibility), settings. A commitment or income row has its schedule, links, skips and "Amount changed". Side column: Upcoming (occurrences of all schedules in the next 30 days, decision 0055) and Detected (new schedule suggestions). Decision 0062. |
 | Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups and categories in two rings), net worth, mortgage. Decisions 0030, 0058. |
 | Accounts | List with balances and the bank status of each account (§5.13), import, bank balances, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
-| Recurring | Plans, Upcoming (occurrences of all plans in the next 30 days, decision 0055), links, skips, Detected (new plan suggestions) |
 | Settings | Subpages: Groups, Categories, Tags, Merchants, Currency (decision 0038), AI access, Backup. |
 
-The first-run setup screen (§7.0) is not one of the 7 screens. It shows only one time.
+The first-run setup screen (§7.0) is not one of the 6 screens. It shows only one time.

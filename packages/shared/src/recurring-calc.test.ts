@@ -163,9 +163,9 @@ test("detection uses the latest run and ignores history older than 18 months", (
   ).toEqual([]);
 });
 
-function occurrence(planId: string, dueDate: string, merchantId: string | null = null): OpenOccurrence {
+function occurrence(bucketId: string, dueDate: string, merchantId: string | null = null): OpenOccurrence {
   return {
-    planId,
+    bucketId,
     dueDate,
     accountId: "account-1",
     merchantId,
@@ -195,7 +195,7 @@ test("auto-link matches one candidate and leaves every other case open", () => {
   expect(isLinkCandidate({ ...plan, merchantId: null }, payment("txn-1", "2026-03-02", -16990, null), 3)).toBe(true);
 
   const one = matchLinks([plan], [payment("txn-1", "2026-03-02")], 3);
-  expect(one.unique).toEqual([{ planId: "plan-1", dueDate: "2026-03-02", transactionId: "txn-1" }]);
+  expect(one.unique).toEqual([{ bucketId: "plan-1", dueDate: "2026-03-02", transactionId: "txn-1" }]);
   expect(one.ambiguous).toEqual([]);
 
   const twoPayments = matchLinks([plan], [payment("txn-1", "2026-03-02"), payment("txn-2", "2026-03-03")], 3);

@@ -9,7 +9,7 @@ import { createBucket } from "./buckets";
 import { createCategory } from "./categories";
 import { readForecast } from "./forecast";
 import { linkOccurrence } from "./recurring-links";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction } from "./transactions";
 
 const at = "2026-10-08T16:00:00Z";
@@ -121,6 +121,7 @@ test("bucket spending is not counted two times", () => {
       fixedAmount: null,
       months: null,
       fillMonths: null,
+      schedule: null,
       asOf: "2000-01-01",
       ...saved,
     });
@@ -157,9 +158,9 @@ test("a forecast read does not write a snapshot", () => {
   const book = tempDatabase();
   try {
     const cash = cashAccount(book.db, "Cash", 10_000);
-    createPlan(book.db, {
+    createSchedule(book.db, {
       name: "Rent",
-      kind: "bill",
+      kind: "commitment",
       accountId: cash.id,
       expectedAmount: -4_000,
       tolerance: 0,
@@ -169,8 +170,7 @@ test("a forecast read does not write a snapshot", () => {
       interval: 1,
       monthDay: 31,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       ...saved,
     });
     const before = book.db.select().from(auditLog).all().length;
@@ -190,7 +190,7 @@ test("variable income uses the median of the last 6 actuals", () => {
   try {
     const cash = cashAccount(book.db, "Cash", 0);
     const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
-    const plan = createPlan(book.db, {
+    const plan = createSchedule(book.db, {
       name: "Pay",
       kind: "income",
       accountId: cash.id,
@@ -203,8 +203,7 @@ test("variable income uses the median of the last 6 actuals", () => {
       interval: 1,
       monthDay: 1,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: true,
+      payday: true,
       ...saved,
     });
     const amounts = [1_000, 2_000, 3_000, 4_000, 5_000, 6_000];
@@ -229,14 +228,14 @@ test("variable income uses the median of the last 6 actuals", () => {
   }
 });
 
-function safeToSpend(income: boolean): number {
+function safeToSpend(income: boolean, payday = true): number {
   const book = tempDatabase();
   try {
     book.db.insert(settings).values({ key: "bufferAmount", value: "2000" }).run();
     const cash = cashAccount(book.db, "Cash", 1_000_000);
-    createPlan(book.db, {
+    createSchedule(book.db, {
       name: "Rent",
-      kind: "bill",
+      kind: "commitment",
       accountId: cash.id,
       expectedAmount: -30_000,
       tolerance: 0,
@@ -246,16 +245,15 @@ function safeToSpend(income: boolean): number {
       interval: 1,
       monthDay: 20,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       ...saved,
     });
     if (income) {
-      createPlan(book.db, {
+      createSchedule(book.db, {
         name: "Pay",
         kind: "income",
         accountId: cash.id,
-        expectedAmount: 50_000,
+        expectedAmount: payday ? 50_000 : 10_000,
         tolerance: 0,
         amountMode: "fixed",
         startDate: "2026-10-10",
@@ -263,8 +261,7 @@ function safeToSpend(income: boolean): number {
         interval: 1,
         monthDay: 10,
         businessDayShift: "none",
-        active: true,
-        fundsBuckets: true,
+        payday,
         ...saved,
       });
     }
@@ -274,8 +271,13 @@ function safeToSpend(income: boolean): number {
   }
 }
 
-test("safe to spend uses the next paycheck, or 30 days when there is no income plan", () => {
+test("safe to spend uses the next income with payday, or 30 days when there is none", () => {
   expect(safeToSpend(true)).toBe(998_000);
   expect(safeToSpend(false)).toBe(968_000);
+});
+
+test("an income that is not a payday does not end the window: the rent of the 20th is in it", () => {
+  // Pay of 10 000 on the 10th, then the rent of 30 000 on the 20th: the lowest total is 980 000, minus the buffer.
+  expect(safeToSpend(true, false)).toBe(978_000);
 });
 

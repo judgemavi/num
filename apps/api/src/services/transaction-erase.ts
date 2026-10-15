@@ -15,7 +15,7 @@ function deleteOccurrenceLinks(tx: WriteTx, transactionId: string): void {
       entityId: link.id,
       action: "delete",
       before: {
-        planId: link.planId,
+        bucketId: link.bucketId,
         dueDate: link.dueDate,
         transactionId: link.transactionId,
         skipped: link.skipped,

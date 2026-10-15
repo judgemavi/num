@@ -1,12 +1,13 @@
-import { occurrenceLinks, recurringPlans, transactions, type OccurrenceLinkRow, type RecurringPlanRow } from "@num/db";
+import { occurrenceLinks, transactions, type OccurrenceLinkRow } from "@num/db";
 import { occurrenceDates, utcNow, type OccurrenceLink } from "@num/shared";
 import { and, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { applyLinkedPlan } from "./match-apply";
+import { applyLinkedSchedule } from "./match-apply";
+import { requireSchedule, type ScheduleView } from "./schedules";
 import { withoutId, write, type WriteTx, type WriteInput } from "./write";
 
-function requireDueDate(row: RecurringPlanRow, dueDate: string) {
+function requireDueDate(row: ScheduleView, dueDate: string) {
   const found = occurrenceDates(row, dueDate).find((item) => item.dueDate === dueDate);
   if (!found) {
     throw new ServiceError("occurrence_not_found", 404);
@@ -14,48 +15,45 @@ function requireDueDate(row: RecurringPlanRow, dueDate: string) {
   return found;
 }
 
-function requireWritablePlan(tx: WriteTx, id: string): RecurringPlanRow {
-  const row = tx.select().from(recurringPlans).where(eq(recurringPlans.id, id)).get();
-  if (!row) {
-    throw new ServiceError("plan_not_found", 404);
-  }
+function requireWritableSchedule(tx: WriteTx, id: string): ScheduleView {
+  const row = requireSchedule(tx, id);
   if (row.archivedAt) {
-    throw new ServiceError("plan_archived", 409);
+    throw new ServiceError("bucket_archived", 409);
   }
   return row;
 }
 
-function existingLink(tx: WriteTx, planId: string, dueDate: string): OccurrenceLinkRow | undefined {
+function existingLink(tx: WriteTx, bucketId: string, dueDate: string): OccurrenceLinkRow | undefined {
   return tx
     .select()
     .from(occurrenceLinks)
-    .where(and(eq(occurrenceLinks.planId, planId), eq(occurrenceLinks.dueDate, dueDate)))
+    .where(and(eq(occurrenceLinks.bucketId, bucketId), eq(occurrenceLinks.dueDate, dueDate)))
     .get();
 }
 
 /**
- * Link the transaction to the occurrence: the payment of the plan on the due date. Part of a write. With `label`, the
- * transaction gets the label of the plan. A save from the editor links without it: the fields of the form are the answer.
+ * Link the transaction to the occurrence: the payment of the schedule on the due date. Part of a write. With `label`, the
+ * transaction gets the label of the schedule. A save from the editor links without it: the fields of the form are the answer.
  */
 export function addOccurrenceLink(
   tx: WriteTx,
-  planId: string,
+  bucketId: string,
   dueDate: string,
   transactionId: string,
   at: string,
   label: boolean,
 ): OccurrenceLink {
-  const plan = requireWritablePlan(tx, planId);
-  requireDueDate(plan, dueDate);
-  if (existingLink(tx, planId, dueDate)) {
+  const schedule = requireWritableSchedule(tx, bucketId);
+  requireDueDate(schedule, dueDate);
+  if (existingLink(tx, bucketId, dueDate)) {
     throw new ServiceError("occurrence_taken", 409);
   }
   const txn = tx.select().from(transactions).where(eq(transactions.id, transactionId)).get();
   if (!txn) {
     throw new ServiceError("transaction_not_found", 404);
   }
-  if (txn.accountId !== plan.accountId) {
-    throw new ServiceError("plan_fields_invalid", 400, { field: "transactionId" });
+  if (txn.accountId !== schedule.accountId) {
+    throw new ServiceError("bucket_fields_invalid", 400, { field: "transactionId" });
   }
   const used = tx.select().from(occurrenceLinks).where(eq(occurrenceLinks.transactionId, transactionId)).get();
   if (used) {
@@ -63,7 +61,7 @@ export function addOccurrenceLink(
   }
   const row: OccurrenceLinkRow = {
     id: crypto.randomUUID(),
-    planId,
+    bucketId,
     dueDate,
     transactionId,
     skipped: false,
@@ -78,7 +76,7 @@ export function addOccurrenceLink(
     after: withoutId(row),
   });
   if (label) {
-    applyLinkedPlan(tx, plan, transactionId, true);
+    applyLinkedSchedule(tx, schedule, transactionId, true);
   }
   tx.update(transactions).set({ editedAt: at }).where(eq(transactions.id, transactionId)).run();
   return row;
@@ -86,19 +84,19 @@ export function addOccurrenceLink(
 
 export function linkOccurrence(
   db: Db,
-  planId: string,
+  bucketId: string,
   dueDate: string,
   transactionId: string,
   input: WriteInput,
 ): OccurrenceLink {
   const at = input.at ?? utcNow();
-  return write(db, { source: input.source, at }, (tx) => addOccurrenceLink(tx, planId, dueDate, transactionId, at, true));
+  return write(db, { source: input.source, at }, (tx) => addOccurrenceLink(tx, bucketId, dueDate, transactionId, at, true));
 }
 
-export function unlinkOccurrence(db: Db, planId: string, dueDate: string, input: WriteInput): OccurrenceLink {
+export function unlinkOccurrence(db: Db, bucketId: string, dueDate: string, input: WriteInput): OccurrenceLink {
   return write(db, { source: input.source, at: input.at }, (tx) => {
-    requireWritablePlan(tx, planId);
-    const link = existingLink(tx, planId, dueDate);
+    requireWritableSchedule(tx, bucketId);
+    const link = existingLink(tx, bucketId, dueDate);
     if (!link?.transactionId) {
       throw new ServiceError("link_not_found", 404);
     }
@@ -116,24 +114,24 @@ export function unlinkOccurrence(db: Db, planId: string, dueDate: string, input:
 
 export function skipOccurrence(
   db: Db,
-  planId: string,
+  bucketId: string,
   dueDate: string,
   reason: string,
   input: WriteInput,
 ): OccurrenceLink {
   const trimmed = reason.trim();
   if (trimmed.length === 0) {
-    throw new ServiceError("plan_fields_invalid", 400, { field: "reason" });
+    throw new ServiceError("bucket_fields_invalid", 400, { field: "reason" });
   }
   return write(db, { source: input.source, at: input.at }, (tx) => {
-    const plan = requireWritablePlan(tx, planId);
-    requireDueDate(plan, dueDate);
-    if (existingLink(tx, planId, dueDate)) {
+    const schedule = requireWritableSchedule(tx, bucketId);
+    requireDueDate(schedule, dueDate);
+    if (existingLink(tx, bucketId, dueDate)) {
       throw new ServiceError("occurrence_taken", 409);
     }
     const row: OccurrenceLinkRow = {
       id: crypto.randomUUID(),
-      planId,
+      bucketId,
       dueDate,
       transactionId: null,
       skipped: true,
@@ -151,10 +149,10 @@ export function skipOccurrence(
   });
 }
 
-export function restoreSkip(db: Db, planId: string, dueDate: string, input: WriteInput): OccurrenceLink {
+export function restoreSkip(db: Db, bucketId: string, dueDate: string, input: WriteInput): OccurrenceLink {
   return write(db, { source: input.source, at: input.at }, (tx) => {
-    requireWritablePlan(tx, planId);
-    const link = existingLink(tx, planId, dueDate);
+    requireWritableSchedule(tx, bucketId);
+    const link = existingLink(tx, bucketId, dueDate);
     if (!link?.skipped) {
       throw new ServiceError("skip_not_found", 404);
     }

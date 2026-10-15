@@ -6,8 +6,8 @@ import { AccountEditor, ImportInfoEditor } from "@/editors/account-editors";
 import { MoveMoney } from "@/buckets/move-money";
 import { AssignEditor, BucketEditor } from "@/editors/bucket-editors";
 import type { EditorFrame, EditorInput, EditorKind } from "@/editors/editor-types";
-import { LinkOccurrenceEditor, PlanEditor, SkipOccurrenceEditor } from "@/editors/recurring-editors";
-import { SkipNext } from "@/recurring/skip-next";
+import { CommitmentEditor, IncomeEditor, LinkOccurrenceEditor, SkipOccurrenceEditor } from "@/editors/schedule-editors";
+import { SkipNext } from "@/schedules/skip-next";
 import { CategoryEditor, GroupEditor, MergeEditor, MerchantEditor, TagEditor } from "@/editors/settings-editors";
 import { BulkEditor } from "@/transactions/bulk-editor";
 import { TransactionEditor } from "@/transactions/transaction-editor";
@@ -22,7 +22,8 @@ const editors: { [K in EditorKind]: (input: EditorInput[K]) => ReactNode } = {
   tag: TagEditor,
   merchant: MerchantEditor,
   bucket: BucketEditor,
-  plan: PlanEditor,
+  commitment: CommitmentEditor,
+  income: IncomeEditor,
   import: ImportForm,
   bankBalance: BankBalanceEditor,
   assignMoney: AssignEditor,
@@ -44,15 +45,16 @@ const loadText: { [K in EditorKind]: { loading: string; failed: string } } = {
   tag: { loading: "Loading the tag.", failed: "The tag did not load." },
   merchant: { loading: "Loading the merchant.", failed: "The merchant did not load." },
   bucket: { loading: "Loading the bucket.", failed: "The bucket did not load." },
-  plan: { loading: "Loading recurring.", failed: "Recurring did not load." },
+  commitment: { loading: "Loading the commitment.", failed: "The commitment did not load." },
+  income: { loading: "Loading the income.", failed: "The income did not load." },
   import: { loading: "Loading the import.", failed: "The import did not load." },
   bankBalance: { loading: "Loading the account.", failed: "The account did not load." },
   assignMoney: { loading: "Loading the bucket.", failed: "The bucket did not load." },
   moveMoney: { loading: "Loading buckets.", failed: "The buckets did not load." },
   importInfo: { loading: "Loading the import.", failed: "The import did not load." },
   mergeMerchant: { loading: "Loading the merchant.", failed: "The merchant did not load." },
-  skipNext: { loading: "Loading recurring.", failed: "Recurring did not load." },
-  skipOccurrence: { loading: "Loading recurring.", failed: "Recurring did not load." },
+  skipNext: { loading: "Loading the schedule.", failed: "The schedule did not load." },
+  skipOccurrence: { loading: "Loading the schedule.", failed: "The schedule did not load." },
   linkOccurrence: { loading: "Loading the transactions.", failed: "The transactions did not load." },
 };
 

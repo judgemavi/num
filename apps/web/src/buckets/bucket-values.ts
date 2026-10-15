@@ -37,9 +37,6 @@ export function bucketValues(bucket: Bucket | null, nextColor: BucketColor, last
 
 type BucketValues = ReturnType<typeof bucketValues>;
 
-/** The values of a new bucket. A form part made with `withForm` gets the type of the form values from them. */
-export const blankBucket = bucketValues(null, "sky", 0);
-
 type BucketAmount = "refillTo" | "amount" | "target" | "fixedAmount";
 
 function bucketFields(currency: string, value: BucketValues, stored: Bucket | null) {
@@ -66,6 +63,7 @@ function bucketFields(currency: string, value: BucketValues, stored: Bucket | nu
     fixedAmount: value.kind === "goal" && value.goalMode === "month" ? read("fixedAmount") : null,
     months: value.kind === "emergency" ? Number(value.months) : null,
     fillMonths: value.kind === "emergency" ? Number(value.fillMonths) : null,
+    schedule: null,
   };
 }
 

@@ -1,9 +1,9 @@
-import { bucketKinds, type Bucket } from "@num/shared";
+import type { Bucket } from "@num/shared";
 import { useStore } from "@tanstack/react-form";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { ChevronRight, X } from "lucide-react";
 import { useState } from "react";
-import { BucketPickers } from "@/buckets/bucket-pickers";
+import { ColorPicker, IconPicker } from "@/buckets/bucket-pickers";
 import { bucketBody, bucketValues } from "@/buckets/bucket-values";
 import { localAsOf } from "@/as-of";
 import { requestError } from "@/buckets/format";
@@ -34,6 +34,8 @@ const kindChoices = [
   { value: "sinking", title: "Saving for a bill", description: "Set aside an amount by a due date." },
   { value: "goal", title: "Goal", description: "Save toward a target." },
 ] as const;
+
+const plainKinds = ["spending", "sinking", "goal"] as const;
 
 const repeatOptions = [
   { value: "none", label: "One time" },
@@ -79,6 +81,7 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
     },
   });
   const kind = useStore(form.store, (state) => state.values.kind);
+  const color = useStore(form.store, (state) => state.values.color);
   const goalMode = useStore(form.store, (state) => state.values.goalMode);
 
   return (
@@ -99,7 +102,7 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
                     value={field.state.value}
                     className="grid gap-2"
                     onValueChange={(value) => {
-                      const next = choiceIn(bucketKinds, value);
+                      const next = choiceIn(plainKinds, value);
                       if (next) {
                         field.handleChange(next);
                       }
@@ -169,7 +172,8 @@ export function BucketForm({ draft }: { draft: Bucket | "new" }) {
               </form.AppField>
             </>
           ) : null}
-          <BucketPickers form={form} suggest={current === null} />
+          <form.Field name="color">{(field) => <ColorPicker value={field.state.value} onChange={field.handleChange} suggest={current === null} />}</form.Field>
+          <form.Field name="icon">{(field) => <IconPicker value={field.state.value} color={color} onChange={field.handleChange} />}</form.Field>
           {kind === "emergency" ? null : (
             <form.Field name="categoryIds">
               {(field) => <CategoryField bucketId={current?.id ?? null} selected={field.state.value} onChange={field.handleChange} />}

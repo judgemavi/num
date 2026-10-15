@@ -4,14 +4,12 @@ import {
   reviewAgeDays,
   Temporal,
   type AccountListQuery,
-  type BucketListQuery,
   type Hygiene,
-  type PlanListQuery,
 } from "@num/shared";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { listAccounts } from "./accounts";
-import { listBuckets, listOverspent } from "./buckets";
+import { listOverspent } from "./buckets";
 import { lastCompleteMonths } from "./complete-months";
 import { emergencyBucket, readEmergencyFund } from "./emergency-fund";
 import { fundingPosition } from "./funding-book";
@@ -19,7 +17,6 @@ import { importFreshness, settingNumber } from "./book-settings";
 import { spendTotals } from "./insights-spend";
 import { loadLedgerLines } from "./ledger-lines";
 import { loadReviewState, type ReviewState } from "./needs-review";
-import { listPlans } from "./recurring-plans";
 
 const pageSize = 200;
 
@@ -47,16 +44,6 @@ function pagesOf<T>(load: (page: number) => { items: T[]; total: number }) {
 function accounts(db: Db) {
   const query = { pageSize, archived: false, sort: "name", dir: "asc" } as const;
   return pagesOf((page) => listAccounts(db, { ...query, page } satisfies AccountListQuery));
-}
-
-function buckets(db: Db) {
-  const query = { pageSize, archived: false, sort: "name", dir: "asc" } as const;
-  return pagesOf((page) => listBuckets(db, { ...query, page } satisfies BucketListQuery));
-}
-
-function bills(db: Db) {
-  const query = { pageSize, archived: false, sort: "name", dir: "asc", kind: "bill" } as const;
-  return pagesOf((page) => listPlans(db, { ...query, page } satisfies PlanListQuery));
 }
 
 function ageDays(asOf: string, day: string) {
@@ -116,19 +103,6 @@ function reviewAge(state: ReviewState, asOf: string) {
   return { code: "review" as const, pass: old.length === 0, limitDays: reviewAgeDays, oldCount: old.length, oldestDate };
 }
 
-function sinkingFunds(db: Db) {
-  const covered = new Set(
-    buckets(db)
-      .filter((bucket) => bucket.kind === "sinking")
-      .flatMap((bucket) => bucket.categoryIds),
-  );
-  const yearly = bills(db).filter((plan) => plan.active && plan.freq === "yearly");
-  const missing = yearly
-    .filter((plan) => plan.categoryId === null || !covered.has(plan.categoryId))
-    .map((plan) => ({ planId: plan.id, categoryId: plan.categoryId }));
-  return { code: "sinking_funds" as const, pass: missing.length === 0, yearly: yearly.length, missing };
-}
-
 /** The last 3 complete months, newest first (decision 0031). */
 function savingsRate(db: Db, asOf: string) {
   const months = lastCompleteMonths(db, asOf, 3).reverse();
@@ -142,7 +116,7 @@ function savingsRate(db: Db, asOf: string) {
   return { code: "savings_rate" as const, pass: rows.every((item) => item.savings >= 0), months: rows };
 }
 
-/** Missed payments. A changed amount is answered on the Recurring screen, not here (decision 0047). */
+/** Missed payments. A changed amount is answered on the Buckets screen, not here (decision 0047). */
 function recurring(state: ReviewState) {
   const missed = state.signals.missed.length;
   return { code: "recurring" as const, pass: missed === 0, missed };
@@ -165,7 +139,6 @@ export function readHygiene(db: Db, asOf: string): Hygiene {
       ...emergencyFund(db, asOf),
       importsCurrent(db, asOf),
       reviewAge(state, asOf),
-      sinkingFunds(db),
       savingsRate(db, asOf),
       recurring(state),
       overspent(db, asOf),

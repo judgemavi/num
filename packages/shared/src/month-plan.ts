@@ -1,10 +1,10 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
-import { bucketColors, bucketKinds, type BucketColor, type BucketKind } from "./bucket";
+import { bucketColors, bucketKinds, comparePriority, type BucketColor, type BucketKind } from "./bucket";
 import { divideAmount } from "./currency";
 import { isoDateSchema } from "./date";
-import { monthlyAmount } from "./funding";
-import { occurrenceDates, variableAmounts, type AmountMode, type PlanKind, type PlanSchedule } from "./recurring-calc";
+import { monthlyAmount, type MonthlyCommitment } from "./funding";
+import { occurrenceDates, variableAmounts, type AmountMode, type PlanSchedule } from "./recurring-calc";
 import { amountSchema as money } from "./money";
 import { firstOfMonthAfter, surplusShares } from "./month-plan-shares";
 
@@ -29,20 +29,19 @@ export const monthPlanQuerySchema = z.object({
   month: yearMonthSchema.optional(),
 });
 
+/** The schedule of a commitment or an income bucket. `id` is the id of the bucket. */
 export type MonthPlanSource = {
   id: string;
   name: string;
-  kind: PlanKind;
+  kind: "commitment" | "income";
   amountMode: AmountMode;
   expectedAmount: number;
-  fundsBuckets: boolean;
-  active: boolean;
   archived: boolean;
   schedule: PlanSchedule;
 };
 
 export type MonthPlanLink = {
-  planId: string;
+  bucketId: string;
   dueDate: string;
   skipped: boolean;
   actual: number | null;
@@ -68,14 +67,25 @@ export type MonthPlanBucketSource = {
   fillMonths: number | null;
   startDate: string;
   actualFunded: number;
+  /** The schedule data of a commitment for its monthly amount (decision 0062 item 5). Null for the other kinds. */
+  commitment: MonthlyCommitment | null;
 };
 
-const billItemSchema = z.object({
-  planId: z.uuid(),
+type PlanInput = {
+  month: string;
+  asOf: string;
+  plans: readonly MonthPlanSource[];
+  links: readonly MonthPlanLink[];
+  buckets: readonly MonthPlanBucketSource[];
+  /** The milliunits in one minor unit of the book currency. */
+  step: number;
+};
+
+const commitmentItemSchema = z.object({
+  bucketId: z.uuid(),
   name: z.string(),
-  dueDate: isoDateSchema,
   planned: nonNegative,
-  actual: nonNegative.nullable(),
+  actual: nonNegative,
 });
 
 const fundingItemSchema = z.object({
@@ -100,13 +110,13 @@ export const monthPlanSchema = z.object({
   month: yearMonthSchema,
   compareActual: z.boolean(),
   income: z.object({ planned: nonNegative, actual: nonNegative }),
-  bills: z.object({ planned: nonNegative, actual: nonNegative, items: z.array(billItemSchema) }),
+  commitments: z.object({ planned: nonNegative, actual: nonNegative, items: z.array(commitmentItemSchema) }),
   funding: z.object({ planned: nonNegative, actual: nonNegative, items: z.array(fundingItemSchema) }),
   leftToSave: z.object({ planned: money, actual: money }),
   feasibility: z
     .object({
       income: nonNegative,
-      bills: nonNegative,
+      commitments: nonNegative,
       refills: nonNegative,
       emergency: nonNegative,
       surplus: money,
@@ -129,7 +139,7 @@ function amountOf(plan: MonthPlanSource, links: readonly MonthPlanLink[], asOf: 
     return plan.expectedAmount;
   }
   const actuals = links
-    .filter((link) => link.planId === plan.id && link.actual !== null && link.dueDate <= asOf)
+    .filter((link) => link.bucketId === plan.id && link.actual !== null && link.dueDate <= asOf)
     .sort((left, right) => (left.dueDate < right.dueDate ? 1 : left.dueDate > right.dueDate ? -1 : 0))
     .flatMap((link) => (link.actual === null ? [] : [link.actual]));
   const both = variableAmounts(actuals, plan.expectedAmount, step);
@@ -137,25 +147,18 @@ function amountOf(plan: MonthPlanSource, links: readonly MonthPlanLink[], asOf: 
 }
 
 function openPlans(plans: readonly MonthPlanSource[]) {
-  return plans.filter((plan) => plan.active && !plan.archived && plan.kind !== "transfer");
+  return plans.filter((plan) => !plan.archived);
 }
 
-function skippedKey(planId: string, dueDate: string) {
-  return `${planId}|${dueDate}`;
+function skippedKey(bucketId: string, dueDate: string) {
+  return `${bucketId}|${dueDate}`;
 }
 
 function nextMonth(month: string) {
   return Temporal.PlainDate.from(`${month}-01`).add({ months: 1 }).toString().slice(0, 7);
 }
 
-function openingsFor(input: {
-  month: string;
-  asOf: string;
-  plans: readonly MonthPlanSource[];
-  links: readonly MonthPlanLink[];
-  buckets: readonly MonthPlanBucketSource[];
-  step: number;
-}) {
+function openingsFor(input: PlanInput) {
   const origin = input.asOf.slice(0, 7);
   if (input.month <= origin) {
     return [...input.buckets];
@@ -163,7 +166,7 @@ function openingsFor(input: {
   let buckets = input.buckets.map((bucket) => ({ ...bucket, actualFunded: 0 }));
   let cursor = origin;
   while (cursor < input.month) {
-    const funded = new Map(monthFigures({ ...input, month: cursor, buckets }).funding.items.map((item) => [item.bucketId, item.planned]));
+    const funded = new Map(monthFigures({ ...input, month: cursor, buckets }).funded.map((item) => [item.bucketId, item.planned]));
     buckets = buckets.map((bucket) => ({ ...bucket, balance: bucket.balance + (funded.get(bucket.id) ?? 0) }));
     cursor = nextMonth(cursor);
   }
@@ -171,51 +174,36 @@ function openingsFor(input: {
   return buckets.map((bucket) => ({ ...bucket, actualFunded: actuals.get(bucket.id) ?? 0 }));
 }
 
-export function buildMonthPlan(input: {
-  month: string;
-  asOf: string;
-  plans: readonly MonthPlanSource[];
-  links: readonly MonthPlanLink[];
-  buckets: readonly MonthPlanBucketSource[];
-  /** The milliunits in one minor unit of the book currency. */
-  step: number;
-}): MonthPlan {
-  return monthFigures({ ...input, buckets: openingsFor(input) });
+export function buildMonthPlan(input: PlanInput): MonthPlan {
+  return monthFigures({ ...input, buckets: openingsFor(input) }).plan;
 }
 
-function monthFigures(input: {
-  month: string;
-  asOf: string;
-  plans: readonly MonthPlanSource[];
-  links: readonly MonthPlanLink[];
-  buckets: readonly MonthPlanBucketSource[];
-  step: number;
-}) {
+function monthFigures(input: PlanInput) {
   const { start, end } = monthRange(input.month);
   const yearEnd = Temporal.PlainDate.from(start).add({ months: 12 }).subtract({ days: 1 }).toString();
-  const skipped = new Set(input.links.filter((link) => link.skipped).map((link) => skippedKey(link.planId, link.dueDate)));
+  const skipped = new Set(input.links.filter((link) => link.skipped).map((link) => skippedKey(link.bucketId, link.dueDate)));
   const linked = new Map<string, number | null>();
   for (const link of input.links) {
     if (!link.skipped) {
-      linked.set(skippedKey(link.planId, link.dueDate), link.actual);
+      linked.set(skippedKey(link.bucketId, link.dueDate), link.actual);
     }
   }
-  const bills: MonthPlan["bills"]["items"] = [];
   let incomePlanned = 0;
   let incomeActual = 0;
   let incomeYear = 0;
   let hasIncome = false;
-  let billPlanned = 0;
-  let billActual = 0;
-  let safeBills = 0;
+  let commitmentYear = 0;
 
   for (const plan of openPlans(input.plans)) {
-    if (plan.kind === "income") {
-      incomeYear += Math.abs(amountOf(plan, input.links, input.asOf, "safe", input.step)) * occurrenceDates(plan.schedule, yearEnd, start).length;
-      hasIncome = true;
-    }
     const forecast = Math.abs(amountOf(plan, input.links, input.asOf, "forecast", input.step));
     const safe = Math.abs(amountOf(plan, input.links, input.asOf, "safe", input.step));
+    const yearCount = occurrenceDates(plan.schedule, yearEnd, start).length;
+    if (plan.kind === "income") {
+      incomeYear += safe * yearCount;
+      hasIncome = true;
+    } else {
+      commitmentYear += safe * yearCount;
+    }
     for (const date of occurrenceDates(plan.schedule, end, start)) {
       if (skipped.has(skippedKey(plan.id, date.dueDate))) {
         continue;
@@ -225,53 +213,51 @@ function monthFigures(input: {
       if (plan.kind === "income") {
         incomePlanned += forecast;
         incomeActual += paid ?? 0;
-      } else if (plan.kind === "bill") {
-        billPlanned += forecast;
-        billActual += paid ?? 0;
-        safeBills += safe;
-        bills.push({ planId: plan.id, name: plan.name, dueDate: date.dueDate, planned: forecast, actual: paid });
       }
     }
   }
 
-  const fundingItems: MonthPlan["funding"]["items"] = [];
+  const funded: MonthPlan["funding"]["items"] = [];
   const need: { bucket: MonthPlanBucketSource; monthly: number }[] = [];
-  let fundingPlanned = 0;
-  let fundingActual = 0;
   let refills = 0;
   let emergency = 0;
 
-  const activeBuckets = input.buckets.filter((bucket) => !bucket.archived).sort((left, right) => {
-    if (left.priority !== right.priority) {
-      return left.priority - right.priority;
-    }
-    return left.name < right.name ? -1 : left.name > right.name ? 1 : 0;
-  });
+  const activeBuckets = input.buckets.filter((bucket) => !bucket.archived && bucket.kind !== "income").sort(comparePriority);
 
   for (const bucket of activeBuckets) {
     const monthly = input.month >= bucket.startDate.slice(0, 7) ? monthlyAmount(bucket, bucket.balance, input.month, input.step) : 0;
     const actual = Math.max(0, bucket.actualFunded);
-    fundingActual += actual;
     if (monthly > 0 || actual > 0) {
-      fundingItems.push({ bucketId: bucket.id, name: bucket.name, kind: bucket.kind, color: bucket.color, planned: monthly, actual });
-      fundingPlanned += monthly;
+      funded.push({ bucketId: bucket.id, name: bucket.name, kind: bucket.kind, color: bucket.color, planned: monthly, actual });
     }
     if (bucket.kind === "spending") {
       refills += monthly;
     } else if (bucket.kind === "emergency") {
       emergency += monthly;
-    } else if (monthly > 0) {
+    } else if (bucket.kind !== "commitment" && monthly > 0) {
       need.push({ bucket, monthly });
     }
   }
 
-  fundingItems.sort((left, right) => right.planned - left.planned || (left.name < right.name ? -1 : 1));
-  bills.sort((left, right) => (left.dueDate < right.dueDate ? -1 : left.dueDate > right.dueDate ? 1 : left.name < right.name ? -1 : 1));
+  // The commitments are their own section (decision 0062 item 15): the monthly amount of each commitment bucket.
+  const byAmount = (left: { planned: number; name: string }, right: { planned: number; name: string }) =>
+    right.planned - left.planned || (left.name < right.name ? -1 : 1);
+  const fundingItems = funded.filter((item) => item.kind !== "commitment").sort(byAmount);
+  const commitments = funded
+    .filter((item) => item.kind === "commitment")
+    .map(({ bucketId, name, planned, actual }) => ({ bucketId, name, planned, actual }))
+    .sort(byAmount);
+  const sum = (items: readonly { planned: number; actual: number }[], key: "planned" | "actual") => items.reduce((total, item) => total + item[key], 0);
+  const fundingPlanned = sum(fundingItems, "planned");
+  const fundingActual = sum(fundingItems, "actual");
+  const commitmentPlanned = sum(commitments, "planned");
+  const commitmentActual = sum(commitments, "actual");
 
   let feasibility: MonthPlan["feasibility"] = null;
   if (hasIncome) {
     const incomeSafe = divideAmount(incomeYear, 12, input.step);
-    const surplus = incomeSafe - safeBills - refills - emergency;
+    const commitmentSafe = divideAmount(commitmentYear, 12, input.step);
+    const surplus = incomeSafe - commitmentSafe - refills - emergency;
     const total = need.reduce((sum, item) => sum + item.monthly, 0);
     const shares = surplusShares(surplus, need.map((item) => ({ bucketId: item.bucket.id, monthly: item.monthly, dueDate: goalDateOf(item.bucket) })), input.step);
     const buckets = need.map(({ bucket, monthly }): NonNullable<MonthPlan["feasibility"]>["buckets"][number] => {
@@ -282,21 +268,22 @@ function monthFigures(input: {
       const later = dueDate !== null && room > 0 && monthly > room && gap > 0 ? firstOfMonthAfter(input.month, Math.ceil(gap / room)) : null;
       return { bucketId: bucket.id, name: bucket.name, kind: bucket.kind === "sinking" ? "sinking" : "goal", monthly, dueDate, laterDate: later !== null && dueDate !== null && later > dueDate ? later : null };
     });
-    feasibility = { income: incomeSafe, bills: safeBills, refills, emergency, surplus, need: total, shortfall: Math.max(0, total - surplus), buckets };
+    feasibility = { income: incomeSafe, commitments: commitmentSafe, refills, emergency, surplus, need: total, shortfall: Math.max(0, total - surplus), buckets };
   }
 
-  return {
+  const plan: MonthPlan = {
     month: input.month,
     compareActual: input.asOf.slice(0, 7) === input.month,
     income: { planned: incomePlanned, actual: incomeActual },
-    bills: { planned: billPlanned, actual: billActual, items: bills },
+    commitments: { planned: commitmentPlanned, actual: commitmentActual, items: commitments },
     funding: { planned: fundingPlanned, actual: fundingActual, items: fundingItems },
     leftToSave: {
-      planned: incomePlanned - billPlanned - fundingPlanned,
-      actual: incomeActual - billActual - fundingActual,
+      planned: incomePlanned - commitmentPlanned - fundingPlanned,
+      actual: incomeActual - commitmentActual - fundingActual,
     },
     feasibility,
   };
+  return { plan, funded };
 }
 
 function goalDateOf(bucket: MonthPlanBucketSource) {

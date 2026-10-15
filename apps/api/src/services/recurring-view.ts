@@ -1,4 +1,4 @@
-import { occurrenceLinks, recurringPlans, settings, transactionLines, transactions, type OccurrenceLinkRow, type RecurringPlanRow } from "@num/db";
+import { occurrenceLinks, settings, transactionLines, transactions, type OccurrenceLinkRow } from "@num/db";
 import {
   Temporal,
   planProposalKey,
@@ -21,8 +21,8 @@ import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { bookStep } from "./book-step";
 import { decidedKeys } from "./decision-keys";
-import { ServiceError } from "../service-error";
-import { applyLinkedPlan, isDecided } from "./match-apply";
+import { applyLinkedSchedule, isDecided } from "./match-apply";
+import { activeSchedules, requireSchedule, type ScheduleView } from "./schedules";
 import { withoutId, write, type WriteInput } from "./write";
 
 type TxnRow = {
@@ -46,14 +46,6 @@ function graceDays(db: { select: Db["select"] }) {
 
 function horizon(asOf: string) {
   return Temporal.PlainDate.from(asOf).add({ days: horizonDays }).toString();
-}
-
-function activePlans(db: Db): RecurringPlanRow[] {
-  return db
-    .select()
-    .from(recurringPlans)
-    .all()
-    .filter((row) => row.active && row.archivedAt === null);
 }
 
 function transactionsByIds(db: Db, ids: readonly string[]) {
@@ -154,32 +146,24 @@ function detectionTransactions(db: Db, asOf: string): DetectionTransaction[] {
 }
 
 /**
- * A plan of the account covers a proposal for its merchant. A plan with no merchant covers a proposal for its
+ * A schedule of the account covers a proposal for its merchant. A schedule with no merchant covers a proposal for its
  * category, or a proposal for one amount when it has no category and the amount is in its tolerance (decision 0054).
- * A plan with no merchant covers a proposal for its transfer target (decision 0056).
+ * A schedule with no merchant covers a proposal for its transfer target (decision 0056).
  */
-function covers(plan: RecurringPlanRow, proposal: PlanProposal) {
-  if (plan.accountId !== proposal.accountId) {
+function covers(schedule: ScheduleView, proposal: PlanProposal) {
+  if (schedule.accountId !== proposal.accountId) {
     return false;
   }
-  if (proposal.merchantId || plan.merchantId) {
-    return plan.merchantId === proposal.merchantId;
+  if (proposal.merchantId || schedule.merchantId) {
+    return schedule.merchantId === proposal.merchantId;
   }
-  if (proposal.transferAccountId || plan.transferAccountId) {
-    return plan.transferAccountId === proposal.transferAccountId;
+  if (proposal.transferAccountId || schedule.transferAccountId) {
+    return schedule.transferAccountId === proposal.transferAccountId;
   }
-  if (proposal.categoryId || plan.categoryId) {
-    return plan.categoryId === proposal.categoryId;
+  if (proposal.categoryId || schedule.categoryId) {
+    return schedule.categoryId === proposal.categoryId;
   }
-  return withinTolerance(proposal.expectedAmount, plan.expectedAmount, plan.tolerance);
-}
-
-function requirePlan(db: Db, id: string): RecurringPlanRow {
-  const row = db.select().from(recurringPlans).where(eq(recurringPlans.id, id)).get();
-  if (!row) {
-    throw new ServiceError("plan_not_found", 404);
-  }
-  return row;
+  return withinTolerance(proposal.expectedAmount, schedule.expectedAmount, schedule.tolerance);
 }
 
 function amountsByDue(links: OccurrenceLinkRow[], txns: Map<string, TxnRow>, asOf: string) {
@@ -193,7 +177,7 @@ function amountsByDue(links: OccurrenceLinkRow[], txns: Map<string, TxnRow>, asO
 }
 
 function statusFor(
-  row: RecurringPlanRow,
+  row: ScheduleView,
   dueDate: string,
   asOf: string,
   grace: number,
@@ -209,16 +193,16 @@ function statusFor(
     }
     return "linked";
   }
-  if (row.active && isInboxMissed(dueDate, asOf, grace)) {
+  if (row.archivedAt === null && isInboxMissed(dueDate, asOf, grace)) {
     return "missed";
   }
   return "open";
 }
 
-export function listOccurrences(db: Db, planId: string, asOf: string) {
-  const row = requirePlan(db, planId);
+export function listOccurrences(db: Db, bucketId: string, asOf: string) {
+  const row = requireSchedule(db, bucketId);
   const grace = graceDays(db);
-  const links = db.select().from(occurrenceLinks).where(eq(occurrenceLinks.planId, planId)).all();
+  const links = db.select().from(occurrenceLinks).where(eq(occurrenceLinks.bucketId, bucketId)).all();
   const byDue = new Map(links.map((link) => [link.dueDate, link]));
   const txns = transactionsByIds(
     db,
@@ -245,21 +229,21 @@ export function listOccurrences(db: Db, planId: string, asOf: string) {
 
 const upcomingDays = 30;
 
-/** The occurrences of all active plans from `asOf` to 30 days later, by date (decision 0055). */
+/** The occurrences of all active schedules from `asOf` to 30 days later, by date (decision 0055). */
 export function listUpcoming(db: Db, asOf: string): UpcomingList {
   const until = Temporal.PlainDate.from(asOf).add({ days: upcomingDays }).toString();
-  const items = activePlans(db).flatMap((row) => {
+  const items = activeSchedules(db).flatMap((row) => {
     const list = listOccurrences(db, row.id, asOf);
     return list.items
       .filter((item) => item.dueDate >= asOf && item.dueDate <= until)
-      .map((item) => ({ ...item, planId: row.id, accountId: row.accountId, forecastAmount: list.forecastAmount }));
+      .map((item) => ({ ...item, bucketId: row.id, accountId: row.accountId, forecastAmount: list.forecastAmount }));
   });
-  items.sort((left, right) => (left.dueDate !== right.dueDate ? (left.dueDate < right.dueDate ? -1 : 1) : left.planId < right.planId ? -1 : 1));
+  items.sort((left, right) => (left.dueDate !== right.dueDate ? (left.dueDate < right.dueDate ? -1 : 1) : left.bucketId < right.bucketId ? -1 : 1));
   return { items };
 }
 
-function openOccurrences(rows: RecurringPlanRow[], links: OccurrenceLinkRow[], asOf: string, grace: number) {
-  const linked = new Set(links.map((link) => `${link.planId}|${link.dueDate}`));
+function openOccurrences(rows: ScheduleView[], links: OccurrenceLinkRow[], asOf: string, grace: number) {
+  const linked = new Set(links.map((link) => `${link.bucketId}|${link.dueDate}`));
   const limit = Temporal.PlainDate.from(asOf).add({ days: grace }).toString();
   const occurrences: OpenOccurrence[] = [];
   for (const row of rows) {
@@ -269,7 +253,7 @@ function openOccurrences(rows: RecurringPlanRow[], links: OccurrenceLinkRow[], a
         continue;
       }
       occurrences.push({
-        planId: row.id,
+        bucketId: row.id,
         dueDate: date.dueDate,
         accountId: row.accountId,
         merchantId: row.merchantId,
@@ -281,15 +265,15 @@ function openOccurrences(rows: RecurringPlanRow[], links: OccurrenceLinkRow[], a
   return occurrences;
 }
 
-function linkTransactions(db: Db, plans: RecurringPlanRow[], asOf: string, grace: number) {
-  const accountIds = [...new Set(plans.map((row) => row.accountId))];
+function linkTransactions(db: Db, schedules: ScheduleView[], asOf: string, grace: number) {
+  const accountIds = [...new Set(schedules.map((row) => row.accountId))];
   const from = Temporal.PlainDate.from(asOf).subtract({ months: 13 }).subtract({ days: grace }).toString();
   const to = Temporal.PlainDate.from(asOf).add({ days: grace * 2 }).toString();
   return transactionsForAccounts(db, accountIds, from, to);
 }
 
 export function recurringSignals(db: Db, asOf: string): RecurringSignals {
-  const plans = activePlans(db);
+  const schedules = activeSchedules(db);
   const links = db.select().from(occurrenceLinks).all();
   const grace = graceDays(db);
   const linkedIds = links.flatMap((link) => (link.transactionId ? [link.transactionId] : []));
@@ -297,11 +281,11 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
   const changed: RecurringSignals["changed"] = [];
   const missed: RecurringSignals["missed"] = [];
   const missedFrom = Temporal.PlainDate.from(asOf).subtract({ days: 35 }).toString();
-  for (const row of plans) {
-    const planLinks = links.filter((link) => link.planId === row.id);
-    const byDue = new Map(planLinks.map((link) => [link.dueDate, link]));
+  for (const row of schedules) {
+    const scheduleLinks = links.filter((link) => link.bucketId === row.id);
+    const byDue = new Map(scheduleLinks.map((link) => [link.dueDate, link]));
     if (row.amountMode === "fixed") {
-      for (const link of planLinks) {
+      for (const link of scheduleLinks) {
         if (!link.transactionId) {
           continue;
         }
@@ -310,7 +294,7 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
           continue;
         }
         changed.push({
-          planId: row.id,
+          bucketId: row.id,
           dueDate: link.dueDate,
           transactionId: txn.id,
           expectedAmount: row.expectedAmount,
@@ -322,44 +306,44 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
       if (byDue.has(date.dueDate) || !isInboxMissed(date.dueDate, asOf, grace)) {
         continue;
       }
-      missed.push({ planId: row.id, dueDate: date.dueDate });
+      missed.push({ bucketId: row.id, dueDate: date.dueDate });
     }
   }
   const taken = new Set(linkedIds);
-  const candidates = linkTransactions(db, plans, asOf, grace).filter((txn) => !taken.has(txn.id));
-  const ambiguous = matchLinks(openOccurrences(plans, links, asOf, grace), candidates, grace).ambiguous;
+  const candidates = linkTransactions(db, schedules, asOf, grace).filter((txn) => !taken.has(txn.id));
+  const ambiguous = matchLinks(openOccurrences(schedules, links, asOf, grace), candidates, grace).ambiguous;
   const declined = decidedKeys(db, "plan_proposal");
   const proposals = detectPlans(detectionTransactions(db, asOf), bookStep(db), asOf).filter((proposal) => {
-    return !plans.some((plan) => covers(plan, proposal)) && !declined.has(planProposalKey(proposal));
+    return !schedules.some((schedule) => covers(schedule, proposal)) && !declined.has(planProposalKey(proposal));
   });
   return { changed, missed, ambiguous, proposals };
 }
 
 export function autoLink(db: Db, asOf: string, input: WriteInput & { accountId?: string }): { linked: number } {
-  const plans = activePlans(db).filter((row) => !input.accountId || row.accountId === input.accountId);
+  const schedules = activeSchedules(db).filter((row) => !input.accountId || row.accountId === input.accountId);
   const links = db.select().from(occurrenceLinks).all();
   const grace = graceDays(db);
   const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
   const unique = matchLinks(
-    openOccurrences(plans, links, asOf, grace),
-    linkTransactions(db, plans, asOf, grace).filter((txn) => !taken.has(txn.id)),
+    openOccurrences(schedules, links, asOf, grace),
+    linkTransactions(db, schedules, asOf, grace).filter((txn) => !taken.has(txn.id)),
     grace,
   ).unique;
   if (unique.length === 0) {
     return { linked: 0 };
   }
-  const byPlan = new Map(plans.map((plan) => [plan.id, plan]));
+  const bySchedule = new Map(schedules.map((schedule) => [schedule.id, schedule]));
   write(db, { source: input.source, at: input.at }, (tx) => {
     for (const pair of unique) {
-      const plan = byPlan.get(pair.planId);
+      const schedule = bySchedule.get(pair.bucketId);
       // An automatic link labels only a row that the person did not decide.
-      if (plan && !isDecided(tx, pair.transactionId)) {
-        applyLinkedPlan(tx, plan, pair.transactionId);
+      if (schedule && !isDecided(tx, pair.transactionId)) {
+        applyLinkedSchedule(tx, schedule, pair.transactionId);
       }
       const id = crypto.randomUUID();
       const row: OccurrenceLinkRow = {
         id,
-        planId: pair.planId,
+        bucketId: pair.bucketId,
         dueDate: pair.dueDate,
         transactionId: pair.transactionId,
         skipped: false,

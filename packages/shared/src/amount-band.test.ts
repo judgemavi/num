@@ -191,7 +191,7 @@ test("a key with no learned labels does not change", () => {
 
 test("a recurring link is automatic when no band contains the amount", () => {
   const rows = [row("a", "2026-01-01", "rent", -2550000), row("b", "2026-02-01", "rent", -2550000)];
-  const recurring = { planId: "plan", categoryId: "rent", merchantId: null, transferAccountId: null, mortgage: false };
+  const recurring = { bucketId: "plan", categoryId: "rent", merchantId: null, transferAccountId: null, mortgage: false };
   const result = score(rows, -2000000, recurring);
   expect(result.reason).toBe("recurring");
   expect(result.level).toBe("automatic");

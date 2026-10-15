@@ -17,7 +17,7 @@ import { insightsRoutes } from "./routes/insights";
 import { merchantRoutes } from "./routes/merchants";
 import { mortgageRoutes } from "./routes/mortgage";
 import { planRoutes } from "./routes/plan";
-import { recurringRoutes } from "./routes/recurring";
+import { scheduleRoutes } from "./routes/schedules";
 import { setupRoutes } from "./routes/setup";
 import { suggestionRoutes } from "./routes/suggestions";
 import { tagRoutes } from "./routes/tags";
@@ -53,6 +53,7 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
     .route("/", mortgageRoutes(db))
     .route("/", insightsRoutes(db))
     .route("/", bankBalanceRoutes(db))
+    .route("/", scheduleRoutes(db))
     .route("/", bucketRoutes(db))
     .route("/", fundingRoutes(db))
     .route("/", forecastRoutes(db))
@@ -62,7 +63,6 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
     .route("/", tagRoutes(db))
     .route("/", merchantRoutes(db))
     .route("/", suggestionRoutes(db))
-    .route("/", recurringRoutes(db))
     .route("/", transactionRoutes(db));
   registerMcp(app, db);
 

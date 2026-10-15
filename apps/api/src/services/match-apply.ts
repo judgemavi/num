@@ -22,7 +22,7 @@ export function mortgageSplitLines(tx: WriteTx, result: MatchResult, fromAccount
 
 /**
  * True when the person decided the label of the transaction: a category, a transfer or a kept "no category", with no
- * automatic label. An automatic link to a recurring plan does not replace such a decision.
+ * automatic label. An automatic link to a recurring schedule does not replace such a decision.
  */
 export function isDecided(tx: WriteTx, transactionId: string) {
   const row = tx.select({ autoReason: transactions.autoReason }).from(transactions).where(eq(transactions.id, transactionId)).get();
@@ -35,9 +35,9 @@ export function isDecided(tx: WriteTx, transactionId: string) {
   return tx.select({ key: inboxDecisions.itemKey }).from(inboxDecisions).where(eq(inboxDecisions.itemKey, keepKey(transactionId))).get() !== undefined;
 }
 
-export function applyLinkedPlan(
+export function applyLinkedSchedule(
   tx: WriteTx,
-  plan: { id: string; name: string; categoryId: string | null; merchantId: string | null; transferAccountId: string | null },
+  schedule: { id: string; name: string; categoryId: string | null; merchantId: string | null; transferAccountId: string | null },
   transactionId: string,
   markEdited = false,
 ): void {
@@ -46,9 +46,9 @@ export function applyLinkedPlan(
     return;
   }
   const mortgage =
-    plan.transferAccountId !== null &&
-    tx.select({ kind: accounts.kind }).from(accounts).where(eq(accounts.id, plan.transferAccountId)).get()?.kind === "mortgage";
-  if (!mortgage && plan.categoryId === null) {
+    schedule.transferAccountId !== null &&
+    tx.select({ kind: accounts.kind }).from(accounts).where(eq(accounts.id, schedule.transferAccountId)).get()?.kind === "mortgage";
+  if (!mortgage && schedule.categoryId === null) {
     return;
   }
   const result = {
@@ -57,10 +57,10 @@ export function applyLinkedPlan(
     confidenceMilli: 990,
     leadMilli: 1000,
     reason: "recurring" as const,
-    sourceId: plan.id,
-    categoryId: mortgage ? null : plan.categoryId,
-    merchantId: plan.merchantId,
-    transferAccountId: mortgage ? plan.transferAccountId : null,
+    sourceId: schedule.id,
+    categoryId: mortgage ? null : schedule.categoryId,
+    merchantId: schedule.merchantId,
+    transferAccountId: mortgage ? schedule.transferAccountId : null,
     keep: false,
     mortgage,
     signals: [],
@@ -73,9 +73,9 @@ export function applyLinkedPlan(
   tx.update(transactions)
     .set({
       // A loan payment has no merchant (decision 0053).
-      merchantId: lines ? null : (plan.merchantId ?? txn.merchantId),
+      merchantId: lines ? null : (schedule.merchantId ?? txn.merchantId),
       autoReason: "recurring",
-      autoSourceId: plan.id,
+      autoSourceId: schedule.id,
       autoConfidence: 990,
       ...(markEdited ? { editedAt: utcNow() } : {}),
     })
@@ -97,29 +97,29 @@ export function applyLinkedPlan(
         }, current.source, principal, false);
       }
     }
-  } else if (plan.categoryId) {
+  } else if (schedule.categoryId) {
     const line = tx.select().from(transactionLines).where(eq(transactionLines.transactionId, transactionId)).all();
     if (line.length === 1 && line[0] && line[0].transferAccountId === null) {
-      tx.update(transactionLines).set({ categoryId: plan.categoryId }).where(eq(transactionLines.id, line[0].id)).run();
+      tx.update(transactionLines).set({ categoryId: schedule.categoryId }).where(eq(transactionLines.id, line[0].id)).run();
     }
   }
   auditTransaction(tx, transactionId, "label", before, readTransaction(tx, transactionId));
 }
 
-export function linkRecurring(tx: WriteTx, planId: string, dueDate: string, transactionId: string): void {
+export function linkRecurring(tx: WriteTx, bucketId: string, dueDate: string, transactionId: string): void {
   const taken = tx.select({ id: occurrenceLinks.id }).from(occurrenceLinks).where(eq(occurrenceLinks.transactionId, transactionId)).get();
   if (taken) {
     return;
   }
   const id = crypto.randomUUID();
-  const row = { id, planId, dueDate, transactionId, skipped: false, reason: null };
+  const row = { id, bucketId, dueDate, transactionId, skipped: false, reason: null };
   tx.insert(occurrenceLinks).values(row).run();
   tx.audit({
     entity: "occurrence_links",
     entityId: id,
     action: "link",
     before: null,
-    after: { planId, dueDate, transactionId, skipped: false, reason: null },
+    after: { bucketId, dueDate, transactionId, skipped: false, reason: null },
   });
 }
 

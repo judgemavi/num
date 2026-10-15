@@ -1,4 +1,4 @@
-import { bucketEvents, buckets, occurrenceLinks, recurringPlans, transactions, type BucketRow, type RecurringPlanRow } from "@num/db";
+import { bucketEvents, buckets, occurrenceLinks, transactions, type BucketRow } from "@num/db";
 import {
   buildMonthPlan,
   isIsoDate,
@@ -15,23 +15,22 @@ import { bookStep } from "./book-step";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
 import { monthlyEssential } from "./emergency-fund";
+import { commitmentsOf, loadSchedules, type ScheduleView } from "./schedules";
 import { literal } from "./transaction-sql";
 
-function planOf(row: RecurringPlanRow): MonthPlanSource {
+function planOf(row: ScheduleView): MonthPlanSource {
   return {
     id: row.id,
     name: row.name,
     kind: row.kind,
     amountMode: row.amountMode,
     expectedAmount: row.expectedAmount,
-    fundsBuckets: row.fundsBuckets,
-    active: row.active,
     archived: row.archivedAt !== null,
     schedule: row,
   };
 }
 
-function bucketOf(row: BucketRow, actualFunded: number, essentialMonthly: number): MonthPlanBucketSource {
+function bucketOf(row: BucketRow, actualFunded: number, essentialMonthly: number, commitment: MonthPlanBucketSource["commitment"]): MonthPlanBucketSource {
   return {
     id: row.id,
     name: row.name,
@@ -50,6 +49,7 @@ function bucketOf(row: BucketRow, actualFunded: number, essentialMonthly: number
     fillMonths: row.fillMonths,
     startDate: row.startDate,
     actualFunded,
+    commitment,
   };
 }
 
@@ -69,7 +69,7 @@ export function readMonthPlan(db: Db, asOf: string, month: string | undefined): 
   const range = monthEnd(selected);
   const origin = selected < asOf.slice(0, 7) ? selected : asOf.slice(0, 7);
   const originStart = `${origin}-01`;
-  const plans = db.select().from(recurringPlans).all().map(planOf);
+  const plans = loadSchedules(db).map(planOf);
   const links = loadLinks(db, asOf, originStart, range.end);
   const funded = new Map<string, number>();
   const events = db
@@ -83,8 +83,9 @@ export function readMonthPlan(db: Db, asOf: string, month: string | undefined): 
   const balances = bucketBalances(db, Temporal.PlainDate.from(originStart).subtract({ days: 1 }).toString());
   const rows = db.select().from(buckets).all();
   const essentialMonthly = rows.some((row) => row.kind === "emergency" && row.archivedAt === null) ? monthlyEssential(db, originStart).monthly : 0;
+  const commitments = commitmentsOf(db, originStart);
   const sources = rows.map((row) => {
-    const source = bucketOf(row, funded.get(row.id) ?? 0, essentialMonthly);
+    const source = bucketOf(row, funded.get(row.id) ?? 0, essentialMonthly, commitments.get(row.id) ?? null);
     source.balance = balances.get(row.id) ?? 0;
     return source;
   });
@@ -99,17 +100,17 @@ function loadLinks(db: Db, asOf: string, windowStart: string, windowEnd: string)
     .all();
   const ranked = db
     .select({
-      planId: occurrenceLinks.planId,
+      bucketId: occurrenceLinks.bucketId,
       dueDate: occurrenceLinks.dueDate,
       amount: transactions.amount,
-      rank: sql<number>`row_number() over (partition by ${occurrenceLinks.planId} order by ${occurrenceLinks.dueDate} desc)`.as("rank"),
+      rank: sql<number>`row_number() over (partition by ${occurrenceLinks.bucketId} order by ${occurrenceLinks.dueDate} desc)`.as("rank"),
     })
     .from(occurrenceLinks)
     .innerJoin(transactions, eq(transactions.id, occurrenceLinks.transactionId))
     .where(and(eq(occurrenceLinks.skipped, literal(0)), lte(occurrenceLinks.dueDate, asOf)))
     .as("ranked");
   const recent = db
-    .select({ planId: ranked.planId, dueDate: ranked.dueDate, amount: ranked.amount })
+    .select({ bucketId: ranked.bucketId, dueDate: ranked.dueDate, amount: ranked.amount })
     .from(ranked)
     .where(lte(ranked.rank, literal(6)))
     .all();
@@ -126,11 +127,11 @@ function loadLinks(db: Db, asOf: string, windowStart: string, windowEnd: string)
   }
   const links = new Map<string, MonthPlanLink>();
   for (const row of recent) {
-    links.set(`${row.planId}|${row.dueDate}`, { planId: row.planId, dueDate: row.dueDate, skipped: false, actual: row.amount });
+    links.set(`${row.bucketId}|${row.dueDate}`, { bucketId: row.bucketId, dueDate: row.dueDate, skipped: false, actual: row.amount });
   }
   for (const row of windowRows) {
     const actual = row.skipped || row.transactionId === null ? null : (amounts.get(row.transactionId) ?? null);
-    links.set(`${row.planId}|${row.dueDate}`, { planId: row.planId, dueDate: row.dueDate, skipped: row.skipped, actual });
+    links.set(`${row.bucketId}|${row.dueDate}`, { bucketId: row.bucketId, dueDate: row.dueDate, skipped: row.skipped, actual });
   }
   return [...links.values()];
 }

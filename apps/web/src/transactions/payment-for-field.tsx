@@ -1,6 +1,6 @@
 import type { TransactionReview } from "@num/shared";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { useActivePlans } from "@/editors/lookups";
+import { useActiveSchedules } from "@/editors/lookups";
 import { withForm } from "@/forms/form-hook";
 import { fieldValue } from "@/forms/form-values";
 import { formatDate } from "@/transactions/format";
@@ -13,12 +13,12 @@ import { blankTransaction } from "@/transactions/transaction-draft";
  */
 export const PaymentForField = withForm({
   defaultValues: blankTransaction,
-  props: { occurrence: fieldValue<NonNullable<TransactionReview["recurring"]>>({ planId: "", dueDate: "" }) },
+  props: { occurrence: fieldValue<NonNullable<TransactionReview["recurring"]>>({ bucketId: "", dueDate: "" }) },
   render: function PaymentForFieldRender({ form, occurrence }) {
-    const plan = useActivePlans().items.find((item) => item.id === occurrence.planId);
+    const schedule = useActiveSchedules().find((item) => item.id === occurrence.bucketId);
     const option = {
-      id: `${occurrence.planId}:${occurrence.dueDate}`,
-      label: `${plan?.name ?? "Recurring payment"} · due ${formatDate(occurrence.dueDate)}`,
+      id: `${occurrence.bucketId}:${occurrence.dueDate}`,
+      label: `${schedule?.name ?? "Scheduled payment"} · due ${formatDate(occurrence.dueDate)}`,
     };
     return (
       <form.Field name="paymentFor">

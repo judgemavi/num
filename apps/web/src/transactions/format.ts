@@ -76,11 +76,11 @@ export function transactionError(code: ErrorCode | undefined): string {
       return "That transfer match is no longer available. Choose the account again.";
     case "occurrence_taken":
     case "occurrence_not_found":
-    case "plan_not_found":
-    case "plan_archived":
+    case "schedule_not_found":
+    case "bucket_archived":
       return "That payment is no longer open.";
     case "transaction_already_linked":
-      return "This transaction is already the payment of a recurring item.";
+      return "This transaction is already the payment of a commitment or an income.";
     case "invalid_body":
       return "Check the transaction fields.";
     default:

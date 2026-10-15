@@ -6,7 +6,7 @@ import { expect, test } from "bun:test";
 import { createDb } from "../db";
 import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { autoLink, listOccurrences } from "./recurring-view";
 import { readTransaction } from "./transaction-record";
 import { createTransaction } from "./transactions";
@@ -41,9 +41,9 @@ test("a linked plan labels an open payment and keeps the label that the person c
     });
     const rent = createCategory(db, { name: "Rent", kind: "expense", ...saved });
     const housing = createCategory(db, { name: "Housing", kind: "expense", ...saved });
-    const plan = createPlan(db, {
+    const plan = createSchedule(db, {
       name: "Rent",
-      kind: "bill",
+      kind: "commitment",
       accountId: account.id,
       categoryId: rent.id,
       expectedAmount: -2_550_000,
@@ -54,8 +54,7 @@ test("a linked plan labels an open payment and keeps the label that the person c
       interval: 1,
       monthDay: 1,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       ...saved,
     });
     const payment = (date: string, categoryId?: string) =>

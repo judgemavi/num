@@ -11,7 +11,7 @@ import { createCategory } from "./categories";
 import { undoImportBatch } from "./import-undo";
 import { importStatement } from "./imports";
 import { loadMatchBook, scorePayee } from "./match-book";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction, getTransaction } from "./transactions";
 
 const at = "2026-10-08T16:00:00.000Z";
@@ -92,9 +92,9 @@ test("undo removes the mortgage mirror created for an imported payment", () => {
       },
       ...saved,
     });
-    createPlan(sample.db, {
+    createSchedule(sample.db, {
       name: "Mortgage",
-      kind: "transfer",
+      kind: "commitment",
       accountId: sample.account.id,
       expectedAmount: -581600,
       tolerance: 0,
@@ -108,8 +108,7 @@ test("undo removes the mortgage mirror created for an imported payment", () => {
       monthDay: 1,
       businessDayShift: "none",
       endDate: null,
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       ...saved,
     });
     const imported = importCsv(sample.db, sample.dir, sample.account.id, "loan.csv", ["03/01/2026,MORTGAGE,-581.60"], "2026-03-05");
@@ -173,9 +172,9 @@ test("a mortgage import links an existing opposite row", () => {
       lines: [{ amount: split.principal }],
       ...saved,
     });
-    createPlan(sample.db, {
+    createSchedule(sample.db, {
       name: "Mortgage",
-      kind: "transfer",
+      kind: "commitment",
       accountId: sample.account.id,
       expectedAmount: -581600,
       tolerance: 0,
@@ -189,8 +188,7 @@ test("a mortgage import links an existing opposite row", () => {
       monthDay: 1,
       businessDayShift: "none",
       endDate: null,
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       ...saved,
     });
     importCsv(sample.db, sample.dir, sample.account.id, "loan.csv", ["03/01/2026,MORTGAGE,-581.60"], "2026-03-05");
@@ -218,9 +216,9 @@ test("a recurring link labels even when payee history disagrees", () => {
         ...saved,
       });
     }
-    createPlan(sample.db, {
+    createSchedule(sample.db, {
       name: "Rent",
-      kind: "bill",
+      kind: "commitment",
       accountId: sample.account.id,
       expectedAmount: -4000,
       tolerance: 0,
@@ -234,8 +232,7 @@ test("a recurring link labels even when payee history disagrees", () => {
       monthDay: 12,
       businessDayShift: "none",
       endDate: null,
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       ...saved,
     });
     importCsv(sample.db, sample.dir, sample.account.id, "rent.csv", ["03/12/2026,NORTH CAFE,-4.00"], "2026-03-20");

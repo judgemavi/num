@@ -1,6 +1,6 @@
 import { createAccount } from "./accounts";
 import { createBucket } from "./buckets";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction } from "./transactions";
 import type { Db } from "../db";
 import { saved } from "./bucket-test-book";
@@ -16,28 +16,30 @@ export function account(db: Db, name: string, kind: "chequing" | "credit_card" |
   });
 }
 
-export function plan(
+export function addSchedule(
   db: Db,
   input: {
     name: string;
-    kind: "income" | "bill";
+    kind: "income" | "commitment";
     accountId: string;
     expectedAmount: number;
     amountMode?: "fixed" | "variable";
     startDate: string;
-    freq: "weekly" | "monthly";
+    bucketStartDate?: string;
+    freq: "weekly" | "monthly" | "yearly";
     interval: number;
     monthDay?: number;
     categoryId?: string;
-    fundsBuckets: boolean;
+    transferAccountId?: string;
+    payday?: boolean;
+    essential?: boolean;
   },
 ) {
-  return createPlan(db, {
+  return createSchedule(db, {
     ...input,
     amountMode: input.amountMode ?? "fixed",
     tolerance: 0,
     businessDayShift: "none",
-    active: true,
     ...saved,
   });
 }
@@ -52,6 +54,7 @@ const noKindFields = {
   fixedAmount: null,
   months: null,
   fillMonths: null,
+  schedule: null,
 } as const;
 
 type BucketOptions = { priority?: number; startDate?: string; essential?: boolean; categoryIds?: string[] };

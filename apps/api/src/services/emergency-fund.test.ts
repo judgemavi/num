@@ -4,12 +4,15 @@ import { createBucketEvent } from "./bucket-events";
 import { expense, expectCode, saved, tempDatabase } from "./bucket-test-book";
 import { archiveBucket, readBucket, updateBucket } from "./buckets";
 import { readEmergencyFund } from "./emergency-fund";
+import { createAccount } from "./accounts";
 import { fillBuckets } from "./funding-fill";
-import { account, emergency, money, plan, spend } from "./funding-test-book";
+import { createTransaction } from "./transactions";
+import { account, addSchedule, emergency, money, spend } from "./funding-test-book";
+import { linkOccurrence } from "./recurring-links";
 
 const asOf = "2026-10-08";
 
-/** A book with an essential spending bucket, a rent bill and a cheque account. */
+/** A book with an essential spending bucket, an essential rent commitment and a cheque account. */
 function essentialBook(openingBalance = 5_000_000) {
   const book = tempDatabase();
   const cash = account(book.db, "Cash", "chequing", openingBalance);
@@ -17,9 +20,9 @@ function essentialBook(openingBalance = 5_000_000) {
   const rent = expense(book.db, "Rent");
   const hobby = expense(book.db, "Hobby");
   const food = spend(book.db, "Food", 400_000, { essential: true, categoryIds: [groceries.id], startDate: "2026-10-01" });
-  const bill = plan(book.db, {
+  const bill = addSchedule(book.db, {
     name: "Rent",
-    kind: "bill",
+    kind: "commitment",
     accountId: cash.id,
     expectedAmount: -1_000_000,
     startDate: "2026-01-15",
@@ -27,14 +30,14 @@ function essentialBook(openingBalance = 5_000_000) {
     interval: 1,
     monthDay: 15,
     categoryId: rent.id,
-    fundsBuckets: false,
   });
   return { ...book, cash, groceries, rent, hobby, food, bill };
 }
 
 function spendIn(book: ReturnType<typeof essentialBook>, month: string, groceries: number, rent: number, hobby = 0) {
   money(book.db, book.cash.id, book.groceries.id, `${month}-05`, -groceries, "Market");
-  money(book.db, book.cash.id, book.rent.id, `${month}-15`, -rent, "Landlord");
+  const payment = money(book.db, book.cash.id, book.rent.id, `${month}-15`, -rent, "Landlord");
+  linkOccurrence(book.db, book.bill.id, `${month}-15`, payment.id, saved);
   if (hobby > 0) {
     money(book.db, book.cash.id, book.hobby.id, `${month}-20`, -hobby, "Shop");
   }
@@ -44,7 +47,7 @@ test("the monthly essential spending is the median of the last 6 complete months
   const book = essentialBook();
   try {
     const fund = emergency(book.db, 3, 12);
-    // March is outside the 6 months. Hobby is not an essential category. October is not complete.
+    // March is outside the 6 months. Hobby is not an essential category. October is not complete. The rent counts as a linked payment.
     spendIn(book, "2026-03", 9_999_000, 1_000_000);
     ["300", "310", "320", "330", "340", "350"].forEach((groceries, index) => {
       spendIn(book, `2026-0${index + 4}`, Number(groceries) * 1000, 1_000_000, 777_000);
@@ -65,7 +68,7 @@ test("the monthly essential spending is the median of the last 6 complete months
   }
 });
 
-test("with fewer than 3 complete months the monthly figure is the plan: bills plus essential refills", () => {
+test("with fewer than 3 complete months the monthly figure is the plan: essential commitments (yearly / 12) plus essential refills", () => {
   const book = essentialBook();
   try {
     emergency(book.db, 2, 12);
@@ -91,6 +94,60 @@ function fundedBy(book: ReturnType<typeof essentialBook>, bucketId: string) {
 function fill(book: ReturnType<typeof essentialBook>, day: string) {
   return fillBuckets(book.db, { asOf: day, ...saved });
 }
+
+test("a payment is counted one time, a non-essential commitment is not counted, a transfer payment counts in full", () => {
+  const book = essentialBook();
+  try {
+    emergency(book.db, 1, 12);
+    const stream = addSchedule(book.db, {
+      name: "Streaming",
+      kind: "commitment",
+      accountId: book.cash.id,
+      expectedAmount: -20_000,
+      startDate: "2026-01-10",
+      freq: "monthly",
+      interval: 1,
+      monthDay: 10,
+      essential: false,
+    });
+    const loan = createAccount(book.db, { name: "Loan", kind: "mortgage", openingDate: "2026-01-01", openingBalance: 0, paymentPolicy: null, ...saved });
+    const mortgage = addSchedule(book.db, {
+      name: "Mortgage",
+      kind: "commitment",
+      accountId: book.cash.id,
+      transferAccountId: loan.id,
+      expectedAmount: -500_000,
+      startDate: "2026-01-20",
+      freq: "monthly",
+      interval: 1,
+      monthDay: 20,
+    });
+    for (const month of ["2026-04", "2026-05", "2026-06"]) {
+      // The groceries bucket is essential. The linked streaming payment is not essential and does not count there.
+      const streamPayment = money(book.db, book.cash.id, book.groceries.id, `${month}-10`, -20_000, "Stream");
+      linkOccurrence(book.db, stream.id, `${month}-10`, streamPayment.id, saved);
+      money(book.db, book.cash.id, book.groceries.id, `${month}-05`, -100_000, "Market");
+      // The rent payment has a groceries category: it counts one time, as a linked payment.
+      const rentPayment = money(book.db, book.cash.id, book.groceries.id, `${month}-15`, -1_000_000, "Landlord");
+      linkOccurrence(book.db, book.bill.id, `${month}-15`, rentPayment.id, saved);
+      const loanPayment = createTransaction(book.db, {
+        accountId: book.cash.id,
+        date: `${month}-20`,
+        amount: -500_000,
+        payeeRaw: "Bank",
+        lines: [
+          { amount: -400_000, transferAccountId: loan.id },
+          { amount: -100_000, categoryId: book.rent.id },
+        ],
+        ...saved,
+      });
+      linkOccurrence(book.db, mortgage.id, `${month}-20`, loanPayment.id, saved);
+    }
+    expect(readEmergencyFund(book.db, asOf)).toMatchObject({ monthly: 1_600_000, basis: "history" });
+  } finally {
+    book.close();
+  }
+});
 
 test("each month funds the rate: the target over the fill months", () => {
   const book = essentialBook();
@@ -124,7 +181,7 @@ test("the amount is capped at the shortfall, and the bucket refills at the rate 
 });
 
 test("the emergency bucket is funded after the spending buckets and before the goals", () => {
-  // The rent of 1 000 000 is reserved. 450 000 is free: Food takes 400 000, and the emergency bucket gets the rest.
+  // The rent commitment is first and takes 1 000 000. 450 000 is left: Food takes 400 000, and the emergency bucket gets the rest.
   const book = essentialBook(1_450_000);
   try {
     const fund = emergency(book.db, 1, 12, { priority: 2, startDate: "2026-10-01" });

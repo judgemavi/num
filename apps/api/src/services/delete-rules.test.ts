@@ -14,7 +14,7 @@ import { fillBuckets } from "./funding-fill";
 import { importStatement } from "./imports";
 import { undoImportBatch } from "./import-undo";
 import { linkOccurrence } from "./recurring-links";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { acceptTransferPair } from "./suggestions";
 import { createTransaction, deleteTransaction, getTransaction } from "./transactions";
 
@@ -69,7 +69,7 @@ function paycheck(db: Db) {
     ...saved,
   });
   const pay = createCategory(db, { name: "Pay", kind: "income", ...saved });
-  const plan = createPlan(db, {
+  const plan = createSchedule(db, {
     name: "Pay",
     kind: "income",
     accountId: cash.id,
@@ -81,8 +81,7 @@ function paycheck(db: Db) {
     interval: 1,
     monthDay: 1,
     businessDayShift: "none",
-    active: true,
-    fundsBuckets: true,
+    payday: true,
     ...saved,
   });
   const deposit = createTransaction(db, {
@@ -111,6 +110,7 @@ function paycheck(db: Db) {
     fixedAmount: null,
     months: null,
     fillMonths: null,
+    schedule: null,
     asOf: "2026-10-01",
     ...saved,
   });

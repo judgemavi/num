@@ -2,7 +2,7 @@ import { notifyManager, useQueryClient, useSuspenseQueries } from "@tanstack/rea
 import { useSyncExternalStore } from "react";
 import { bankStatusesQuery } from "@/api/bank-balances";
 import { hygieneQuery } from "@/api/insights";
-import { recurringSignalsQuery } from "@/api/recurring";
+import { scheduleSignalsQuery } from "@/api/schedules";
 import { reviewSummaryQuery } from "@/api/review";
 import { localAsOf } from "@/as-of";
 import { Boundary } from "@/components/boundary";
@@ -58,7 +58,7 @@ export function HomeScreen() {
 
 /** The reads of the kicker. The cards do the same reads. */
 function kickerReads(asOf: string) {
-  return [hygieneQuery(asOf), reviewSummaryQuery(asOf), recurringSignalsQuery(asOf), bankStatusesQuery()] as const;
+  return [hygieneQuery(asOf), reviewSummaryQuery(asOf), scheduleSignalsQuery(asOf), bankStatusesQuery()] as const;
 }
 
 /**

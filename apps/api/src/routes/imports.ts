@@ -54,7 +54,7 @@ const listRoute = createRoute({
 
 const importRoute = createRoute({
   operationId: "post_imports",
-  description: "Import a statement file. This can create transactions, match existing transactions, skip duplicates and store the file. It does not change buckets, plans or the book currency. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Import a statement file. This can create transactions, match existing transactions, skip duplicates and store the file. It does not change buckets, schedules or the book currency. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/imports",
   request: {

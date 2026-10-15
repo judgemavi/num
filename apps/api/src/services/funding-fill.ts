@@ -1,5 +1,5 @@
 import { bucketEvents, buckets, monthHolds, settings } from "@num/db";
-import { floorToStep, isIsoDate, utcNow, type FillResult } from "@num/shared";
+import { comparePriority, floorToStep, isIsoDate, utcNow, type FillResult } from "@num/shared";
 import { eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -28,7 +28,7 @@ function negativeBuckets(db: Reader) {
     .from(buckets)
     .where(isNull(buckets.archivedAt))
     .all()
-    .sort((left, right) => left.priority - right.priority || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
+    .sort(comparePriority)
     .flatMap((bucket) => ((balances.get(bucket.id) ?? 0) < 0 ? [{ bucket, need: -(balances.get(bucket.id) ?? 0) }] : []));
 }
 

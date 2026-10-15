@@ -1,15 +1,12 @@
-import { accounts, bucketCategories, buckets, categories, occurrenceLinks, recurringPlans, settings, transactionLines, transactions, type RecurringPlanRow } from "@num/db";
+import { accounts, bucketCategories, buckets, categories, occurrenceLinks, settings, transactionLines, transactions } from "@num/db";
 import {
   buildForecast,
   cardPaymentDay,
   forecastDates,
   isIsoDate,
-  nextIncomeDate,
   occurrenceDates,
   spendDeltas,
   unbucketedMonthly,
-  Temporal,
-  variableAmounts,
   type Forecast,
   type ForecastDelta,
   type ForecastFlow,
@@ -21,6 +18,8 @@ import { balancesOf } from "./account-balance";
 import { lastCompleteMonths } from "./complete-months";
 import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
+import { nextPayday } from "./funding-book";
+import { activeSchedules, scheduleAmounts, type ScheduleView } from "./schedules";
 import { literal } from "./transaction-sql";
 
 const peer = alias(transactions, "peer");
@@ -53,34 +52,11 @@ function bufferOf(db: Db) {
   return Number.isSafeInteger(value) ? value : 0;
 }
 
-function planAmount(
-  plan: RecurringPlanRow,
-  links: { planId: string; dueDate: string; transactionId: string | null }[],
-  amounts: Map<string, number>,
-  asOf: string,
-  step: number,
-) {
-  if (plan.amountMode !== "variable") {
-    return plan.expectedAmount;
-  }
-  const actuals = links
-    .filter((link) => link.planId === plan.id && link.transactionId !== null && link.dueDate <= asOf)
-    .sort((left, right) => (left.dueDate < right.dueDate ? 1 : left.dueDate > right.dueDate ? -1 : 0))
-    .flatMap((link) => {
-      const amount = link.transactionId ? amounts.get(link.transactionId) : undefined;
-      return amount === undefined ? [] : [amount];
-    });
-  return variableAmounts(actuals, plan.expectedAmount, step).forecast;
-}
-
-function planFlows(kind: string, date: string, amount: number): ForecastFlow[] {
-  if (kind === "income") {
+function scheduleFlows(schedule: ScheduleView, date: string, amount: number): ForecastFlow[] {
+  if (schedule.kind === "income") {
     return [{ date, income: amount, spending: 0 }];
   }
-  if (kind === "bill") {
-    return [{ date, income: 0, spending: -amount }];
-  }
-  return [];
+  return schedule.transferAccountId === null ? [{ date, income: 0, spending: -amount }] : [];
 }
 
 export function readForecast(db: Db, asOf: string): Forecast {
@@ -97,46 +73,26 @@ export function readForecast(db: Db, asOf: string): Forecast {
     .orderBy(asc(accounts.name))
     .all();
   const accountIds = new Set(openAccounts.map((row) => row.id));
-  const plans = db
-    .select()
-    .from(recurringPlans)
-    .all()
-    .filter((row) => row.active && row.archivedAt === null);
+  const schedules = activeSchedules(db);
+  const amounts = scheduleAmounts(db, schedules, asOf);
   const links = db.select().from(occurrenceLinks).all();
-  const skipped = new Set(links.filter((link) => link.skipped).map((link) => `${link.planId}|${link.dueDate}`));
-  const posted = new Set(links.filter((link) => link.transactionId !== null).map((link) => `${link.planId}|${link.dueDate}`));
+  const skipped = new Set(links.filter((link) => link.skipped).map((link) => `${link.bucketId}|${link.dueDate}`));
+  const posted = new Set(links.filter((link) => link.transactionId !== null).map((link) => `${link.bucketId}|${link.dueDate}`));
   const linkedTransactions = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
-  const amounts = new Map(
-    db
-      .select({ id: transactions.id, amount: transactions.amount })
-      .from(occurrenceLinks)
-      .innerJoin(transactions, eq(transactions.id, occurrenceLinks.transactionId))
-      .all()
-      .map((row) => [row.id, row.amount]),
-  );
   const deltas: ForecastDelta[] = [];
   const flows: ForecastFlow[] = [];
-  const incomeDates: string[] = [];
-  const incomeHorizon = Temporal.PlainDate.from(asOf).add({ years: 1 }).toString();
-  for (const plan of plans) {
-    const amount = planAmount(plan, links, amounts, asOf, step);
-    if (plan.kind === "income" && plan.fundsBuckets) {
-      for (const date of occurrenceDates(plan, incomeHorizon, asOf)) {
-        if (!skipped.has(`${plan.id}|${date.dueDate}`)) {
-          incomeDates.push(date.dueDate);
-        }
-      }
-    }
-    for (const date of occurrenceDates(plan, horizonEnd, asOf)) {
-      if (skipped.has(`${plan.id}|${date.dueDate}`) || posted.has(`${plan.id}|${date.dueDate}`)) {
+  for (const schedule of schedules) {
+    const amount = amounts.get(schedule.id)?.forecast ?? schedule.expectedAmount;
+    for (const date of occurrenceDates(schedule, horizonEnd, asOf)) {
+      if (skipped.has(`${schedule.id}|${date.dueDate}`) || posted.has(`${schedule.id}|${date.dueDate}`)) {
         continue;
       }
-      if (accountIds.has(plan.accountId)) {
-        deltas.push({ date: date.dueDate, accountId: plan.accountId, amount, series: "known" });
-        flows.push(...planFlows(plan.kind, date.dueDate, amount));
+      if (accountIds.has(schedule.accountId)) {
+        deltas.push({ date: date.dueDate, accountId: schedule.accountId, amount, series: "known" });
+        flows.push(...scheduleFlows(schedule, date.dueDate, amount));
       }
-      if (plan.kind === "transfer" && plan.transferAccountId && accountIds.has(plan.transferAccountId)) {
-        deltas.push({ date: date.dueDate, accountId: plan.transferAccountId, amount: -amount, series: "known" });
+      if (schedule.transferAccountId && accountIds.has(schedule.transferAccountId)) {
+        deltas.push({ date: date.dueDate, accountId: schedule.transferAccountId, amount: -amount, series: "known" });
       }
     }
   }
@@ -238,7 +194,7 @@ export function readForecast(db: Db, asOf: string): Forecast {
   const forecast = buildForecast({
     asOf,
     bufferAmount: bufferOf(db),
-    nextIncomeDate: nextIncomeDate(asOf, incomeDates),
+    nextIncomeDate: nextPayday(schedules, skipped, asOf),
     warnings,
     accounts: balancesOf(db, openAccounts, asOf).map(({ account, balance }) => ({
       id: account.id,

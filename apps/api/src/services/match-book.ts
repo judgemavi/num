@@ -1,4 +1,4 @@
-import { accounts, occurrenceLinks, recurringPlans, settings, transactions, type TransactionRow } from "@num/db";
+import { accounts, occurrenceLinks, settings, transactions, type TransactionRow } from "@num/db";
 import {
   Temporal,
   amountGuardFor,
@@ -24,10 +24,10 @@ import {
   type PayeeIndex,
   type RecurringSignal,
 } from "@num/shared";
-import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { keepPrefix } from "./decision-keep";
 import { loadMortgageLearned, type MortgageHit, type MortgageLearned } from "./mortgage-learned";
-import { literal } from "./transaction-sql";
+import { activeSchedules } from "./schedules";
 import type { Reader } from "./write";
 
 /**
@@ -280,40 +280,36 @@ export function recurringForRows(db: Reader, pending: readonly LinkTransaction[]
   if (pending.length === 0) {
     return hits;
   }
-  const plans = db
-    .select()
-    .from(recurringPlans)
-    .where(and(eq(recurringPlans.active, literal(1)), isNull(recurringPlans.archivedAt)))
-    .all();
-  if (plans.length === 0) {
+  const schedules = activeSchedules(db);
+  if (schedules.length === 0) {
     return hits;
   }
   const grace = graceDays(db);
   const links = db
-    .select({ planId: occurrenceLinks.planId, dueDate: occurrenceLinks.dueDate, transactionId: occurrenceLinks.transactionId })
+    .select({ bucketId: occurrenceLinks.bucketId, dueDate: occurrenceLinks.dueDate, transactionId: occurrenceLinks.transactionId })
     .from(occurrenceLinks)
     .all();
-  const linked = new Set(links.map((link) => `${link.planId}|${link.dueDate}`));
+  const linked = new Set(links.map((link) => `${link.bucketId}|${link.dueDate}`));
   const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
   const limit = Temporal.PlainDate.from(asOf).add({ days: grace }).toString();
-  const occurrences = plans.flatMap((plan) => {
-    const from = linkWindowStart(plan.startDate, asOf);
-    return occurrenceDates(plan, limit, from).flatMap((date) =>
-      linked.has(`${plan.id}|${date.dueDate}`)
+  const occurrences = schedules.flatMap((schedule) => {
+    const from = linkWindowStart(schedule.startDate, asOf);
+    return occurrenceDates(schedule, limit, from).flatMap((date) =>
+      linked.has(`${schedule.id}|${date.dueDate}`)
         ? []
         : [
             {
-              planId: plan.id,
+              bucketId: schedule.id,
               dueDate: date.dueDate,
-              accountId: plan.accountId,
-              merchantId: plan.merchantId,
-              expectedAmount: plan.expectedAmount,
-              tolerance: plan.tolerance,
+              accountId: schedule.accountId,
+              merchantId: schedule.merchantId,
+              expectedAmount: schedule.expectedAmount,
+              tolerance: schedule.tolerance,
             },
           ],
     );
   });
-  const accountIds = new Set(plans.map((plan) => plan.accountId));
+  const accountIds = new Set(schedules.map((schedule) => schedule.accountId));
   const from = Temporal.PlainDate.from(asOf).subtract({ months: 13 }).subtract({ days: grace }).toString();
   const to = Temporal.PlainDate.from(asOf).add({ days: grace * 2 }).toString();
   const existing = db
@@ -342,21 +338,21 @@ export function recurringForRows(db: Reader, pending: readonly LinkTransaction[]
       .all()
       .map((row) => row.id),
   );
-  const byPlan = new Map(plans.map((plan) => [plan.id, plan]));
+  const bySchedule = new Map(schedules.map((schedule) => [schedule.id, schedule]));
   for (const pair of unique) {
     if (!pendingIds.has(pair.transactionId)) {
       continue;
     }
-    const plan = byPlan.get(pair.planId);
-    if (!plan) {
+    const schedule = bySchedule.get(pair.bucketId);
+    if (!schedule) {
       continue;
     }
-    const mortgage = plan.kind === "transfer" && plan.transferAccountId !== null && mortgages.has(plan.transferAccountId);
+    const mortgage = schedule.transferAccountId !== null && mortgages.has(schedule.transferAccountId);
     hits.set(pair.transactionId, {
-      planId: plan.id,
-      categoryId: mortgage ? null : plan.categoryId,
-      merchantId: plan.merchantId,
-      transferAccountId: plan.transferAccountId,
+      bucketId: schedule.id,
+      categoryId: mortgage ? null : schedule.categoryId,
+      merchantId: schedule.merchantId,
+      transferAccountId: schedule.transferAccountId,
       mortgage,
       dueDate: pair.dueDate,
     });

@@ -7,7 +7,7 @@ import { createDb, type Db } from "../db";
 import { archiveAccount, createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { readInsights } from "./insights";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at: "2026-10-15T16:00:00Z" };
@@ -38,8 +38,8 @@ function record(db: Db, accountId: string, date: string, amount: number, categor
   });
 }
 
-function monthly(db: Db, accountId: string, kind: "income" | "bill", expectedAmount: number, monthDay: number) {
-  return createPlan(db, {
+function monthly(db: Db, accountId: string, kind: "income" | "commitment", expectedAmount: number, monthDay: number) {
+  return createSchedule(db, {
     name: kind,
     kind,
     accountId,
@@ -51,8 +51,7 @@ function monthly(db: Db, accountId: string, kind: "income" | "bill", expectedAmo
     interval: 1,
     monthDay,
     businessDayShift: "none",
-    active: true,
-    fundsBuckets: false,
+    payday: false,
     ...saved,
   });
 }
@@ -68,7 +67,7 @@ test("the month of asOf has an actual part to asOf and a forecast part after it"
     record(book.db, cash.id, "2026-10-05", -5000, groceries.id);
     record(book.db, cash.id, "2026-10-14", 1000, groceries.id);
     record(book.db, cash.id, "2026-10-18", -9000, groceries.id);
-    monthly(book.db, cash.id, "bill", -10_000, 25);
+    monthly(book.db, cash.id, "commitment", -10_000, 25);
     monthly(book.db, cash.id, "income", 30_000, 28);
 
     // September is the one complete month. Its 7000 is the monthly estimate: 230 on days 1 to 18, then 220.
@@ -110,7 +109,7 @@ test("a period that ends before asOf has only its own months and no forecast", (
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
     record(book.db, cash.id, "2026-08-12", -7000, groceries.id);
     record(book.db, cash.id, "2026-09-25", -3000, groceries.id);
-    monthly(book.db, cash.id, "bill", -10_000, 25);
+    monthly(book.db, cash.id, "commitment", -10_000, 25);
 
     const report = readInsights(book.db, { asOf: "2026-10-15", window: "custom", from: "2026-08-01", to: "2026-09-20" });
     expect(report.timeline.forecast).toBeNull();

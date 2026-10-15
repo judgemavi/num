@@ -3,13 +3,14 @@ import { z } from "zod";
 import type { AccountKind, PaymentPolicy } from "./account";
 import { isoDateSchema } from "./date";
 import { isMonthKey } from "./month";
-import { billReserveDays } from "./funding";
 import { roundToStep } from "./currency";
 import { medianAmount, medianOf } from "./recurring-calc";
 import { amountSchema } from "./money";
 
 export const forecastDayCount = 90;
 
+/** The safe-to-spend window when no income has `payday` (spec §6). */
+export const noPaydayWindowDays = 30;
 
 export const forecastWarningCodes = ["manual_card"] as const;
 
@@ -279,7 +280,7 @@ export function buildForecast(input: ForecastInput): Forecast {
 
   const totalKnown = dates.map((_, day) => ids.reduce((sum, id) => sum + (knownSeries.get(id)?.[day] ?? 0), 0));
   const totalEstimated = dates.map((_, day) => ids.reduce((sum, id) => sum + (estimatedSeries.get(id)?.[day] ?? 0), 0));
-  const windowEnd = input.nextIncomeDate ?? Temporal.PlainDate.from(input.asOf).add({ days: billReserveDays }).toString();
+  const windowEnd = input.nextIncomeDate ?? Temporal.PlainDate.from(input.asOf).add({ days: noPaydayWindowDays }).toString();
   let floor = totalEstimated[0] ?? 0;
   for (let day = 0; day < dates.length; day += 1) {
     if ((dates[day] ?? "") >= windowEnd) {

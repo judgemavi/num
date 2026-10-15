@@ -8,6 +8,6 @@ export { bankBalances, documents, importBatches, importRows, valuations } from "
 export type { DocumentRow, ImportBatchRow } from "./imports";
 export { lineTags, transactionLines, transactions } from "./ledger";
 export type { TransactionRow } from "./ledger";
-export { occurrenceLinks, recurringPlans } from "./plans";
-export type { OccurrenceLinkRow, RecurringPlanRow } from "./plans";
+export { occurrenceLinks, schedules } from "./schedules";
+export type { OccurrenceLinkRow, ScheduleRow } from "./schedules";
 export { auditLog, inboxDecisions, settings } from "./records";

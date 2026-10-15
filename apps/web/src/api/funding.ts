@@ -27,16 +27,30 @@ export function fundingMonthsQuery() {
   });
 }
 
-/** True when the answer of a fill shows a payment or a new emergency bucket. The rule in `main.tsx` reads only such a fill. */
+/** True when the answer of a fill shows a payment, a new emergency bucket or a new link. The rule in `main.tsx` reads only such a fill. */
 export function fillPaid(result: unknown): boolean {
-  return typeof result === "object" && result !== null && "payments" in result && "madeBucket" in result && (result.payments !== 0 || result.madeBucket === true);
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    "payments" in result &&
+    "madeBucket" in result &&
+    "linked" in result &&
+    (result.payments !== 0 || result.madeBucket === true || result.linked !== 0)
+  );
 }
 
-/** The automatic fill (decision 0059). The browser sends the date of today. */
+/**
+ * The automatic fill (decision 0059). It first links the transactions that match an occurrence of a commitment or an
+ * income (decision 0062), because a link changes the balances. The browser sends the date of today.
+ */
 export function useFill() {
   return useMutation({
     meta: { fill: true },
-    mutationFn: () => unwrap(api.funding.fill.$post({ query: { asOf: localAsOf() } })),
+    mutationFn: async () => {
+      const asOf = localAsOf();
+      const { linked } = await unwrap(api.buckets["auto-link"].$post({ query: { asOf } }));
+      return { ...(await unwrap(api.funding.fill.$post({ query: { asOf } }))), linked };
+    },
   });
 }
 

@@ -8,7 +8,7 @@ describe("edit url", () => {
       id: "6b1e0c4a-1111-4222-8333-444455556666",
     });
     expect(parseEditParam("account:new")).toEqual({ kind: "account", id: null });
-    expect(formatEditParam("plan", null)).toBe("plan:new");
+    expect(formatEditParam("commitment", null)).toBe("commitment:new");
     expect(formatEditParam("tag", "tag-1")).toBe("tag:tag-1");
   });
 

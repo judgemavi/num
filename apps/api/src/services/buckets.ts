@@ -1,8 +1,9 @@
-import { bucketCategories, buckets, categories, type BucketRow } from "@num/db";
+import { bucketCategories, buckets, categories, schedules, type BucketRow } from "@num/db";
 import {
   bucketWriteSchema,
   emergencyDefaults,
   foldName,
+  hasSchedule,
   isIsoDate,
   kindFieldsValid,
   nextBucketColor,
@@ -13,14 +14,16 @@ import {
   type BucketUpdate,
   type BucketWrite,
   type OverspentBucket,
+  type Schedule,
 } from "@num/shared";
-import { eq, inArray, isNotNull, isNull, max } from "drizzle-orm";
+import { asc, desc, eq, inArray, isNotNull, isNull, max, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
 import { mergedWrite } from "./patch";
 import { withoutId, write, type WriteTx, type WriteInput, type Reader } from "./write";
 import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
+import { assertScheduleRefs, putSchedule, scheduleOf } from "./schedules";
 import { requireWholeAmounts } from "./book-step";
 
 /** The route schema uses the same rule. This check is for callers that are not routes. */
@@ -55,13 +58,27 @@ function allCategoryIds(db: Reader) {
 
 type BucketFields = Omit<BucketRow, "sortKey">;
 
-/** The audit log keeps the bucket row without its id, and the categories of the bucket. */
-function snapshot(row: BucketFields, categoryIds: string[]) {
-  return { ...withoutId(row), categoryIds };
+/** The audit log keeps the bucket row without its id, the categories of the bucket and its schedule. */
+function snapshot(row: BucketFields, categoryIds: string[], schedule: Schedule | null) {
+  return { ...withoutId(row), categoryIds, schedule };
 }
 
-function toBucket({ startDate, ...row }: BucketFields, categoryIds: string[], balance: number): Bucket {
-  return { ...row, categoryIds, startDate, balance };
+function toBucket({ startDate, ...row }: BucketFields, categoryIds: string[], schedule: Schedule | null, balance: number): Bucket {
+  return { ...row, categoryIds, schedule, startDate, balance };
+}
+
+function allSchedules(db: Reader) {
+  return new Map(
+    db
+      .select()
+      .from(schedules)
+      .all()
+      .map(({ bucketId, ...fields }) => [bucketId, fields] as const),
+  );
+}
+
+function scheduleAmounts(schedule: Schedule | null | undefined) {
+  return [schedule?.expectedAmount, schedule?.tolerance];
 }
 
 function replaceCategories(tx: WriteTx, bucketId: string, categoryIds: string[]) {
@@ -137,8 +154,11 @@ export function readBucket(db: Reader, id: string): Bucket {
     throw new ServiceError("bucket_not_found", 404);
   }
   const balance = bucketBalances(db).get(id) ?? 0;
-  return toBucket(row, categoryIdsFor(db, id), balance);
+  return toBucket(row, categoryIdsFor(db, id), scheduleOf(db, id), balance);
 }
+
+/** Priority sort: the direction applies to the priority. A commitment comes first in a tie, then the id (decision 0062 item 8). */
+const dir = (column: typeof buckets.priority, direction: "asc" | "desc" | undefined) => (direction === "desc" ? desc(column) : asc(column));
 
 function bucketCount(db: Reader) {
   return totalOf(db, buckets, undefined);
@@ -147,13 +167,18 @@ function bucketCount(db: Reader) {
 export function listBuckets(db: Db, query: BucketListQuery) {
   const balances = bucketBalances(db);
   const categoriesByBucket = allCategoryIds(db);
+  const schedulesByBucket = allSchedules(db);
   const where = query.archived ? isNotNull(buckets.archivedAt) : isNull(buckets.archivedAt);
   const sort = query.sort ?? "priority";
   const order =
-    sort === "name" ? byName(buckets, query.dir) : byColumn(sort === "kind" ? buckets.kind : buckets.priority, buckets.id, query.dir);
+    sort === "name"
+      ? byName(buckets, query.dir)
+      : sort === "kind"
+        ? byColumn(buckets.kind, buckets.id, query.dir)
+        : [dir(buckets.priority, query.dir), desc(sql`${buckets.kind} = 'commitment'`), asc(buckets.id)];
   const { limit, offset } = windowOf(query);
   const rows = db.select().from(buckets).where(where).orderBy(...order).limit(limit).offset(offset).all();
-  const items = rows.map((row) => toBucket(withoutSortKey(row), categoriesByBucket.get(row.id) ?? [], balances.get(row.id) ?? 0));
+  const items = rows.map((row) => toBucket(withoutSortKey(row), categoriesByBucket.get(row.id) ?? [], schedulesByBucket.get(row.id) ?? null, balances.get(row.id) ?? 0));
   return { ...pagedOf(items, totalOf(db, buckets, where), query), nextColor: nextBucketColor(bucketCount(db)) };
 }
 
@@ -194,12 +219,16 @@ function insertBucket(tx: WriteTx, input: BucketCreate & { asOf: string }): stri
   const row = rowValues(id, { ...input, startDate: input.startDate ?? input.asOf }, null);
   tx.insert(buckets).values({ ...row, sortKey: foldName(row.name) }).run();
   const categoryIds = replaceCategories(tx, id, input.categoryIds);
+  if (input.schedule && hasSchedule(input.kind)) {
+    assertScheduleRefs(tx, input.kind, input.schedule);
+    putSchedule(tx, id, input.schedule);
+  }
   tx.audit({
     entity: "buckets",
     entityId: id,
     action: "create",
     before: null,
-    after: snapshot(row, categoryIds),
+    after: snapshot(row, categoryIds, input.schedule),
   });
   return id;
 }
@@ -227,6 +256,7 @@ export function insertEmergencyBucket(tx: WriteTx, asOf: string): string {
     target: null,
     targetDate: null,
     fixedAmount: null,
+    schedule: null,
     ...emergencyDefaults,
     asOf,
   });
@@ -234,36 +264,47 @@ export function insertEmergencyBucket(tx: WriteTx, asOf: string): string {
 
 export function createBucket(db: Db, input: BucketCreate & WriteInput & { asOf: string }): Bucket {
   assertKindFields(input);
-  requireWholeAmounts(db, [input.refillTo, input.amount, input.target, input.fixedAmount]);
+  requireWholeAmounts(db, [input.refillTo, input.amount, input.target, input.fixedAmount, ...scheduleAmounts(input.schedule)]);
   if (!isIsoDate(input.asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
   }
   return write(db, { source: input.source, at: input.at }, (tx) => readBucket(tx, insertBucket(tx, input)));
 }
 
+/** A bucket keeps its family: a commitment, an income, the emergency fund, or a spending, sinking or goal bucket. */
+function sameFamily(left: BucketRow["kind"], right: BucketRow["kind"]) {
+  const family = (kind: BucketRow["kind"]) => (kind === "spending" || kind === "sinking" || kind === "goal" ? "plain" : kind);
+  return family(left) === family(right);
+}
+
 /** A PATCH: a field that the patch leaves out keeps its stored value. The kind fields are checked on the result. */
 export function updateBucket(db: Db, id: string, input: BucketUpdate & WriteInput): Bucket {
   // Only the amounts in the patch. A stored amount is not checked again (decision 0040).
-  requireWholeAmounts(db, [input.refillTo, input.amount, input.target, input.fixedAmount]);
+  requireWholeAmounts(db, [input.refillTo, input.amount, input.target, input.fixedAmount, ...scheduleAmounts(input.schedule)]);
   return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = withoutSortKey(tx.select().from(buckets).where(eq(buckets.id, id)).get());
     if (!existing) {
       throw new ServiceError("bucket_not_found", 404);
     }
     const beforeIds = categoryIdsFor(tx, id);
-    const next = mergedWrite(bucketWriteSchema, { ...existing, categoryIds: beforeIds }, input);
-    if ((next.kind === "emergency") !== (existing.kind === "emergency")) {
-      throw new ServiceError("bucket_fields_invalid", 400);
+    const beforeSchedule = scheduleOf(tx, id);
+    const next = mergedWrite(bucketWriteSchema, { ...existing, categoryIds: beforeIds, schedule: beforeSchedule }, input);
+    if (!sameFamily(existing.kind, next.kind)) {
+      throw new ServiceError("bucket_fields_invalid", 400, { field: "kind" });
     }
     const row = rowValues(id, next, existing.archivedAt);
     tx.update(buckets).set({ ...withoutId(row), sortKey: foldName(row.name) }).where(eq(buckets.id, id)).run();
     const categoryIds = replaceCategories(tx, id, next.categoryIds);
+    if (next.schedule && hasSchedule(next.kind)) {
+      assertScheduleRefs(tx, next.kind, next.schedule);
+      putSchedule(tx, id, next.schedule);
+    }
     tx.audit({
       entity: "buckets",
       entityId: id,
       action: "update",
-      before: snapshot(existing, beforeIds),
-      after: snapshot(row, categoryIds),
+      before: snapshot(existing, beforeIds, beforeSchedule),
+      after: snapshot(row, categoryIds, next.schedule),
     });
     return readBucket(tx, id);
   });
@@ -284,6 +325,7 @@ export function archiveBucket(db: Db, id: string, input: WriteInput): Bucket {
       throw new ServiceError("bucket_balance", 409);
     }
     const categoryIds = categoryIdsFor(tx, id);
+    const schedule = scheduleOf(tx, id);
     tx.delete(bucketCategories).where(eq(bucketCategories.bucketId, id)).run();
     const next = { ...existing, archivedAt: at };
     tx.update(buckets).set({ archivedAt: at }).where(eq(buckets.id, id)).run();
@@ -291,8 +333,8 @@ export function archiveBucket(db: Db, id: string, input: WriteInput): Bucket {
       entity: "buckets",
       entityId: id,
       action: "archive",
-      before: snapshot(existing, categoryIds),
-      after: snapshot(next, []),
+      before: snapshot(existing, categoryIds, schedule),
+      after: snapshot(next, [], schedule),
     });
     return readBucket(tx, id);
   });
@@ -308,14 +350,15 @@ export function restoreBucket(db: Db, id: string, input: WriteInput): Bucket {
       throw new ServiceError("bucket_not_archived", 409);
     }
     const categoryIds = categoryIdsFor(tx, id);
+    const schedule = scheduleOf(tx, id);
     const next = { ...existing, archivedAt: null };
     tx.update(buckets).set({ archivedAt: null }).where(eq(buckets.id, id)).run();
     tx.audit({
       entity: "buckets",
       entityId: id,
       action: "restore",
-      before: snapshot(existing, categoryIds),
-      after: snapshot(next, categoryIds),
+      before: snapshot(existing, categoryIds, schedule),
+      after: snapshot(next, categoryIds, schedule),
     });
     return readBucket(tx, id);
   });

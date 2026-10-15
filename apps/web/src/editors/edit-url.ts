@@ -6,7 +6,8 @@ export const recordEditorKinds = [
   "tag",
   "merchant",
   "bucket",
-  "plan",
+  "commitment",
+  "income",
 ] as const;
 
 export type RecordEditorKind = (typeof recordEditorKinds)[number];

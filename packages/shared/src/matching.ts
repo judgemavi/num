@@ -36,7 +36,7 @@ export type LearnedScore<Label extends string | null = string> = {
 export type MatchLevel = "automatic" | "suggestion" | "none";
 
 export type RecurringSignal = {
-  planId: string;
+  bucketId: string;
   categoryId: string | null;
   merchantId: string | null;
   transferAccountId: string | null;
@@ -242,7 +242,7 @@ function collectSignals(input: ScoreInput) {
       merchantId: input.recurring.merchantId,
       transferAccountId: input.recurring.transferAccountId,
       keep: false,
-      sourceId: input.recurring.planId,
+      sourceId: input.recurring.bucketId,
     });
     return signals;
   }
@@ -254,7 +254,7 @@ function collectSignals(input: ScoreInput) {
       merchantId: input.recurring.merchantId,
       transferAccountId: null,
       keep: false,
-      sourceId: input.recurring.planId,
+      sourceId: input.recurring.bucketId,
     });
     return signals;
   }
@@ -266,7 +266,7 @@ function collectSignals(input: ScoreInput) {
       merchantId: null,
       transferAccountId: input.recurring.transferAccountId,
       keep: false,
-      sourceId: input.recurring.planId,
+      sourceId: input.recurring.bucketId,
     });
   }
   pushLearned(signals, input.amountScores, "learned_amount", 1);

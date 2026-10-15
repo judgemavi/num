@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { merchants, migrateDatabase, openDatabase, recurringPlans, settings, transactions } from "@num/db";
+import { merchants, migrateDatabase, openDatabase, schedules, settings, transactions } from "@num/db";
 import { storedPayee } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
@@ -11,7 +11,7 @@ import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { mergeMerchants } from "./merchant-merge";
 import { createMerchant } from "./merchants";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 
 const at = "2026-10-07T16:00:00Z";
 
@@ -45,9 +45,9 @@ test("merge moves transactions and plans, then archives the source", () => {
     const category = createCategory(db, { name: "Coffee", kind: "expense", source: "ui", at });
     const source = createMerchant(db, { name: "Cafe North", source: "ui", at });
     const target = createMerchant(db, { name: "Cafe South", source: "ui", at });
-    const plan = createPlan(db, {
+    const plan = createSchedule(db, {
       name: "Coffee",
-      kind: "bill",
+      kind: "commitment",
       accountId: account.id,
       expectedAmount: -5000,
       tolerance: 0,
@@ -59,8 +59,7 @@ test("merge moves transactions and plans, then archives the source", () => {
       interval: 1,
       monthDay: 15,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       source: "ui",
       at,
     });
@@ -81,7 +80,7 @@ test("merge moves transactions and plans, then archives the source", () => {
     const kept = mergeMerchants(db, source.id, target.id, { source: "ui", at });
     expect(kept.id).toBe(target.id);
     expect(db.select().from(transactions).where(eq(transactions.id, txnId)).get()?.merchantId).toBe(target.id);
-    expect(db.select().from(recurringPlans).where(eq(recurringPlans.id, plan.id)).get()?.merchantId).toBe(target.id);
+    expect(db.select().from(schedules).where(eq(schedules.bucketId, plan.id)).get()?.merchantId).toBe(target.id);
     expect(db.select().from(merchants).where(eq(merchants.id, source.id)).get()?.archivedAt).toBe(at);
   } finally {
     close();

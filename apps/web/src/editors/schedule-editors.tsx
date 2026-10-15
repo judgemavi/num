@@ -1,8 +1,9 @@
-import type { PlanKind } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { bucketQuery } from "@/api/buckets";
 import { errorCode } from "@/api/client";
-import { planQuery, useLinkOccurrence, useSkipOccurrence } from "@/api/recurring";
+import { useLinkOccurrence, useSkipOccurrence } from "@/api/schedules";
 import { linkCandidatesQuery } from "@/api/transactions";
+import { bucketError } from "@/buckets/format";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FieldError } from "@/components/ui/field";
@@ -11,23 +12,23 @@ import type { EditorInput } from "@/editors/editor-types";
 import { DialogBody } from "@/editors/form-chrome";
 import { useAppForm } from "@/forms/form-hook";
 import { fieldValue } from "@/forms/form-values";
-import { planError } from "@/recurring/format";
-import { PlanForm } from "@/recurring/plan-form";
+import { ScheduleForm } from "@/schedules/schedule-form";
 import { formatDate } from "@/transactions/format";
 
-export function PlanEditor({ id, seed, kind }: EditorInput["plan"]) {
-  if (id === null) {
-    return <PlanForm draft={seed ?? "new"} initialKind={kind} />;
-  }
-  return <SavedPlan id={id} initialKind={kind} />;
+export function CommitmentEditor({ id, seed }: EditorInput["commitment"]) {
+  return id === null ? <ScheduleForm kind="commitment" draft={seed ?? "new"} /> : <SavedSchedule id={id} kind="commitment" />;
 }
 
-function SavedPlan({ id, initialKind }: { id: string; initialKind?: PlanKind }) {
-  const { data: plan } = useSuspenseQuery(planQuery(id));
-  return <PlanForm draft={plan} initialKind={initialKind} />;
+export function IncomeEditor({ id, seed }: EditorInput["income"]) {
+  return id === null ? <ScheduleForm kind="income" draft={seed ?? "new"} /> : <SavedSchedule id={id} kind="income" />;
 }
 
-export function SkipOccurrenceEditor({ planId, dueDate }: EditorInput["skipOccurrence"]) {
+function SavedSchedule({ id, kind }: { id: string; kind: "commitment" | "income" }) {
+  const { data: bucket } = useSuspenseQuery(bucketQuery(id));
+  return <ScheduleForm kind={kind} draft={bucket} />;
+}
+
+export function SkipOccurrenceEditor({ bucketId, dueDate }: EditorInput["skipOccurrence"]) {
   const { close } = useEditorFrame();
   const skipOccurrence = useSkipOccurrence();
   const form = useAppForm({
@@ -37,10 +38,10 @@ export function SkipOccurrenceEditor({ planId, dueDate }: EditorInput["skipOccur
     },
     onSubmit: async ({ value, formApi }) => {
       try {
-        await skipOccurrence.mutateAsync({ planId, dueDate, reason: value.reason.trim() });
+        await skipOccurrence.mutateAsync({ bucketId, dueDate, reason: value.reason.trim() });
         close("ok");
       } catch (error) {
-        formApi.setErrorMap({ onSubmit: { form: planError(errorCode(error)), fields: {} } });
+        formApi.setErrorMap({ onSubmit: { form: bucketError(errorCode(error)), fields: {} } });
       }
     },
   });
@@ -73,7 +74,7 @@ export function SkipOccurrenceEditor({ planId, dueDate }: EditorInput["skipOccur
   );
 }
 
-export function LinkOccurrenceEditor({ planId, accountId, dueDate }: EditorInput["linkOccurrence"]) {
+export function LinkOccurrenceEditor({ bucketId, accountId, dueDate }: EditorInput["linkOccurrence"]) {
   const { close } = useEditorFrame();
   const { data: candidates } = useSuspenseQuery(linkCandidatesQuery(accountId, dueDate));
   const linkOccurrence = useLinkOccurrence();
@@ -87,10 +88,10 @@ export function LinkOccurrenceEditor({ planId, accountId, dueDate }: EditorInput
         return;
       }
       try {
-        await linkOccurrence.mutateAsync({ planId, dueDate, transactionId: value.transactionId });
+        await linkOccurrence.mutateAsync({ bucketId, dueDate, transactionId: value.transactionId });
         close("ok");
       } catch (error) {
-        formApi.setErrorMap({ onSubmit: { form: planError(errorCode(error)), fields: {} } });
+        formApi.setErrorMap({ onSubmit: { form: bucketError(errorCode(error)), fields: {} } });
       }
     },
   });

@@ -68,7 +68,7 @@ test("signals for one candidate combine and a small lead stays a suggestion", ()
 test("a recurring category label is automatic and a transfer is not", () => {
   const labeled = score({
     recurring: {
-      planId: "plan",
+      bucketId: "plan",
       categoryId: "rent",
       merchantId: "landlord",
       transferAccountId: null,
@@ -84,7 +84,7 @@ test("a recurring category label is automatic and a transfer is not", () => {
 
   const transfer = score({
     recurring: {
-      planId: "plan",
+      bucketId: "plan",
       categoryId: null,
       merchantId: null,
       transferAccountId: "savings",
@@ -99,7 +99,7 @@ test("a recurring category label is automatic and a transfer is not", () => {
 test("a recurring mortgage item is an automatic split", () => {
   const result = score({
     recurring: {
-      planId: "plan",
+      bucketId: "plan",
       categoryId: null,
       merchantId: null,
       transferAccountId: "mortgage",

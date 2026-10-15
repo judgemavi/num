@@ -125,6 +125,7 @@ test("each expense category is in one bucket only", () => {
       fixedAmount: null,
       months: null,
       fillMonths: null,
+      schedule: null,
       startDate: "2000-01-01",
       ...saved,
     });
@@ -145,6 +146,7 @@ test("each expense category is in one bucket only", () => {
       fixedAmount: null,
       months: null,
       fillMonths: null,
+      schedule: null,
       startDate: "2000-01-01",
       ...saved,
     });
@@ -212,6 +214,7 @@ test("kind fields that do not match the kind are rejected", () => {
           fixedAmount: null,
           months: null,
           fillMonths: null,
+          schedule: null,
           asOf: "2000-01-01",
           ...saved,
         }),
@@ -236,6 +239,7 @@ test("kind fields that do not match the kind are rejected", () => {
           fixedAmount: 200,
           months: null,
           fillMonths: null,
+          schedule: null,
           asOf: "2000-01-01",
           ...saved,
         }),

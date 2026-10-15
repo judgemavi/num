@@ -11,7 +11,7 @@ import { createCategory } from "./categories";
 import { decisionRows } from "./inbox-decisions";
 import { listNeedsReview } from "./needs-review";
 import { linkOccurrence } from "./recurring-links";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { listReviewTransactions } from "./transaction-list";
 import { acceptLooksRight, createTransaction, getTransaction, updateTransaction } from "./transactions";
 
@@ -102,9 +102,9 @@ test("Save with No purchase records not_linked and the refund question does not 
 });
 
 function bill(db: Db, accountId: string, name: string, day: number, categoryId: string | null) {
-  return createPlan(db, {
+  return createSchedule(db, {
     name,
-    kind: "bill",
+    kind: "commitment",
     accountId,
     expectedAmount: -10_000,
     tolerance: 0,
@@ -118,8 +118,7 @@ function bill(db: Db, accountId: string, name: string, day: number, categoryId: 
     monthDay: day,
     businessDayShift: "none",
     endDate: `2026-03-${day}`,
-    active: true,
-    fundsBuckets: false,
+    payday: false,
     ...saved,
   });
 }
@@ -130,8 +129,8 @@ test("Save with Payment for links the transaction to the occurrence", () => {
     const first = pay(db, ids.cash, "2026-03-20", -10_000, "Phone a", ids.food);
     const second = pay(db, ids.cash, "2026-03-21", -10_000, "Phone b", ids.food);
     expect(questionOf(db, first.id)).toBe("recurring_ambiguous");
-    updateTransaction(db, first.id, { answer: { question: "recurring_ambiguous", planId: plan.id, dueDate: "2026-03-20" }, ...saved });
-    const link = db.select().from(occurrenceLinks).where(eq(occurrenceLinks.planId, plan.id)).get();
+    updateTransaction(db, first.id, { answer: { question: "recurring_ambiguous", bucketId: plan.id, dueDate: "2026-03-20" }, ...saved });
+    const link = db.select().from(occurrenceLinks).where(eq(occurrenceLinks.bucketId, plan.id)).get();
     expect(link?.transactionId).toBe(first.id);
     expect(link?.dueDate).toBe("2026-03-20");
     expect(questionOf(db, first.id)).toBeUndefined();

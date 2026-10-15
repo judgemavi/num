@@ -12,7 +12,7 @@ import { createBucket } from "../services/buckets";
 import { listCategories } from "../services/categories";
 import { importStatement } from "../services/imports";
 import { createMerchant } from "../services/merchants";
-import { createPlan } from "../services/recurring-plans";
+import { createSchedule } from "../services/schedule-test-book";
 import { runSetup } from "../services/setup";
 import { createTransaction } from "../services/transactions";
 
@@ -141,12 +141,13 @@ function seed(db: Db, dir: string) {
     fixedAmount: null,
     months: null,
     fillMonths: null,
+    schedule: null,
     asOf: "2000-01-01",
     ...saved,
   });
-  const plan = createPlan(db, {
+  const plan = createSchedule(db, {
     name: "Rent",
-    kind: "bill",
+    kind: "commitment",
     accountId: account.id,
     expectedAmount: -900_000,
     tolerance: 0,
@@ -157,8 +158,7 @@ function seed(db: Db, dir: string) {
     interval: 1,
     monthDay: 15,
     businessDayShift: "none",
-    active: true,
-    fundsBuckets: false,
+    payday: false,
     ...saved,
   });
   const imported = importStatement(db, dir, {
@@ -174,13 +174,13 @@ function seed(db: Db, dir: string) {
   if (imported.kind !== "batch") {
     throw new Error("Expected an import batch");
   }
-  return { accountId: account.id, planId: plan.id };
+  return { accountId: account.id, bucketId: plan.id };
 }
 
 test("a read tool returns the same data as REST", async () => {
   const book = tempBook();
   try {
-    const { accountId, planId } = seed(book.db, book.dir);
+    const { accountId, bucketId } = seed(book.db, book.dir);
     const cases: [string, Record<string, unknown>, string][] = [
       ["list_accounts", { sort: "name", dir: "asc" }, "/api/accounts?sort=name&dir=asc"],
       [
@@ -192,8 +192,7 @@ test("a read tool returns the same data as REST", async () => {
       ["list_category_groups", {}, "/api/category-groups"],
       ["list_merchants", {}, "/api/merchants"],
       ["list_buckets", { sort: "name" }, "/api/buckets?sort=name"],
-      ["list_plans", { accountId, kind: "bill" }, `/api/recurring?accountId=${accountId}&kind=bill`],
-      ["list_occurrences", { id: planId, asOf }, `/api/recurring/${planId}/occurrences?asOf=${asOf}`],
+      ["list_occurrences", { id: bucketId, asOf }, `/api/buckets/${bucketId}/occurrences?asOf=${asOf}`],
       ["get_forecast", { asOf }, `/api/forecast?asOf=${asOf}`],
       ["get_insights", { asOf, window: "3" }, `/api/insights?asOf=${asOf}&window=3`],
       ["get_hygiene", { asOf }, `/api/hygiene?asOf=${asOf}`],
@@ -227,9 +226,9 @@ test("tools that need today require asOf", async () => {
 test("date tools reject a call without asOf", async () => {
   const book = tempBook();
   try {
-    const { planId } = seed(book.db, book.dir);
+    const { bucketId } = seed(book.db, book.dir);
     for (const name of ["list_occurrences", "get_forecast", "get_insights", "get_hygiene"] as const) {
-      const missing = await callTool(book.app, name, name === "list_occurrences" ? { id: planId } : {});
+      const missing = await callTool(book.app, name, name === "list_occurrences" ? { id: bucketId } : {});
       expect(missing.result?.isError).toBe(true);
       expect(missing.result?.structuredContent).toEqual({ code: "as_of_required", params: {} });
     }
@@ -281,7 +280,7 @@ test("an unknown tool or bad input returns an error code", async () => {
       asOf,
     });
     expect(missingPlan.result?.isError).toBe(true);
-    expect(missingPlan.result?.structuredContent).toEqual({ code: "plan_not_found", params: {} });
+    expect(missingPlan.result?.structuredContent).toEqual({ code: "schedule_not_found", params: {} });
   } finally {
     book.close();
   }

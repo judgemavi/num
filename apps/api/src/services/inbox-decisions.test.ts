@@ -17,7 +17,7 @@ import { listNeedsReview } from "./needs-review";
 import { recurringSignals } from "./recurring-view";
 import { createMerchant } from "./merchants";
 import { linkOccurrence, restoreSkip, skipOccurrence } from "./recurring-links";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction } from "./transactions";
 
 const at = "2026-10-07T16:00:00Z";
@@ -78,11 +78,11 @@ function hasKey(db: Db, asOfDate: string, itemKey: string): boolean {
     return true;
   }
   const signals = recurringSignals(db, asOfDate);
-  if (signals.missed.some((item) => `recurring_missed:${item.planId}:${item.dueDate}` === itemKey)) {
+  if (signals.missed.some((item) => `recurring_missed:${item.bucketId}:${item.dueDate}` === itemKey)) {
     return true;
   }
   // The Recurring screen shows a changed amount until its decision (decision 0047).
-  const changed = signals.changed.some((item) => `recurring_changed:${item.planId}:${item.dueDate}` === itemKey);
+  const changed = signals.changed.some((item) => `recurring_changed:${item.bucketId}:${item.dueDate}` === itemKey);
   if (changed && !decidedKeys(db).has(itemKey)) {
     return true;
   }
@@ -112,9 +112,9 @@ test("each no decision hides its review item until undo", () => {
     const pairKey = left.id < right.id ? `transfer_pair:${left.id}:${right.id}` : `transfer_pair:${right.id}:${left.id}`;
     roundTrip(sample.db, asOf, pairKey, "not_transfer");
 
-    const changedPlan = createPlan(sample.db, {
+    const changedPlan = createSchedule(sample.db, {
       name: "Stream",
-      kind: "bill",
+      kind: "commitment",
       accountId: cash.id,
       expectedAmount: -10000,
       tolerance: 0,
@@ -128,17 +128,16 @@ test("each no decision hides its review item until undo", () => {
       monthDay: 15,
       businessDayShift: "none",
       endDate: "2026-03-15",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       ...saved,
     });
     const changedPay = pay(sample.db, cash.id, "2026-03-15", -19990, "Stream", food.id);
     linkOccurrence(sample.db, changedPlan.id, "2026-03-15", changedPay.id, saved);
     roundTrip(sample.db, asOf, `recurring_changed:${changedPlan.id}:2026-03-15`, "keep_plan_amount");
 
-    const missedPlan = createPlan(sample.db, {
+    const missedPlan = createSchedule(sample.db, {
       name: "Gym",
-      kind: "bill",
+      kind: "commitment",
       accountId: cash.id,
       expectedAmount: -10000,
       tolerance: 0,
@@ -152,8 +151,7 @@ test("each no decision hides its review item until undo", () => {
       monthDay: 15,
       businessDayShift: "none",
       endDate: null,
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       ...saved,
     });
     const missedKey = `recurring_missed:${missedPlan.id}:2026-02-15`;

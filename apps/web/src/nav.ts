@@ -1,8 +1,8 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeftRight, ChartColumn, House, Landmark, Repeat, Settings, Wallet } from "lucide-react";
+import { ArrowLeftRight, ChartColumn, House, Landmark, Settings, Wallet } from "lucide-react";
 
 type NavItem = {
-  to: "/" | "/transactions" | "/buckets" | "/accounts" | "/insights" | "/recurring" | "/settings";
+  to: "/" | "/transactions" | "/buckets" | "/accounts" | "/insights" | "/settings";
   label: string;
   icon: LucideIcon;
 };
@@ -16,7 +16,6 @@ export const primaryNav = [
 
 export const moreNav = [
   { to: "/insights", label: "Insights", icon: ChartColumn },
-  { to: "/recurring", label: "Recurring", icon: Repeat },
 ] as const satisfies readonly NavItem[];
 
 export const settingsNav = { to: "/settings", label: "Settings", icon: Settings } as const satisfies NavItem;

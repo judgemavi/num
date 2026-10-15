@@ -26,7 +26,7 @@ const positionRoute = createRoute({
   request: { query: asOfQuerySchema },
   responses: {
     200: {
-      description: "On-budget total, bills reserved and Unassigned",
+      description: "On-budget total, Unassigned and the next payday",
       content: { "application/json": { schema: fundingPositionSchema } },
     },
     400: errorResponse,

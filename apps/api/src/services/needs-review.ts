@@ -182,8 +182,8 @@ export function listNeedsReview(
       };
     } else if (ambiguous) {
       review.question = "recurring_ambiguous";
-      review.itemKey = `recurring_ambiguous:${ambiguous.planId}:${ambiguous.dueDate}`;
-      review.recurring = { planId: ambiguous.planId, dueDate: ambiguous.dueDate };
+      review.itemKey = `recurring_ambiguous:${ambiguous.bucketId}:${ambiguous.dueDate}`;
+      review.recurring = { bucketId: ambiguous.bucketId, dueDate: ambiguous.dueDate };
     } else if (refundAsk) {
       review.question = "refund_purchase";
       review.itemKey = refundAsk.itemKey;

@@ -42,7 +42,7 @@ function isOpen(db: Db, asOf: string, itemKey: string) {
     case "transfer_pair":
       return listTransferPairs(db, asOf).items.some((pair) => pairKey(pair.leftId, pair.rightId) === itemKey);
     case "recurring_changed":
-      return recurringSignals(db, asOf).changed.some((item) => `recurring_changed:${item.planId}:${item.dueDate}` === itemKey);
+      return recurringSignals(db, asOf).changed.some((item) => `recurring_changed:${item.bucketId}:${item.dueDate}` === itemKey);
     case "plan_proposal":
       return recurringSignals(db, asOf).proposals.some((item) => planProposalKey(item) === itemKey);
     case "import_unreadable":

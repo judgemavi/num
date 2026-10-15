@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
 import { coverBucket, createBucketEvent } from "./bucket-events";
-import { createBucket, listOverspent } from "./buckets";
+import { createBucket, listOverspent, updateBucket } from "./buckets";
 import { createCategory } from "./categories";
 import { getImportDetail } from "./import-list";
 import { undoImportBatch } from "./import-undo";
@@ -18,7 +18,7 @@ import { decideInboxItem } from "./inbox-decisions";
 import { listNeedsReview } from "./needs-review";
 import { openUnreadableKeys } from "./book-settings";
 import { recurringSignals } from "./recurring-view";
-import { createPlan, updatePlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { linkOccurrence, skipOccurrence } from "./recurring-links";
 import { acceptTransferPair, listTransferPairs } from "./suggestions";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
@@ -106,8 +106,8 @@ function overspentIds(db: Db): string[] {
   return listOverspent(db).items.map((item) => item.id);
 }
 
-function dueKeys(items: { planId: string; dueDate: string }[]): string[] {
-  return items.map((item) => `${item.planId}:${item.dueDate}`);
+function dueKeys(items: { bucketId: string; dueDate: string }[]): string[] {
+  return items.map((item) => `${item.bucketId}:${item.dueDate}`);
 }
 
 function reviewRowIds(db: Db, batchId: string): string[] {
@@ -117,7 +117,7 @@ function reviewRowIds(db: Db, batchId: string): string[] {
 function planFields(accountId: string, merchantId: string | null, expectedAmount: number, startDate: string) {
   return {
     name: "Stream",
-    kind: "bill" as const,
+    kind: "commitment" as const,
     accountId,
     expectedAmount,
     tolerance: 0,
@@ -131,8 +131,7 @@ function planFields(accountId: string, merchantId: string | null, expectedAmount
     monthDay: 15,
     businessDayShift: "none" as const,
     endDate: startDate,
-    active: true,
-    fundsBuckets: false,
+    payday: false,
   };
 }
 
@@ -191,6 +190,7 @@ test("each review source appears and leaves after its action", () => {
       fixedAmount: null,
       months: null,
       fillMonths: null,
+      schedule: null,
       asOf: "2000-01-01",
       ...saved,
     });
@@ -211,6 +211,7 @@ test("each review source appears and leaves after its action", () => {
       fixedAmount: null,
       months: null,
       fillMonths: null,
+      schedule: null,
       asOf: "2000-01-01",
       ...saved,
     });
@@ -220,19 +221,20 @@ test("each review source appears and leaves after its action", () => {
     coverBucket(sample.db, meals.id, { fromBucketId: spare.id, date: asOf, ...saved });
     expect(overspentIds(sample.db)).toEqual([]);
 
-    const changedPlan = createPlan(sample.db, { ...planFields(cash.id, null, -10000, "2026-03-15"), ...saved });
+    const changedPlan = createSchedule(sample.db, { ...planFields(cash.id, null, -10000, "2026-03-15"), ...saved });
     const changedPay = pay(sample.db, cash.id, "2026-03-15", -19990, "Stream", food.id);
     linkOccurrence(sample.db, changedPlan.id, "2026-03-15", changedPay.id, saved);
     expect(dueKeys(recurringSignals(sample.db, asOf).changed)).toEqual([`${changedPlan.id}:2026-03-15`]);
-    updatePlan(sample.db, changedPlan.id, { ...planFields(cash.id, null, -19990, "2026-03-15"), name: changedPlan.name, ...saved });
+    const { name: _name, kind: _kind, ...raised } = planFields(cash.id, null, -19990, "2026-03-15");
+    updateBucket(sample.db, changedPlan.id, { schedule: raised, ...saved });
     expect(recurringSignals(sample.db, asOf).changed).toEqual([]);
 
-    const missedPlan = createPlan(sample.db, { ...planFields(cash.id, null, -10000, "2026-01-15"), endDate: null, name: "Gym", ...saved });
+    const missedPlan = createSchedule(sample.db, { ...planFields(cash.id, null, -10000, "2026-01-15"), endDate: null, name: "Gym", ...saved });
     expect(dueKeys(recurringSignals(sample.db, asOf).missed)).toContain(`${missedPlan.id}:2026-02-15`);
     skipOccurrence(sample.db, missedPlan.id, "2026-02-15", "Closed", saved);
     expect(dueKeys(recurringSignals(sample.db, asOf).missed)).not.toContain(`${missedPlan.id}:2026-02-15`);
 
-    const ambiguousPlan = createPlan(sample.db, { ...planFields(savings.id, null, -10000, "2026-03-15"), name: "Phone", ...saved });
+    const ambiguousPlan = createSchedule(sample.db, { ...planFields(savings.id, null, -10000, "2026-03-15"), name: "Phone", ...saved });
     const first = pay(sample.db, savings.id, "2026-03-15", -10000, "Phone a", food.id);
     const second = pay(sample.db, savings.id, "2026-03-16", -10000, "Phone b", food.id);
     expect(dueKeys(recurringSignals(sample.db, asOf).ambiguous)).toEqual([`${ambiguousPlan.id}:2026-03-15`]);
@@ -246,9 +248,9 @@ test("each review source appears and leaves after its action", () => {
     const proposal = recurringSignals(sample.db, asOf).proposals[0];
     expect(proposal).toBeDefined();
     if (proposal) {
-      createPlan(sample.db, {
+      createSchedule(sample.db, {
         name: "Stream",
-        kind: "bill",
+        kind: "commitment",
         accountId: proposal.accountId,
         expectedAmount: proposal.expectedAmount,
         tolerance: proposal.tolerance,
@@ -262,8 +264,7 @@ test("each review source appears and leaves after its action", () => {
         monthDay: proposal.monthDay,
         businessDayShift: "none",
         endDate: null,
-        active: true,
-        fundsBuckets: false,
+        payday: false,
         ...saved,
       });
     }
@@ -345,8 +346,8 @@ test("auto-link runs for the imported account after the import commits", () => {
   try {
     const cash = account(sample.db, "Cash");
     const other = account(sample.db, "Other");
-    const home = createPlan(sample.db, { ...planFields(cash.id, null, -12500, "2026-02-15"), name: "Hydro", ...saved });
-    const away = createPlan(sample.db, { ...planFields(other.id, null, -8000, "2026-02-15"), name: "Other bill", ...saved });
+    const home = createSchedule(sample.db, { ...planFields(cash.id, null, -12500, "2026-02-15"), name: "Hydro", ...saved });
+    const away = createSchedule(sample.db, { ...planFields(other.id, null, -8000, "2026-02-15"), name: "Other bill", ...saved });
     pay(sample.db, other.id, "2026-02-15", -8000, "Other bill", null);
     importStatement(sample.db, sample.dir, {
       source: "import",
@@ -359,8 +360,8 @@ test("auto-link runs for the imported account after the import commits", () => {
       columnMap: map,
     });
     const links = sample.db.select().from(occurrenceLinks).all();
-    expect(links.filter((link) => link.planId === home.id && link.transactionId)).toHaveLength(1);
-    expect(links.filter((link) => link.planId === away.id)).toHaveLength(0);
+    expect(links.filter((link) => link.bucketId === home.id && link.transactionId)).toHaveLength(1);
+    expect(links.filter((link) => link.bucketId === away.id)).toHaveLength(0);
     expect(sample.db.select().from(auditLog).where(eq(auditLog.entity, "occurrence_links")).all().some((row) => row.action === "link")).toBe(true);
   } finally {
     sample.close();
@@ -371,7 +372,7 @@ test("undo of an import removes occurrence links for the removed transactions", 
   const sample = book();
   try {
     const cash = account(sample.db, "Cash");
-    const plan = createPlan(sample.db, { ...planFields(cash.id, null, -12500, "2026-02-15"), name: "Hydro", ...saved });
+    const plan = createSchedule(sample.db, { ...planFields(cash.id, null, -12500, "2026-02-15"), name: "Hydro", ...saved });
     const imported = importStatement(sample.db, sample.dir, {
       source: "import",
       at,
@@ -383,11 +384,11 @@ test("undo of an import removes occurrence links for the removed transactions", 
       columnMap: map,
     });
     expect(imported.kind).toBe("batch");
-    expect(sample.db.select().from(occurrenceLinks).where(eq(occurrenceLinks.planId, plan.id)).all()).toHaveLength(1);
+    expect(sample.db.select().from(occurrenceLinks).where(eq(occurrenceLinks.bucketId, plan.id)).all()).toHaveLength(1);
     if (imported.kind === "batch") {
       undoImportBatch(sample.db, imported.id, saved);
     }
-    expect(sample.db.select().from(occurrenceLinks).where(eq(occurrenceLinks.planId, plan.id)).all()).toHaveLength(0);
+    expect(sample.db.select().from(occurrenceLinks).where(eq(occurrenceLinks.bucketId, plan.id)).all()).toHaveLength(0);
     expect(
       sample.db.select().from(auditLog).where(eq(auditLog.entity, "occurrence_links")).all().some((row) => row.action === "delete"),
     ).toBe(true);

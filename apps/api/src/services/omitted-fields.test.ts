@@ -3,13 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrateDatabase, openDatabase, settings } from "@num/db";
 import { expect, test } from "bun:test";
-import { planCreateSchema, planUpdateSchema } from "@num/shared";
 import { createDb, type Db } from "../db";
 import { createAccount, updateAccount } from "./accounts";
 import { createBucket, updateBucket } from "./buckets";
 import { createCategory } from "./categories";
 import { createMerchant } from "./merchants";
-import { createPlan, updatePlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction, updateTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at: "2026-10-07T16:00:00Z" };
@@ -117,106 +116,84 @@ test("a patch with the opening date and the opening balance changes only these f
   });
 });
 
-test("a plan update keeps the fields that it leaves out and clears the fields that are null", () => {
+const scheduleBody = (accountId: string) => ({
+  name: "Stream",
+  kind: "commitment" as const,
+  accountId,
+  expectedAmount: -10_000,
+  tolerance: 0,
+  amountMode: "fixed" as const,
+  startDate: "2026-01-15",
+  freq: "monthly" as const,
+  interval: 1,
+  businessDayShift: "none" as const,
+});
+
+test("a schedule update keeps the fields that it leaves out and replaces the schedule when it is given", () => {
   withBook((db) => {
     const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
     const category = createCategory(db, { name: "Example bills", kind: "expense", ...saved });
     const merchant = createMerchant(db, { name: "Example stream", ...saved });
-    const body = {
-      name: "Stream",
-      kind: "bill" as const,
-      accountId: account.id,
-      expectedAmount: -10_000,
-      tolerance: 0,
-      amountMode: "fixed" as const,
-      startDate: "2026-01-15",
-      freq: "monthly" as const,
-      interval: 1,
-      businessDayShift: "none" as const,
-      active: true,
-      fundsBuckets: false,
+    const commitment = createSchedule(db, {
+      ...scheduleBody(account.id),
+      categoryId: category.id,
+      merchantId: merchant.id,
+      monthDay: 15,
+      endDate: "2027-01-15",
       ...saved,
-    };
-    const plan = createPlan(db, { ...body, categoryId: category.id, merchantId: merchant.id, monthDay: 15, endDate: "2027-01-15" });
+    });
+    const schedule = commitment.schedule;
+    if (!schedule) {
+      throw new Error("The commitment has a schedule");
+    }
 
-    const kept = updatePlan(db, plan.id, { ...body, name: "Stream 2" });
-    expect(kept).toEqual({ ...plan, name: "Stream 2" });
+    const kept = updateBucket(db, commitment.id, { name: "Stream 2", ...saved });
+    expect(kept).toEqual({ ...commitment, name: "Stream 2" });
 
-    const cleared = updatePlan(db, plan.id, { ...body, categoryId: null, merchantId: null, monthDay: null, endDate: null });
-    expect(cleared).toEqual({ ...plan, categoryId: null, merchantId: null, monthDay: null, endDate: null });
+    const cleared = updateBucket(db, commitment.id, { schedule: { ...schedule, categoryId: null, merchantId: null, monthDay: null, endDate: null }, ...saved });
+    expect(cleared.schedule).toEqual({ ...schedule, categoryId: null, merchantId: null, monthDay: null, endDate: null });
   });
 });
 
-test("a plan update keeps `active` and `fundsBuckets` when it leaves them out", () => {
+test("an income keeps `payday` when the patch leaves the schedule out, and a commitment cannot have payday", () => {
   withBook((db) => {
     const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
-    const fields = {
-      name: "Pay",
-      kind: "income" as const,
-      accountId: account.id,
-      expectedAmount: 3_000_000,
-      tolerance: 0,
-      amountMode: "fixed" as const,
-      startDate: "2026-01-15",
-      freq: "monthly" as const,
-      interval: 1,
-      businessDayShift: "none" as const,
-    };
-    // The create schema gives the defaults. The update schema gives none.
-    expect(planCreateSchema.parse(fields)).toMatchObject({ active: true, fundsBuckets: false });
-    const omitted = planUpdateSchema.parse(fields);
-    expect(omitted.active).toBeUndefined();
-    expect(omitted.fundsBuckets).toBeUndefined();
-
-    const plan = createPlan(db, { ...fields, active: false, fundsBuckets: true, ...saved });
-    const kept = updatePlan(db, plan.id, { ...omitted, name: "Pay 2", ...saved });
-    expect(kept).toEqual({ ...plan, name: "Pay 2" });
-
-    const set = updatePlan(db, plan.id, { ...planUpdateSchema.parse({ ...fields, active: true, fundsBuckets: false }), ...saved });
-    expect(set.active).toBe(true);
-    expect(set.fundsBuckets).toBe(false);
-    expect(updatePlan(db, plan.id, { ...omitted, ...saved })).toEqual({ ...set });
-
-    const paused = updatePlan(db, plan.id, { ...omitted, active: false, fundsBuckets: true, ...saved });
-    expect(paused.active).toBe(false);
-    expect(paused.fundsBuckets).toBe(true);
-    // A plan that is not income cannot fund buckets. The check uses the stored value when the patch leaves it out.
-    expect(() => updatePlan(db, plan.id, { kind: "bill", expectedAmount: -10_000, ...saved })).toThrow(
-      expect.objectContaining({ code: "invalid_body", params: { field: "fundsBuckets" } }),
+    const income = createSchedule(db, { ...scheduleBody(account.id), name: "Pay", kind: "income", expectedAmount: 3_000_000, payday: true, ...saved });
+    expect(income.schedule?.payday).toBe(true);
+    expect(updateBucket(db, income.id, { name: "Pay 2", ...saved }).schedule?.payday).toBe(true);
+    const commitment = createSchedule(db, { ...scheduleBody(account.id), ...saved });
+    expect(() => updateBucket(db, commitment.id, { schedule: { ...scheduleBody(account.id), categoryId: null, transferAccountId: null, merchantId: null, monthDay: null, endDate: null, payday: true }, ...saved })).toThrow(
+      expect.objectContaining({ code: "invalid_body", params: { field: "schedule" } }),
     );
-    expect(updatePlan(db, plan.id, { kind: "bill", expectedAmount: -10_000, fundsBuckets: false, ...saved }).kind).toBe("bill");
+    // A commitment cannot become an income, and a plain bucket cannot get a schedule.
+    expect(() => updateBucket(db, commitment.id, { kind: "income", ...saved })).toThrow();
   });
 });
 
-test("a plan patch is checked with the stored fields that it leaves out", () => {
+test("a commitment is money out and an income is money in", () => {
   withBook((db) => {
     const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
-    const body = {
-      name: "Stream",
-      kind: "bill" as const,
-      accountId: account.id,
-      expectedAmount: -10_000,
-      tolerance: 0,
-      amountMode: "fixed" as const,
-      startDate: "2026-01-15",
-      interval: 1,
-      businessDayShift: "none" as const,
-      active: true,
-      fundsBuckets: false,
-      ...saved,
-    };
-    const plan = createPlan(db, { ...body, freq: "monthly", monthDay: 15 });
-    expect(() => updatePlan(db, plan.id, { freq: "weekly", ...saved })).toThrow(
-      expect.objectContaining({ code: "invalid_body", params: { field: "monthDay" } }),
-    );
-    expect(updatePlan(db, plan.id, { freq: "weekly", monthDay: null, ...saved }).monthDay).toBeNull();
-    expect(() => updatePlan(db, plan.id, { endDate: "2025-12-31", ...saved })).toThrow(
-      expect.objectContaining({ code: "invalid_body", params: { field: "endDate" } }),
-    );
-    expect(() => updatePlan(db, plan.id, { kind: "transfer", transferAccountId: account.id, ...saved })).toThrow(
-      expect.objectContaining({ code: "invalid_body", params: { field: "transferAccountId" } }),
-    );
-    expect(updatePlan(db, plan.id, { name: "Stream 2", ...saved })).toEqual({ ...plan, name: "Stream 2", freq: "weekly", monthDay: null });
+    const sign = expect.objectContaining({ code: "bucket_fields_invalid" });
+    expect(() => createSchedule(db, { ...scheduleBody(account.id), expectedAmount: 10_000, ...saved })).toThrow(sign);
+    expect(() => createSchedule(db, { ...scheduleBody(account.id), kind: "income", expectedAmount: -10_000, ...saved })).toThrow(sign);
+    expect(createSchedule(db, { ...scheduleBody(account.id), kind: "income", expectedAmount: 10_000, ...saved }).schedule?.expectedAmount).toBe(10_000);
+  });
+});
+
+test("a schedule patch is checked with the stored fields that it leaves out", () => {
+  withBook((db) => {
+    const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
+    const commitment = createSchedule(db, { ...scheduleBody(account.id), freq: "monthly", monthDay: 15, ...saved });
+    const schedule = commitment.schedule;
+    if (!schedule) {
+      throw new Error("The commitment has a schedule");
+    }
+    const patch = (fields: Partial<typeof schedule>) => updateBucket(db, commitment.id, { schedule: { ...schedule, ...fields }, ...saved });
+    expect(() => patch({ freq: "weekly" })).toThrow(expect.objectContaining({ code: "invalid_body", params: { field: "schedule" } }));
+    expect(patch({ freq: "weekly", monthDay: null }).schedule?.monthDay).toBeNull();
+    expect(() => patch({ endDate: "2025-12-31" })).toThrow(expect.objectContaining({ code: "invalid_body", params: { field: "schedule" } }));
+    expect(() => patch({ transferAccountId: account.id })).toThrow(expect.objectContaining({ code: "invalid_body", params: { field: "schedule" } }));
+    expect(updateBucket(db, commitment.id, { name: "Stream 2", ...saved })).toMatchObject({ name: "Stream 2", schedule: { freq: "weekly", monthDay: null } });
   });
 });
 
@@ -286,6 +263,7 @@ test("a bucket patch is checked with the stored kind fields", () => {
       fixedAmount: null,
       months: null,
       fillMonths: null,
+      schedule: null,
       asOf: "2026-03-01",
       ...saved,
     });

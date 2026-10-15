@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { bucketEventsQuery, bucketListQuery, emergencyFundQuery, overspentQuery } from "@/api/buckets";
 import { fundingMonthsQuery, fundingOwedQuery, fundingPositionQuery } from "@/api/funding";
 import { monthPlanQuery } from "@/api/plan";
+import { upcomingQuery } from "@/api/schedules";
 import { localAsOf } from "@/as-of";
 import { ActivityList } from "@/buckets/activity-list";
 import { BucketRow } from "@/buckets/bucket-row";
@@ -19,16 +20,20 @@ import { ListCard, ListGroup } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
 import { GoalFeasibility } from "@/plan/month-board";
+import { DetectedList } from "@/schedules/detected-list";
+import { ScheduleRow } from "@/schedules/schedule-row";
+import { UpcomingOccurrences } from "@/schedules/upcoming-list";
 
-const groupOrder: { kind: BucketKind; label: string }[] = [
-  { kind: "spending", label: "Spending" },
-  { kind: "sinking", label: "Saving for bills" },
-  { kind: "emergency", label: "Emergency fund" },
-  { kind: "goal", label: "Goals" },
+const groupOrder: { id: string; kinds: BucketKind[]; label: string }[] = [
+  { id: "income", kinds: ["income"], label: "Income" },
+  { id: "commitments", kinds: ["commitment"], label: "Commitments" },
+  { id: "spending", kinds: ["spending"], label: "Spending" },
+  { id: "savings", kinds: ["sinking", "emergency", "goal"], label: "Savings" },
 ];
 
 /** The screen puts the parts in their places and starts their reads together. Each part reads its own data. */
@@ -53,17 +58,25 @@ export function BucketsScreen() {
   );
 }
 
-/** The lists. The Overspent panel has a column only while Unassigned is below zero and a bucket is overspent. */
+/**
+ * The lists, and the side column: Detected, Upcoming and, while a bucket is overspent, Overspent. The automatic fill
+ * links the transactions that match an occurrence, and the reads load again when it links one.
+ */
 function BucketsBody() {
-  const overspent = useOverspent();
+  const asOf = localAsOf();
+  usePrefetchQuery(upcomingQuery(asOf));
   return (
-    <div className={`grid items-start gap-5 ${overspent.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_336px]" : ""}`}>
+    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
       <div className="grid gap-5">
         <BucketList />
         <FundingHistory />
         <ActivityList />
       </div>
-      <OverspentPanel />
+      <div className="grid gap-5">
+        <OverspentPanel />
+        <DetectedList />
+        <UpcomingOccurrences />
+      </div>
     </div>
   );
 }
@@ -80,10 +93,25 @@ function BucketsHeader() {
           <Button type="button" variant="secondary" onClick={() => void openEditor("moveMoney", { fromId: null })}>
             Move money
           </Button>
-          <Button type="button" onClick={() => void openEditor("bucket", { id: null })}>
-            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
-            New bucket
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button">
+                <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
+                New
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("bucket", { id: null })}>
+                New bucket
+              </DropdownMenuItem>
+              <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("commitment", { id: null })}>
+                New commitment
+              </DropdownMenuItem>
+              <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("income", { id: null })}>
+                New income
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </>
       }
     />
@@ -132,17 +160,17 @@ function BucketList() {
         <p className="px-5 py-5 text-muted-foreground">{shown.archived ? "No archived buckets." : "No buckets yet."}</p>
       ) : (
         groupOrder.map((group) => {
-          const items = rows.filter((bucket) => bucket.kind === group.kind);
+          const items = rows.filter((bucket) => group.kinds.includes(bucket.kind));
           if (items.length === 0) {
             return null;
           }
           const total = items.reduce((sum, bucket) => sum + bucket.balance, 0);
           return (
-            <div key={group.kind}>
+            <div key={group.id}>
               <ListGroup
                 label={group.label}
                 aside={
-                  group.kind === "spending" ? (
+                  group.id === "income" ? undefined : group.id === "spending" ? (
                     total < 0 ? (
                       <>
                         Over by <Amount value={-total} />
@@ -159,9 +187,9 @@ function BucketList() {
                   )
                 }
               />
-              {items.map((bucket) => (
-                <BucketRow key={bucket.id} bucket={bucket} />
-              ))}
+              {items.map((bucket) =>
+                bucket.schedule ? <ScheduleRow key={bucket.id} bucket={bucket} /> : <BucketRow key={bucket.id} bucket={bucket} />,
+              )}
             </div>
           );
         })

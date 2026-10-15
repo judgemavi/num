@@ -4,10 +4,16 @@ import { monthKeySchema } from "./month";
 import { archivedQuery, listQuerySchema, pagedResponseSchema } from "./list";
 import { isUtcTimestamp } from "./time";
 import { nonNegativeAmountSchema as money, positiveAmountSchema } from "./money";
+import { scheduleIssues, scheduleSchema, type Schedule } from "./schedule";
 
-export const bucketKinds = ["spending", "sinking", "goal", "emergency"] as const;
+export const bucketKinds = ["commitment", "income", "spending", "sinking", "goal", "emergency"] as const;
 
 export type BucketKind = (typeof bucketKinds)[number];
+
+/** A commitment and an income have a schedule (decision 0062). */
+export function hasSchedule(kind: BucketKind): kind is "commitment" | "income" {
+  return kind === "commitment" || kind === "income";
+}
 
 export const sinkingRepeats = ["none", "yearly"] as const;
 
@@ -48,6 +54,20 @@ export const bucketIcons = [
 
 export type BucketIcon = (typeof bucketIcons)[number];
 
+/** The order of buckets: the priority, then a commitment first, then the id (decision 0062 item 8). */
+export function comparePriority(
+  left: { priority: number; kind: BucketKind; id: string },
+  right: { priority: number; kind: BucketKind; id: string },
+): number {
+  if (left.priority !== right.priority) {
+    return left.priority - right.priority;
+  }
+  if ((left.kind === "commitment") !== (right.kind === "commitment")) {
+    return left.kind === "commitment" ? -1 : 1;
+  }
+  return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+}
+
 const nameSchema = z.string().trim().min(1);
 const monthCount = z.number().int().min(1).max(120);
 
@@ -71,6 +91,7 @@ const bucketFields = {
   fixedAmount: money.nullable(),
   months: monthCount.nullable(),
   fillMonths: monthCount.nullable(),
+  schedule: scheduleSchema.nullable(),
 };
 
 export function kindFieldsValid(value: {
@@ -85,8 +106,28 @@ export function kindFieldsValid(value: {
   fixedAmount: number | null;
   months: number | null;
   fillMonths: number | null;
+  schedule: Schedule | null;
 }): boolean {
   const emergency = value.months !== null && value.fillMonths !== null;
+  if (hasSchedule(value.kind)) {
+    return (
+      value.schedule !== null &&
+      scheduleIssues(value.kind, value.schedule).length === 0 &&
+      value.categoryIds.length === 0 &&
+      value.months === null &&
+      value.fillMonths === null &&
+      value.refillTo === null &&
+      value.amount === null &&
+      value.dueDate === null &&
+      value.repeat === null &&
+      value.target === null &&
+      value.targetDate === null &&
+      value.fixedAmount === null
+    );
+  }
+  if (value.schedule !== null) {
+    return false;
+  }
   if (value.kind === "emergency") {
     return (
       emergency &&
@@ -139,7 +180,15 @@ export function kindFieldsValid(value: {
 
 const bucketWriteFields = z.object(bucketFields);
 
-export const bucketWriteSchema = bucketWriteFields.refine(kindFieldsValid, { path: ["kind"] });
+function scheduleRules(value: { kind: BucketKind; schedule: Schedule | null }, context: z.RefinementCtx) {
+  if (value.schedule && hasSchedule(value.kind)) {
+    for (const field of scheduleIssues(value.kind, value.schedule)) {
+      context.addIssue({ code: "custom", path: ["schedule", field] });
+    }
+  }
+}
+
+export const bucketWriteSchema = bucketWriteFields.superRefine(scheduleRules).refine(kindFieldsValid, { path: ["kind"] });
 
 /** A PATCH body: only the fields that change. The API checks the kind fields on the stored bucket with the patch. */
 export const bucketUpdateSchema = bucketWriteFields.partial();
@@ -147,6 +196,7 @@ export const bucketUpdateSchema = bucketWriteFields.partial();
 // A new bucket can leave out startDate. Then the bucket starts on asOf (decision 0029).
 export const bucketCreateSchema = z
   .object({ ...bucketFields, startDate: isoDateSchema.optional() })
+  .superRefine(scheduleRules)
   .refine(kindFieldsValid, { path: ["kind"] });
 
 export const bucketSchema = z.object({

@@ -13,7 +13,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as BucketsRouteImport } from './routes/buckets'
 import { Route as InsightsRouteImport } from './routes/insights'
-import { Route as RecurringRouteImport } from './routes/recurring'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TransactionsRouteImport } from './routes/transactions'
 import { Route as AccountsAccountIdRouteImport } from './routes/accounts_.$accountId'
@@ -47,11 +46,6 @@ const BucketsRoute = BucketsRouteImport.update({
 const InsightsRoute = InsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RecurringRoute = RecurringRouteImport.update({
-  id: '/recurring',
-  path: '/recurring',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -130,7 +124,6 @@ export interface FileRoutesByFullPath {
   '/accounts': typeof AccountsRoute
   '/buckets': typeof BucketsRoute
   '/insights': typeof InsightsRoute
-  '/recurring': typeof RecurringRoute
   '/settings': typeof SettingsRouteWithChildren
   '/transactions': typeof TransactionsRoute
   '/accounts/$accountId': typeof AccountsAccountIdRoute
@@ -151,7 +144,6 @@ export interface FileRoutesByTo {
   '/accounts': typeof AccountsRoute
   '/buckets': typeof BucketsRoute
   '/insights': typeof InsightsRoute
-  '/recurring': typeof RecurringRoute
   '/transactions': typeof TransactionsRoute
   '/accounts/$accountId': typeof AccountsAccountIdRoute
   '/accounts/imports': typeof AccountsImportsRoute
@@ -172,7 +164,6 @@ export interface FileRoutesById {
   '/accounts': typeof AccountsRoute
   '/buckets': typeof BucketsRoute
   '/insights': typeof InsightsRoute
-  '/recurring': typeof RecurringRoute
   '/settings': typeof SettingsRouteWithChildren
   '/transactions': typeof TransactionsRoute
   '/accounts_/$accountId': typeof AccountsAccountIdRoute
@@ -195,7 +186,6 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/buckets'
     | '/insights'
-    | '/recurring'
     | '/settings'
     | '/transactions'
     | '/accounts/$accountId'
@@ -216,7 +206,6 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/buckets'
     | '/insights'
-    | '/recurring'
     | '/transactions'
     | '/accounts/$accountId'
     | '/accounts/imports'
@@ -236,7 +225,6 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/buckets'
     | '/insights'
-    | '/recurring'
     | '/settings'
     | '/transactions'
     | '/accounts_/$accountId'
@@ -258,7 +246,6 @@ export interface RootRouteChildren {
   AccountsRoute: typeof AccountsRoute
   BucketsRoute: typeof BucketsRoute
   InsightsRoute: typeof InsightsRoute
-  RecurringRoute: typeof RecurringRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   TransactionsRoute: typeof TransactionsRoute
   AccountsAccountIdRoute: typeof AccountsAccountIdRoute
@@ -295,13 +282,6 @@ declare module '@tanstack/react-router' {
       path: '/insights'
       fullPath: '/insights'
       preLoaderRoute: typeof InsightsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/recurring': {
-      id: '/recurring'
-      path: '/recurring'
-      fullPath: '/recurring'
-      preLoaderRoute: typeof RecurringRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -436,7 +416,6 @@ const rootRouteChildren: RootRouteChildren = {
   AccountsRoute: AccountsRoute,
   BucketsRoute: BucketsRoute,
   InsightsRoute: InsightsRoute,
-  RecurringRoute: RecurringRoute,
   SettingsRoute: SettingsRouteWithChildren,
   TransactionsRoute: TransactionsRoute,
   AccountsAccountIdRoute: AccountsAccountIdRoute,

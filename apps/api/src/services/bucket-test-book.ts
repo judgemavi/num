@@ -62,6 +62,7 @@ export function spending(db: Db, name: string, categoryIds: string[], refillTo =
     fixedAmount: null,
     months: null,
     fillMonths: null,
+    schedule: null,
     asOf: "2000-01-01",
     ...saved,
   });

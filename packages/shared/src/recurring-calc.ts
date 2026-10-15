@@ -1,12 +1,10 @@
 import { Temporal } from "temporal-polyfill";
 import { divideAmount } from "./currency";
 
-export const planKinds = ["income", "bill", "transfer"] as const;
 export const amountModes = ["fixed", "variable"] as const;
 export const planFrequencies = ["weekly", "monthly", "yearly"] as const;
 export const businessDayShifts = ["none", "next", "previous"] as const;
 
-export type PlanKind = (typeof planKinds)[number];
 export type AmountMode = (typeof amountModes)[number];
 export type PlanFrequency = (typeof planFrequencies)[number];
 export type BusinessDayShift = (typeof businessDayShifts)[number];
@@ -178,7 +176,7 @@ export function variableAmounts(
 }
 
 export type OpenOccurrence = {
-  planId: string;
+  bucketId: string;
   dueDate: string;
   accountId: string;
   merchantId: string | null;
@@ -195,19 +193,19 @@ export type LinkTransaction = {
 };
 
 export type UniqueLink = {
-  planId: string;
+  bucketId: string;
   dueDate: string;
   transactionId: string;
 };
 
 export type AmbiguousLink = {
-  planId: string;
+  bucketId: string;
   dueDate: string;
   transactionIds: string[];
 };
 
-function occurrenceKey(planId: string, dueDate: string) {
-  return `${planId}|${dueDate}`;
+function occurrenceKey(bucketId: string, dueDate: string) {
+  return `${bucketId}|${dueDate}`;
 }
 
 export function isLinkCandidate(
@@ -273,7 +271,7 @@ export function matchLinks(
   const byOccurrence = new Map<string, string[]>();
   const byTransaction = new Map<string, string[]>();
   for (const occurrence of occurrences) {
-    const key = occurrenceKey(occurrence.planId, occurrence.dueDate);
+    const key = occurrenceKey(occurrence.bucketId, occurrence.dueDate);
     const rows = byAccount.get(occurrence.accountId) ?? [];
     const from = Temporal.PlainDate.from(occurrence.dueDate).subtract({ days: graceDays }).toString();
     const to = Temporal.PlainDate.from(occurrence.dueDate).add({ days: graceDays }).toString();
@@ -294,16 +292,16 @@ export function matchLinks(
   const unique: UniqueLink[] = [];
   const ambiguous: AmbiguousLink[] = [];
   for (const occurrence of occurrences) {
-    const ids = byOccurrence.get(occurrenceKey(occurrence.planId, occurrence.dueDate)) ?? [];
+    const ids = byOccurrence.get(occurrenceKey(occurrence.bucketId, occurrence.dueDate)) ?? [];
     if (ids.length === 0) {
       continue;
     }
     const sole = ids.length === 1 ? ids[0] : undefined;
     if (sole && (byTransaction.get(sole)?.length ?? 0) === 1) {
-      unique.push({ planId: occurrence.planId, dueDate: occurrence.dueDate, transactionId: sole });
+      unique.push({ bucketId: occurrence.bucketId, dueDate: occurrence.dueDate, transactionId: sole });
       continue;
     }
-    ambiguous.push({ planId: occurrence.planId, dueDate: occurrence.dueDate, transactionIds: ids });
+    ambiguous.push({ bucketId: occurrence.bucketId, dueDate: occurrence.dueDate, transactionIds: ids });
   }
   return { unique, ambiguous };
 }

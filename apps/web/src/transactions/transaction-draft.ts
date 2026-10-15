@@ -89,7 +89,7 @@ export function transactionValues(categories: Category[], transaction: Transacti
     interest: interest ? amountText(Math.abs(interest.amount)) : "",
     interestCategoryId: interest?.categoryId ?? null,
     tagIds: [...new Set(transaction?.lines.flatMap((line) => line.tagIds) ?? [])],
-    /** The occurrence that the transaction pays: "planId:dueDate". Only for the question "Which payment is this?". */
+    /** The occurrence that the transaction pays: "bucketId:dueDate". Only for the question "Which payment is this?". */
     paymentFor: fieldValue<string | null>(null),
   };
 }

@@ -1,11 +1,12 @@
 import { bucketEvents, buckets, monthHolds, type BucketRow } from "@num/db";
-import { addDays, isIsoDate, monthlyAmount, utcNow, type MonthFunding, type Owed } from "@num/shared";
+import { addDays, comparePriority, isIsoDate, monthlyAmount, utcNow, type MonthFunding, type Owed } from "@num/shared";
 import { and, eq, isNull, isNotNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
 import { bucketBalances } from "./bucket-balance";
 import { monthlyEssential } from "./emergency-fund";
+import { commitmentsOf } from "./schedules";
 import { withoutId, write, type Reader, type WriteInput } from "./write";
 
 type MonthlyRow = { bucket: BucketRow; monthly: number; funded: number; owed: number };
@@ -52,12 +53,13 @@ export function monthlyRows(db: Reader, month: string): MonthlyRow[] {
     .from(buckets)
     .where(isNull(buckets.archivedAt))
     .all()
-    .filter((bucket) => bucket.startDate.slice(0, 7) <= month)
-    .sort((left, right) => left.priority - right.priority || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+    .filter((bucket) => bucket.kind !== "income" && bucket.startDate.slice(0, 7) <= month)
+    .sort(comparePriority);
   const essential = rows.some((bucket) => bucket.kind === "emergency") ? monthlyEssential(db, start).monthly : 0;
+  const commitments = commitmentsOf(db, start);
   return rows.map((bucket) => {
     const target = bucket.kind === "emergency" ? (bucket.months ?? 0) * essential : bucket.target;
-    const monthly = monthlyAmount({ ...bucket, target }, balances.get(bucket.id) ?? 0, month, step);
+    const monthly = monthlyAmount({ ...bucket, target, commitment: commitments.get(bucket.id) ?? null }, balances.get(bucket.id) ?? 0, month, step);
     const paid = funded.get(bucket.id) ?? 0;
     return { bucket, monthly, funded: paid, owed: Math.max(0, monthly - paid) };
   });

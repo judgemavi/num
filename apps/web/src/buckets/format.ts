@@ -1,6 +1,7 @@
-import { Temporal, parseAmount, type Bucket, type BucketColor, type BucketIcon, type ErrorCode } from "@num/shared";
+import { parseAmount, type Bucket, type BucketColor, type BucketIcon, type ErrorCode } from "@num/shared";
 import { errorCode } from "@/api/client";
 import { decimalsError, formatMoney } from "@/money";
+import { formatDate } from "@/transactions/format";
 
 const colors: Record<BucketColor, string> = {
   sky: "Blue",
@@ -40,14 +41,6 @@ export function colorLabel(color: BucketColor): string {
 
 export function iconLabel(icon: BucketIcon): string {
   return icons[icon];
-}
-
-export function formatDate(iso: string): string {
-  return Temporal.PlainDate.from(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 export function bucketDetail(bucket: Bucket, currency: string, essentialMonthly: number): string {
@@ -146,7 +139,34 @@ export function bucketError(code: ErrorCode | undefined): string {
     return "That is more than this bucket holds.";
   }
   if (code === "bucket_fields_invalid" || code === "invalid_body") {
-    return "Check the bucket fields.";
+    return "Check the details and try again.";
+  }
+  if (code === "schedule_not_found") {
+    return "That commitment or income is not in the book.";
+  }
+  if (code === "account_not_found" || code === "account_archived") {
+    return "Choose an account that is still in use.";
+  }
+  if (code === "merchant_not_found" || code === "merchant_archived") {
+    return "Choose a merchant that is still in use.";
+  }
+  if (code === "occurrence_not_found") {
+    return "That date is not on this schedule.";
+  }
+  if (code === "occurrence_taken") {
+    return "This occurrence already has a link or a skip.";
+  }
+  if (code === "transaction_already_linked") {
+    return "That transaction is already linked.";
+  }
+  if (code === "transaction_not_found") {
+    return "That transaction is not in the book.";
+  }
+  if (code === "link_not_found") {
+    return "This occurrence has no linked transaction.";
+  }
+  if (code === "skip_not_found") {
+    return "This occurrence is not skipped.";
   }
   return "That did not work. Try again.";
 }

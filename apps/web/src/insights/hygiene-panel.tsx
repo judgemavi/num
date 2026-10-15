@@ -37,15 +37,6 @@ function detail(check: HygieneCheck, currency: string) {
     }
     return `${check.oldCount} older than ${reviewAgeDays} days.`;
   }
-  if (check.code === "sinking_funds") {
-    if (check.yearly === 0) {
-      return "No yearly bills.";
-    }
-    if (check.missing.length === 0) {
-      return "Each yearly bill has a sinking fund.";
-    }
-    return `${check.missing.length} of ${check.yearly} yearly bills have no sinking fund.`;
-  }
   if (check.code === "savings_rate") {
     if (check.months.length === 0) {
       return "No complete month yet.";
@@ -68,7 +59,6 @@ const titles: Record<HygieneCheck["code"], string> = {
   emergency_fund: "Emergency fund",
   imports_current: "Imports are current",
   review: "Review",
-  sinking_funds: "Sinking funds",
   savings_rate: "Savings rate",
   recurring: "Recurring",
   overspent: "Buckets",
@@ -78,7 +68,6 @@ const places: Record<HygieneCheck["code"], string> = {
   emergency_fund: "Buckets",
   imports_current: "Imports",
   review: "Review",
-  sinking_funds: "Buckets",
   savings_rate: "Insights",
   recurring: "Home",
   overspent: "Buckets",
@@ -92,7 +81,7 @@ export function HygienePanel() {
   const failedCount = hygiene.checks.filter((item) => !item.pass).length;
 
   function open(check: HygieneCheck) {
-    if (check.code === "emergency_fund" || check.code === "sinking_funds" || check.code === "overspent") {
+    if (check.code === "emergency_fund" || check.code === "overspent") {
       void go({ to: "/buckets" });
       return;
     }

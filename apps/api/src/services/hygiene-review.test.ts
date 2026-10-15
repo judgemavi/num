@@ -9,7 +9,7 @@ import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { readHygiene } from "./hygiene";
 import { linkOccurrence } from "./recurring-links";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at: "2026-04-02T16:00:00Z" };
@@ -50,9 +50,9 @@ function check<T extends HygieneCheck["code"]>(db: Db, asOf: string, code: T): E
 function changedPlan(db: Db) {
   const cash = account(db, "chequing", "Cash", 50_000);
   const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-  const plan = createPlan(db, {
+  const plan = createSchedule(db, {
     name: "Stream",
-    kind: "bill",
+    kind: "commitment",
     accountId: cash.id,
     categoryId: food.id,
     expectedAmount: -10_000,
@@ -63,8 +63,7 @@ function changedPlan(db: Db) {
     interval: 1,
     monthDay: 15,
     businessDayShift: "none",
-    active: true,
-    fundsBuckets: false,
+    payday: false,
     ...saved,
   });
   const paid = createTransaction(db, {

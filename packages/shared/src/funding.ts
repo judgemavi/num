@@ -4,21 +4,14 @@ import type { BucketKind } from "./bucket";
 import { divideAmount } from "./currency";
 import { isoDateSchema } from "./date";
 import { monthKeySchema } from "./month";
+import { occurrenceDates, type PlanSchedule } from "./recurring-calc";
 import { amountSchema as money } from "./money";
 
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
-export const billReserveDays = 30;
-
 export function addDays(iso: string, days: number): string {
   return Temporal.PlainDate.from(iso).add({ days }).toString();
 }
-
-export type ReservedBill = {
-  dueDate: string;
-  amount: number;
-  linked: boolean;
-};
 
 export function nextIncomeDate(asOf: string, dates: readonly string[]): string | null {
   let next: string | null = null;
@@ -33,18 +26,6 @@ export function nextIncomeDate(asOf: string, dates: readonly string[]): string |
   return next;
 }
 
-export function billsReserved(asOf: string, bills: readonly ReservedBill[], nextIncome: string | null): number {
-  const end = nextIncome ?? addDays(asOf, billReserveDays);
-  let total = 0;
-  for (const bill of bills) {
-    if (bill.linked || bill.dueDate < asOf || bill.dueDate >= end) {
-      continue;
-    }
-    total += Math.abs(bill.amount);
-  }
-  return total;
-}
-
 export function positiveBalances(balances: readonly number[]): number {
   let total = 0;
   for (const balance of balances) {
@@ -55,8 +36,8 @@ export function positiveBalances(balances: readonly number[]): number {
   return total;
 }
 
-export function unassigned(onBudgetTotal: number, positiveBucketBalances: number, reserved: number): number {
-  return onBudgetTotal - positiveBucketBalances - reserved;
+export function unassigned(onBudgetTotal: number, positiveBucketBalances: number): number {
+  return onBudgetTotal - positiveBucketBalances;
 }
 
 /** The share of a shortfall for one month, rounded up to a whole number of minor units (`step`). */
@@ -70,8 +51,20 @@ export function roundUpShare(shortfall: number, months: number, step: number): n
   return divideAmount(shortfall, months, step, "up");
 }
 
+/** What the monthly amount of a commitment needs (decision 0062 item 5). `amount` is the safe amount, as a positive number. */
+export type MonthlyCommitment = {
+  schedule: PlanSchedule;
+  amount: number;
+  /** The due dates of the skipped occurrences. */
+  skipped: ReadonlySet<string>;
+  /** The date of the linked transaction of each paid occurrence, by due date. */
+  paid: ReadonlyMap<string, string>;
+};
+
 export type MonthlyBucket = {
   kind: BucketKind;
+  startDate: string;
+  commitment: MonthlyCommitment | null;
   refillTo: number | null;
   amount: number | null;
   dueDate: string | null;
@@ -106,7 +99,45 @@ function dueDateFor(bucket: MonthlyBucket, month: string): string | null {
   return due;
 }
 
+/** Monthly or more often: weekly up to every 4 weeks, or monthly every month. */
+function isFrequent(schedule: PlanSchedule) {
+  return (schedule.freq === "weekly" && schedule.interval <= 4) || (schedule.freq === "monthly" && schedule.interval === 1);
+}
+
+function periodAfter(date: string, schedule: PlanSchedule) {
+  const count = schedule.interval + 1;
+  const start = Temporal.PlainDate.from(date);
+  const end =
+    schedule.freq === "weekly" ? start.add({ weeks: count }) : schedule.freq === "monthly" ? start.add({ months: count }) : start.add({ years: count });
+  return end.toString();
+}
+
+/** The monthly amount of a commitment (decision 0062 item 5), from the occurrences on or after the start date of the bucket. */
+function commitmentAmount(bucket: MonthlyBucket, commitment: MonthlyCommitment, balance: number, month: string, step: number): number {
+  const monthFirst = `${month}-01`;
+  const from = bucket.startDate > monthFirst ? bucket.startDate : monthFirst;
+  const { schedule, skipped, paid } = commitment;
+  // A skipped occurrence is not counted. An occurrence that was paid before the month is already in the opening balance.
+  const counted = (item: { dueDate: string }) => !skipped.has(item.dueDate) && (paid.get(item.dueDate) ?? monthFirst) >= monthFirst;
+  if (isFrequent(schedule)) {
+    const monthLast = Temporal.PlainDate.from(monthFirst).with({ day: Temporal.PlainDate.from(monthFirst).daysInMonth }).toString();
+    const due = occurrenceDates(schedule, monthLast, from).filter(counted);
+    return Math.max(0, due.length * commitment.amount - balance);
+  }
+  const next = occurrenceDates(schedule, periodAfter(from, schedule), from).find(counted);
+  if (!next) {
+    return 0;
+  }
+  return roundUpShare(commitment.amount - balance, monthsUntil(month, next.dueDate), step);
+}
+
 export function monthlyAmount(bucket: MonthlyBucket, balance: number, month: string, step: number): number {
+  if (bucket.kind === "income") {
+    return 0;
+  }
+  if (bucket.kind === "commitment") {
+    return bucket.commitment ? commitmentAmount(bucket, bucket.commitment, balance, month, step) : 0;
+  }
   if (bucket.kind === "spending") {
     return Math.max(0, (bucket.refillTo ?? 0) - balance);
   }
@@ -125,7 +156,6 @@ export function monthlyAmount(bucket: MonthlyBucket, balance: number, month: str
 export const fundingPositionSchema = z.object({
   asOf: isoDateSchema,
   onBudgetTotal: money,
-  billsReserved: nonNegative,
   unassigned: money,
   nextIncomeDate: isoDateSchema.nullable(),
 });

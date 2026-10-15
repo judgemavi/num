@@ -40,7 +40,7 @@ export function recordSaveAnswer(tx: WriteTx, saved: Transaction, answer: Review
       }
       return;
     case "recurring_ambiguous":
-      addOccurrenceLink(tx, answer.planId, answer.dueDate, saved.id, at, false);
+      addOccurrenceLink(tx, answer.bucketId, answer.dueDate, saved.id, at, false);
       return;
   }
 }

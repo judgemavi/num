@@ -1,9 +1,9 @@
+import { hasSchedule } from "@num/shared";
 import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { accountOptionsQuery } from "@/api/accounts";
 import { activeBucketsQuery } from "@/api/buckets";
 import { categoryOptionsQuery, groupListQuery } from "@/api/categories";
 import { merchantOptionsQuery } from "@/api/merchants";
-import { activePlansQuery } from "@/api/recurring";
 import { bookCurrencyQuery } from "@/api/settings";
 import { tagOptionsQuery } from "@/api/tags";
 import { accountLabel } from "@/accounts/label";
@@ -21,7 +21,6 @@ export function useStartSharedLists() {
   usePrefetchQuery(merchantOptionsQuery());
   usePrefetchQuery(groupListQuery());
   usePrefetchQuery(activeBucketsQuery());
-  usePrefetchQuery(activePlansQuery());
 }
 
 export function useBookCurrency() {
@@ -52,8 +51,12 @@ export function useActiveBuckets() {
   return useSuspenseQuery(activeBucketsQuery()).data;
 }
 
-export function useActivePlans() {
-  return useSuspenseQuery(activePlansQuery()).data;
+/** The active commitments and incomes: the buckets that have a schedule. */
+export function useActiveSchedules() {
+  return useSuspenseQuery({
+    ...activeBucketsQuery(),
+    select: (board) => board.items.flatMap(({ schedule, kind, ...bucket }) => (schedule && hasSchedule(kind) ? [{ ...bucket, kind, schedule }] : [])),
+  }).data;
 }
 
 /**
@@ -99,11 +102,6 @@ export function useGroupNames() {
 /** The display name of each account, by id. Active and archived. */
 export function useAccountLabels() {
   return useSuspenseQuery({ ...accountOptionsQuery(), select: labelsById }).data;
-}
-
-/** The name of each plan that is not archived, by id. */
-export function usePlanNames() {
-  return useSuspenseQuery({ ...activePlansQuery(), select: (list) => namesById(list.items) }).data;
 }
 
 /** The name of each active bucket, by id. */

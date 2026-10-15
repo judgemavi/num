@@ -13,7 +13,8 @@ import { useActiveBuckets, useBookCurrency } from "@/editors/lookups";
 export function MoveMoney({ fromId }: EditorInput["moveMoney"]) {
   const { close } = useEditorFrame();
   const currency = useBookCurrency();
-  const active = useActiveBuckets().items;
+  // An income holds no money.
+  const active = useActiveBuckets().items.filter((bucket) => bucket.kind !== "income");
   const save = useAddBucketEvent();
   const startFrom = fromId ?? active[0]?.id ?? "";
   const form = useAppForm({

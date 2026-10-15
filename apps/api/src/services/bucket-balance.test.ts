@@ -43,6 +43,7 @@ const spendingFields = {
   fixedAmount: null,
   months: null,
   fillMonths: null,
+  schedule: null,
 };
 
 function purchase(db: Db, accountId: string, categoryId: string, amount: number, date: string) {

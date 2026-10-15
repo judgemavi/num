@@ -1,4 +1,4 @@
-import { categoryCreateSchema, type Category, type CategoryKind } from "@num/shared";
+import { categoryCreateSchema, hasSchedule, type Category, type CategoryKind } from "@num/shared";
 import { useUpdateBucket } from "@/api/buckets";
 import { useSaveCategory } from "@/api/categories";
 import { errorCode } from "@/api/client";
@@ -27,7 +27,8 @@ type CategoryFormProps = {
 
 export function CategoryForm({ category, initialName, initialKind, inline = false, depth = 0 }: CategoryFormProps) {
   const { close } = useEditorFrame();
-  const buckets = useActiveBuckets();
+  // A commitment and an income have no categories.
+  const buckets = useActiveBuckets().items.filter((item) => !hasSchedule(item.kind));
   const groups = useGroups();
   const save = useSaveCategory();
   const addToBucket = useUpdateBucket();
@@ -63,7 +64,7 @@ export function CategoryForm({ category, initialName, initialKind, inline = fals
         formApi.setErrorMap({ onSubmit: { form: categoryError(errorCode(error)), fields: {} } });
         return;
       }
-      const bucket = category || value.kind !== "expense" ? undefined : buckets.items.find((item) => item.id === value.bucketId);
+      const bucket = category || value.kind !== "expense" ? undefined : buckets.find((item) => item.id === value.bucketId);
       if (bucket) {
         try {
           await addToBucket.mutateAsync({ id: bucket.id, body: { categoryIds: [...bucket.categoryIds, saved.id] } });
@@ -128,7 +129,7 @@ export function CategoryForm({ category, initialName, initialKind, inline = fals
                         <field.ComboboxField
                           id={`${fieldId}-bucket`}
                           label="Add to a bucket"
-                          options={buckets.items.map((bucket) => ({ id: bucket.id, label: bucket.name }))}
+                          options={buckets.map((bucket) => ({ id: bucket.id, label: bucket.name }))}
                           placeholder="No bucket"
                           emptyLabel="No bucket"
                         />

@@ -61,7 +61,7 @@ describe("keep uncategorized on save (decisions 0024, 0045)", () => {
 
 describe("the answer to a Needs review question (decision 0047)", () => {
   const otherId = "00000000-0000-4000-8000-000000000006";
-  const planId = "00000000-0000-4000-8000-000000000007";
+  const bucketId = "00000000-0000-4000-8000-000000000007";
   const base = { level: "none" as const, reason: null, suggestion: null, itemKey: null, transfer: null, recurring: null, refund: null };
 
   test("a save with no other change still sends the answer", () => {
@@ -73,7 +73,7 @@ describe("the answer to a Needs review question (decision 0047)", () => {
   });
 
   test("a transfer pair always sends its answer: the saved lines give yes or no", () => {
-    const transfer = { otherId, otherAccountId: planId, otherPayee: "Deposit", otherAmount: -40_000, otherDate: "2026-03-01" };
+    const transfer = { otherId, otherAccountId: bucketId, otherPayee: "Deposit", otherAmount: -40_000, otherDate: "2026-03-01" };
     expect(reviewAnswer({ ...base, question: "transfer_pair", transfer }, null, "2026-03-02")).toEqual({
       question: "transfer_pair",
       otherId,
@@ -82,9 +82,9 @@ describe("the answer to a Needs review question (decision 0047)", () => {
   });
 
   test("Payment for is an answer only when the person chose the payment", () => {
-    const review = { ...base, question: "recurring_ambiguous" as const, recurring: { planId, dueDate: "2026-03-01" } };
+    const review = { ...base, question: "recurring_ambiguous" as const, recurring: { bucketId, dueDate: "2026-03-01" } };
     expect(reviewAnswer(review, null, "2026-03-02")).toBeUndefined();
-    expect(reviewAnswer(review, `${planId}:2026-03-01`, "2026-03-02")).toEqual({ question: "recurring_ambiguous", planId, dueDate: "2026-03-01" });
+    expect(reviewAnswer(review, `${bucketId}:2026-03-01`, "2026-03-02")).toEqual({ question: "recurring_ambiguous", bucketId, dueDate: "2026-03-01" });
   });
 });
 

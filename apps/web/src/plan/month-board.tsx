@@ -8,19 +8,14 @@ import { PaycheckSplitIllustration } from "@/components/illustrations";
 import { hueColor } from "@/components/hue";
 import { ListCard, ListRow, listAmt, listName } from "@/components/list-card";
 import { SplitBar } from "@/components/split-bar";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
 
-const billColor = hueColor.sky.glyph;
+const commitmentColor = hueColor.sky.glyph;
 const bucketColor = hueColor.lilac.glyph;
 const saveColor = "#2B7A4E";
-
-function shortDate(iso: string) {
-  return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric" });
-}
 
 function longDate(iso: string) {
   return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "long", day: "numeric", year: "numeric" });
@@ -58,7 +53,7 @@ function FlowStep({
 export function MonthFlow({ plan }: { plan: MonthPlan }) {
   const currency = useBookCurrency();
   const left = plan.leftToSave.planned;
-  const bills = plan.bills.items.length;
+  const commitments = plan.commitments.items.length;
   const buckets = plan.funding.items.length;
   return (
     <Card aria-label="Monthly flow" className="border-transparent bg-tint-plan">
@@ -67,7 +62,7 @@ export function MonthFlow({ plan }: { plan: MonthPlan }) {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
             <FlowStep label="Income" planned={plan.income.planned} actual={plan.income.actual} compare={plan.compareActual} />
             <ArrowRight className="text-muted-foreground" strokeWidth={1.8} aria-hidden="true" />
-            <FlowStep label="Bills" planned={plan.bills.planned} actual={plan.bills.actual} compare={plan.compareActual} />
+            <FlowStep label="Commitments" planned={plan.commitments.planned} actual={plan.commitments.actual} compare={plan.compareActual} />
             <ArrowRight className="text-muted-foreground" strokeWidth={1.8} aria-hidden="true" />
             <FlowStep label="Bucket funding" planned={plan.funding.planned} actual={plan.funding.actual} compare={plan.compareActual} />
             <ArrowRight className="text-muted-foreground" strokeWidth={1.8} aria-hidden="true" />
@@ -82,9 +77,9 @@ export function MonthFlow({ plan }: { plan: MonthPlan }) {
           </div>
           <div className="mt-4">
             <SplitBar
-              label={`Of income: bills ${formatMoney(currency, plan.bills.planned)}, bucket funding ${formatMoney(currency, plan.funding.planned)}, left to save ${formatMoney(currency, left)}`}
+              label={`Of income: commitments ${formatMoney(currency, plan.commitments.planned)}, bucket funding ${formatMoney(currency, plan.funding.planned)}, left to save ${formatMoney(currency, left)}`}
               segments={[
-                { key: "bills", label: countLabel(bills, "bill", "bills"), color: billColor, value: plan.bills.planned, amount: <Amount value={plan.bills.planned} /> },
+                { key: "commitments", label: countLabel(commitments, "commitment", "commitments"), color: commitmentColor, value: plan.commitments.planned, amount: <Amount value={plan.commitments.planned} /> },
                 { key: "buckets", label: countLabel(buckets, "bucket", "buckets"), color: bucketColor, value: plan.funding.planned, amount: <Amount value={plan.funding.planned} /> },
                 { key: "save", label: "Left to save", color: saveColor, value: Math.max(0, left), amount: <Amount value={left} /> },
               ]}
@@ -111,7 +106,7 @@ export function GoalFeasibility() {
       </CardHeader>
       <CardContent className="grid gap-3 px-0 pb-5">
         <p className="px-5">
-          Income is <Amount value={item.income} /> a month. Bills take <Amount value={item.bills} />. Spending refills take <Amount value={item.refills} />.{item.emergency > 0 ? <> The emergency fund takes <Amount value={item.emergency} />.</> : null} <Amount value={item.surplus} /> is left for goals and sinking funds.
+          Income is <Amount value={item.income} /> a month. Commitments take <Amount value={item.commitments} />. Spending refills take <Amount value={item.refills} />.{item.emergency > 0 ? <> The emergency fund takes <Amount value={item.emergency} />.</> : null} <Amount value={item.surplus} /> is left for goals and sinking funds.
         </p>
         {item.shortfall > 0 ? (
           <p className="px-5 font-semibold text-attn">
@@ -143,20 +138,14 @@ export function MonthDetails({ plan }: { plan: MonthPlan }) {
   return (
     <>
       <div className="grid items-start gap-5 lg:grid-cols-2">
-        <ListCard label="Bills" title="Bills" actions={<span className="text-sm font-semibold tabular-nums">{formatMoney(currency, plan.bills.planned)}</span>}>
-          {plan.bills.items.length === 0 ? <p className="px-5 py-5 text-muted-foreground">No bills this month.</p> : null}
-          {plan.bills.items.map((item) => (
-            <ListRow key={`${item.planId}-${item.dueDate}`} onOpen={() => void openEditor("plan", { id: item.planId })}>
-              <span className="w-14 shrink-0 text-[13px] text-muted-foreground">{shortDate(item.dueDate)}</span>
-              <span className={listName}>
-                {item.name}
-                {plan.compareActual && item.actual !== null ? <Badge variant="positive">Paid</Badge> : null}
-              </span>
+        <ListCard label="Commitments" title="Commitments" actions={<span className="text-sm font-semibold tabular-nums">{formatMoney(currency, plan.commitments.planned)}</span>}>
+          {plan.commitments.items.length === 0 ? <p className="px-5 py-5 text-muted-foreground">No commitments yet.</p> : null}
+          {plan.commitments.items.map((item) => (
+            <ListRow key={item.bucketId} onOpen={() => void openEditor("commitment", { id: item.bucketId })}>
+              <span className={listName}>{item.name}</span>
               <span className={listAmt}>
                 <Amount value={item.planned} />
-                {plan.compareActual && item.actual !== null && item.actual !== item.planned ? (
-                  <small>Actual {formatMoney(currency, item.actual)}</small>
-                ) : null}
+                {plan.compareActual ? <small>Actual {formatMoney(currency, item.actual)}</small> : null}
               </span>
             </ListRow>
           ))}

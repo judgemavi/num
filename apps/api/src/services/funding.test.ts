@@ -4,8 +4,7 @@ import { expectCode, saved, tempDatabase } from "./bucket-test-book";
 import { readBucket } from "./buckets";
 import { createCategory } from "./categories";
 import { fundingPosition } from "./funding-book";
-import { account, money, plan, spend } from "./funding-test-book";
-import { linkOccurrence } from "./recurring-links";
+import { account, addSchedule, money, spend } from "./funding-test-book";
 import { createTransaction } from "./transactions";
 
 test("a card purchase does not change Unassigned", () => {
@@ -36,11 +35,11 @@ test("a card purchase does not change Unassigned", () => {
   }
 });
 
-test("bills are reserved on payday", () => {
+test("the window of payday ends at the next occurrence of an income with payday", () => {
   const book = tempDatabase();
   try {
     const cash = account(book.db, "Cash", "chequing", 100_000);
-    plan(book.db, {
+    addSchedule(book.db, {
       name: "Pay",
       kind: "income",
       accountId: cash.id,
@@ -48,74 +47,42 @@ test("bills are reserved on payday", () => {
       startDate: "2026-10-01",
       freq: "weekly",
       interval: 2,
-      fundsBuckets: true,
+      payday: true,
     });
-    plan(book.db, {
+    addSchedule(book.db, {
+      name: "Side job",
+      kind: "income",
+      accountId: cash.id,
+      expectedAmount: 5_000,
+      startDate: "2026-10-05",
+      freq: "weekly",
+      interval: 1,
+      payday: false,
+    });
+    expect(fundingPosition(book.db, "2026-10-01").nextIncomeDate).toBe("2026-10-15");
+    expect(fundingPosition(book.db, "2026-10-15").nextIncomeDate).toBe("2026-10-29");
+  } finally {
+    book.close();
+  }
+});
+
+test("Unassigned has no bills reserved: a commitment lowers it only through its balance", () => {
+  const book = tempDatabase();
+  try {
+    const cash = account(book.db, "Cash", "chequing", 100_000);
+    const power = addSchedule(book.db, {
       name: "Power",
-      kind: "bill",
+      kind: "commitment",
       accountId: cash.id,
       expectedAmount: -2_500,
       startDate: "2026-10-01",
       freq: "monthly",
       interval: 1,
       monthDay: 1,
-      fundsBuckets: false,
     });
-    plan(book.db, {
-      name: "Rent",
-      kind: "bill",
-      accountId: cash.id,
-      expectedAmount: -9_990,
-      startDate: "2026-10-15",
-      freq: "monthly",
-      interval: 1,
-      monthDay: 15,
-      fundsBuckets: false,
-    });
-    const reserved = fundingPosition(book.db, "2026-10-01");
-    expect(reserved.nextIncomeDate).toBe("2026-10-15");
-    expect(reserved.billsReserved).toBe(2_500);
-  } finally {
-    book.close();
-  }
-});
-
-test("a variable bill reserves the safe amount", () => {
-  const book = tempDatabase();
-  try {
-    const cash = account(book.db, "Cash", "chequing", 100_000);
-    const power = createCategory(book.db, { name: "Power", kind: "expense", ...saved });
-    plan(book.db, {
-      name: "Pay",
-      kind: "income",
-      accountId: cash.id,
-      expectedAmount: 200_000,
-      startDate: "2026-10-01",
-      freq: "weekly",
-      interval: 2,
-      fundsBuckets: true,
-    });
-    const bill = plan(book.db, {
-      name: "Power",
-      kind: "bill",
-      accountId: cash.id,
-      expectedAmount: -10_000,
-      amountMode: "variable",
-      startDate: "2026-07-12",
-      freq: "monthly",
-      interval: 1,
-      monthDay: 12,
-      fundsBuckets: false,
-    });
-    for (const [date, amount] of [
-      ["2026-07-12", -1_000],
-      ["2026-08-12", -2_500],
-      ["2026-09-12", -9_000],
-    ] as const) {
-      const paid = money(book.db, cash.id, power.id, date, amount, "Power Co");
-      linkOccurrence(book.db, bill.id, date, paid.id, saved);
-    }
-    expect(fundingPosition(book.db, "2026-10-08").billsReserved).toBe(9_000);
+    expect(fundingPosition(book.db, "2026-10-01").unassigned).toBe(100_000);
+    createBucketEvent(book.db, power.id, { kind: "fund", amount: 2_500, date: "2026-10-01", asOf: "2026-10-01", ...saved });
+    expect(fundingPosition(book.db, "2026-10-01").unassigned).toBe(97_500);
   } finally {
     book.close();
   }

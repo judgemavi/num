@@ -1,5 +1,5 @@
-import type { BucketEventKind, CategoryKind, ImportBatch, PlanKind } from "@num/shared";
-import type { PlanSeed } from "@/recurring/plan-values";
+import type { BucketEventKind, CategoryKind, ImportBatch } from "@num/shared";
+import type { ScheduleSeed } from "@/schedules/schedule-values";
 
 /** The input of each editor. `openEditor(kind, input)` and the editor component of that kind use the same type. */
 export type EditorInput = {
@@ -17,7 +17,8 @@ export type EditorInput = {
   tag: { id: string | null; name?: string };
   merchant: { id: string | null; name?: string };
   bucket: { id: string | null };
-  plan: { id: string | null; seed?: PlanSeed; kind?: PlanKind };
+  commitment: { id: string | null; seed?: ScheduleSeed };
+  income: { id: string | null; seed?: ScheduleSeed };
   import: { accountId: string | null };
   /** Add a bank balance of an account, or change one. It is not in the URL. */
   bankBalance: { accountId: string; id: string | null };
@@ -25,9 +26,9 @@ export type EditorInput = {
   moveMoney: { fromId: string | null };
   importInfo: Pick<ImportBatch, "filename" | "counts" | "unreadable">;
   mergeMerchant: { merchantId: string };
-  skipNext: { planId: string };
-  skipOccurrence: { planId: string; dueDate: string };
-  linkOccurrence: { planId: string; accountId: string; dueDate: string };
+  skipNext: { bucketId: string };
+  skipOccurrence: { bucketId: string; dueDate: string };
+  linkOccurrence: { bucketId: string; accountId: string; dueDate: string };
 };
 
 export type EditorKind = keyof EditorInput;

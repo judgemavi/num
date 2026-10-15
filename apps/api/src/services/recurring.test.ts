@@ -7,9 +7,10 @@ import { expect, test } from "bun:test";
 import { createDb } from "../db";
 import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
+import { archiveBucket } from "./buckets";
 import { createCategory } from "./categories";
 import { createTransaction } from "./transactions";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { linkOccurrence } from "./recurring-links";
 import { autoLink, listOccurrences, listUpcoming, recurringSignals } from "./recurring-view";
 
@@ -72,9 +73,9 @@ function payment(
 }
 
 function bill(db: ReturnType<typeof tempDatabase>["db"], accountId: string, mode: "fixed" | "variable" = "fixed") {
-  return createPlan(db, {
+  return createSchedule(db, {
     name: mode === "variable" ? "Pay" : "Stream",
-    kind: "bill",
+    kind: "commitment",
     accountId,
     expectedAmount: -10000,
     tolerance: 1000,
@@ -84,8 +85,7 @@ function bill(db: ReturnType<typeof tempDatabase>["db"], accountId: string, mode
     interval: 1,
     monthDay: 15,
     businessDayShift: "none",
-    active: true,
-    fundsBuckets: false,
+    payday: false,
     source: "ui",
     at,
   });
@@ -96,9 +96,9 @@ test("one transaction can link to one occurrence only", () => {
   try {
     const chequing = account(db);
     const first = bill(db, chequing.id);
-    const second = createPlan(db, {
+    const second = createSchedule(db, {
       name: "Other stream",
-      kind: "bill",
+      kind: "commitment",
       accountId: chequing.id,
       expectedAmount: -10000,
       tolerance: 1000,
@@ -108,8 +108,7 @@ test("one transaction can link to one occurrence only", () => {
       interval: 1,
       monthDay: 15,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       source: "ui",
       at,
     });
@@ -122,9 +121,9 @@ test("one transaction can link to one occurrence only", () => {
       expect((error as ServiceError).code).toBe("transaction_already_linked");
     }
     const shared = payment(db, chequing.id, "2026-02-15", -10000);
-    const twin = createPlan(db, {
+    const twin = createSchedule(db, {
       name: "Twin stream",
-      kind: "bill",
+      kind: "commitment",
       accountId: chequing.id,
       expectedAmount: -10000,
       tolerance: 1000,
@@ -134,13 +133,12 @@ test("one transaction can link to one occurrence only", () => {
       interval: 1,
       monthDay: 15,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       source: "ui",
       at,
     });
     expect(autoLink(db, "2026-02-20", { source: "ui", at }).linked).toBe(0);
-    const ids = recurringSignals(db, "2026-02-20").ambiguous.map((item) => item.planId);
+    const ids = recurringSignals(db, "2026-02-20").ambiguous.map((item) => item.bucketId);
     expect(ids).toContain(first.id);
     expect(ids).toContain(second.id);
     expect(ids).toContain(twin.id);
@@ -156,9 +154,9 @@ test("auto-link saves the one candidate and leaves two candidates open", () => {
   try {
     const chequing = account(db);
     const shop = merchant(db, "Stream Co");
-    const plan = createPlan(db, {
+    const plan = createSchedule(db, {
       name: "Stream",
-      kind: "bill",
+      kind: "commitment",
       accountId: chequing.id,
       merchantId: shop,
       expectedAmount: -16990,
@@ -169,8 +167,7 @@ test("auto-link saves the one candidate and leaves two candidates open", () => {
       interval: 1,
       monthDay: 2,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       source: "ui",
       at,
     });
@@ -218,7 +215,7 @@ test("a variable plan uses the last 6 actuals and does not report a changed amou
     linkOccurrence(db, fixed.id, "2026-01-15", odd, { source: "ui", at });
     expect(recurringSignals(db, "2026-08-01").changed).toEqual([
       {
-        planId: fixed.id,
+        bucketId: fixed.id,
         dueDate: "2026-01-15",
         transactionId: odd,
         expectedAmount: -10000,
@@ -234,9 +231,9 @@ test("an old unlinked occurrence is not missed", () => {
   const { db, close } = tempDatabase();
   try {
     const chequing = account(db);
-    const plan = createPlan(db, {
+    const plan = createSchedule(db, {
       name: "Old bill",
-      kind: "bill",
+      kind: "commitment",
       accountId: chequing.id,
       expectedAmount: -10000,
       tolerance: 0,
@@ -246,12 +243,11 @@ test("an old unlinked occurrence is not missed", () => {
       interval: 1,
       monthDay: 15,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       source: "ui",
       at,
     });
-    const missed = recurringSignals(db, "2026-10-07").missed.filter((item) => item.planId === plan.id);
+    const missed = recurringSignals(db, "2026-10-07").missed.filter((item) => item.bucketId === plan.id);
     expect(missed.map((item) => item.dueDate)).toEqual(["2026-09-15"]);
     const history = listOccurrences(db, plan.id, "2026-10-07").items.find((item) => item.dueDate === "2024-01-15");
     expect(history?.status).toBe("open");
@@ -281,9 +277,9 @@ test("a payment with no merchant is detected by its category until a plan with t
     expect(proposals).toHaveLength(1);
     expect(proposals[0]).toMatchObject({ merchantId: null, categoryId: rent.id, freq: "monthly", expectedAmount: -1_800_000 });
 
-    createPlan(db, {
+    createSchedule(db, {
       name: "Rent",
-      kind: "bill",
+      kind: "commitment",
       accountId: chequing.id,
       categoryId: rent.id,
       expectedAmount: -1_800_000,
@@ -294,8 +290,7 @@ test("a payment with no merchant is detected by its category until a plan with t
       interval: 1,
       monthDay: 1,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       source: "ui",
       at,
     });
@@ -305,12 +300,12 @@ test("a payment with no merchant is detected by its category until a plan with t
   }
 });
 
-test("upcoming has the occurrences of all active plans in the next 30 days, by date", () => {
+test("upcoming has the occurrences of all active schedules in the next 30 days, by date", () => {
   const { db, close } = tempDatabase();
   try {
     const chequing = account(db);
     const monthly = bill(db, chequing.id);
-    const weekly = createPlan(db, {
+    const weekly = createSchedule(db, {
       name: "Pay",
       kind: "income",
       accountId: chequing.id,
@@ -322,14 +317,13 @@ test("upcoming has the occurrences of all active plans in the next 30 days, by d
       interval: 2,
       monthDay: null,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       source: "ui",
       at,
     });
-    createPlan(db, {
+    const paused = createSchedule(db, {
       name: "Paused",
-      kind: "bill",
+      kind: "commitment",
       accountId: chequing.id,
       expectedAmount: -1000,
       tolerance: 0,
@@ -339,18 +333,18 @@ test("upcoming has the occurrences of all active plans in the next 30 days, by d
       interval: 1,
       monthDay: 20,
       businessDayShift: "none",
-      active: false,
-      fundsBuckets: false,
+      payday: false,
       source: "ui",
       at,
     });
+    archiveBucket(db, paused.id, { source: "ui", at });
     const items = listUpcoming(db, "2026-03-10").items;
-    expect(items.map((item) => [item.planId, item.dueDate])).toEqual([
+    expect(items.map((item) => [item.bucketId, item.dueDate])).toEqual([
       [weekly.id, "2026-03-13"],
       [monthly.id, "2026-03-15"],
       [weekly.id, "2026-03-27"],
     ]);
-    expect(items.find((item) => item.planId === monthly.id)?.forecastAmount).toBe(-10000);
+    expect(items.find((item) => item.bucketId === monthly.id)?.forecastAmount).toBe(-10000);
   } finally {
     close();
   }
@@ -377,9 +371,9 @@ test("a regular transfer out with no merchant is proposed as a transfer until a 
     expect(proposals).toHaveLength(1);
     expect(proposals[0]).toMatchObject({ accountId: chequing.id, transferAccountId: savings.id, freq: "monthly" });
 
-    createPlan(db, {
+    createSchedule(db, {
       name: "Savings",
-      kind: "transfer",
+      kind: "commitment",
       accountId: chequing.id,
       transferAccountId: savings.id,
       expectedAmount: -300_000,
@@ -390,8 +384,7 @@ test("a regular transfer out with no merchant is proposed as a transfer until a 
       interval: 1,
       monthDay: 1,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: false,
+      payday: false,
       source: "ui",
       at,
     });

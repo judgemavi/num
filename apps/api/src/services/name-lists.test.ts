@@ -7,7 +7,6 @@ import { createDb } from "../db";
 import { createAccount, listAccounts } from "./accounts";
 import { createBucket, listBuckets } from "./buckets";
 import { createCategory, createCategoryGroup, listCategories, listCategoryGroups, updateCategory } from "./categories";
-import { createPlan, listPlans } from "./recurring-plans";
 import { createTag, listTags } from "./tags";
 
 const saved = { source: "ui" as const, at: "2026-10-07T16:00:00Z" };
@@ -66,10 +65,9 @@ test("a category rename writes the new sort key", () => {
   }
 });
 
-test("buckets and plans sort by the folded name, and the plan search ignores accents and case", () => {
+test("buckets sort by the folded name", () => {
   const { db, close } = tempDatabase();
   try {
-    const account = createAccount(db, { name: "Cash", institution: null, kind: "chequing", openingBalance: 0, ...saved });
     for (const name of names) {
       createBucket(db, {
         name,
@@ -88,30 +86,12 @@ test("buckets and plans sort by the folded name, and the plan search ignores acc
         fixedAmount: null,
         months: null,
         fillMonths: null,
+        schedule: null,
         asOf: "2000-01-01",
-        ...saved,
-      });
-      createPlan(db, {
-        name,
-        kind: "bill",
-        accountId: account.id,
-        expectedAmount: -10_000,
-        tolerance: 1000,
-        amountMode: "fixed",
-        startDate: "2026-01-15",
-        freq: "monthly",
-        interval: 1,
-        monthDay: 15,
-        businessDayShift: "none",
-        active: true,
-        fundsBuckets: false,
         ...saved,
       });
     }
     expect(listBuckets(db, { ...first, sort: "name" }).items.map((item) => item.name)).toEqual(sorted);
-    expect(listPlans(db, first).items.map((item) => item.name)).toEqual(sorted);
-    expect(listPlans(db, { ...first, q: "ECOLE" }).items.map((item) => item.name)).toEqual(["École"]);
-    expect(listPlans(db, { ...first, q: "ea" })).toMatchObject({ total: 1, items: [{ name: "Eagle" }] });
   } finally {
     close();
   }

@@ -1,4 +1,4 @@
-import { merchants, recurringPlans, transactions } from "@num/db";
+import { merchants, schedules, transactions } from "@num/db";
 import { utcNow, type Merchant } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
@@ -16,13 +16,13 @@ function moveTransactions(tx: WriteTx, sourceId: string, targetId: string, at: s
   }
 }
 
-function movePlans(tx: WriteTx, sourceId: string, targetId: string) {
-  const rows = tx.select().from(recurringPlans).where(eq(recurringPlans.merchantId, sourceId)).all();
-  for (const row of rows) {
-    tx.update(recurringPlans).set({ merchantId: targetId }).where(eq(recurringPlans.id, row.id)).run();
+function moveSchedules(tx: WriteTx, sourceId: string, targetId: string) {
+  const rows = tx.select().from(schedules).where(eq(schedules.merchantId, sourceId)).all();
+  for (const { bucketId, ...row } of rows) {
+    tx.update(schedules).set({ merchantId: targetId }).where(eq(schedules.bucketId, bucketId)).run();
     tx.audit({
-      entity: "recurring_plans",
-      entityId: row.id,
+      entity: "schedules",
+      entityId: bucketId,
       action: "update",
       before: row,
       after: { ...row, merchantId: targetId },
@@ -42,7 +42,7 @@ export function mergeMerchants(db: Db, sourceId: string, targetId: string, input
       throw new ServiceError("merchant_archived", 409);
     }
     moveTransactions(tx, sourceId, targetId, at);
-    movePlans(tx, sourceId, targetId);
+    moveSchedules(tx, sourceId, targetId);
     const next = { ...source, archivedAt: source.archivedAt ?? at };
     if (!source.archivedAt) {
       tx.update(merchants).set({ archivedAt: at }).where(eq(merchants.id, sourceId)).run();

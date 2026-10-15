@@ -8,7 +8,7 @@ import { createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { readForecast } from "./forecast";
 import { linkOccurrence, skipOccurrence } from "./recurring-links";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction } from "./transactions";
 
 const at = "2026-10-08T16:00:00Z";
@@ -80,9 +80,9 @@ function bill(
   monthDay = 15,
   endDate: string | null = null,
 ) {
-  return createPlan(db, {
+  return createSchedule(db, {
     name: `Bill ${startDate}`,
-    kind: "bill",
+    kind: "commitment",
     accountId,
     expectedAmount: amount,
     tolerance: 0,
@@ -93,8 +93,7 @@ function bill(
     monthDay,
     businessDayShift: shift,
     endDate,
-    active: true,
-    fundsBuckets: false,
+    payday: false,
     ...saved,
   });
 }

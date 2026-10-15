@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import { foldName } from "@num/shared";
 
 /** The tables that have a `sort_key` column: the folded name (`foldName`). */
-const sortKeyTables = ["accounts", "buckets", "categories", "category_groups", "merchants", "recurring_plans", "tags"] as const;
+const sortKeyTables = ["accounts", "buckets", "categories", "category_groups", "merchants", "tags"] as const;
 
 /**
  * Migration 0008 adds `sort_key` with an empty value. SQL cannot fold Unicode, thus this step writes the key of each

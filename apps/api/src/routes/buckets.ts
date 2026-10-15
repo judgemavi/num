@@ -83,7 +83,7 @@ const overspentRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_buckets",
-  description: "Create or run buckets. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Create or run buckets. A commitment or an income bucket has a schedule (its payments or deposits on a calendar) in the field schedule. Other kinds have schedule null. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "post",
   path: "/api/buckets",
   request: {
@@ -103,7 +103,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_buckets_id",
-  description: "Change buckets. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. The API checks the fields together on the stored record with your changes. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Change buckets. Send only the fields that change. A schedule replaces the stored schedule as a whole. A field that you leave out keeps its value. null clears a field that can be empty. The API checks the fields together on the stored record with your changes. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
   method: "patch",
   path: "/api/buckets/{id}",
   request: {

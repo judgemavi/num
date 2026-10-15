@@ -13,7 +13,7 @@ import { fillBuckets } from "./funding-fill";
 import { emergency } from "./funding-test-book";
 import { readHygiene } from "./hygiene";
 import { importStatement } from "./imports";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction } from "./transactions";
 
 const at = "2026-04-02T16:00:00Z";
@@ -66,9 +66,9 @@ function check<T extends HygieneCheck["code"]>(db: Db, asOf: string, code: T): E
 }
 
 function bill(db: Db, accountId: string, categoryId: string | null, freq: "monthly" | "yearly") {
-  return createPlan(db, {
+  return createSchedule(db, {
     name: freq === "yearly" ? "Insurance" : "Rent",
-    kind: "bill",
+    kind: "commitment",
     accountId,
     categoryId,
     expectedAmount: freq === "yearly" ? -120_000 : -10_000,
@@ -79,8 +79,7 @@ function bill(db: Db, accountId: string, categoryId: string | null, freq: "month
     interval: 1,
     monthDay: freq === "yearly" ? 15 : 15,
     businessDayShift: "none",
-    active: true,
-    fundsBuckets: false,
+    payday: false,
     ...saved,
   });
 }
@@ -114,6 +113,7 @@ function spendBucket(db: Db, categoryId: string, essential: boolean, refillTo: n
     fixedAmount: null,
     months: null,
     fillMonths: null,
+    schedule: null,
     asOf: "2000-01-01",
     ...saved,
   });
@@ -227,48 +227,6 @@ test("the inbox fails when an item is older than 7 days", () => {
       ...saved,
     });
     expect(check(db, "2026-02-01", "review")).toMatchObject({ pass: false, oldCount: 1, oldestDate: "2026-01-01" });
-  });
-});
-
-test("sinking funds pass when each yearly bill has a sinking bucket for its category", () => {
-  withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 0);
-    const insurance = expense(db, "Insurance");
-    bill(db, cash.id, insurance.id, "yearly");
-    createBucket(db, {
-      name: "Insurance",
-      kind: "sinking",
-      priority: 1,
-      essential: false,
-      color: "lilac",
-      icon: "shield",
-      categoryIds: [insurance.id],
-      refillTo: null,
-      amount: 120_000,
-      dueDate: "2026-06-15",
-      repeat: "yearly",
-      target: null,
-      targetDate: null,
-      fixedAmount: null,
-      months: null,
-      fillMonths: null,
-      asOf: "2000-01-01",
-      ...saved,
-    });
-    expect(check(db, "2026-06-15", "sinking_funds")).toMatchObject({ pass: true, yearly: 1, missing: [] });
-  });
-});
-
-test("sinking funds fail when a yearly bill has no sinking bucket for its category", () => {
-  withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 0);
-    const insurance = expense(db, "Insurance");
-    const plan = bill(db, cash.id, insurance.id, "yearly");
-    bill(db, cash.id, insurance.id, "monthly");
-    const row = check(db, "2026-06-15", "sinking_funds");
-    expect(row.pass).toBe(false);
-    expect(row.yearly).toBe(1);
-    expect(row.missing).toEqual([{ planId: plan.id, categoryId: insurance.id }]);
   });
 });
 

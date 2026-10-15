@@ -2,7 +2,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrateDatabase, openDatabase, settings } from "@num/db";
-import type { PlanCreate } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
@@ -10,7 +9,7 @@ import { createBucket } from "./buckets";
 import { createCategory } from "./categories";
 import { readForecast } from "./forecast";
 import { linkOccurrence } from "./recurring-links";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at: "2026-10-01T16:00:00Z" };
@@ -41,16 +40,17 @@ function record(db: Db, accountId: string, date: string, amount: number, line: {
   });
 }
 
-function monthly(db: Db, input: Pick<PlanCreate, "name" | "kind" | "accountId" | "expectedAmount" | "monthDay"> & Partial<PlanCreate>) {
-  return createPlan(db, {
+type ScheduleInput = Parameters<typeof createSchedule>[1];
+
+function monthly(db: Db, input: Pick<ScheduleInput, "name" | "kind" | "accountId" | "expectedAmount" | "monthDay"> & Partial<ScheduleInput>) {
+  return createSchedule(db, {
     tolerance: 0,
     amountMode: "fixed",
     startDate: `2026-01-${String(input.monthDay).padStart(2, "0")}`,
     freq: "monthly",
     interval: 1,
     businessDayShift: "none",
-    active: true,
-    fundsBuckets: false,
+    payday: false,
     ...input,
     ...saved,
   });
@@ -74,9 +74,9 @@ test("forecast months: unlinked income, bills and variable spending; card paymen
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
     const dining = createCategory(book.db, { name: "Dining", kind: "expense", ...saved });
 
-    const salary = monthly(book.db, { name: "Pay", kind: "income", accountId: cash.id, expectedAmount: 50_000, monthDay: 1, categoryId: pay.id, fundsBuckets: true });
-    monthly(book.db, { name: "Rent", kind: "bill", accountId: cash.id, expectedAmount: -30_000, monthDay: 20 });
-    monthly(book.db, { name: "Save", kind: "transfer", accountId: cash.id, expectedAmount: -10_000, monthDay: 15, transferAccountId: savings.id });
+    const salary = monthly(book.db, { name: "Pay", kind: "income", accountId: cash.id, expectedAmount: 50_000, monthDay: 1, categoryId: pay.id, payday: true });
+    monthly(book.db, { name: "Rent", kind: "commitment", accountId: cash.id, expectedAmount: -30_000, monthDay: 20 });
+    monthly(book.db, { name: "Save", kind: "commitment", accountId: cash.id, expectedAmount: -10_000, monthDay: 15, transferAccountId: savings.id });
     const paid = record(book.db, cash.id, "2026-10-01", 50_000, { categoryId: pay.id });
     linkOccurrence(book.db, salary.id, "2026-10-01", paid.id, saved);
 
@@ -100,6 +100,7 @@ test("forecast months: unlinked income, bills and variable spending; card paymen
       fixedAmount: null,
       months: null,
       fillMonths: null,
+      schedule: null,
       asOf: "2000-01-01",
       ...saved,
     });

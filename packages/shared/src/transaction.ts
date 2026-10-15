@@ -63,7 +63,7 @@ export const transactionCreateSchema = transactionWriteSchema.extend({
 export const reviewAnswerSchema = z.discriminatedUnion("question", [
   z.object({ question: z.literal("transfer_pair"), otherId: z.uuid(), asOf: isoDateSchema }),
   z.object({ question: z.literal("refund_purchase") }),
-  z.object({ question: z.literal("recurring_ambiguous"), planId: z.uuid(), dueDate: isoDateSchema }),
+  z.object({ question: z.literal("recurring_ambiguous"), bucketId: z.uuid(), dueDate: isoDateSchema }),
 ]);
 
 /**

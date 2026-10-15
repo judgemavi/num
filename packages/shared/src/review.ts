@@ -22,7 +22,7 @@ export const reviewTransferSchema = z.object({
 });
 
 export const reviewRecurringSchema = z.object({
-  planId: z.uuid(),
+  bucketId: z.uuid(),
   dueDate: isoDateSchema,
 });
 

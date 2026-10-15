@@ -38,18 +38,6 @@ const reviewCheckSchema = z.object({
   oldestDate: isoDateSchema.nullable(),
 });
 
-const sinkingGapSchema = z.object({
-  planId: z.uuid(),
-  categoryId: z.uuid().nullable(),
-});
-
-const sinkingCheckSchema = z.object({
-  code: z.literal("sinking_funds"),
-  pass: z.boolean(),
-  yearly: nonNegative,
-  missing: z.array(sinkingGapSchema),
-});
-
 const savingsMonthSchema = z.object({
   month: monthKeySchema,
   savingsRateMilliPct: z.number().int().nullable(),
@@ -80,7 +68,6 @@ export const hygieneCheckSchema = z.discriminatedUnion("code", [
   emergencyFundCheckSchema,
   importsCheckSchema,
   reviewCheckSchema,
-  sinkingCheckSchema,
   savingsRateCheckSchema,
   recurringCheckSchema,
   overspentCheckSchema,

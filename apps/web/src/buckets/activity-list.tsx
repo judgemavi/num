@@ -1,7 +1,7 @@
 import type { BucketEvent } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { bucketEventsQuery, useUndoBucketEvent } from "@/api/buckets";
-import { formatDate } from "@/buckets/format";
+import { formatDate } from "@/transactions/format";
 import { useBucketBoard } from "@/buckets/use-board";
 import { useEditors } from "@/editors/editor-api";
 import { useBucketNames } from "@/editors/lookups";

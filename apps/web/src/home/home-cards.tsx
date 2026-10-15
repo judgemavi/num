@@ -5,7 +5,7 @@ import { useBankMismatches } from "@/accounts/bank-status-reads";
 import { fundingOwedQuery } from "@/api/funding";
 import { insightsQuery } from "@/api/insights";
 import { forecastQuery, monthPlanQuery } from "@/api/plan";
-import { recurringSignalsQuery } from "@/api/recurring";
+import { scheduleSignalsQuery } from "@/api/schedules";
 import { reviewSummaryQuery } from "@/api/review";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEditors } from "@/editors/editor-api";
-import { useAccountLabels, useAccounts, useActivePlans, useBookCurrency, useBucketNames, useCategoryNames } from "@/editors/lookups";
+import { useAccountLabels, useAccounts, useActiveSchedules, useBookCurrency, useBucketNames, useCategoryNames } from "@/editors/lookups";
 import { homeInsights } from "@/home/home-reads";
 import { signedMoney } from "@/insights/format";
 import { formatMoney } from "@/money";
@@ -133,34 +133,34 @@ export function StillOwedCard() {
   );
 }
 
-/** The recurring payments that did not arrive. The card shows only when there is one. */
+/** The payments of commitments and incomes that did not arrive. The card shows only when there is one. */
 export function MissedPaymentsCard() {
   const { openEditor } = useEditors();
-  const plans = useActivePlans().items;
-  const { data: signals } = useSuspenseQuery(recurringSignalsQuery(localAsOf()));
+  const schedules = useActiveSchedules();
+  const { data: signals } = useSuspenseQuery(scheduleSignalsQuery(localAsOf()));
   if (signals.missed.length === 0) {
     return null;
   }
   return (
     <ListCard label="Missed payments" title="Missed payments">
       {signals.missed.map((item) => {
-        const plan = plans.find((row) => row.id === item.planId);
+        const schedule = schedules.find((row) => row.id === item.bucketId);
         return (
-        <ListRow key={`${item.planId}-${item.dueDate}`}>
+        <ListRow key={`${item.bucketId}-${item.dueDate}`}>
           <span className={listName}>
-            {plan?.name ?? "Recurring payment"}
+            {schedule?.name ?? "Scheduled payment"}
             <small>Missed · due {formatDate(item.dueDate)}</small>
           </span>
-          {plan ? (
+          {schedule ? (
             <Button
               type="button"
               variant="ghost"
-              onClick={() => void openEditor("linkOccurrence", { planId: plan.id, accountId: plan.accountId, dueDate: item.dueDate })}
+              onClick={() => void openEditor("linkOccurrence", { bucketId: schedule.id, accountId: schedule.schedule.accountId, dueDate: item.dueDate })}
             >
               Link a transaction
             </Button>
           ) : null}
-          <Button type="button" variant="ghost" onClick={() => void openEditor("skipOccurrence", { planId: item.planId, dueDate: item.dueDate })}>
+          <Button type="button" variant="ghost" onClick={() => void openEditor("skipOccurrence", { bucketId: item.bucketId, dueDate: item.dueDate })}>
             Skip
           </Button>
         </ListRow>

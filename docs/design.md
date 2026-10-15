@@ -84,11 +84,11 @@ Other screens use the surface colour.
   the app remembers the choice.
   - Brand at the top.
   - Primary: Home (with the tomato needs-review count), Transactions, Buckets, Accounts.
-  - Group "More": Insights, Recurring.
+  - Group "More": Insights.
   - Settings at the bottom.
   - Items are 44px high, radius 10px. Current item: `primary-soft` fill, `primary` text and icon.
 - **Phone (width < 768px):** a bottom tab bar: Home, Transactions, Buckets, Accounts, More.
-  More opens a sheet with Insights, Recurring and Settings.
+  More opens a sheet with Insights and Settings.
 - Icons: lucide icons, stroke 1.8, 20px.
 
 ## 5. Page pattern
@@ -180,7 +180,7 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 
 ## 6a. Transaction editor
 
-The transaction editor is one shared editor (§6b). Home, Transactions, import detail and Recurring open it.
+The transaction editor is one shared editor (§6b). Home, Transactions, import detail and Buckets open it.
 
 Order, top to bottom:
 1. **Money out / Money in** (ToggleGroup) and **Amount** as a positive number. The sign comes from the toggle.
@@ -242,7 +242,7 @@ The table has no group rows. The page header of `/transactions/review` has no "A
 
 ## 6b. Shared editors and the dialog host
 
-- One editor component for each entity: Transaction, Account, Category, Group, Tag, Merchant, Bucket, Recurring.
+- One editor component for each entity: Transaction, Account, Category, Group, Tag, Merchant, Bucket, Commitment, Income.
   The bulk editor of selected transactions (§6a) is a separate editor; the transaction editor has no group mode.
   Each editor is built from one form component. The same form is used in a dialog and inline (create on the spot).
   The same editor creates and edits, on every screen.

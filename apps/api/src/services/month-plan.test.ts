@@ -16,7 +16,7 @@ import { fillBuckets } from "./funding-fill";
 import { undoMonthFunding } from "./funding-months";
 import { readMonthPlan } from "./month-plan";
 import { linkOccurrence } from "./recurring-links";
-import { createPlan } from "./recurring-plans";
+import { createSchedule } from "./schedule-test-book";
 import { createTransaction, deleteTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at: "2026-03-20T16:00:00Z" };
@@ -59,7 +59,7 @@ test("funding and spending inside the month do not change the plan", () => {
       ...saved,
     });
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
-    createPlan(book.db, {
+    createSchedule(book.db, {
       name: "Pay",
       kind: "income",
       accountId: cash.id,
@@ -71,8 +71,7 @@ test("funding and spending inside the month do not change the plan", () => {
       interval: 1,
       monthDay: 1,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: true,
+      payday: true,
       ...saved,
     });
     const food = createBucket(book.db, {
@@ -92,6 +91,7 @@ test("funding and spending inside the month do not change the plan", () => {
       fixedAmount: null,
       months: null,
       fillMonths: null,
+      schedule: null,
       asOf: "2026-03-01",
       ...saved,
     });
@@ -126,7 +126,7 @@ test("a future month includes planned funding from earlier months", () => {
       paymentPolicy: null,
       ...saved,
     });
-    createPlan(book.db, {
+    createSchedule(book.db, {
       name: "Pay",
       kind: "income",
       accountId: cash.id,
@@ -138,8 +138,7 @@ test("a future month includes planned funding from earlier months", () => {
       interval: 1,
       monthDay: 1,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: true,
+      payday: true,
       ...saved,
     });
     const trip = createBucket(book.db, {
@@ -159,6 +158,7 @@ test("a future month includes planned funding from earlier months", () => {
       fixedAmount: null,
       months: null,
       fillMonths: null,
+      schedule: null,
       asOf: "2000-01-01",
       ...saved,
     });
@@ -182,7 +182,7 @@ test("readMonthPlan ignores an undone month, a deleted transaction, and an archi
       ...saved,
     });
     const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
-    const plan = createPlan(book.db, {
+    const plan = createSchedule(book.db, {
       name: "Pay",
       kind: "income",
       accountId: cash.id,
@@ -194,8 +194,7 @@ test("readMonthPlan ignores an undone month, a deleted transaction, and an archi
       interval: 1,
       monthDay: 1,
       businessDayShift: "none",
-      active: true,
-      fundsBuckets: true,
+      payday: true,
       ...saved,
     });
     const amounts = [1_000, 2_000, 3_000, 99_990];
@@ -231,6 +230,7 @@ test("readMonthPlan ignores an undone month, a deleted transaction, and an archi
       fixedAmount: 10_000,
       months: null,
       fillMonths: null,
+      schedule: null,
       asOf: "2026-03-01",
       ...saved,
     });
@@ -263,6 +263,7 @@ test("readMonthPlan ignores an undone month, a deleted transaction, and an archi
       fixedAmount: null,
       months: null,
       fillMonths: null,
+      schedule: null,
       asOf: "2000-01-01",
       ...saved,
     });

@@ -1,21 +1,14 @@
-import { Temporal, billReserveDays, type InboxDecisionCode, type PlanFrequency, type ErrorCode } from "@num/shared";
+import { currencyStep, divideAmount, noPaydayWindowDays, Temporal, type InboxDecisionCode, type ErrorCode } from "@num/shared";
 import { formatMoney } from "@/money";
 
-function perDay(amount: number, days: number) {
-  if (days <= 0) {
-    return amount;
-  }
-  const negative = amount < 0;
-  const magnitude = Math.abs(amount);
-  const quotient = Math.floor(magnitude / days);
-  const remainder = magnitude % days;
-  const rounded = remainder * 2 >= days ? quotient + 1 : quotient;
-  return negative ? -rounded : rounded;
+/** The safe amount for one day, rounded to a whole minor unit of the currency. */
+function perDay(currency: string, amount: number, days: number) {
+  return days <= 0 ? amount : divideAmount(amount, days, currencyStep(currency));
 }
 
 export function paydayHint(currency: string, asOf: string, nextIncome: string | null, safe: number): string {
   if (nextIncome === null) {
-    return `No paycheck on the plan · next ${billReserveDays} days · about ${formatMoney(currency, perDay(safe, billReserveDays))} a day`;
+    return `No paycheck on the plan · next ${noPaydayWindowDays} days · about ${formatMoney(currency, perDay(currency, safe, noPaydayWindowDays))} a day`;
   }
   const days = Temporal.PlainDate.from(asOf).until(Temporal.PlainDate.from(nextIncome), { largestUnit: "day" }).days;
   const when = Temporal.PlainDate.from(nextIncome).toLocaleString(undefined, {
@@ -23,15 +16,7 @@ export function paydayHint(currency: string, asOf: string, nextIncome: string | 
     month: "long",
     day: "numeric",
   });
-  return `Payday is ${when} · about ${formatMoney(currency, perDay(safe, days))} a day`;
-}
-
-export function repeatLabel(freq: PlanFrequency, interval: number): string {
-  const unit = freq === "weekly" ? "week" : freq === "monthly" ? "month" : "year";
-  if (interval === 1) {
-    return `Every ${unit}`;
-  }
-  return `Every ${interval} ${unit}s`;
+  return `Payday is ${when} · about ${formatMoney(currency, perDay(currency, safe, days))} a day`;
 }
 
 export function decisionText(code: InboxDecisionCode): string {

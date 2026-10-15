@@ -14,7 +14,7 @@ export type { InsightsRoutes } from "./routes/insights";
 export type { MerchantRoutes } from "./routes/merchants";
 export type { MortgageRoutes } from "./routes/mortgage";
 export type { PlanRoutes } from "./routes/plan";
-export type { RecurringRoutes } from "./routes/recurring";
+export type { ScheduleRoutes } from "./routes/schedules";
 export type { SetupRoutes } from "./routes/setup";
 export type { SuggestionRoutes } from "./routes/suggestions";
 export type { TagRoutes } from "./routes/tags";

@@ -5,7 +5,7 @@ import { overspentQuery } from "@/api/buckets";
 import { fundingOwedQuery, fundingPositionQuery } from "@/api/funding";
 import { hygieneQuery, insightsQuery } from "@/api/insights";
 import { forecastQuery, monthPlanQuery } from "@/api/plan";
-import { recurringSignalsQuery } from "@/api/recurring";
+import { scheduleSignalsQuery } from "@/api/schedules";
 import { reviewSummaryQuery } from "@/api/review";
 import { localAsOf } from "@/as-of";
 
@@ -22,7 +22,7 @@ export function startHomeReads(queryClient: QueryClient) {
   void queryClient.prefetchQuery(monthPlanQuery(asOf));
   void queryClient.prefetchQuery(hygieneQuery(asOf));
   void queryClient.prefetchQuery(reviewSummaryQuery(asOf));
-  void queryClient.prefetchQuery(recurringSignalsQuery(asOf));
+  void queryClient.prefetchQuery(scheduleSignalsQuery(asOf));
   void queryClient.prefetchQuery(overspentQuery());
   void queryClient.prefetchQuery(fundingPositionQuery(asOf));
   void queryClient.prefetchQuery(fundingOwedQuery(asOf));
