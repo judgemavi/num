@@ -380,7 +380,7 @@ Bucket events (append only):
   It has no `month`. It is not funding of a month (§5.9).
 - `recede`: money that the fill moves from a savings bucket with `canRecede` back to Unassigned for a cover (§7.7).
   `otherBucketId` is the covered bucket. It has no `month`. The user does not make it and cannot undo it.
-- A manual `fund` cannot be more than Unassigned.
+- A manual `fund` cannot be more than Unassigned on `asOf` (§6).
 - Each event has `amount` (positive), `date`, `month?`, `undoneAt?`. `month` (YYYY-MM) is on a `fund` event that the
   fill paid (§5.9). A manual event has no `month`.
 - Undo of an event sets `undoneAt`. The app does not delete events.
@@ -521,8 +521,10 @@ decision of that item, as a save in the editor does.
   A paused bill gets no money from the fill, thus Unassigned does not cover its gap: all of its gap is short.
 - Thus Available to spend = Unassigned + the positive balances of the spending buckets − the gaps of the bills.
   The app shows no time window and no payday.
-- Available to spend, its parts, Unassigned on Home and Buckets, and the "Saved" fact of the Buckets summary strip
-  (the positive balances of the savings buckets) use the balances on `asOf`: the transactions and the bucket events dated on or before `asOf`, over all active buckets.
+- There is one Unassigned: the Unassigned on `asOf`. It uses the balances on `asOf`: the transactions and the bucket
+  events dated on or before `asOf`. Available to spend and its parts, Unassigned on Home and Buckets, the "Saved" fact
+  of the Buckets summary strip (the positive balances of the savings buckets), the fill (§7.6), the limit of a manual
+  `fund` (§5.8) and the checks (§10) use it. A transaction or an event dated after `asOf` does not change it.
 
 ## 7. Workflows
 

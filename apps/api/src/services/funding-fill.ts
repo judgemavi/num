@@ -4,8 +4,7 @@ import { eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
-import { bucketBalances } from "./bucket-balance";
-import { fundingPosition } from "./funding-book";
+import { positionOn } from "./funding-book";
 import { monthStart, monthlyRows } from "./funding-months";
 import { withoutId, write, type Reader, type WriteInput, type WriteTx } from "./write";
 
@@ -18,10 +17,9 @@ function requireSetup(db: Reader) {
 /** A recede has the covered bucket in `otherBucketId`. */
 type FillEvent = { kind: "cover" | "fund" | "recede"; bucketId: string; otherBucketId: string | null; amount: number; month: string | null };
 
-/** The bucket balances in memory, and Unassigned after the events that are added. */
+/** The bucket balances on `asOf` in memory, and Unassigned on `asOf` after the events that are added. */
 function pool(db: Reader, asOf: string) {
-  const total = fundingPosition(db, asOf).onBudgetTotal;
-  const balances = bucketBalances(db);
+  const { onBudgetTotal: total, balances } = positionOn(db, asOf);
   const events: FillEvent[] = [];
   const balanceOf = (id: string) => balances.get(id) ?? 0;
   return {

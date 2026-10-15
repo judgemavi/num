@@ -1,36 +1,18 @@
 import { accounts } from "@num/db";
-import { divideAmount, isIsoDate, occurrenceDates, positiveBalances, Temporal, unassigned, type FundingPosition } from "@num/shared";
+import { divideAmount, occurrenceDates, positiveBalances, Temporal, unassigned } from "@num/shared";
 import { eq } from "drizzle-orm";
-import { ServiceError } from "../service-error";
 import { balancesOf } from "./account-balance";
 import { bookStep } from "./book-step";
 import { bucketBalances } from "./bucket-balance";
 import { scheduleAmounts, type ScheduleView } from "./schedules";
 import type { Reader } from "./write";
 
-function onBudgetTotal(db: Reader) {
-  const rows = db.select().from(accounts).where(eq(accounts.onBudget, true)).all();
-  return balancesOf(db, rows).reduce((total, item) => total + item.balance, 0);
-}
-
-/** The on-budget total, the bucket balances and Unassigned, all on `asOf`. */
+/** The on-budget total, the bucket balances and Unassigned, all on `asOf`. Each Unassigned of the app comes from here. */
 export function positionOn(db: Reader, asOf: string) {
   const onBudget = db.select().from(accounts).where(eq(accounts.onBudget, true)).all();
   const onBudgetTotal = balancesOf(db, onBudget, asOf).reduce((total, item) => total + item.balance, 0);
   const balances = bucketBalances(db, asOf);
   return { onBudgetTotal, balances, unassigned: unassigned(onBudgetTotal, positiveBalances([...balances.values()])) };
-}
-
-export function fundingPosition(db: Reader, asOf: string): FundingPosition {
-  if (!isIsoDate(asOf)) {
-    throw new ServiceError("as_of_invalid", 400, { asOf });
-  }
-  const total = onBudgetTotal(db);
-  return {
-    asOf,
-    onBudgetTotal: total,
-    unassigned: unassigned(total, positiveBalances([...bucketBalances(db).values()])),
-  };
 }
 
 /** The yearly amount of a schedule divided by 12, with its safe amount. */

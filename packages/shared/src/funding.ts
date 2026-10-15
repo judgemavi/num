@@ -140,12 +140,6 @@ export function monthlyAmount(bucket: MonthlyBucket, balance: number, month: str
   return roundUpShare(total - balance, goalDate === null ? 0 : monthsUntil(month, goalDate), step);
 }
 
-export const fundingPositionSchema = z.object({
-  asOf: isoDateSchema,
-  onBudgetTotal: money,
-  unassigned: money,
-});
-
 /**
  * Available to spend and its parts, all from the balances on `asOf` (spec §6). `savings` is the sum of the positive
  * balances of the sinking, goal and emergency buckets. `billsSetAside` is the positive balance of each bill + the gap of
@@ -179,7 +173,6 @@ export const owedSchema = z.object({
   ),
 });
 
-export type FundingPosition = z.infer<typeof fundingPositionSchema>;
 export type FillResult = z.infer<typeof fillResultSchema>;
 export type Owed = z.infer<typeof owedSchema>;
 export type Available = z.infer<typeof availableSchema>;

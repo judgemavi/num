@@ -3,7 +3,7 @@ import { createBucketEvent } from "./bucket-events";
 import { expectCode, saved, tempDatabase } from "./bucket-test-book";
 import { readBucket } from "./buckets";
 import { createCategory } from "./categories";
-import { fundingPosition } from "./funding-book";
+import { positionOn } from "./funding-book";
 import { account, addSchedule, money, spend } from "./funding-test-book";
 import { createTransaction } from "./transactions";
 
@@ -16,9 +16,9 @@ test("a card purchase does not change Unassigned", () => {
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
     const food = spend(book.db, "Food", 100_000, { categoryIds: [groceries.id] });
     createBucketEvent(book.db, food.id, { kind: "fund", amount: 50_000, date: "2026-10-01", asOf: "2026-10-01", ...saved });
-    expect(fundingPosition(book.db, "2026-10-01").unassigned).toBe(150_000);
+    expect(positionOn(book.db, "2026-10-01").unassigned).toBe(150_000);
     money(book.db, card.id, groceries.id, "2026-10-02", -20_000, "Shop");
-    const after = fundingPosition(book.db, "2026-10-02");
+    const after = positionOn(book.db, "2026-10-02");
     expect(after.onBudgetTotal).toBe(180_000);
     expect(after.unassigned).toBe(150_000);
     createTransaction(book.db, {
@@ -29,7 +29,7 @@ test("a card purchase does not change Unassigned", () => {
       lines: [{ amount: -20_000, transferAccountId: card.id }],
       ...saved,
     });
-    expect(fundingPosition(book.db, "2026-10-03").unassigned).toBe(150_000);
+    expect(positionOn(book.db, "2026-10-03").unassigned).toBe(150_000);
   } finally {
     book.close();
   }
@@ -49,9 +49,9 @@ test("a commitment lowers Unassigned only through its balance", () => {
       interval: 1,
       monthDay: 1,
     });
-    expect(fundingPosition(book.db, "2026-10-01").unassigned).toBe(100_000);
+    expect(positionOn(book.db, "2026-10-01").unassigned).toBe(100_000);
     createBucketEvent(book.db, power.id, { kind: "fund", amount: 2_500, date: "2026-10-01", asOf: "2026-10-01", ...saved });
-    expect(fundingPosition(book.db, "2026-10-01").unassigned).toBe(97_500);
+    expect(positionOn(book.db, "2026-10-01").unassigned).toBe(97_500);
   } finally {
     book.close();
   }

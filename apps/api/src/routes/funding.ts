@@ -1,8 +1,7 @@
-import { asOfQuerySchema, availableSchema, fillResultSchema, fundingPositionSchema, owedSchema } from "@num/shared";
+import { asOfQuerySchema, availableSchema, fillResultSchema, owedSchema } from "@num/shared";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { readAvailable } from "../services/available";
-import { fundingPosition } from "../services/funding-book";
 import { fillBuckets } from "../services/funding-fill";
 import { readOwed } from "../services/funding-months";
 import { validationHook } from "../validation";
@@ -10,21 +9,6 @@ import { errorResponse } from "./common";
 
 const units = "Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.";
 const readOnly = `Read funding. This does not create, change or delete a record. ${units}`;
-
-const positionRoute = createRoute({
-  operationId: "get_funding_position",
-  description: readOnly,
-  method: "get",
-  path: "/api/funding/position",
-  request: { query: asOfQuerySchema },
-  responses: {
-    200: {
-      description: "On-budget total and Unassigned",
-      content: { "application/json": { schema: fundingPositionSchema } },
-    },
-    400: errorResponse,
-  },
-});
 
 const owedRoute = createRoute({
   operationId: "get_funding_owed",
@@ -68,7 +52,6 @@ const fillRoute = createRoute({
 
 export function fundingRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook })
-    .openapi(positionRoute, (c) => c.json(fundingPosition(db, c.req.valid("query").asOf), 200))
     .openapi(owedRoute, (c) => c.json(readOwed(db, c.req.valid("query").asOf), 200))
     .openapi(availableRoute, (c) => c.json(readAvailable(db, c.req.valid("query").asOf), 200))
     .openapi(fillRoute, (c) => c.json(fillBuckets(db, { asOf: c.req.valid("query").asOf, source: "ui" }), 200));

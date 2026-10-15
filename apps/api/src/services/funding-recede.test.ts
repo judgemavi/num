@@ -4,7 +4,7 @@ import { createBucketEvent, undoBucketEvent } from "./bucket-events";
 import { expectCode, expense, saved, tempDatabase } from "./bucket-test-book";
 import { readBucket } from "./buckets";
 import { fillBuckets } from "./funding-fill";
-import { fundingPosition } from "./funding-book";
+import { positionOn } from "./funding-book";
 import { readOwed } from "./funding-months";
 import { needsYouChecks } from "./needs-you-checks";
 import { account, addSchedule, emergency, money, spend } from "./funding-test-book";
@@ -44,12 +44,12 @@ function poolBook(reserve: number) {
 test("a cover that Unassigned cannot pay takes the missing part back from the emergency fund", () => {
   const { book, food, fund } = poolBook(50_000);
   try {
-    expect(fundingPosition(book.db, "2026-10-21").unassigned).toBe(-30_000);
+    expect(positionOn(book.db, "2026-10-21").unassigned).toBe(-30_000);
     fill(book, "2026-10-21");
     expect(recedes(book)).toEqual([{ bucketId: fund.id, otherBucketId: food.id, amount: 30_000, date: "2026-10-01", month: null, undone: false }]);
     expect(readBucket(book.db, food.id).balance).toBe(0);
     expect(readBucket(book.db, fund.id).balance).toBe(20_000);
-    expect(fundingPosition(book.db, "2026-10-21").unassigned).toBe(0);
+    expect(positionOn(book.db, "2026-10-21").unassigned).toBe(0);
     expect(fill(book, "2026-10-22")).toEqual({ paid: 0, payments: 0 });
   } finally {
     book.close();

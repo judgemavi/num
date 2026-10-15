@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
-import { fundingPosition } from "./funding-book";
+import { positionOn } from "./funding-book";
 import { withoutId, write, type WriteTx, type WriteInput } from "./write";
 import { requireWholeAmounts } from "./book-step";
 
@@ -52,7 +52,7 @@ export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCr
       if (!isIsoDate(input.asOf)) {
         throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
       }
-      const free = fundingPosition(tx, input.asOf).unassigned;
+      const free = positionOn(tx, input.asOf).unassigned;
       if (input.amount > free) {
         throw new ServiceError("fund_over_unassigned", 409);
       }

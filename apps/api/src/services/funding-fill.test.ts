@@ -1,11 +1,11 @@
 import { bucketEvents, buckets } from "@num/db";
 import { expect, test } from "bun:test";
-import { undoBucketEvent } from "./bucket-events";
+import { createBucketEvent, undoBucketEvent } from "./bucket-events";
 import { expectCode, expense, saved, tempDatabase } from "./bucket-test-book";
 import { readBucket, updateBucket } from "./buckets";
 import { createCategory } from "./categories";
 import { fillBuckets } from "./funding-fill";
-import { fundingPosition } from "./funding-book";
+import { positionOn } from "./funding-book";
 import { readOwed } from "./funding-months";
 import { account, money, spend } from "./funding-test-book";
 
@@ -37,12 +37,34 @@ test("the fill pays the owed amounts in priority order and stops when Unassigned
       { bucketId: food.id, amount: 100_000, date: "2026-10-01", month: "2026-10", undone: false },
       { bucketId: fuel.id, amount: 20_000, date: "2026-10-01", month: "2026-10", undone: false },
     ]);
-    expect(fundingPosition(book.db, "2026-10-08").unassigned).toBe(0);
+    expect(positionOn(book.db, "2026-10-08").unassigned).toBe(0);
     expect(readOwed(book.db, "2026-10-08").items.filter((item) => item.monthly > 0).map((item) => [item.bucketId, item.monthly, item.owed])).toEqual([
       [food.id, 100_000, 0],
       [fuel.id, 50_000, 30_000],
       [trip.id, 400_000, 400_000],
     ]);
+  } finally {
+    book.close();
+  }
+});
+
+test("a transaction or an event dated after asOf does not change the Unassigned of the fill on asOf", () => {
+  const book = tempDatabase();
+  try {
+    const cash = account(book.db, "Cash", "chequing", 120_000);
+    const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
+    const food = spend(book.db, "Food", 100_000, { priority: 1, ...october });
+    const fuel = spend(book.db, "Fuel", 50_000, { priority: 2, ...october });
+    const trip = spend(book.db, "Trip", 0, { priority: 3, ...october });
+    money(book.db, cash.id, pay.id, "2026-10-20", 500_000, "Payroll");
+    createBucketEvent(book.db, trip.id, { kind: "fund", amount: 20_000, date: "2026-10-25", asOf: "2026-10-25", ...saved });
+    expect(positionOn(book.db, "2026-10-08").unassigned).toBe(120_000);
+    expect(fill(book, "2026-10-08")).toEqual({ paid: 120_000, payments: 2 });
+    expect(funding(book).filter((event) => event.month !== null)).toEqual([
+      { bucketId: food.id, amount: 100_000, date: "2026-10-01", month: "2026-10", undone: false },
+      { bucketId: fuel.id, amount: 20_000, date: "2026-10-01", month: "2026-10", undone: false },
+    ]);
+    expect(positionOn(book.db, "2026-10-08").unassigned).toBe(0);
   } finally {
     book.close();
   }
@@ -190,7 +212,7 @@ test("the fill covers before it pays owed amounts, in priority order, and a part
     money(book.db, cash.id, first.id, "2026-10-05", -30_000, "Shop");
     money(book.db, cash.id, second.id, "2026-10-05", -30_000, "Shop");
     // On-budget total -40 000: cash covers none of it. Unassigned is -40 000, thus 20 000 of 60 000 is covered.
-    expect(fundingPosition(book.db, "2026-10-08").unassigned).toBe(-40_000);
+    expect(positionOn(book.db, "2026-10-08").unassigned).toBe(-40_000);
     fill(book, "2026-10-08");
     expect(covers(book)).toEqual([{ bucketId: a.id, amount: 20_000, date: "2026-10-01", month: null, undone: false }]);
     expect(readBucket(book.db, a.id).balance).toBe(-10_000);
