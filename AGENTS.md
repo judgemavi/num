@@ -180,6 +180,16 @@ in docs or code. Git history keeps the records. An idea that the owner refuses g
   Use your own `PORT`, `WEB_PORT`, `API_PORT` and a `DATA_DIR` under `/tmp`.
 - Stop every server that you started before you report the slice as finished.
 
+## Clean up
+
+Before you report a slice as finished, remove everything that the slice made and does not keep:
+
+- The `DATA_DIR`, logs and scratch files under `/tmp`. Tests remove their temporary databases.
+- The decision record of the slice in `docs/decisions/`. When the folder is empty, remove it.
+- Files that are not in a commit. `git status` in the worktree shows nothing.
+
+After the owner merges, the worktree and the branch of the slice are removed.
+
 ## Verification
 
 Before you open a PR, run all of these. All must pass:
