@@ -56,9 +56,7 @@ function ImportViewPage() {
         title="Imports"
         actions={
           <Button type="button" variant="secondary" asChild>
-            <Link to="/accounts">
-              Accounts
-            </Link>
+            <Link to="/accounts">Accounts</Link>
           </Button>
         }
       />
@@ -79,7 +77,17 @@ function ImportListRow({ item }: { item: ImportViewItem }) {
   const navigate = importsRoute.useNavigate();
   const accountName = useAccountLabels().get(item.accountId) ?? item.accountName;
   return (
-    <ListRow label={item.filename ?? "Statement"} onOpen={() => void navigate({ to: "/accounts/imports/$importId", params: { importId: item.id } })}>
+    <ListRow
+      label={item.filename ?? "Statement"}
+      onOpen={() => void navigate({ to: "/accounts/imports/$importId", params: { importId: item.id } })}
+      menu={
+        hasRemovableFile(item) ? (
+          <RowMenu label={`Actions for ${item.filename ?? "this import"}`}>
+            <RemoveFileMenuItem item={item} />
+          </RowMenu>
+        ) : null
+      }
+    >
       <div className={listName}>
         <p>{item.filename ?? "Statement"}</p>
         <small>
@@ -91,11 +99,6 @@ function ImportListRow({ item }: { item: ImportViewItem }) {
         </small>
       </div>
       <Badge variant={statusVariant(item.status)}>{importStatusLabel(item.status)}</Badge>
-      {hasRemovableFile(item) ? (
-        <RowMenu label={`Actions for ${item.filename ?? "this import"}`}>
-          <RemoveFileMenuItem item={item} />
-        </RowMenu>
-      ) : null}
     </ListRow>
   );
 }

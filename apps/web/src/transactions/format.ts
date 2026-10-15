@@ -1,4 +1,4 @@
-import { Temporal, type ErrorCode, type ReviewLevel } from "@num/shared";
+import { Temporal, type ErrorCode, type ReviewLevel, type TransactionReview } from "@num/shared";
 import { formatMoney } from "@/money";
 
 export function formatDate(iso: string): string {
@@ -16,6 +16,24 @@ export function levelLabel(level: ReviewLevel): string {
     return "Maybe";
   }
   return "No suggestion";
+}
+
+/**
+ * The review text of a row in the table. On the All page: the level of a suggestion or of an automatic label, and
+ * "Needs review" for a question or no suggestion. On the Needs review page: "Question" for a question, the level, and
+ * nothing for no suggestion. A row that does not need review has no text.
+ */
+export function reviewText(review: TransactionReview | null, onReview: boolean): string | null {
+  if (review === null) {
+    return null;
+  }
+  if (review.question !== "categorize") {
+    return onReview ? "Question" : "Needs review";
+  }
+  if (review.level === "none") {
+    return onReview ? null : "Needs review";
+  }
+  return levelLabel(review.level);
 }
 
 /** The text of the toast after approve or a bulk edit: "10 approved · 2 skipped". */

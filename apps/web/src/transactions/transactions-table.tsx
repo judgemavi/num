@@ -1,4 +1,5 @@
 import { accountClass, type TransactionListItem, type TransactionListQuery, type TransactionReviewListQuery } from "@num/shared";
+import { cn } from "cn";
 import { Amount } from "@/components/amount";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,10 +10,9 @@ import type { SortChoice } from "@/lists/list-search";
 import { useAccountLabels, useBookCurrency } from "@/editors/lookups";
 import { CategoryCell } from "@/transactions/category-cell";
 import { useRowLabel } from "@/transactions/row-label";
-import { formatDate, refundOfText, refundedText } from "@/transactions/format";
-import { ReviewConfidence, ReviewStatus } from "@/transactions/review-status";
+import { formatDate, refundOfText, refundedText, reviewText } from "@/transactions/format";
 import { selectable, useSelection } from "@/transactions/selection-state";
-import { useOnReview, useReviewSearch } from "@/transactions/use-transaction-list";
+import { useOnReview } from "@/transactions/use-transaction-list";
 
 export type TransactionSort = SortChoice<NonNullable<TransactionListQuery["sort"]>>;
 
@@ -53,26 +53,24 @@ function SortButton<Column extends string>({ column, label, onSort }: { column: 
   );
 }
 
-/** A column header that sorts the table by its column. */
+/** The `aria-sort` value of a header that sorts by one of `columns`. */
+function ariaSort(sort: TableSort, columns: readonly string[]) {
+  return !columns.includes(sort.sort) ? undefined : sort.dir === "asc" ? "ascending" : "descending";
+}
+
+/** A column header that sorts the table by its column. Only the sorted header has `aria-sort`. */
 function SortHead<Column extends string>({ column, label, sort, onSort, className }: SortHeadProps<Column>) {
-  const sorted = sort.sort !== column ? "none" : sort.dir === "asc" ? "ascending" : "descending";
   return (
-    <TableHead aria-sort={sorted} className={className}>
+    <TableHead aria-sort={ariaSort(sort, [column])} className={className}>
       <SortButton column={column} label={label} onSort={onSort} />
     </TableHead>
   );
 }
 
-/** The Confidence header of Needs review sorts by confidence. */
-function ConfidenceHead() {
-  const { sort, sortBy } = useReviewSearch();
-  return <SortHead column="confidence" label="Confidence" sort={sort} onSort={sortBy} className={wide} />;
-}
-
 const loanPaymentHint = "Loan payments are changed one at a time.";
 
 /** The checkbox of a row. A click selects the row; Shift and click selects a range. */
-function SelectCell({ rows, row }: { rows: TransactionListItem[]; row: TransactionListItem }) {
+function SelectCell({ rows, row, className }: { rows: TransactionListItem[]; row: TransactionListItem; className: string | null }) {
   const selection = useSelection();
   if (!selection) {
     return null;
@@ -89,7 +87,7 @@ function SelectCell({ rows, row }: { rows: TransactionListItem[]; row: Transacti
     />
   );
   return (
-    <TableCell className="w-10" onClick={(event) => event.stopPropagation()}>
+    <TableCell className={cn("w-10", className)} onClick={(event) => event.stopPropagation()}>
       {selectable(row) ? (
         box
       ) : (
@@ -131,16 +129,21 @@ export function TransactionsTable(props: Props) {
   const { openEditor } = useEditors();
   const currency = useBookCurrency();
   const accountNames = useAccountLabels();
-  // The Needs review page shows the proposed label and the confidence.
+  // The Needs review page shows the proposed label and other review text.
   const onReview = useOnReview();
   const rowLabel = useRowLabel(onReview);
+  const selection = useSelection();
 
   function renderRow(row: TransactionListItem) {
     const open = () => void openEditor("transaction", { id: row.id });
     const { label, merchant } = rowLabel(row);
     const balance =
       showBalance && row.runningBalance !== null ? <Amount value={row.runningBalance} owed={accountClass(row.accountKind) === "liability"} /> : null;
-    const status = onReview ? <ReviewConfidence review={row.review} /> : <ReviewStatus review={row.review} />;
+    const review = reviewText(row.review, onReview);
+    // A row that needs review has a stripe in the attention colour at its left edge: on the checkbox cell, or with no
+    // checkbox on the first cell of the narrow table and of the wide table.
+    const stripe = row.review ? "shadow-[inset_3px_0_0_var(--color-attn)]" : null;
+    const edge = selection ? null : stripe;
     return (
       <TableRow
         key={row.id}
@@ -153,41 +156,37 @@ export function TransactionsTable(props: Props) {
           open();
         }}
       >
-        <SelectCell rows={rows} row={row} />
-        {/* A narrow table: line 1 is the payee and the amount; line 2 is the date and the label. */}
-        <TableCell className={`w-full max-w-0 ${narrow}`}>
+        <SelectCell rows={rows} row={row} className={stripe} />
+        {/* A narrow table: line 1 is the payee and the amount; line 2 is the date, the label and the review text. */}
+        <TableCell className={cn("w-full max-w-0", narrow, edge)}>
           <div className="flex items-baseline gap-3">
             <span className="min-w-0 flex-1 truncate font-semibold">{row.payeeRaw}</span>
             <Amount value={row.amount} className="shrink-0" />
           </div>
-          <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-            <span className="min-w-0 flex-1 truncate">
-              {[formatDate(row.date), label, row.status === "open" ? "Pending" : null].filter(Boolean).join(" · ")}
-            </span>
-            {status}
-            {balance ? <small className="shrink-0 text-[13px]">{balance}</small> : null}
+          {/* The review text does not truncate: the label before it truncates. */}
+          <div className="flex items-center gap-1 text-[13px] text-muted-foreground">
+            <span className="min-w-0 truncate">{[formatDate(row.date), label, row.status === "open" ? "Pending" : null].filter(Boolean).join(" · ")}</span>
+            {review ? <span className="shrink-0">· {review}</span> : null}
+            {balance ? <small className="ml-auto shrink-0 pl-1 text-[13px]">{balance}</small> : null}
           </div>
         </TableCell>
-        <TableCell className={wide}>{formatDate(row.date)}</TableCell>
+        <TableCell className={cn(wide, edge)}>{formatDate(row.date)}</TableCell>
         {hideAccount ? null : <TableCell className={`${wide} ${account}`}>{accountNames.get(row.accountId) ?? row.accountName}</TableCell>}
         <TableCell className={`w-full max-w-0 ${wide}`}>
           <div className="truncate">{row.payeeRaw}</div>
           {row.refundOf ? <div className="truncate text-muted-foreground">{refundOfText(currency, row.refundOf.date, row.refundOf.amount)}</div> : null}
           {row.refundedAmount ? <div className="truncate text-muted-foreground">{refundedText(currency, row.refundedAmount)}</div> : null}
         </TableCell>
-        <TableCell className={`max-w-48 [&>div]:truncate ${wide}`}>
-          <CategoryCell label={label} merchant={merchant} />
+        <TableCell className={`max-w-64 [&>div]:truncate ${wide}`}>
+          <CategoryCell label={label} review={review} merchant={merchant} />
         </TableCell>
         <TableCell className={`text-right ${wide}`}>
           <div className="flex items-center justify-end gap-2">
-            {row.status === "open" ? (
-              <span className="text-sm text-muted-foreground">Pending</span>
-            ) : null}
+            {row.status === "open" ? <span className="text-sm text-muted-foreground">Pending</span> : null}
             <Amount value={row.amount} />
           </div>
         </TableCell>
         {showBalance ? <TableCell className={`text-right ${wide}`}>{balance}</TableCell> : null}
-        <TableCell className={wide}>{status}</TableCell>
       </TableRow>
     );
   }
@@ -199,7 +198,7 @@ export function TransactionsTable(props: Props) {
           <TableRow>
             <SelectAllHead rows={rows} />
             {/* A narrow table has one header cell with the sort buttons of its two lines. */}
-            <TableHead className={narrow}>
+            <TableHead aria-sort={ariaSort(sort, ["payeeRaw", "date", "amount"])} className={narrow}>
               <div className="flex items-center gap-4">
                 <SortButton column="payeeRaw" label="Payee" onSort={onSort} />
                 <SortButton column="date" label="Date" onSort={onSort} />
@@ -214,7 +213,6 @@ export function TransactionsTable(props: Props) {
             <TableHead className={wide}>Category</TableHead>
             <SortHead column="amount" label="Amount" sort={sort} onSort={onSort} className={`text-right ${wide}`} />
             {showBalance ? <TableHead className={`text-right ${wide}`}>Balance</TableHead> : null}
-            {onReview ? <ConfidenceHead /> : <TableHead className={wide}>Status</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>{rows.map(renderRow)}</TableBody>

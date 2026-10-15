@@ -8,7 +8,7 @@ import { formatDate } from "@/transactions/format";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { ListCard, ListEmpty, ListRow, listName } from "@/components/list-card";
+import { ListCard, ListEmpty, ListRow, ListTitle, listAmt, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 
 type UpcomingItem = UpcomingList["items"][number];
@@ -55,38 +55,45 @@ function UpcomingRows() {
             key={`${item.bucketId}|${item.dueDate}`}
             label={`${name} on ${formatDate(item.dueDate)}`}
             onOpen={schedule ? () => void openEditor(schedule.kind, { id: item.bucketId }) : undefined}
+            menu={
+              <RowMenu label={`Actions for ${name} on ${formatDate(item.dueDate)}`}>
+                {item.transactionId ? (
+                  <DropdownMenuItem className="min-h-11" onSelect={() => unlink.mutate({ bucketId: item.bucketId, dueDate: item.dueDate })}>
+                    Remove link
+                  </DropdownMenuItem>
+                ) : item.status === "skipped" ? (
+                  <DropdownMenuItem className="min-h-11" onSelect={() => restore.mutate({ bucketId: item.bucketId, dueDate: item.dueDate })}>
+                    Restore
+                  </DropdownMenuItem>
+                ) : (
+                  <>
+                    <DropdownMenuItem
+                      className="min-h-11"
+                      onSelect={() => void openEditor("linkOccurrence", { bucketId: item.bucketId, accountId: item.accountId, dueDate: item.dueDate })}
+                    >
+                      Link a transaction
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="min-h-11"
+                      onSelect={() => void openEditor("skipOccurrence", { bucketId: item.bucketId, dueDate: item.dueDate })}
+                    >
+                      Skip
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </RowMenu>
+            }
           >
             <div className={listName}>
-              <span className="block truncate">{name}</span>
+              <ListTitle name={name} amount={<Amount value={item.actualAmount ?? item.forecastAmount} />} />
               <small>
                 {formatDate(item.dueDate)}
                 {note ? ` · ${note}` : null}
               </small>
             </div>
-            <Amount value={item.actualAmount ?? item.forecastAmount} className="shrink-0" />
-            <RowMenu label={`Actions for ${name} on ${formatDate(item.dueDate)}`}>
-              {item.transactionId ? (
-                <DropdownMenuItem className="min-h-11" onSelect={() => unlink.mutate({ bucketId: item.bucketId, dueDate: item.dueDate })}>
-                  Remove link
-                </DropdownMenuItem>
-              ) : item.status === "skipped" ? (
-                <DropdownMenuItem className="min-h-11" onSelect={() => restore.mutate({ bucketId: item.bucketId, dueDate: item.dueDate })}>
-                  Restore
-                </DropdownMenuItem>
-              ) : (
-                <>
-                  <DropdownMenuItem
-                    className="min-h-11"
-                    onSelect={() => void openEditor("linkOccurrence", { bucketId: item.bucketId, accountId: item.accountId, dueDate: item.dueDate })}
-                  >
-                    Link a transaction
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("skipOccurrence", { bucketId: item.bucketId, dueDate: item.dueDate })}>
-                    Skip
-                  </DropdownMenuItem>
-                </>
-              )}
-            </RowMenu>
+            <div className={listAmt}>
+              <Amount value={item.actualAmount ?? item.forecastAmount} />
+            </div>
           </ListRow>
         );
       })}

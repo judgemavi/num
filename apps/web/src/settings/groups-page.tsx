@@ -54,29 +54,36 @@ function Groups() {
           <ListEmpty>No groups.</ListEmpty>
         ) : (
           rows.map((group) => (
-            <ListRow key={group.id} size="simple" label={group.name} onOpen={() => void openEditor("group", { id: group.id })}>
+            <ListRow
+              key={group.id}
+              size="simple"
+              label={group.name}
+              onOpen={() => void openEditor("group", { id: group.id })}
+              menu={
+                <RowMenu label={`Actions for ${group.name}`}>
+                  <DropdownMenuItem
+                    className="min-h-11"
+                    onSelect={() => {
+                      void confirm({
+                        title: "Delete this group?",
+                        description: `Delete ${group.name}. Categories in this group move to no group.`,
+                        confirmLabel: "Delete",
+                      }).then((ok) => {
+                        if (ok) {
+                          deleteGroup.mutate(group.id);
+                        }
+                      });
+                    }}
+                  >
+                    Delete
+                  </DropdownMenuItem>
+                </RowMenu>
+              }
+            >
               <div className={listName}>
                 {group.name}
                 <small>{countLabel(counts.get(group.id) ?? 0)}</small>
               </div>
-              <RowMenu label={`Actions for ${group.name}`}>
-                <DropdownMenuItem
-                  className="min-h-11"
-                  onSelect={() => {
-                    void confirm({
-                      title: "Delete this group?",
-                      description: `Delete ${group.name}. Categories in this group move to no group.`,
-                      confirmLabel: "Delete",
-                    }).then((ok) => {
-                      if (ok) {
-                        deleteGroup.mutate(group.id);
-                      }
-                    });
-                  }}
-                >
-                  Delete
-                </DropdownMenuItem>
-              </RowMenu>
             </ListRow>
           ))
         )}

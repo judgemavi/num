@@ -3,6 +3,7 @@ import { useState, type ComponentProps, type ReactNode } from "react";
 import { usePhone } from "@/components/use-phone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FieldGroup } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
@@ -17,6 +18,7 @@ type FilterBarProps = {
   search?: ReactNode;
   activeCount: number;
   badges: FilterBadge[];
+  /** The fields of the panel. Each field is one block (`Field`), with a gap between the blocks. */
   fields: ReactNode;
   onOpenChange: (open: boolean) => void;
   onApply: () => void;
@@ -48,17 +50,7 @@ function PanelActions({ onApply, onClear }: { onApply: () => void; onClear: () =
   );
 }
 
-export function FilterBar({
-  search,
-  activeCount,
-  badges,
-  fields,
-  onOpenChange,
-  onApply,
-  onClear,
-  onClearAll,
-  sort,
-}: FilterBarProps) {
+export function FilterBar({ search, activeCount, badges, fields, onOpenChange, onApply, onClear, onClearAll, sort }: FilterBarProps) {
   const phone = usePhone();
   const [open, setOpen] = useState(false);
 
@@ -85,7 +77,7 @@ export function FilterBar({
               <SheetHeader className="shrink-0 px-4 pt-4">
                 <SheetTitle className="font-display text-2xl font-extrabold uppercase [font-stretch:72%]">Filters</SheetTitle>
               </SheetHeader>
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{fields}</div>
+              <FieldGroup className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{fields}</FieldGroup>
               <SheetFooter className="shrink-0">
                 <PanelActions onApply={apply} onClear={onClear} />
               </SheetFooter>
@@ -100,7 +92,7 @@ export function FilterBar({
               <PopoverHeader className="shrink-0 px-4 pt-4">
                 <PopoverTitle className="text-base font-semibold">Filters</PopoverTitle>
               </PopoverHeader>
-              <div className="min-h-0 overflow-y-auto px-4 py-4">{fields}</div>
+              <FieldGroup className="min-h-0 overflow-y-auto px-4 py-4">{fields}</FieldGroup>
               <div className="shrink-0 px-4 pb-4">
                 <PanelActions onApply={apply} onClear={onClear} />
               </div>
@@ -112,9 +104,7 @@ export function FilterBar({
             Clear
           </Button>
         ) : null}
-        {sort ? (
-          <div className="ml-auto shrink-0 max-md:ml-0 max-md:min-w-0 max-md:flex-1">{sort}</div>
-        ) : null}
+        {sort ? <div className="ml-auto shrink-0 max-md:ml-0 max-md:min-w-0 max-md:flex-1">{sort}</div> : null}
       </div>
       {badges.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">

@@ -51,19 +51,26 @@ function Tags() {
           <ListEmpty>{list.shown.archived ? "No archived tags." : "No tags yet."}</ListEmpty>
         ) : (
           rows.map((tag) => (
-            <ListRow key={tag.id} size="simple" label={tag.name} onOpen={() => void openEditor("tag", { id: tag.id })}>
+            <ListRow
+              key={tag.id}
+              size="simple"
+              label={tag.name}
+              onOpen={() => void openEditor("tag", { id: tag.id })}
+              menu={
+                <RowMenu label={`Actions for ${tag.name}`}>
+                  <ArchiveMenuItem
+                    archived={tag.archivedAt !== null}
+                    question={(restore) => ({
+                      title: restore ? "Restore this tag?" : "Archive this tag?",
+                      description: restore ? `Restore ${tag.name}. It returns to the active list.` : `Archive ${tag.name}. It leaves the active list.`,
+                      confirmLabel: restore ? "Restore" : "Archive",
+                    })}
+                    onConfirm={(restore) => archive.mutate({ id: tag.id, restore })}
+                  />
+                </RowMenu>
+              }
+            >
               <div className={listName}>{tag.name}</div>
-              <RowMenu label={`Actions for ${tag.name}`}>
-                <ArchiveMenuItem
-                  archived={tag.archivedAt !== null}
-                  question={(restore) => ({
-                    title: restore ? "Restore this tag?" : "Archive this tag?",
-                    description: restore ? `Restore ${tag.name}. It returns to the active list.` : `Archive ${tag.name}. It leaves the active list.`,
-                    confirmLabel: restore ? "Restore" : "Archive",
-                  })}
-                  onConfirm={(restore) => archive.mutate({ id: tag.id, restore })}
-                />
-              </RowMenu>
             </ListRow>
           ))
         )}

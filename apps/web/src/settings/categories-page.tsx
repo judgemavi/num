@@ -56,8 +56,7 @@ function Categories() {
   const { data: categories } = useSuspenseQuery(categoryListQuery(shown));
   const archive = useArchiveCategory();
 
-  const selectedGroup =
-    search.groupId === "none" ? "No group" : search.groupId ? (groupName.get(search.groupId) ?? "Group") : undefined;
+  const selectedGroup = search.groupId === "none" ? "No group" : search.groupId ? (groupName.get(search.groupId) ?? "Group") : undefined;
   const rows = categories.items;
 
   return (
@@ -112,22 +111,31 @@ function Categories() {
           <ListEmpty>{shown.archived ? "No archived categories." : "No categories."}</ListEmpty>
         ) : (
           rows.map((category) => (
-            <ListRow key={category.id} size="simple" label={category.name} onOpen={() => void openEditor("category", { id: category.id })}>
+            <ListRow
+              key={category.id}
+              size="simple"
+              label={category.name}
+              onOpen={() => void openEditor("category", { id: category.id })}
+              menu={
+                <RowMenu label={`Actions for ${category.name}`}>
+                  <ArchiveMenuItem
+                    archived={category.archivedAt !== null}
+                    question={(restore) => ({
+                      title: restore ? "Restore this category?" : "Archive this category?",
+                      description: restore
+                        ? `Restore ${category.name}. It returns to the active list.`
+                        : `Archive ${category.name}. It leaves the active list.`,
+                      confirmLabel: restore ? "Restore" : "Archive",
+                    })}
+                    onConfirm={(restore) => archive.mutate({ id: category.id, restore })}
+                  />
+                </RowMenu>
+              }
+            >
               <div className={listName}>
                 {category.name}
                 <small>{category.groupId ? (groupName.get(category.groupId) ?? "No group") : "No group"}</small>
               </div>
-              <RowMenu label={`Actions for ${category.name}`}>
-                <ArchiveMenuItem
-                  archived={category.archivedAt !== null}
-                  question={(restore) => ({
-                    title: restore ? "Restore this category?" : "Archive this category?",
-                    description: restore ? `Restore ${category.name}. It returns to the active list.` : `Archive ${category.name}. It leaves the active list.`,
-                    confirmLabel: restore ? "Restore" : "Archive",
-                  })}
-                  onConfirm={(restore) => archive.mutate({ id: category.id, restore })}
-                />
-              </RowMenu>
             </ListRow>
           ))
         )}

@@ -49,7 +49,18 @@ export function DetectedList() {
         const itemKey = planProposalKey(item);
         const add = () => void openEditor(item.expectedAmount > 0 ? "income" : "commitment", { id: null, seed: { ...item, name: name ?? "" } });
         return (
-          <ListRow key={itemKey} label={name ?? "No merchant"} onOpen={add}>
+          <ListRow
+            key={itemKey}
+            label={name ?? "No merchant"}
+            onOpen={add}
+            menu={
+              <RowMenu label={`Actions for ${name ?? "this suggestion"}`}>
+                <DropdownMenuItem className="min-h-11" disabled={decide.isPending} onSelect={() => decide.mutate({ asOf, itemKey, decision: "not_recurring" })}>
+                  Not recurring
+                </DropdownMenuItem>
+              </RowMenu>
+            }
+          >
             <div className={listName}>
               <span className="block truncate">{name ?? "No merchant"}</span>
               <small>
@@ -61,11 +72,6 @@ export function DetectedList() {
                 Add
               </Button>
             </ItemActions>
-            <RowMenu label={`Actions for ${name ?? "this suggestion"}`}>
-              <DropdownMenuItem className="min-h-11" disabled={decide.isPending} onSelect={() => decide.mutate({ asOf, itemKey, decision: "not_recurring" })}>
-                Not recurring
-              </DropdownMenuItem>
-            </RowMenu>
           </ListRow>
         );
       })}

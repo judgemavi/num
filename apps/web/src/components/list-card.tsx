@@ -3,7 +3,7 @@ import { cn } from "cn";
 import { Slot } from "radix-ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Item } from "@/components/ui/item";
+import { Item, ItemActions } from "@/components/ui/item";
 
 type ListCardProps = {
   label: string;
@@ -58,16 +58,15 @@ const rowSize = {
 } as const;
 
 // The target of the row covers the whole row. The other controls of the row are above it (`ItemActions`).
-const rowTarget =
-  "absolute inset-0 cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset";
+// The menu of a row is in the top-right corner of the row. It has no column: a row with a menu has more space at the
+// top, and the content of the row uses the full width. The 44px hit area goes into the padding of the row.
+const rowTarget = "absolute inset-0 cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset";
 
 /**
  * A row that opens has a target: `onOpen` (it opens an editor or does an action) or `link` (a `Link` with no children
  * that goes to a page). `label` is the accessible name of the target.
  */
-type RowTarget =
-  | { label: string; onOpen?: () => void; link?: ReactElement }
-  | { label?: undefined; onOpen?: undefined; link?: undefined };
+type RowTarget = { label: string; onOpen?: () => void; link?: ReactElement } | { label?: undefined; onOpen?: undefined; link?: undefined };
 
 /**
  * A row of a ListCard (`docs/design.md` §6), built on the shadcn `Item`. The target of a row that opens is a button or
@@ -79,10 +78,13 @@ export function ListRow({
   label,
   onOpen,
   link,
+  menu,
   children,
 }: RowTarget & {
   size?: keyof typeof rowSize;
   current?: boolean;
+  /** The `RowMenu` of the row. */
+  menu?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -91,6 +93,7 @@ export function ListRow({
       className={cn(
         "@container relative flex-wrap gap-3.5 rounded-none border-0 border-t border-border px-5 text-[15px] first:border-t-0 hover:bg-row-hover hover:[&_.list-name]:text-primary [.list-group+&]:border-t-0",
         rowSize[size],
+        menu ? "pt-5" : null,
         current && "bg-primary-soft",
       )}
     >
@@ -101,6 +104,7 @@ export function ListRow({
         </Slot.Root>
       ) : null}
       {children}
+      {menu ? <ItemActions className="absolute -top-2.5 right-1.5 z-10">{menu}</ItemActions> : null}
     </Item>
   );
 }
@@ -112,7 +116,21 @@ const smallLines = "[&_small]:block [&_small]:text-[13px] [&_small]:font-normal 
 export const listName = `list-name min-w-0 flex-1 font-semibold ${smallLines}`;
 
 // The columns after the name have fixed widths. Thus the columns of all rows in a card line up, also when the amounts
-// and their secondary lines have different lengths. In a narrow row (less than 42rem) each column takes a full line
-// below the name, and the row actions stay at the top right.
+// and their secondary lines have different lengths. In a narrow row (less than 42rem) the middle column takes a full
+// line below the name. The amount column does not show: `ListTitle` puts the amount at the end of line 1.
 export const listMid = "w-40 shrink-0 @max-2xl:order-1 @max-2xl:basis-full";
-export const listAmt = `w-40 shrink-0 text-right text-base @max-2xl:order-1 @max-2xl:w-auto @max-2xl:basis-full ${smallLines}`;
+export const listAmt = `w-40 shrink-0 text-right text-base @max-2xl:hidden ${smallLines}`;
+
+/**
+ * Line 1 of a row with an amount column: the name (it truncates) and its badges. In a narrow row the amount goes at
+ * the end of this line, at the right edge of the row. The secondary lines of the amount go on line 2 of the name.
+ */
+export function ListTitle({ name, badges, amount, attention = false }: { name: ReactNode; badges?: ReactNode; amount: ReactNode; attention?: boolean }) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="truncate">{name}</span>
+      {badges}
+      <span className={cn("ml-auto hidden shrink-0 pl-2 whitespace-nowrap @max-2xl:inline", attention && "text-attn")}>{amount}</span>
+    </span>
+  );
+}

@@ -129,7 +129,7 @@ global component CSS (AGENTS.md).
 | Pill | Status label, 24px high. Neutral, positive (pos-soft/pos) or attention (attn-soft/attn). |
 | Count | Tomato badge with ink text. Only for "needs you" counts. |
 | Amount | Formats with `Intl` in the browser. Tabular figures. "Owed" label for liabilities. 16px/600. In a secondary line (13px, normal weight) it has the size and the weight of the line. |
-| ListCard | One card. Each row is a shadcn `Item`. A row that opens has one target: a button or a link that covers the row (the row is not a `div` with a key handler). The More menu and the one visible button are `ItemActions` above the target. Optional group header rows: 12px uppercase label on the left, the group total on the right, the same height with and without a total. One hairline is above a header (not above the first group) and one is under it. Lines are never doubled. Rows: min height 60px (48px for simple lists, 36px for dense lists), hairline between rows (lighter in dense lists), `row-hover` on hover, the name in iris on hover. The name column is flexible. The columns after it (a bar, a kind, the amount) have fixed widths, thus they line up in all rows of the card. Long secondary text goes below the name, not in the amount column. In a narrow row (the row is less than 42rem wide) each column after the name takes a full line below the name, and the More button stays at the top right of the row. A bucket row in a narrow row: line 1 is the icon, the name (it truncates), the balance on the right and the More button. Line 2 (muted) is the detail: for a bill "Due <date> · of <amount>" and the short or the fill text; for another bucket its detail and "of <target>" (a spending bucket shows only its detail; an income has no target). Line 2 breaks only after a "·". A thin progress bar in the full width of the row is under the two lines. An income has no bar. The bucket row has no separate amount line. A dense list (the spending list on Home) has a dot, the name and the amount on one line, also on a phone. On a touch screen a dense row is 44px high. |
+| ListCard | One card. Each row is a shadcn `Item`. A row that opens has one target: a button or a link that covers the row (the row is not a `div` with a key handler). The one visible button is an `ItemActions` above the target. The More menu (⋯) is in the top-right corner of the row, above the target, in every list (`ListRow` `menu`). It has no column: a row with a menu has 20px padding at the top, and the content of the row uses the full width. The amount aligns to the right edge of the row. The visible icon is small. The hit area is 44px and goes into the padding of the row. Optional group header rows: 12px uppercase label on the left, the group total on the right, the same height with and without a total. One hairline is above a header (not above the first group) and one is under it. Lines are never doubled. Rows: min height 60px (48px for simple lists, 36px for dense lists), hairline between rows (lighter in dense lists), `row-hover` on hover, the name in iris on hover. The name column is flexible. The columns after it (a bar, a kind, the amount) have fixed widths, thus they line up in all rows of the card. Long secondary text goes below the name, not in the amount column. All lists use one row style. In a narrow row (the row is less than 42rem wide) the amount column does not show: the amount goes on line 1, after the name (it truncates), at the right edge of the row (`ListTitle`). The secondary lines of the amount go on line 2. A middle column (a bar) takes a full line below the name. A bucket row in a narrow row: line 1 is the icon, the name (it truncates) and the balance on the right. Line 2 (muted) is the detail: for a bill "Due <date> · of <amount>" and the short or the fill text; for another bucket its detail and "of <target>" (a spending bucket shows only its detail; an income has no target). Line 2 breaks only after a "·". A thin progress bar in the full width of the row is under the two lines. An income has no bar. The bucket row has no separate amount line. A dense list (the spending list on Home) has a dot, the name and the amount on one line, also on a phone. On a touch screen a dense row is 44px high. |
 | IconTile | 36–40px tile with an identity hue: soft fill, deep glyph. It is the media of the row (`ItemMedia`). |
 | Empty | The empty state of a list: shadcn `Empty` with one quiet line (the title, 15px, muted). No icon, no description, no large block. |
 | Progress | 8px bar, round ends, `sunken` track. Fill = the identity glyph colour. Over budget: `attn-soft` track and tomato text, no fill. |
@@ -179,6 +179,8 @@ page header: a muted chevron and the name of the parent page.
 - Left: search field (max 320px) with a search icon.
 - Then a "Filters" button (secondary). Its count badge shows the number of active filters.
   It opens a `Popover` on desktop and a `Sheet` on the phone with all filter fields and "Apply" / "Clear".
+  The fields are in one `FieldGroup`. Each field (the label and its control) is one `Field`, with a 20px gap between
+  the fields.
 - Then, only when filters are active: a "Clear" ghost button. A click removes all filters.
 - Right: the sort control (`Select` or `DropdownMenu`).
 - On the phone the bar has two lines. Line 1: the search field in the full width. Line 2: "Filters", "Clear" (only when
@@ -239,14 +241,16 @@ Needs review is its own route with the same table: `/transactions` shows all tra
 two tabs (links) in the page header: "All" and "Needs review · N" (with the count, also when it is 0). The tabs are 44px
 high. The text of a tab that is not selected is muted. The selected tab has an iris line under it. With no row, the
 review page shows its empty state. A tab link does not keep the search and the filters.
-Columns: a checkbox, Date, Account, Payee, Category, Amount, Status (and Balance when one account is shown).
+Columns: a checkbox, Date, Account, Payee, Category, Amount (and Balance when one account is shown). There is no
+Status column.
 All column headers have one style: 12px, weight 700, uppercase, muted. A sortable header is a button with the same text.
 The table follows the width of its container, not of the screen. It never scrolls sideways.
 - A narrow table (less than 48rem: a phone, a tablet, a half-screen window) shows the checkbox and one cell with two
   lines. Line 1: the payee (it truncates) and the amount on the right. Line 2 (muted): the date · the category or the
-  transfer text ("Transfer to …"), and "Pending" for a pending row. At the end of line 2: a small Status badge only when
-  the row needs review (on the Needs review page, the confidence badge), and the balance on the page of an account.
-  The header shows the checkbox and the sort buttons "Payee", "Date" and "Amount" (on the right).
+  transfer text ("Transfer to …"), "Pending" for a pending row and the review text. The category truncates, the review
+  text does not. At the end of line 2: the balance on the page of an account.
+  The header shows the checkbox and the sort buttons "Payee", "Date" and "Amount" (on the right). The header has
+  `aria-sort` when the table is sorted by one of them.
 - A wider table shows the columns. The payee and the category truncate. The Account column shows only when the table
   is 56rem wide or more.
 The checkbox column shows only on these two pages, not on the page of an account. A click on the
@@ -258,10 +262,12 @@ The Category column shows the category, "Transfer to <account>" (money out) or "
 below it.
 The Amount cell shows only the exception: "Pending" for an open row (entered by hand in an account that gets imports, not yet on a statement).
 A cleared row shows nothing.
-The Status column (right-most) shows a Badge only when the row needs review: the level (Sure, Likely, Maybe, never a
-percentage) for a row with a suggestion or an automatic label, and "Needs review" for a row with a question or no
-suggestion. On `/transactions/review` the column is "Confidence": the level, "Question" for a question,
-and nothing for a row with no suggestion. The Confidence header is a sort button, as Date, Payee and Amount are.
+A row that needs review has a 3px stripe in the attention colour (`attn`) at its left edge, at all widths. All levels
+have the same colour. The review text is muted text after the category (in the Category cell of a wide table, and on
+line 2 of a narrow table): the level (Sure, Likely, Maybe, never a percentage) for a row with a suggestion or an
+automatic label, and "Needs review" for a row with a question or no suggestion. On `/transactions/review` the review
+text is the level, "Question" for a question, and nothing for a row with no suggestion. The sort by confidence is in the
+sort control. Only the sorted header has `aria-sort`.
 There, the Category column shows the proposed label and merchant of a
 suggestion (the same text as a stored label; the level tells that it is a proposal) and "Transfer to <account>" or "Transfer from <account>" for a
 possible transfer. A row has no buttons. The whole row opens the editor. No dismiss, no queue mode.

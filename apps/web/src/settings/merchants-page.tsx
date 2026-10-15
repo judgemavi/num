@@ -52,22 +52,29 @@ function Merchants() {
           <ListEmpty>{list.shown.archived ? "No archived merchants." : "No merchants yet."}</ListEmpty>
         ) : (
           rows.map((merchant) => (
-            <ListRow key={merchant.id} size="simple" label={merchant.name} onOpen={() => void openEditor("merchant", { id: merchant.id })}>
+            <ListRow
+              key={merchant.id}
+              size="simple"
+              label={merchant.name}
+              onOpen={() => void openEditor("merchant", { id: merchant.id })}
+              menu={
+                <RowMenu label={`Actions for ${merchant.name}`}>
+                  <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("mergeMerchant", { merchantId: merchant.id })}>
+                    Merge
+                  </DropdownMenuItem>
+                  <ArchiveMenuItem
+                    archived={merchant.archivedAt !== null}
+                    question={(restore) => ({
+                      title: restore ? "Restore this merchant?" : "Archive this merchant?",
+                      description: restore ? "It returns to the active list." : "It leaves the active list. You can restore it later.",
+                      confirmLabel: restore ? "Restore" : "Archive",
+                    })}
+                    onConfirm={(restore) => archive.mutate({ id: merchant.id, restore })}
+                  />
+                </RowMenu>
+              }
+            >
               <div className={listName}>{merchant.name}</div>
-              <RowMenu label={`Actions for ${merchant.name}`}>
-                <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("mergeMerchant", { merchantId: merchant.id })}>
-                  Merge
-                </DropdownMenuItem>
-                <ArchiveMenuItem
-                  archived={merchant.archivedAt !== null}
-                  question={(restore) => ({
-                    title: restore ? "Restore this merchant?" : "Archive this merchant?",
-                    description: restore ? "It returns to the active list." : "It leaves the active list. You can restore it later.",
-                    confirmLabel: restore ? "Restore" : "Archive",
-                  })}
-                  onConfirm={(restore) => archive.mutate({ id: merchant.id, restore })}
-                />
-              </RowMenu>
             </ListRow>
           ))
         )}

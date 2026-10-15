@@ -4,11 +4,10 @@ import { useArchiveBucket } from "@/api/buckets";
 import { scheduleSignalsQuery } from "@/api/schedules";
 import { localAsOf } from "@/as-of";
 import { BucketGlyph } from "@/buckets/icons";
-import { BucketTitle } from "@/buckets/bucket-title";
 import { Amount } from "@/components/amount";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { IconTile } from "@/components/icon-tile";
-import { ListRow, listAmt, listName } from "@/components/list-card";
+import { ListRow, ListTitle, listAmt, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -27,40 +26,44 @@ export function IncomeRow({ bucket }: { bucket: Bucket }) {
   const changed = signals.changed.some((item) => item.bucketId === bucket.id);
 
   return (
-    <ListRow label={bucket.name} onOpen={() => void openEditor("income", { id: bucket.id })}>
+    <ListRow
+      label={bucket.name}
+      onOpen={() => void openEditor("income", { id: bucket.id })}
+      menu={
+        <RowMenu label={`Actions for ${bucket.name}`}>
+          {bucket.archivedAt ? null : (
+            <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("skipNext", { bucketId: bucket.id })}>
+              Skip next
+            </DropdownMenuItem>
+          )}
+          <ArchiveMenuItem
+            archived={bucket.archivedAt !== null}
+            question={(restore) => ({
+              title: restore ? "Restore this income?" : "Archive this income?",
+              description: restore
+                ? `Restore ${bucket.name}. It returns to the active list.`
+                : `Archive ${bucket.name}. It leaves the active list. You can restore it later.`,
+              confirmLabel: restore ? "Restore" : "Archive",
+            })}
+            onConfirm={(restore) => archive.mutate({ id: bucket.id, restore })}
+          />
+        </RowMenu>
+      }
+    >
       <IconTile hue={bucket.color}>
         <BucketGlyph name={bucket.icon} />
       </IconTile>
       <div className={listName}>
-        <BucketTitle
+        <ListTitle
           name={bucket.name}
           badges={changed ? <Badge variant="attention">Amount changed</Badge> : null}
           amount={<Amount value={schedule.expectedAmount} />}
-          over={false}
         />
         <small>{scheduleLabel(schedule)}</small>
       </div>
-      <div className={`${listAmt} @max-2xl:hidden`}>
+      <div className={listAmt}>
         <Amount value={schedule.expectedAmount} />
       </div>
-      <RowMenu label={`Actions for ${bucket.name}`}>
-        {bucket.archivedAt ? null : (
-          <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("skipNext", { bucketId: bucket.id })}>
-            Skip next
-          </DropdownMenuItem>
-        )}
-        <ArchiveMenuItem
-          archived={bucket.archivedAt !== null}
-          question={(restore) => ({
-            title: restore ? "Restore this income?" : "Archive this income?",
-            description: restore
-              ? `Restore ${bucket.name}. It returns to the active list.`
-              : `Archive ${bucket.name}. It leaves the active list. You can restore it later.`,
-            confirmLabel: restore ? "Restore" : "Archive",
-          })}
-          onConfirm={(restore) => archive.mutate({ id: bucket.id, restore })}
-        />
-      </RowMenu>
     </ListRow>
   );
 }

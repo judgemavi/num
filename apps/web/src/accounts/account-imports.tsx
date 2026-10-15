@@ -83,6 +83,15 @@ function ImportRows({ accountId, onUndo }: { accountId: string; onUndo: (item: I
       size="simple"
       label={formatImportDate(item.createdAt)}
       onOpen={() => void openEditor("importInfo", { filename: item.filename, counts: item.counts, unreadable: item.unreadable })}
+      menu={
+        item.undoneAt ? null : (
+          <RowMenu label={`Actions for the import on ${formatImportDate(item.createdAt)}`}>
+            <DropdownMenuItem className="min-h-11" onSelect={() => onUndo(item)}>
+              Undo
+            </DropdownMenuItem>
+          </RowMenu>
+        )
+      }
     >
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{formatImportDate(item.createdAt)}</p>
@@ -92,13 +101,6 @@ function ImportRows({ accountId, onUndo }: { accountId: string; onUndo: (item: I
         </p>
       </div>
       <p className="text-right text-[13px] text-muted-foreground">{importCountText(item.counts)}</p>
-      {item.undoneAt ? null : (
-        <RowMenu label={`Actions for the import on ${formatImportDate(item.createdAt)}`}>
-          <DropdownMenuItem className="min-h-11" onSelect={() => onUndo(item)}>
-            Undo
-          </DropdownMenuItem>
-        </RowMenu>
-      )}
     </ListRow>
   ));
 }

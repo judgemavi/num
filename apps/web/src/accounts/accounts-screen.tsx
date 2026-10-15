@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { IconTile } from "@/components/icon-tile";
 import { BalanceScaleIllustration } from "@/components/illustrations";
-import { ListCard, ListEmpty, ListGroup, ListRow, listAmt, listMid, listName } from "@/components/list-card";
+import { ListCard, ListEmpty, ListGroup, ListRow, ListTitle, listAmt, listMid, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RowMenu } from "@/components/row-menu";
@@ -55,15 +55,9 @@ function AccountsPage() {
         actions={
           <>
             <Button type="button" variant="secondary" asChild>
-              <Link to="/accounts/imports">
-                Imports
-              </Link>
+              <Link to="/accounts/imports">Imports</Link>
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => void openEditor("import", { accountId: null })}
-            >
+            <Button type="button" variant="secondary" onClick={() => void openEditor("import", { accountId: null })}>
               <Upload size={20} strokeWidth={1.8} aria-hidden="true" />
               Import a statement
             </Button>
@@ -98,30 +92,13 @@ function AccountsPage() {
           ) : (
             groups.map((group) => (
               <div key={group.id}>
-                <ListGroup
-                  label={groupLabel[group.id]}
-                  aside={<Amount value={group.total} owed={group.id === "liabilities"} />}
-                />
+                <ListGroup label={groupLabel[group.id]} aside={<Amount value={group.total} owed={group.id === "liabilities"} />} />
                 {group.items.map((account) => (
-                    <ListRow
-                      key={account.id}
-                      label={accountLabel(account)}
-                      link={<Link to="/accounts/$accountId" params={{ accountId: account.id }} />}
-                    >
-                      <IconTile hue={groupHue[group.id]}>
-                        <AccountIcon kind={account.kind} />
-                      </IconTile>
-                      <div className={listName}>
-                        {accountLabel(account)}
-                        {owedToYou(account) ? <small className="text-attn">{owedToYouWarning}</small> : null}
-                        <BankStatusLine accountId={account.id} />
-                      </div>
-                      <div className={`${listMid} text-[13px] text-muted-foreground @max-2xl:hidden`}>
-                        {account.archivedAt ? <Badge variant="attention">Archived</Badge> : kindLabel(account.kind)}
-                      </div>
-                      <div className={listAmt}>
-                        <Amount value={account.balance} owed={accountClass(account.kind) === "liability"} />
-                      </div>
+                  <ListRow
+                    key={account.id}
+                    label={accountLabel(account)}
+                    link={<Link to="/accounts/$accountId" params={{ accountId: account.id }} />}
+                    menu={
                       <RowMenu label={`Actions for ${accountLabel(account)}`}>
                         <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("account", { id: account.id })}>
                           Edit
@@ -146,7 +123,23 @@ function AccountsPage() {
                           onConfirm={(restore) => archive.mutate({ id: account.id, restore })}
                         />
                       </RowMenu>
-                    </ListRow>
+                    }
+                  >
+                    <IconTile hue={groupHue[group.id]}>
+                      <AccountIcon kind={account.kind} />
+                    </IconTile>
+                    <div className={listName}>
+                      <ListTitle name={accountLabel(account)} amount={<Amount value={account.balance} owed={accountClass(account.kind) === "liability"} />} />
+                      {owedToYou(account) ? <small className="text-attn">{owedToYouWarning}</small> : null}
+                      <BankStatusLine accountId={account.id} />
+                    </div>
+                    <div className={`${listMid} text-[13px] text-muted-foreground @max-2xl:hidden`}>
+                      {account.archivedAt ? <Badge variant="attention">Archived</Badge> : kindLabel(account.kind)}
+                    </div>
+                    <div className={listAmt}>
+                      <Amount value={account.balance} owed={accountClass(account.kind) === "liability"} />
+                    </div>
+                  </ListRow>
                 ))}
               </div>
             ))

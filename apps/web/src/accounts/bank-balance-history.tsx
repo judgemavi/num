@@ -6,7 +6,7 @@ import { BankStatusActions, BankStatusText } from "@/accounts/bank-status";
 import { useEditors } from "@/editors/editor-api";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
-import { ListCard, ListEmpty, ListRow, listAmt, listName } from "@/components/list-card";
+import { ListCard, ListEmpty, ListRow, ListTitle, listAmt, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -62,22 +62,27 @@ function BankBalanceRows({ accountId }: { accountId: string }) {
       ) : null}
       {list.status ? <BankStatusActions status={list.status} /> : null}
       {list.items.map((item) => (
-        <ListRow key={item.id} size="simple">
+        <ListRow
+          key={item.id}
+          size="simple"
+          menu={
+            <RowMenu label={`Actions for the bank balance on ${formatDate(item.date)}`}>
+              <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("bankBalance", { accountId, id: item.id })}>
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem className="min-h-11" onSelect={() => void confirmDelete(item)}>
+                Delete
+              </DropdownMenuItem>
+            </RowMenu>
+          }
+        >
           <div className={listName}>
-            {formatDate(item.date)}
+            <ListTitle name={formatDate(item.date)} amount={<Amount value={item.balance} owed={owed} />} />
             <small>{item.importBatchId ? "From an import" : "Added by you"}</small>
           </div>
           <div className={listAmt}>
             <Amount value={item.balance} owed={owed} />
           </div>
-          <RowMenu label={`Actions for the bank balance on ${formatDate(item.date)}`}>
-            <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("bankBalance", { accountId, id: item.id })}>
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem className="min-h-11" onSelect={() => void confirmDelete(item)}>
-              Delete
-            </DropdownMenuItem>
-          </RowMenu>
         </ListRow>
       ))}
     </>

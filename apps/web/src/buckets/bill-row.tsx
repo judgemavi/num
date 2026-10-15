@@ -6,12 +6,11 @@ import { localAsOf } from "@/as-of";
 import { BucketBar } from "@/buckets/bucket-bar";
 import { barLabel } from "@/buckets/format";
 import { BucketGlyph } from "@/buckets/icons";
-import { BucketTitle } from "@/buckets/bucket-title";
 import { PauseMenuItem } from "@/buckets/pause-menu-item";
 import { Amount } from "@/components/amount";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
 import { IconTile } from "@/components/icon-tile";
-import { ListRow, listAmt, listMid, listName } from "@/components/list-card";
+import { ListRow, ListTitle, listAmt, listMid, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -44,12 +43,47 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
   );
 
   return (
-    <ListRow label={bucket.name} onOpen={() => void openEditor("commitment", { id: bucket.id })}>
+    <ListRow
+      label={bucket.name}
+      onOpen={() => void openEditor("commitment", { id: bucket.id })}
+      menu={
+        <RowMenu label={`Actions for ${bucket.name}`}>
+          {bucket.archivedAt ? null : (
+            <>
+              <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("assignMoney", { bucketId: bucket.id, kind: "fund" })}>
+                Fund from Unassigned
+              </DropdownMenuItem>
+              <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("assignMoney", { bucketId: bucket.id, kind: "release" })}>
+                Release to Unassigned
+              </DropdownMenuItem>
+              <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("moveMoney", { fromId: bucket.id })}>
+                Move money
+              </DropdownMenuItem>
+              <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("skipNext", { bucketId: bucket.id })}>
+                Skip next
+              </DropdownMenuItem>
+              <PauseMenuItem bucket={bucket} />
+            </>
+          )}
+          <ArchiveMenuItem
+            archived={bucket.archivedAt !== null}
+            question={(restore) => ({
+              title: restore ? "Restore this bill?" : "Archive this bill?",
+              description: restore
+                ? `Restore ${bucket.name}. It returns to the active list.`
+                : `Archive ${bucket.name}. The balance must be zero. It leaves the active list. You can restore it later.`,
+              confirmLabel: restore ? "Restore" : "Archive",
+            })}
+            onConfirm={(restore) => archive.mutate({ id: bucket.id, restore })}
+          />
+        </RowMenu>
+      }
+    >
       <IconTile hue={bucket.color}>
         <BucketGlyph name={bucket.icon} />
       </IconTile>
       <div className={listName}>
-        <BucketTitle
+        <ListTitle
           name={bucket.name}
           badges={
             <>
@@ -58,7 +92,7 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
             </>
           }
           amount={balance}
-          over={over}
+          attention={over}
         />
         <small>
           <span className="whitespace-nowrap">{need ? `Due ${formatDate(need.dueDate)}` : "No next payment"}</span>
@@ -87,42 +121,12 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
       <div className={listMid}>
         <BucketBar hue={bucket.color} balance={bucket.balance} target={amount} label={barLabel(bucket, currency, amount)} />
       </div>
-      <div className={`${listAmt} @max-2xl:hidden ${over ? "text-attn" : ""}`}>
+      <div className={`${listAmt} ${over ? "text-attn" : ""}`}>
         {balance}
         <small>
           of <Amount value={amount} />
         </small>
       </div>
-      <RowMenu label={`Actions for ${bucket.name}`}>
-        {bucket.archivedAt ? null : (
-          <>
-            <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("assignMoney", { bucketId: bucket.id, kind: "fund" })}>
-              Fund from Unassigned
-            </DropdownMenuItem>
-            <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("assignMoney", { bucketId: bucket.id, kind: "release" })}>
-              Release to Unassigned
-            </DropdownMenuItem>
-            <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("moveMoney", { fromId: bucket.id })}>
-              Move money
-            </DropdownMenuItem>
-            <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("skipNext", { bucketId: bucket.id })}>
-              Skip next
-            </DropdownMenuItem>
-            <PauseMenuItem bucket={bucket} />
-          </>
-        )}
-        <ArchiveMenuItem
-          archived={bucket.archivedAt !== null}
-          question={(restore) => ({
-            title: restore ? "Restore this bill?" : "Archive this bill?",
-            description: restore
-              ? `Restore ${bucket.name}. It returns to the active list.`
-              : `Archive ${bucket.name}. The balance must be zero. It leaves the active list. You can restore it later.`,
-            confirmLabel: restore ? "Restore" : "Archive",
-          })}
-          onConfirm={(restore) => archive.mutate({ id: bucket.id, restore })}
-        />
-      </RowMenu>
     </ListRow>
   );
 }
