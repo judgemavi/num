@@ -151,7 +151,7 @@ export const MortgageSection = withForm({
             </form.Field>
             {draftIsBlank(draft) ? null : (
               <Button type="button" variant="outline" className="justify-self-start" onClick={() => form.setFieldValue("mortgage", draftFromTerms(null))}>
-                Remove the mortgage terms
+                Remove
               </Button>
             )}
           </div>

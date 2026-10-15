@@ -75,7 +75,7 @@ function ImportDetailPage() {
     const ok = await confirm({
       title: "Undo this import?",
       description: `Remove the transactions from ${filename} that are still unchanged. Matched rows lose their link.`,
-      confirmLabel: "Undo import",
+      confirmLabel: "Undo",
     });
     if (!ok) {
       return;
@@ -127,7 +127,7 @@ function ImportDetailPage() {
             {item.documentDeletedAt ? <span className="text-sm text-muted-foreground">File removed</span> : null}
             {item.documentId && !item.documentDeletedAt ? (
               <Button type="button" variant="secondary" asChild>
-                <a href={documentPath(item.documentId)}>Download file</a>
+                <a href={documentPath(item.documentId)}>Download</a>
               </Button>
             ) : null}
             {item.status === "undone" && !hasRemovableFile(item) ? null : (

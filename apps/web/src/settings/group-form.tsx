@@ -34,7 +34,7 @@ export function GroupForm({ id, initialName, inline = false, idPrefix = "record-
       idPrefix={idPrefix}
       title={id ? "Rename group" : "New group"}
       description="A group only organizes categories."
-      submitLabel={id ? "Save group" : "Add group"}
+      submitLabel={id ? "Save" : "Add"}
       saving="Saving group"
     />
   );

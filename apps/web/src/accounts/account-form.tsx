@@ -153,7 +153,7 @@ export function AccountForm({ account, terms = null, initialName, inline = false
         <FormActions inline={inline}>
           <FormCancel>Cancel</FormCancel>
           <form.SubmitButton inline={inline} saving="Saving account">
-            {account ? "Save account" : "Add account"}
+            {account ? "Save" : "Add"}
           </form.SubmitButton>
         </FormActions>
       </form.FormShell>

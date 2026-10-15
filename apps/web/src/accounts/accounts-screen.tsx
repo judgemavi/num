@@ -72,7 +72,7 @@ function AccountsPage() {
             </Button>
             <Button type="button" onClick={() => void openEditor("account", { id: null })}>
               <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
-              Add account
+              New
             </Button>
           </>
         }
@@ -161,7 +161,7 @@ function AccountsPage() {
                               : account.balance !== 0
                                 ? `${accountLabel(account)} has a balance of ${formatBalance(bookCurrency, account.kind, account.balance)}. Archive it only if you mean to.`
                                 : `Archive ${accountLabel(account)}. It leaves the active list.`,
-                            confirmLabel: restore ? "Restore account" : "Archive account",
+                            confirmLabel: restore ? "Restore" : "Archive",
                           })}
                           onConfirm={(restore) => archive.mutate({ id: account.id, restore })}
                         />

@@ -90,7 +90,7 @@ export function SetupScreen({ onAlreadyComplete }: SetupScreenProps) {
             )}
           </form.Field>
           <form.FormError invalid="Choose a currency." />
-          <form.SubmitButton saving="Saving setup">Save setup</form.SubmitButton>
+          <form.SubmitButton saving="Saving">Save</form.SubmitButton>
         </form.FormShell>
       </form.AppForm>
     </main>

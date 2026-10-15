@@ -53,7 +53,7 @@ function CurrencyForm() {
         <form.Subscribe selector={(state) => state.values.currency === current}>
           {(unchanged) => (
             <form.SubmitButton disabled={unchanged} saving="Saving currency">
-              Save currency
+              Save
             </form.SubmitButton>
           )}
         </form.Subscribe>

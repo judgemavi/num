@@ -70,7 +70,7 @@ function UpcomingRows() {
                 </DropdownMenuItem>
               ) : item.status === "skipped" ? (
                 <DropdownMenuItem className="min-h-11" onSelect={() => restore.mutate({ bucketId: item.bucketId, dueDate: item.dueDate })}>
-                  Restore this occurrence
+                  Restore
                 </DropdownMenuItem>
               ) : (
                 <>

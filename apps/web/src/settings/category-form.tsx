@@ -154,7 +154,7 @@ export function CategoryForm({ category, initialName, initialKind, inline = fals
         <FormActions inline={inline}>
           <FormCancel>Cancel</FormCancel>
           <form.SubmitButton inline={inline} saving="Saving category">
-            Save category
+            Save
           </form.SubmitButton>
         </FormActions>
       </form.FormShell>

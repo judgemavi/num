@@ -140,6 +140,8 @@ Use shadcn `Table` only for the Transactions list. All other record lists use Li
   Do not use tomato for destructive actions. Tomato means "this needs you" only.
 - Show a status only when it is not the default. Example: show an "Essential" badge; do not show "Not essential".
 - Do not repeat information that the group already gives. Example: no "Income" label on rows in the Income group.
+- A button uses only the verb when the dialog, card, page or row already names the record: "Save", "Add", "New",
+  "Delete". Keep the noun only when the verb alone is not clear (decision 0064).
 
 **Messages after a write (decision 0042):** shadcn `Sonner` toasts, one `Toaster` at the app root, bottom centre.
 - A write that has no form (a row action, a one-click answer, archive, undo, cover) shows an error toast when it

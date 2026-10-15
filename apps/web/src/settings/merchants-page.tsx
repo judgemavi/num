@@ -40,7 +40,7 @@ function Merchants() {
         title="Merchants"
         actions={
           <Button type="button" onClick={() => void openEditor("merchant", { id: null })}>
-            New merchant
+            New
           </Button>
         }
       />

@@ -39,7 +39,7 @@ function Tags() {
         title="Tags"
         actions={
           <Button type="button" onClick={() => void openEditor("tag", { id: null })}>
-            New tag
+            New
           </Button>
         }
       />
@@ -57,7 +57,7 @@ function Tags() {
                   question={(restore) => ({
                     title: restore ? "Restore this tag?" : "Archive this tag?",
                     description: restore ? `Restore ${tag.name}. It returns to the active list.` : `Archive ${tag.name}. It leaves the active list.`,
-                    confirmLabel: restore ? "Restore tag" : "Archive tag",
+                    confirmLabel: restore ? "Restore" : "Archive",
                   })}
                   onConfirm={(restore) => archive.mutate({ id: tag.id, restore })}
                 />

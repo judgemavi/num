@@ -85,7 +85,7 @@ function TimelineCard() {
         <CardTitle className="text-base font-bold">{categoryName ? `${categoryName} spending` : "Income, spending and balance"}</CardTitle>
         {search.category ? (
           <Button type="button" variant="ghost" onClick={() => patchSearch({ category: undefined })}>
-            Show all spending
+            Show all
           </Button>
         ) : null}
       </CardHeader>

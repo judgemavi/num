@@ -86,7 +86,7 @@ export function BankBalanceEditor({ accountId, id }: EditorInput["bankBalance"])
               Cancel
             </Button>
           </DialogClose>
-          <form.SubmitButton>Save bank balance</form.SubmitButton>
+          <form.SubmitButton>Save</form.SubmitButton>
         </DialogFooter>
       </form.FormShell>
     </form.AppForm>

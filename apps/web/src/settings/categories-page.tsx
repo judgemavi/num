@@ -68,7 +68,7 @@ function Categories() {
         title="Categories"
         actions={
           <Button type="button" onClick={() => void openEditor("category", { id: null })}>
-            New category
+            New
           </Button>
         }
       />
@@ -123,7 +123,7 @@ function Categories() {
                   question={(restore) => ({
                     title: restore ? "Restore this category?" : "Archive this category?",
                     description: restore ? `Restore ${category.name}. It returns to the active list.` : `Archive ${category.name}. It leaves the active list.`,
-                    confirmLabel: restore ? "Restore category" : "Archive category",
+                    confirmLabel: restore ? "Restore" : "Archive",
                   })}
                   onConfirm={(restore) => archive.mutate({ id: category.id, restore })}
                 />

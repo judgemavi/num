@@ -22,7 +22,7 @@ export function RemoveFileMenuItem({ item }: { item: ImportViewItem }) {
     <DropdownMenuItem
       className="min-h-11"
       onSelect={() => {
-        void confirm({ title: "Remove the file?", description: keptText(item.transactionCount), confirmLabel: "Remove file" }).then((ok) => {
+        void confirm({ title: "Remove the file?", description: keptText(item.transactionCount), confirmLabel: "Remove" }).then((ok) => {
           if (ok) {
             erase.mutate(documentId);
           }

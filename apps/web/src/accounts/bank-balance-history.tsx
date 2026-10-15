@@ -20,7 +20,7 @@ export function BankBalanceHistory({ accountId }: { accountId: string }) {
       title="Bank balance"
       actions={
         <Button type="button" variant="outline" onClick={() => void openEditor("bankBalance", { accountId, id: null })}>
-          Add bank balance
+          Add
         </Button>
       }
     >
@@ -43,7 +43,7 @@ function BankBalanceRows({ accountId }: { accountId: string }) {
     const ok = await confirm({
       title: "Delete this bank balance?",
       description: `Delete the bank balance of ${formatDate(item.date)}. Your transactions stay as they are.`,
-      confirmLabel: "Delete bank balance",
+      confirmLabel: "Delete",
     });
     if (ok) {
       remove.mutate({ accountId, id: item.id });

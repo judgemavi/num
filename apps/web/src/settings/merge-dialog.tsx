@@ -61,7 +61,7 @@ export function MergeDialog({ source }: { source: Merchant }) {
               Cancel
             </Button>
           </DialogClose>
-          <form.SubmitButton saving="Merging">Merge merchants</form.SubmitButton>
+          <form.SubmitButton saving="Merging">Merge</form.SubmitButton>
         </DialogFooter>
       </form.FormShell>
     </form.AppForm>

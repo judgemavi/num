@@ -43,7 +43,7 @@ function Groups() {
         title="Groups"
         actions={
           <Button type="button" onClick={() => void openEditor("group", { id: null })}>
-            New group
+            New
           </Button>
         }
       />
@@ -64,7 +64,7 @@ function Groups() {
                     void confirm({
                       title: "Delete this group?",
                       description: `Delete ${group.name}. Categories in this group move to no group.`,
-                      confirmLabel: "Delete group",
+                      confirmLabel: "Delete",
                     }).then((ok) => {
                       if (ok) {
                         deleteGroup.mutate(group.id);

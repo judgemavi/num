@@ -98,7 +98,7 @@ export function DateField({ id, value, onChange, disabled, required, placeholder
                 setOpen(false);
               }}
             >
-              Clear date
+              Clear
             </Button>
           </div>
         ) : null}

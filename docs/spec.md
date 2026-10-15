@@ -706,7 +706,7 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
 - **Changed amount.** If a linked amount is outside the tolerance, the Buckets screen shows "Amount changed" on the
   commitment or income row (decisions 0047, 0055, 0062). The person opens it and updates the amount.
 - **Missed.** If an occurrence is older than the grace period, has no link and is not skipped, Home shows it (This month).
-- **Detection.** Buckets → "Detected" suggests a new schedule (Home shows a count). Each suggestion offers "Add as commitment" or "Add as income" (decision 0062) when a group of transactions in one
+- **Detection.** Buckets → "Detected" suggests a new schedule (Home shows a count). Each suggestion offers "Add": a commitment for money out, an income for money in (decisions 0062, 0064) when a group of transactions in one
   account has:
   - 3 or more transactions.
   - Gaps that agree with weekly, biweekly, monthly or yearly, within ±3 days.

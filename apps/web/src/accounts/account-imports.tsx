@@ -21,7 +21,7 @@ export function AccountImports({ accountId }: { accountId: string }) {
     const ok = await confirm({
       title: "Undo this import?",
       description: `Remove the transactions from ${item.filename ?? "this file"} that are still unchanged. Matched rows lose their link.`,
-      confirmLabel: "Undo import",
+      confirmLabel: "Undo",
     });
     if (!ok) {
       return;

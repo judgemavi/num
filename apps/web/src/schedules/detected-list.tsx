@@ -56,32 +56,38 @@ export function DetectedList() {
         const itemKey = planProposalKey(item);
         return (
           <ListRow key={itemKey}>
-            <div className={listName}>
-              {name ?? "No merchant"}
-              <small>
-                {scheduleLabel(item)} from {formatDate(item.startDate)}
-              </small>
+            <div className="grid min-w-0 flex-1 gap-2 py-1">
+              <div className="flex items-start gap-3">
+                <div className={listName}>
+                  {name ?? "No merchant"}
+                  <small>
+                    {scheduleLabel(item)} from {formatDate(item.startDate)}
+                  </small>
+                </div>
+                <Amount value={item.expectedAmount} className="shrink-0" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {item.expectedAmount > 0 ? (
+                  <Button type="button" disabled={pending} onClick={() => add("income", item, name)}>
+                    Add
+                  </Button>
+                ) : (
+                  <Button type="button" disabled={pending} onClick={() => add("commitment", item, name)}>
+                    Add
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={pending}
+                  onClick={() => {
+                    decide.mutate({ asOf, itemKey, decision: "not_recurring" });
+                  }}
+                >
+                  Not recurring
+                </Button>
+              </div>
             </div>
-            <Amount value={item.expectedAmount} />
-            {item.expectedAmount > 0 ? (
-              <Button type="button" disabled={pending} onClick={() => add("income", item, name)}>
-                Add as income
-              </Button>
-            ) : (
-              <Button type="button" disabled={pending} onClick={() => add("commitment", item, name)}>
-                Add as commitment
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={pending}
-              onClick={() => {
-                decide.mutate({ asOf, itemKey, decision: "not_recurring" });
-              }}
-            >
-              Not recurring
-            </Button>
           </ListRow>
         );
       })}

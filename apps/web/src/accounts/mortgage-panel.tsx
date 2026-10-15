@@ -88,7 +88,7 @@ function MortgageView({ accountId }: { accountId: string }) {
           <CardTitle>Mortgage</CardTitle>
         </CardHeader>
         <CardContent className="px-5 pt-4 pb-5">
-          <Button type="button" onClick={openTerms}>Add mortgage terms</Button>
+          <Button type="button" onClick={openTerms}>Add</Button>
         </CardContent>
       </Card>
     );
@@ -101,7 +101,7 @@ function MortgageView({ accountId }: { accountId: string }) {
       <CardHeader className="px-5 pt-5 pb-0">
         <CardTitle>Mortgage</CardTitle>
         <CardAction>
-          <Button type="button" variant="outline" onClick={openTerms}>Mortgage terms</Button>
+          <Button type="button" variant="outline" onClick={openTerms}>Edit</Button>
         </CardAction>
       </CardHeader>
       <CardContent className="grid gap-4 px-5 pt-4 pb-5">

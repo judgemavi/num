@@ -51,7 +51,7 @@ function NewTransaction() {
   return (
     <Button type="button" disabled={accounts.every((account) => account.archivedAt)} onClick={() => void openEditor("transaction", { id: null })}>
       <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
-      New transaction
+      New
     </Button>
   );
 }
