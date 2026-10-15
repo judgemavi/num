@@ -23,7 +23,7 @@ export function InsightsBreakdown() {
   const category = search.category ?? null;
   const { arcs, colors } = spendArcs(data.groups);
   const categoryGroup = category ? data.groups.find((group) => group.categories.some((row) => row.id === category)) : undefined;
-  const selectedGroup = categoryGroup ?? data.groups.find((group) => idOrNone(group) === search.group);
+  const selectedGroup = categoryGroup ?? (search.group ? data.groups.find((group) => idOrNone(group) === search.group) : undefined);
   const selectedKey = selectedGroup ? `${selectedGroup.kind}-${selectedGroup.id ?? ""}` : null;
 
   const groupName = (row: InsightRow) =>
