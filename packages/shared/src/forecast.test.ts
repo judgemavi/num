@@ -15,8 +15,6 @@ test("the card payment day is the median day of the payments in the last 12 mont
 function run(cardInput: Partial<ForecastCard>, start = asOf, cardBalance = -80_000) {
   return buildForecast({
     asOf: start,
-    bufferAmount: 0,
-    nextIncomeDate: null,
     warnings: [],
     accounts: [
       { id: checking, kind: "chequing", balance: 500_000 },

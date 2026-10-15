@@ -170,7 +170,6 @@ test("a forecast read does not write a snapshot", () => {
       interval: 1,
       monthDay: 31,
       businessDayShift: "none",
-      payday: false,
       ...saved,
     });
     const before = book.db.select().from(auditLog).all().length;
@@ -203,7 +202,6 @@ test("variable income uses the median of the last 6 actuals", () => {
       interval: 1,
       monthDay: 1,
       businessDayShift: "none",
-      payday: true,
       ...saved,
     });
     const amounts = [1_000, 2_000, 3_000, 4_000, 5_000, 6_000];
@@ -226,58 +224,5 @@ test("variable income uses the median of the last 6 actuals", () => {
   } finally {
     book.close();
   }
-});
-
-function safeToSpend(income: boolean, payday = true): number {
-  const book = tempDatabase();
-  try {
-    book.db.insert(settings).values({ key: "bufferAmount", value: "2000" }).run();
-    const cash = cashAccount(book.db, "Cash", 1_000_000);
-    createSchedule(book.db, {
-      name: "Rent",
-      kind: "commitment",
-      accountId: cash.id,
-      expectedAmount: -30_000,
-      tolerance: 0,
-      amountMode: "fixed",
-      startDate: "2026-10-20",
-      freq: "monthly",
-      interval: 1,
-      monthDay: 20,
-      businessDayShift: "none",
-      payday: false,
-      ...saved,
-    });
-    if (income) {
-      createSchedule(book.db, {
-        name: "Pay",
-        kind: "income",
-        accountId: cash.id,
-        expectedAmount: payday ? 50_000 : 10_000,
-        tolerance: 0,
-        amountMode: "fixed",
-        startDate: "2026-10-10",
-        freq: "monthly",
-        interval: 1,
-        monthDay: 10,
-        businessDayShift: "none",
-        payday,
-        ...saved,
-      });
-    }
-    return readForecast(book.db, "2026-10-01").safeToSpend;
-  } finally {
-    book.close();
-  }
-}
-
-test("safe to spend uses the next income with payday, or 30 days when there is none", () => {
-  expect(safeToSpend(true)).toBe(998_000);
-  expect(safeToSpend(false)).toBe(968_000);
-});
-
-test("an income that is not a payday does not end the window: the rent of the 20th is in it", () => {
-  // Pay of 10 000 on the 10th, then the rent of 30 000 on the 20th: the lowest total is 980 000, minus the buffer.
-  expect(safeToSpend(true, false)).toBe(978_000);
 });
 

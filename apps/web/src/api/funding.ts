@@ -1,7 +1,6 @@
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { localAsOf } from "@/as-of";
-import { bucketError } from "@/buckets/format";
 
 /** The money that is not in a bucket. */
 export function fundingPositionQuery(asOf: string) {
@@ -19,11 +18,11 @@ export function fundingOwedQuery(asOf: string) {
   });
 }
 
-/** The funding of each month, with the months that the user undid. */
-export function fundingMonthsQuery() {
+/** Available to spend and its parts. */
+export function availableQuery(asOf: string) {
   return queryOptions({
-    queryKey: ["funding-months"],
-    queryFn: async () => (await unwrap(api.funding.months.$get())).items,
+    queryKey: ["funding-available", asOf],
+    queryFn: () => unwrap(api.funding.available.$get({ query: { asOf } })),
   });
 }
 
@@ -50,20 +49,5 @@ export function useFill() {
       const { linked } = await unwrap(api.buckets["auto-link"].$post({ query: { asOf } }));
       return { ...(await unwrap(api.funding.fill.$post({ query: { asOf } }))), linked };
     },
-  });
-}
-
-/** Pay a month again after the user undid its funding. */
-export function useFundAgain() {
-  return useMutation({
-    meta: { errorText: bucketError },
-    mutationFn: (month: string) => unwrap(api.funding.months[":month"].again.$post({ param: { month }, query: { asOf: localAsOf() } })),
-  });
-}
-
-export function useUndoMonthFunding() {
-  return useMutation({
-    meta: { errorText: bucketError },
-    mutationFn: (month: string) => unwrap(api.funding.months[":month"].undo.$post({ param: { month } })),
   });
 }

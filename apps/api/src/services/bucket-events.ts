@@ -1,6 +1,6 @@
 import { bucketEvents, buckets, type BucketEventRow } from "@num/db";
 import { isIsoDate, utcNow, type BucketCover, type BucketEvent, type BucketEventCreate } from "@num/shared";
-import { desc, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
@@ -121,16 +121,6 @@ export function undoBucketEvent(db: Db, bucketId: string, eventId: string, input
     });
     return next;
   });
-}
-
-export function listBucketEvents(db: Db): { items: BucketEvent[] } {
-  const rows = db
-    .select()
-    .from(bucketEvents)
-    .where(isNull(bucketEvents.undoneAt))
-    .orderBy(desc(bucketEvents.date), desc(bucketEvents.id))
-    .all();
-  return { items: rows };
 }
 
 /** Cover an overspent bucket with the amount that it is over: a move from a second bucket. The source must have the whole amount. */

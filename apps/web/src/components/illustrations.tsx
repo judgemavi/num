@@ -20,15 +20,15 @@ function stroke(fill: string, width = 2.5) {
 
 function Art({ label, viewBox, children }: { label: string; viewBox: string; children: ReactNode }) {
   return (
-    <svg className="block h-auto w-[132px] max-md:w-[92px]" viewBox={viewBox} role="img" aria-label={label}>
+    <svg className="block h-auto w-[132px] max-md:w-[88px]" viewBox={viewBox} role="img" aria-label={label}>
       {children}
     </svg>
   );
 }
 
-export function PaydayIllustration() {
+export function HomeIllustration() {
   return (
-    <Art label="A wallet and a calendar with payday circled" viewBox="0 0 220 160">
+    <Art label="A wallet and a calendar" viewBox="0 0 220 160">
       <rect {...stroke(paper)} x="66" y="6" width="8" height="18" rx="4" />
       <rect {...stroke(paper)} x="146" y="6" width="8" height="18" rx="4" />
       <rect {...stroke(paper)} x="56" y="14" width="120" height="112" rx="12" />
@@ -95,24 +95,6 @@ export function JarsIllustration() {
       <path {...stroke(paper)} d="M152 66q0-8 8-8h36q8 0 8 8v74q0 8-8 8h-36q-8 0-8-8z" />
       <path fill={lilac} d="M153.5 76h49v64q0 6.5-6.5 6.5h-36q-6.5 0-6.5-6.5z" />
       <path {...stroke("none")} d="M152 66q0-8 8-8h36q8 0 8 8v74q0 8-8 8h-36q-8 0-8-8z" />
-    </Art>
-  );
-}
-
-export function PaycheckSplitIllustration() {
-  return (
-    <Art label="A paycheck shared between a home, a jar, and a bill" viewBox="0 0 260 160">
-      <rect {...stroke(gold)} x="95" y="6" width="70" height="40" rx="6" />
-      <circle {...stroke("none")} cx="130" cy="26" r="9" />
-      <path {...stroke("none")} strokeDasharray="0 8" d="M118 48Q60 60 40 96M130 48v50M142 48q58 12 79 56" />
-      <rect {...stroke(paper)} x="24" y="118" width="32" height="28" />
-      <path {...stroke(pink)} d="M18 120l22-20 22 20z" />
-      <rect fill={ink} x="36" y="128" width="8" height="18" />
-      <rect {...stroke(ink)} x="118" y="102" width="24" height="9" rx="3" />
-      <rect {...stroke(mint)} x="113" y="110" width="34" height="36" rx="8" />
-      <rect {...stroke(sky)} x="202" y="108" width="40" height="38" rx="7" />
-      <circle {...stroke(paper)} cx="222" cy="127" r="9" />
-      <path {...stroke("none")} d="M222 127l4-4" />
     </Art>
   );
 }

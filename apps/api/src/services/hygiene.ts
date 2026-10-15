@@ -117,12 +117,6 @@ function savingsRate(db: Db, asOf: string) {
   return { code: "savings_rate" as const, pass: rows.every((item) => item.savings >= 0), months: rows };
 }
 
-/** Missed payments. A changed amount is answered on the Buckets screen, not here. */
-function recurring(state: ReviewState) {
-  const missed = state.signals.missed.length;
-  return { code: "recurring" as const, pass: missed === 0, missed };
-}
-
 /** The fill covers a negative bucket from Unassigned. The check fails when a bucket stays negative. */
 function overspent(db: Db, asOf: string) {
   const items = listOverspent(db).items;
@@ -131,20 +125,20 @@ function overspent(db: Db, asOf: string) {
   return { code: "overspent" as const, pass: items.length === 0, unassigned: free, count: items.length, balance };
 }
 
+/** The checks of §10 with the review state that the caller already read. */
+export function hygieneChecks(db: Db, asOf: string, state: ReviewState): Hygiene["checks"] {
+  return [
+    ...emergencyFund(db, asOf),
+    billsShortCheck(db, asOf),
+    ...poolChecks(db, asOf),
+    importsCurrent(db, asOf),
+    reviewAge(state, asOf),
+    savingsRate(db, asOf),
+    overspent(db, asOf),
+  ];
+}
+
 export function readHygiene(db: Db, asOf: string): Hygiene {
   requireAsOf(asOf);
-  const state = loadReviewState(db, asOf);
-  return {
-    asOf,
-    checks: [
-      ...emergencyFund(db, asOf),
-      billsShortCheck(db, asOf),
-      ...poolChecks(db, asOf),
-      importsCurrent(db, asOf),
-      reviewAge(state, asOf),
-      savingsRate(db, asOf),
-      recurring(state),
-      overspent(db, asOf),
-    ],
-  };
+  return { asOf, checks: hygieneChecks(db, asOf, loadReviewState(db, asOf)) };
 }

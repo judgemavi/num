@@ -9,12 +9,10 @@ import { amountSchema } from "./money";
 
 export const forecastDayCount = 90;
 
-/** The safe-to-spend window when no income has `payday` (spec §6). */
-export const noPaydayWindowDays = 30;
-
 export const forecastWarningCodes = ["manual_card"] as const;
 
-export const forecastRisks = ["below_zero", "below_buffer"] as const;
+export const forecastRisks = ["below_zero"] as const;
+
 
 const seriesSchema = z.object({
   known: z.array(amountSchema).length(forecastDayCount),
@@ -35,9 +33,6 @@ const monthFlowSchema = z.object({
 export const forecastSchema = z.object({
   asOf: isoDateSchema,
   dates: z.array(isoDateSchema).length(forecastDayCount),
-  nextIncomeDate: isoDateSchema.nullable(),
-  bufferAmount: z.number().int().min(0),
-  safeToSpend: amountSchema,
   lowest: pointSchema,
   warnings: z.array(
     z.object({
@@ -90,8 +85,6 @@ const riskKinds = new Set<AccountKind>(["chequing", "savings", "cash"]);
 
 export type ForecastInput = {
   asOf: string;
-  bufferAmount: number;
-  nextIncomeDate: string | null;
   warnings: { code: ForecastWarningCode; accountId: string }[];
   accounts: { id: string; kind: AccountKind; balance: number }[];
   deltas: ForecastDelta[];
@@ -286,38 +279,16 @@ export function buildForecast(input: ForecastInput): Forecast {
 
   const totalKnown = dates.map((_, day) => ids.reduce((sum, id) => sum + (knownSeries.get(id)?.[day] ?? 0), 0));
   const totalEstimated = dates.map((_, day) => ids.reduce((sum, id) => sum + (estimatedSeries.get(id)?.[day] ?? 0), 0));
-  const windowEnd = input.nextIncomeDate ?? Temporal.PlainDate.from(input.asOf).add({ days: noPaydayWindowDays }).toString();
-  let floor = totalEstimated[0] ?? 0;
-  for (let day = 0; day < dates.length; day += 1) {
-    if ((dates[day] ?? "") >= windowEnd) {
-      break;
-    }
-    const value = totalEstimated[day] ?? 0;
-    if (value < floor) {
-      floor = value;
-    }
-  }
-
   return {
     asOf: input.asOf,
     dates,
-    nextIncomeDate: input.nextIncomeDate,
-    bufferAmount: input.bufferAmount,
-    safeToSpend: floor - input.bufferAmount,
     lowest: lowestPoint(dates, totalEstimated),
     warnings: input.warnings,
     accounts: ids.map((id) => {
       const estimatedValues = estimatedSeries.get(id) ?? [];
       const low = estimatedValues.length === 0 ? 0 : Math.min(...estimatedValues);
       const kind = kinds.get(id);
-      let risk: ForecastRisk | null = null;
-      if (kind && riskKinds.has(kind)) {
-        if (low < 0) {
-          risk = "below_zero";
-        } else if (low < input.bufferAmount) {
-          risk = "below_buffer";
-        }
-      }
+      const risk: ForecastRisk | null = kind && riskKinds.has(kind) && low < 0 ? "below_zero" : null;
       return {
         accountId: id,
         known: knownSeries.get(id) ?? [],

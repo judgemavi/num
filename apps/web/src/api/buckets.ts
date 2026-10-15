@@ -51,13 +51,6 @@ export function emergencyFundQuery(asOf: string) {
   });
 }
 
-export function bucketEventsQuery() {
-  return queryOptions({
-    queryKey: ["bucket-events"],
-    queryFn: async () => (await unwrap(api.buckets.events.$get())).items,
-  });
-}
-
 export function bucketQuery(id: string) {
   return queryOptions({
     queryKey: ["bucket", id],

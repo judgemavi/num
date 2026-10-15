@@ -16,7 +16,7 @@ const windows = [
   { value: "custom", label: "Custom" },
 ] as const;
 
-/** The period of the Insights screen. It reads the period from the URL and changes it there. */
+/** The period of Spending on Home. It reads the period from the URL and changes it there. */
 export function PeriodSelect() {
   const { search, patchSearch } = useInsightsSearch();
   const queryClient = useQueryClient();

@@ -1,4 +1,4 @@
-import { accounts, bucketCategories, buckets, categories, occurrenceLinks, settings, transactionLines, transactions } from "@num/db";
+import { accounts, bucketCategories, buckets, categories, occurrenceLinks, transactionLines, transactions } from "@num/db";
 import {
   buildForecast,
   cardPaymentDay,
@@ -19,7 +19,6 @@ import { balancesOf } from "./account-balance";
 import { lastCompleteMonths } from "./complete-months";
 import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
-import { nextPayday } from "./funding-book";
 import { activeSchedules, scheduleAmounts, type ScheduleView } from "./schedules";
 import { literal } from "./transaction-sql";
 
@@ -42,15 +41,6 @@ function usualAccount(rows: readonly { accountId: string; date: string }[]) {
     }
   }
   return best?.id ?? null;
-}
-
-function bufferOf(db: Db) {
-  const row = db.select().from(settings).where(eq(settings.key, "bufferAmount")).get();
-  if (!row || !/^\d+$/.test(row.value)) {
-    return 0;
-  }
-  const value = Number(row.value);
-  return Number.isSafeInteger(value) ? value : 0;
 }
 
 function scheduleFlows(schedule: ScheduleView, date: string, amount: number): ForecastFlow[] {
@@ -207,8 +197,6 @@ export function forecastInput(db: Db, asOf: string): ForecastInput & { transfers
 
   return {
     asOf,
-    bufferAmount: bufferOf(db),
-    nextIncomeDate: nextPayday(schedules, skipped, asOf),
     warnings,
     accounts: balancesOf(db, openAccounts, asOf).map(({ account, balance }) => ({
       id: account.id,

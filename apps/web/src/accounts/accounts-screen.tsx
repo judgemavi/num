@@ -82,7 +82,6 @@ function AccountsPage() {
         tint="accounts"
         label={search.archived ? "Archived balances" : "Net worth"}
         amount={<Amount value={worth.net} owed hero />}
-        hint={search.archived ? "These accounts are not in the active list." : "What you have, minus what you owe."}
         facts={
           <>
             <Fact label="What you have">

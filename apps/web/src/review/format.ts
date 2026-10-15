@@ -1,23 +1,4 @@
-import { currencyStep, divideAmount, noPaydayWindowDays, Temporal, type InboxDecisionCode, type ErrorCode } from "@num/shared";
-import { formatMoney } from "@/money";
-
-/** The safe amount for one day, rounded to a whole minor unit of the currency. */
-function perDay(currency: string, amount: number, days: number) {
-  return days <= 0 ? amount : divideAmount(amount, days, currencyStep(currency));
-}
-
-export function paydayHint(currency: string, asOf: string, nextIncome: string | null, safe: number): string {
-  if (nextIncome === null) {
-    return `No paycheck on the plan · next ${noPaydayWindowDays} days · about ${formatMoney(currency, perDay(currency, safe, noPaydayWindowDays))} a day`;
-  }
-  const days = Temporal.PlainDate.from(asOf).until(Temporal.PlainDate.from(nextIncome), { largestUnit: "day" }).days;
-  const when = Temporal.PlainDate.from(nextIncome).toLocaleString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-  return `Payday is ${when} · about ${formatMoney(currency, perDay(currency, safe, days))} a day`;
-}
+import type { InboxDecisionCode, ErrorCode } from "@num/shared";
 
 export function decisionText(code: InboxDecisionCode): string {
   switch (code) {

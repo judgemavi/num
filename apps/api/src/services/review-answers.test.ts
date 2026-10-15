@@ -118,7 +118,6 @@ function bill(db: Db, accountId: string, name: string, day: number, categoryId: 
     monthDay: day,
     businessDayShift: "none",
     endDate: `2026-03-${day}`,
-    payday: false,
     ...saved,
   });
 }

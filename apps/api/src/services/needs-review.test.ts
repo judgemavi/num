@@ -89,7 +89,6 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
       monthDay: 15,
       businessDayShift: "none",
       endDate: "2026-03-15",
-      payday: false,
       ...saved,
     });
     const changedPay = pay(db, cash.id, "2026-03-15", -19_990, "Stream", food.id);
@@ -110,7 +109,6 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
       monthDay: 20,
       businessDayShift: "none",
       endDate: "2026-03-20",
-      payday: false,
       ...saved,
     });
     const phoneA = pay(db, savings.id, "2026-03-20", -10_000, "Phone a", food.id);

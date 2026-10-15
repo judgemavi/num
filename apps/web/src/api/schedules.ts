@@ -1,4 +1,3 @@
-import type { BucketCreate } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { api, formWrite, unwrap } from "@/api/client";
 import { bucketError } from "@/buckets/format";
@@ -23,14 +22,6 @@ export function occurrencesQuery(bucketId: string, asOf: string) {
   return queryOptions({
     queryKey: ["occurrences", bucketId, asOf],
     queryFn: () => unwrap(api.buckets[":id"].occurrences.$get({ param: { id: bucketId }, query: { asOf } })),
-  });
-}
-
-/** Add a schedule that the app detected, with one click. */
-export function useAddDetectedSchedule() {
-  return useMutation({
-    meta: { errorText: bucketError },
-    mutationFn: ({ asOf, body }: { asOf: string; body: BucketCreate }) => unwrap(api.buckets.$post({ query: { asOf }, json: body })),
   });
 }
 

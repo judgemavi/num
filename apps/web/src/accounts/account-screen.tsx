@@ -1,16 +1,15 @@
-import { accountClass } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { accountQuery } from "@/api/accounts";
 import { errorCode } from "@/api/client";
 import { AccountImports } from "@/accounts/account-imports";
+import { AccountSummary } from "@/accounts/account-summary";
 import { MortgagePanel } from "@/accounts/mortgage-panel";
 import { AccountTransactions } from "@/accounts/account-transactions";
 import { BankBalanceHistory } from "@/accounts/bank-balance-history";
 import { accountDetail, kindLabel } from "@/accounts/format";
 import { accountLabel } from "@/accounts/label";
 import { useEditors } from "@/editors/editor-api";
-import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -69,9 +68,7 @@ function AccountPage() {
         </Link>
         {detail ? <span className="text-muted-foreground"> · {detail}</span> : null}
       </p>
-      <p className="text-sm text-muted-foreground">
-        Balance <Amount value={row.balance} owed={accountClass(row.kind) === "liability"} />
-      </p>
+      <AccountSummary accountId={row.id} />
       <div className="grid items-start gap-5">
         {row.kind === "mortgage" ? <MortgagePanel accountId={row.id} /> : null}
         <AccountTransactions />

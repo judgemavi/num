@@ -51,7 +51,6 @@ function monthly(db: Db, accountId: string, kind: "income" | "commitment", expec
     interval: 1,
     monthDay,
     businessDayShift: "none",
-    payday: false,
     ...saved,
   });
 }

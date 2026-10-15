@@ -85,7 +85,6 @@ function bill(db: ReturnType<typeof tempDatabase>["db"], accountId: string, mode
     interval: 1,
     monthDay: 15,
     businessDayShift: "none",
-    payday: false,
     source: "ui",
     at,
   });
@@ -108,7 +107,6 @@ test("one transaction can link to one occurrence only", () => {
       interval: 1,
       monthDay: 15,
       businessDayShift: "none",
-      payday: false,
       source: "ui",
       at,
     });
@@ -133,7 +131,6 @@ test("one transaction can link to one occurrence only", () => {
       interval: 1,
       monthDay: 15,
       businessDayShift: "none",
-      payday: false,
       source: "ui",
       at,
     });
@@ -167,7 +164,6 @@ test("auto-link saves the one candidate and leaves two candidates open", () => {
       interval: 1,
       monthDay: 2,
       businessDayShift: "none",
-      payday: false,
       source: "ui",
       at,
     });
@@ -243,7 +239,6 @@ test("an old unlinked occurrence is not missed", () => {
       interval: 1,
       monthDay: 15,
       businessDayShift: "none",
-      payday: false,
       source: "ui",
       at,
     });
@@ -290,7 +285,6 @@ test("a payment with no merchant is detected by its category until a plan with t
       interval: 1,
       monthDay: 1,
       businessDayShift: "none",
-      payday: false,
       source: "ui",
       at,
     });
@@ -317,7 +311,6 @@ test("upcoming has the occurrences of all active schedules in the next 30 days, 
       interval: 2,
       monthDay: null,
       businessDayShift: "none",
-      payday: false,
       source: "ui",
       at,
     });
@@ -333,7 +326,6 @@ test("upcoming has the occurrences of all active schedules in the next 30 days, 
       interval: 1,
       monthDay: 20,
       businessDayShift: "none",
-      payday: false,
       source: "ui",
       at,
     });
@@ -384,7 +376,6 @@ test("a regular transfer out with no merchant is proposed as a transfer until a 
       interval: 1,
       monthDay: 1,
       businessDayShift: "none",
-      payday: false,
       source: "ui",
       at,
     });

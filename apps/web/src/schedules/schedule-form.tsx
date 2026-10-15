@@ -43,8 +43,8 @@ const shiftOptions = [
 
 const words = {
   commitment: {
-    add: "New commitment",
-    edit: "Edit commitment",
+    add: "New bill",
+    edit: "Edit bill",
     describe: "A payment you must make on a schedule. The app keeps money for it in a bucket.",
     hint: "Enter the amount you pay each time.",
   },
@@ -56,7 +56,7 @@ const words = {
   },
 } as const;
 
-/** The form of a commitment or an income: a bucket with a schedule. */
+/** The form of a bill (a commitment) or an income: a bucket with a schedule. The UI calls a commitment a bill. */
 export function ScheduleForm({ kind, draft }: { kind: "commitment" | "income"; draft: Bucket | ScheduleSeed | "new" }) {
   const { close } = useEditorFrame();
   const currency = useBookCurrency();
@@ -160,11 +160,6 @@ export function ScheduleForm({ kind, draft }: { kind: "commitment" | "income"; d
           {freq === "weekly" ? null : (
             <form.AppField name="monthDay">{(field) => <field.SelectField id="schedule-day" label="Day of the month" options={monthDayOptions} />}</form.AppField>
           )}
-          {kind === "income" ? (
-            <form.AppField name="payday">
-              {(field) => <field.SwitchField id="schedule-payday" label="Payday: safe to spend counts until this income" />}
-            </form.AppField>
-          ) : null}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <form.AppField name="shift">{(field) => <field.SelectField id="schedule-shift" label="Weekend" options={shiftOptions} />}</form.AppField>
             <form.AppField name="endDate">{(field) => <field.DateInputField id="schedule-end" label="Ends" />}</form.AppField>

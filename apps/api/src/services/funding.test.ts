@@ -35,37 +35,6 @@ test("a card purchase does not change Unassigned", () => {
   }
 });
 
-test("the window of payday ends at the next occurrence of an income with payday", () => {
-  const book = tempDatabase();
-  try {
-    const cash = account(book.db, "Cash", "chequing", 100_000);
-    addSchedule(book.db, {
-      name: "Pay",
-      kind: "income",
-      accountId: cash.id,
-      expectedAmount: 200_000,
-      startDate: "2026-10-01",
-      freq: "weekly",
-      interval: 2,
-      payday: true,
-    });
-    addSchedule(book.db, {
-      name: "Side job",
-      kind: "income",
-      accountId: cash.id,
-      expectedAmount: 5_000,
-      startDate: "2026-10-05",
-      freq: "weekly",
-      interval: 1,
-      payday: false,
-    });
-    expect(fundingPosition(book.db, "2026-10-01").nextIncomeDate).toBe("2026-10-15");
-    expect(fundingPosition(book.db, "2026-10-15").nextIncomeDate).toBe("2026-10-29");
-  } finally {
-    book.close();
-  }
-});
-
 test("a commitment lowers Unassigned only through its balance", () => {
   const book = tempDatabase();
   try {

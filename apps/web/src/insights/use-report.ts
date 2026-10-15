@@ -6,12 +6,12 @@ import { insightsQuery } from "@/api/insights";
 import { localAsOf } from "@/as-of";
 import { pageQuery } from "@/editors/page-search";
 
-const insightsRoute = getRouteApi("/insights");
+const homeRoute = getRouteApi("/");
 
-/** The period and the selection in the URL, and the function that changes them. */
+/** The period and the selection of Spending on Home in the URL, and the function that changes them. */
 export function useInsightsSearch() {
-  const urlSearch = insightsRoute.useSearch();
-  const navigate = insightsRoute.useNavigate();
+  const urlSearch = homeRoute.useSearch();
+  const navigate = homeRoute.useNavigate();
   const search = useMemo(() => pageQuery(urlSearch), [urlSearch]);
 
   function patchSearch(patch: InsightsSearch) {
@@ -22,7 +22,7 @@ export function useInsightsSearch() {
 }
 
 /**
- * The report for the period and the selection in the URL. Each card of the Insights screen calls this hook.
+ * The report for the period and the selection in the URL. Each part of Spending on Home calls this hook.
  * The cards share one read. The report on the screen stays while the report for a new period or a new selection loads.
  */
 export function useInsightsReport() {

@@ -158,7 +158,6 @@ function seed(db: Db, dir: string) {
     interval: 1,
     monthDay: 15,
     businessDayShift: "none",
-    payday: false,
     ...saved,
   });
   const imported = importStatement(db, dir, {

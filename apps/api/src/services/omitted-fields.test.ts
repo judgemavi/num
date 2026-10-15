@@ -155,17 +155,10 @@ test("a schedule update keeps the fields that it leaves out and replaces the sch
   });
 });
 
-test("an income keeps `payday` when the patch leaves the schedule out, and a commitment cannot have payday", () => {
+test("a commitment cannot become an income", () => {
   withBook((db) => {
     const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
-    const income = createSchedule(db, { ...scheduleBody(account.id), name: "Pay", kind: "income", expectedAmount: 3_000_000, payday: true, ...saved });
-    expect(income.schedule?.payday).toBe(true);
-    expect(updateBucket(db, income.id, { name: "Pay 2", ...saved }).schedule?.payday).toBe(true);
     const commitment = createSchedule(db, { ...scheduleBody(account.id), ...saved });
-    expect(() => updateBucket(db, commitment.id, { schedule: { ...scheduleBody(account.id), categoryId: null, transferAccountId: null, merchantId: null, monthDay: null, endDate: null, payday: true }, ...saved })).toThrow(
-      expect.objectContaining({ code: "invalid_body", params: { field: "schedule" } }),
-    );
-    // A commitment cannot become an income, and a plain bucket cannot get a schedule.
     expect(() => updateBucket(db, commitment.id, { kind: "income", ...saved })).toThrow();
   });
 });

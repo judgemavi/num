@@ -31,7 +31,6 @@ export function addSchedule(
     monthDay?: number;
     categoryId?: string;
     transferAccountId?: string;
-    payday?: boolean;
     essential?: boolean;
     priority?: number;
   },

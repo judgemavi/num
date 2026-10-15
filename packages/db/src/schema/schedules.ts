@@ -25,7 +25,6 @@ export const schedules = sqliteTable("schedules", {
   monthDay: integer("month_day"),
   businessDayShift: text("business_day_shift", { enum: businessDayShifts }).notNull(),
   endDate: text("end_date"),
-  payday: integer("payday", { mode: "boolean" }).notNull(),
 });
 export type ScheduleRow = typeof schedules.$inferSelect;
 

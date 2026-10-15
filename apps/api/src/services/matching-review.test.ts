@@ -108,7 +108,6 @@ test("undo removes the mortgage mirror created for an imported payment", () => {
       monthDay: 1,
       businessDayShift: "none",
       endDate: null,
-      payday: false,
       ...saved,
     });
     const imported = importCsv(sample.db, sample.dir, sample.account.id, "loan.csv", ["03/01/2026,MORTGAGE,-581.60"], "2026-03-05");
@@ -188,7 +187,6 @@ test("a mortgage import links an existing opposite row", () => {
       monthDay: 1,
       businessDayShift: "none",
       endDate: null,
-      payday: false,
       ...saved,
     });
     importCsv(sample.db, sample.dir, sample.account.id, "loan.csv", ["03/01/2026,MORTGAGE,-581.60"], "2026-03-05");
@@ -232,7 +230,6 @@ test("a recurring link labels even when payee history disagrees", () => {
       monthDay: 12,
       businessDayShift: "none",
       endDate: null,
-      payday: false,
       ...saved,
     });
     importCsv(sample.db, sample.dir, sample.account.id, "rent.csv", ["03/12/2026,NORTH CAFE,-4.00"], "2026-03-20");

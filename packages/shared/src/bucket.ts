@@ -283,10 +283,6 @@ export const bucketEventSchema = z.object({
   undoneAt: z.string().refine(isUtcTimestamp).nullable(),
 });
 
-export const bucketEventListSchema = z.object({
-  items: z.array(bucketEventSchema),
-});
-
 export const bucketEventCreateSchema = z
   .object({
     kind: z.enum(manualEventKinds),

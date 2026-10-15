@@ -130,19 +130,10 @@ export function bucketError(code: ErrorCode | undefined): string {
     return "Money that went back to Unassigned to cover a bucket cannot be undone.";
   }
   if (code === "event_month_funding") {
-    return "This event is part of the funding of a month. Undo the month in the funding history.";
+    return "Funding of a month cannot be undone.";
   }
   if (code === "bucket_emergency_exists") {
     return "The book has one emergency fund already.";
-  }
-  if (code === "funding_month_not_found") {
-    return "That month has no funding to undo.";
-  }
-  if (code === "funding_month_held") {
-    return "The funding of that month is already undone.";
-  }
-  if (code === "funding_month_not_held") {
-    return "That month was not undone.";
   }
   if (code === "fund_over_unassigned") {
     return "That is more than Unassigned.";
@@ -154,7 +145,7 @@ export function bucketError(code: ErrorCode | undefined): string {
     return "Check the details and try again.";
   }
   if (code === "schedule_not_found") {
-    return "That commitment or income is not in the book.";
+    return "That bill or income is not in the book.";
   }
   if (code === "account_not_found" || code === "account_archived") {
     return "Choose an account that is still in use.";

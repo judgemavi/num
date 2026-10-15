@@ -25,7 +25,6 @@ export const scheduleSchema = z.object({
   monthDay: monthDaySchema.nullable(),
   businessDayShift: z.enum(businessDayShifts),
   endDate: isoDateSchema.nullable(),
-  payday: z.boolean(),
 });
 
 export type Schedule = z.infer<typeof scheduleSchema>;
@@ -47,9 +46,6 @@ export function scheduleIssues(kind: "commitment" | "income", schedule: Schedule
     if (schedule.categoryId !== null) {
       issues.push("categoryId");
     }
-  }
-  if (kind === "commitment" && schedule.payday) {
-    issues.push("payday");
   }
   if (schedule.freq === "weekly" && schedule.monthDay !== null) {
     issues.push("monthDay");

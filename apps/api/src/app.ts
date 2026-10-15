@@ -16,7 +16,7 @@ import { inboxRoutes } from "./routes/inbox";
 import { insightsRoutes } from "./routes/insights";
 import { merchantRoutes } from "./routes/merchants";
 import { mortgageRoutes } from "./routes/mortgage";
-import { planRoutes } from "./routes/plan";
+import { feasibilityRoutes } from "./routes/feasibility";
 import { scheduleRoutes } from "./routes/schedules";
 import { setupRoutes } from "./routes/setup";
 import { suggestionRoutes } from "./routes/suggestions";
@@ -58,7 +58,7 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
     .route("/", fundingRoutes(db))
     .route("/", forecastRoutes(db))
     .route("/", hygieneRoutes(db))
-    .route("/", planRoutes(db))
+    .route("/", feasibilityRoutes(db))
     .route("/", categoryRoutes(db))
     .route("/", tagRoutes(db))
     .route("/", merchantRoutes(db))

@@ -60,7 +60,6 @@ function body(accountId: string, kind: "commitment" | "income", schedule: Record
       monthDay: 1,
       businessDayShift: "none",
       endDate: null,
-      payday: false,
       ...schedule,
     },
   };
@@ -90,13 +89,10 @@ test("a commitment and an income are created with their schedule, and the schedu
   const book = tempBook();
   try {
     expect((await create(book, body(book.accountId, "commitment"))).status).toBe(200);
-    expect((await create(book, body(book.accountId, "income", { payday: true }))).status).toBe(200);
+    expect((await create(book, body(book.accountId, "income"))).status).toBe(200);
     const upcoming = (await (await book.app.request(`/api/buckets/upcoming?asOf=${asOf}`)).json()) as { items: { dueDate: string }[] };
     expect(upcoming.items.map((item) => item.dueDate)).toEqual(["2026-11-01", "2026-11-01"]);
 
-    const payday = await create(book, body(book.accountId, "commitment", { payday: true }));
-    expect(payday.status).toBe(400);
-    expect(await payday.json()).toEqual({ code: "invalid_body", params: { field: "schedule" } });
     const transfer = await create(book, body(book.accountId, "income", { transferAccountId: book.accountId }));
     expect(transfer.status).toBe(400);
     const noSchedule = await create(book, { ...body(book.accountId, "commitment"), schedule: null });

@@ -3,7 +3,7 @@ import type { Db } from "../db";
 import { createBucket } from "./buckets";
 import type { WriteInput } from "./write";
 
-type ScheduleInput = Partial<Pick<Schedule, "categoryId" | "transferAccountId" | "merchantId" | "monthDay" | "endDate" | "payday">> &
+type ScheduleInput = Partial<Pick<Schedule, "categoryId" | "transferAccountId" | "merchantId" | "monthDay" | "endDate">> &
   Pick<Schedule, "accountId" | "expectedAmount" | "tolerance" | "amountMode" | "startDate" | "freq" | "interval" | "businessDayShift"> & {
     name: string;
     kind: "commitment" | "income";
@@ -40,7 +40,6 @@ export function createSchedule(db: Db, input: ScheduleInput & WriteInput): Bucke
       merchantId: null,
       monthDay: null,
       endDate: null,
-      payday: false,
       ...schedule,
     },
     asOf: "2000-01-01",

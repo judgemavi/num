@@ -22,7 +22,7 @@ All features must support one of these three loops:
 |---|---|---|---|
 | Weekly review | One time each week | 10 min | Statements are imported. Nothing needs review. Home is all clear. |
 | Monthly funding | Each month | 0 min | The app fills the buckets from Unassigned. The user sees what is still owed. |
-| Monthly check | At the start of each month | 15 min | Each account matches its bank (§5.13). Insights shows the changes of the month. |
+| Monthly check | At the start of each month | 15 min | Each account matches its bank (§5.13). Home shows the spending of the month and the categories that went up. |
 
 If a screen or feature does not support one of these loops, do not add it.
 
@@ -33,7 +33,7 @@ If a screen or feature does not support one of these loops, do not add it.
 3. **Money never changes by itself.** The app does not create, change or delete money (amounts, dates, accounts,
    transfers, loan payments) without a user action. Labels (category and merchant) can be automatic when the app is sure
    (§7.3). An automatic label always shows its level (Sure) and is easy to correct.
-4. **Reversible.** The user can undo imports and funding.
+4. **Reversible.** The user can undo imports and manual bucket events (fund, move, release).
    The user can restore archived accounts, categories, tags, merchants, commitments, incomes and buckets.
    The audit log records each of these actions.
 5. **Exceptions only.** Home shows only what needs the user. The user selects rows, approves their labels and
@@ -97,7 +97,11 @@ The owner tried or examined these ideas and refused them. Do not propose them ag
 | Amounts in minor units, a locked currency, conversion on a currency change | A currency change is a label only (§4). |
 | A full record in a `PATCH` | Clients undid each other's changes (§4). |
 | Seed data (a built-in merchant list, v1 data) | The app learns from the user's answers. |
-| Spending lists by merchant or by tag in Insights | Little use next to the donut. |
+| Spending lists by merchant or by tag | Little use next to the donut. |
+| "Safe to spend until payday", `payday`, a buffer amount | It used the cash forecast and ignored the buckets. It could count money in a savings bucket. Home shows Available to spend (§6). |
+| Month undo, "Fund again", a funding history, an Activity list | Not used. The fill is automatic. A manual bucket event keeps its Undo in the toast. |
+| An Insights screen, a net worth chart, category decreases, new merchants | They repeated other screens. Home has Spending. Accounts has the net worth. |
+| Home cards that repeat a different screen, a hint line that repeats a label, a row that only says that a check passed | Home shows only what needs the user. |
 | A notes field on a transaction | The line memo does the same job. |
 
 ## 4. Conventions
@@ -311,8 +315,6 @@ Fields:
 - `businessDayShift`: `none | next | previous`
 - `endDate?`
 - `transferAccountId?` (a commitment only): the payment is a transfer to that account (example: the mortgage).
-- `payday` (boolean, an income only): the income occurrence ends the window of safe to spend (§6). It does not fund
-  buckets.
 
 The name, `archivedAt`, `color`, `icon`, `priority`, `essential` and the `startDate` of the bucket are fields of the bucket (§5.8).
 The schedule `startDate` is the first occurrence. There is no `active` field. To stop a schedule, archive its bucket
@@ -321,7 +323,6 @@ The schedule `startDate` is the first occurrence. There is no `active` field. To
 Rules:
 - A schedule is a commitment or an income. A transfer that is not a commitment has no schedule (example: a monthly move to savings).
 - `transferAccountId` is for a commitment only. It must not be `accountId`. Then `categoryId` is empty.
-- `payday` is for an income only.
 - A commitment is money out (`expectedAmount` is 0 or less). An income is money in (0 or more).
 - `monthDay` is only for `monthly` and `yearly`. For `yearly`, the month comes from `startDate`.
 - The app calculates occurrences. It does not store occurrences as transactions.
@@ -359,7 +360,7 @@ Settings for each kind:
 - `commitment`: a bucket with a schedule (§5.7). It holds money for the payments of the schedule. `essential` is true by
   default (example of false: a streaming service). A new commitment has priority 0, thus it comes before the other buckets.
   The user can change the order. When two buckets have the same priority, a commitment comes first, then the order of the
-  id. The fill, the month plan and the bucket list use this order. The monthly amount follows the schedule (§7.6).
+  id. The fill and the bucket list use this order. The monthly amount follows the schedule (§7.6).
 - `income`: a schedule with no balance (§5.7). It is not funded and holds no money. Income goes to Unassigned. It has no
   bucket events, and it is never in the fill or in the overspent list.
 - `spending`: `refillTo`. Each month, funding brings the balance up to this amount. `essential` is true by default. The
@@ -383,7 +384,7 @@ Bucket events (append only):
 - Each event has `amount` (positive), `date`, `note?`, `month?`, `undoneAt?`. `month` (YYYY-MM) is on a `fund` event that the
   fill paid (§5.9). A manual event has no `month`.
 - Undo of an event sets `undoneAt`. The app does not delete events.
-  The user can undo an event that has no `month`. The events of the fill are undone only with their month (§5.9).
+  The user can undo an event that has no `month`. The events of the fill cannot be undone (§5.9).
 - To archive a bucket, its balance must be 0. Archive removes its category mappings (audited).
 
 Commitment balance = funds + covers + moves in − moves out − releases − recedes + the full amount of the transactions that are linked
@@ -401,13 +402,9 @@ The balance carries over. There is no reset at the end of a cycle.
 The fill (§7.6) pays the amounts that the buckets owe, month by month. A payment is a `fund` event with
 its `month`. The event has the date of the first day of the month. A funding record does not belong to a transaction.
 
-Month hold: `month` (YYYY-MM), `createdAt`. A hold means that the user undid the funding of that month.
-
-- Funding of a month = the `fund` events with that `month` that are not undone.
-- Undo of a month sets `undoneAt` on the `fund` events of that month and makes the hold (audited, one write).
-  The money returns to Unassigned. The fill does not pay a held month. The covers and the recedes stay.
-- The fill pays only the month of `asOf`. An older held month stays in the history as "Undone". It has no "Fund again".
-- "Fund again" removes the hold, then runs the fill (audited, one write). The fill pays the month by the current figures.
+- Funding of a month = the `fund` events with that `month`.
+- The fill pays only the month of `asOf`.
+- A `fund` event of the fill cannot be undone. There is no month undo.
 - A manual `fund` event does not count as funding of a month.
 
 ### 5.10 Valuation
@@ -501,7 +498,6 @@ decision of that item, as a save in the editor does.
 | Key | Default | Use |
 |---|---|---|
 | `currency` | Set at setup | Book currency (§4) |
-| `bufferAmount` | 0 | Lowest safe balance for "safe to spend" |
 | `staleImportDays` | 10 | Hygiene check |
 | `recurringGraceDays` | 3 | Date window for recurring links |
 | `aiCanWrite` | false | MCP write tools are listed only when true (§12) |
@@ -514,8 +510,13 @@ decision of that item, as a save in the editor does.
 - **Credit cards do not need a special bucket.** The on-budget total includes the card balances.
   A card purchase decreases its bucket and the total by the same amount. Thus, Unassigned does not change.
   A card payment is a transfer between two on-budget accounts. It does not change Unassigned.
-- **Safe to spend (today)** = the lowest projected on-budget total until the next occurrence of an income with `payday` (§5.7, §8) − `bufferAmount`.
-  Show the balance of each spending bucket with it.
+- **Available to spend** = on-budget total − the positive balances of the savings buckets (sinking, goal, emergency)
+  − bills set aside.
+- **Bills set aside** = for each active commitment bucket: its positive balance + the short amount of its next payment
+  (§10 Bills: the next payment, when it is due in the next 30 days after `asOf`). A negative balance counts as 0.
+  Available to spend, the bill row on Buckets and the Bills check use this one calculation.
+- Thus Available to spend = Unassigned + the positive balances of the spending buckets − the short amount of the bills.
+  The app shows no time window and no payday.
 
 ## 7. Workflows
 
@@ -771,9 +772,12 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
   - More than one candidate: the transaction needs review.
 - **Changed amount.** If a linked amount is outside the tolerance, the Buckets screen shows "Amount changed" on the
   commitment or income row. The person opens it and updates the amount.
-- **Missed.** If an occurrence is older than the grace period, has no link and is not skipped, Home shows it (This month).
-- **Detection.** Buckets → "Detected" suggests a new schedule (Home shows a count). Each suggestion offers "Add": a commitment for money out, an income for money in, when a group of transactions in one
-  account has:
+- **Missed.** If an occurrence is older than the grace period, has no link and is not skipped, Home shows it in
+  Needs you. The row opens Buckets, where Upcoming has "Link a transaction" and "Skip". Home is read-only.
+- **Detection.** Buckets → "Detected" suggests a new schedule. A row shows the name, the amount and the cadence, one
+  "Add" button and a menu with "Not recurring". "Add" and a click on the row open the bill or income editor (a commitment
+  for money out, an income for money in), filled with the suggestion. "Add" does not save: the user changes the values,
+  then saves. The app suggests a group when a group of transactions in one account has:
   - 3 or more transactions.
   - Gaps that agree with weekly, biweekly, monthly or yearly, within ±3 days.
   - Amounts within 10% of their median. Older transactions at the start of the run with an amount outside this band
@@ -786,7 +790,7 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
     else no merchant and the same category; else no merchant and the same transfer target; else no merchant, no
     category and an amount within its tolerance.
   - The name of a suggestion is its merchant, else its category, else its transfer target. A suggestion with only an
-    amount has no name: "Add" opens the editor with the proposed values.
+    amount has no name: the user names it in the editor.
 - **Time windows** (they keep the work small and Home calm):
   - Link candidates: occurrences from the later of `startDate` and `asOf` − 13 months.
   - Missed: only occurrences in the last 35 days. Home does not show older unlinked occurrences. The app has no
@@ -799,8 +803,8 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
 ### 7.5 Bank balance
 
 1. The import supplies the bank balance (§7.2). For an account whose files have no balance, the user adds one (§5.13).
-2. The Accounts list, the account page and Home show the status (§5.13). Home is all clear only when each account matches
-   its bank.
+2. The Accounts list and the account page show the status (§5.13). Home shows each account that does not match its bank
+   in Needs you.
 3. The user can change or delete a bank balance. A bank balance does not lock a transaction.
 
 ### 7.6 Monthly funding
@@ -838,7 +842,7 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
      successful write. A read never writes.
    - It funds only the month of `asOf`. It never pays a past month. A month that the app did not fill is not paid later:
      the next month's amount corrects spending, sinking and dated goals, and a goal with no date skips that month.
-   - It skips a held month. It pays only what is still owed, thus it is idempotent. It never takes money back. When
+   - It pays only what is still owed, thus it is idempotent. It never takes money back. When
      nothing is owed or Unassigned is 0, it writes nothing.
    - Before it pays, it covers the negative buckets (§7.7).
    - The emergency bucket takes what is left, up to its owed amount. The buckets after it take the rest. An owed
@@ -848,8 +852,7 @@ Look only at unlinked, not deleted transactions from the last 90 days. Each tran
 5. **Paychecks.** A paycheck makes no funding. Its link, unlink or delete does not change funding.
 6. **Manual funding.** The user can fund, move or release money of a bucket at any time (§5.8). This does not count as
    the funding of a month.
-7. **Still owed.** Home and Buckets show the amount that is still owed for the month of `asOf`, for each bucket. When
-   the month is held, they show that its funding is undone, with "Fund again".
+7. **Still owed.** Buckets shows the amount that is still owed for the month of `asOf`, for each bucket.
 
 ### 7.7 Overspending
 
@@ -864,8 +867,8 @@ from Unassigned. It does this in the same write, before it pays the owed amounts
   with `recede` events, then the cover is written. They give in priority order, the lowest
   priority first. The emergency bucket is in this order by its priority. Each bucket gives down to 0, never less.
   A bucket does not cover itself with a recede. A paused bucket can give. Commitments and spending buckets never give.
-  The recede is automatic. A recede has no month. A month undo does not remove it.
-- When a bucket stays negative, Home and Buckets show the overspent buckets. The user moves money from a different bucket
+  The recede is automatic. A recede has no month.
+- When a bucket stays negative, Home (Needs you) and Buckets show the overspent buckets. The user moves money from a different bucket
   or releases money. There is no review item for this.
 
 Expense lines in categories without a bucket decrease Unassigned directly.
@@ -873,7 +876,8 @@ Expense lines in categories without a bucket decrease Unassigned directly.
 ### 7.8 Goal feasibility
 
 For each goal and sinking bucket, the app calculates the monthly amount (§7.6).
-Buckets (goals) compares the total with the monthly surplus.
+Buckets (goals) compares the total with the monthly surplus. When the goals do not fit, Home shows the shortfall in
+Needs you.
 
 Monthly surplus = the monthly income − the monthly amount of each other bucket (the commitments, the spending refills, the
 sinking and goal buckets). It does not subtract an emergency amount.
@@ -912,20 +916,20 @@ The forecast is daily, for 90 days. It shows each on-budget account and the tota
 
 **Output:**
 - The lowest point and its date.
-- Safe to spend (§6).
-- Each account that goes below zero or below the buffer.
+- Each chequing, savings or cash account that goes below zero.
+- The monthly income and spending of the 90 days. Do not show daily values after 90 days.
 
-After 90 days, show only the monthly net values (Home, this month). Do not show daily values.
+## 9. Spending
 
-## 9. Insights
+Spending is a part of Home (§14). It has no screen of its own.
 
-- **Summary.** Income, spending, savings and the savings rate of the breakdown range.
-- **Changes.** The changes of one month, the change month.
-  - The change month is the selected month. If no month is selected, it is the month of the last day of the period.
-  - The 3 largest increases and the 3 largest decreases by category, compared with the median of the 3 months
-    before the change month.
-  - New merchants: merchants whose first transaction is in the change month.
-- **Period.** One selector: 1, 3, 6 (default) or 12 months, All, or Custom (From and To). "1" is the month of `asOf`.
+- **Summary.** One muted line: the breakdown range, the spending of the income and the savings rate
+  (example: "October · $4,410 spent of $6,200 income · 29% saved"). It follows the selected period. One month shows
+  its name, with the year when it is not the year of `asOf`.
+- **Increases.** The 3 largest increases by category in the month of `asOf`, compared with the median of the 3 months
+  before it. They show in Needs you (§14). There are no decreases and no new merchants.
+- **Period.** One selector: 1 (default, "This month"), 3, 6 or 12 months, All, or Custom (From and To). "1" is the
+  month of `asOf`.
   "All" starts at the first transaction. The breakdowns use the period up to `asOf`.
 - **Timeline.** One chart: monthly income and spending bars, and the daily on-budget balance line.
   After `asOf`, it shows the forecast (§8, 90 days): the bar of the month of `asOf` has an actual part and a forecast
@@ -937,13 +941,15 @@ After 90 days, show only the monthly net values (Home, this month). Do not show 
   Uncategorized lines are one inner slice, "Uncategorized", that cannot be selected. A group or category with spending
   of 0 or less is not a slice, but it stays in the list. A click on a group highlights it and limits the list to it.
   A click on a category limits the timeline and the list to that category. On a wide screen, the timeline and the
-  donut are in one row. The list is under them. It opens when a month bar or a slice is selected.
-- **Net worth.** Assets − liabilities at the end of each month. Show a chart for 24 months.
-- **Mortgage.** Balance, rate, schedule and payoff date. Also, the effect of an extra payment amount.
+  donut are in one row. The list of groups and categories is under them. It is always open. A month bar or a slice
+  limits it.
+- **Mortgage.** The page of the mortgage account shows the balance, rate, schedule and payoff date. Also, the effect of
+  an extra payment amount.
 
 ## 10. Hygiene checks
 
-One panel shows all checks. Each check is deterministic. Each check shows its numbers and a link to the fix.
+Each check is deterministic. The UI shows a check only when it fails, as an item in Home "Needs you" (§14), with its
+numbers. The row opens the screen of its fix.
 
 | Check | The check passes when |
 |---|---|
@@ -954,7 +960,6 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 | Imports are current | Each on-budget account has an import in the last `staleImportDays` days |
 | Review | No transaction has needed review for more than 7 days |
 | Savings rate | The savings rate of the last 3 complete months (§8) is 0% or more. Show the percentage. |
-| Recurring | There are no missed occurrences |
 | Overspent | No bucket has a negative balance (§7.7) |
 
 ## 11. Audit and undo
@@ -963,8 +968,7 @@ One panel shows all checks. Each check is deterministic. Each check shows its nu
 
 Undo is available for:
 - Import batch.
-- Funding of a month (§5.9).
-- Bucket move.
+- A manual bucket event: fund, move and release (§5.8). The success toast has "Undo".
 
 To correct other records, the user edits them. The audit log records each edit.
 
@@ -1018,18 +1022,18 @@ To correct other records, the user edits them. The audit log records each edit.
 
 ## 14. Screens
 
-There are 6 screens.
+There are 5 screens. The UI calls a commitment a "bill" (the group, the editor and the "New" menu item). The code names
+do not change.
 
 | Screen | Contents |
 |---|---|
-| Home | The first screen. Financial health: safe to spend until payday; "N need review" (link to Needs review, `/transactions/review`); each account that does not match its bank (§5.13); hygiene checks (§10); this month: income → commitments (the monthly amount of the commitment buckets, §7.6) → bucket funding (the monthly amount of the other buckets) → left to save, what buckets still owe this month, missed payments, overspent buckets (only when a bucket stays negative), goal status; spending changes this month; net worth. Each card links to its screen. |
+| Home | The first screen, from top to bottom. 1. **Summary strip:** "Available to spend" (§6) and, below it, one row with three small amounts: "In your accounts" − "Saving buckets" − "Set aside for bills". No hint line. 2. **Needs you:** one list card with a count badge. It shows only the items that need the user, in this order: transactions need review (the count, and the count older than 7 days); each account that does not match its bank (§5.13); imports older than `staleImportDays`; each missed payment (§7.4); overspent buckets (§7.7); goals that do not fit the monthly income, with the short amount (§7.8); each bill that is short for its next payment, "<bill> is <amount> short for <date>" (§10 Bills); emergency fund below its target; savings used this month; the pool runs short, with the buckets to pause, the buckets that would give money back and the part that is not covered (§10); a savings rate below 0% in a complete month; each category that went up against its median (§9). Home is read-only: each row has no actions and opens the screen of its fix. When no item needs the user, the card shows one line: "All clear". 3. **Spending** (§9): a section title, the summary line, the period selector, the timeline, the spending donut and the list of groups and categories. |
 | Transactions | Two pages with the same table: All (`/transactions`) and Needs review (`/transactions/review`, §7.3). Search and filter, Status column (Confidence on Needs review), detail and edit, lines, tags, transfers, row selection with Approve and the bulk editor. |
-| Buckets | Groups Income, Commitments, Spending and Savings (sinking, goal, emergency). The Commitments group shows its rows in fill order (§7.6). A commitment row shows "Due <date>" of its next payment, a progress bar, "<balance> of <amount>" of that payment (§10 Bills) and, when it is short, "<amount> short" in the attention colour. Each bucket except an income has "Pause" or "Resume" in its row menu, and a paused row shows "Paused". Balances, what is still owed this month, funding history (by month, with Undo and Fund again), moves, goals (feasibility), settings. A commitment or income row has its schedule, links, skips and "Amount changed". Side column: Upcoming (occurrences of all schedules in the next 30 days) and Detected (new schedule suggestions). |
-| Insights | Changes (category increases and decreases, new merchants), timeline (actual and forecast), spending donut (groups and categories in two rings), net worth, mortgage. |
-| Accounts | List with balances and the bank status of each account (§5.13), import, bank balances, valuations, mortgage terms. An "Imports" view lists all imports and import problems (§7.2). |
+| Buckets | Summary strip: the hero is Unassigned. Facts: "Left to spend" (the spending buckets) and "Saved" (the savings buckets). No hint line. Groups Income, Bills (the UI name of the commitments), Spending and Savings (sinking, goal, emergency). The Bills group shows its rows in fill order (§7.6). A bill row shows "Due <date>" of its next payment, a progress bar, "<balance> of <amount>" of that payment (§10 Bills) and, when it is short, "<amount> short" in the attention colour. Each bucket except an income has "Pause" or "Resume" in its row menu, and a paused row shows "Paused". Balances, what is still owed this month, moves, goals (feasibility), settings. A bill or income row has its schedule, links, skips and "Amount changed". Side column: Upcoming (occurrences of all schedules in the next 30 days) and Detected (new schedule suggestions). |
+| Accounts | Summary strip with the net worth and no hint line. List with balances and the bank status of each account (§5.13), import, bank balances, valuations, mortgage terms. The account page shows the balance in a summary strip (surface colour, no illustration). Facts: the last bank balance with its date, and the date of the last import. When the account does not match its bank, the hint line shows the difference. A mortgage account page has the mortgage panel (§9). An "Imports" view lists all imports and import problems (§7.2). |
 | Settings | Subpages: Groups, Categories, Tags, Merchants, Currency, AI access, Backup. |
 
-The first-run setup screen (§7.0) is not one of the 6 screens. It shows only one time.
+The first-run setup screen (§7.0) is not one of the 5 screens. It shows only one time.
 
 ## 15. Open source
 

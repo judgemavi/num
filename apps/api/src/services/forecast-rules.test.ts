@@ -93,7 +93,6 @@ function bill(
     monthDay,
     businessDayShift: shift,
     endDate,
-    payday: false,
     ...saved,
   });
 }

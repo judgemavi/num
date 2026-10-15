@@ -80,7 +80,7 @@ export function transactionError(code: ErrorCode | undefined): string {
     case "bucket_archived":
       return "That payment is no longer open.";
     case "transaction_already_linked":
-      return "This transaction is already the payment of a commitment or an income.";
+      return "This transaction is already the payment of a bill or an income.";
     case "invalid_body":
       return "Check the transaction fields.";
     default:

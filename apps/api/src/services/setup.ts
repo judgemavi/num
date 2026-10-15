@@ -8,7 +8,6 @@ import { defaultCategoryGroups } from "./default-categories";
 import { write, type AuditSource, type WriteTx } from "./write";
 
 const settingDefaults = [
-  ["bufferAmount", "0"],
   ["staleImportDays", "10"],
   ["recurringGraceDays", "3"],
 ] as const;

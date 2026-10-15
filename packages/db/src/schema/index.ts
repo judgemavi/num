@@ -1,6 +1,6 @@
 export { accounts, mortgageTerms } from "./accounts";
 export type { AccountRow, MortgageTermRow } from "./accounts";
-export { bucketCategories, bucketEvents, buckets, monthHolds } from "./buckets";
+export { bucketCategories, bucketEvents, buckets } from "./buckets";
 export type { BucketEventRow, BucketRow } from "./buckets";
 export { categories, categoryGroups, merchants, tags } from "./categories";
 export type { CategoryGroupRow, CategoryRow, MerchantRow, TagRow } from "./categories";

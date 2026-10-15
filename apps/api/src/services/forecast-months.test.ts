@@ -50,7 +50,6 @@ function monthly(db: Db, input: Pick<ScheduleInput, "name" | "kind" | "accountId
     freq: "monthly",
     interval: 1,
     businessDayShift: "none",
-    payday: false,
     ...input,
     ...saved,
   });
@@ -74,7 +73,7 @@ test("forecast months: unlinked income, bills and variable spending; card paymen
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
     const dining = createCategory(book.db, { name: "Dining", kind: "expense", ...saved });
 
-    const salary = monthly(book.db, { name: "Pay", kind: "income", accountId: cash.id, expectedAmount: 50_000, monthDay: 1, categoryId: pay.id, payday: true });
+    const salary = monthly(book.db, { name: "Pay", kind: "income", accountId: cash.id, expectedAmount: 50_000, monthDay: 1, categoryId: pay.id });
     monthly(book.db, { name: "Rent", kind: "commitment", accountId: cash.id, expectedAmount: -30_000, monthDay: 20 });
     monthly(book.db, { name: "Save", kind: "commitment", accountId: cash.id, expectedAmount: -10_000, monthDay: 15, transferAccountId: savings.id });
     const paid = record(book.db, cash.id, "2026-10-01", 50_000, { categoryId: pay.id });

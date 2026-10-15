@@ -32,7 +32,6 @@ export function IncomeRow({ bucket }: { bucket: Bucket }) {
       </IconTile>
       <div className={listName}>
         {bucket.name}
-        {schedule.payday ? <Badge variant="neutral">Payday</Badge> : null}
         {changed ? <Badge variant="attention">Amount changed</Badge> : null}
         <small>{scheduleLabel(schedule)}</small>
       </div>

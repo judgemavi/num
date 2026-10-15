@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { buildInsightChanges, savingsRateMilliPct, type InsightChangesInput } from "./insights-changes";
+import { savingsRateMilliPct, spendingIncreases } from "./insights-changes";
 import type { FlowLine } from "./month";
 
 const groceries = "11111111-1111-4111-8111-111111111111";
@@ -15,11 +15,7 @@ function line(month: string, amount: number, categoryId: string | null, kind: Fl
   return { month, amount, categoryId, kind, transfer };
 }
 
-function changes(input: Partial<InsightChangesInput> & Pick<InsightChangesInput, "lines">) {
-  return buildInsightChanges({ month: "2026-04", merchants: [], ...input });
-}
-
-test("the 3 largest changes use the median of the previous 3 months", () => {
+test("the 3 largest increases use the median of the previous 3 months", () => {
   const months = ["2026-01", "2026-02", "2026-03"];
   const history: FlowLine[] = [];
   const series = [
@@ -37,41 +33,20 @@ test("the 3 largest changes use the median of the previous 3 months", () => {
     });
     history.push(line("2026-04", -row.current, row.id, "expense"));
   }
-  const result = changes({ lines: history });
-  expect(result.increases.map((row) => row.categoryId)).toEqual([groceries, dining, fuel]);
-  expect(result.increases[0]).toMatchObject({ amount: 8000, median: 2000, delta: 6000 });
-  expect(result.decreases.map((row) => [row.categoryId, row.delta])).toEqual([
-    [travel, -3000],
-    [gifts, -2500],
-    [hobbies, -1800],
+  const result = spendingIncreases("2026-04", history);
+  expect(result.map((row) => row.categoryId)).toEqual([groceries, dining, fuel]);
+  expect(result[0]).toMatchObject({ month: "2026-04", amount: 8000, median: 2000, delta: 6000 });
+  expect(result.some((row) => [rent, travel, gifts, hobbies].includes(row.categoryId))).toBe(false);
+});
+
+test("income, transfer and uncategorized lines are not category increases", () => {
+  const result = spendingIncreases("2026-04", [
+    line("2026-04", 50_000, income, "income"),
+    line("2026-04", -9000, groceries, "expense", true),
+    line("2026-04", -7000, null, null),
+    line("2026-04", -3000, dining, "expense"),
   ]);
-  expect(result.increases.some((row) => row.categoryId === rent)).toBe(false);
-});
-
-test("income, transfer and uncategorized lines are not category changes", () => {
-  const result = changes({
-    lines: [
-      line("2026-04", 50_000, income, "income"),
-      line("2026-04", -9000, groceries, "expense", true),
-      line("2026-04", -7000, null, null),
-      line("2026-04", -3000, dining, "expense"),
-    ],
-  });
-  expect(result.increases).toEqual([{ categoryId: dining, amount: 3000, median: 0, delta: 3000 }]);
-  expect(result.decreases).toEqual([]);
-});
-
-test("a new merchant has its first transaction in the change month", () => {
-  const result = changes({
-    lines: [],
-    merchants: [
-      { merchantId: fuel, firstMonth: "2026-04" },
-      { merchantId: dining, firstMonth: "2026-03" },
-      { merchantId: groceries, firstMonth: "2026-04" },
-      { merchantId: rent, firstMonth: "2026-05" },
-    ],
-  });
-  expect(result.newMerchants).toEqual([{ merchantId: groceries }, { merchantId: fuel }]);
+  expect(result).toEqual([{ categoryId: dining, month: "2026-04", amount: 3000, median: 0, delta: 3000 }]);
 });
 
 test("the savings rate is thousandths of a percent, and it is null when income is zero", () => {

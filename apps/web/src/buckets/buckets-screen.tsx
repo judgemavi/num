@@ -1,18 +1,16 @@
 import { comparePriority, type BucketKind } from "@num/shared";
 import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { billNeedsQuery, bucketEventsQuery, bucketListQuery, emergencyFundQuery, overspentQuery } from "@/api/buckets";
-import { fundingMonthsQuery, fundingOwedQuery, fundingPositionQuery } from "@/api/funding";
-import { monthPlanQuery } from "@/api/plan";
+import { billNeedsQuery, bucketListQuery, emergencyFundQuery, overspentQuery } from "@/api/buckets";
+import { fundingOwedQuery, fundingPositionQuery } from "@/api/funding";
+import { feasibilityQuery } from "@/api/feasibility";
 import { upcomingQuery } from "@/api/schedules";
 import { localAsOf } from "@/as-of";
-import { ActivityList } from "@/buckets/activity-list";
 import { BillRow } from "@/buckets/bill-row";
 import { BucketRow } from "@/buckets/bucket-row";
 import { BucketFilterBar } from "@/buckets/filters";
-import { FundingHistory } from "@/buckets/funding-history";
+import { GoalFeasibility } from "@/buckets/goal-feasibility";
 import { OverspentPanel } from "@/buckets/overspent-panel";
-import { useOverspent } from "@/buckets/use-overspent";
 import { useBucketBoard, useBucketSearch } from "@/buckets/use-board";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
@@ -23,16 +21,13 @@ import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useEditors } from "@/editors/editor-api";
-import { useBookCurrency } from "@/editors/lookups";
-import { formatMoney } from "@/money";
-import { GoalFeasibility } from "@/plan/month-board";
 import { DetectedList } from "@/schedules/detected-list";
 import { IncomeRow } from "@/schedules/schedule-row";
 import { UpcomingOccurrences } from "@/schedules/upcoming-list";
 
 const groupOrder: { id: string; kinds: BucketKind[]; label: string }[] = [
   { id: "income", kinds: ["income"], label: "Income" },
-  { id: "commitments", kinds: ["commitment"], label: "Commitments" },
+  { id: "commitments", kinds: ["commitment"], label: "Bills" },
   { id: "spending", kinds: ["spending"], label: "Spending" },
   { id: "savings", kinds: ["sinking", "emergency", "goal"], label: "Savings" },
 ];
@@ -42,12 +37,10 @@ export function BucketsScreen() {
   const asOf = localAsOf();
   usePrefetchQuery(bucketListQuery(useBucketSearch().shown));
   usePrefetchQuery(fundingPositionQuery(asOf));
-  usePrefetchQuery(monthPlanQuery(asOf));
+  usePrefetchQuery(feasibilityQuery(asOf));
   usePrefetchQuery(overspentQuery());
   usePrefetchQuery(emergencyFundQuery(asOf));
   usePrefetchQuery(fundingOwedQuery(asOf));
-  usePrefetchQuery(fundingMonthsQuery());
-  usePrefetchQuery(bucketEventsQuery());
   usePrefetchQuery(billNeedsQuery(asOf));
   return (
     <Boundary loading="Loading buckets." failed="The buckets did not load.">
@@ -71,8 +64,6 @@ function BucketsBody() {
     <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_336px]">
       <div className="grid gap-5">
         <BucketList />
-        <FundingHistory />
-        <ActivityList />
       </div>
       <div className="grid gap-5">
         <OverspentPanel />
@@ -107,7 +98,7 @@ function BucketsHeader() {
                 New bucket
               </DropdownMenuItem>
               <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("commitment", { id: null })}>
-                New commitment
+                New bill
               </DropdownMenuItem>
               <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("income", { id: null })}>
                 New income
@@ -120,31 +111,23 @@ function BucketsHeader() {
   );
 }
 
+/** Unassigned, with the money left in the spending buckets and the money in the savings buckets. */
 function BucketsSummary() {
-  const currency = useBookCurrency();
   const rows = useBucketBoard().board.items;
   const { data: position } = useSuspenseQuery(fundingPositionQuery(localAsOf()));
-  const overspent = useOverspent();
-  const spending = rows.filter((bucket) => bucket.kind === "spending");
-  const spendingLeft = spending.reduce((sum, bucket) => sum + bucket.balance, 0);
-  const spendingTarget = spending.reduce((sum, bucket) => sum + (bucket.refillTo ?? 0), 0);
-  const allBalances = rows.reduce((sum, bucket) => sum + bucket.balance, 0);
+  const total = (kinds: readonly BucketKind[]) => rows.filter((bucket) => kinds.includes(bucket.kind)).reduce((sum, bucket) => sum + bucket.balance, 0);
   return (
     <SummaryStrip
       tint="buckets"
-      label="Left to spend"
-      amount={<Amount value={spendingLeft} hero />}
-      hint={`of ${formatMoney(currency, spendingTarget)} across ${spending.length} spending ${spending.length === 1 ? "bucket" : "buckets"}`}
+      label="Unassigned"
+      amount={<Amount value={position.unassigned} hero />}
       facts={
         <>
-          <Fact label="Unassigned">
-            <Amount value={position.unassigned} className="text-lg" />
+          <Fact label="Left to spend">
+            <Amount value={total(["spending"])} className="text-lg" />
           </Fact>
-          <Fact label="In all buckets">
-            <Amount value={allBalances} className="text-lg" />
-          </Fact>
-          <Fact label="Overspent">
-            <span className="text-lg font-semibold tabular-nums">{overspent.length}</span>
+          <Fact label="Saved">
+            <Amount value={total(["sinking", "emergency", "goal"])} className="text-lg" />
           </Fact>
         </>
       }

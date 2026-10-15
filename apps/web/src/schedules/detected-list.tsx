@@ -1,93 +1,75 @@
 import { planProposalKey, type PlanProposal } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useAddDetectedSchedule, scheduleSignalsQuery } from "@/api/schedules";
 import { useDecideItem } from "@/api/review";
+import { scheduleSignalsQuery } from "@/api/schedules";
 import { localAsOf } from "@/as-of";
-import { useAccountLabels, useActiveBuckets, useBookCurrency, useCategoryNames, useMerchantNames } from "@/editors/lookups";
-import { useEditors } from "@/editors/editor-api";
-import { Amount } from "@/components/amount";
-import { scheduleLabel } from "@/schedules/format";
-import { scheduleBody, scheduleValues } from "@/schedules/schedule-values";
-import { formatDate } from "@/transactions/format";
 import { ListCard, ListRow, listName } from "@/components/list-card";
+import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { useEditors } from "@/editors/editor-api";
+import { useAccountLabels, useBookCurrency, useCategoryNames, useMerchantNames } from "@/editors/lookups";
+import { formatMoney } from "@/money";
+import { scheduleLabel } from "@/schedules/format";
 
-/** The schedules that the app detected. The screen reads the same signals, thus this read does not start a request. */
+/**
+ * The schedules that the app detected. "Add" and a click on the row open the bill or income editor, filled with the
+ * suggestion. The person checks the values, then saves. The screen reads the same signals, thus
+ * this read does not start a request.
+ */
 export function DetectedList() {
   const asOf = localAsOf();
   const { data: signals } = useSuspenseQuery(scheduleSignalsQuery(asOf));
   const currency = useBookCurrency();
-  const { nextColor } = useActiveBuckets();
   const merchantName = useMerchantNames();
   const categoryName = useCategoryNames();
   const accountLabel = useAccountLabels();
   const { openEditor } = useEditors();
-  const create = useAddDetectedSchedule();
   const decide = useDecideItem();
-  const pending = create.isPending || decide.isPending;
   if (signals.proposals.length === 0) {
     return null;
   }
 
-  /** With a name, one click adds the schedule. A proposal for one amount has no name: the person names it in the form. */
-  function add(kind: "commitment" | "income", item: PlanProposal, name: string | undefined) {
-    if (!name) {
-      void openEditor(kind, { id: null, seed: { ...item, name: "" } });
-      return;
+  /** A proposal for one amount has no name: the person names it in the form. */
+  function nameOf(item: PlanProposal) {
+    if (item.merchantId) {
+      return merchantName.get(item.merchantId);
     }
-    const { body } = scheduleBody(currency, kind, scheduleValues(kind, { ...item, name }, nextColor), null);
-    if (body) {
-      create.mutate({ asOf, body });
-    } else {
-      void openEditor(kind, { id: null, seed: { ...item, name } });
+    if (item.transferAccountId) {
+      return accountLabel.get(item.transferAccountId);
     }
+    return item.categoryId ? categoryName.get(item.categoryId) : undefined;
   }
 
   return (
     <ListCard label="Detected" title="Detected">
       {signals.proposals.map((item) => {
-        const name = item.merchantId
-          ? merchantName.get(item.merchantId)
-          : item.transferAccountId
-            ? accountLabel.get(item.transferAccountId)
-            : item.categoryId
-              ? categoryName.get(item.categoryId)
-              : undefined;
+        const name = nameOf(item);
         const itemKey = planProposalKey(item);
+        const add = () => void openEditor(item.expectedAmount > 0 ? "income" : "commitment", { id: null, seed: { ...item, name: name ?? "" } });
         return (
-          <ListRow key={itemKey}>
-            <div className="grid min-w-0 flex-1 gap-2 py-1">
-              <div className="flex items-start gap-3">
-                <div className={listName}>
-                  {name ?? "No merchant"}
-                  <small>
-                    {scheduleLabel(item)} from {formatDate(item.startDate)}
-                  </small>
-                </div>
-                <Amount value={item.expectedAmount} className="shrink-0" />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {item.expectedAmount > 0 ? (
-                  <Button type="button" disabled={pending} onClick={() => add("income", item, name)}>
-                    Add
-                  </Button>
-                ) : (
-                  <Button type="button" disabled={pending} onClick={() => add("commitment", item, name)}>
-                    Add
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={pending}
-                  onClick={() => {
-                    decide.mutate({ asOf, itemKey, decision: "not_recurring" });
-                  }}
-                >
-                  Not recurring
-                </Button>
-              </div>
+          <ListRow key={itemKey} onOpen={add}>
+            <div className={listName}>
+              {name ?? "No merchant"}
+              <small>
+                {formatMoney(currency, Math.abs(item.expectedAmount))} · {scheduleLabel(item)}
+              </small>
             </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={(event) => {
+                event.stopPropagation();
+                add();
+              }}
+            >
+              Add
+            </Button>
+            <RowMenu label={`Actions for ${name ?? "this suggestion"}`}>
+              <DropdownMenuItem className="min-h-11" disabled={decide.isPending} onSelect={() => decide.mutate({ asOf, itemKey, decision: "not_recurring" })}>
+                Not recurring
+              </DropdownMenuItem>
+            </RowMenu>
           </ListRow>
         );
       })}

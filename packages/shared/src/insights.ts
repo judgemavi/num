@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
-import { insightChangesSchema } from "./insights-changes";
 import { optionalQuery, queryDate, queryId, queryIdOrNone } from "./list";
 import { isMonthKey } from "./month";
 import { amountSchema as money } from "./money";
@@ -9,7 +8,7 @@ export const insightWindows = ["1", "3", "6", "12", "all", "custom"] as const;
 
 export type InsightWindow = (typeof insightWindows)[number];
 
-export const defaultInsightWindow: InsightWindow = "6";
+export const defaultInsightWindow: InsightWindow = "1";
 
 export const insightRowKinds = ["item", "none", "uncategorized"] as const;
 
@@ -91,20 +90,8 @@ export const insightsSchema = z.object({
   spending: money,
   savings: money,
   savingsRateMilliPct: z.number().int().nullable(),
-  changes: insightChangesSchema,
   groups: z.array(groupRowSchema),
   timeline: timelineSchema,
-  netWorth: z
-    .array(
-      z.object({
-        month: z.string().refine(isMonthKey),
-        date: isoDateSchema,
-        assets: money,
-        liabilities: money,
-        net: money,
-      }),
-    )
-    .length(24),
 });
 
 export type InsightRow = z.infer<typeof rowSchema>;

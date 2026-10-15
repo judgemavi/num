@@ -5,7 +5,7 @@ import { expectCode, expense, saved, tempDatabase } from "./bucket-test-book";
 import { readBucket } from "./buckets";
 import { fillBuckets } from "./funding-fill";
 import { fundingPosition } from "./funding-book";
-import { readOwed, undoMonthFunding } from "./funding-months";
+import { readOwed } from "./funding-months";
 import { readHygiene } from "./hygiene";
 import { account, addSchedule, emergency, money, spend } from "./funding-test-book";
 
@@ -82,11 +82,10 @@ test("an owed amount that Unassigned cannot pay does not take money from the eme
   }
 });
 
-test("a month undo keeps the recede, and a recede cannot be undone alone", () => {
+test("a recede cannot be undone", () => {
   const { book, fund } = poolBook(50_000);
   try {
     fill(book, "2026-10-21");
-    undoMonthFunding(book.db, "2026-10", saved);
     expect(recedes(book)).toMatchObject([{ amount: 30_000, undone: false }]);
     const [event] = book.db.select().from(bucketEvents).all().filter((item) => item.kind === "recede");
     expectCode(() => undoBucketEvent(book.db, fund.id, event?.id ?? "", saved), "event_recede");

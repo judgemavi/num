@@ -1,29 +1,12 @@
 import { categories } from "@num/db";
-import { defaultInsightWindow, Temporal, type Insights, type InsightsQuery } from "@num/shared";
+import { defaultInsightWindow, type Insights, type InsightsQuery } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { changeMonth, readInsightChanges } from "./insights-changes";
 import { loadLedgerLines } from "./ledger-lines";
 import { breakdownRange, firstTransactionDate, windowPeriod } from "./insights-period";
 import { groupRows, spendTotals } from "./insights-spend";
 import { readTimeline } from "./insights-timeline";
-import { netWorthSeries, type MonthPoint } from "./insights-worth";
-
-function monthEnds(asOf: string, count: number) {
-  const end = Temporal.PlainDate.from(asOf).with({ day: 1 });
-  const start = end.subtract({ months: count - 1 });
-  const points: MonthPoint[] = [];
-  for (let index = 0; index < count; index += 1) {
-    const monthDate = start.add({ months: index });
-    const last = monthDate.with({ day: monthDate.daysInMonth }).toString();
-    points.push({
-      month: monthDate.toString().slice(0, 7),
-      date: last > asOf ? asOf : last,
-    });
-  }
-  return points;
-}
 
 function assertFilters(db: Db, query: InsightsQuery) {
   if (query.category) {
@@ -51,9 +34,7 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
     spending: totals.spending,
     savings: totals.savings,
     savingsRateMilliPct: totals.savingsRateMilliPct,
-    changes: readInsightChanges(db, facts, changeMonth(period, query.month), query.asOf),
     groups: groupRows(facts, range),
     timeline: readTimeline(db, facts, period, query.asOf, category),
-    netWorth: netWorthSeries(db, monthEnds(query.asOf, 24)),
   };
 }

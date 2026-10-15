@@ -86,18 +86,16 @@ export function SpendDonutCard() {
 }
 
 /**
- * The drill-down under the timeline and the donut. It opens when a month bar or a slice is selected.
- * It shows the groups of the month, or only the selected group or category.
+ * The list of groups and categories under the timeline and the donut. It is always open. A month bar or a slice limits
+ * it to that month, group or category.
  */
 export function SelectedSpendList() {
   const { data, search, patchSearch, colors, category, selectedGroup, groupName, categoryName, openTransactions } = useSpendSelection();
-  if (!selectedGroup && !search.month) {
-    return null;
-  }
   const groups = selectedGroup
     ? [{ ...selectedGroup, categories: selectedGroup.categories.filter((row) => category === null || row.id === category) }]
     : data.groups;
-  const title = [search.month ? monthTitle(search.month) : null, selectedGroup ? groupName(selectedGroup) : null].filter(Boolean).join(": ");
+  const title = [search.month ? monthTitle(search.month) : null, selectedGroup ? groupName(selectedGroup) : null].filter(Boolean).join(": ") || "Groups and categories";
+  const filtered = Boolean(selectedGroup || search.month);
   return (
     <CategorySpendList
       title={title}
@@ -108,9 +106,11 @@ export function SelectedSpendList() {
       onOpenGroup={(row) => openTransactions(row.kind === "uncategorized" ? { uncategorized: true } : { groupId: idOrNone(row) })}
       onOpenCategory={(row) => openTransactions({ categoryId: row.id ?? undefined })}
       actions={
-        <Button type="button" variant="ghost" onClick={() => patchSearch({ month: undefined, group: undefined, category: undefined })}>
-          Clear
-        </Button>
+        filtered ? (
+          <Button type="button" variant="ghost" onClick={() => patchSearch({ month: undefined, group: undefined, category: undefined })}>
+            Clear
+          </Button>
+        ) : null
       }
     />
   );

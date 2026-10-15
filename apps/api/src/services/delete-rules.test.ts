@@ -81,7 +81,6 @@ function paycheck(db: Db) {
     interval: 1,
     monthDay: 1,
     businessDayShift: "none",
-    payday: true,
     ...saved,
   });
   const deposit = createTransaction(db, {

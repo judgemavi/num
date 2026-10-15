@@ -131,7 +131,6 @@ function planFields(accountId: string, merchantId: string | null, expectedAmount
     monthDay: 15,
     businessDayShift: "none" as const,
     endDate: startDate,
-    payday: false,
   };
 }
 
@@ -264,7 +263,6 @@ test("each review source appears and leaves after its action", () => {
         monthDay: proposal.monthDay,
         businessDayShift: "none",
         endDate: null,
-        payday: false,
         ...saved,
       });
     }

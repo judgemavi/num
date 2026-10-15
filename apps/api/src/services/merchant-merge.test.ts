@@ -59,7 +59,6 @@ test("merge moves transactions and plans, then archives the source", () => {
       interval: 1,
       monthDay: 15,
       businessDayShift: "none",
-      payday: false,
       source: "ui",
       at,
     });

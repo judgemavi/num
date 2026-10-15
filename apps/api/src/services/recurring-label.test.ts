@@ -54,7 +54,6 @@ test("a linked plan labels an open payment and keeps the label that the person c
       interval: 1,
       monthDay: 1,
       businessDayShift: "none",
-      payday: false,
       ...saved,
     });
     const payment = (date: string, categoryId?: string) =>

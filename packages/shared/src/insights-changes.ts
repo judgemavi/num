@@ -3,32 +3,15 @@ import { amountSchema as money } from "./money";
 import { expenseSpending, isExpenseLine, monthKeySchema, priorMonths, type FlowLine } from "./month";
 import { medianOf } from "./recurring-calc";
 
-const categoryChangeSchema = z.object({
+export const spendingIncreaseSchema = z.object({
   categoryId: z.uuid(),
+  month: monthKeySchema,
   amount: money,
   median: money,
   delta: money,
 });
 
-export const insightChangesSchema = z.object({
-  month: monthKeySchema,
-  increases: z.array(categoryChangeSchema).max(3),
-  decreases: z.array(categoryChangeSchema).max(3),
-  newMerchants: z.array(z.object({ merchantId: z.uuid() })),
-});
-
-export type InsightChanges = z.infer<typeof insightChangesSchema>;
-
-export type MerchantFirstMonth = {
-  merchantId: string;
-  firstMonth: string;
-};
-
-export type InsightChangesInput = {
-  month: string;
-  lines: readonly FlowLine[];
-  merchants: readonly MerchantFirstMonth[];
-};
+export type SpendingIncrease = z.infer<typeof spendingIncreaseSchema>;
 
 function divRoundHalfAway(numerator: bigint, denominator: bigint) {
   const negative = numerator < 0n !== denominator < 0n;
@@ -73,7 +56,11 @@ function compareId(left: string, right: string): number {
   return left > right ? 1 : 0;
 }
 
-function categoryChanges(byMonth: Map<string, Map<string, number>>, month: string) {
+/**
+ * The 3 largest increases of one month by category, against the median of the 3 months before it. Home "Needs you" shows them.
+ */
+export function spendingIncreases(month: string, lines: readonly FlowLine[]): SpendingIncrease[] {
+  const byMonth = expenseByMonth(lines);
   const earlier = priorMonths(month);
   const ids = new Set<string>();
   for (const key of [month, ...earlier]) {
@@ -81,35 +68,13 @@ function categoryChanges(byMonth: Map<string, Map<string, number>>, month: strin
       ids.add(id);
     }
   }
-  const changes = [...ids].map((categoryId) => {
-    const amount = byMonth.get(month)?.get(categoryId) ?? 0;
-    const median = medianOf(earlier.map((key) => byMonth.get(key)?.get(categoryId) ?? 0));
-    return { categoryId, amount, median, delta: amount - median };
-  });
-  const increases = changes
+  return [...ids]
+    .map((categoryId) => {
+      const amount = byMonth.get(month)?.get(categoryId) ?? 0;
+      const median = medianOf(earlier.map((key) => byMonth.get(key)?.get(categoryId) ?? 0));
+      return { categoryId, month, amount, median, delta: amount - median };
+    })
     .filter((row) => row.delta > 0)
     .sort((left, right) => right.delta - left.delta || compareId(left.categoryId, right.categoryId))
     .slice(0, 3);
-  const decreases = changes
-    .filter((row) => row.delta < 0)
-    .sort((left, right) => left.delta - right.delta || compareId(left.categoryId, right.categoryId))
-    .slice(0, 3);
-  return { increases, decreases };
-}
-
-/**
- * The changes of one month: the 3 largest increases and decreases by category against the median
- * of the 3 months before it, and the merchants whose first transaction is in the month.
- */
-export function buildInsightChanges(input: InsightChangesInput): InsightChanges {
-  const { increases, decreases } = categoryChanges(expenseByMonth(input.lines), input.month);
-  return {
-    month: input.month,
-    increases,
-    decreases,
-    newMerchants: input.merchants
-      .filter((row) => row.firstMonth === input.month)
-      .map((row) => ({ merchantId: row.merchantId }))
-      .sort((left, right) => compareId(left.merchantId, right.merchantId)),
-  };
 }

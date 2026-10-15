@@ -79,7 +79,6 @@ function bill(db: Db, accountId: string, categoryId: string | null, freq: "month
     interval: 1,
     monthDay: freq === "yearly" ? 15 : 15,
     businessDayShift: "none",
-    payday: false,
     ...saved,
   });
 }
@@ -279,21 +278,6 @@ test("the savings rate does not count months before the first transaction", () =
     expect(check(db, "2026-04-15", "savings_rate").months).toEqual([
       { month: "2026-03", savingsRateMilliPct: 75_000, savings: 7_500 },
     ]);
-  });
-});
-
-test("recurring passes when nothing is missed", () => {
-  withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 0);
-    bill(db, cash.id, null, "monthly");
-    expect(check(db, "2026-01-10", "recurring")).toMatchObject({ pass: true, missed: 0 });
-  });
-});
-test("recurring fails when a payment was missed", () => {
-  withBook((db) => {
-    const cash = account(db, "chequing", "Cash", 0);
-    bill(db, cash.id, null, "monthly");
-    expect(check(db, "2026-02-20", "recurring")).toMatchObject({ pass: false, missed: 1 });
   });
 });
 

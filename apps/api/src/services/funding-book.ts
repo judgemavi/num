@@ -1,50 +1,12 @@
-import { accounts, occurrenceLinks } from "@num/db";
-import {
-  addDays,
-  divideAmount,
-  isIsoDate,
-  nextIncomeDate,
-  occurrenceDates,
-  positiveBalances,
-  Temporal,
-  unassigned,
-  type FundingPosition,
-} from "@num/shared";
+import { accounts } from "@num/db";
+import { divideAmount, isIsoDate, occurrenceDates, positiveBalances, Temporal, unassigned, type FundingPosition } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import { balancesOf } from "./account-balance";
 import { bookStep } from "./book-step";
 import { bucketBalances } from "./bucket-balance";
-import { activeSchedules, scheduleAmounts, type ScheduleView } from "./schedules";
+import { scheduleAmounts, type ScheduleView } from "./schedules";
 import type { Reader } from "./write";
-
-function skippedKeys(db: Reader) {
-  return new Set(
-    db
-      .select()
-      .from(occurrenceLinks)
-      .all()
-      .filter((link) => link.skipped)
-      .map((link) => `${link.bucketId}|${link.dueDate}`),
-  );
-}
-
-/** The next occurrence of an income with `payday` after `asOf` (spec §6). An occurrence on `asOf` is the current payday. */
-export function nextPayday(schedules: readonly ScheduleView[], skipped: ReadonlySet<string>, asOf: string): string | null {
-  const start = addDays(asOf, 1);
-  const horizon = Temporal.PlainDate.from(asOf).add({ years: 1 }).toString();
-  const dates: string[] = [];
-  for (const schedule of schedules) {
-    if (schedule.kind !== "income" || !schedule.payday) {
-      continue;
-    }
-    const next = occurrenceDates(schedule, horizon, start).find((date) => !skipped.has(`${schedule.id}|${date.dueDate}`));
-    if (next) {
-      dates.push(next.dueDate);
-    }
-  }
-  return nextIncomeDate(asOf, dates);
-}
 
 function onBudgetTotal(db: Reader) {
   const rows = db.select().from(accounts).where(eq(accounts.onBudget, true)).all();
@@ -60,7 +22,6 @@ export function fundingPosition(db: Reader, asOf: string): FundingPosition {
     asOf,
     onBudgetTotal: total,
     unassigned: unassigned(total, positiveBalances([...bucketBalances(db).values()])),
-    nextIncomeDate: nextPayday(activeSchedules(db), skippedKeys(db), asOf),
   };
 }
 

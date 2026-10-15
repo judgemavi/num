@@ -9,9 +9,10 @@ export function insightsQuery(asOf: string, { group: _group, ...request }: Insig
   });
 }
 
-export function hygieneQuery(asOf: string) {
+/** The items of Home "Needs you": only the checks that fail. */
+export function needsYouQuery(asOf: string) {
   return queryOptions({
-    queryKey: ["hygiene", asOf],
-    queryFn: () => unwrap(api.hygiene.$get({ query: { asOf } })),
+    queryKey: ["needs-you", asOf],
+    queryFn: () => unwrap(api["needs-you"].$get({ query: { asOf } })),
   });
 }

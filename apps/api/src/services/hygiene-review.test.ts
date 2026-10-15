@@ -6,11 +6,7 @@ import type { HygieneCheck } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
-import { createCategory } from "./categories";
 import { readHygiene } from "./hygiene";
-import { linkOccurrence } from "./recurring-links";
-import { createSchedule } from "./schedule-test-book";
-import { createTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at: "2026-04-02T16:00:00Z" };
 
@@ -46,43 +42,6 @@ function check<T extends HygieneCheck["code"]>(db: Db, asOf: string, code: T): E
   }
   return found as Extract<HygieneCheck, { code: T }>;
 }
-
-function changedPlan(db: Db) {
-  const cash = account(db, "chequing", "Cash", 50_000);
-  const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
-  const plan = createSchedule(db, {
-    name: "Stream",
-    kind: "commitment",
-    accountId: cash.id,
-    categoryId: food.id,
-    expectedAmount: -10_000,
-    tolerance: 0,
-    amountMode: "fixed",
-    startDate: "2026-01-15",
-    freq: "monthly",
-    interval: 1,
-    monthDay: 15,
-    businessDayShift: "none",
-    payday: false,
-    ...saved,
-  });
-  const paid = createTransaction(db, {
-    accountId: cash.id,
-    date: "2026-01-15",
-    amount: -19_990,
-    payeeRaw: "Stream",
-    lines: [{ amount: -19_990, categoryId: food.id }],
-    ...saved,
-  });
-  linkOccurrence(db, plan.id, "2026-01-15", paid.id, saved);
-}
-
-test("a changed amount does not fail the recurring check", () => {
-  withBook((db) => {
-    changedPlan(db);
-    expect(check(db, "2026-01-20", "recurring")).toMatchObject({ pass: true, missed: 0 });
-  });
-});
 
 test("a cash account that was never imported does not fail", () => {
   withBook((db) => {

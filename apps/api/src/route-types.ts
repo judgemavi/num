@@ -13,7 +13,7 @@ export type { InboxRoutes } from "./routes/inbox";
 export type { InsightsRoutes } from "./routes/insights";
 export type { MerchantRoutes } from "./routes/merchants";
 export type { MortgageRoutes } from "./routes/mortgage";
-export type { PlanRoutes } from "./routes/plan";
+export type { FeasibilityRoutes } from "./routes/feasibility";
 export type { ScheduleRoutes } from "./routes/schedules";
 export type { SetupRoutes } from "./routes/setup";
 export type { SuggestionRoutes } from "./routes/suggestions";

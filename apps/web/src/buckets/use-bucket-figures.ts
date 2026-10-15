@@ -22,7 +22,7 @@ export function useBucketFigures(bucket: Bucket) {
   const target = bucket.kind === "emergency" ? (fund?.target ?? 0) : bucketTarget(bucket);
   return {
     target,
-    detail: still > 0 ? `${base} · ${owed.held ? "Funding undone this month" : `Still owed ${formatMoney(currency, still)} this month`}` : base,
+    detail: still > 0 ? `${base} · Still owed ${formatMoney(currency, still)} this month` : base,
     label: barLabel(bucket, currency, target),
   };
 }

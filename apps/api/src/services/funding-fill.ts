@@ -1,12 +1,12 @@
-import { bucketEvents, buckets, monthHolds, settings } from "@num/db";
-import { comparePriority, floorToStep, isIsoDate, positiveBalances, recedeOrder, unassigned, utcNow, type FillResult } from "@num/shared";
+import { bucketEvents, buckets, settings } from "@num/db";
+import { comparePriority, floorToStep, isIsoDate, positiveBalances, recedeOrder, unassigned, type FillResult } from "@num/shared";
 import { eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
 import { bucketBalances } from "./bucket-balance";
 import { fundingPosition } from "./funding-book";
-import { heldMonths, monthStart, monthlyRows } from "./funding-months";
+import { monthStart, monthlyRows } from "./funding-months";
 import { withoutId, write, type Reader, type WriteInput, type WriteTx } from "./write";
 
 function requireSetup(db: Reader) {
@@ -75,13 +75,10 @@ function coverEvents(db: Reader, asOf: string): FillEvent[] {
 
 /**
  * The owed amounts of the month of `asOf`, in priority order, from Unassigned. It reads the covers of
- * the month, thus the covers are written first. An owed amount never causes a recede. A held month owes nothing.
+ * the month, thus the covers are written first. An owed amount never causes a recede.
  */
 function fundEvents(db: Reader, asOf: string): FillEvent[] {
   const month = asOf.slice(0, 7);
-  if (heldMonths(db).has(month)) {
-    return [];
-  }
   const step = bookStep(db);
   const state = pool(db, asOf);
   for (const row of monthlyRows(db, asOf)) {
@@ -128,21 +125,4 @@ export function fillBuckets(db: Db, input: WriteInput & { asOf: string }): FillR
     return { paid: 0, payments: 0 };
   }
   return write(db, { source: input.source, at: input.at }, (tx) => fillInTx(tx, input.asOf));
-}
-
-/** "Fund again": remove the hold of the month, then fill. */
-export function fundMonthAgain(db: Db, month: string, input: WriteInput & { asOf: string }): FillResult {
-  if (!isIsoDate(input.asOf)) {
-    throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
-  }
-  const at = input.at ?? utcNow();
-  return write(db, { source: input.source, at }, (tx) => {
-    const hold = tx.select().from(monthHolds).where(eq(monthHolds.month, month)).get();
-    if (!hold) {
-      throw new ServiceError("funding_month_not_held", 409);
-    }
-    tx.delete(monthHolds).where(eq(monthHolds.month, month)).run();
-    tx.audit({ entity: "month_holds", entityId: month, action: "delete", before: { createdAt: hold.createdAt }, after: null });
-    return fillInTx(tx, input.asOf);
-  });
 }

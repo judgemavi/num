@@ -79,12 +79,6 @@ const savingsRateCheckSchema = z.object({
   months: z.array(savingsMonthSchema),
 });
 
-const recurringCheckSchema = z.object({
-  code: z.literal("recurring"),
-  pass: z.boolean(),
-  missed: nonNegative,
-});
-
 const overspentCheckSchema = z.object({
   code: z.literal("overspent"),
   pass: z.boolean(),
@@ -101,7 +95,6 @@ export const hygieneCheckSchema = z.discriminatedUnion("code", [
   importsCheckSchema,
   reviewCheckSchema,
   savingsRateCheckSchema,
-  recurringCheckSchema,
   overspentCheckSchema,
 ]);
 

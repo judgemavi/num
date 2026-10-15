@@ -42,7 +42,6 @@ test("setup runs only one time", () => {
     expect(names(db.sqlite, "categories").sort()).toEqual(categoryNames().sort());
     expect(db.sqlite.query("select id from accounts").all()).toEqual([]);
     expect(db.sqlite.query("select key, value from settings order by key").all()).toEqual([
-      { key: "bufferAmount", value: "0" },
       { key: "currency", value: "CAD" },
       { key: "recurringGraceDays", value: "3" },
       { key: "staleImportDays", value: "10" },

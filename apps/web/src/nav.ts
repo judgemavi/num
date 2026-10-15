@@ -1,8 +1,8 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeftRight, ChartColumn, House, Landmark, Settings, Wallet } from "lucide-react";
+import { ArrowLeftRight, House, Landmark, Settings, Wallet } from "lucide-react";
 
 type NavItem = {
-  to: "/" | "/transactions" | "/buckets" | "/accounts" | "/insights" | "/settings";
+  to: "/" | "/transactions" | "/buckets" | "/accounts" | "/settings";
   label: string;
   icon: LucideIcon;
 };
@@ -14,12 +14,9 @@ export const primaryNav = [
   { to: "/accounts", label: "Accounts", icon: Landmark },
 ] as const satisfies readonly NavItem[];
 
-export const moreNav = [
-  { to: "/insights", label: "Insights", icon: ChartColumn },
-] as const satisfies readonly NavItem[];
-
 export const settingsNav = { to: "/settings", label: "Settings", icon: Settings } as const satisfies NavItem;
 
-export const phoneMoreNav = [...moreNav, settingsNav] as const satisfies readonly NavItem[];
+/** The bottom tab bar of the phone. */
+export const phoneTabs = [...primaryNav, settingsNav] as const satisfies readonly NavItem[];
 
 export type NavPath = NavItem["to"];

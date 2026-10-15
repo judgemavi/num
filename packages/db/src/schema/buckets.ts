@@ -43,12 +43,6 @@ export const bucketCategories = sqliteTable("bucket_categories", {
     .references(() => buckets.id),
 });
 
-/** A month whose funding the user undid. The fill does not pay a held month. */
-export const monthHolds = sqliteTable("month_holds", {
-  month: text("month").primaryKey(),
-  createdAt: text("created_at").notNull(),
-});
-
 export const bucketEvents = sqliteTable(
   "bucket_events",
   {

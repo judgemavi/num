@@ -53,7 +53,6 @@
     --color-tint-home: #ffefe7;
     --color-tint-accounts: #fff6d6;
     --color-tint-buckets: #e6f4ec;
-    --color-tint-plan: #eeeefe;
     --color-est: #7c7b88;
     --radius-sm: 10px;
     --radius-md: 12px;
@@ -116,7 +115,6 @@
     --tint-home: #ffefe7;
     --tint-accounts: #fff6d6;
     --tint-buckets: #e6f4ec;
-    --tint-plan: #eeeefe;
     --font-display: "Archivo Variable", "Arial Narrow", "Helvetica Neue", sans-serif;
 }
 

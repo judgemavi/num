@@ -4,9 +4,9 @@ import { undoBucketEvent } from "./bucket-events";
 import { expectCode, expense, saved, tempDatabase } from "./bucket-test-book";
 import { readBucket, updateBucket } from "./buckets";
 import { createCategory } from "./categories";
-import { fillBuckets, fundMonthAgain } from "./funding-fill";
+import { fillBuckets } from "./funding-fill";
 import { fundingPosition } from "./funding-book";
-import { listMonthFunding, readOwed, undoMonthFunding } from "./funding-months";
+import { readOwed } from "./funding-months";
 import { account, money, spend } from "./funding-test-book";
 
 const october = { startDate: "2026-10-01" };
@@ -167,16 +167,11 @@ test("a cover is not month funding: the next month refills to the level, not abo
   }
 });
 
-test("month undo leaves the covers, and an event of a cover cannot be undone alone", () => {
+test("an event of a cover cannot be undone", () => {
   const { book, food } = overspentBook();
   try {
     fill(book, "2026-10-21");
-    undoMonthFunding(book.db, "2026-10", saved);
     expect(covers(book)).toMatchObject([{ amount: 30_000, undone: false }]);
-    expect(readBucket(book.db, food.id).balance).toBe(-100_000);
-    fill(book, "2026-10-22");
-    expect(covers(book).reduce((sum, item) => sum + item.amount, 0)).toBe(130_000);
-    expect(readBucket(book.db, food.id).balance).toBe(0);
     const [event] = book.db.select().from(bucketEvents).all().filter((item) => item.kind === "cover");
     expectCode(() => undoBucketEvent(book.db, food.id, event?.id ?? "", saved), "event_cover");
   } finally {
@@ -224,69 +219,11 @@ test("a cover comes first, then the owed amounts use the Unassigned that is left
   }
 });
 
-test("undo of a month returns the money and holds the month until Fund again", () => {
+test("an event of the fill cannot be undone", () => {
   const book = tempDatabase();
   try {
     account(book.db, "Cash", "chequing", 500_000);
     const food = spend(book.db, "Food", 100_000, october);
-    fill(book, "2026-10-08");
-    expect(readBucket(book.db, food.id).balance).toBe(100_000);
-    expect(undoMonthFunding(book.db, "2026-10", saved)).toEqual({ month: "2026-10", total: 0, held: true });
-    expect(readBucket(book.db, food.id).balance).toBe(0);
-    expect(listMonthFunding(book.db).items).toEqual([{ month: "2026-10", total: 0, held: true }]);
-    expect(fill(book, "2026-10-09")).toEqual({ paid: 0, payments: 0 });
-    expect(readBucket(book.db, food.id).balance).toBe(0);
-    expectCode(() => undoMonthFunding(book.db, "2026-10", saved), "funding_month_held");
-
-    expect(fundMonthAgain(book.db, "2026-10", { asOf: "2026-10-10", ...saved })).toEqual({ paid: 100_000, payments: 1 });
-    expect(readBucket(book.db, food.id).balance).toBe(100_000);
-    expect(listMonthFunding(book.db).items).toEqual([{ month: "2026-10", total: 100_000, held: false }]);
-    expectCode(() => fundMonthAgain(book.db, "2026-10", { asOf: "2026-10-10", ...saved }), "funding_month_not_held");
-  } finally {
-    book.close();
-  }
-});
-
-test("the next month does not repay a month that the user undid", () => {
-  const book = tempDatabase();
-  try {
-    account(book.db, "Cash", "chequing", 500_000);
-    const food = spend(book.db, "Food", 100_000, october);
-    fill(book, "2026-10-08");
-    undoMonthFunding(book.db, "2026-10", saved);
-    fill(book, "2026-11-02");
-    expect(readBucket(book.db, food.id).balance).toBe(100_000);
-    expect(funding(book).map((event) => [event.month, event.undone])).toEqual([
-      ["2026-10", true],
-      ["2026-11", false],
-    ]);
-  } finally {
-    book.close();
-  }
-});
-
-test("a Fund again that pays nothing leaves no month to undo", () => {
-  const book = tempDatabase();
-  try {
-    const cash = account(book.db, "Cash", "chequing", 100_000);
-    const other = expense(book.db, "Other");
-    spend(book.db, "Food", 100_000, october);
-    fill(book, "2026-10-08");
-    undoMonthFunding(book.db, "2026-10", saved);
-    money(book.db, cash.id, other.id, "2026-10-09", -100_000, "Shop");
-    expect(fundMonthAgain(book.db, "2026-10", { asOf: "2026-10-10", ...saved }).payments).toBe(0);
-    expect(listMonthFunding(book.db).items).toEqual([]);
-  } finally {
-    book.close();
-  }
-});
-
-test("a month without funding cannot be undone, and one event of the fill cannot be undone alone", () => {
-  const book = tempDatabase();
-  try {
-    account(book.db, "Cash", "chequing", 500_000);
-    const food = spend(book.db, "Food", 100_000, october);
-    expectCode(() => undoMonthFunding(book.db, "2026-10", saved), "funding_month_not_found");
     fill(book, "2026-10-08");
     const [event] = book.db.select().from(bucketEvents).all();
     expectCode(() => undoBucketEvent(book.db, food.id, event?.id ?? "", saved), "event_month_funding");

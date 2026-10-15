@@ -1,24 +1,22 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Ellipsis, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { reviewSummaryQuery } from "@/api/review";
 import { setupStatusQuery } from "@/api/setup";
 import { localAsOf } from "@/as-of";
 import { Boundary } from "@/components/boundary";
 import { EditorHost } from "@/editors/editor-host";
 import { useStartSharedLists } from "@/editors/lookups";
-import { moreNav, phoneMoreNav, primaryNav, settingsNav, type NavPath } from "@/nav";
+import { phoneTabs, primaryNav, settingsNav, type NavPath } from "@/nav";
 import { SetupScreen } from "@/setup-screen";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -116,16 +114,6 @@ function AppSidebar({ pathname }: { pathname: string }) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-3 text-xs font-semibold text-muted-foreground">More</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {moreNav.map((item) => (
-                <NavItem key={item.to} {...item} pathname={pathname} />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
@@ -147,67 +135,28 @@ function sidebarDefaultOpen() {
 }
 
 function PhoneTabs({ pathname }: { pathname: string }) {
-  const moreCurrent = phoneMoreNav.some((item) => isCurrent(pathname, item.to));
-  const tabs = primaryNav;
   return (
-    <>
-      <nav
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-card px-1 pt-1.5 pb-[calc(10px+env(safe-area-inset-bottom))] md:hidden"
-        aria-label="Main"
-      >
-        {tabs.map((item) => {
-          const current = isCurrent(pathname, item.to);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              aria-current={current ? "page" : undefined}
-              className={`relative grid min-h-[52px] justify-items-center gap-0.5 pt-1.5 text-[11px] font-semibold ${current ? "text-primary" : "text-muted-foreground"}`}
-            >
-              <Icon size={24} strokeWidth={1.8} aria-hidden="true" />
-              {item.label}
-              {item.to === "/" ? <ReviewCount className="absolute top-0 left-[calc(50%+6px)]" /> : null}
-            </Link>
-          );
-        })}
-        <Sheet>
-          <SheetTrigger asChild>
-            <button
-              type="button"
-              aria-current={moreCurrent ? "page" : undefined}
-              className={`grid min-h-[52px] justify-items-center gap-0.5 pt-1.5 text-[11px] font-semibold ${moreCurrent ? "text-primary" : "text-muted-foreground"}`}
-            >
-              <Ellipsis size={24} strokeWidth={1.8} aria-hidden="true" />
-              More
-            </button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-[20px] pb-[calc(16px+env(safe-area-inset-bottom))]">
-            <SheetHeader>
-              <SheetTitle className="font-display text-2xl font-extrabold uppercase [font-stretch:72%]">More</SheetTitle>
-            </SheetHeader>
-            <nav aria-label="More" className="grid px-2">
-              {phoneMoreNav.map((item) => {
-                const Icon = item.icon;
-                const current = isCurrent(pathname, item.to);
-                return (
-                  <SheetClose asChild key={item.to}>
-                    <Link
-                      to={item.to}
-                      aria-current={current ? "page" : undefined}
-                      className={`flex min-h-11 items-center gap-3 rounded-[10px] px-3 font-semibold ${current ? "bg-primary-soft text-primary" : ""}`}
-                    >
-                      <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
-                      {item.label}
-                    </Link>
-                  </SheetClose>
-                );
-              })}
-            </nav>
-          </SheetContent>
-        </Sheet>
-      </nav>
-    </>
+    <nav
+      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-card px-1 pt-1.5 pb-[calc(10px+env(safe-area-inset-bottom))] md:hidden"
+      aria-label="Main"
+    >
+      {phoneTabs.map((item) => {
+        const current = isCurrent(pathname, item.to);
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.to}
+            to={item.to}
+            aria-current={current ? "page" : undefined}
+            className={`relative grid min-h-[52px] justify-items-center gap-0.5 pt-1.5 text-[11px] font-semibold ${current ? "text-primary" : "text-muted-foreground"}`}
+          >
+            <Icon size={24} strokeWidth={1.8} aria-hidden="true" />
+            {item.label}
+            {item.to === "/" ? <ReviewCount className="absolute top-0 left-[calc(50%+6px)]" /> : null}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 

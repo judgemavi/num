@@ -90,7 +90,6 @@ export {
   bucketCoverSchema,
   bucketEventCreateSchema,
   bucketEventKinds,
-  bucketEventListSchema,
   bucketEventSchema,
   bucketIcons,
   bucketKinds,
@@ -130,35 +129,21 @@ export {
 } from "./bucket";
 export {
   addDays,
+  availableSchema,
   fillResultSchema,
   fundingPositionSchema,
-  monthFundingListSchema,
-  monthFundingSchema,
-  monthParamSchema,
   monthlyAmount,
-  nextIncomeDate,
   owedSchema,
   positiveBalances,
   unassigned,
+  type Available,
   type FillResult,
   type FundingPosition,
-  type MonthFunding,
   type MonthlyBucket,
   type MonthlyCommitment,
   type Owed,
 } from "./funding";
-export {
-  buildMonthPlan,
-  isYearMonth,
-  monthPlanQuerySchema,
-  monthPlanSchema,
-  planSearchSchema,
-  yearMonthSchema,
-  type MonthPlan,
-  type MonthPlanBucketSource,
-  type MonthPlanLink,
-  type MonthPlanSource,
-} from "./month-plan";
+export { buildFeasibility, feasibilitySchema, type Feasibility, type FeasibilityBucket, type FeasibilityPlan } from "./feasibility";
 export { asOfQuerySchema, isIsoDate, isoDateSchema } from "./date";
 export {
   defaultInsightWindow,
@@ -400,11 +385,9 @@ export {
   buildForecast,
   cardPaymentDay,
   forecastDates,
-  forecastDayCount,
   forecastRisks,
   forecastSchema,
   forecastWarningCodes,
-  noPaydayWindowDays,
   monthEnd,
   spendDeltas,
   unbucketedMonthly,
@@ -433,10 +416,9 @@ export {
   type FlowLine,
 } from "./month";
 export {
-  buildInsightChanges,
-  insightChangesSchema,
   savingsRateMilliPct,
-  type InsightChanges,
+  spendingIncreases,
+  type SpendingIncrease,
 } from "./insights-changes";
 export {
   hygieneCheckSchema,
@@ -446,6 +428,7 @@ export {
   type HygieneCheck,
 } from "./hygiene";
 export { billNeed, pausePlan, projectedPoolShort, recedeOrder, recedePlan } from "./pool";
+export { needsYouItemSchema, needsYouSchema, type NeedsYou, type NeedsYouItem } from "./needs-you";
 export { reviewLevel, reviewLevels, type ReviewLevel } from "./review-level";
 export {
   approveResultSchema,

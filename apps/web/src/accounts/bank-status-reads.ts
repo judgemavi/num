@@ -10,11 +10,6 @@ export function useBankStatus(accountId: string) {
   return useSuspenseQuery({ ...bankStatusesQuery(), select: (list) => list.items.find((item) => item.accountId === accountId) ?? null }).data;
 }
 
-/** The accounts that do not match their bank. */
-export function useBankMismatches() {
-  return useSuspenseQuery({ ...bankStatusesQuery(), select: (list) => list.items.filter((item) => item.difference !== 0) }).data;
-}
-
 export function useBankStatusText(kind: AccountKind, status: BankStatus) {
   const currency = useBookCurrency();
   if (status.difference === 0) {

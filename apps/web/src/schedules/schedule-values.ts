@@ -46,7 +46,6 @@ export function scheduleValues(kind: ScheduleKind, draft: Bucket | ScheduleSeed 
     monthDay: monthValue(source?.monthDay),
     shift: schedule?.businessDayShift ?? "none",
     endDate: schedule?.endDate ?? "",
-    payday: schedule?.payday ?? false,
   };
 }
 
@@ -104,7 +103,6 @@ function scheduleFields(currency: string, kind: ScheduleKind, value: ScheduleFor
       monthDay: value.freq === "weekly" || value.monthDay === "same" ? null : value.monthDay === "last" ? -1 : Number(value.monthDay),
       businessDayShift: value.shift,
       endDate: value.endDate.trim().length > 0 ? value.endDate : null,
-      payday: kind === "income" && value.payday,
     },
   };
 }

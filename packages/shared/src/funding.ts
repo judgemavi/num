@@ -13,19 +13,6 @@ export function addDays(iso: string, days: number): string {
   return Temporal.PlainDate.from(iso).add({ days }).toString();
 }
 
-export function nextIncomeDate(asOf: string, dates: readonly string[]): string | null {
-  let next: string | null = null;
-  for (const date of dates) {
-    if (date <= asOf) {
-      continue;
-    }
-    if (next === null || date < next) {
-      next = date;
-    }
-  }
-  return next;
-}
-
 export function positiveBalances(balances: readonly number[]): number {
   let total = 0;
   for (const balance of balances) {
@@ -157,7 +144,19 @@ export const fundingPositionSchema = z.object({
   asOf: isoDateSchema,
   onBudgetTotal: money,
   unassigned: money,
-  nextIncomeDate: isoDateSchema.nullable(),
+});
+
+/**
+ * Available to spend: the on-budget total − the savings buckets − the bills set aside. `savings` is the
+ * sum of the positive balances of the sinking, goal and emergency buckets. `billsSetAside` is, for each commitment
+ * bucket, its positive balance + the amount that it is short for its occurrences in the next 30 days.
+ */
+export const availableSchema = z.object({
+  asOf: isoDateSchema,
+  onBudgetTotal: money,
+  savings: nonNegative,
+  billsSetAside: nonNegative,
+  available: money,
 });
 
 export const fillResultSchema = z.object({
@@ -169,8 +168,6 @@ export const fillResultSchema = z.object({
 
 export const owedSchema = z.object({
   month: monthKeySchema,
-  /** True when the user undid the funding of this month. The fill does not pay a held month. */
-  held: z.boolean(),
   items: z.array(
     z.object({
       bucketId: z.uuid(),
@@ -180,20 +177,7 @@ export const owedSchema = z.object({
   ),
 });
 
-export const monthFundingSchema = z.object({
-  month: monthKeySchema,
-  /** The funding of the month that is not undone. */
-  total: nonNegative,
-  held: z.boolean(),
-});
-
-export const monthFundingListSchema = z.object({
-  items: z.array(monthFundingSchema),
-});
-
-export const monthParamSchema = z.object({ month: monthKeySchema });
-
 export type FundingPosition = z.infer<typeof fundingPositionSchema>;
 export type FillResult = z.infer<typeof fillResultSchema>;
 export type Owed = z.infer<typeof owedSchema>;
-export type MonthFunding = z.infer<typeof monthFundingSchema>;
+export type Available = z.infer<typeof availableSchema>;

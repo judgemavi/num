@@ -128,7 +128,6 @@ test("each no decision hides its review item until undo", () => {
       monthDay: 15,
       businessDayShift: "none",
       endDate: "2026-03-15",
-      payday: false,
       ...saved,
     });
     const changedPay = pay(sample.db, cash.id, "2026-03-15", -19990, "Stream", food.id);
@@ -151,7 +150,6 @@ test("each no decision hides its review item until undo", () => {
       monthDay: 15,
       businessDayShift: "none",
       endDate: null,
-      payday: false,
       ...saved,
     });
     const missedKey = `recurring_missed:${missedPlan.id}:2026-02-15`;

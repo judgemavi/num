@@ -16,7 +16,7 @@ The visual reference is `docs/design/signal-reference.html`. Open it in a browse
 3. **Everything else is neutral:** text, borders, group labels, navigation.
 4. **One page pattern** on every main screen (§5).
 5. **Rows, not boxes.** Group rows inside one card with hairlines. Do not put each record in its own box.
-6. **Plain words.** Example: "Owed", "Safe to spend until payday", "Give it a job".
+6. **Plain words.** Example: "Owed", "Available to spend", "Set aside for bills".
 7. **Light theme only** in v2.
 
 ## 2. Tokens
@@ -57,7 +57,7 @@ Put these in `apps/web/src/index.css` as CSS variables. Map them to the shadcn v
 | pink | `#FCE7F1` | `#A3326B` |
 | teal | `#DDF3F1` | `#11706A` |
 
-**Page tints** (summary strip background only): Home `#FFEFE7`, Accounts `#FFF6D6`, Buckets `#E6F4EC`, Insights `#EEEEFE`.
+**Page tints** (summary strip background only): Home `#FFEFE7`, Accounts `#FFF6D6`, Buckets `#E6F4EC`.
 Other screens use the surface colour.
 
 **Radius:** cards 16px, inputs 12px, dialogs 20px, icon tiles 10px, buttons and chips fully round (999px).
@@ -84,11 +84,10 @@ Other screens use the surface colour.
   the app remembers the choice.
   - Brand at the top.
   - Primary: Home (with the tomato needs-review count), Transactions, Buckets, Accounts.
-  - Group "More": Insights.
   - Settings at the bottom.
   - Items are 44px high, radius 10px. Current item: `primary-soft` fill, `primary` text and icon.
-- **Phone (width < 768px):** a bottom tab bar: Home, Transactions, Buckets, Accounts, More.
-  More opens a sheet with Insights and Settings.
+- **Phone (width < 768px):** a bottom tab bar: Home, Transactions, Buckets, Accounts, Settings. There is no "More"
+  sheet.
 - Icons: lucide icons, stroke 1.8, 20px.
 
 ## 5. Page pattern
@@ -96,8 +95,13 @@ Other screens use the surface colour.
 Every main screen has, from top to bottom:
 
 1. **Page header:** a small muted line (date, count or period), the page title, and actions on the right.
-2. **Summary strip:** one card with the page tint. It contains the label, the hero amount, one hint line,
-   2–3 facts separated by hairlines, and the page illustration (§7) on the right.
+2. **Summary strip:** one card with the page tint. It contains the label, the hero amount, 2–3 facts separated by
+   hairlines, and the page illustration (§7) on the right. It has no hint line that repeats a label or a fact. A hint
+   line shows only a fact that needs the user (example: the difference of an account that does not match its bank).
+   On a phone, the illustration is about 88px, in the top right corner next to the hero amount.
+   A screen without a page tint (the account page) uses the surface colour and has no illustration.
+   Home: below the hero, one row with three small amounts (18px, weight 600): "In your accounts" − "Saving buckets" −
+   "Set aside for bills".
 3. **Content:** a main list card, and a 336px side panel column on the right.
    Below 1024px the side panel goes below the list.
 
@@ -171,7 +175,7 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 **Full height:** the app shell fills the viewport height. The desktop sidebar is full height and stays in place when the page scrolls.
 
 **Charts:** use only the chart tokens `chart-1` to `chart-5`, `est` and `attn`.
-- Insights timeline: income bars `chart-3`, spending bars `chart-2`, balance line `chart-5`.
+- Spending timeline (Home): income bars `chart-3`, spending bars `chart-2`, balance line `chart-5`.
   Forecast bars and the balance forecast line use the same colour at a lower opacity (lighter tone).
   When the forecast ends inside a month, the forecast part of that bar also has a dashed outline in the same colour.
   The known-only forecast line is `est`, dashed. The `asOf` marker is `muted`, dashed.
@@ -276,8 +280,8 @@ the balance after the payment. A past row also shows the actual payment or "No p
 
 ## 7. Illustrations
 
-Four small duotone illustrations, one for each tinted summary strip: payday (Home), balance scale (Accounts),
-jars (Buckets), paycheck split (Insights). Port them from the reference file into React SVG components.
+Three small duotone illustrations, one for each tinted summary strip: wallet and calendar (Home), balance scale
+(Accounts), jars (Buckets). Port them from the reference file into React SVG components.
 Stroke ink 2.5px, fills from the identity hues and `#F4CD55` as the one warm highlight. They are decoration:
 give each one an accessible label, or `aria-hidden` when the text already says the same thing.
 
@@ -286,8 +290,14 @@ give each one an accessible label, or `aria-hidden` when the text already says t
 - **Account groups:** Cash & cards = sky, Savings = mint, Investments & property = butter, Loans & mortgage = lilac.
   Group by kind: chequing, cash, credit card → Cash & cards. Savings → Savings. Investment, property, receivable,
   other asset → Investments & property. Mortgage, loan, other liability → Loans & mortgage.
-- **Review and Home item kinds:** categorize = sky, recurring change = lilac, transfer = butter,
-  over budget = attention (tomato).
+- **Review and Home item kinds:** categorize and review = sky, recurring change and missed payment = lilac,
+  transfer and spending that went up = butter, imports = teal, goals and savings rate = mint, emergency fund and savings used = pink,
+  over budget, a short bill, a short pool and an account that does not match its bank = attention (tomato).
+
+**Home "Needs you":** one ListCard with a tomato count badge. Each row: an IconTile with the hue of its kind, a title,
+one short detail line and a chevron. The whole row opens the screen of its fix. Home is read-only: a row has no buttons
+and no menu. With no item: one line, "All clear". A section title "Spending" (display font, uppercase) starts the Spending
+part of Home.
 - **Buckets:** each bucket has a `color` (one identity hue) and an `icon` (from a fixed lucide set). The user picks them.
   The app suggests a hue in rotation for a new bucket.
 

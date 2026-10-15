@@ -3,7 +3,6 @@ import {
   bucketCoverSchema,
   bucketCreateSchema,
   bucketEventCreateSchema,
-  bucketEventListSchema,
   bucketEventSchema,
   bucketListQuerySchema,
   bucketListSchema,
@@ -15,7 +14,7 @@ import {
 } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { coverBucket, createBucketEvent, listBucketEvents, undoBucketEvent } from "../services/bucket-events";
+import { coverBucket, createBucketEvent, undoBucketEvent } from "../services/bucket-events";
 import { listBillNeeds } from "../services/bills";
 import { pauseBucket, resumeBucket } from "../services/bucket-pause";
 import { readEmergencyFund } from "../services/emergency-fund";
@@ -40,19 +39,6 @@ const listRoute = createRoute({
       content: { "application/json": { schema: bucketListSchema } },
     },
     400: errorResponse,
-  },
-});
-
-const eventsRoute = createRoute({
-  operationId: "get_buckets_events",
-  description: "Read buckets. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
-  method: "get",
-  path: "/api/buckets/events",
-  responses: {
-    200: {
-      description: "Bucket events that still count",
-      content: { "application/json": { schema: bucketEventListSchema } },
-    },
   },
 });
 
@@ -275,7 +261,6 @@ const readRoute = createRoute({
 export function bucketRoutes(db: Db) {
   return new OpenAPIHono({ defaultHook: validationHook })
     .openapi(listRoute, (c) => c.json(listBuckets(db, c.req.valid("query")), 200))
-    .openapi(eventsRoute, (c) => c.json(listBucketEvents(db), 200))
     .openapi(overspentRoute, (c) => c.json(listOverspent(db), 200))
     .openapi(billsRoute, (c) => c.json(listBillNeeds(db, c.req.valid("query").asOf), 200))
     .openapi(emergencyRoute, (c) => c.json(readEmergencyFund(db, c.req.valid("query").asOf), 200))
