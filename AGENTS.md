@@ -180,6 +180,19 @@ in docs or code. Git history keeps the records. An idea that the owner refuses g
   Use your own `PORT`, `WEB_PORT`, `API_PORT` and a `DATA_DIR` under `/tmp`.
 - Stop every server that you started before you report the slice as finished.
 
+## Docs size
+
+The docs were pruned. Keep them small:
+
+- `docs/spec.md` and `docs/design.md` tell what a person sees and the rules. They do not tell how the code does it:
+  no component, prop, class or icon names, no breakpoints and no pixel values of hit areas. The code has these.
+  Exceptions: design tokens, the shadcn component of a control, and the sizes in the tables of `docs/design.md`.
+- A change replaces text. Do not add a second rule next to the old one. Remove the text that the change makes wrong
+  or not necessary.
+- Write each rule in one place. `docs/design.md` refers to the spec for behaviour. It does not repeat it.
+- The PR description gives the line counts of `docs/spec.md` and `docs/design.md` before and after the slice.
+  Give the reason for each increase.
+
 ## Clean up
 
 Before you report a slice as finished, remove everything that the slice made and does not keep:
