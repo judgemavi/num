@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Boundary } from "@/components/boundary";
 import { retryLazy } from "@/components/retry-lazy";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { localAsOf } from "@/as-of";
 import { cn } from "cn";
 
 const calendar = retryLazy<ComponentProps<typeof import("@/components/ui/calendar").Calendar>>(() => import("@/components/ui/calendar").then((module) => ({ default: module.Calendar })));
@@ -44,6 +45,15 @@ function fromCalendarDate(date: Date) {
 
 function showDate(date: Date) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+}
+
+/** The year selector reaches back far enough for a long mortgage and forward for a planned date. */
+const yearsBack = 50;
+const yearsAhead = 10;
+
+function yearRange() {
+  const year = Temporal.PlainDate.from(localAsOf()).year;
+  return { startMonth: new Date(year - yearsBack, 0, 1), endMonth: new Date(year + yearsAhead, 11, 1) };
 }
 
 const captionFormat = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" });
@@ -99,6 +109,8 @@ export function DateField({ id, value, onChange, disabled, required, placeholder
           >
             <calendar.Component
               mode="single"
+              captionLayout="dropdown"
+              {...yearRange()}
               autoFocus
               fixedWeeks
               classNames={{ root: "size-full" }}
