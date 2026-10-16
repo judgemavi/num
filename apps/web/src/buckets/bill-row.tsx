@@ -1,4 +1,4 @@
-import { billFillsOn, type Bucket } from "@num/shared";
+import { billFillsOn, isFrequent, type Bucket } from "@num/shared";
 import { useSuspenseQueries } from "@tanstack/react-query";
 import { billNeedsQuery, useArchiveBucket } from "@/api/buckets";
 import { scheduleSignalsQuery } from "@/api/schedules";
@@ -31,6 +31,7 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
   const [{ data: needs }, { data: signals }] = useSuspenseQueries({ queries: [billNeedsQuery(asOf), scheduleSignalsQuery(asOf)] });
   const need = needs.find((item) => item.bucketId === bucket.id);
   const amount = need?.amount ?? 0;
+  const showBar = bucket.schedule !== null && !isFrequent(bucket.schedule);
   const changed = signals.changed.some((item) => item.bucketId === bucket.id);
   const over = bucket.balance < 0;
   const balance = over ? (
@@ -113,8 +114,8 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
           ) : null}
         </small>
       </div>
-      <div className={listMid}>
-        <BucketBar hue={bucket.color} balance={bucket.balance} target={amount} label={barLabel(bucket, currency, amount)} />
+      <div className={`${listMid} ${showBar ? "" : "@max-2xl:hidden"}`}>
+        {showBar ? <BucketBar hue={bucket.color} balance={bucket.balance} target={amount} label={barLabel(bucket, currency, amount)} /> : null}
       </div>
       <div className={`${listAmt} ${over ? "text-attn" : ""}`}>
         {balance}

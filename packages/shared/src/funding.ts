@@ -80,7 +80,7 @@ function dueDateFor(bucket: MonthlyBucket, month: string): string | null {
 }
 
 /** Monthly or more often: weekly up to every 4 weeks, or monthly every month. */
-function isFrequent(schedule: PlanSchedule) {
+export function isFrequent(schedule: PlanSchedule) {
   return (schedule.freq === "weekly" && schedule.interval <= 4) || (schedule.freq === "monthly" && schedule.interval === 1);
 }
 

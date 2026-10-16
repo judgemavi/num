@@ -39,7 +39,7 @@ export {
   type EmergencyFund, type OverspentBucket,
 } from "./bucket";
 export {
-  positiveBalances, unassigned, monthlyAmount,
+  positiveBalances, unassigned, monthlyAmount, isFrequent,
   type MonthlyCommitment, availableSchema, fillResultSchema,
   owedSchema, type FillResult, type Owed,
   type Available,
