@@ -343,7 +343,7 @@ test("each review source appears and leaves after its action", () => {
   }
 });
 
-test("auto-link runs for the imported account after the import commits", () => {
+test("auto-link runs for the imported account inside the import transaction", () => {
   const sample = book();
   try {
     const cash = account(sample.db, "Cash");

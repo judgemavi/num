@@ -9,8 +9,9 @@ import {
   type TransactionReview,
 } from "@num/shared";
 import { transactionLines, transactions } from "@num/db";
-import { and, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
+import { idIn } from "./list-sql";
 import { ServiceError } from "../service-error";
 import { keepKey } from "./decision-keep";
 import { decidedKeys, pairKey } from "./decision-keys";
@@ -39,17 +40,9 @@ export function requireAsOf(asOf: string) {
   }
 }
 
-export function chunks<T>(values: readonly T[], size: number) {
-  const groups: T[][] = [];
-  for (let index = 0; index < values.length; index += size) {
-    groups.push(values.slice(index, index + size));
-  }
-  return groups;
-}
-
 function loadBases(db: Db, ids: readonly string[]) {
-  return chunks([...new Set(ids)], 400).flatMap((group) =>
-    db
+  if (ids.length === 0) return [];
+  return db
       .select({
         id: transactions.id,
         accountId: transactions.accountId,
@@ -64,9 +57,8 @@ function loadBases(db: Db, ids: readonly string[]) {
         lineCount: lineCount(transactions.id),
       })
       .from(transactions)
-      .where(inArray(transactions.id, group))
-      .all(),
-  );
+      .where(idIn(transactions.id, ids))
+      .all();
 }
 
 /** A row is Likely only when Approve can apply its suggestion. Other rows with a suggestion are Maybe. */
@@ -125,9 +117,9 @@ export function listNeedsReview(
   const refundById = refundQuestions(db, hidden, asOf, scope.only);
   const openIds = db.select({ id: transactionLines.transactionId }).from(transactionLines)
     .where(and(isNull(transactionLines.categoryId), isNull(transactionLines.transferAccountId),
-      only ? sql`${transactionLines.transactionId} in (select value from json_each(${JSON.stringify([...only])}))` : undefined))
+      only ? idIn(transactionLines.transactionId, [...only]) : undefined))
     .union(db.select({ id: transactions.id }).from(transactions)
-      .where(and(isNotNull(transactions.autoReason), only ? sql`${transactions.id} in (select value from json_each(${JSON.stringify([...only])}))` : undefined)))
+      .where(and(isNotNull(transactions.autoReason), only ? idIn(transactions.id, [...only]) : undefined)))
     .all();
   const ids = [...openIds.map((row) => row.id), ...pairById.keys(), ...ambiguousById.keys(), ...refundById.keys()].filter(wanted);
   const otherIds = ids.flatMap((id) => {

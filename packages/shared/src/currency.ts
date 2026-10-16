@@ -88,13 +88,21 @@ export function parseAmount(code: string, text: string): number {
     throw new Error("Amount has too many decimal places");
   }
 
-  const scaled = `${match[2]}${fraction.padEnd(milliunitDigits, "0")}`;
-  const amount = BigInt(scaled) * (match[1] === "-" ? -1n : 1n);
-  const max = BigInt(Number.MAX_SAFE_INTEGER);
-  if (amount > max || amount < -max) {
+  const amount = scaleMilliunits(match[2] ?? "0", fraction, match[1] === "-");
+  if (amount === null) {
     throw new Error("Amount is too large");
   }
-  return Number(amount);
+  return amount;
+}
+
+/** Scale validated decimal parts without floating-point arithmetic. Null means the amount is too large. */
+export function scaleMilliunits(whole: string, fraction: string, negative: boolean): number | null {
+  const scaled = BigInt(`${whole}${fraction.padEnd(milliunitDigits, "0")}`);
+  if (scaled > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return null;
+  }
+  const amount = Number(scaled);
+  return amount === 0 ? 0 : negative ? -amount : amount;
 }
 
 /** The exact decimal text of an amount in milliunits, with no zeros at the end of the fraction. 12340 is "12.34". */

@@ -1,8 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { columnMapSchema, type ColumnMap } from "@num/shared";
+import { columnMapSchema, readAmount, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
-import { readAmount } from "./parse-amount";
 import { parseCsvStatement } from "./parse-csv";
 import { parseOfxStatement } from "./parse-ofx";
 import { loadPreset, presetsDirectory } from "./presets";

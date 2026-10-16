@@ -4,25 +4,10 @@ import { z } from "zod";
 import type { Db } from "../db";
 import { aiCanWrite } from "../services/ai-access";
 import { callMcpTool } from "./execute";
-import { fieldKeys, isFileSchema, isZodSchema, shapeOf } from "./inputs";
+import { fileInputSchema, fieldKeys, isFileSchema, isZodSchema, shapeOf } from "./inputs";
 import { isRecord, publishedSchema } from "./result";
 
 const moneyText = "Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.";
-
-const fileInputSchema = z
-  .union([
-    z.object({
-      filename: z.string(),
-      mimeType: z.string().optional(),
-      text: z.string(),
-    }),
-    z.object({
-      filename: z.string(),
-      mimeType: z.string().optional(),
-      contentBase64: z.string(),
-    }),
-  ])
-  .describe("The file as text or as base64. Use text for a CSV.");
 
 export type McpRoute = {
   method: "get" | "post" | "put" | "patch" | "delete";
@@ -112,21 +97,25 @@ function bodyOf(route: RouteConfig): { schema?: z.ZodType; multipart: boolean } 
   return { multipart: false };
 }
 
-export function isDestructive(method: string, path: string): boolean {
-  if (method === "get") {
-    return false;
-  }
-  const text = path.toLowerCase();
-  return (
-    method === "delete" ||
-    text.endsWith("/delete") ||
-    text.includes("undo") ||
-    text.includes("/import") ||
-    text.includes("/funding") ||
-    text === "/api/transactions/approve" ||
-    text.startsWith("/api/accounts")
-  );
-}
+const destructiveOperations = new Set([
+  "delete_accounts_id_bank_balances_balanceid",
+  "delete_category_groups_id",
+  "delete_documents_id",
+  "delete_transactions_id",
+  "patch_accounts_id",
+  "post_accounts",
+  "post_accounts_id_archive",
+  "post_accounts_id_bank_balances",
+  "post_accounts_id_restore",
+  "post_buckets_id_events_eventid_undo",
+  "post_funding_fill",
+  "post_imports",
+  "post_imports_id_undo",
+  "post_imports_rows_id_resolve",
+  "post_review_decisions_undo",
+  "post_transactions_approve",
+  "put_accounts_id_bank_balances_balanceid",
+]);
 
 export function mcpRoutes(app: OpenAPIHono): McpRoute[] {
   const routes: McpRoute[] = [];
@@ -156,7 +145,7 @@ export function mcpRoutes(app: OpenAPIHono): McpRoute[] {
       operationId: route.operationId,
       description: route.description,
       read: route.method === "get",
-      destructive: isDestructive(route.method, route.path),
+      destructive: destructiveOperations.has(route.operationId),
       params: route.request?.params,
       query: route.request?.query,
       body: body.schema,
@@ -210,7 +199,7 @@ function inputSchema(route: McpRoute) {
 }
 
 function toolDescription(route: McpRoute) {
-  const base = route.description.replaceAll(` ${moneyText}`, "").replaceAll(moneyText, "").trim();
+  const base = route.description;
   if (!routeHasAmount(route.schemas)) {
     return base;
   }

@@ -1,8 +1,7 @@
 import { bucketEvents, buckets, type BucketRow } from "@num/db";
-import { addDays, comparePriority, isIsoDate, monthlyAmount, type Owed, type EmergencyFund } from "@num/shared";
+import { addDays, monthStart, comparePriority, monthlyAmount, type Owed, type EmergencyFund } from "@num/shared";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
-import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
 import { bucketBalances } from "./bucket-balance";
 import { readEmergencyFund } from "./emergency-fund";
@@ -10,11 +9,6 @@ import { commitmentsOf } from "./schedules";
 import type { Reader } from "./write";
 
 type MonthlyRow = { bucket: BucketRow; monthly: number; funded: number; owed: number };
-
-/** The first day of the month (YYYY-MM). The fund events of the fill have this date. */
-export function monthStart(month: string) {
-  return `${month}-01`;
-}
 
 function fundedByBucket(db: Reader, month: string) {
   const funded = new Map<string, number>();
@@ -80,9 +74,6 @@ export function monthlyRows(
 }
 
 export function readOwed(db: Db, asOf: string): Owed {
-  if (!isIsoDate(asOf)) {
-    throw new ServiceError("as_of_invalid", 400, { asOf });
-  }
   const month = asOf.slice(0, 7);
   return {
     month,

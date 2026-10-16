@@ -1,7 +1,8 @@
+import { tempDatabase } from "./test-support";
 import { expect, test } from "bun:test";
 import { readAvailable } from "./available";
 import { listBillNeeds } from "./bills";
-import { expense, saved, tempDatabase } from "./bucket-test-book";
+import { expense, saved } from "./bucket-test-book";
 import { account, addSchedule, money, spend } from "./funding-test-book";
 import { needsYouChecks } from "./needs-you-checks";
 import { autoLink, recurringSignals } from "./recurring-view";

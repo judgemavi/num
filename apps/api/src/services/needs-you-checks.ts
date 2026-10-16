@@ -1,4 +1,4 @@
-import { monthLastDay, reviewAgeDays, staleImportDays, Temporal } from "@num/shared";
+import { daysBetween, monthLastDay, reviewAgeDays, staleImportDays, Temporal } from "@num/shared";
 import type { Db } from "../db";
 import { listOverspent } from "./buckets";
 import { lastCompleteMonths } from "./complete-months";
@@ -11,7 +11,7 @@ import { loadLedgerLines } from "./ledger-lines";
 import { loadReviewState, type ReviewState } from "./needs-review";
 
 function ageDays(asOf: string, day: string) {
-  const days = Temporal.PlainDate.from(day).until(Temporal.PlainDate.from(asOf), { largestUnit: "day" }).days;
+  const days = daysBetween(day, asOf);
   return days < 0 ? 0 : days;
 }
 

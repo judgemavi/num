@@ -47,7 +47,7 @@ const transactionSaveResponse = {
 
 const refundPurchasesRoute = createRoute({
   operationId: "get_transactions_refund_purchases",
-  description: "Read transactions. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read transactions. This does not create, change or delete a record.",
   method: "get",
   path: "/api/transactions/refund-purchases",
   request: { query: refundPurchaseQuerySchema },
@@ -101,7 +101,7 @@ const bulkRoute = createRoute({
 
 const listRoute = createRoute({
   operationId: "search_transactions",
-  description: "Read transactions. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive. With asOf (an ISO date), each row that needs review has its review.",
+  description: "Read transactions. This does not create, change or delete a record. With asOf (an ISO date), each row that needs review has its review.",
   method: "get",
   path: "/api/transactions",
   request: {
@@ -122,7 +122,7 @@ const listRoute = createRoute({
 
 const reviewListRoute = createRoute({
   operationId: "search_transactions_review",
-  description: "Read the transactions that need review, with the same filters, sort order and pages as search_transactions. sort=confidence also sorts by the review level (no suggestion, question, Maybe, Likely, Sure), then by the score. Each row has its review. The counts are for all pages. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read the transactions that need review, with the same filters, sort order and pages as search_transactions. sort=confidence also sorts by the review level (no suggestion, question, Maybe, Likely, Sure), then by the score. Each row has its review. The counts are for all pages. This does not create, change or delete a record.",
   method: "get",
   path: "/api/transactions/review",
   request: { query: transactionReviewQuerySchema },
@@ -137,7 +137,7 @@ const reviewListRoute = createRoute({
 
 const reviewReadRoute = createRoute({
   operationId: "get_transactions_id_review",
-  description: "Read the review of one transaction: its level, its question and the proposed answer. Null when it does not need review. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read the review of one transaction: its level, its question and the proposed answer. Null when it does not need review. This does not create, change or delete a record.",
   method: "get",
   path: "/api/transactions/{id}/review",
   request: { params: idParams, query: asOfQuerySchema },
@@ -152,7 +152,7 @@ const reviewReadRoute = createRoute({
 
 const looksRightRoute = createRoute({
   operationId: "post_transactions_id_looks_right",
-  description: "Create or run transactions. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Create or run transactions. This does not change records outside this action.",
   method: "post",
   path: "/api/transactions/{id}/looks-right",
   request: { params: idParams },
@@ -166,7 +166,7 @@ const looksRightRoute = createRoute({
 
 const refundOfRoute = createRoute({
   operationId: "post_transactions_id_refund_of",
-  description: "Link a refund to the purchase it returns. This changes only the refund and its automatic label. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Link a refund to the purchase it returns. This changes only the refund and its automatic label.",
   method: "post",
   path: "/api/transactions/{id}/refund-of",
   request: {
@@ -186,7 +186,7 @@ const refundOfRoute = createRoute({
 
 const readRoute = createRoute({
   operationId: "get_transactions_id",
-  description: "Read transactions. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read transactions. This does not create, change or delete a record.",
   method: "get",
   path: "/api/transactions/{id}",
   request: { params: idParams },
@@ -198,7 +198,7 @@ const readRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_transactions",
-  description: "Create or run transactions. This does not change records outside this action. A transaction with more than one line is a loan payment: two lines of money out, one with an expense category (the interest) and one transfer line to a mortgage or loan account (the principal). Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Create or run transactions. This does not change records outside this action. A transaction with more than one line is a loan payment: two lines of money out, one with an expense category (the interest) and one transfer line to a mortgage or loan account (the principal).",
   method: "post",
   path: "/api/transactions",
   request: {
@@ -221,7 +221,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_transactions_id",
-  description: "Change transactions. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. lines replaces all the lines: when you change the amount, send the lines too. The API checks the fields together on the stored transaction with your changes. answer gives the answer to the Needs review question of the transaction (from get_transactions_id_review): for transfer_pair, one transfer line to the account of otherId links the two transactions, and other lines record not_transfer; for refund_purchase, no refundOfId records not_linked; recurring_ambiguous links the transaction to the occurrence. Other records do not change. A transaction with more than one line is a loan payment: two lines of money out, one with an expense category (the interest) and one transfer line to a mortgage or loan account (the principal). Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Change transactions. Send only the fields that change. A field that you leave out keeps its value. null clears a field that can be empty. lines replaces all the lines: when you change the amount, send the lines too. The API checks the fields together on the stored transaction with your changes. answer gives the answer to the Needs review question of the transaction (from get_transactions_id_review): for transfer_pair, one transfer line to the account of otherId links the two transactions, and other lines record not_transfer; for refund_purchase, no refundOfId records not_linked; recurring_ambiguous links the transaction to the occurrence. Other records do not change. A transaction with more than one line is a loan payment: two lines of money out, one with an expense category (the interest) and one transfer line to a mortgage or loan account (the principal).",
   method: "patch",
   path: "/api/transactions/{id}",
   request: {
@@ -245,7 +245,7 @@ const updateRoute = createRoute({
 
 const deleteRoute = createRoute({
   operationId: "delete_transactions_id",
-  description: "Remove or archive transactions. This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Remove or archive transactions. This does not change records of another kind.",
   method: "delete",
   path: "/api/transactions/{id}",
   request: { params: idParams },

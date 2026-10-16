@@ -1,3 +1,4 @@
+import { expectCode } from "./test-support";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -5,7 +6,6 @@ import { merchants, migrateDatabase, openDatabase, settings, transactions } from
 import { foldName, storedPayee } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
-import { ServiceError } from "../service-error";
 import { createAccount } from "./accounts";
 import { archiveBucket } from "./buckets";
 import { createCategory } from "./categories";
@@ -113,12 +113,7 @@ test("one transaction can link to one occurrence only", () => {
     });
     const txn = payment(db, chequing.id, "2026-01-15", -10000);
     linkOccurrence(db, first.id, "2026-01-15", txn, { source: "ui", at });
-    expect(() => linkOccurrence(db, second.id, "2026-01-15", txn, { source: "ui", at })).toThrow(ServiceError);
-    try {
-      linkOccurrence(db, second.id, "2026-01-15", txn, { source: "ui", at });
-    } catch (error) {
-      expect((error as ServiceError).code).toBe("transaction_already_linked");
-    }
+    expectCode(() => linkOccurrence(db, second.id, "2026-01-15", txn, { source: "ui", at }), "transaction_already_linked");
     const shared = payment(db, chequing.id, "2026-02-15", -10000);
     const twin = createSchedule(db, {
       name: "Twin stream",

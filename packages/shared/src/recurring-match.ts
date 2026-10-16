@@ -1,4 +1,5 @@
-import { dayDistance, linkWindowStart, withinTolerance, type PlanSchedule } from "./recurring-calc";
+import { dayDistance } from "./date";
+import { linkWindowStart, withinTolerance, type PlanSchedule } from "./recurring-calc";
 import { addPeriods, occurrenceWindows } from "./recurring-window";
 
 /** An occurrence with no link. A transaction can match it when its date is from `start` (included) to `end` (not included). */

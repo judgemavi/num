@@ -1,5 +1,6 @@
+import { idIn } from "./list-sql";
 import { accounts, inboxDecisions, occurrenceLinks, transactionLines, transactions } from "@num/db";
-import { utcNow, type MatchResult } from "@num/shared";
+import { automaticLinkConfidence, utcNow, type MatchResult } from "@num/shared";
 import { and, eq, inArray, isNull, notExists, or, sql } from "drizzle-orm";
 import { isUncategorized, keepKey, keepPrefix } from "./decision-keep";
 import { mortgageLinesFor } from "./mortgage-learned";
@@ -54,7 +55,7 @@ export function applyLinkedSchedule(
   const result = {
     level: "automatic" as const,
     confidence: 0.99,
-    confidenceMilli: 990,
+    confidenceMilli: automaticLinkConfidence,
     leadMilli: 1000,
     reason: "recurring" as const,
     sourceId: schedule.id,
@@ -76,7 +77,7 @@ export function applyLinkedSchedule(
       merchantId: lines ? null : (schedule.merchantId ?? txn.merchantId),
       autoReason: "recurring",
       autoSourceId: schedule.id,
-      autoConfidence: 990,
+      autoConfidence: automaticLinkConfidence,
       ...(markEdited ? { editedAt: utcNow() } : {}),
     })
     .where(eq(transactions.id, transactionId))
@@ -199,7 +200,7 @@ function openRows(tx: WriteTx, payees: string[]) {
     .where(
       and(
         eq(transactions.mirror, literal(0)),
-        inArray(transactions.payeeNormalized, payees),
+        idIn(transactions.payeeNormalized, payees),
         or(isNull(transactionLines.categoryId), inArray(transactions.autoReason, learnedReasons)),
         isNull(transactionLines.transferAccountId),
         isOnlyLine,

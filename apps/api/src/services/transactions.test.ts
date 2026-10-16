@@ -1,9 +1,10 @@
+import { expectCode, tempDatabase } from "./test-support";
 import type { Transaction } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createCategory } from "./categories";
 import { createTag } from "./tags";
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
-import { tempDatabase, saved, expectCode, account, entry, countWrites, requirePeer } from "./transaction-test-book";
+import { saved, account, entry, countWrites, requirePeer } from "./transaction-test-book";
 
 test("lines must sum to the transaction amount", () => {
   const book = tempDatabase();

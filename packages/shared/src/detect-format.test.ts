@@ -167,3 +167,13 @@ test("import order follows each file's first date, oldest first", () => {
   ]);
   expect(ordered.map((item) => item.id)).toEqual(["chequing", "same", "card", "savings", "none"]);
 });
+
+
+test("currency symbols use the same amount parser for detection and import", () => {
+  const preset = presetSchema.parse({
+    id: "synthetic", name: "Synthetic bank", dateFormat: "iso", hasHeader: false,
+    date: 0, description: 1, amount: 2, dateOrder: "mdy", signConvention: "account",
+  });
+  expect(detectStatementFormat("statement.csv", "2026-10-01,Synthetic Shop,₹12.34", [preset]))
+    .toEqual({ kind: "preset", presetId: "synthetic" });
+});

@@ -1,6 +1,7 @@
+import { idIn } from "./list-sql";
 import { transactions, valuations } from "@num/db";
 import type { AccountKind } from "@num/shared";
-import { and, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
+import { and, eq, gt, lte, or, sql } from "drizzle-orm";
 import { accountBalance } from "./account-rules";
 import type { Reader } from "./write";
 
@@ -12,7 +13,7 @@ function transactionTotals(db: Reader, ids: string[], asOf?: string) {
   const rows = db
     .select({ accountId: transactions.accountId, total: amountSum })
     .from(transactions)
-    .where(and(inArray(transactions.accountId, ids), asOf ? lte(transactions.date, asOf) : undefined))
+    .where(and(idIn(transactions.accountId, ids), asOf ? lte(transactions.date, asOf) : undefined))
     .groupBy(transactions.accountId)
     .all();
   return new Map(rows.map((row) => [row.accountId, row.total]));
@@ -26,7 +27,7 @@ function latestValuations(db: Reader, ids: string[], asOf?: string) {
       balance: valuations.balance,
     })
     .from(valuations)
-    .where(and(inArray(valuations.accountId, ids), asOf ? lte(valuations.date, asOf) : undefined))
+    .where(and(idIn(valuations.accountId, ids), asOf ? lte(valuations.date, asOf) : undefined))
     .all();
   const latest = new Map<string, { date: string; balance: number }>();
   for (const row of rows) {

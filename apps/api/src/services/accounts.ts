@@ -1,3 +1,4 @@
+import { blankToNull } from "./text";
 import { accounts, type AccountRow } from "@num/db";
 import {
   accountCreateSchema,
@@ -19,16 +20,9 @@ import { readTerms, resolveTerms, saveTerms } from "./mortgage-terms";
 import { automaticOpening, automaticOpenings, type AutomaticOpening } from "./opening-date";
 import { mergedWrite } from "./patch";
 import { write, type WriteInput } from "./write";
-import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
+import { setArchived, byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 import { requireWholeAmounts } from "./book-step";
 
-function blankToNull(value: string | null | undefined) {
-  if (value === undefined || value === null) {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed.length === 0 ? null : trimmed;
-}
 
 function toAccount(row: AccountRow, balance: number, automatic: AutomaticOpening): Account {
   const { id, name, institution, kind, onBudget, openingDate, createdAt, createdOn, ...rest } = withoutSortKey(row);
@@ -161,19 +155,10 @@ export function archiveAccount(
     if (!existing) {
       throw new ServiceError("account_not_found", 404);
     }
-    if (existing.archivedAt) {
-      throw new ServiceError("account_archived", 409);
-    }
     const balance = balanceOf(tx, existing);
-    assertCanArchive(balance, input.confirm);
-    const next = { ...existing, archivedAt: at };
-    tx.update(accounts).set({ archivedAt: at }).where(eq(accounts.id, id)).run();
-    tx.audit({
-      entity: "accounts",
-      entityId: id,
-      action: "archive",
-      before: accountAuditSnapshot(existing),
-      after: accountAuditSnapshot(next),
+    const next = setArchived(tx, accounts, existing, "accounts", at, {
+      beforeChange: () => assertCanArchive(balance, input.confirm),
+      snapshot: accountAuditSnapshot,
     });
     return toAccount(next, balance, automaticOpening(tx, id));
   });
@@ -185,18 +170,7 @@ export function restoreAccount(db: Db, id: string, input: WriteInput): Account {
     if (!existing) {
       throw new ServiceError("account_not_found", 404);
     }
-    if (!existing.archivedAt) {
-      throw new ServiceError("account_not_archived", 409);
-    }
-    const next = { ...existing, archivedAt: null };
-    tx.update(accounts).set({ archivedAt: null }).where(eq(accounts.id, id)).run();
-    tx.audit({
-      entity: "accounts",
-      entityId: id,
-      action: "restore",
-      before: accountAuditSnapshot(existing),
-      after: accountAuditSnapshot(next),
-    });
+    const next = setArchived(tx, accounts, existing, "accounts", null, { snapshot: accountAuditSnapshot });
     return toAccount(next, balanceOf(tx, existing), automaticOpening(tx, id));
   });
 }

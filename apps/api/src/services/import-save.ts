@@ -301,16 +301,12 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
         merchantId: null,
       }));
       const recurring = recurringForRows(tx, pending, input.asOf);
-      const scores = new Map<number, MatchResult>();
-      for (const row of created) {
-        const hit = recurring.get(`import:${row.rowIndex}`) ?? null;
-        scores.set(row.rowIndex, scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: hit }));
-      }
       const createdIds: string[] = [];
       for (const row of input.rows) {
         if (row.outcome === "created") {
           const hit = recurring.get(`import:${row.rowIndex}`);
-          const newId = insertCreated(tx, batchId, input.accountId, row, scores.get(row.rowIndex) ?? scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: null }), hit?.dueDate ?? null);
+          const score = scorePayee(book, { payee: normalizePayee(row.payeeRaw), amount: row.amount, recurring: hit ?? null });
+          const newId = insertCreated(tx, batchId, input.accountId, row, score, hit?.dueDate ?? null);
           createdIds.push(newId);
         } else if (row.outcome === "matched") {
           insertMatched(tx, batchId, input.accountId, row);

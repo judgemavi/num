@@ -1,5 +1,6 @@
+import { idIn } from "./list-sql";
 import { bucketCategories, bucketEvents, buckets, occurrenceLinks, transactionLines, transactions } from "@num/db";
-import { and, eq, gte, isNotNull, isNull, lte, notExists, inArray, or, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lte, notExists, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { Reader } from "./write";
 
@@ -24,7 +25,7 @@ export function bucketBalances(db: Reader, asOf?: string, bucketIds?: readonly s
     .where(
       and(
         isNull(bucketEvents.undoneAt),
-        bucketIds ? or(inArray(bucketEvents.bucketId, [...bucketIds]), inArray(bucketEvents.otherBucketId, [...bucketIds])) : undefined,
+        bucketIds ? or(idIn(bucketEvents.bucketId, [...bucketIds]), idIn(bucketEvents.otherBucketId, [...bucketIds])) : undefined,
         asOf ? lte(bucketEvents.date, asOf) : undefined,
       ),
     )
@@ -52,7 +53,7 @@ export function bucketBalances(db: Reader, asOf?: string, bucketIds?: readonly s
     .innerJoin(buckets, eq(bucketCategories.bucketId, buckets.id))
     .where(
       and(
-        bucketIds ? inArray(buckets.id, [...bucketIds]) : undefined,
+        bucketIds ? idIn(buckets.id, [...bucketIds]) : undefined,
         gte(transactions.date, buckets.startDate),
         asOf ? lte(transactions.date, asOf) : undefined,
         notExists(
@@ -83,7 +84,7 @@ export function bucketBalances(db: Reader, asOf?: string, bucketIds?: readonly s
       and(
         isNotNull(occurrenceLinks.transactionId),
         eq(buckets.kind, "commitment"),
-        bucketIds ? inArray(buckets.id, [...bucketIds]) : undefined,
+        bucketIds ? idIn(buckets.id, [...bucketIds]) : undefined,
         gte(transactions.date, buckets.startDate),
         asOf ? lte(transactions.date, asOf) : undefined,
       ),

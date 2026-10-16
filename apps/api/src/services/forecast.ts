@@ -1,8 +1,8 @@
-import { accounts, occurrenceLinks, transactions } from "@num/db";
+import { loadLinkIndex } from "./link-index";
+import { accounts, transactions } from "@num/db";
 import {
   buildForecast,
   forecastDates,
-  isIsoDate,
   occurrenceDates,
   spendDeltas,
   type Forecast,
@@ -15,7 +15,6 @@ import type { Db } from "../db";
 import { spendingCaps, unbucketedSpending } from "./forecast-spending";
 import { balancesOf } from "./account-balance";
 import { lastCompleteMonths } from "./complete-months";
-import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
 import { activeSchedules, scheduleAmounts, type ScheduleView } from "./schedules";
 
@@ -37,9 +36,6 @@ export function readForecast(db: Db, asOf: string): Forecast {
  */
 export function forecastInput(db: Db, asOf: string, accountBalances?: ReadonlyMap<string, number>): ForecastInput & { transfersOut: ForecastFlow[] } {
   const step = bookStep(db);
-  if (!isIsoDate(asOf)) {
-    throw new ServiceError("as_of_invalid", 400, { asOf });
-  }
   const dates = forecastDates(asOf);
   const horizonEnd = dates[dates.length - 1] ?? asOf;
   const openAccounts = db
@@ -50,9 +46,7 @@ export function forecastInput(db: Db, asOf: string, accountBalances?: ReadonlyMa
   const accountIds = new Set(openAccounts.map((row) => row.id));
   const schedules = activeSchedules(db);
   const amounts = scheduleAmounts(db, schedules, asOf);
-  const links = db.select().from(occurrenceLinks).all();
-  const skipped = new Set(links.filter((link) => link.skipped).map((link) => `${link.bucketId}|${link.dueDate}`));
-  const posted = new Set(links.filter((link) => link.transactionId !== null).map((link) => `${link.bucketId}|${link.dueDate}`));
+  const { skippedKeys: skipped, postedKeys: posted } = loadLinkIndex(db);
   const deltas: ForecastDelta[] = [];
   const flows: ForecastFlow[] = [];
   const transfersOut: ForecastFlow[] = [];

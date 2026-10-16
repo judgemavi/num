@@ -7,7 +7,7 @@ import { errorResponse, idParams } from "./common";
 
 const downloadRoute = createRoute({
   operationId: "get_documents_id",
-  description: "Read documents. This does not create, change or delete a record. An erased document answers 404. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read documents. This does not create, change or delete a record. An erased document answers 404.",
   method: "get",
   path: "/api/documents/{id}",
   request: { params: idParams },
@@ -26,7 +26,7 @@ const downloadRoute = createRoute({
 
 const eraseRoute = createRoute({
   operationId: "delete_documents_id",
-  description: "Erase the file of a document. The document record (filename, hash, upload time) stays with the erased time in deletedAt, for the audit log. The import and its transactions stay. A new import of the same file stores it again. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Erase the file of a document. The document record (filename, hash, upload time) stays with the erased time in deletedAt, for the audit log. The import and its transactions stay. A new import of the same file stores it again.",
   method: "delete",
   path: "/api/documents/{id}",
   request: { params: idParams },

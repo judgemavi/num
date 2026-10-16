@@ -1,4 +1,5 @@
-import { accounts, occurrenceLinks, transactions, type TransactionRow } from "@num/db";
+import { loadLinkIndex } from "./link-index";
+import { accounts, transactions, type TransactionRow } from "@num/db";
 import {
   amountGuardFor,
   bandSignals,
@@ -277,12 +278,9 @@ export function recurringForRows(db: Reader, pending: readonly LinkTransaction[]
   if (schedules.length === 0) {
     return hits;
   }
-  const links = db
-    .select({ bucketId: occurrenceLinks.bucketId, dueDate: occurrenceLinks.dueDate, transactionId: occurrenceLinks.transactionId })
-    .from(occurrenceLinks)
-    .all();
-  const occurrences = openOccurrences(schedules, new Set(links.map((link) => `${link.bucketId}|${link.dueDate}`)), asOf);
-  const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
+  const links = loadLinkIndex(db);
+  const occurrences = openOccurrences(schedules, links.allKeys, asOf);
+  const taken = links.transactionIds;
   const accountIds = new Set(schedules.map((schedule) => schedule.accountId));
   const range = linkDateRange(occurrences);
   const existing = range

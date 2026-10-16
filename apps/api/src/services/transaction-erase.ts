@@ -1,5 +1,6 @@
+import { idIn } from "./list-sql";
 import { importRows, inboxDecisions, lineTags, occurrenceLinks, transactionLines, transactions, type TransactionRow } from "@num/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { ServiceError } from "../service-error";
 import { clearRefundLinks } from "./refund-link";
 import { loadLines, replaceLines } from "./transaction-lines";
@@ -58,7 +59,7 @@ export function eraseTransaction(tx: WriteTx, id: string): void {
   deleteOccurrenceLinks(tx, id);
   deleteInboxDecisions(tx, [id, ...lineIds]);
   if (lineIds.length > 0) {
-    tx.delete(lineTags).where(inArray(lineTags.lineId, lineIds)).run();
+    tx.delete(lineTags).where(idIn(lineTags.lineId, lineIds)).run();
     tx.delete(transactionLines).where(eq(transactionLines.transactionId, id)).run();
   }
   tx.update(importRows).set({ transactionId: null }).where(eq(importRows.transactionId, id)).run();

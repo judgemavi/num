@@ -1,6 +1,5 @@
-import { isIsoDate } from "@num/shared";
-import { readAmount } from "./parse-amount";
-import type { ParsedStatement, StatementRow, UnreadableReason, UnreadableRow } from "./statement";
+import { isIsoDate, readAmount, type UnreadableReason, type UnreadableRow } from "@num/shared";
+import type { ParsedStatement, StatementRow } from "./statement";
 
 type Block = {
   text: string;

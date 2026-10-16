@@ -1,18 +1,10 @@
-import type { UnreadableReason } from "@num/shared";
-
-export type { UnreadableReason };
+import type { UnreadableRow } from "@num/shared";
 
 export type StatementRow = {
   date: string;
   description: string;
   amount: number;
   bankId: string | null;
-};
-
-export type UnreadableRow = {
-  line: number;
-  raw: string;
-  reason: UnreadableReason;
 };
 
 export type StatementOpeningRow = {

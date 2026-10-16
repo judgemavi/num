@@ -1,6 +1,7 @@
+import { idIn } from "./list-sql";
 import { accounts, inboxDecisions, transactionLines, transactions } from "@num/db";
-import { Temporal } from "@num/shared";
-import { and, eq, gte, inArray, isNull, lte, ne, type SQL } from "drizzle-orm";
+import { addDays, matchDateWindowDays, matchHistoryDays, automaticLinkConfidence } from "@num/shared";
+import { and, eq, gte, isNull, lte, ne, type SQL } from "drizzle-orm";
 import { pairKey } from "./decision-keys";
 import { ServiceError } from "../service-error";
 import { loadLines, replaceLines } from "./transaction-lines";
@@ -13,7 +14,7 @@ type Row = ReturnType<typeof openRows>[number];
 /** The fields of one side of a linked pair. An automatic link is not an edit, so the import can still be undone. */
 function linkFields(peerId: string, editedAt: string | null) {
   if (editedAt === null) {
-    return { transferPeerId: peerId, autoReason: "transfer_match" as const, autoSourceId: peerId, autoConfidence: 990 };
+    return { transferPeerId: peerId, autoReason: "transfer_match" as const, autoSourceId: peerId, autoConfidence: automaticLinkConfidence };
   }
   return { transferPeerId: peerId, autoReason: null, autoSourceId: null, autoConfidence: null, editedAt };
 }
@@ -86,8 +87,8 @@ function openRows(tx: WriteTx, ...conditions: SQL[]) {
 
 /** Opposite rows in other accounts within 3 days that no recorded "no" excludes. Indexed by account, date and amount. */
 function candidates(tx: WriteTx, row: Row) {
-  const from = Temporal.PlainDate.from(row.date).subtract({ days: 3 }).toString();
-  const to = Temporal.PlainDate.from(row.date).add({ days: 3 }).toString();
+  const from = addDays(row.date, -matchDateWindowDays);
+  const to = addDays(row.date, matchDateWindowDays);
   const found = openRows(
     tx,
     ne(transactions.accountId, row.accountId),
@@ -103,7 +104,7 @@ function candidates(tx: WriteTx, row: Row) {
     tx
       .select({ itemKey: inboxDecisions.itemKey })
       .from(inboxDecisions)
-      .where(inArray(inboxDecisions.itemKey, keys))
+      .where(idIn(inboxDecisions.itemKey, keys))
       .all()
       .map((item) => item.itemKey),
   );
@@ -196,8 +197,8 @@ export function linkLearnedTransfers(tx: WriteTx, confirmedIds: readonly string[
     if (!row || row.payee.length === 0) {
       continue;
     }
-    const from = Temporal.PlainDate.from(row.date).subtract({ days: 90 }).toString();
-    const to = Temporal.PlainDate.from(row.date).add({ days: 90 }).toString();
+    const from = addDays(row.date, -matchHistoryDays);
+    const to = addDays(row.date, matchHistoryDays);
     const others = tx
       .select({ id: transactions.id })
       .from(transactions)

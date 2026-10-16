@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { normalizePayee, Temporal, type Suggestion } from "@num/shared";
+import { normalizePayee, dayDistance, matchDateWindowDays, type ImportRowOutcome, type Suggestion } from "@num/shared";
 
 export type PlanCandidate = {
   id: string;
@@ -14,12 +14,10 @@ export type PlanInput = {
   bankId: string | null;
 };
 
-export type PlannedOutcome = "created" | "matched" | "duplicate" | "needs_review";
-
 export type PlannedImportRow = PlanInput & {
   rowIndex: number;
   identity: string;
-  outcome: PlannedOutcome;
+  outcome: Exclude<ImportRowOutcome, "ignored">;
   transactionId: string | null;
   suggestion: Suggestion | null;
 };
@@ -30,8 +28,7 @@ function fingerprint(accountId: string, date: string, amount: number, payee: str
 }
 
 function withinThreeDays(left: string, right: string) {
-  const days = Temporal.PlainDate.from(left).until(Temporal.PlainDate.from(right), { largestUnit: "day" }).days;
-  return Math.abs(days) <= 3;
+  return dayDistance(left, right) <= matchDateWindowDays;
 }
 
 export function planImportRows(

@@ -1,6 +1,5 @@
 import { buckets } from "@num/db";
-import { isIsoDate, type Available } from "@num/shared";
-import { ServiceError } from "../service-error";
+import { type Available } from "@num/shared";
 import { listBillNeeds } from "./bills";
 import { createFundingReads } from "./funding-reads";
 import type { Reader } from "./write";
@@ -10,9 +9,6 @@ import type { Reader } from "./write";
  * gap of the bills (spec §10 Bills): the whole gap, also the part that Unassigned covers. A negative bucket balance counts as 0.
  */
 export function readAvailable(db: Reader, asOf: string): Available {
-  if (!isIsoDate(asOf)) {
-    throw new ServiceError("as_of_invalid", 400, { asOf });
-  }
   const reads = createFundingReads(db, asOf);
   const { onBudgetTotal, balances, unassigned: free } = reads.position;
   const totals = { savings: 0, held: 0 };

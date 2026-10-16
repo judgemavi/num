@@ -1,12 +1,12 @@
+import { expectCode } from "./test-support";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrateDatabase, openDatabase, settings, transactions, valuations } from "@num/db";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
-import { ServiceError } from "../service-error";
 import { archiveAccount, createAccount, listAccounts, restoreAccount, updateAccount } from "./accounts";
-import { storedPayee, type AccountCreate, type AccountKind, type AccountUpdate, type ErrorCode } from "@num/shared";
+import { storedPayee, type AccountCreate, type AccountKind, type AccountUpdate } from "@num/shared";
 
 function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-accounts-"));
@@ -45,16 +45,6 @@ function card(kind: AccountKind = "credit_card"): AccountCreate & { source: "ui"
   };
 }
 
-function expectCode(run: () => void, code: ErrorCode) {
-  try {
-    run();
-  } catch (error) {
-    expect(error).toBeInstanceOf(ServiceError);
-    expect((error as ServiceError).code).toBe(code);
-    return;
-  }
-  throw new Error(`Expected ${code}`);
-}
 
 function addTransaction(db: Db, accountId: string, date: string, amount: number) {
   db.insert(transactions)

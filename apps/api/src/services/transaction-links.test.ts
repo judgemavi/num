@@ -1,8 +1,9 @@
+import { tempDatabase } from "./test-support";
 import { expect, test } from "bun:test";
 import { createCategory } from "./categories";
 import { createMerchant } from "./merchants";
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
-import { tempDatabase, saved, account, entry, requirePeer } from "./transaction-test-book";
+import { saved, account, entry, requirePeer } from "./transaction-test-book";
 
 test("a mortgage payment puts the principal and the interest on two lines", () => {
   const book = tempDatabase();

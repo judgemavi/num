@@ -1,3 +1,9 @@
+/** Date distance allowed for a possible duplicate or transfer pair. */
+export const matchDateWindowDays = 3;
+/** History scanned for possible transfer pairs. */
+export const matchHistoryDays = 90;
+export const automaticLinkConfidence = 990;
+
 export const autoReasons = ["recurring", "learned_amount", "learned_payee", "similar", "family", "refund_match", "refund_reversal", "transfer_match"] as const;
 
 export type AutoReason = (typeof autoReasons)[number];

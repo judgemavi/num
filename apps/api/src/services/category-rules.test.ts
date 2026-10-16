@@ -1,3 +1,4 @@
+import { expectCode } from "./test-support";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +14,6 @@ import {
 import { storedPayee } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
-import { ServiceError } from "../service-error";
 import {
   archiveCategory,
   createCategory,
@@ -26,7 +26,6 @@ import {
   updateCategoryGroup,
 } from "./categories";
 import { archiveTag, createTag, restoreTag, updateTag } from "./tags";
-import type { ErrorCode } from "@num/shared";
 
 function tempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), "num-names-"));
@@ -43,16 +42,6 @@ function tempDatabase() {
 
 const at = "2026-10-07T16:00:00Z";
 
-function expectCode(run: () => void, code: ErrorCode) {
-  try {
-    run();
-  } catch (error) {
-    expect(error).toBeInstanceOf(ServiceError);
-    expect((error as ServiceError).code).toBe(code);
-    return;
-  }
-  throw new Error(`Expected ${code}`);
-}
 
 test("category and tag names stay unique when the case differs", () => {
   const book = tempDatabase();

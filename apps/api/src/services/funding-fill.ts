@@ -1,11 +1,11 @@
 import { bucketEvents, buckets, settings } from "@num/db";
-import { comparePriority, floorToStep, isIsoDate, positiveBalances, recedeOrder, unassigned, type FillResult } from "@num/shared";
+import { monthStart, comparePriority, floorToStep, isIsoDate, positiveBalances, recedeOrder, unassigned, type FillResult } from "@num/shared";
 import { eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
 import { positionOn } from "./funding-book";
-import { monthStart, monthlyRows } from "./funding-months";
+import { monthlyRows } from "./funding-months";
 import { withoutId, write, type Reader, type WriteInput, type WriteTx } from "./write";
 
 function requireSetup(db: Reader) {

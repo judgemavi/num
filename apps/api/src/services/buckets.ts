@@ -4,7 +4,6 @@ import {
   emergencyDefaults,
   foldName,
   hasSchedule,
-  isIsoDate,
   kindFieldsValid,
   nextBucketColor,
   recedeDefault,
@@ -23,7 +22,7 @@ import { ServiceError } from "../service-error";
 import { bucketBalances } from "./bucket-balance";
 import { mergedWrite } from "./patch";
 import { withoutId, write, type WriteTx, type WriteInput, type Reader } from "./write";
-import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
+import { idIn, setArchived, byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 import { assertScheduleRefs, putSchedule, scheduleOf } from "./schedules";
 import { requireWholeAmounts } from "./book-step";
 
@@ -89,7 +88,7 @@ function replaceCategories(tx: WriteTx, bucketId: string, categoryIds: string[])
     tx
       .select()
       .from(categories)
-      .where(inArray(categories.id, next))
+      .where(idIn(categories.id, next))
       .all()
       .map((row) => [row.id, row]),
   );
@@ -97,7 +96,7 @@ function replaceCategories(tx: WriteTx, bucketId: string, categoryIds: string[])
     tx
       .select()
       .from(bucketCategories)
-      .where(inArray(bucketCategories.categoryId, next))
+      .where(idIn(bucketCategories.categoryId, next))
       .all()
       .map((row) => [row.categoryId, row.bucketId]),
   );
@@ -266,9 +265,6 @@ export function insertEmergencyBucket(tx: WriteTx, asOf: string): string {
 export function createBucket(db: Db, input: BucketCreate & WriteInput & { asOf: string }): Bucket {
   assertKindFields(input);
   requireWholeAmounts(db, [input.refillTo, input.amount, input.target, input.fixedAmount, ...scheduleAmounts(input.schedule)]);
-  if (!isIsoDate(input.asOf)) {
-    throw new ServiceError("as_of_invalid", 400, { asOf: input.asOf });
-  }
   return write(db, { source: input.source, at: input.at }, (tx) => readBucket(tx, insertBucket(tx, input)));
 }
 
@@ -318,24 +314,14 @@ export function archiveBucket(db: Db, id: string, input: WriteInput): Bucket {
     if (!existing) {
       throw new ServiceError("bucket_not_found", 404);
     }
-    if (existing.archivedAt) {
-      throw new ServiceError("bucket_archived", 409);
-    }
-    const balance = bucketBalances(tx, undefined, [id]).get(id) ?? 0;
-    if (balance !== 0) {
-      throw new ServiceError("bucket_balance", 409);
-    }
     const categoryIds = categoryIdsFor(tx, id);
     const schedule = scheduleOf(tx, id);
-    tx.delete(bucketCategories).where(eq(bucketCategories.bucketId, id)).run();
-    const next = { ...existing, archivedAt: at };
-    tx.update(buckets).set({ archivedAt: at }).where(eq(buckets.id, id)).run();
-    tx.audit({
-      entity: "buckets",
-      entityId: id,
-      action: "archive",
-      before: snapshot(existing, categoryIds, schedule),
-      after: snapshot(next, [], schedule),
+    setArchived(tx, buckets, existing, "buckets", at, {
+      beforeChange: () => {
+        if ((bucketBalances(tx, undefined, [id]).get(id) ?? 0) !== 0) throw new ServiceError("bucket_balance", 409);
+        tx.delete(bucketCategories).where(eq(bucketCategories.bucketId, id)).run();
+      },
+      snapshot: (row) => snapshot(row, row.archivedAt ? [] : categoryIds, schedule),
     });
     return readBucket(tx, id);
   });
@@ -347,20 +333,9 @@ export function restoreBucket(db: Db, id: string, input: WriteInput): Bucket {
     if (!existing) {
       throw new ServiceError("bucket_not_found", 404);
     }
-    if (!existing.archivedAt) {
-      throw new ServiceError("bucket_not_archived", 409);
-    }
     const categoryIds = categoryIdsFor(tx, id);
     const schedule = scheduleOf(tx, id);
-    const next = { ...existing, archivedAt: null };
-    tx.update(buckets).set({ archivedAt: null }).where(eq(buckets.id, id)).run();
-    tx.audit({
-      entity: "buckets",
-      entityId: id,
-      action: "restore",
-      before: snapshot(existing, categoryIds, schedule),
-      after: snapshot(next, categoryIds, schedule),
-    });
+    setArchived(tx, buckets, existing, "buckets", null, { snapshot: (row) => snapshot(row, categoryIds, schedule) });
     return readBucket(tx, id);
   });
 }

@@ -1,4 +1,4 @@
-import { Temporal } from "temporal-polyfill";
+import { dayDistance } from "./date";
 
 export type ScheduledMortgagePayment = {
   date: string;
@@ -19,10 +19,6 @@ export type MortgageScheduleMatch = {
   scheduled: ScheduledMortgagePayment | null;
   actual: MortgageActualPayment | null;
 };
-
-function dayDistance(left: string, right: string) {
-  return Math.abs(Temporal.PlainDate.from(left).until(Temporal.PlainDate.from(right), { largestUnit: "day" }).days);
-}
 
 /** Past scheduled payments take the nearest unused actual. An actual that matches none is its own row. */
 export function matchMortgageActuals(

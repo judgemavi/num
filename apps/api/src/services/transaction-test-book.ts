@@ -1,47 +1,15 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { accounts, migrateDatabase, openDatabase, settings } from "@num/db";
-import type { AccountKind, ErrorCode, Transaction, TransactionCreate, TransactionLineInput } from "@num/shared";
+import { accounts } from "@num/db";
+import type { AccountKind, Transaction, TransactionCreate, TransactionLineInput } from "@num/shared";
 import { Database } from "bun:sqlite";
-import { expect } from "bun:test";
 import { eq } from "drizzle-orm";
-import { createDb, type Db } from "../db";
-import { ServiceError } from "../service-error";
+import type { Db } from "../db";
 import { createAccount } from "./accounts";
 import { map } from "./import-test-book";
 import { getTransaction } from "./transactions";
 
-export function tempDatabase() {
-  const dir = mkdtempSync(join(tmpdir(), "num-transactions-"));
-  const sqlite = openDatabase(join(dir, "num.sqlite"));
-  migrateDatabase(sqlite);
-  const db = createDb(sqlite);
-  db.insert(settings).values({ key: "currency", value: "CAD" }).run();
-  return {
-    db,
-    sqlite,
-    close() {
-      sqlite.close();
-      rmSync(dir, { recursive: true, force: true });
-    },
-  };
-}
-
 export const at = "2026-10-07T16:00:00Z";
 
 export const saved = { source: "ui" as const, at };
-
-export function expectCode(run: () => void, code: ErrorCode) {
-  try {
-    run();
-  } catch (error) {
-    expect(error).toBeInstanceOf(ServiceError);
-    expect((error as ServiceError).code).toBe(code);
-    return;
-  }
-  throw new Error(`Expected ${code}`);
-}
 
 export function account(db: Db, name: string, kind: AccountKind) {
   return createAccount(db, {

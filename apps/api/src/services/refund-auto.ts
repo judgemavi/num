@@ -1,5 +1,6 @@
 import { categories, inboxDecisions, transactionLines, transactions } from "@num/db";
 import {
+  automaticLinkConfidence,
   autoRefundPurchase,
   candidateKind,
   refundCandidates,
@@ -9,8 +10,9 @@ import {
   type RefundCandidate,
   type RefundSubject,
 } from "@num/shared";
-import { and, eq, exists, gt, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, eq, exists, gt, gte, isNull, lt, lte, sql } from "drizzle-orm";
 import { alias, QueryBuilder, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
+import { idIn } from "./list-sql";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { lineCategory, lineCount, literal, refundedSum } from "./transaction-sql";
 import type { WriteTx, Reader } from "./write";
@@ -77,7 +79,7 @@ function loadRefunds(db: Reader, id?: string, scope?: { from?: string; only?: re
         hasOneExpenseLine(transactions.id),
         id ? eq(transactions.id, id) : undefined,
         scope?.from ? gte(transactions.date, scope.from) : undefined,
-        scope?.only ? sql`${transactions.id} in (select value from json_each(${JSON.stringify(scope.only)}))` : undefined,
+        scope?.only ? idIn(transactions.id, scope.only) : undefined,
       ),
     )
     .all();
@@ -85,26 +87,15 @@ function loadRefunds(db: Reader, id?: string, scope?: { from?: string; only?: re
 
 /** Purchases of these payees dated on or after `from`. An older purchase cannot be a candidate. */
 function loadPurchases(db: Reader, payees: readonly string[], from: string) {
-  const found: RefundCandidate[] = [];
-  const unique = [...new Set(payees)];
-  for (let index = 0; index < unique.length; index += 400) {
-    found.push(
-      ...db
-        .select({ ...purchaseColumns, categoryId: lineCategory(transactions.id) })
-        .from(transactions)
-        .where(
-          and(
-            eq(transactions.mirror, literal(0)),
-            lt(transactions.amount, literal(0)),
-            gte(transactions.date, from),
-            inArray(transactions.payeeNormalized, unique.slice(index, index + 400)),
-            hasOneExpenseLine(transactions.id),
-          ),
-        )
-        .all(),
-    );
-  }
-  return found;
+  if (payees.length === 0) return [];
+  return db
+    .select({ ...purchaseColumns, categoryId: lineCategory(transactions.id) })
+    .from(transactions)
+    .where(and(
+      eq(transactions.mirror, literal(0)), lt(transactions.amount, literal(0)), gte(transactions.date, from),
+      idIn(transactions.payeeNormalized, payees), hasOneExpenseLine(transactions.id),
+    ))
+    .all();
 }
 
 /**
@@ -136,7 +127,7 @@ function loadReversals(db: Reader, id?: string, only?: readonly string[]) {
         isNull(incoming.refundOfId),
         eq(transactions.mirror, literal(0)),
         id ? eq(incoming.id, id) : undefined,
-        only ? sql`${incoming.id} in (select value from json_each(${JSON.stringify(only)}))` : undefined,
+        only ? idIn(incoming.id, only) : undefined,
         hasOneExpenseLine(incoming.id),
         hasOneExpenseLine(transactions.id),
       ),
@@ -234,7 +225,7 @@ export function linkRefundIfSure(tx: WriteTx, transactionId: string): void {
       merchantId: purchase.merchantId,
       autoReason: candidateKind(subjectOf(refund), purchaseRef) === "reversal" ? "refund_reversal" : "refund_match",
       autoSourceId: purchase.id,
-      autoConfidence: 990,
+      autoConfidence: automaticLinkConfidence,
     })
     .where(eq(transactions.id, refund.id))
     .run();

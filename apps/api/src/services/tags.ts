@@ -1,22 +1,11 @@
 import { tags } from "@num/db";
 import { foldName, tagCreateSchema, utcNow, type Tag, type TagCreate, type TagListQuery, type TagUpdate } from "@num/shared";
-import { eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { eq, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { mergedWrite } from "./patch";
-import { withoutId, write, type WriteTx, type WriteInput } from "./write";
-import { byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
-
-function assertTagName(tx: WriteTx, name: string, exceptId?: string) {
-  const row = tx
-    .select({ id: tags.id })
-    .from(tags)
-    .where(sql`lower(${tags.name}) = lower(${name})`)
-    .get();
-  if (row && row.id !== exceptId) {
-    throw new ServiceError("tag_name_taken", 409);
-  }
-}
+import { withoutId, write, type WriteInput } from "./write";
+import { assertUniqueName, setArchived, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 
 export function getTag(db: Db, id: string): Tag {
   const row = withoutSortKey(db.select().from(tags).where(eq(tags.id, id)).get());
@@ -37,7 +26,7 @@ export function createTag(db: Db, input: TagCreate & WriteInput): Tag {
   const id = crypto.randomUUID();
   const row = { id, name: input.name.trim(), archivedAt: null };
   write(db, { source: input.source, at: input.at }, (tx) => {
-    assertTagName(tx, row.name);
+    assertUniqueName(tx, tags, row.name, "tag_name_taken");
     tx.insert(tags).values({ ...row, sortKey: foldName(row.name) }).run();
     tx.audit({
       entity: "tags",
@@ -57,7 +46,7 @@ export function updateTag(db: Db, id: string, input: TagUpdate & WriteInput): Ta
       throw new ServiceError("tag_not_found", 404);
     }
     const { name } = mergedWrite(tagCreateSchema, existing, input);
-    assertTagName(tx, name, id);
+    assertUniqueName(tx, tags, name, "tag_name_taken", id);
     const next = { name, archivedAt: existing.archivedAt };
     tx.update(tags).set({ name, sortKey: foldName(name) }).where(eq(tags.id, id)).run();
     tx.audit({
@@ -75,43 +64,15 @@ export function archiveTag(db: Db, id: string, input: WriteInput): Tag {
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
     const existing = withoutSortKey(tx.select().from(tags).where(eq(tags.id, id)).get());
-    if (!existing) {
-      throw new ServiceError("tag_not_found", 404);
-    }
-    if (existing.archivedAt) {
-      throw new ServiceError("tag_archived", 409);
-    }
-    const next = { ...existing, archivedAt: at };
-    tx.update(tags).set({ archivedAt: at }).where(eq(tags.id, id)).run();
-    tx.audit({
-      entity: "tags",
-      entityId: id,
-      action: "archive",
-      before: withoutId(existing),
-      after: withoutId(next),
-    });
-    return next;
+    if (!existing) throw new ServiceError("tag_not_found", 404);
+    return setArchived(tx, tags, existing, "tags", at);
   });
 }
 
 export function restoreTag(db: Db, id: string, input: WriteInput): Tag {
   return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = withoutSortKey(tx.select().from(tags).where(eq(tags.id, id)).get());
-    if (!existing) {
-      throw new ServiceError("tag_not_found", 404);
-    }
-    if (!existing.archivedAt) {
-      throw new ServiceError("tag_not_archived", 409);
-    }
-    const next = { ...existing, archivedAt: null };
-    tx.update(tags).set({ archivedAt: null }).where(eq(tags.id, id)).run();
-    tx.audit({
-      entity: "tags",
-      entityId: id,
-      action: "restore",
-      before: withoutId(existing),
-      after: withoutId(next),
-    });
-    return next;
+    if (!existing) throw new ServiceError("tag_not_found", 404);
+    return setArchived(tx, tags, existing, "tags", null);
   });
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { amountSchema as money } from "./money";
 import { expenseSpending, isExpenseLine, monthKeySchema, priorMonths, type FlowLine } from "./month";
-import { medianOf } from "./recurring-calc";
+import { medianAmount } from "./recurring-calc";
 
 export const spendingIncreaseSchema = z.object({
   categoryId: z.uuid(),
@@ -71,7 +71,7 @@ export function spendingIncreases(month: string, lines: readonly FlowLine[]): Sp
   return [...ids]
     .map((categoryId) => {
       const amount = byMonth.get(month)?.get(categoryId) ?? 0;
-      const median = medianOf(earlier.map((key) => byMonth.get(key)?.get(categoryId) ?? 0));
+      const median = medianAmount(earlier.map((key) => byMonth.get(key)?.get(categoryId) ?? 0), 1);
       return { categoryId, month, amount, median, delta: amount - median };
     })
     .filter((row) => row.delta > 0)

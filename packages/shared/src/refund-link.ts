@@ -1,6 +1,6 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
-import { isoDateSchema } from "./date";
+import { daysBetween, isoDateSchema } from "./date";
 import { amountSchema } from "./money";
 
 export const refundWindowDays = 90;
@@ -44,10 +44,6 @@ export function refundWindowStart(asOf: string): string {
   return Temporal.PlainDate.from(asOf).subtract({ days: refundWindowDays }).toString();
 }
 
-function daySpan(earlier: string, later: string) {
-  return Temporal.PlainDate.from(earlier).until(Temporal.PlainDate.from(later), { largestUnit: "day" }).days;
-}
-
 /** A missing field keeps the stored link. Only an explicit null clears it. */
 export function refundOfIdAfterEdit(current: string | null, incoming: string | null | undefined): string | null {
   if (incoming === undefined) {
@@ -66,7 +62,7 @@ export function refundLinkAllowed(input: {
   if (input.purchaseAmount >= 0 || input.refundAmount <= 0 || input.purchaseDate > input.refundDate) {
     return false;
   }
-  return daySpan(input.purchaseDate, input.refundDate) <= refundWindowDays;
+  return daysBetween(input.purchaseDate, input.refundDate) <= refundWindowDays;
 }
 
 function preferred(row: RefundPurchase, payeeNormalized: string) {

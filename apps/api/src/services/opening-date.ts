@@ -1,6 +1,7 @@
+import { idIn } from "./list-sql";
 import { accounts, transactions } from "@num/db";
 import { dayBefore } from "@num/shared";
-import { eq, inArray, min, sql } from "drizzle-orm";
+import { eq, min, sql } from "drizzle-orm";
 import { QueryBuilder } from "drizzle-orm/sqlite-core";
 import { ServiceError } from "../service-error";
 import type { Reader } from "./write";
@@ -28,7 +29,7 @@ export function automaticOpenings(db: Reader, accountIds: readonly string[]): Ma
   const rows = db
     .select({ id: accounts.id, firstDate: sql<string | null>`${firstDate}`, createdOn: accounts.createdOn })
     .from(accounts)
-    .where(inArray(accounts.id, [...accountIds]))
+    .where(idIn(accounts.id, [...accountIds]))
     .all();
   const found = new Map<string, AutomaticOpening>();
   for (const row of rows) {

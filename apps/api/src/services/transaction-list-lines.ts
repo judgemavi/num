@@ -1,6 +1,7 @@
+import { idIn } from "./list-sql";
 import { transactionLines } from "@num/db";
 import type { TransactionListItem } from "@num/shared";
-import { asc, inArray } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import type { Db } from "../db";
 
 /** The category or transfer target of each line, for the Category column. */
@@ -16,7 +17,7 @@ export function linesForIds(db: Db, ids: readonly string[]): Map<string, Transac
       transferAccountId: transactionLines.transferAccountId,
     })
     .from(transactionLines)
-    .where(inArray(transactionLines.transactionId, [...ids]))
+    .where(idIn(transactionLines.transactionId, [...ids]))
     .orderBy(asc(transactionLines.id))
     .all();
   for (const { transactionId, ...line } of rows) {

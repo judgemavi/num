@@ -1,3 +1,4 @@
+import { daysBetween } from "./date";
 import { Temporal } from "temporal-polyfill";
 import { indexedOccurrences, occurrenceAt, type OccurrenceDate, type PlanSchedule } from "./recurring-calc";
 
@@ -10,10 +11,6 @@ export type OccurrenceWindow = OccurrenceDate & { start: string; end: string };
 
 /** The days of Home "Missed": only occurrences due in the last 35 days. */
 const missedDays = 35;
-
-function daysBetween(left: string, right: string) {
-  return Temporal.PlainDate.from(left).until(Temporal.PlainDate.from(right), { largestUnit: "day" }).days;
-}
 
 /** The date `count` intervals of the schedule after `date` (before it when `count` is less than 0). */
 export function addPeriods(plan: PlanSchedule, date: string, count: number): string {

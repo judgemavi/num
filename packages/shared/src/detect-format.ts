@@ -1,5 +1,7 @@
+import { readAmount } from "./read-amount";
+import { milliunitDigits } from "./currency";
 import { isIsoDate } from "./date";
-import { columnMapSchema, statementDate, type ColumnMap, type DateFormat, type DateOrder, type DecimalSeparator, type Preset } from "./statement";
+import { columnMapSchema, statementDate, statementDatePattern, stripBom, type ColumnMap, type DateFormat, type DateOrder, type DecimalSeparator, type Preset } from "./statement";
 
 export type StatementFormat =
   | { kind: "ofx" }
@@ -236,7 +238,7 @@ function dateMatchesFormat(raw: string, format: DateFormat) {
   if (format === "iso") {
     return isIsoDate(text);
   }
-  if (isIsoDate(text) || !/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/.test(text)) {
+  if (isIsoDate(text) || !statementDatePattern.test(text)) {
     return false;
   }
   return statementDate(text, format) !== null;
@@ -260,21 +262,7 @@ function amountsFit(row: string[], preset: Preset) {
 }
 
 function looksLikeAmount(raw: string, decimal: DecimalSeparator) {
-  let text = raw.trim().replace(/\s/g, "");
-  if (text.length === 0) {
-    return true;
-  }
-  if (text.startsWith("(") && text.endsWith(")") && text.length > 2) {
-    text = text.slice(1, -1);
-  }
-  if (text.startsWith("+") || text.startsWith("-")) {
-    text = text.slice(1);
-  }
-  text = text.replace(/[$€£¥]/g, "");
-  if (decimal === ",") {
-    return /^\d{1,3}(\.\d{3})*(,\d+)?$/.test(text) || /^\d+(,\d+)?$/.test(text);
-  }
-  return /^\d{1,3}(,\d{3})*(\.\d+)?$/.test(text) || /^\d+(\.\d+)?$/.test(text);
+  return readAmount(raw, milliunitDigits, decimal).kind !== "error";
 }
 
 function columnWidth(preset: Preset) {
@@ -290,11 +278,12 @@ function columnWidth(preset: Preset) {
 
 function contentLines(text: string, limit: number) {
   const lines: string[] = [];
-  let start = text.charCodeAt(0) === 0xfeff ? 1 : 0;
-  while (start < text.length && lines.length < limit) {
-    const newline = text.indexOf("\n", start);
-    const end = newline < 0 ? text.length : newline;
-    const line = text.slice(start, end).replace(/\r$/, "");
+  const source = stripBom(text);
+  let start = 0;
+  while (start < source.length && lines.length < limit) {
+    const newline = source.indexOf("\n", start);
+    const end = newline < 0 ? source.length : newline;
+    const line = source.slice(start, end).replace(/\r$/, "");
     if (line.trim().length > 0) {
       lines.push(line);
     }

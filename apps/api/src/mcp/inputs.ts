@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpRoute } from "./catalog";
 
-const fileInputSchema = z.union([
+export const fileInputSchema = z.union([
   z.object({
     filename: z.string().min(1),
     mimeType: z.string().optional(),
@@ -12,7 +12,7 @@ const fileInputSchema = z.union([
     mimeType: z.string().optional(),
     contentBase64: z.string(),
   }),
-]);
+]).describe("The file as text or as base64. Use text for a CSV.");
 
 export function isZodSchema(value: unknown): value is z.ZodType {
   return value instanceof z.ZodType;

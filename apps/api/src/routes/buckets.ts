@@ -30,7 +30,7 @@ const eventParams = z.object({
 
 const listRoute = createRoute({
   operationId: "list_buckets",
-  description: "Read buckets. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read buckets. This does not create, change or delete a record.",
   method: "get",
   path: "/api/buckets",
   request: { query: bucketListQuerySchema },
@@ -45,7 +45,7 @@ const listRoute = createRoute({
 
 const emergencyRoute = createRoute({
   operationId: "get_buckets_emergency",
-  description: "Read the emergency fund bucket: its balance, the months to keep, the monthly essential spending and the target (months times monthly). This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read the emergency fund bucket: its balance, the months to keep, the monthly essential spending and the target (months times monthly). This does not create, change or delete a record.",
   method: "get",
   path: "/api/buckets/emergency",
   request: { query: asOfQuerySchema },
@@ -60,7 +60,7 @@ const emergencyRoute = createRoute({
 
 const billsRoute = createRoute({
   operationId: "get_buckets_bills",
-  description: "Read the next payment of each active commitment (bill), in fill order: its due date, its amount (the sum of the payments of that month when it is due more than one time a month), the gap (the part that the balance does not hold when it is due in the next 30 days), the part of the gap that Unassigned covers in fill order (covered) and the rest (short). The next payment is the earliest occurrence that is not skipped, not linked and whose window has not ended on asOf. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read the next payment of each active commitment (bill), in fill order: its due date, its amount (the sum of the payments of that month when it is due more than one time a month), the gap (the part that the balance does not hold when it is due in the next 30 days), the part of the gap that Unassigned covers in fill order (covered) and the rest (short). The next payment is the earliest occurrence that is not skipped, not linked and whose window has not ended on asOf. This does not create, change or delete a record.",
   method: "get",
   path: "/api/buckets/bills",
   request: { query: asOfQuerySchema },
@@ -75,7 +75,7 @@ const billsRoute = createRoute({
 
 const overspentRoute = createRoute({
   operationId: "get_buckets_overspent",
-  description: "Read buckets. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read buckets. This does not create, change or delete a record.",
   method: "get",
   path: "/api/buckets/overspent",
   responses: {
@@ -88,7 +88,7 @@ const overspentRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_buckets",
-  description: "Create or run buckets. A commitment or an income bucket has a schedule (its payments or deposits on a calendar) in the field schedule. Other kinds have schedule null. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Create or run buckets. A commitment or an income bucket has a schedule (its payments or deposits on a calendar) in the field schedule. Other kinds have schedule null. This does not change records outside this action.",
   method: "post",
   path: "/api/buckets",
   request: {
@@ -108,7 +108,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "patch_buckets_id",
-  description: "Change buckets. Send only the fields that change. A schedule replaces the stored schedule as a whole. A field that you leave out keeps its value. null clears a field that can be empty. The API checks the fields together on the stored record with your changes. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Change buckets. Send only the fields that change. A schedule replaces the stored schedule as a whole. A field that you leave out keeps its value. null clears a field that can be empty. The API checks the fields together on the stored record with your changes. This does not change records outside this action.",
   method: "patch",
   path: "/api/buckets/{id}",
   request: {
@@ -128,7 +128,7 @@ const updateRoute = createRoute({
 
 const archiveRoute = createRoute({
   operationId: "post_buckets_id_archive",
-  description: "Remove or archive buckets (archive). This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Remove or archive buckets (archive). This does not change records of another kind.",
   method: "post",
   path: "/api/buckets/{id}/archive",
   request: { params: idParams },
@@ -144,7 +144,7 @@ const archiveRoute = createRoute({
 
 const restoreRoute = createRoute({
   operationId: "post_buckets_id_restore",
-  description: "Restore buckets (restore). This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Restore buckets (restore). This does not change records of another kind.",
   method: "post",
   path: "/api/buckets/{id}/restore",
   request: { params: idParams },
@@ -160,7 +160,7 @@ const restoreRoute = createRoute({
 
 const pauseRoute = createRoute({
   operationId: "post_buckets_id_pause",
-  description: "Pause buckets (pause). A paused bucket keeps its balance. The fill does not fund it: its monthly amount is 0. An income cannot be paused. This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Pause buckets (pause). A paused bucket keeps its balance. The fill does not fund it: its monthly amount is 0. An income cannot be paused. This does not change records of another kind.",
   method: "post",
   path: "/api/buckets/{id}/pause",
   request: { params: idParams },
@@ -176,7 +176,7 @@ const pauseRoute = createRoute({
 
 const resumeRoute = createRoute({
   operationId: "post_buckets_id_resume",
-  description: "Resume buckets (resume). The fill funds the bucket again. This does not change records of another kind. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Resume buckets (resume). The fill funds the bucket again. This does not change records of another kind.",
   method: "post",
   path: "/api/buckets/{id}/resume",
   request: { params: idParams },
@@ -192,7 +192,7 @@ const resumeRoute = createRoute({
 
 const eventRoute = createRoute({
   operationId: "post_buckets_id_events",
-  description: "Create or run buckets. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Create or run buckets. This does not change records outside this action.",
   method: "post",
   path: "/api/buckets/{id}/events",
   request: {
@@ -213,7 +213,7 @@ const eventRoute = createRoute({
 
 const undoRoute = createRoute({
   operationId: "post_buckets_id_events_eventid_undo",
-  description: "Undo buckets (undo). This reverses that change. It does not remove the audit log. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Undo buckets (undo). This reverses that change. It does not remove the audit log.",
   method: "post",
   path: "/api/buckets/{id}/events/{eventId}/undo",
   request: { params: eventParams },
@@ -229,7 +229,7 @@ const undoRoute = createRoute({
 
 const coverRoute = createRoute({
   operationId: "post_buckets_id_cover",
-  description: "Cover an overspent bucket with the amount that it is over, with a move from a second bucket (fromBucketId). The source must have the whole amount. This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Cover an overspent bucket with the amount that it is over, with a move from a second bucket (fromBucketId). The source must have the whole amount. This does not change records outside this action.",
   method: "post",
   path: "/api/buckets/{id}/cover",
   request: {
@@ -249,7 +249,7 @@ const coverRoute = createRoute({
 
 const readRoute = createRoute({
   operationId: "get_buckets_id",
-  description: "Read buckets. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read buckets. This does not create, change or delete a record.",
   method: "get",
   path: "/api/buckets/{id}",
   request: { params: idParams },

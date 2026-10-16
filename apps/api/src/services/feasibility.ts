@@ -1,7 +1,6 @@
 import { buckets } from "@num/db";
-import { addDays, buildFeasibility, isIsoDate } from "@num/shared";
+import { addDays, buildFeasibility } from "@num/shared";
 import { isNull } from "drizzle-orm";
-import { ServiceError } from "../service-error";
 import { bookStep } from "./book-step";
 import { bucketBalances } from "./bucket-balance";
 import { activeSchedules, scheduleAmounts } from "./schedules";
@@ -12,9 +11,6 @@ import type { Reader } from "./write";
  * starts, thus funding and spending inside the month do not change it.
  */
 export function readFeasibility(db: Reader, asOf: string, suppliedBalances?: ReadonlyMap<string, number>) {
-  if (!isIsoDate(asOf)) {
-    throw new ServiceError("as_of_invalid", 400, { asOf });
-  }
   const month = asOf.slice(0, 7);
   const balances = suppliedBalances ?? bucketBalances(db, addDays(`${month}-01`, -1));
   const active = activeSchedules(db);

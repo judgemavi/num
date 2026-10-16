@@ -9,6 +9,7 @@ import type {
 } from "@num/shared";
 import { and, asc, count, desc, eq, exists, gte, inArray, isNotNull, isNull, lte, notExists, or, sql, type SQL } from "drizzle-orm";
 import { alias, QueryBuilder, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
+import { idIn } from "./list-sql";
 import type { Db } from "../db";
 import { linesForIds } from "./transaction-list-lines";
 import { listNeedsReview, reviewCounts, type NeedsReviewHit } from "./needs-review";
@@ -201,7 +202,7 @@ function runningBalances(db: Db, accountId: string, rows: readonly ListRow[]) {
     db
       .select({ id: running.id, spent: running.spent })
       .from(running)
-      .where(inArray(running.id, rows.map((row) => row.id)))
+      .where(idIn(running.id, rows.map((row) => row.id)))
       .all()
       .map((row) => [row.id, row.spent]),
   );
@@ -219,11 +220,6 @@ function runningBalances(db: Db, accountId: string, rows: readonly ListRow[]) {
   return balances;
 }
 
-/** The rows whose id is in the list. One parameter: a JSON array that SQLite reads with `json_each`. */
-function idIn(ids: readonly string[]) {
-  return inArray(transactions.id, sql`(select value from json_each(${JSON.stringify(ids)}))`);
-}
-
 /** Needs review rows that also match the other filters. Bulk approval and the review list use the same set. */
 export function filteredReviewHits(db: Db, filter: TransactionFilter, asOf: string): NeedsReviewHit[] {
   const hits = listNeedsReview(db, asOf);
@@ -234,7 +230,7 @@ export function filteredReviewHits(db: Db, filter: TransactionFilter, asOf: stri
   const ids = db.select({ id: transactions.id }).from(transactions).$dynamic();
   const matching = new Set(
     (filter.q ? ids.leftJoin(merchants, onMerchant) : ids)
-      .where(and(idIn(hits.map((hit) => hit.id)), where))
+      .where(and(idIn(transactions.id, hits.map((hit) => hit.id)), where))
       .all()
       .map((row) => row.id),
   );
@@ -312,7 +308,7 @@ function confidenceOrder(dir: TransactionReviewListQuery["dir"]) {
 export function listReviewTransactions(db: Db, query: TransactionReviewListQuery & { asOf: string }) {
   const hits = filteredReviewHits(db, query, query.asOf);
   const reviews = reviewMap(hits);
-  const where = hits.length === 0 ? sql`0` : idIn(hits.map((hit) => hit.id));
+  const where = hits.length === 0 ? sql`0` : idIn(transactions.id, hits.map((hit) => hit.id));
   const sortOrder =
     query.sort === undefined
       ? confidenceOrder(query.dir ?? "desc")

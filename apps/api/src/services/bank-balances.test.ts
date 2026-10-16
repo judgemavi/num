@@ -1,3 +1,4 @@
+import { expectCode } from "./test-support";
 import { auditLog, bankBalances, valuations } from "@num/db";
 import { columnMapSchema } from "@num/shared";
 import { expect, test } from "bun:test";
@@ -13,7 +14,7 @@ import {
 import { importStatement } from "./imports";
 import { at, csv, tempBook } from "./import-test-book";
 import { undoImportBatch } from "./import-undo";
-import { expectCode } from "./transaction-test-book";
+
 import { createTransaction, updateTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at };

@@ -1,5 +1,5 @@
 import { transactions } from "@num/db";
-import { monthLastDay, Temporal, type InsightWindow } from "@num/shared";
+import { monthLastDay, monthStart, Temporal, type InsightWindow } from "@num/shared";
 import { sql } from "drizzle-orm";
 import type { Reader } from "./write";
 import { ServiceError } from "../service-error";
@@ -8,10 +8,6 @@ export type Period = {
   from: string;
   to: string;
 };
-
-function monthStart(date: string) {
-  return `${date.slice(0, 7)}-01`;
-}
 
 export function firstTransactionDate(db: Reader): string | null {
   const row = db.select({ first: sql<string | null>`min(${transactions.date})` }).from(transactions).get();

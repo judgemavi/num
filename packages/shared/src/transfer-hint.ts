@@ -1,7 +1,8 @@
+import { matchDateWindowDays } from "./matching";
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { queryNumber } from "./list";
-import { dayDistance } from "./recurring-calc";
+import { dayDistance } from "./date";
 
 export const transferHintQuerySchema = z.object({
   accountId: z.uuid(),
@@ -25,7 +26,7 @@ export type OppositeRow = {
 export function oppositeTransferAccount(rows: OppositeRow[], input: { accountId: string; date: string; amount: number }): string | null {
   const wanted = -input.amount;
   const open = rows.filter(
-    (row) => row.accountId !== input.accountId && row.amount === wanted && row.lineCount === 1 && dayDistance(row.date, input.date) <= 3,
+    (row) => row.accountId !== input.accountId && row.amount === wanted && row.lineCount === 1 && dayDistance(row.date, input.date) <= matchDateWindowDays,
   );
   open.sort((left, right) => {
     const distance = dayDistance(left.date, input.date) - dayDistance(right.date, input.date);

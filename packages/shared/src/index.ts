@@ -85,7 +85,7 @@ export {
   type BankBalanceInput,
   type BankStatus,
 } from "./bank-balance";
-export { dayBefore, openingFromFirstRow, openingSuggestionSchema, openingFromBankBalance, type OpeningSuggestion } from "./opening";
+export { openingFromFirstRow, openingSuggestionSchema, openingFromBankBalance, type OpeningSuggestion } from "./opening";
 export {
   bucketColors,
   bucketCoverSchema,
@@ -129,7 +129,6 @@ export {
   type SinkingRepeat,
 } from "./bucket";
 export {
-  addDays,
   availableSchema,
   fillResultSchema,
   monthlyAmount,
@@ -308,7 +307,6 @@ export {
   aiAccessUpdateSchema,
   currencyUpdateSchema,
   setupRequestSchema,
-  setupResultSchema,
   setupStatusSchema,
   type CategorySet,
 } from "./setup";
@@ -361,7 +359,6 @@ export {
   amountModes,
   applyBusinessDayShift,
   businessDayShifts,
-  dayDistance,
   linkWindowStart,
   medianAmount,
   occurrenceAt,
@@ -513,3 +510,8 @@ export {
   type TransactionUpdate,
   type TransactionWrite,
 } from "./transaction";
+
+export { addDays, clampDay, dayBefore, dayDistance, daysBetween, monthStart } from "./date";
+export { automaticLinkConfidence, matchDateWindowDays, matchHistoryDays } from "./matching";
+export { readAmount, type AmountProblem, type AmountRead } from "./read-amount";
+export { statementDatePattern, stripBom } from "./statement";

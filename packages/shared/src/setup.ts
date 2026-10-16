@@ -16,8 +16,6 @@ export const setupRequestSchema = z.object({
   categorySet: categorySetSchema,
 });
 
-export const setupResultSchema = setupRequestSchema;
-
 export const currencyUpdateSchema = z.object({
   currency: currencyCodeSchema,
 });

@@ -1,6 +1,7 @@
-import { currencyCodes, milliunitDigits, type DecimalSeparator } from "@num/shared";
+import { currencyCodes, milliunitDigits, scaleMilliunits } from "./currency";
+import type { DecimalSeparator, UnreadableReason } from "./statement";
 
-export type AmountProblem = "amount_unreadable" | "too_many_decimals" | "amount_too_large" | "sign_marker";
+export type AmountProblem = Exclude<UnreadableReason, "date_unreadable">;
 
 export type AmountRead =
   | { kind: "empty" }
@@ -47,7 +48,10 @@ export function readAmount(raw: string, digits: number, decimal: DecimalSeparato
   if (hasUnknownLetters(text)) {
     return invalid("amount_unreadable");
   }
-  text = text.replace(/\p{L}+/gu, "").replace(/[^\d.,+\-()]/g, "");
+  text = text.replace(/\p{L}+/gu, "").replace(/[\p{Sc}\s]/gu, "");
+  if (/[^\d.,+\-()]/.test(text)) {
+    return invalid("amount_unreadable");
+  }
   if (!/\d/.test(text)) {
     return invalid("amount_unreadable");
   }
@@ -90,11 +94,6 @@ export function readAmount(raw: string, digits: number, decimal: DecimalSeparato
     return invalid("too_many_decimals");
   }
 
-  const scaled = BigInt(`${match[1]}${fraction.padEnd(milliunitDigits, "0")}`);
-  if (scaled > BigInt(Number.MAX_SAFE_INTEGER)) {
-    return invalid("amount_too_large");
-  }
-
-  const amount = Number(scaled);
-  return { kind: "value", amount: negative ? -amount : amount };
+  const amount = scaleMilliunits(match[1], fraction, negative);
+  return amount === null ? invalid("amount_too_large") : { kind: "value", amount };
 }

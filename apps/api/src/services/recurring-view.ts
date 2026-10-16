@@ -1,3 +1,4 @@
+import { loadLinkIndex } from "./link-index";
 import { occurrenceLinks, transactionLines, transactions, type OccurrenceLinkRow } from "@num/db";
 import {
   Temporal,
@@ -20,7 +21,8 @@ import {
   type RecurringSignals,
   type UpcomingList,
 } from "@num/shared";
-import { and, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lt, lte } from "drizzle-orm";
+import { idIn } from "./list-sql";
 import type { Db } from "../db";
 import { bookStep } from "./book-step";
 import { decidedKeys } from "./decision-keys";
@@ -43,28 +45,13 @@ function horizon(asOf: string) {
 }
 
 function transactionsByIds(db: Db, ids: readonly string[]) {
-  const found = new Map<string, TxnRow>();
-  for (let index = 0; index < ids.length; index += 400) {
-    const slice = ids.slice(index, index + 400);
-    if (slice.length === 0) {
-      continue;
-    }
-    const rows = db
-      .select({
-        id: transactions.id,
-        accountId: transactions.accountId,
-        date: transactions.date,
-        amount: transactions.amount,
-        merchantId: transactions.merchantId,
-      })
-      .from(transactions)
-      .where(and(inArray(transactions.id, slice)))
-      .all();
-    for (const row of rows) {
-      found.set(row.id, row);
-    }
-  }
-  return found;
+  if (ids.length === 0) return new Map<string, TxnRow>();
+  const rows = db
+    .select({ id: transactions.id, accountId: transactions.accountId, date: transactions.date, amount: transactions.amount, merchantId: transactions.merchantId })
+    .from(transactions)
+    .where(idIn(transactions.id, ids))
+    .all();
+  return new Map(rows.map((row) => [row.id, row]));
 }
 
 /** The transactions of the accounts from `from` (included) to `before` (not included). */
@@ -230,8 +217,7 @@ const upcomingDays = 30;
 export function listUpcoming(db: Db, asOf: string): UpcomingList {
   const until = Temporal.PlainDate.from(asOf).add({ days: upcomingDays }).toString();
   const schedules = activeSchedules(db);
-  const ids = JSON.stringify(schedules.map((row) => row.id));
-  const scope = sql`${occurrenceLinks.bucketId} in (select value from json_each(${ids}))`;
+  const scope = idIn(occurrenceLinks.bucketId, schedules.map((row) => row.id));
   const links = db.select().from(occurrenceLinks).where(scope).all();
   const linkedTransactions = db.select({ transaction: transactions }).from(transactions)
     .innerJoin(occurrenceLinks, eq(occurrenceLinks.transactionId, transactions.id)).where(scope).all();
@@ -277,13 +263,12 @@ export function recurringAmbiguities(db: Db, asOf: string, only?: readonly strin
 
 export function recurringSignals(db: Db, asOf: string): RecurringSignals {
   const schedules = activeSchedules(db);
-  const links = db.select().from(occurrenceLinks).all();
-  const linkedIds = links.flatMap((link) => (link.transactionId ? [link.transactionId] : []));
-  const txnById = transactionsByIds(db, linkedIds);
+  const links = loadLinkIndex(db);
+  const txnById = transactionsByIds(db, [...links.transactionIds]);
   const changed: RecurringSignals["changed"] = [];
   const missed: RecurringSignals["missed"] = [];
   for (const row of schedules) {
-    const scheduleLinks = links.filter((link) => link.bucketId === row.id);
+    const scheduleLinks = links.byBucket.get(row.id) ?? [];
     const byDue = new Map(scheduleLinks.map((link) => [link.dueDate, link]));
     if (row.amountMode === "fixed") {
       for (const link of scheduleLinks) {
@@ -309,7 +294,7 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
       }
     }
   }
-  const open = linkInput(db, schedules, links, asOf);
+  const open = linkInput(db, schedules, links.links, asOf);
   const ambiguous = matchLinks(open.occurrences, open.candidates).ambiguous;
   const declined = decidedKeys(db, "plan_proposal");
   const proposals = detectPlans(detectionTransactions(db, asOf), bookStep(db), asOf).filter((proposal) => {

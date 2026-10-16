@@ -21,11 +21,10 @@ const balanceParams = z.object({
   balanceId: z.uuid(),
 });
 
-const money = "Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.";
 
 const statusRoute = createRoute({
   operationId: "get_bank_balances_status",
-  description: `Read the latest bank balance of each account that has one, and the calculated balance of the account on its date. A difference of 0 means that Num agrees with the bank. This does not create, change or delete a record. ${money}`,
+  description: `Read the latest bank balance of each account that has one, and the calculated balance of the account on its date. A difference of 0 means that Num agrees with the bank. This does not create, change or delete a record.`,
   method: "get",
   path: "/api/bank-balances/status",
   responses: {
@@ -38,7 +37,7 @@ const statusRoute = createRoute({
 
 const listRoute = createRoute({
   operationId: "get_accounts_id_bank_balances",
-  description: `Read the bank balances of an account and its status (the latest bank balance against the calculated balance on its date). This does not create, change or delete a record. ${money}`,
+  description: `Read the bank balances of an account and its status (the latest bank balance against the calculated balance on its date). This does not create, change or delete a record.`,
   method: "get",
   path: "/api/accounts/{id}/bank-balances",
   request: { params: idParams },
@@ -53,7 +52,7 @@ const listRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_accounts_id_bank_balances",
-  description: `Save a balance that the bank shows on a date. The app saves it also when it is not equal to the calculated balance. An account has one bank balance for each date. ${money}`,
+  description: `Save a balance that the bank shows on a date. The app saves it also when it is not equal to the calculated balance. An account has one bank balance for each date.`,
   method: "post",
   path: "/api/accounts/{id}/bank-balances",
   request: {
@@ -73,7 +72,7 @@ const createRouteDef = createRoute({
 
 const updateRoute = createRoute({
   operationId: "put_accounts_id_bank_balances_balanceid",
-  description: `Change the date and the balance of a bank balance. ${money}`,
+  description: `Change the date and the balance of a bank balance.`,
   method: "put",
   path: "/api/accounts/{id}/bank-balances/{balanceId}",
   request: {
@@ -93,7 +92,7 @@ const updateRoute = createRoute({
 
 const deleteRoute = createRoute({
   operationId: "delete_accounts_id_bank_balances_balanceid",
-  description: `Delete a bank balance. ${money}`,
+  description: `Delete a bank balance.`,
   method: "delete",
   path: "/api/accounts/{id}/bank-balances/{balanceId}",
   request: { params: balanceParams },

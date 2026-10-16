@@ -13,12 +13,12 @@ import {
   type CategoryListQuery,
   type CategoryUpdate,
 } from "@num/shared";
-import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { mergedWrite } from "./patch";
 import { withoutId, write, type WriteTx, type WriteInput } from "./write";
-import { byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
+import { assertUniqueName, setArchived, byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 
 function assertGroup(tx: WriteTx, groupId: string | null) {
   if (groupId === null) {
@@ -27,28 +27,6 @@ function assertGroup(tx: WriteTx, groupId: string | null) {
   const group = tx.select({ id: categoryGroups.id }).from(categoryGroups).where(eq(categoryGroups.id, groupId)).get();
   if (!group) {
     throw new ServiceError("group_not_found", 404);
-  }
-}
-
-function assertGroupName(tx: WriteTx, name: string, exceptId?: string) {
-  const row = tx
-    .select({ id: categoryGroups.id })
-    .from(categoryGroups)
-    .where(sql`lower(${categoryGroups.name}) = lower(${name})`)
-    .get();
-  if (row && row.id !== exceptId) {
-    throw new ServiceError("group_name_taken", 409);
-  }
-}
-
-function assertCategoryName(tx: WriteTx, name: string, exceptId?: string) {
-  const row = tx
-    .select({ id: categories.id })
-    .from(categories)
-    .where(sql`lower(${categories.name}) = lower(${name})`)
-    .get();
-  if (row && row.id !== exceptId) {
-    throw new ServiceError("category_name_taken", 409);
   }
 }
 
@@ -92,7 +70,7 @@ export function createCategoryGroup(db: Db, input: CategoryGroupCreate & WriteIn
   const id = crypto.randomUUID();
   return write(db, { source: input.source, at: input.at }, (tx) => {
     const row = { id, name: input.name.trim() };
-    assertGroupName(tx, row.name);
+    assertUniqueName(tx, categoryGroups, row.name, "group_name_taken");
     tx.insert(categoryGroups).values({ ...row, sortKey: foldName(row.name) }).run();
     tx.audit({
       entity: "category_groups",
@@ -116,7 +94,7 @@ export function updateCategoryGroup(
       throw new ServiceError("group_not_found", 404);
     }
     const next = mergedWrite(categoryGroupCreateSchema, existing, input);
-    assertGroupName(tx, next.name, id);
+    assertUniqueName(tx, categoryGroups, next.name, "group_name_taken", id);
     tx.update(categoryGroups).set({ name: next.name, sortKey: foldName(next.name) }).where(eq(categoryGroups.id, id)).run();
     tx.audit({
       entity: "category_groups",
@@ -179,7 +157,7 @@ export function createCategory(db: Db, input: CategoryCreate & WriteInput): Cate
   };
   write(db, { source: input.source, at: input.at }, (tx) => {
     assertGroup(tx, row.groupId);
-    assertCategoryName(tx, row.name);
+    assertUniqueName(tx, categories, row.name, "category_name_taken");
     tx.insert(categories).values({ ...row, sortKey: foldName(row.name) }).run();
     tx.audit({
       entity: "categories",
@@ -207,7 +185,7 @@ export function updateCategory(db: Db, id: string, input: CategoryUpdate & Write
     };
     assertKindChange(tx, id, existing.kind, next.kind);
     assertGroup(tx, next.groupId);
-    assertCategoryName(tx, next.name, id);
+    assertUniqueName(tx, categories, next.name, "category_name_taken", id);
     tx.update(categories)
       .set({ name: next.name, sortKey: foldName(next.name), kind: next.kind, groupId: next.groupId })
       .where(eq(categories.id, id))
@@ -227,43 +205,15 @@ export function archiveCategory(db: Db, id: string, input: WriteInput): Category
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
     const existing = withoutSortKey(tx.select().from(categories).where(eq(categories.id, id)).get());
-    if (!existing) {
-      throw new ServiceError("category_not_found", 404);
-    }
-    if (existing.archivedAt) {
-      throw new ServiceError("category_archived", 409);
-    }
-    const next = { ...existing, archivedAt: at };
-    tx.update(categories).set({ archivedAt: at }).where(eq(categories.id, id)).run();
-    tx.audit({
-      entity: "categories",
-      entityId: id,
-      action: "archive",
-      before: withoutId(existing),
-      after: withoutId(next),
-    });
-    return next;
+    if (!existing) throw new ServiceError("category_not_found", 404);
+    return setArchived(tx, categories, existing, "categories", at);
   });
 }
 
 export function restoreCategory(db: Db, id: string, input: WriteInput): Category {
   return write(db, { source: input.source, at: input.at }, (tx) => {
     const existing = withoutSortKey(tx.select().from(categories).where(eq(categories.id, id)).get());
-    if (!existing) {
-      throw new ServiceError("category_not_found", 404);
-    }
-    if (!existing.archivedAt) {
-      throw new ServiceError("category_not_archived", 409);
-    }
-    const next = { ...existing, archivedAt: null };
-    tx.update(categories).set({ archivedAt: null }).where(eq(categories.id, id)).run();
-    tx.audit({
-      entity: "categories",
-      entityId: id,
-      action: "restore",
-      before: withoutId(existing),
-      after: withoutId(next),
-    });
-    return next;
+    if (!existing) throw new ServiceError("category_not_found", 404);
+    return setArchived(tx, categories, existing, "categories", null);
   });
 }

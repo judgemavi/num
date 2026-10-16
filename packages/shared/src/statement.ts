@@ -39,13 +39,20 @@ const columnSchema = z.number().int().nonnegative();
 
 export const hasHeaderSchema = z.union([z.literal("auto"), z.boolean()]).default("auto");
 
+/** Day, month and year fields in a statement, before the date order is applied. */
+export const statementDatePattern = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/;
+
+export function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 export function statementDate(raw: string, order: DateOrder): string | null {
   const text = raw.trim();
   if (isIsoDate(text)) {
     return text;
   }
 
-  const match = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/.exec(text);
+  const match = statementDatePattern.exec(text);
   if (!match) {
     return null;
   }

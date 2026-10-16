@@ -1,3 +1,4 @@
+import { blankToNull } from "./text";
 import type { TransactionLineInput } from "@num/shared";
 import { ServiceError } from "../service-error";
 
@@ -9,13 +10,6 @@ export type NormalizedLine = {
   tagIds: string[];
 };
 
-function blankToNull(value: string | null | undefined): string | null {
-  if (value === undefined || value === null) {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed.length === 0 ? null : trimmed;
-}
 
 export function requireText(value: string, field: string): string {
   const trimmed = value.trim();

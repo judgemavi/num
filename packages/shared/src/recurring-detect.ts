@@ -1,5 +1,6 @@
+import { daysBetween } from "./date";
 import { Temporal } from "temporal-polyfill";
-import { medianAmount, medianOf, type AmountMode, type PlanFrequency } from "./recurring-calc";
+import { medianAmount, type AmountMode, type PlanFrequency } from "./recurring-calc";
 
 /**
  * `plain` is true for a transaction with one line that is not a transfer. `categoryId` is the category of that line.
@@ -42,22 +43,18 @@ const detectionPatterns: { freq: PlanFrequency; interval: number }[] = [
   { freq: "yearly", interval: 1 },
 ];
 
-function gapDays(left: Temporal.PlainDate, right: Temporal.PlainDate) {
-  return left.until(right, { largestUnit: "day" }).days;
-}
-
 function expectedGap(previous: Temporal.PlainDate, freq: PlanFrequency, interval: number) {
   if (freq === "weekly") {
     return 7 * interval;
   }
   if (freq === "monthly") {
-    return gapDays(previous, previous.add({ months: interval }));
+    return daysBetween(previous, previous.add({ months: interval }));
   }
-  return gapDays(previous, previous.add({ years: interval }));
+  return daysBetween(previous, previous.add({ years: interval }));
 }
 
 function withinTenPercent(amounts: readonly number[]) {
-  const mid = medianOf(amounts);
+  const mid = medianAmount(amounts, 1);
   if (mid === 0) {
     return amounts.every((amount) => amount === 0);
   }
@@ -92,7 +89,7 @@ function proposalFrom(
 }
 
 function patternForGap(previous: Temporal.PlainDate, next: Temporal.PlainDate) {
-  const actual = gapDays(previous, next);
+  const actual = daysBetween(previous, next);
   return detectionPatterns.find(
     (pattern) => Math.abs(actual - expectedGap(previous, pattern.freq, pattern.interval)) <= 3,
   );
@@ -120,7 +117,7 @@ function latestRun(sorted: readonly DetectionTransaction[], step: number): PlanP
     if (!left || !right) {
       break;
     }
-    if (Math.abs(gapDays(left, right) - expectedGap(left, pattern.freq, pattern.interval)) > 3) {
+    if (Math.abs(daysBetween(left, right) - expectedGap(left, pattern.freq, pattern.interval)) > 3) {
       break;
     }
     start -= 1;

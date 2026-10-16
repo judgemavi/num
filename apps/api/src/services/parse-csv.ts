@@ -1,6 +1,5 @@
-import { splitCsvLine, statementDate, type ColumnMap, type DecimalSeparator, type SignConvention } from "@num/shared";
-import { readAmount, type AmountProblem } from "./parse-amount";
-import type { ParsedStatement, StatementRow, UnreadableReason, UnreadableRow } from "./statement";
+import { readAmount, splitCsvLine, statementDate, stripBom, type AmountProblem, type UnreadableReason, type UnreadableRow, type ColumnMap, type DecimalSeparator, type SignConvention } from "@num/shared";
+import type { ParsedStatement, StatementRow } from "./statement";
 
 type BalanceRow = {
   date: string;
@@ -11,10 +10,6 @@ type BalanceRow = {
 type ReadRow =
   | { ok: true; row: StatementRow; balance: number | null }
   | { ok: false; reason: UnreadableReason };
-
-function stripBom(text: string) {
-  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-}
 
 function firstContentIndex(lines: string[]) {
   for (let index = 0; index < lines.length; index += 1) {

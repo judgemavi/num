@@ -1,7 +1,7 @@
 import { comparePriority, isSavings, type BucketKind } from "./bucket";
 import { floorToStep, roundToStep } from "./currency";
 import type { ForecastFlow } from "./forecast";
-import { addDays } from "./funding";
+import { addDays } from "./date";
 import { monthLastDay } from "./month";
 import type { PlanSchedule } from "./recurring-calc";
 import { addPeriods, occurrenceWindows, windowEnded } from "./recurring-window";

@@ -1,10 +1,11 @@
+import { tempDatabase } from "./test-support";
 import { mortgageSplitForDate } from "@num/shared";
 import { expect, test } from "bun:test";
 import { archiveCategory, createCategory } from "./categories";
 import { createAccount } from "./accounts";
 import { loanPaymentDefaults } from "./loan-payment";
 import { createTransaction } from "./transactions";
-import { account, saved, tempDatabase } from "./transaction-test-book";
+import { account, saved } from "./transaction-test-book";
 
 function mortgageBook() {
   const book = tempDatabase();

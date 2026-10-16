@@ -1,5 +1,5 @@
 import { importBatches, importRows, transactionLines, transactions } from "@num/db";
-import { normalizePayee, storedPayee, Temporal, type ImportReviewResolve } from "@num/shared";
+import { normalizePayee, storedPayee, dayDistance, matchDateWindowDays, type ImportReviewResolve } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -10,8 +10,7 @@ import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type WriteTx, type WriteInput } from "./write";
 
 function withinThreeDays(left: string, right: string) {
-  const days = Temporal.PlainDate.from(left).until(Temporal.PlainDate.from(right), { largestUnit: "day" }).days;
-  return Math.abs(days) <= 3;
+  return dayDistance(left, right) <= matchDateWindowDays;
 }
 
 function requireReview(tx: WriteTx, id: string) {

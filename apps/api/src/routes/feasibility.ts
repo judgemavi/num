@@ -7,7 +7,7 @@ import { errorResponse } from "./common";
 
 const feasibilityRoute = createRoute({
   operationId: "get_goals_feasibility",
-  description: "Read goal feasibility for the month of asOf: the monthly income, the bills and the spending refills, the surplus, what the goals and sinking funds need, the shortfall, and a later date that fits for each one. It is null when the book has no active income. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read goal feasibility for the month of asOf: the monthly income, the bills and the spending refills, the surplus, what the goals and sinking funds need, the shortfall, and a later date that fits for each one. It is null when the book has no active income. This does not create, change or delete a record.",
   method: "get",
   path: "/api/goals/feasibility",
   request: { query: asOfQuerySchema },

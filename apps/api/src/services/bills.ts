@@ -1,22 +1,11 @@
-import { buckets, occurrenceLinks } from "@num/db";
-import { billNeed, comparePriority, coverBills, isIsoDate } from "@num/shared";
+import { loadLinkIndex } from "./link-index";
+import { buckets } from "@num/db";
+import { billNeed, comparePriority, coverBills } from "@num/shared";
 import { and, isNull, ne } from "drizzle-orm";
 import type { Db } from "../db";
-import { ServiceError } from "../service-error";
 import { createFundingReads, type FundingReads } from "./funding-reads";
 import { activeSchedules, scheduleAmounts } from "./schedules";
 import type { Reader } from "./write";
-
-/** The due dates of the occurrences that are skipped or linked, for each schedule. */
-function closedDates(db: Reader) {
-  const closed = new Map<string, Set<string>>();
-  for (const link of db.select().from(occurrenceLinks).all()) {
-    if (link.skipped || link.transactionId) {
-      closed.set(link.bucketId, (closed.get(link.bucketId) ?? new Set()).add(link.dueDate));
-    }
-  }
-  return closed;
-}
 
 /** The owed amount of each bucket for a month, read one time for each month. */
 function owedByMonth(reads: FundingReads) {
@@ -37,14 +26,11 @@ function owedByMonth(reads: FundingReads) {
  * bill is in the list. A `variable` amount uses the safe amount, as the monthly amount does (§7.6).
  */
 export function listBillNeeds(db: Reader, asOf: string, shared?: FundingReads) {
-  if (!isIsoDate(asOf)) {
-    throw new ServiceError("as_of_invalid", 400, { asOf });
-  }
   const reads = shared ?? createFundingReads(db, asOf);
   const views = new Map(activeSchedules(db).filter((view) => view.kind === "commitment").map((view) => [view.id, view]));
   const amounts = scheduleAmounts(db, [...views.values()], asOf);
   const balances = reads.position.balances;
-  const closed = closedDates(db);
+  const closed = loadLinkIndex(db).closedDates;
   const rows = db
     .select()
     .from(buckets)

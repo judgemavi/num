@@ -14,7 +14,7 @@ import {
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import type { Db } from "../db";
-import { ServiceError } from "../service-error";
+import { blankToNull } from "../services/text";
 import { resolveImportReview } from "../services/import-review";
 import { getImportDetail, listImportView } from "../services/import-list";
 import { importStatement, listImportBatches, listImportPresets } from "../services/imports";
@@ -26,7 +26,7 @@ const maxUploadBytes = 20 * 1024 * 1024;
 
 const presetsRoute = createRoute({
   operationId: "get_import_presets",
-  description: "Read bank presets. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read bank presets. This does not create, change or delete a record.",
   method: "get",
   path: "/api/import-presets",
   responses: {
@@ -39,7 +39,7 @@ const presetsRoute = createRoute({
 
 const listRoute = createRoute({
   operationId: "get_accounts_id_imports",
-  description: "Read accounts. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read accounts. This does not create, change or delete a record.",
   method: "get",
   path: "/api/accounts/{id}/imports",
   request: { params: idParams },
@@ -54,7 +54,7 @@ const listRoute = createRoute({
 
 const importRoute = createRoute({
   operationId: "post_imports",
-  description: "Import a statement file. This can create transactions, match existing transactions, skip duplicates and store the file. It does not change buckets, schedules or the book currency. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Import a statement file. This can create transactions, match existing transactions, skip duplicates and store the file. It does not change buckets, schedules or the book currency.",
   method: "post",
   path: "/api/imports",
   request: {
@@ -66,8 +66,18 @@ const importRoute = createRoute({
             file: z.instanceof(File).openapi({ type: "string", format: "binary" }),
             accountId: z.uuid(),
             asOf: isoDateSchema,
-            presetId: z.string().optional(),
-            columnMap: z.string().optional(),
+            presetId: z.string().optional().transform(blankToNull),
+            columnMap: z.string().optional().transform((value, context) => {
+              const text = blankToNull(value);
+              if (text === null) return null;
+              try {
+                const json: unknown = JSON.parse(text);
+                return json;
+              } catch {
+                context.addIssue({ code: "custom", message: "Invalid JSON" });
+                return z.NEVER;
+              }
+            }).pipe(columnMapSchema.nullable()),
           }),
         },
       },
@@ -86,7 +96,7 @@ const importRoute = createRoute({
 
 const reviewRoute = createRoute({
   operationId: "post_imports_rows_id_resolve",
-  description: "Create or run imports (resolve). This does not change records outside this action. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Create or run imports (resolve). This does not change records outside this action.",
   method: "post",
   path: "/api/imports/rows/{id}/resolve",
   request: {
@@ -106,7 +116,7 @@ const reviewRoute = createRoute({
 
 const viewRoute = createRoute({
   operationId: "list_imports",
-  description: "Read imports. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read imports. This does not create, change or delete a record.",
   method: "get",
   path: "/api/imports",
   request: { query: importViewQuerySchema },
@@ -121,7 +131,7 @@ const viewRoute = createRoute({
 
 const detailRoute = createRoute({
   operationId: "get_imports_id",
-  description: "Read imports. This does not create, change or delete a record. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Read imports. This does not create, change or delete a record.",
   method: "get",
   path: "/api/imports/{id}",
   request: { params: idParams },
@@ -136,7 +146,7 @@ const detailRoute = createRoute({
 
 const undoRoute = createRoute({
   operationId: "post_imports_id_undo",
-  description: "Undo imports (undo). This reverses that change. It does not remove the audit log. Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.",
+  description: "Undo imports (undo). This reverses that change. It does not remove the audit log.",
   method: "post",
   path: "/api/imports/{id}/undo",
   request: { params: idParams },
@@ -148,29 +158,6 @@ const undoRoute = createRoute({
     404: errorResponse,
   },
 });
-
-function blankToNull(value: string | undefined) {
-  const text = value?.trim() ?? "";
-  return text.length > 0 ? text : null;
-}
-
-function readColumnMap(value: string | undefined) {
-  const text = value?.trim() ?? "";
-  if (text.length === 0) {
-    return null;
-  }
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    throw new ServiceError("invalid_body", 400, { field: "columnMap" });
-  }
-  const parsed = columnMapSchema.safeParse(json);
-  if (!parsed.success) {
-    throw new ServiceError("invalid_body", 400, { field: "columnMap" });
-  }
-  return parsed.data;
-}
 
 export function importRoutes(db: Db, dataDir: string) {
   const app = new OpenAPIHono({ defaultHook: validationHook });
@@ -196,8 +183,8 @@ export function importRoutes(db: Db, dataDir: string) {
         filename: body.file.name,
         mimeType: body.file.type,
         bytes: new Uint8Array(await body.file.arrayBuffer()),
-        presetId: blankToNull(body.presetId),
-        columnMap: readColumnMap(body.columnMap),
+        presetId: body.presetId,
+        columnMap: body.columnMap,
         asOf: body.asOf,
         source: "import",
       });

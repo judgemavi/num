@@ -3,7 +3,7 @@ import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { isMonthKey } from "./month";
 import { roundToStep } from "./currency";
-import { medianAmount, medianOf } from "./recurring-calc";
+import { medianAmount } from "./recurring-calc";
 import { amountSchema } from "./money";
 
 export const forecastDayCount = 90;
@@ -57,7 +57,7 @@ export function unbucketedMonthly(months: readonly string[], lines: readonly { m
   if (months.length === 0 || lines.length === 0) {
     return 0;
   }
-  const medianLine = medianOf(lines.map((line) => line.amount));
+  const medianLine = medianAmount(lines.map((line) => line.amount), 1);
   const limit = Math.abs(medianLine) * 3;
   const totals = new Map<string, number>(months.map((month) => [month, 0]));
   for (const line of lines) {

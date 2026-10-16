@@ -3,7 +3,9 @@ import {
   normalizePayee,
   oppositeTransferAccount,
   suggestionFromMatch,
-  Temporal,
+  addDays,
+  matchDateWindowDays,
+  matchHistoryDays,
   transferPairs,
   utcNow,
   type Suggestion,
@@ -26,8 +28,8 @@ export function transferHint(db: Db, input: { accountId: string; date: string; a
   if (input.amount === 0) {
     return { accountId: null };
   }
-  const start = Temporal.PlainDate.from(input.date).subtract({ days: 3 }).toString();
-  const end = Temporal.PlainDate.from(input.date).add({ days: 3 }).toString();
+  const start = addDays(input.date, -matchDateWindowDays);
+  const end = addDays(input.date, matchDateWindowDays);
   const rows = db
     .select({
       id: transactions.id,
@@ -66,7 +68,7 @@ export function suggestForPayee(db: Db, accountId: string, rawPayee: string, amo
 }
 
 export function listTransferPairs(db: Db, asOf: string, only?: readonly string[]): { items: TransferPair[] } {
-  const start = Temporal.PlainDate.from(asOf).subtract({ days: 90 }).toString();
+  const start = addDays(asOf, -matchHistoryDays);
   const rows = db
     .select({
       id: transactions.id,

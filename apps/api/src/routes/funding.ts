@@ -7,8 +7,7 @@ import { readOwed } from "../services/funding-months";
 import { validationHook } from "../validation";
 import { errorResponse } from "./common";
 
-const units = "Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.";
-const readOnly = `Read funding. This does not create, change or delete a record. ${units}`;
+const readOnly = `Read funding. This does not create, change or delete a record.`;
 
 const owedRoute = createRoute({
   operationId: "get_funding_owed",
@@ -39,7 +38,7 @@ const availableRoute = createRoute({
 
 const fillRoute = createRoute({
   operationId: "post_funding_fill",
-  description: `Create or run funding. Cover the buckets below zero, then pay the amounts that buckets still owe from Unassigned for the month of asOf, in priority order. When Unassigned cannot cover a bucket below zero, the savings buckets that can give money back give it to Unassigned, the lowest priority first. A paused bucket is not funded. It writes nothing when nothing is owed. This does not change records outside this action. ${units}`,
+  description: `Create or run funding. Cover the buckets below zero, then pay the amounts that buckets still owe from Unassigned for the month of asOf, in priority order. When Unassigned cannot cover a bucket below zero, the savings buckets that can give money back give it to Unassigned, the lowest priority first. A paused bucket is not funded. It writes nothing when nothing is owed. This does not change records outside this action.`,
   method: "post",
   path: "/api/funding/fill",
   request: { query: asOfQuerySchema },

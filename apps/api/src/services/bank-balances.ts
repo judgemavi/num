@@ -1,6 +1,7 @@
+import { idIn } from "./list-sql";
 import { accounts, bankBalances, mortgageTerms, type AccountRow } from "@num/db";
 import { dayBefore, openingFromBankBalance, utcNow, type BankBalance, type BankBalanceInput, type BankStatus } from "@num/shared";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { requireWholeAmounts } from "./book-step";
@@ -52,7 +53,7 @@ export function listBankStatuses(db: Db): { items: BankStatus[] } {
     firstDate: sql<string | null>`(SELECT t.date FROM transactions t WHERE t.account_id = "accounts"."id" ORDER BY t.date LIMIT 1)`,
   }).from(accounts).where(isNull(accounts.archivedAt)).all();
   const ids = open.map(({ account }) => account.id);
-  const rows = db.select().from(bankBalances).where(inArray(bankBalances.accountId, ids)).orderBy(desc(bankBalances.date)).all();
+  const rows = db.select().from(bankBalances).where(idIn(bankBalances.accountId, ids)).orderBy(desc(bankBalances.date)).all();
   const byId = new Map(open.map((row) => [row.account.id, row]));
   const points = rows.flatMap((bank) => {
     const found = byId.get(bank.accountId);

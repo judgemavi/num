@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   applyBusinessDayShift,
-  medianOf,
+  medianAmount,
   occurrenceAt,
   occurrenceDates,
   variableAmounts,
@@ -65,8 +65,8 @@ test("a variable plan uses the median and the lowest of the last 6, then the fal
   expect(variableAmounts([12_350, 12_340, 12_340, 12_350], 0, 10)).toEqual({ forecast: 12_350, safe: 12_340 });
   expect(variableAmounts([1_000_000, 2_000_000, 3_000_000, 4_000_000], 0, 1000).forecast).toBe(2_500_000);
   expect(variableAmounts([1_000, 2_000, 4_000, 5_000], 0, 1000).forecast).toBe(3_000);
-  expect(medianOf([10, 20, 30, 40])).toBe(25);
-  expect(medianOf([-3, -2])).toBe(-3);
+  expect(medianAmount([10, 20, 30, 40], 1)).toBe(25);
+  expect(medianAmount([-3, -2], 1)).toBe(-3);
 });
 
 function txn(id: string, date: string, amount: number, merchantId: string | null = "merchant-1"): DetectionTransaction {

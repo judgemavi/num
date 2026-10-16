@@ -1,16 +1,17 @@
 import { accounts, documents, importBatches, importRows, inboxDecisions, transactions } from "@num/db";
 import {
-  Temporal,
+  addDays,
+  matchDateWindowDays,
   type ImportDetail,
   type ImportDetailRow,
   type ImportViewItem,
   type ImportViewQuery,
   type ImportViewStatus,
 } from "@num/shared";
-import { and, asc, count, desc, eq, gte, inArray, isNull, lte, ne, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNull, lte, ne, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { pagedOf, totalOf, windowOf } from "./list-sql";
+import { idIn, pagedOf, totalOf, windowOf } from "./list-sql";
 
 type OutcomeCounts = {
   created: number;
@@ -73,7 +74,7 @@ function outcomeCounts(db: Db, batchIds: string[]) {
   const outcomes = db
     .select({ batchId: importRows.batchId, outcome: importRows.outcome, total: count() })
     .from(importRows)
-    .where(inArray(importRows.batchId, batchIds))
+    .where(idIn(importRows.batchId, batchIds))
     .groupBy(importRows.batchId, importRows.outcome)
     .all();
   const byBatch = new Map<string, OutcomeCounts>();
@@ -174,7 +175,7 @@ export function getImportDetail(db: Db, id: string): ImportDetail {
       : db
           .select({ id: transactions.id })
           .from(transactions)
-          .where(and(inArray(transactions.id, transactionIds)))
+          .where(idIn(transactions.id, transactionIds))
           .all()
           .map((row) => row.id),
   );
@@ -196,7 +197,7 @@ export function getImportDetail(db: Db, id: string): ImportDetail {
           .where(
             and(
               eq(importRows.accountId, batch.accountId),
-              inArray(importRows.identity, identities),
+              idIn(importRows.identity, identities),
               ne(importRows.outcome, "duplicate"),
             ),
           )
@@ -249,8 +250,8 @@ export function getImportDetail(db: Db, id: string): ImportDetail {
         and(
           eq(transactions.accountId, batch.accountId),
           isNull(transactions.importRowId),
-          gte(transactions.date, Temporal.PlainDate.from(minDate).subtract({ days: 3 }).toString()),
-          lte(transactions.date, Temporal.PlainDate.from(maxDate).add({ days: 3 }).toString()),
+          gte(transactions.date, addDays(minDate, -matchDateWindowDays)),
+          lte(transactions.date, addDays(maxDate, matchDateWindowDays)),
         ),
       )
       .all();
@@ -258,8 +259,8 @@ export function getImportDetail(db: Db, id: string): ImportDetail {
       if (detail.outcome !== "needs_review") {
         continue;
       }
-      const start = Temporal.PlainDate.from(detail.date).subtract({ days: 3 }).toString();
-      const end = Temporal.PlainDate.from(detail.date).add({ days: 3 }).toString();
+      const start = addDays(detail.date, -matchDateWindowDays);
+      const end = addDays(detail.date, matchDateWindowDays);
       detail.matches = pool
         .filter((item) => item.amount === detail.amount && item.date >= start && item.date <= end)
         .sort((left, right) => (left.date < right.date ? -1 : left.date > right.date ? 1 : left.id < right.id ? -1 : 1));

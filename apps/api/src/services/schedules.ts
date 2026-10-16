@@ -1,6 +1,8 @@
+import { idIn } from "./list-sql";
+import { loadLinkIndex } from "./link-index";
 import { accounts, buckets, categories, merchants, occurrenceLinks, schedules, transactions, type BucketRow, type ScheduleRow } from "@num/db";
 import { addDays, variableAmounts, type MonthlyCommitment, type Schedule } from "@num/shared";
-import { and, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, lte } from "drizzle-orm";
 import { bookStep } from "./book-step";
 import { ServiceError } from "../service-error";
 import type { Reader, WriteTx } from "./write";
@@ -128,7 +130,7 @@ export function scheduleAmounts(db: Reader, views: readonly ScheduleView[], asOf
       .select({ bucketId: occurrenceLinks.bucketId, amount: transactions.amount })
       .from(occurrenceLinks)
       .innerJoin(transactions, eq(transactions.id, occurrenceLinks.transactionId))
-      .where(and(inArray(occurrenceLinks.bucketId, variable), lte(occurrenceLinks.dueDate, asOf)))
+      .where(and(idIn(occurrenceLinks.bucketId, variable), lte(occurrenceLinks.dueDate, asOf)))
       .orderBy(desc(occurrenceLinks.dueDate))
       .all();
     for (const row of rows) {
@@ -153,20 +155,7 @@ export function scheduleAmounts(db: Reader, views: readonly ScheduleView[], asOf
 export function commitmentsOf(db: Reader, start: string): Map<string, MonthlyCommitment> {
   const views = activeSchedules(db).filter((view) => view.kind === "commitment");
   const amounts = scheduleAmounts(db, views, addDays(start, -1));
-  const skipped = new Map<string, Set<string>>();
-  const paid = new Map<string, Map<string, string>>();
-  const links = db
-    .select({ bucketId: occurrenceLinks.bucketId, dueDate: occurrenceLinks.dueDate, skipped: occurrenceLinks.skipped, date: transactions.date })
-    .from(occurrenceLinks)
-    .leftJoin(transactions, eq(transactions.id, occurrenceLinks.transactionId))
-    .all();
-  for (const link of links) {
-    if (link.skipped) {
-      skipped.set(link.bucketId, (skipped.get(link.bucketId) ?? new Set()).add(link.dueDate));
-    } else if (link.date) {
-      paid.set(link.bucketId, (paid.get(link.bucketId) ?? new Map()).set(link.dueDate, link.date));
-    }
-  }
+  const { skipped, paid } = loadLinkIndex(db, true);
   return new Map(
     views.map((view) => [
       view.id,

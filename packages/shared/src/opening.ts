@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { Temporal } from "temporal-polyfill";
-import { isoDateSchema } from "./date";
+import { dayBefore, isoDateSchema } from "./date";
 import { amountSchema } from "./money";
 
 
@@ -10,10 +9,6 @@ export const openingSuggestionSchema = z.object({
 });
 
 export type OpeningSuggestion = z.infer<typeof openingSuggestionSchema>;
-
-export function dayBefore(date: string): string {
-  return Temporal.PlainDate.from(date).subtract({ days: 1 }).toString();
-}
 
 /** Balance and amount are stored money. A card balance is negative when the statement shows an amount owed. */
 export function openingFromFirstRow(input: { balance: number; amount: number; date: string }): OpeningSuggestion | null {

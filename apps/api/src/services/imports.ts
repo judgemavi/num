@@ -6,7 +6,8 @@ import {
   isOfxFile,
   currencyDigits,
   sampleCsvRows,
-  Temporal,
+  addDays,
+  matchDateWindowDays,
   utcNow,
   type ColumnMap,
   type ImportResult,
@@ -148,8 +149,8 @@ function dateWindow(dates: readonly string[]) {
     throw new Error("A batch needs a statement row");
   }
   return {
-    start: Temporal.PlainDate.from(first).subtract({ days: 3 }).toString(),
-    end: Temporal.PlainDate.from(last).add({ days: 3 }).toString(),
+    start: addDays(first, -matchDateWindowDays),
+    end: addDays(last, matchDateWindowDays),
   };
 }
 

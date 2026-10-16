@@ -1,7 +1,7 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
 import { roundToStep } from "./currency";
-import { isoDateSchema } from "./date";
+import { clampDay, daysBetween, isoDateSchema } from "./date";
 import { queryNumber } from "./list";
 import { interestRateMilliPctSchema } from "./rate";
 import { amountSchema, nonNegativeAmountSchema as money, positiveAmountSchema } from "./money";
@@ -115,10 +115,6 @@ export function mortgagePeriodRate(rateMilliPct: number, compound: Compounding, 
   return Math.expm1(Math.log1p(nominal / compounds) * (compounds / periods));
 }
 
-function clampDay(month: Temporal.PlainDate, day: number) {
-  return month.with({ day: Math.min(day, month.daysInMonth) }).toString();
-}
-
 export function mortgagePaymentDate(firstPaymentDate: string, index: number, frequency: PaymentFrequency): string {
   const start = Temporal.PlainDate.from(firstPaymentDate);
   if (frequency === "weekly") {
@@ -128,13 +124,13 @@ export function mortgagePaymentDate(firstPaymentDate: string, index: number, fre
     return start.add({ days: index * 14 }).toString();
   }
   if (frequency === "monthly") {
-    return clampDay(start.with({ day: 1 }).add({ months: index }), start.day);
+    return clampDay(start.with({ day: 1 }).add({ months: index }), start.day).toString();
   }
   const firstDay = start.day;
   const otherDay = firstDay <= 15 ? firstDay + 15 : firstDay - 15;
   const months = firstDay <= 15 ? Math.floor(index / 2) : Math.ceil(index / 2);
   const day = index % 2 === 0 ? firstDay : otherDay;
-  return clampDay(start.with({ day: 1 }).add({ months }), day);
+  return clampDay(start.with({ day: 1 }).add({ months }), day).toString();
 }
 
 /** True when the first payment is not one payment period after the opening date. The user can still save. */
@@ -144,10 +140,6 @@ export function mortgageFirstPaymentOffPeriod(
   frequency: PaymentFrequency,
 ): boolean {
   return mortgagePaymentDate(openingDate, 1, frequency) !== firstPaymentDate;
-}
-
-function daysBetween(from: string, to: string) {
-  return Temporal.PlainDate.from(from).until(Temporal.PlainDate.from(to), { largestUnit: "day" }).days;
 }
 
 function chargeRate(regular: number, periods: number, from: string, to: string, frequency: PaymentFrequency) {

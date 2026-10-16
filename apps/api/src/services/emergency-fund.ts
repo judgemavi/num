@@ -1,6 +1,7 @@
+import { idIn } from "./list-sql";
 import { bucketCategories, buckets, categories, occurrenceLinks, transactionLines, transactions } from "@num/db";
 import { medianAmount, monthLastDay, type EmergencyFund } from "@num/shared";
-import { and, eq, gte, inArray, isNotNull, isNull, lte, notExists, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lte, notExists, sql } from "drizzle-orm";
 import { bookStep } from "./book-step";
 import { bucketBalances } from "./bucket-balance";
 import { lastCompleteMonths } from "./complete-months";
@@ -71,7 +72,7 @@ function categorySpendingByMonth(db: Reader, categoryIds: string[], first: strin
     .innerJoin(categories, eq(transactionLines.categoryId, categories.id))
     .where(
       and(
-        inArray(transactionLines.categoryId, categoryIds),
+        idIn(transactionLines.categoryId, categoryIds),
         eq(categories.kind, "expense"),
         isNull(transactionLines.transferAccountId),
         gte(transactions.date, `${first}-01`),

@@ -1,3 +1,4 @@
+import { clampDay, daysBetween } from "./date";
 import { Temporal } from "temporal-polyfill";
 import { divideAmount } from "./currency";
 
@@ -22,13 +23,6 @@ export type OccurrenceDate = {
   nominalDate: string;
   dueDate: string;
 };
-
-function clampDay(month: Temporal.PlainDate, monthDay: number) {
-  if (monthDay === -1) {
-    return month.with({ day: month.daysInMonth });
-  }
-  return month.with({ day: Math.min(monthDay, month.daysInMonth) });
-}
 
 function nominalOn(start: Temporal.PlainDate, plan: PlanSchedule, index: number) {
   const step = plan.interval * index;
@@ -68,7 +62,7 @@ function firstIndex(plan: PlanSchedule, from: Temporal.PlainDate) {
     return 0;
   }
   if (plan.freq === "weekly") {
-    const days = start.until(from, { largestUnit: "day" }).days;
+    const days = daysBetween(start, from);
     return Math.max(0, Math.floor(days / (7 * plan.interval)) - 1);
   }
   if (plan.freq === "monthly") {
@@ -116,32 +110,8 @@ export function linkWindowStart(startDate: string, asOf: string): string {
   return startDate > earliest ? startDate : earliest;
 }
 
-export function dayDistance(left: string, right: string): number {
-  const start = Temporal.PlainDate.from(left);
-  const end = Temporal.PlainDate.from(right);
-  return Math.abs(start.until(end, { largestUnit: "day" }).days);
-}
-
 export function withinTolerance(actual: number, expected: number, tolerance: number): boolean {
   return Math.abs(actual - expected) <= tolerance;
-}
-
-function divideHalfAway(sum: number, divisor: number): number {
-  const negative = sum < 0;
-  const magnitude = Math.abs(sum);
-  const quotient = Math.floor(magnitude / divisor);
-  const remainder = magnitude % divisor;
-  const rounded = remainder * 2 >= divisor ? quotient + 1 : quotient;
-  return negative ? -rounded : rounded;
-}
-
-export function medianOf(values: readonly number[]): number {
-  const sorted = [...values].sort((left, right) => left - right);
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) {
-    return sorted[mid] ?? 0;
-  }
-  return divideHalfAway((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0), 2);
 }
 
 /** The median of amounts. The middle of two amounts is rounded to a whole number of minor units (`step`). */

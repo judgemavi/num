@@ -1,12 +1,12 @@
+import { expectCode } from "./test-support";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { accounts, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
-import type { AccountKind, ErrorCode, TransactionLineInput } from "@num/shared";
+import type { AccountKind, TransactionLineInput } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
-import { ServiceError } from "../service-error";
 import { archiveAccount, createAccount } from "./accounts";
 import { createCategory } from "./categories";
 import { getsImports } from "./transaction-test-book";
@@ -30,16 +30,6 @@ function tempDatabase() {
 const at = "2026-10-07T16:00:00Z";
 const saved = { source: "ui" as const, at };
 
-function expectCode(run: () => void, code: ErrorCode) {
-  try {
-    run();
-  } catch (error) {
-    expect(error).toBeInstanceOf(ServiceError);
-    expect((error as ServiceError).code).toBe(code);
-    return;
-  }
-  throw new Error(`Expected ${code}`);
-}
 
 function account(db: Db, name: string, kind: AccountKind) {
   return createAccount(db, {

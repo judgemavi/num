@@ -9,10 +9,6 @@ import { amountSchema as money } from "./money";
 
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
-export function addDays(iso: string, days: number): string {
-  return Temporal.PlainDate.from(iso).add({ days }).toString();
-}
-
 export function positiveBalances(balances: readonly number[]): number {
   let total = 0;
   for (const balance of balances) {

@@ -1,8 +1,7 @@
-import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
-import { autoReasons, type AutoReason, type MatchResult } from "./matching";
+import { matchDateWindowDays, matchHistoryDays, autoReasons, type AutoReason, type MatchResult } from "./matching";
 import { queryNumber } from "./list";
-import { dayDistance } from "./recurring-calc";
+import { addDays, dayDistance } from "./date";
 import { reviewLevel, reviewLevels } from "./review-level";
 
 export const suggestionReasons = [...autoReasons, "none"] as const;
@@ -88,7 +87,7 @@ function pairAmount(group: TransferCandidate[]) {
       incomingIndex < incoming.length &&
       incoming[incomingIndex] !== undefined &&
       incoming[incomingIndex]!.date < row.date &&
-      dayDistance(row.date, incoming[incomingIndex]!.date) > 3
+      dayDistance(row.date, incoming[incomingIndex]!.date) > matchDateWindowDays
     ) {
       incomingIndex += 1;
     }
@@ -97,7 +96,7 @@ function pairAmount(group: TransferCandidate[]) {
       if (!other) {
         break;
       }
-      if (other.date > row.date && dayDistance(row.date, other.date) > 3) {
+      if (other.date > row.date && dayDistance(row.date, other.date) > matchDateWindowDays) {
         break;
       }
       if (used.has(other.id) || other.accountId === row.accountId || other.amount !== -row.amount) {
@@ -132,7 +131,7 @@ export function chooseTransferMatch(
     (row) =>
       row.amount === wanted &&
       row.lineCount === 1 &&
-      dayDistance(row.date, input.date) <= 3,
+      dayDistance(row.date, input.date) <= matchDateWindowDays,
   );
   open.sort((left, right) => {
     const distance = dayDistance(left.date, input.date) - dayDistance(right.date, input.date);
@@ -145,7 +144,7 @@ export function chooseTransferMatch(
 }
 
 export function transferPairs(rows: TransferCandidate[], asOf: string): TransferPair[] {
-  const start = Temporal.PlainDate.from(asOf).subtract({ days: 90 }).toString();
+  const start = addDays(asOf, -matchHistoryDays);
   const open = rows
     .filter((row) => row.onBudget && !row.linked && row.amount !== 0 && row.date >= start && row.date <= asOf)
     .sort((left, right) => {
