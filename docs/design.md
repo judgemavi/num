@@ -266,7 +266,7 @@ below it.
 The Amount cell shows only the exception: "Pending" for an open row (entered by hand in an account that gets imports, not yet on a statement).
 A cleared row shows nothing.
 On `/transactions` and on the page of an account, a row that needs review has a 3px `attn` stripe at its left edge.
-`/transactions/review` has no stripe. The review text (spec §7.3) is muted text after the category.
+`/transactions/review` has no stripe. The review text (spec §7.3) is a pill after the category.
 There, the Category column shows the proposed label and merchant of a
 suggestion (the same text as a stored label; the level tells that it is a proposal) and "Transfer to <account>" or "Transfer from <account>" for a
 possible transfer. A row has no buttons. The whole row opens the editor. No dismiss, no queue mode.

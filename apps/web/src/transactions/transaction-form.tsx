@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { errorCode } from "@/api/client";
 import { localAsOf } from "@/as-of";
 import { useDeleteTransaction, useSaveTransaction } from "@/api/transactions";
-import { Badge } from "@/components/ui/badge";
+import { ReviewPill } from "@/transactions/review-pill";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEditorFrame } from "@/editors/editor-api";
@@ -147,7 +147,7 @@ export function TransactionForm({
           ) : null}
           {transaction?.autoReason ? (
             <div>
-              <Badge variant="neutral">{levelLabel("sure")}</Badge>
+              <ReviewPill text={levelLabel("sure")} />
             </div>
           ) : null}
           {imported ? (

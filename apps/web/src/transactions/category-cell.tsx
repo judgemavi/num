@@ -1,10 +1,12 @@
-/** The Category column: the label, the review text (muted) and the merchant. */
+import { ReviewPill } from "@/transactions/review-pill";
+
+/** The Category column: the label, the review pill and the merchant. */
 export function CategoryCell({ label, review, merchant }: { label: string; review: string | null; merchant: string | null }) {
   return (
     <>
-      <div className="flex gap-1">
-        <span className="truncate">{label}</span>
-        {review ? <span className="shrink-0 text-muted-foreground">· {review}</span> : null}
+      <div className="flex items-center gap-1">
+        <span className="min-w-0 truncate">{label}</span>
+        <ReviewPill text={review} />
       </div>
       {merchant ? <div className="text-muted-foreground">{merchant}</div> : null}
     </>

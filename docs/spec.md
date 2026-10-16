@@ -730,7 +730,7 @@ It has the same sort orders, and also a sort by confidence. The page has only th
 "Needs review · N". The search of both pages matches the description and the merchant name.
 - **Review stripe and review text:** on the All page and on the page of an account, a row that needs review has a
   stripe in the attention colour at its left edge. The Needs review page has no stripe: all its rows need review. On
-  both pages, the review text of the row is muted text after the category. On the All page it is the level (Sure,
+  both pages, the review text of the row is a pill after the category: Sure is positive, Likely is neutral, and Maybe, Needs review and Question use attention. On the All page it is the level (Sure,
   Likely, Maybe) when the row has a suggestion or an automatic label, and "Needs review" when it has a question or no
   suggestion. Other rows have no stripe and no review text. The table has no Status column.
 - **Needs review page:** the review text is the level, "Question" for a question, and nothing for a row with no
