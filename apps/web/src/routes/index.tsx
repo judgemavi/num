@@ -6,7 +6,10 @@ import { HomeScreen } from "@/home/home-screen";
 
 export const Route = createFileRoute("/")({
   validateSearch: searchWithDefaults(insightsSearchSchema),
-  loaderDeps: ({ search }) => pageQuery(search),
+  loaderDeps: ({ search }) => {
+    const { group: _group, by: _by, ...request } = pageQuery(search);
+    return request;
+  },
   loader: ({ context, deps }) => startHomeReads(context.queryClient, deps),
   component: HomeScreen,
 });

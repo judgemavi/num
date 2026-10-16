@@ -2,15 +2,13 @@ import { Temporal, type ErrorCode } from "@num/shared";
 import { errorCode } from "@/api/client";
 import { localAsOf } from "@/as-of";
 import { Boundary } from "@/components/boundary";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useBookCurrency, useCategoryNames, useTagNames } from "@/editors/lookups";
+import { useBookCurrency, useTagNames } from "@/editors/lookups";
 import { monthTitle, rateText } from "@/home/spending/format";
-import { SelectedSpendList, SpendDonutCard } from "@/home/spending/spending-breakdown";
 import { PeriodSelect } from "@/home/spending/period-select";
 import { SelectionClear } from "@/home/spending/selection-clear";
 import { TagSelect } from "@/home/spending/tag-select";
-import { TimelineChart } from "@/home/spending/timeline-chart";
 import { useSpendingReport } from "@/home/spending/use-spending";
+import { spendingContent } from "@/home/spending-lazy";
 import { formatMoney } from "@/money";
 
 const errorText: Partial<Record<ErrorCode, string>> = {
@@ -58,23 +56,6 @@ function SpendingLine() {
   return <p className="text-sm text-muted-foreground">{parts.join(" · ")}</p>;
 }
 
-function TimelineCard() {
-  const { data, search } = useSpendingReport();
-  const categoryName = useCategoryNames().get(search.category ?? "");
-  const tagName = useTagNames().get(data.tagId ?? "");
-  const scope = categoryName ?? tagName;
-  return (
-    <Card>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 px-5 pt-5 md:px-6">
-        <CardTitle className="text-base font-bold">{scope ? `${scope} spending` : "Income and spending"}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-3 px-5 pb-5 md:px-6">
-        <TimelineChart />
-      </CardContent>
-    </Card>
-  );
-}
-
 /**
  * Spending on Home: the period (default this month), the tag (default all spending), the timeline, the spending donut
  * and the list of groups and categories. The period and the tag selectors and "Clear" stay outside the boundary, thus
@@ -99,17 +80,14 @@ export function SpendingSection() {
         <SelectionClear />
       </div>
       <Boundary
+        onRetry={spendingContent.retry}
         loading="Loading spending."
         failed={({ error }) => {
           const code = errorCode(error);
           return (code && errorText[code]) ?? "Spending did not load.";
         }}
       >
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <TimelineCard />
-          <SpendDonutCard />
-        </div>
-        <SelectedSpendList />
+        <spendingContent.Component />
       </Boundary>
     </section>
   );

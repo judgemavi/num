@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
+import { searchDelayMs } from "@/lists/list-search";
 import { withForm } from "@/forms/form-hook";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -64,7 +65,10 @@ export const MoneySection = withForm({
             </Field>
           )}
         </form.Field>
-        <form.AppField name="amount">{(field) => <field.MoneyField id="txn-amount" label="Amount" disabled={moneyLocked} />}</form.AppField>
+        <form.AppField name="amount" listeners={{
+          onChangeDebounceMs: searchDelayMs,
+          onChange: ({ value, fieldApi }) => fieldApi.form.setFieldValue("suggestionAmount", value, quietChange),
+        }}>{(field) => <field.MoneyField id="txn-amount" label="Amount" disabled={moneyLocked} />}</form.AppField>
         <div className="grid gap-4 sm:grid-cols-2">
           <form.Field
             name="accountId"

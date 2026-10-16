@@ -14,6 +14,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { formatEditParam, isRecordEditorKind, parseEditParam, type RecordEditorKind } from "@/editors/edit-url";
 import { EditorContext, EditorFrameContext } from "@/editors/editor-api";
 import { EditorBody } from "@/editors/editor-registry";
+import { preloadEditor } from "@/editors/editor-chunks";
 import { createEditorStore } from "@/editors/editor-store";
 import type { EditorFrame, EditorInput, EditorKind } from "@/editors/editor-types";
 
@@ -46,6 +47,7 @@ function panelClass(kind: EditorKind) {
 function createHost(router: ReturnType<typeof useRouter>) {
   const store = createEditorStore();
   let lastPath = router.state.location.pathname;
+  let opening = 0;
 
   /** Show one editor in the URL, or no editor. */
   function writeUrl(shown: { frame: EditorFrame; key: string } | null, replace: boolean) {
@@ -70,7 +72,7 @@ function createHost(router: ReturnType<typeof useRouter>) {
     store,
     close,
     /** Make the open editor agree with the URL. The person used Back or Forward, or opened a link. */
-    followUrl(wanted: ReturnType<typeof editorOfUrl>, pathname: string) {
+    async followUrl(wanted: ReturnType<typeof editorOfUrl>, pathname: string) {
       const pathnameChanged = lastPath !== pathname;
       lastPath = pathname;
       const open = store.snapshot().editor;
@@ -80,15 +82,22 @@ function createHost(router: ReturnType<typeof useRouter>) {
       if (open && open.editValue !== null && open.editValue === wanted?.key) {
         return;
       }
+      const request = ++opening;
       if (open) {
         store.close(open.key, null);
       }
       if (wanted) {
-        void store.open(wanted.frame, { editValue: wanted.key, pushed: false });
+        await preloadEditor(wanted.frame.kind).catch(() => undefined);
+        if (request === opening) {
+          void store.open(wanted.frame, { editValue: wanted.key, pushed: false });
+        }
       }
     },
     api: {
-      openEditor<K extends EditorKind>(kind: K, input: EditorInput[K]) {
+      async openEditor<K extends EditorKind>(kind: K, input: EditorInput[K]) {
+        const request = ++opening;
+        await preloadEditor(kind).catch(() => undefined);
+        if (request !== opening) return null;
         const open = store.snapshot().editor;
         const hadUrl = open !== null && open.editValue !== null;
         // The type argument makes the frame of one kind a member of the union of all frames.
@@ -116,7 +125,7 @@ export function EditorHost({ children }: { children: ReactNode }) {
 
   // The router is the source of the URL. The store of the host is not a part of React. This effect makes them agree.
   useEffect(() => {
-    host.followUrl(editorOfUrl({ edit }), pathname);
+    void host.followUrl(editorOfUrl({ edit }), pathname);
   }, [host, pathname, edit]);
 
   const description = confirm?.description;

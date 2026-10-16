@@ -1,29 +1,7 @@
-import { createElement, lazy, type ReactNode } from "react";
+import { createElement } from "react";
+import { editors } from "@/editors/editor-chunks";
 import { Boundary } from "@/components/boundary";
-import type { EditorFrame, EditorInput, EditorKind } from "@/editors/editor-types";
-
-/** The editor component of each kind. The input of the kind is the props of the component. */
-const editors: { [K in EditorKind]: (input: EditorInput[K]) => ReactNode } = {
-  transaction: lazy(() => import("@/transactions/transaction-editor").then((module) => ({ default: module.TransactionEditor }))),
-  bulkEdit: lazy(() => import("@/transactions/bulk-editor").then((module) => ({ default: module.BulkEditor }))),
-  account: lazy(() => import("@/editors/account-editors").then((module) => ({ default: module.AccountEditor }))),
-  category: lazy(() => import("@/editors/settings-editors").then((module) => ({ default: module.CategoryEditor }))),
-  group: lazy(() => import("@/editors/settings-editors").then((module) => ({ default: module.GroupEditor }))),
-  tag: lazy(() => import("@/editors/settings-editors").then((module) => ({ default: module.TagEditor }))),
-  merchant: lazy(() => import("@/editors/settings-editors").then((module) => ({ default: module.MerchantEditor }))),
-  bucket: lazy(() => import("@/editors/bucket-editors").then((module) => ({ default: module.BucketEditor }))),
-  commitment: lazy(() => import("@/editors/schedule-editors").then((module) => ({ default: module.CommitmentEditor }))),
-  income: lazy(() => import("@/editors/schedule-editors").then((module) => ({ default: module.IncomeEditor }))),
-  import: lazy(() => import("@/accounts/import-dialog").then((module) => ({ default: module.ImportForm }))),
-  bankBalance: lazy(() => import("@/accounts/bank-balance-editor").then((module) => ({ default: module.BankBalanceEditor }))),
-  assignMoney: lazy(() => import("@/editors/bucket-editors").then((module) => ({ default: module.AssignEditor }))),
-  moveMoney: lazy(() => import("@/buckets/move-money").then((module) => ({ default: module.MoveMoney }))),
-  importInfo: lazy(() => import("@/editors/account-editors").then((module) => ({ default: module.ImportInfoEditor }))),
-  mergeMerchant: lazy(() => import("@/editors/settings-editors").then((module) => ({ default: module.MergeEditor }))),
-  skipNext: lazy(() => import("@/schedules/skip-next").then((module) => ({ default: module.SkipNext }))),
-  skipOccurrence: lazy(() => import("@/editors/schedule-editors").then((module) => ({ default: module.SkipOccurrenceEditor }))),
-  linkOccurrence: lazy(() => import("@/editors/schedule-editors").then((module) => ({ default: module.LinkOccurrenceEditor }))),
-};
+import type { EditorFrame, EditorKind } from "@/editors/editor-types";
 
 /** The text of each kind while the editor loads its data, and the text after a read fails. */
 const loadText: { [K in EditorKind]: { loading: string; failed: string } } = {
@@ -51,8 +29,8 @@ const loadText: { [K in EditorKind]: { loading: string; failed: string } } = {
 /** The open editor. Its data loads inside one boundary, thus each editor shows the loading line and the error the same way. */
 export function EditorBody<K extends EditorKind>({ kind, input }: EditorFrame<K>) {
   return (
-    <Boundary look="dialog" loading={loadText[kind].loading} failed={loadText[kind].failed}>
-      {createElement(editors[kind], input)}
+    <Boundary onRetry={editors[kind].retry} look="dialog" loading={loadText[kind].loading} failed={loadText[kind].failed}>
+      {createElement(editors[kind].Component, input)}
     </Boundary>
   );
 }

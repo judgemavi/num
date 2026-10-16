@@ -85,7 +85,10 @@ export const WhatIsThis = withForm({
     const values = useStore(form.store, (state) => state.values);
     const { direction, choice, refundOfId, accountId } = values;
     const totalMilli = signedTotal(currency, storedAmount, values.amount, direction);
-    const { suggestion } = useSuggestion({ accountId, payee: values.payee, date: values.date, direction, amount: totalMilli });
+    const { suggestion } = useSuggestion(
+      { accountId, payee: values.suggestionPayee, date: values.date, direction, amount: signedTotal(currency, storedAmount, values.suggestionAmount, direction) },
+      values.payee === values.suggestionPayee && values.amount === values.suggestionAmount,
+    );
     const choices = choicesForDirection(direction);
     const categoryKind = categoryKindForChoice(choice);
 

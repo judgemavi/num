@@ -11,6 +11,7 @@ import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody } from "@/editors/form-chrome";
 import { useAccountLabels, useAccounts, useBookCurrency, useCategories } from "@/editors/lookups";
 import { useAppForm } from "@/forms/form-hook";
+import { searchDelayMs } from "@/lists/list-search";
 import { formatMoney } from "@/money";
 import { formatDate, levelLabel, refundedText, transactionError } from "@/transactions/format";
 import { DecisionNotes, DeleteMenu, MoneySection, TagsField } from "@/transactions/transaction-parts";
@@ -107,7 +108,11 @@ export function TransactionForm({
     (state) => alreadyChosen(transaction) || answerFilled(review) || choiceFields.some((name) => state.fieldMeta[name]?.isTouched),
   );
   const totalMilli = signedTotal(currency, storedTotal(values), values.amount, values.direction);
-  const suggested = useSuggestion({ accountId: values.accountId, payee: values.payee, date: values.date, direction: values.direction, amount: totalMilli });
+  const suggestionAmount = signedTotal(currency, storedTotal({ ...values, amount: values.suggestionAmount }), values.suggestionAmount, values.direction);
+  const suggested = useSuggestion(
+    { accountId: values.accountId, payee: values.suggestionPayee, date: values.date, direction: values.direction, amount: suggestionAmount },
+    values.payee === values.suggestionPayee && values.amount === values.suggestionAmount,
+  );
 
   // The suggestion arrives from the API, outside the form. The form takes its choice until the person makes a choice.
   const suggestedChoice = touched ? null : suggested.choice;
@@ -153,7 +158,10 @@ export function TransactionForm({
           ) : (
             <MoneySection form={form} moneyLocked={amountLocked || imported} />
           )}
-          <form.AppField name="payee">
+          <form.AppField name="payee" listeners={{
+            onChangeDebounceMs: searchDelayMs,
+            onChange: ({ value, fieldApi }) => fieldApi.form.setFieldValue("suggestionPayee", value, quietChange),
+          }}>
             {(field) => (
               <field.TextField
                 id="txn-payee"

@@ -4,9 +4,7 @@ import { Boundary } from "@/components/boundary";
 import { PageHeader } from "@/components/page-header";
 import { AvailableStrip } from "@/home/available-strip";
 import { NeedsYouCard } from "@/home/needs-you-card";
-import { lazy } from "react";
-
-const SpendingSection = lazy(() => import("@/home/spending-section").then((module) => ({ default: module.SpendingSection })));
+import { SpendingSection } from "@/home/spending-section";
 
 /**
  * Home: Available to spend, the items that need the user, and Spending. Each part reads its own data and
@@ -22,9 +20,7 @@ export function HomeScreen() {
       <Boundary loading="Loading Needs you." failed="Needs you did not load.">
         <NeedsYouCard />
       </Boundary>
-      <Boundary loading="Loading spending." failed="Spending did not load.">
-        <SpendingSection />
-      </Boundary>
+      <SpendingSection />
     </>
   );
 }

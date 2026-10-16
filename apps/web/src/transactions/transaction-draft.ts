@@ -17,7 +17,6 @@ import { suggestionQuery, transferHintQuery } from "@/api/suggestions";
 import { localAsOf } from "@/as-of";
 import { useCategories } from "@/editors/lookups";
 import { fieldValue } from "@/forms/form-values";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { decimalsError } from "@/money";
 
 /** A change that the form makes, not the person. It does not mark the field as changed and does not start the listeners. */
@@ -80,6 +79,8 @@ export function transactionValues(categories: Category[], transaction: Transacti
     direction: transaction ? moneyDirection(transaction.amount) : "out",
     amount: transaction ? amountText(Math.abs(transaction.amount)) : "",
     payee: transaction?.payeeRaw ?? "",
+    suggestionPayee: transaction?.payeeRaw ?? "",
+    suggestionAmount: transaction ? amountText(Math.abs(transaction.amount)) : "",
     merchantId: transaction && !pair ? transaction.merchantId : null,
     refundOfId: purchase ? purchase.id : transaction ? transaction.refundOfId : null,
     choice: pair ? "transfer" : purchase ? "refund" : choiceOf(transaction, categories),
@@ -135,14 +136,10 @@ type SuggestionInput = {
  * The suggestion for the form, and the choice that it gives. `choice` is null until the reads that the choice needs
  * complete. It is the same object until the suggestion, the transfer hint or the direction changes.
  */
-export function useSuggestion(input: SuggestionInput) {
+export function useSuggestion(input: SuggestionInput, settled = true) {
   const categories = useCategories();
-  const payee = useDebouncedValue(input.payee);
-  const amount = useDebouncedValue(input.amount);
-  const settled = payee === input.payee && amount === input.amount;
-  const draft = { ...input, payee, amount };
-  const { data: suggestion = null } = useQuery(suggestionQuery(draft));
-  const transferHint = useQuery(transferHintQuery(draft));
+  const { data: suggestion = null } = useQuery(suggestionQuery(input));
+  const transferHint = useQuery(transferHintQuery(input));
   const hintReady = input.amount === null || input.amount === 0 || transferHint.isSuccess || transferHint.isError;
   const oppositeAccountId = transferHint.data?.accountId ?? null;
   const { direction } = input;

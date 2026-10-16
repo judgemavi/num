@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { availableQuery } from "@/api/funding";
 import { insightsQuery } from "@/api/insights";
 import { needsYouQuery } from "@/api/needs-you";
+import { spendingContent } from "@/home/spending-lazy";
 import { localAsOf } from "@/as-of";
 
 /**
@@ -10,6 +11,7 @@ import { localAsOf } from "@/as-of";
  * boundaries. Spending starts with the period and filters from the URL.
  */
 export function startHomeReads(queryClient: QueryClient, search: InsightsSearch) {
+  void spendingContent.preload().catch(() => undefined);
   const asOf = localAsOf();
   void queryClient.prefetchQuery(availableQuery(asOf));
   void queryClient.prefetchQuery(needsYouQuery(asOf));

@@ -102,6 +102,7 @@ type BoundaryProps = {
   frame?: (content: ReactNode) => ReactNode;
   /** A value that is not in the URL and that the children load data for. A new value shows the children again. */
   resetKey?: string;
+  onRetry?: () => void;
   children: ReactNode;
 };
 
@@ -109,7 +110,7 @@ type BoundaryProps = {
  * The place where children that read data with `useSuspenseQuery` show that they load or that a read failed.
  * "Try again" starts each failed read of the children again. A change of the URL does the same.
  */
-export function Boundary({ look = "page", loading, failed, frame = (content) => content, resetKey = "", children }: BoundaryProps) {
+export function Boundary({ look = "page", loading, failed, frame = (content) => content, resetKey = "", onRetry, children }: BoundaryProps) {
   const href = useRouterState({ select: (state) => state.location.href });
   const shown = looks[look];
   return (
@@ -117,7 +118,10 @@ export function Boundary({ look = "page", loading, failed, frame = (content) => 
       {({ reset }) => (
         <Catch
           resetKey={`${href} ${resetKey}`}
-          onReset={reset}
+          onReset={() => {
+            onRetry?.();
+            reset();
+          }}
           failed={(failure) => {
             const content = typeof failed === "string" ? failed : failed(failure);
             return typeof content === "string" ? frame(shown.failed(content, failure.retry)) : content;
