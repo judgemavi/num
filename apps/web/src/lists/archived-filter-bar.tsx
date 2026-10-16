@@ -5,7 +5,7 @@ import { SortSelect } from "@/lists/sort-select";
 
 type ArchivedFilterBarProps<Column extends string> = {
   /** The result of `useListSearch(...)` for the list. */
-  list: {
+  useList: () => {
     search: { archived: boolean };
     sort: SortChoice<Column>;
     patch: (change: { archived: boolean }) => void;
@@ -18,7 +18,8 @@ type ArchivedFilterBarProps<Column extends string> = {
 };
 
 /** The filter bar of a list that has one filter, "Show archived", and a sort control. */
-export function ArchivedFilterBar<Column extends string>({ list, switchId, sortId, sortLabel = "Sort", sortOptions }: ArchivedFilterBarProps<Column>) {
+export function ArchivedFilterBar<Column extends string>({ useList, switchId, sortId, sortLabel = "Sort", sortOptions }: ArchivedFilterBarProps<Column>) {
+  const list = useList();
   const shown = list.search.archived;
   // The panel keeps the change of the person until the person applies it.
   const panel = useAppForm({

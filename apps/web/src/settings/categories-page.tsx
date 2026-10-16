@@ -120,13 +120,7 @@ function Categories() {
                 <RowMenu label={`Actions for ${category.name}`}>
                   <ArchiveMenuItem
                     archived={category.archivedAt !== null}
-                    question={(restore) => ({
-                      title: restore ? "Restore this category?" : "Archive this category?",
-                      description: restore
-                        ? `Restore ${category.name}. It returns to the active list.`
-                        : `Archive ${category.name}. It leaves the active list.`,
-                      confirmLabel: restore ? "Restore" : "Archive",
-                    })}
+                    noun="category" name={category.name}
                     onConfirm={(restore) => archive.mutate({ id: category.id, restore })}
                   />
                 </RowMenu>

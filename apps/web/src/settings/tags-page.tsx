@@ -1,56 +1,44 @@
-import { Plus } from "lucide-react";
+import { RecordListPage, ArchivedSettingsList } from "@/settings/record-list-page";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { tagListQuery, useArchiveTag } from "@/api/tags";
 import { ArchiveMenuItem } from "@/components/archive-menu-item";
-import { Boundary } from "@/components/boundary";
-import { ListCard, ListEmpty, ListRow, listName } from "@/components/list-card";
-import { PageHeader } from "@/components/page-header";
+import { ListRow, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
-import { Button } from "@/components/ui/button";
 import { useEditors } from "@/editors/editor-api";
 import { ArchivedFilterBar } from "@/lists/archived-filter-bar";
 import { nameSortOptions } from "@/lists/list-search";
 import { useListSearch } from "@/lists/use-list-search";
-import { SettingsBack } from "@/settings/settings-nav";
 
 const tagsRoute = getRouteApi("/settings/tags");
 
+function useTagsSearch() {
+  return useListSearch(tagsRoute.useSearch(), tagsRoute.useNavigate(), { sort: "name", dir: "asc" });
+}
+
 export function TagsPage() {
-  return (
-    <Boundary loading="Loading tags." failed="The tags did not load.">
-      <Tags />
-    </Boundary>
-  );
+  return <RecordListPage title="Tags" kind="tag"><Tags /></RecordListPage>;
+}
+
+function useTagsRows() {
+  const list = useTagsSearch();
+  const { data } = useSuspenseQuery(tagListQuery(list.shown));
+  return { items: data.items, archived: list.shown.archived };
 }
 
 function Tags() {
-  const list = useListSearch(tagsRoute.useSearch(), tagsRoute.useNavigate(), { sort: "name", dir: "asc" });
-  const { openEditor } = useEditors();
-  // The list on the screen stays while the list for a new filter or a new sort order loads.
-  const { data: tags } = useSuspenseQuery(tagListQuery(list.shown));
-  const archive = useArchiveTag();
-  const rows = tags.items;
+  return <>
+    <ArchivedFilterBar useList={useTagsSearch} switchId="filter-archived-tags" sortId="tag-sort" sortOptions={nameSortOptions} />
+    <ArchivedSettingsList title="Tags" useRows={useTagsRows}>
+      {(tag) => <TagRow key={tag.id} tag={tag} />}
+    </ArchivedSettingsList>
+  </>;
+}
 
+function TagRow({ tag }: { tag: ReturnType<typeof useTagsRows>["items"][number] }) {
+  const { openEditor } = useEditors();
+  const archive = useArchiveTag();
   return (
-    <>
-      <SettingsBack />
-      <PageHeader
-        kicker="Settings"
-        title="Tags"
-        actions={
-          <Button type="button" onClick={() => void openEditor("tag", { id: null })}>
-            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
-            New
-          </Button>
-        }
-      />
-      <ArchivedFilterBar list={list} switchId="filter-archived-tags" sortId="tag-sort" sortOptions={nameSortOptions} />
-      <ListCard label="Tags">
-        {rows.length === 0 ? (
-          <ListEmpty>{list.shown.archived ? "No archived tags." : "No tags yet."}</ListEmpty>
-        ) : (
-          rows.map((tag) => (
             <ListRow
               key={tag.id}
               size="simple"
@@ -60,11 +48,7 @@ function Tags() {
                 <RowMenu label={`Actions for ${tag.name}`}>
                   <ArchiveMenuItem
                     archived={tag.archivedAt !== null}
-                    question={(restore) => ({
-                      title: restore ? "Restore this tag?" : "Archive this tag?",
-                      description: restore ? `Restore ${tag.name}. It returns to the active list.` : `Archive ${tag.name}. It leaves the active list.`,
-                      confirmLabel: restore ? "Restore" : "Archive",
-                    })}
+                    noun="tag" name={tag.name}
                     onConfirm={(restore) => archive.mutate({ id: tag.id, restore })}
                   />
                 </RowMenu>
@@ -72,9 +56,5 @@ function Tags() {
             >
               <div className={listName}>{tag.name}</div>
             </ListRow>
-          ))
-        )}
-      </ListCard>
-    </>
   );
 }

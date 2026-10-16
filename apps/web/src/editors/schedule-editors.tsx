@@ -13,7 +13,7 @@ import { DialogBody } from "@/editors/form-chrome";
 import { useAppForm } from "@/forms/form-hook";
 import { fieldValue } from "@/forms/form-values";
 import { ScheduleForm } from "@/schedules/schedule-form";
-import { formatDate } from "@/transactions/format";
+import { formatDate } from "@/date-format";
 
 export function CommitmentEditor({ id, seed }: EditorInput["commitment"]) {
   return id === null ? <ScheduleForm kind="commitment" draft={seed ?? "new"} /> : <SavedSchedule id={id} kind="commitment" />;
@@ -39,7 +39,7 @@ export function SkipOccurrenceEditor({ bucketId, dueDate }: EditorInput["skipOcc
     onSubmit: async ({ value, formApi }) => {
       try {
         await skipOccurrence.mutateAsync({ bucketId, dueDate, reason: value.reason.trim() });
-        close("ok");
+        close(bucketId);
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: bucketError(errorCode(error)), fields: {} } });
       }
@@ -88,7 +88,7 @@ export function LinkOccurrenceEditor({ bucketId, accountId, dueDate }: EditorInp
       }
       try {
         await linkOccurrence.mutateAsync({ bucketId, dueDate, transactionId: value.transactionId });
-        close("ok");
+        close(bucketId);
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: bucketError(errorCode(error)), fields: {} } });
       }

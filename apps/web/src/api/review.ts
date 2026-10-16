@@ -9,7 +9,7 @@ import { countText } from "@/transactions/format";
 
 export function reviewSummaryQuery(asOf: string) {
   return queryOptions({
-    queryKey: ["needs-review", asOf],
+    queryKey: ["review", asOf],
     queryFn: async () => {
       const page = await unwrap(api.transactions.review.$get({ query: { asOf, pageSize: 1 } }));
       return { total: page.total, counts: page.reviewCounts };

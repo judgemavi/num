@@ -10,11 +10,6 @@ import { fieldValue } from "@/forms/form-values";
 import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { RadioGroup } from "@/components/ui/radio-group";
 
-type SetupScreenProps = {
-  /** The book is already set up, thus the setup status on the screen is old. */
-  onAlreadyComplete: () => void;
-};
-
 function messageFor(code: ErrorCode | undefined) {
   switch (code) {
     case "setup_already_complete":
@@ -26,7 +21,7 @@ function messageFor(code: ErrorCode | undefined) {
   }
 }
 
-export function SetupScreen({ onAlreadyComplete }: SetupScreenProps) {
+export function SetupScreen() {
   const setup = useCompleteSetup();
   const currencies = useCurrencyOptions();
   const form = useAppForm({
@@ -39,9 +34,6 @@ export function SetupScreen({ onAlreadyComplete }: SetupScreenProps) {
         await setup.mutateAsync(setupRequestSchema.parse(value));
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: messageFor(errorCode(error)), fields: {} } });
-        if (errorCode(error) === "setup_already_complete") {
-          onAlreadyComplete();
-        }
       }
     },
   });

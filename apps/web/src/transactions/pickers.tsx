@@ -1,4 +1,4 @@
-import { merchantNameFromPayee, type CategoryKind } from "@num/shared";
+import { merchantNameFromPayee, type AccountKind, type CategoryKind } from "@num/shared";
 import { AccountForm } from "@/accounts/account-form";
 import { accountLabel, accountOptionLabel } from "@/accounts/label";
 import { useArchiveAccount } from "@/api/accounts";
@@ -45,22 +45,23 @@ export function CategoryPicker({ id, value, onChange, disabled, depth = 0, kind,
 }
 
 /** `exceptId` is the account of the transaction. A transfer goes to a different account. */
-export function AccountPicker({ id, value, onChange, disabled, depth = 0, exceptId }: PickerProps & { exceptId?: string }) {
-  const accounts = useAccounts().filter((account) => account.id !== exceptId);
+export function AccountPicker({ id, value, onChange, disabled, depth = 0, exceptId, kind, emptyLabel }: PickerProps & { exceptId?: string; kind?: AccountKind; emptyLabel?: string }) {
+  const accounts = useAccounts().filter((account) => account.id !== exceptId && (kind === undefined || account.kind === kind));
   const archive = useArchiveAccount();
   return (
     <ManagedPicker
       id={id}
       value={value}
       options={accounts.filter((account) => account.archivedAt === null || account.id === value).map((account) => ({ id: account.id, label: accountOptionLabel(account) }))}
-      placeholder="Choose an account"
+      placeholder={emptyLabel ?? "Choose an account"}
+      emptyLabel={emptyLabel}
       disabled={disabled}
       noun="account"
       depth={depth}
       archived={accounts.filter((account) => account.archivedAt !== null).map((account) => ({ id: account.id, label: accountLabel(account) }))}
       onRestore={(archivedId) => archive.mutate({ id: archivedId, restore: true }, { onSuccess: (restored) => onChange(restored.id) })}
       onChange={onChange}
-      renderForm={(name) => <AccountForm inline account={null} initialName={name} />}
+      renderForm={(name) => <AccountForm inline account={null} initialName={name} initialKind={kind} />}
     />
   );
 }

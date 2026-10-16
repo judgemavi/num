@@ -179,7 +179,7 @@ function AppShell() {
 function Book() {
   const setup = useSuspenseQuery(setupStatusQuery());
   if (!setup.data.complete) {
-    return <SetupScreen onAlreadyComplete={() => void setup.refetch()} />;
+    return <SetupScreen />;
   }
   return (
     <EditorHost>

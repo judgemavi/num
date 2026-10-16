@@ -1,3 +1,4 @@
+import { formatDate } from "@/date-format";
 import type { ImportCounts, ImportRowOutcome, ImportViewStatus, UnreadableReason, UndoBlockReason, ErrorCode, ImportViewItem } from "@num/shared";
 
 const unreadableText: Record<UnreadableReason, string> = {
@@ -73,12 +74,8 @@ export function formatImportPeriod(start: string, end: string): string {
   return `${formatStatementDate(start)} to ${formatStatementDate(end)}`;
 }
 
-export function formatStatementDate(iso: string): string {
-  const [year, month, day] = iso.split("-").map(Number);
-  if (!year || !month || !day) {
-    return iso;
-  }
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(year, month - 1, day));
+export function formatStatementDate(iso: string | null): string {
+  return iso === null ? "No date" : formatDate(iso);
 }
 
 export function importError(code: ErrorCode | undefined): string {

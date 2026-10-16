@@ -49,7 +49,7 @@ export function AssignMoney({ bucket, kind }: AssignMoneyProps) {
           asOf: localAsOf(),
           body: { kind, amount: amount.milli, date: value.date },
         });
-        close("ok");
+        close(bucket.id);
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: requestError(error, "The money did not move. Try again."), fields: {} } });
       }

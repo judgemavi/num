@@ -27,7 +27,7 @@ export function SkipNext({ bucketId }: EditorInput["skipNext"]) {
       }
       try {
         await skip.mutateAsync({ bucketId, dueDate: next.dueDate, reason: value.reason.trim() });
-        close("ok");
+        close(bucketId);
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: bucketError(errorCode(error)), fields: {} } });
       }

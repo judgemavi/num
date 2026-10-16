@@ -39,7 +39,7 @@ export function MoveMoney({ fromId }: EditorInput["moveMoney"]) {
           asOf: localAsOf(),
           body: { kind: "move", amount: amount.milli, date: value.date, otherBucketId: value.to },
         });
-        close("ok");
+        close(value.from);
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: requestError(error, "The money did not move. Try again."), fields: {} } });
       }

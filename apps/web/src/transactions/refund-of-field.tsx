@@ -1,8 +1,10 @@
-import { categoryForRefund, type Transaction, type TransactionReview } from "@num/shared";
+import { useOptionalQuery } from "@/api/optional-query";
+import { useDraftReview } from "@/transactions/use-draft-suggestion";
+import { categoryForRefund } from "@num/shared";
 import { useStore } from "@tanstack/react-form";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useDeferredValue } from "react";
-import { refundPurchasesQuery } from "@/api/transactions";
+import { refundPurchasesQuery, transactionQuery } from "@/api/transactions";
 import { Boundary } from "@/components/boundary";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { useBookCurrency, useCategoryNames, useMerchantNames } from "@/editors/lookups";
@@ -12,20 +14,16 @@ import { refundPurchaseLabel } from "@/transactions/format";
 import { blankTransaction } from "@/transactions/transaction-draft";
 import { OptionCombobox } from "@/transactions/option-combobox";
 
-const refundProps = {
-  linked: fieldValue<Transaction["refundOf"]>(null),
-  /** The candidate purchases of the question "Refund of which purchase?". The list shows them first. */
-  candidates: fieldValue<NonNullable<TransactionReview["refund"]>["purchases"]>([]),
-};
+const refundProps = { transactionId: fieldValue<string | null>(null) };
 
 /** The purchase that a refund returns. A chosen purchase gives the category and the merchant of the refund. */
 export const RefundOfField = withForm({
   defaultValues: blankTransaction,
   props: refundProps,
-  render: function RefundOfFieldRender({ form, linked, candidates }) {
+  render: function RefundOfFieldRender({ form, transactionId }) {
     return (
       <Boundary look="panel" loading="Loading the purchases." failed="The purchases did not load.">
-        <RefundOf form={form} linked={linked} candidates={candidates} />
+        <RefundOf form={form} transactionId={transactionId} />
       </Boundary>
     );
   },
@@ -34,7 +32,11 @@ export const RefundOfField = withForm({
 const RefundOf = withForm({
   defaultValues: blankTransaction,
   props: refundProps,
-  render: function RefundOfRender({ form, linked, candidates }) {
+  render: function RefundOfRender({ form, transactionId }) {
+    const review = useDraftReview(transactionId);
+    const transaction = useOptionalQuery(transactionId, transactionQuery);
+    const linked = transaction?.refundOf ?? null;
+    const candidates = review?.question === "refund_purchase" ? (review.refund?.purchases ?? []) : [];
     const currency = useBookCurrency();
     const { date, suggestionPayee, categoryId, merchantId } = useStore(form.store, (state) => state.values);
     const categoryName = useCategoryNames().get(categoryId ?? "");

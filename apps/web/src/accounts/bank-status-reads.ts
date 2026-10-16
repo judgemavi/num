@@ -3,7 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { formatBalance } from "@/accounts/format";
 import { bankStatusesQuery } from "@/api/bank-balances";
 import { useBookCurrency } from "@/editors/lookups";
-import { formatDate } from "@/transactions/format";
+import { formatDate } from "@/date-format";
 
 /** The status of one account. Null when the account has no bank balance. */
 export function useBankStatus(accountId: string) {

@@ -26,7 +26,7 @@ export function MergeDialog({ source }: { source: Merchant }) {
       }
       try {
         await merge.mutateAsync({ id: source.id, targetId: value.targetId });
-        close("ok");
+        close(value.targetId);
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: merchantError(errorCode(error)), fields: {} } });
       }

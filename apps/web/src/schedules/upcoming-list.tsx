@@ -4,7 +4,7 @@ import { upcomingQuery, useRestoreOccurrence, useUnlinkOccurrence } from "@/api/
 import { localAsOf } from "@/as-of";
 import { useEditors } from "@/editors/editor-api";
 import { useActiveSchedules } from "@/editors/lookups";
-import { formatDate } from "@/transactions/format";
+import { formatDate } from "@/date-format";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";

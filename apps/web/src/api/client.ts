@@ -58,6 +58,7 @@ export async function unwrap<R extends ClientResponse<unknown, number, string>>(
   if (!response.ok) {
     throw new ApiError(errorSchema.parse(await response.json()));
   }
+  // Hono leaves the generic response body as unknown after the status check.
   return (await response.json()) as OkBody<R>;
 }
 

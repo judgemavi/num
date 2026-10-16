@@ -1,4 +1,6 @@
-import { amountText, moneyDirection, type MoneyDirection, type Transaction, type TransactionReview } from "@num/shared";
+import { useDraftReview, useDraftSuggestion } from "@/transactions/use-draft-suggestion";
+import { DecisionNotes } from "@/review/decision-notes";
+import { amountText, moneyDirection, type MoneyDirection, type Transaction } from "@num/shared";
 import { useStore } from "@tanstack/react-form";
 import { useEffect } from "react";
 import { errorCode } from "@/api/client";
@@ -13,17 +15,16 @@ import { useAccountLabels, useAccounts, useBookCurrency, useCategories } from "@
 import { useAppForm } from "@/forms/form-hook";
 import { searchDelayMs } from "@/lists/list-search";
 import { formatMoney } from "@/money";
-import { formatDate, levelLabel, refundedText, transactionError } from "@/transactions/format";
-import { DecisionNotes, DeleteMenu, MoneySection, TagsField } from "@/transactions/transaction-parts";
+import { formatDate } from "@/date-format";
+import { levelLabel, refundedText, transactionError } from "@/transactions/format";
+import { DeleteMenu, MoneySection, TagsField } from "@/transactions/transaction-parts";
 import { PaymentForField } from "@/transactions/payment-for-field";
-import { alreadyChosen, answerFilled, interestLine, quietChange, signedTotal, transactionValues, useSuggestion } from "@/transactions/transaction-draft";
+import { alreadyChosen, answerFilled, interestLine, quietChange, signedTotal, transactionValues } from "@/transactions/transaction-draft";
 import { buildTransactionSave, reviewAnswer } from "@/transactions/transaction-submit";
 import { WhatIsThis } from "@/transactions/what-is-this";
 
 type TransactionFormProps = {
   transaction: Transaction | null;
-  /** The Needs review question of the saved transaction. Its fields start with the proposed answer. */
-  review?: TransactionReview | null;
   /** True when this side of a transfer follows the other account. */
   amountLocked: boolean;
   rawLine?: string;
@@ -37,7 +38,6 @@ const choiceFields = ["choice", "categoryId", "transferAccountId", "merchantId",
 
 export function TransactionForm({
   transaction,
-  review = null,
   amountLocked,
   rawLine,
   initialAccountId,
@@ -45,6 +45,7 @@ export function TransactionForm({
   deleteKind = "plain",
 }: TransactionFormProps) {
   const { close } = useEditorFrame();
+  const review = useDraftReview(transaction?.id ?? null);
   const currency = useBookCurrency();
   const accounts = useAccounts();
   const categories = useCategories();
@@ -108,11 +109,7 @@ export function TransactionForm({
     (state) => alreadyChosen(transaction) || answerFilled(review) || choiceFields.some((name) => state.fieldMeta[name]?.isTouched),
   );
   const totalMilli = signedTotal(currency, storedTotal(values), values.amount, values.direction);
-  const suggestionAmount = signedTotal(currency, storedTotal({ ...values, amount: values.suggestionAmount }), values.suggestionAmount, values.direction);
-  const suggested = useSuggestion(
-    { accountId: values.accountId, payee: values.suggestionPayee, date: values.date, direction: values.direction, amount: suggestionAmount },
-    values.payee === values.suggestionPayee && values.amount === values.suggestionAmount,
-  );
+  const suggested = useDraftSuggestion(values, storedTotal({ ...values, amount: values.suggestionAmount }));
 
   // The suggestion arrives from the API, outside the form. The form takes its choice until the person makes a choice.
   const suggestedChoice = touched ? null : suggested.choice;
@@ -173,15 +170,10 @@ export function TransactionForm({
           </form.AppField>
           <WhatIsThis
             form={form}
-            choiceLocked={amountLocked}
-            categoryLocked={amountLocked}
-            transferLocked={amountLocked}
-            amountsLocked={amountLocked}
+            locked={amountLocked}
+            transactionId={transaction?.id ?? null}
             loanFill={interestLine(transaction) === null}
             storedAmount={storedTotal(values)}
-            linkedRefund={values.refundOfId !== null && transaction?.refundOf?.id === values.refundOfId ? transaction.refundOf : null}
-            pair={review?.question === "transfer_pair" ? review.transfer : null}
-            refundCandidates={review?.question === "refund_purchase" ? (review.refund?.purchases ?? []) : []}
           />
           {review?.question === "recurring_ambiguous" && review.recurring ? <PaymentForField form={form} occurrence={review.recurring} /> : null}
           {transaction?.refundedAmount ? <p className="text-sm text-muted-foreground">{refundedText(currency, transaction.refundedAmount)}</p> : null}

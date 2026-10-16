@@ -113,7 +113,7 @@ function useUndoBucketEvent() {
 export function useCoverBucket() {
   const undo = useUndoBucketEvent();
   return useMutation({
-    meta: { errorText: bucketError },
+    meta: formWrite,
     onSuccess: (event) => undoToast("Bucket covered.", () => undo.mutate({ bucketId: event.bucketId, eventId: event.id })),
     mutationFn: ({ id, body }: { id: string; body: BucketCover }) => unwrap(api.buckets[":id"].cover.$post({ param: { id }, json: body })),
   });

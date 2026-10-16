@@ -193,6 +193,8 @@ export const accountListApiQuerySchema = accountListQuerySchema.extend({ asOf: i
 
 export const accountActivityQuerySchema = z.object({
   page: queryNumber().min(1).default(1),
+  sort: z.enum(["date", "payeeRaw", "amount"]).optional(),
+  dir: z.enum(["asc", "desc"]).optional(),
 });
 
 export const accountListSchema = pagedResponseSchema(accountSchema);

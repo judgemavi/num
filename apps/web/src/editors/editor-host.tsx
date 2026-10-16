@@ -56,7 +56,7 @@ function createHost(router: ReturnType<typeof useRouter>) {
   }
 
   /** Close an editor and remove it from the URL. */
-  function close(key: number, result: string | null) {
+  function close(key: number, result: string | true | null) {
     const closed = store.close(key, result);
     if (!closed || closed.editValue === null) {
       return;

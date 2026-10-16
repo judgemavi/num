@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAccountLabels, useActiveSchedules, useBookCurrency, useBucketNames, useCategoryNames } from "@/editors/lookups";
 import { monthTitle, rateText } from "@/home/spending/format";
 import { formatMoney } from "@/money";
-import { formatDate } from "@/transactions/format";
+import { formatDate } from "@/date-format";
 
 type Row = {
   key: string;

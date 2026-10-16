@@ -111,15 +111,8 @@ function AccountsPage() {
                         </DropdownMenuItem>
                         <ArchiveMenuItem
                           archived={account.archivedAt !== null}
-                          question={(restore) => ({
-                            title: restore ? "Restore this account?" : "Archive this account?",
-                            description: restore
-                              ? `Restore ${accountLabel(account)}. It returns to the active list.`
-                              : account.balance !== 0
-                                ? `${accountLabel(account)} has a balance of ${formatBalance(bookCurrency, account.kind, account.balance)}. Archive it only if you mean to.`
-                                : `Archive ${accountLabel(account)}. It leaves the active list.`,
-                            confirmLabel: restore ? "Restore" : "Archive",
-                          })}
+                          noun="account" name={accountLabel(account)}
+                          archiveDescription={account.balance !== 0 ? `${accountLabel(account)} has a balance of ${formatBalance(bookCurrency, account.kind, account.balance)}. Archive it only if you mean to.` : undefined}
                           onConfirm={(restore) => archive.mutate({ id: account.id, restore })}
                         />
                       </RowMenu>

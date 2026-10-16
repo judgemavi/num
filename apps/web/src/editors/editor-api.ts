@@ -10,7 +10,7 @@ export type ConfirmOptions = {
 };
 
 type HostApi = {
-  openEditor: <K extends EditorKind>(kind: K, input: EditorInput[K]) => Promise<string | null>;
+  openEditor: <K extends EditorKind>(kind: K, input: EditorInput[K]) => Promise<string | true | null>;
   confirm: (options: ConfirmOptions) => Promise<boolean>;
 };
 
@@ -25,8 +25,8 @@ export function useEditors(): HostApi {
 }
 
 type FrameApi = {
-  /** Close the form. The result goes to the code that opened it: the id of the saved record, or nothing. */
-  close: (result?: string | null) => void;
+  /** Close the form. The result goes to the code that opened it: the id of the saved record, true for a save of several records, or nothing. */
+  close: (result?: string | true | null) => void;
 };
 
 /**

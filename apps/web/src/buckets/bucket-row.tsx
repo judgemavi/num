@@ -55,13 +55,7 @@ export function BucketRow({ bucket }: { bucket: Bucket }) {
             )}
             <ArchiveMenuItem
               archived={bucket.archivedAt !== null}
-              question={(restore) => ({
-                title: restore ? "Restore this bucket?" : "Archive this bucket?",
-                description: restore
-                  ? "The bucket returns to the active list. Its categories are not put back."
-                  : "The balance must be zero. Categories leave this bucket. You can restore the bucket later.",
-                confirmLabel: restore ? "Restore" : "Archive",
-              })}
+              noun="bucket" name={bucket.name}
               onConfirm={(restore) => archive.mutate({ id: bucket.id, restore })}
             />
           </RowMenu>

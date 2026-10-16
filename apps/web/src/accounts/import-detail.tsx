@@ -1,10 +1,11 @@
-import type { ImportDetailRow, ImportUndo } from "@num/shared";
+import { useUndoImportFlow } from "@/accounts/use-undo-import-flow";
+import type { ImportDetailRow } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { errorCode } from "@/api/client";
 import { documentPath } from "@/api/documents";
-import { importDetailQuery, useResolveImportRow, useUndoImport } from "@/api/imports";
+import { importDetailQuery, useResolveImportRow } from "@/api/imports";
 import { useDecideItem, useUndoDecision } from "@/api/review";
 import {
   formatImportDate,
@@ -15,7 +16,6 @@ import {
   importError,
   importOutcomeLabel,
   importStatusLabel,
-  undoBlockLabel,
   unreadableLabel,
 } from "@/accounts/import-format";
 import { RemoveFileMenuItem } from "@/accounts/remove-file-item";
@@ -56,11 +56,10 @@ export function ImportDetailScreen() {
 
 function ImportDetailPage() {
   const { importId } = detailRoute.useParams();
-  const { openEditor, confirm } = useEditors();
+  const { openEditor } = useEditors();
   const accountLabels = useAccountLabels();
   const { data: detail } = useSuspenseQuery(importDetailQuery(importId));
-  const undoImport = useUndoImport();
-  const resolve = useResolveImportRow();
+  const undo = useUndoImportFlow();
   const decide = useDecideItem();
   const undoDecision = useUndoDecision();
   useEffect(() => {
@@ -70,49 +69,6 @@ function ImportDetailPage() {
     }
     document.getElementById(id)?.scrollIntoView({ block: "center" });
   }, [detail]);
-
-  async function undo(filename: string) {
-    const ok = await confirm({
-      title: "Undo this import?",
-      description: `Remove the transactions from ${filename} that are still unchanged. Matched rows lose their link.`,
-      confirmLabel: "Undo",
-    });
-    if (!ok) {
-      return;
-    }
-    undoImport.mutate(importId, {
-      onSuccess: (result) => {
-        if (result.blocked.length > 0) {
-          void showBlocked(result.blocked);
-        }
-      },
-    });
-  }
-
-  function showBlocked(blocked: ImportUndo["blocked"]) {
-    return confirm({
-      title: "Some rows stayed",
-      description: (
-        <div className="grid gap-3">
-          <p>These rows were edited after import, so this undo left them in place.</p>
-          <ul className="grid max-h-64 gap-3 overflow-y-auto">
-            {blocked.map((row) => (
-              <li key={row.rowIndex} className="grid gap-1 border-t pt-3 text-sm">
-                <p className="font-semibold text-foreground">
-                  {formatStatementDate(row.date)} · {row.payeeRaw || "No description"}
-                </p>
-                <p>
-                  <Amount value={row.amount} /> · {undoBlockLabel(row.reason)}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ),
-      confirmLabel: "Close",
-      hideCancel: true,
-    });
-  }
 
   const item = detail.item;
   const filename = item.filename ?? "Statement";
@@ -133,7 +89,7 @@ function ImportDetailPage() {
             {item.status === "undone" && !hasRemovableFile(item) ? null : (
               <RowMenu label={`Actions for ${filename}`}>
                 {item.status === "undone" ? null : (
-                  <DropdownMenuItem className="min-h-11" onSelect={() => void undo(filename)}>
+                  <DropdownMenuItem className="min-h-11" onSelect={() => void undo(item)}>
                     Undo
                   </DropdownMenuItem>
                 )}
@@ -159,16 +115,7 @@ function ImportDetailPage() {
           <p className="px-5 py-4 text-muted-foreground">This file has no rows.</p>
         ) : null}
         {detail.rows.map((row) => (
-          <DetailRow
-            key={row.id}
-            row={row}
-            onMatch={(transactionId) => {
-              resolve.mutate({ rowId: row.id, body: { decision: "match", transactionId } });
-            }}
-            onAddNew={() => {
-              resolve.mutate({ rowId: row.id, body: { decision: "create" } });
-            }}
-          />
+          <DetailRow key={row.id} row={row} />
         ))}
         {detail.unreadable.map((row) => (
           <ListRow key={`line-${row.line}`}>
@@ -219,7 +166,8 @@ function ImportDetailPage() {
   );
 }
 
-function DetailRow({ row, onMatch, onAddNew }: { row: ImportDetailRow; onMatch: (transactionId: string) => void; onAddNew: () => void }) {
+function DetailRow({ row }: { row: ImportDetailRow }) {
+  const resolve = useResolveImportRow();
   return (
     <ListRow>
       <div id={`import-row-${row.id}`} className={listName}>
@@ -232,11 +180,11 @@ function DetailRow({ row, onMatch, onAddNew }: { row: ImportDetailRow; onMatch: 
       {row.outcome === "needs_review" ? (
         <span className="flex flex-wrap gap-2">
           {row.matches.map((match) => (
-            <Button key={match.id} type="button" variant="outline" onClick={() => onMatch(match.id)}>
+            <Button key={match.id} type="button" variant="outline" onClick={() => resolve.mutate({ rowId: row.id, body: { decision: "match", transactionId: match.id } })}>
               Use {match.payeeRaw}
             </Button>
           ))}
-          <Button type="button" onClick={onAddNew}>
+          <Button type="button" onClick={() => resolve.mutate({ rowId: row.id, body: { decision: "create" } })}>
             Add as new
           </Button>
         </span>
@@ -251,9 +199,9 @@ function RowLinks({ row }: { row: ImportDetailRow }) {
   const transactionId = row.transactionId;
   if (transactionId) {
     return (
-      <button type="button" className="min-h-11 text-left font-semibold text-primary" onClick={() => void openEditor("transaction", { id: transactionId })}>
+      <Button type="button" variant="link" className="justify-start px-0" onClick={() => void openEditor("transaction", { id: transactionId })}>
         Open transaction
-      </button>
+      </Button>
     );
   }
   if (row.duplicateBatchId && row.duplicateRowId) {

@@ -3,7 +3,7 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { useActiveSchedules } from "@/editors/lookups";
 import { withForm } from "@/forms/form-hook";
 import { fieldValue } from "@/forms/form-values";
-import { formatDate } from "@/transactions/format";
+import { formatDate } from "@/date-format";
 import { OptionCombobox } from "@/transactions/option-combobox";
 import { blankTransaction } from "@/transactions/transaction-draft";
 

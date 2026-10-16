@@ -8,8 +8,8 @@ type OpenEditor = {
   editValue: string | null;
   /** True when this editor added a history entry. */
   pushed: boolean;
-  done: Promise<string | null>;
-  resolve: (result: string | null) => void;
+  done: Promise<string | true | null>;
+  resolve: (result: string | true | null) => void;
 };
 
 type ConfirmRequest = ConfirmOptions & { resolve: (value: boolean) => void };
@@ -41,7 +41,7 @@ export function createEditorStore() {
     open(frame: EditorFrame, url: Pick<OpenEditor, "editValue" | "pushed">) {
       state.editor?.resolve(null);
       let resolve: OpenEditor["resolve"] = () => {};
-      const done = new Promise<string | null>((settle) => {
+      const done = new Promise<string | true | null>((settle) => {
         resolve = settle;
       });
       const key = nextKey;
@@ -50,7 +50,7 @@ export function createEditorStore() {
       return done;
     },
     /** Close the editor with this key and give the result to the code that opened it. Other keys do nothing. */
-    close(key: number, result: string | null) {
+    close(key: number, result: string | true | null) {
       const closed = state.editor;
       if (!closed || closed.key !== key) {
         return null;

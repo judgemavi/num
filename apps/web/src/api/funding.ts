@@ -5,7 +5,7 @@ import { localAsOf } from "@/as-of";
 /** The monthly amount of each bucket for the month of `asOf`, and the amount that is still owed. */
 export function fundingOwedQuery(asOf: string) {
   return queryOptions({
-    queryKey: ["funding-owed", asOf],
+    queryKey: ["funding", "owed", asOf],
     queryFn: () => unwrap(api.funding.owed.$get({ query: { asOf } })),
   });
 }

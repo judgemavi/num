@@ -1,13 +1,9 @@
-import { Plus } from "lucide-react";
+import { RecordListPage, SettingsRows } from "@/settings/record-list-page";
 import { useDeleteGroup } from "@/api/categories";
-import { Boundary } from "@/components/boundary";
 import { useEditors } from "@/editors/editor-api";
 import { useCategories, useGroups } from "@/editors/lookups";
-import { SettingsBack } from "@/settings/settings-nav";
-import { ListCard, ListEmpty, ListRow, listName } from "@/components/list-card";
-import { PageHeader } from "@/components/page-header";
+import { ListEmpty, ListRow, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
-import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 function countLabel(count: number) {
@@ -15,11 +11,7 @@ function countLabel(count: number) {
 }
 
 export function GroupsPage() {
-  return (
-    <Boundary loading="Loading groups." failed="The groups did not load.">
-      <Groups />
-    </Boundary>
-  );
+  return <RecordListPage title="Groups" kind="group"><Groups /></RecordListPage>;
 }
 
 function Groups() {
@@ -38,18 +30,7 @@ function Groups() {
 
   return (
     <>
-      <SettingsBack />
-      <PageHeader
-        kicker="Settings"
-        title="Groups"
-        actions={
-          <Button type="button" onClick={() => void openEditor("group", { id: null })}>
-            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
-            New
-          </Button>
-        }
-      />
-      <ListCard label="Groups">
+      <SettingsRows title="Groups">
         {rows.length === 0 ? (
           <ListEmpty>No groups.</ListEmpty>
         ) : (
@@ -87,7 +68,7 @@ function Groups() {
             </ListRow>
           ))
         )}
-      </ListCard>
+      </SettingsRows>
     </>
   );
 }

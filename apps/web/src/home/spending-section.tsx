@@ -1,3 +1,4 @@
+import { formatCalendarDate } from "@/date-format";
 import { Temporal, type ErrorCode } from "@num/shared";
 import { errorCode } from "@/api/client";
 import { localAsOf } from "@/as-of";
@@ -19,14 +20,14 @@ const errorText: Partial<Record<ErrorCode, string>> = {
 };
 
 function shortMonth(iso: string) {
-  return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", year: "numeric" });
+  return formatCalendarDate(iso, { month: "short", year: "numeric" });
 }
 
 /** The name of the breakdown range: one month (with the year when it is not this year), or the first and the last month. */
 function rangeName(from: string, to: string) {
   if (from.slice(0, 7) === to.slice(0, 7)) {
     const sameYear = from.slice(0, 4) === localAsOf().slice(0, 4);
-    return sameYear ? Temporal.PlainDate.from(from).toLocaleString(undefined, { month: "long" }) : monthTitle(from.slice(0, 7));
+    return sameYear ? formatCalendarDate(from, { month: "long" }) : monthTitle(from.slice(0, 7));
   }
   return `${shortMonth(from)} – ${shortMonth(to)}`;
 }

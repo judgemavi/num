@@ -8,5 +8,5 @@ const sortOptions = [
 ] as const;
 
 export function BucketFilterBar() {
-  return <ArchivedFilterBar list={useBucketSearch()} switchId="filter-archived-buckets" sortId="bucket-sort" sortOptions={sortOptions} />;
+  return <ArchivedFilterBar useList={useBucketSearch} switchId="filter-archived-buckets" sortId="bucket-sort" sortOptions={sortOptions} />;
 }

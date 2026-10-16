@@ -1,9 +1,7 @@
+import { choiceIn } from "@/components/choice";
 import { choicesForDirection, defaultChoice, merchantForChoice } from "@num/shared";
-import { useSuspenseQuery } from "@tanstack/react-query";
 import { Ellipsis } from "lucide-react";
-import { useState } from "react";
 import { useEditors } from "@/editors/editor-api";
-import { inboxDecisionsQuery, useUndoDecision } from "@/api/review";
 import { useArchiveTag } from "@/api/tags";
 import { useTags } from "@/editors/lookups";
 import { ManagedPicker } from "@/editors/managed-picker";
@@ -20,7 +18,6 @@ import { withForm } from "@/forms/form-hook";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TagForm } from "@/settings/tag-form";
-import { decisionText } from "@/review/format";
 import { AccountPicker } from "@/transactions/pickers";
 import { blankTransaction, quietChange } from "@/transactions/transaction-draft";
 
@@ -54,8 +51,9 @@ export const MoneySection = withForm({
                 value={field.state.value}
                 disabled={moneyLocked}
                 onValueChange={(value) => {
-                  if (value === "out" || value === "in") {
-                    field.handleChange(value);
+                  const next = choiceIn(["out", "in"], value);
+                  if (next) {
+                    field.handleChange(next);
                   }
                 }}
               >
@@ -110,8 +108,7 @@ export const MoneySection = withForm({
 export function TagsField({ id = "txn-tag", label = "Tags", tagIds, onTags }: { id?: string; label?: string; tagIds: string[]; onTags: (ids: string[]) => void }) {
   const archiveTag = useArchiveTag();
   const tags = useTags();
-  const [created, setCreated] = useState<typeof tags>([]);
-  const allTags = [...tags, ...created.filter((tag) => !tags.some((item) => item.id === tag.id))];
+  const allTags = tags;
   const selected = allTags.filter((tag) => tagIds.includes(tag.id));
   const options = allTags.filter((tag) => tag.archivedAt === null && !tagIds.includes(tag.id)).map((tag) => ({ id: tag.id, label: tag.name }));
   return (
@@ -130,7 +127,6 @@ export function TagsField({ id = "txn-tag", label = "Tags", tagIds, onTags }: { 
             onTags([...tagIds, tagId]);
           }
         }}
-        onCreated={(option) => setCreated((current) => [...current, { id: option.id, name: option.label, archivedAt: null }])}
         renderForm={(name) => <TagForm inline id={null} idPrefix="inline-tag-name" initialName={name} />}
       />
       {selected.length > 0 ? (
@@ -176,32 +172,5 @@ export function DeleteMenu({ kind, onDelete }: { kind: "plain" | "mirror" | "lin
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-/** The answers that the person gave in Needs review for a transaction. Each answer has an Undo button. */
-export function DecisionNotes({ transactionId }: { transactionId: string }) {
-  const undo = useUndoDecision();
-  const { data: decisions } = useSuspenseQuery({
-    ...inboxDecisionsQuery(),
-    select: (rows) =>
-      rows.filter(
-        (row) =>
-          (row.decision === "not_transfer" && row.itemKey.split(":").includes(transactionId)) ||
-          (row.decision === "keep_uncategorized" && row.itemKey === `uncategorized:${transactionId}`) ||
-          (row.decision === "not_linked" && row.itemKey === `refund_link:${transactionId}`),
-      ),
-  });
-  return (
-    <>
-      {decisions.map((row) => (
-        <p key={row.itemKey} className="flex flex-wrap items-center gap-2 text-sm">
-          <span>{decisionText(row.decision)}</span>
-          <Button type="button" variant="outline" onClick={() => undo.mutate(row.itemKey)}>
-            Undo
-          </Button>
-        </p>
-      ))}
-    </>
   );
 }

@@ -8,7 +8,7 @@ import { Amount } from "@/components/amount";
 import { Fact, SummaryStrip } from "@/components/summary-strip";
 import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
-import { formatDate } from "@/transactions/format";
+import { formatDate } from "@/date-format";
 
 /**
  * The balance of one account, with the last bank balance and the date of the last import. The

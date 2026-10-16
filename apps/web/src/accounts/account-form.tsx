@@ -1,4 +1,4 @@
-import { accountClass, accountKinds, allowsInterestRate, defaultOnBudget, paymentPolicies, type Account, type MortgageTerms } from "@num/shared";
+import { accountClass, accountKinds, allowsInterestRate, defaultOnBudget, paymentPolicies, type Account, type AccountKind, type MortgageTerms } from "@num/shared";
 import type { ReactNode } from "react";
 import { accountBody, accountValues, automaticOpeningDate, blankAccount } from "@/accounts/account-values";
 import { accountError, owedToYou, owedToYouWarning, policyLabel } from "@/accounts/format";
@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/date-field";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Switch } from "@/components/ui/switch";
 import { useEditorFrame } from "@/editors/editor-api";
 import { DialogBody, FormActions, FormCancel, FormHeading } from "@/editors/form-chrome";
 import { useBookCurrency } from "@/editors/lookups";
@@ -23,6 +22,7 @@ import { useStore } from "@tanstack/react-form";
 
 type AccountFormProps = {
   initialName?: string;
+  initialKind?: AccountKind;
   account: Account | null;
   /** The saved terms of a mortgage account. Null when the account has none. */
   terms?: MortgageTerms | null;
@@ -35,7 +35,7 @@ const policyOptions = paymentPolicies.map((value) => ({ value, label: policyLabe
 /** A change that the form makes after another change. It does not start the listeners of the field. */
 const follow = { dontRunListeners: true };
 
-export function AccountForm({ account, terms = null, initialName, inline = false, below }: AccountFormProps) {
+export function AccountForm({ account, terms = null, initialName, initialKind, inline = false, below }: AccountFormProps) {
   const { close } = useEditorFrame();
   const currency = useBookCurrency();
   const save = useSaveAccount();
@@ -43,7 +43,7 @@ export function AccountForm({ account, terms = null, initialName, inline = false
   const stored = account ? { account, terms } : null;
 
   const form = useAppForm({
-    defaultValues: accountValues(account, terms, initialName ?? ""),
+    defaultValues: { ...accountValues(account, terms, initialName ?? ""), ...(account === null && initialKind ? { kind: initialKind, onBudget: defaultOnBudget(initialKind) } : {}) },
     validators: {
       onSubmit: ({ value }) => accountBody(currency, value, value.kind === "mortgage" && !inline, stored).error ?? undefined,
     },
@@ -124,14 +124,9 @@ export function AccountForm({ account, terms = null, initialName, inline = false
                       {(field) => <field.TextField inputMode="decimal" id="interest-rate" label="Interest rate (%)" placeholder="6.875" />}
                     </form.AppField>
                   ) : null}
-                  <form.Field name="onBudget">
-                    {(field) => (
-                      <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                        <FieldLabel htmlFor="on-budget">Use this account's money in my budget</FieldLabel>
-                        <Switch id="on-budget" checked={field.state.value} onCheckedChange={field.handleChange} />
-                      </div>
-                    )}
-                  </form.Field>
+                  <form.AppField name="onBudget">
+                    {(field) => <field.SwitchField id="on-budget" label="Use this account's money in my budget" />}
+                  </form.AppField>
                 </div>
               </>
             )}

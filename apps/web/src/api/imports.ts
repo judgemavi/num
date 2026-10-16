@@ -20,14 +20,14 @@ export function accountImportsQuery(accountId: string) {
 
 export function importViewQuery(search: ImportViewQuery) {
   return queryOptions({
-    queryKey: ["import-view", search],
+    queryKey: ["imports", "view", search],
     queryFn: () => unwrap(api.imports.$get({ query: search })),
   });
 }
 
 export function importDetailQuery(id: string) {
   return queryOptions({
-    queryKey: ["import-detail", id],
+    queryKey: ["import", id, "detail"],
     queryFn: () => unwrap(api.imports[":id"].$get({ param: { id } })),
   });
 }

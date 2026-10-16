@@ -1,3 +1,4 @@
+import { useAccountActivitySearch } from "@/accounts/use-account-activity";
 import { accountClass, type TransactionListItem, type TransactionListQuery, type TransactionReviewListQuery } from "@num/shared";
 import { cn } from "cn";
 import { Amount } from "@/components/amount";
@@ -11,9 +12,10 @@ import type { SortChoice } from "@/lists/list-search";
 import { useAccountLabels, useBookCurrency } from "@/editors/lookups";
 import { CategoryCell } from "@/transactions/category-cell";
 import { useRowLabel } from "@/transactions/row-label";
-import { formatDate, refundOfText, refundedText, reviewText } from "@/transactions/format";
+import { formatDate } from "@/date-format";
+import { refundOfText, refundedText, reviewText } from "@/transactions/format";
 import { selectable, useSelection } from "@/transactions/selection-state";
-import { useOnReview } from "@/transactions/use-transaction-list";
+import { useOnReview, useTransactionSearch } from "@/transactions/use-transaction-list";
 
 export type TransactionSort = SortChoice<NonNullable<TransactionListQuery["sort"]>>;
 
@@ -24,8 +26,6 @@ type Props = {
   rows: TransactionListItem[];
   showBalance: boolean;
   hideAccount?: boolean;
-  sort: TableSort;
-  onSort: (column: TransactionSort["sort"]) => void;
 };
 
 /**
@@ -128,7 +128,9 @@ function SelectAllHead({ rows }: { rows: TransactionListItem[] }) {
 }
 
 export function TransactionsTable(props: Props) {
-  const { rows, showBalance, hideAccount, sort, onSort } = props;
+  const { rows, showBalance, hideAccount } = props;
+  const useSearch = hideAccount ? useAccountActivitySearch : useTransactionSearch;
+  const { sort, sortBy: onSort } = useSearch();
   const { openEditor } = useEditors();
   const currency = useBookCurrency();
   const accountNames = useAccountLabels();

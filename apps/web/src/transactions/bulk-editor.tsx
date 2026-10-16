@@ -13,7 +13,8 @@ import { useAccountLabels } from "@/editors/lookups";
 import { useAppForm } from "@/forms/form-hook";
 import { BulkMerchantField, BulkTagFields, BulkWhatField } from "@/transactions/bulk-fields";
 import { bulkChoices, bulkValues } from "@/transactions/bulk-values";
-import { formatDate, transactionError } from "@/transactions/format";
+import { formatDate } from "@/date-format";
+import { transactionError } from "@/transactions/format";
 import { useTargetText } from "@/transactions/names";
 
 /** The bulk editor of the selected rows. It reads each row by its id. */
@@ -88,7 +89,7 @@ function BulkForm({ rows }: { rows: Transaction[] }) {
     onSubmit: async ({ value, formApi }) => {
       try {
         await save.mutateAsync(bulkBody(ids, accountId, value));
-        close("ok");
+        close(true);
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: transactionError(errorCode(error)), fields: {} } });
       }

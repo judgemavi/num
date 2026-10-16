@@ -1,11 +1,11 @@
+import { fieldValue } from "@/forms/form-values";
+import { requestError } from "@/buckets/format";
 import type { OverspentBucket } from "@num/shared";
 import { useOverspent } from "@/buckets/use-overspent";
 import { useCoverBucket } from "@/api/buckets";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
 import { SidePanel } from "@/components/side-panel";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useActiveBuckets } from "@/editors/lookups";
 import { useAppForm } from "@/forms/form-hook";
 
@@ -34,8 +34,16 @@ function CoverRow({ item }: { item: OverspentBucket }) {
   const need = -item.balance;
   const options = useActiveBuckets().items.filter((bucket) => bucket.id !== item.id && bucket.balance >= need);
   const form = useAppForm({
-    defaultValues: { fromBucketId: "" },
-    onSubmit: ({ value }) => cover.mutate({ id: item.id, body: { fromBucketId: value.fromBucketId, date: localAsOf() } }),
+    defaultValues: { fromBucketId: fieldValue<string | null>(null) },
+    validators: { onSubmit: ({ value }) => value.fromBucketId ? undefined : "Choose a bucket." },
+    onSubmit: async ({ value, formApi }) => {
+      if (!value.fromBucketId) return;
+      try {
+        await cover.mutateAsync({ id: item.id, body: { fromBucketId: value.fromBucketId, date: localAsOf() } });
+      } catch (error) {
+        formApi.setErrorMap({ onSubmit: { form: requestError(error, "The money did not move. Try again."), fields: {} } });
+      }
+    },
   });
   return (
     <div className="grid gap-2 border-t pt-3 first:border-t-0 first:pt-0">
@@ -48,27 +56,15 @@ function CoverRow({ item }: { item: OverspentBucket }) {
       {options.length === 0 ? (
         <p className="text-sm text-muted-foreground">No other bucket has enough to cover this.</p>
       ) : (
-        <form.Field name="fromBucketId">
-          {(field) => (
-            <div className="grid gap-2">
-              <Select value={field.state.value || undefined} onValueChange={field.handleChange}>
-                <SelectTrigger aria-label={`Cover ${item.name} from`} className="w-full">
-                  <SelectValue placeholder="Cover from" />
-                </SelectTrigger>
-                <SelectContent>
-                  {options.map((bucket) => (
-                    <SelectItem key={bucket.id} value={bucket.id}>
-                      {bucket.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button type="button" disabled={!field.state.value} onClick={() => void form.handleSubmit()}>
-                Cover
-              </Button>
-            </div>
-          )}
-        </form.Field>
+        <form.AppForm>
+          <form.FormShell className="grid gap-2">
+            <form.AppField name="fromBucketId">{(field) => (
+              <field.SelectField id={`cover-${item.id}`} label={`Cover ${item.name} from`} placeholder="Cover from" options={options.map((bucket) => ({ value: bucket.id, label: bucket.name }))} />
+            )}</form.AppField>
+            <form.FormError />
+            <form.SubmitButton>Cover</form.SubmitButton>
+          </form.FormShell>
+        </form.AppForm>
       )}
     </div>
   );

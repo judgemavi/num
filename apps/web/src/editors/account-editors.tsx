@@ -1,4 +1,5 @@
-import { useSuspenseQueries, useSuspenseQuery } from "@tanstack/react-query";
+import { useOptionalQuery } from "@/api/optional-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { useDeferredValue } from "react";
 import { accountQuery } from "@/api/accounts";
 import { mortgageTermsQuery } from "@/api/mortgage";
@@ -22,8 +23,7 @@ function SavedAccount({ id }: { id: string }) {
   // A read in the background can change the kind to mortgage. The terms then load in a transition, thus the form
   // stays on the screen. The list of ids is empty for an account that is not a mortgage.
   const mortgage = useDeferredValue(account.kind === "mortgage");
-  const mortgageIds = mortgage ? [id] : [];
-  const terms = useSuspenseQueries({ queries: mortgageIds.map((accountId) => mortgageTermsQuery(accountId)) }).at(0)?.data ?? null;
+  const terms = useOptionalQuery(mortgage ? id : null, mortgageTermsQuery);
   return <AccountForm account={account} terms={terms} below={<AccountImports accountId={id} />} />;
 }
 

@@ -2,7 +2,7 @@ import type { TransactionFilter } from "@num/shared";
 import { accountLabel } from "@/accounts/label";
 import { FilterBar, type FilterBadge } from "@/components/filter-bar";
 import { useAccounts, useCategories, useGroups, useMerchants, useTags } from "@/editors/lookups";
-import { formatDate } from "@/transactions/format";
+import { formatDate } from "@/date-format";
 import { useAllSearch, useOnReview, useReviewSearch, useTransactionSearch } from "@/transactions/use-transaction-list";
 import { SortSelect } from "@/lists/sort-select";
 import { SearchBox } from "@/lists/search-box";

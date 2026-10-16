@@ -1,3 +1,4 @@
+import { keptAmount } from "@/forms/form-values";
 import { accountClass, amountText, bankBalanceInputSchema, parseAmount, printedBankBalance, storedBankBalance, type AccountKind } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { accountQuery } from "@/api/accounts";
@@ -14,10 +15,10 @@ import { useAppForm } from "@/forms/form-hook";
 import { decimalsError } from "@/money";
 
 /** The values of the form as a bank balance. Null when the date or the balance is not valid. */
-function bankBalanceOf(currency: string, kind: AccountKind, value: { date: string; amount: string }) {
+function bankBalanceOf(currency: string, kind: AccountKind, value: { date: string; amount: string }, start: { text: string; amount: number } | null) {
   let balance;
   try {
-    balance = storedBankBalance(kind, parseAmount(currency, value.amount.trim()));
+    balance = keptAmount(value.amount, start, (text) => storedBankBalance(kind, parseAmount(currency, text.trim())));
   } catch {
     return null;
   }
@@ -34,6 +35,7 @@ export function BankBalanceEditor({ accountId, id }: EditorInput["bankBalance"])
   const kind = account.kind;
   const owed = accountClass(kind) === "liability";
   const saved = list.items.find((item) => item.id === id);
+  const start = saved ? { text: amountText(printedBankBalance(kind, saved.balance)), amount: saved.balance } : null;
   const form = useAppForm({
     defaultValues: {
       date: saved?.date ?? "",
@@ -41,16 +43,19 @@ export function BankBalanceEditor({ accountId, id }: EditorInput["bankBalance"])
     },
     validators: {
       onSubmit: ({ value }) =>
-        bankBalanceOf(currency, kind, value) ? undefined : (decimalsError(currency, value.amount) ?? "Enter a date and a balance."),
+        bankBalanceOf(currency, kind, value, start) ? undefined : (decimalsError(currency, value.amount) ?? "Enter a date and a balance."),
     },
     onSubmit: async ({ value, formApi }) => {
-      const body = bankBalanceOf(currency, kind, value);
+      const body = bankBalanceOf(currency, kind, value, start);
       if (!body) {
         return;
       }
       try {
-        await save.mutateAsync({ accountId, id, body });
-        close();
+        if (saved && saved.date === body.date && saved.balance === body.balance) {
+          close();
+          return;
+        }
+        close((await save.mutateAsync({ accountId, id, body })).id);
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: bankBalanceError(errorCode(error)), fields: {} } });
       }

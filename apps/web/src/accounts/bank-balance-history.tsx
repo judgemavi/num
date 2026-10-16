@@ -10,7 +10,7 @@ import { ListCard, ListEmpty, ListRow, ListTitle, listAmt, listName } from "@/co
 import { RowMenu } from "@/components/row-menu";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { formatDate } from "@/transactions/format";
+import { formatDate } from "@/date-format";
 
 export function BankBalanceHistory({ accountId }: { accountId: string }) {
   const { openEditor } = useEditors();

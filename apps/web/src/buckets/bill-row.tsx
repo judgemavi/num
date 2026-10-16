@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useEditors } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
-import { formatDate } from "@/transactions/format";
+import { formatDate } from "@/date-format";
 
 /**
  * One bill (a commitment) of the Buckets list: the next due date, and how much of the next payment the balance holds.
@@ -66,13 +66,7 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
           )}
           <ArchiveMenuItem
             archived={bucket.archivedAt !== null}
-            question={(restore) => ({
-              title: restore ? "Restore this bill?" : "Archive this bill?",
-              description: restore
-                ? `Restore ${bucket.name}. It returns to the active list.`
-                : `Archive ${bucket.name}. The balance must be zero. It leaves the active list. You can restore it later.`,
-              confirmLabel: restore ? "Restore" : "Archive",
-            })}
+            noun="bill" name={bucket.name}
             onConfirm={(restore) => archive.mutate({ id: bucket.id, restore })}
           />
         </RowMenu>

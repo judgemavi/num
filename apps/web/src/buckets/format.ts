@@ -1,7 +1,7 @@
 import { parseAmount, type Bucket, type BucketColor, type BucketIcon, type ErrorCode } from "@num/shared";
 import { errorCode } from "@/api/client";
 import { decimalsError, formatMoney } from "@/money";
-import { formatDate } from "@/transactions/format";
+import { formatDate } from "@/date-format";
 
 const colors: Record<BucketColor, string> = {
   sky: "Blue",

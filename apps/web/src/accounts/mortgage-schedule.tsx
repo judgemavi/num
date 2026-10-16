@@ -1,6 +1,6 @@
+import { formatCalendarDate } from "@/date-format";
 import {
   matchMortgageActuals,
-  Temporal,
   type MortgageActualPayment,
   type MortgageScheduleMatch,
   type ScheduledMortgagePayment,
@@ -15,7 +15,7 @@ import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
 
 function formatDay(iso: string) {
-  return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return formatCalendarDate(iso, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function Cell({ label, children }: { label: string; children: ReactNode }) {

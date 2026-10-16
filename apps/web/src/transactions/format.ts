@@ -1,9 +1,7 @@
-import { Temporal, type ErrorCode, type ReviewLevel, type TransactionReview } from "@num/shared";
+import { formatCalendarDate } from "@/date-format";
+import { type ErrorCode, type ReviewLevel, type TransactionReview } from "@num/shared";
 import { formatMoney } from "@/money";
 
-export function formatDate(iso: string): string {
-  return Temporal.PlainDate.from(iso).toLocaleString(undefined, { dateStyle: "medium" });
-}
 
 export function levelLabel(level: ReviewLevel): string {
   if (level === "sure") {
@@ -42,12 +40,12 @@ export function countText(done: number, doneWord: string, skipped: number): stri
 }
 
 export function refundOfText(currency: string, date: string, amount: number): string {
-  const day = Temporal.PlainDate.from(date).toLocaleString(undefined, { month: "short", day: "numeric" });
+  const day = formatCalendarDate(date, { month: "short", day: "numeric" });
   return `Refund of ${day} · ${formatMoney(currency, Math.abs(amount))}`;
 }
 
 export function refundPurchaseLabel(currency: string, payee: string, date: string, amount: number): string {
-  const day = Temporal.PlainDate.from(date).toLocaleString(undefined, { month: "short", day: "numeric" });
+  const day = formatCalendarDate(date, { month: "short", day: "numeric" });
   return `${payee} · ${day} · ${formatMoney(currency, Math.abs(amount))}`;
 }
 

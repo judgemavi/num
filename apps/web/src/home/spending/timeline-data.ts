@@ -1,3 +1,4 @@
+import { formatCalendarDate } from "@/date-format";
 import { Temporal, type InsightFlow, type InsightTimeline, type InsightTimelineMonth } from "@num/shared";
 import { formatMoney } from "@/money";
 
@@ -68,11 +69,11 @@ export function timelineRanges(timeline: InsightTimeline) {
 }
 
 export function shortMonth(month: string): string {
-  return Temporal.PlainDate.from(`${month}-01`).toLocaleString(undefined, { month: "short", year: "2-digit" });
+  return formatCalendarDate(`${month}-01`, { month: "short", year: "2-digit" });
 }
 
 function shortDay(date: string): string {
-  return Temporal.PlainDate.from(date).toLocaleString(undefined, { month: "short", day: "numeric" });
+  return formatCalendarDate(date, { month: "short", day: "numeric" });
 }
 
 export type BarKind = { key: "income" | "spending"; label: string };

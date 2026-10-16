@@ -38,13 +38,7 @@ export function IncomeRow({ bucket }: { bucket: Bucket }) {
           )}
           <ArchiveMenuItem
             archived={bucket.archivedAt !== null}
-            question={(restore) => ({
-              title: restore ? "Restore this income?" : "Archive this income?",
-              description: restore
-                ? `Restore ${bucket.name}. It returns to the active list.`
-                : `Archive ${bucket.name}. It leaves the active list. You can restore it later.`,
-              confirmLabel: restore ? "Restore" : "Archive",
-            })}
+            noun="income" name={bucket.name}
             onConfirm={(restore) => archive.mutate({ id: bucket.id, restore })}
           />
         </RowMenu>

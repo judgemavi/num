@@ -1,19 +1,13 @@
-import { compounding, mortgageFirstPaymentOffPeriod, paymentFrequencies, type Account, type Category } from "@num/shared";
-import { useArchiveAccount } from "@/api/accounts";
-import { useArchiveCategory } from "@/api/categories";
-import { AccountForm } from "@/accounts/account-form";
-import { accountLabel } from "@/accounts/label";
+import { AccountPicker, CategoryPicker } from "@/transactions/pickers";
+import { compounding, mortgageFirstPaymentOffPeriod, paymentFrequencies } from "@num/shared";
 import { compoundingLabels, frequencyLabels } from "@/accounts/mortgage-format";
 import { blankAccount } from "@/accounts/account-values";
 import { draftFromTerms, draftIsBlank, firstPaymentNotAfterOpening } from "@/accounts/mortgage-draft";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { useAccounts, useCategories } from "@/editors/lookups";
 import { withForm } from "@/forms/form-hook";
 import { fieldValue } from "@/forms/form-values";
 import { useStore } from "@tanstack/react-form";
-import { ManagedPicker } from "@/editors/managed-picker";
-import { CategoryForm } from "@/settings/category-form";
 
 export const mortgageTermsHelp = "Add the terms to see the payment schedule and the interest and principal of each payment.";
 export const openingDateHelp = "Use the date of the last payment before the first payment in Num. Use the amount owed after that payment.";
@@ -23,34 +17,13 @@ const firstPaymentWarning =
 const compoundingOptions = compounding.map((value) => ({ value, label: compoundingLabels[value] }));
 const frequencyOptions = paymentFrequencies.map((value) => ({ value, label: frequencyLabels[value] }));
 
-function accountOptions(accounts: Account[]) {
-  return accounts.map((account) => ({ id: account.id, label: accountLabel(account) }));
-}
-
-function categoryOptions(categories: Category[]) {
-  return categories.map((category) => ({ id: category.id, label: category.name }));
-}
-
 /** The mortgage terms of the Account form. The section is open by default. */
 export const MortgageSection = withForm({
   defaultValues: blankAccount,
   props: { accountId: fieldValue<string | null>(null) },
   render: function MortgageSectionRender({ form, accountId }) {
-    const archiveAccount = useArchiveAccount();
-    const archiveCategory = useArchiveCategory();
-    const accounts = useAccounts();
-    const categories = useCategories();
     const draft = useStore(form.store, (state) => state.values.mortgage);
     const openingDate = useStore(form.store, (state) => state.values.openingDate);
-    const keep = (id: string) => id === draft.paymentAccountId || id === draft.propertyAccountId;
-    const others = accounts.filter((account) => account.id !== accountId);
-    const open = others.filter((account) => account.archivedAt === null || keep(account.id));
-    const archivedAccounts = others.filter((account) => account.archivedAt !== null);
-    const properties = open.filter((account) => account.kind === "property");
-    const archivedProperties = archivedAccounts.filter((account) => account.kind === "property");
-    const expense = categories.filter((category) => category.kind === "expense");
-    const interest = expense.filter((category) => category.archivedAt === null || category.id === draft.interestCategoryId);
-    const archivedInterest = expense.filter((category) => category.archivedAt !== null);
     const beforeOpening = firstPaymentNotAfterOpening(openingDate, draft);
     const offPeriod =
       !beforeOpening &&
@@ -92,17 +65,7 @@ export const MortgageSection = withForm({
             {(field) => (
               <Field>
                 <FieldLabel htmlFor="mortgage-pay-from">Pay from</FieldLabel>
-                <ManagedPicker
-                  id="mortgage-pay-from"
-                  value={field.state.value}
-                  options={accountOptions(open)}
-                  placeholder="Choose an account"
-                  noun="account"
-                  archived={accountOptions(archivedAccounts)}
-                  onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => field.handleChange(restored.id) })}
-                  onChange={field.handleChange}
-                  renderForm={(name) => <AccountForm inline account={null} initialName={name} />}
-                />
+                <AccountPicker id="mortgage-pay-from" value={field.state.value} onChange={field.handleChange} exceptId={accountId ?? undefined} />
               </Field>
             )}
           </form.Field>
@@ -110,17 +73,7 @@ export const MortgageSection = withForm({
             {(field) => (
               <Field>
                 <FieldLabel htmlFor="mortgage-interest">Interest category</FieldLabel>
-                <ManagedPicker
-                  id="mortgage-interest"
-                  value={field.state.value}
-                  options={categoryOptions(interest)}
-                  placeholder="Choose a category"
-                  noun="category"
-                  archived={categoryOptions(archivedInterest)}
-                  onRestore={(id) => archiveCategory.mutate({ id, restore: true }, { onSuccess: (restored) => field.handleChange(restored.id) })}
-                  onChange={field.handleChange}
-                  renderForm={(name) => <CategoryForm inline depth={1} category={null} initialName={name} initialKind="expense" />}
-                />
+                <CategoryPicker id="mortgage-interest" value={field.state.value} onChange={field.handleChange} kind="expense" allowEmpty={false} depth={1} />
               </Field>
             )}
           </form.Field>
@@ -128,18 +81,7 @@ export const MortgageSection = withForm({
             {(field) => (
               <Field>
                 <FieldLabel htmlFor="mortgage-property">Property</FieldLabel>
-                <ManagedPicker
-                  id="mortgage-property"
-                  value={field.state.value}
-                  options={accountOptions(properties)}
-                  placeholder="No property"
-                  emptyLabel="No property"
-                  noun="account"
-                  archived={accountOptions(archivedProperties)}
-                  onRestore={(id) => archiveAccount.mutate({ id, restore: true }, { onSuccess: (restored) => field.handleChange(restored.id) })}
-                  onChange={field.handleChange}
-                  renderForm={(name) => <AccountForm inline account={null} initialName={name} />}
-                />
+                <AccountPicker id="mortgage-property" value={field.state.value} onChange={field.handleChange} kind="property" emptyLabel="No property" />
               </Field>
             )}
           </form.Field>

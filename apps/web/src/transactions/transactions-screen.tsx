@@ -79,7 +79,7 @@ function TransactionsHeader() {
 function TransactionList() {
   const accounts = useAccounts();
   const review = useOnReview();
-  const { shown, sort, sortBy, page } = useTransactionPage();
+  const { shown, page } = useTransactionPage();
   const selectedAccount = accounts.find((account) => account.id === shown.accountId);
   const empty = hasFilters(shown) ? "No transactions match." : review ? "Nothing needs review." : "No transactions yet.";
 
@@ -91,8 +91,6 @@ function TransactionList() {
         <TransactionsTable
           rows={page.items}
           showBalance={selectedAccount !== undefined && showsRunningBalance(selectedAccount.hasValuation)}
-          sort={sort}
-          onSort={sortBy}
         />
       )}
     </Card>

@@ -1,4 +1,4 @@
-import { Temporal } from "@num/shared";
+import { formatCalendarDate } from "@/date-format";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { feasibilityQuery } from "@/api/feasibility";
 import { localAsOf } from "@/as-of";
@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEditors } from "@/editors/editor-api";
 
 function longDate(iso: string) {
-  return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "long", day: "numeric", year: "numeric" });
+  return formatCalendarDate(iso, { month: "long", day: "numeric", year: "numeric" });
 }
 
 /** The check that the goals and the sinking funds fit in the income of the month. It reads the feasibility of this month. */

@@ -1,4 +1,5 @@
-import { milliPctToPercent, Temporal, parseAmount } from "@num/shared";
+import { formatCalendarDate } from "@/date-format";
+import { milliPctToPercent, parseAmount } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useDeferredValue, useState } from "react";
 import { mortgageViewQuery } from "@/api/mortgage";
@@ -42,7 +43,7 @@ function readExtra(currency: string, value: { extra: string; lump: string; lumpD
 }
 
 function formatDay(iso: string) {
-  return Temporal.PlainDate.from(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return formatCalendarDate(iso, { month: "short", day: "numeric", year: "numeric" });
 }
 
 export function MortgagePanel({ accountId }: { accountId: string }) {
@@ -121,15 +122,15 @@ function MortgageView({ accountId }: { accountId: string }) {
         )}
         <MortgageSchedule payments={row.payments} actuals={row.actualPayments} />
         <form.AppForm>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <form.FormShell className="grid gap-3 sm:grid-cols-2">
             <form.AppField name="extra">{(field) => <field.MoneyField id="mortgage-extra" label="Extra on each payment" />}</form.AppField>
             <form.AppField name="lump">{(field) => <field.MoneyField id="mortgage-lump" label="One-time extra" />}</form.AppField>
             <form.AppField name="lumpDate">{(field) => <field.DateInputField id="mortgage-lump-date" label="Date of the one-time extra" />}</form.AppField>
-            <Button type="button" variant="outline" className="self-end" onClick={() => void form.handleSubmit()}>
+            <form.SubmitButton>
               Show the effect
-            </Button>
-          </div>
-          <form.FormError />
+            </form.SubmitButton>
+            <form.FormError />
+          </form.FormShell>
         </form.AppForm>
         {row.extra ? (
           <p className="text-sm" role="status">

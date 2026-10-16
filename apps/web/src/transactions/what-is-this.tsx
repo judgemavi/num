@@ -1,10 +1,9 @@
+import { useDraftReview, useDraftSuggestion } from "@/transactions/use-draft-suggestion";
 import {
   categoryKindForChoice,
   choicesForDirection,
   merchantForChoice,
   type Suggestion,
-  type Transaction,
-  type TransactionReview,
   type WhatChoice,
 } from "@num/shared";
 import { useStore } from "@tanstack/react-form";
@@ -18,7 +17,7 @@ import { AccountPicker, CategoryPicker, MerchantPicker } from "@/transactions/pi
 import { LoanPaymentFields } from "@/transactions/loan-payment-fields";
 import { RefundOfField } from "@/transactions/refund-of-field";
 import { levelLabel, refundPurchaseLabel } from "@/transactions/format";
-import { blankTransaction, quietChange, signedTotal, useSuggestion } from "@/transactions/transaction-draft";
+import { blankTransaction, quietChange, signedTotal } from "@/transactions/transaction-draft";
 
 const choiceLabel: Record<WhatChoice, string> = {
   spending: "Spending",
@@ -52,43 +51,27 @@ function SuggestionHint({ suggestion }: { suggestion: Suggestion }) {
 export const WhatIsThis = withForm({
   defaultValues: blankTransaction,
   props: {
-    choiceLocked: false,
-    categoryLocked: false,
-    transferLocked: false,
-    amountsLocked: false,
+    locked: false,
+    transactionId: fieldValue<string | null>(null),
     /** False for a saved loan payment: its fields keep the saved values. */
     loanFill: true,
     /** The stored amount while the amount is unchanged, or the amount of an imported transaction. */
     storedAmount: fieldValue<number | null>(null),
-    /** The purchase that the saved refund links to. */
-    linkedRefund: fieldValue<Transaction["refundOf"]>(null),
-    /** The proposed transfer pair: the other transaction. */
-    pair: fieldValue<TransactionReview["transfer"]>(null),
-    /** The candidate purchases of the question "Refund of which purchase?". */
-    refundCandidates: fieldValue<NonNullable<TransactionReview["refund"]>["purchases"]>([]),
+
   },
   render: function WhatIsThisRender({
     form,
-    choiceLocked,
-    categoryLocked,
-    transferLocked,
-    amountsLocked,
-    loanFill,
-    storedAmount,
-    linkedRefund,
-    pair,
-    refundCandidates,
+    locked, transactionId, loanFill, storedAmount,
   }) {
+    const review = useDraftReview(transactionId);
+    const pair = review?.question === "transfer_pair" ? review.transfer : null;
     const currency = useBookCurrency();
     const categories = useCategories();
     const accounts = useAccounts();
     const values = useStore(form.store, (state) => state.values);
     const { direction, choice, refundOfId, accountId } = values;
     const totalMilli = signedTotal(currency, storedAmount, values.amount, direction);
-    const { suggestion } = useSuggestion(
-      { accountId, payee: values.suggestionPayee, date: values.date, direction, amount: signedTotal(currency, storedAmount, values.suggestionAmount, direction) },
-      values.payee === values.suggestionPayee && values.amount === values.suggestionAmount,
-    );
+    const { suggestion } = useDraftSuggestion(values, storedAmount);
     const choices = choicesForDirection(direction);
     const categoryKind = categoryKindForChoice(choice);
 
@@ -123,7 +106,7 @@ export const WhatIsThis = withForm({
                 variant="outline"
                 spacing={2}
                 value={choices.includes(field.state.value) ? field.state.value : ""}
-                disabled={choiceLocked}
+                disabled={locked}
                 onValueChange={(value) => {
                   const next = choiceIn(choices, value);
                   if (next) {
@@ -140,13 +123,13 @@ export const WhatIsThis = withForm({
             </Field>
           )}
         </form.Field>
-        {choice === "refund" && values.date.length > 0 ? <RefundOfField form={form} linked={linkedRefund} candidates={refundCandidates} /> : null}
+        {choice === "refund" && values.date.length > 0 ? <RefundOfField form={form} transactionId={transactionId} /> : null}
         {categoryKind !== null && (choice !== "refund" || refundOfId === null) ? (
           <form.Field name="categoryId">
             {(field) => (
               <Field>
                 <FieldLabel htmlFor="txn-category">Category</FieldLabel>
-                <CategoryPicker id="txn-category" value={field.state.value} kind={categoryKind} allowEmpty disabled={categoryLocked} onChange={field.handleChange} />
+                <CategoryPicker id="txn-category" value={field.state.value} kind={categoryKind} allowEmpty disabled={locked} onChange={field.handleChange} />
               </Field>
             )}
           </form.Field>
@@ -156,7 +139,7 @@ export const WhatIsThis = withForm({
             {(field) => (
               <Field>
                 <FieldLabel htmlFor="txn-transfer">{direction === "out" ? "To account" : "From account"}</FieldLabel>
-                <AccountPicker id="txn-transfer" value={field.state.value} exceptId={accountId} disabled={transferLocked} onChange={field.handleChange} />
+                <AccountPicker id="txn-transfer" value={field.state.value} exceptId={accountId} disabled={locked} onChange={field.handleChange} />
                 {pair && field.state.value === pair.otherAccountId ? (
                   <FieldDescription>{`Links to ${refundPurchaseLabel(currency, pair.otherPayee, pair.otherDate, pair.otherAmount)}.`}</FieldDescription>
                 ) : null}
@@ -164,7 +147,7 @@ export const WhatIsThis = withForm({
             )}
           </form.Field>
         ) : null}
-        {choice === "loan_payment" ? <LoanPaymentFields form={form} moneyLocked={transferLocked || amountsLocked} fill={loanFill} totalMilli={totalMilli} /> : null}
+        {choice === "loan_payment" ? <LoanPaymentFields form={form} moneyLocked={locked} fill={loanFill} totalMilli={totalMilli} /> : null}
         {choice === "loan_payment" && suggestion?.mortgage ? <SuggestionHint suggestion={suggestion} /> : null}
         {choice === "transfer" || choice === "loan_payment" || (choice === "refund" && refundOfId !== null) ? null : (
           <form.Field name="merchantId">
