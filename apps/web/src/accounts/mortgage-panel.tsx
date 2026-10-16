@@ -1,7 +1,7 @@
 import { formatCalendarDate } from "@/date-format";
-import { clampMortgageYear, milliPctToPercent, parseAmount, Temporal } from "@num/shared";
+import { milliPctToPercent, parseAmount, Temporal } from "@num/shared";
 import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue } from "react";
 import { useStore } from "@tanstack/react-form";
 import { mortgageScheduleQuery, mortgageViewQuery } from "@/api/mortgage";
 import { frequencyLabels } from "@/accounts/mortgage-format";
@@ -11,8 +11,6 @@ import { useBookCurrency } from "@/editors/lookups";
 import { localAsOf } from "@/as-of";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
-import { ChoiceSelect } from "@/components/choice-select";
-import { ListCard } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppForm } from "@/forms/form-hook";
@@ -45,21 +43,14 @@ function readExtra(currency: string, value: { extra: string; lump: string; lumpD
   return { effect: { extra, lumpSum, lumpDate: value.lumpDate } };
 }
 
-function yearOptions({ first, last }: { first: number; last: number }) {
-  return Array.from({ length: last - first + 1 }, (_, index) => ({ value: String(first + index), label: String(first + index) }));
-}
-
 function formatDay(iso: string) {
   return formatCalendarDate(iso, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function thisYear() {
-  return Temporal.PlainDate.from(localAsOf()).year;
-}
-
 export function MortgagePanel({ accountId }: { accountId: string }) {
   // The schedule of this year loads together with the mortgage.
-  usePrefetchQuery(mortgageScheduleQuery(accountId, localAsOf(), thisYear()));
+  const asOf = localAsOf();
+  usePrefetchQuery(mortgageScheduleQuery(accountId, asOf, Temporal.PlainDate.from(asOf).year));
   return (
     <Boundary loading="Loading the mortgage." failed="The mortgage did not load.">
       <MortgageView accountId={accountId} />
@@ -70,7 +61,6 @@ export function MortgagePanel({ accountId }: { accountId: string }) {
 function MortgageView({ accountId }: { accountId: string }) {
   const { openEditor } = useEditors();
   const currency = useBookCurrency();
-  const [chosenYear, setChosenYear] = useState(thisYear);
   const form = useAppForm({
     defaultValues: { extra: "", lump: "", lumpDate: "", effect: { extra: 0, lumpSum: 0, lumpDate: "" } },
     validators: {
@@ -110,8 +100,6 @@ function MortgageView({ accountId }: { accountId: string }) {
   }
 
   const rate = `${milliPctToPercent(row.rateMilliPct)}%`;
-  // The chosen year stays in the range of the schedule when the terms change.
-  const year = row.years ? clampMortgageYear(chosenYear, row.years) : null;
 
   return (
     <Card>
@@ -136,25 +124,7 @@ function MortgageView({ accountId }: { accountId: string }) {
         ) : (
           <p className="text-sm">This payment does not pay off the loan.</p>
         )}
-        {row.years && year !== null ? (
-          <ListCard
-            label="Payment schedule"
-            title="Payment schedule"
-            actions={
-              <ChoiceSelect
-                aria-label="Year"
-                className="w-28"
-                value={String(year)}
-                options={yearOptions(row.years)}
-                onValueChange={(year) => setChosenYear(Number(year))}
-              />
-            }
-          >
-            <MortgageSchedule accountId={accountId} year={year} />
-          </ListCard>
-        ) : (
-          <p className="text-sm text-muted-foreground">No payments remain.</p>
-        )}
+        <MortgageSchedule accountId={accountId} />
         <form.AppForm>
           <form.FormShell className="grid gap-3 sm:grid-cols-2">
             <form.AppField name="extra">{(field) => <field.MoneyField id="mortgage-extra" label="Extra on each payment" />}</form.AppField>

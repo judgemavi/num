@@ -41,7 +41,7 @@ const viewRoute = createRoute({
   },
   responses: {
     200: {
-      description: "Mortgage balance, payoff and the years of the payment schedule",
+      description: "Mortgage balance and payoff",
       content: { "application/json": { schema: mortgageViewSchema } },
     },
     400: errorResponse,
@@ -51,7 +51,7 @@ const viewRoute = createRoute({
 
 const scheduleRoute = createRoute({
   operationId: "get_accounts_id_mortgage_schedule",
-  description: "Read the payment schedule of a mortgage account in one calendar year. Each past scheduled payment shows the actual payment nearest to its date, or none. An actual payment that matches no scheduled payment is its own row. This does not create, change or delete a record.",
+  description: "Read the payment schedule of a mortgage account in one calendar year. A year outside the schedule gives the nearest year of the schedule. The answer has the year, the first and last years of the schedule, and the rows. Each past scheduled payment shows the actual payment nearest to its date, or none. An actual payment that matches no scheduled payment is its own row. This does not create, change or delete a record.",
   method: "get",
   path: "/api/accounts/{id}/mortgage/schedule",
   request: {
@@ -60,7 +60,7 @@ const scheduleRoute = createRoute({
   },
   responses: {
     200: {
-      description: "The rows of the payment schedule in the year, in date order",
+      description: "The year, the years of the schedule and the rows of the year in date order",
       content: { "application/json": { schema: mortgageScheduleSchema } },
     },
     400: errorResponse,

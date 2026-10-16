@@ -1,5 +1,6 @@
 import { accounts, mortgageTerms, transactionLines, transactions, valuations } from "@num/db";
 import {
+  clampMortgageYear,
   matchMortgageActuals,
   mortgageExtraEffect,
   mortgageLoan,
@@ -66,15 +67,13 @@ function actualPayments(db: Db, accountId: string) {
     .all();
 }
 
-/** The schedule of a mortgage with its actual payments. Matching uses the full schedule: a match can cross the end of a year. */
-function matchedSchedule(db: Db, accountId: string, asOf: string) {
+/** The loan of a mortgage account and its full payment schedule. */
+function loanSchedule(db: Db, accountId: string) {
   const account = requireMortgage(db, accountId);
   const terms = getMortgageTerms(db, accountId);
   const loan = mortgageLoan(terms, { balance: account.openingBalance, date: storedOpeningDate(account) }, bookStep(db));
   const dated = activeValuations(db, accountId);
-  const schedule = mortgageSchedule(loan, dated);
-  const rows = matchMortgageActuals(schedule.payments, actualPayments(db, accountId), asOf);
-  return { account, terms, loan, dated, schedule, rows };
+  return { account, terms, loan, dated, schedule: mortgageSchedule(loan, dated) };
 }
 
 export function mortgageAccountView(
@@ -83,7 +82,7 @@ export function mortgageAccountView(
   asOf: string,
   options: { extra?: number; lumpSum?: number; lumpDate?: string },
 ): MortgageView {
-  const { account, terms, loan, dated, schedule, rows } = matchedSchedule(db, accountId, asOf);
+  const { account, terms, loan, dated, schedule } = loanSchedule(db, accountId);
   const perPayment = options.extra ?? 0;
   const lump = options.lumpSum && options.lumpSum > 0 && options.lumpDate ? { date: options.lumpDate, amount: options.lumpSum } : null;
   const effect = perPayment > 0 || lump ? mortgageExtraEffect(loan, dated, { perPayment, lumpSum: lump }) : null;
@@ -95,7 +94,6 @@ export function mortgageAccountView(
     termEnd: terms.termEnd,
     paymentAmount: terms.paymentAmount,
     paymentFrequency: terms.paymentFrequency,
-    years: mortgageScheduleYears(rows),
     extra: effect
       ? {
           amount: perPayment,
@@ -108,7 +106,14 @@ export function mortgageAccountView(
   };
 }
 
-/** The rows of the payment schedule in one calendar year, with the actual payment of each past row. */
-export function mortgageScheduleOfYear(db: Db, accountId: string, asOf: string, year: number) {
-  return mortgageRowsOfYear(matchedSchedule(db, accountId, asOf).rows, year);
+/**
+ * The rows of the payment schedule in one calendar year, with the actual payment of each past row. Matching uses the
+ * full schedule: a match can cross the end of a year. A year outside the range of the schedule goes to the nearest year.
+ */
+export function mortgageScheduleOfYear(db: Db, accountId: string, asOf: string, requested: number) {
+  const { schedule } = loanSchedule(db, accountId);
+  const rows = matchMortgageActuals(schedule.payments, actualPayments(db, accountId), asOf);
+  const years = mortgageScheduleYears(rows);
+  const year = years ? clampMortgageYear(requested, years) : requested;
+  return { year, years, rows: mortgageRowsOfYear(rows, year) };
 }

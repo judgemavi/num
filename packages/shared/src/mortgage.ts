@@ -333,14 +333,21 @@ const mortgageActualSchema = z.object({
 
 const calendarYearSchema = z.number().int().min(1).max(9999);
 
-/** One row of the payment schedule: a scheduled payment, an actual payment, or both. */
-export const mortgageScheduleSchema = z.array(
-  z.object({
-    date: isoDateSchema,
-    scheduled: mortgagePaymentSchema.nullable(),
-    actual: mortgageActualSchema.nullable(),
-  }),
-);
+/**
+ * The rows of the payment schedule in one year. A row has a scheduled payment, an actual payment, or both. `year` is the
+ * requested year, moved into `years` (the first and the last year with a row). `years` is null when there is no row.
+ */
+export const mortgageScheduleSchema = z.object({
+  year: calendarYearSchema,
+  years: z.object({ first: calendarYearSchema, last: calendarYearSchema }).nullable(),
+  rows: z.array(
+    z.object({
+      date: isoDateSchema,
+      scheduled: mortgagePaymentSchema.nullable(),
+      actual: mortgageActualSchema.nullable(),
+    }),
+  ),
+});
 
 export const mortgageScheduleQuerySchema = z.object({
   asOf: isoDateSchema,
@@ -355,8 +362,6 @@ export const mortgageViewSchema = z.object({
   termEnd: isoDateSchema,
   paymentAmount: positiveAmountSchema,
   paymentFrequency: z.enum(paymentFrequencies),
-  /** The first and the last calendar year with a row in the schedule. Null when the schedule has no row. */
-  years: z.object({ first: calendarYearSchema, last: calendarYearSchema }).nullable(),
   extra: z
     .object({
       amount: money,

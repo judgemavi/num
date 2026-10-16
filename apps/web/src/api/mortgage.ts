@@ -41,11 +41,14 @@ export function mortgageViewQuery(accountId: string, asOf: string, { extra, lump
   });
 }
 
-/** The rows of the payment schedule of a mortgage in one calendar year, with the actual payments. */
+/**
+ * The rows of the payment schedule of a mortgage in one calendar year, with the actual payments, or null when the
+ * account has no terms. The server moves a year outside the schedule to the nearest year.
+ */
 export function mortgageScheduleQuery(accountId: string, asOf: string, year: number) {
   return queryOptions({
     queryKey: ["mortgage-schedule", accountId, { asOf, year }],
-    queryFn: () => unwrap(api.accounts[":id"].mortgage.schedule.$get({ param: { id: accountId }, query: { asOf, year } })),
+    queryFn: () => orNoTerms(unwrap(api.accounts[":id"].mortgage.schedule.$get({ param: { id: accountId }, query: { asOf, year } }))),
   });
 }
 
