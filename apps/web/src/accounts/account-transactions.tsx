@@ -1,4 +1,4 @@
-import { transactionListQuerySchema, showsRunningBalance } from "@num/shared";
+import { transactionListQuerySchema } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { accountQuery } from "@/api/accounts";
@@ -40,7 +40,7 @@ function AccountActivity() {
       ) : (
         <TransactionsTable
           rows={rows}
-          showBalance={showsRunningBalance(account.hasValuation)}
+          showBalance={!account.hasValuation}
           hideAccount
         />
       )}

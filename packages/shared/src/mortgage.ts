@@ -200,8 +200,9 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
     if (through && date > through) {
       break;
     }
-    while (cursor < dated.length && dated[cursor].date < date) {
+    while (true) {
       const valuation = dated[cursor];
+      if (!valuation || valuation.date >= date) break;
       cursor += 1;
       if (valuation.date <= previous) {
         continue;
@@ -238,10 +239,12 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
     if (![balance, covered, payment, principal, totalInterest].every(Number.isSafeInteger)) {
       throw new Error("Schedule amount is not a safe integer");
     }
-    payments.push({ date, payment, principal, interest: covered, balance });
-    if (cursor < dated.length && dated[cursor].date === date) {
-      balance = owed(dated[cursor].balance);
-      payments[payments.length - 1].balance = balance;
+    const paymentRow = { date, payment, principal, interest: covered, balance };
+    payments.push(paymentRow);
+    const valuation = dated[cursor];
+    if (valuation?.date === date) {
+      balance = owed(valuation.balance);
+      paymentRow.balance = balance;
       cursor += 1;
     }
     previous = date;
@@ -318,7 +321,7 @@ export function mortgageSplitForDate(input: {
   };
 }
 
-export const mortgagePaymentSchema = z.object({
+const mortgagePaymentSchema = z.object({
   date: isoDateSchema,
   payment: money,
   principal: money,

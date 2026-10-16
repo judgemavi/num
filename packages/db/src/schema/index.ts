@@ -3,7 +3,7 @@ export type { AccountRow, MortgageTermRow } from "./accounts";
 export { bucketCategories, bucketEvents, buckets } from "./buckets";
 export type { BucketEventRow, BucketRow } from "./buckets";
 export { categories, categoryGroups, merchants, tags } from "./categories";
-export type { CategoryGroupRow, CategoryRow, MerchantRow, TagRow } from "./categories";
+export type { MerchantRow } from "./categories";
 export { bankBalances, documents, importBatches, importRows, valuations } from "./imports";
 export type { DocumentRow, ImportBatchRow } from "./imports";
 export { lineTags, transactionLines, transactions } from "./ledger";

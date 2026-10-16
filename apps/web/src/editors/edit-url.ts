@@ -1,4 +1,4 @@
-export const recordEditorKinds = [
+const recordEditorKinds = [
   "transaction",
   "account",
   "category",

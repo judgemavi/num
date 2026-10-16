@@ -70,7 +70,7 @@ function hasOpenLine(lines: readonly { categoryId?: string | null; transferAccou
  * The interest of a loan payment as a negative amount. An interest text that the person did not change
  * keeps its stored amount. It is more than zero and less than the amount.
  */
-export function loanInterest(input: Pick<SubmitInput, "currency" | "transaction" | "totalMilli" | "interest">): number {
+function loanInterest(input: Pick<SubmitInput, "currency" | "transaction" | "totalMilli" | "interest">): number {
   const stored = interestLine(input.transaction);
   const start = stored ? { text: amountText(Math.abs(stored.amount)), amount: stored.amount } : null;
   if (input.interest.trim().length === 0) {

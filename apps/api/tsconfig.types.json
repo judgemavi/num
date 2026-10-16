@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
     "composite": true,
     "noEmit": false,
     "emitDeclarationOnly": true,

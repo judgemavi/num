@@ -55,7 +55,7 @@ const purchaseColumns = {
   refunded: sql<number>`coalesce(${refundedSum(transactions.id)}, 0)`,
 };
 
-export function refundItemKey(transactionId: string): string {
+function refundItemKey(transactionId: string): string {
   return `refund_link:${transactionId}`;
 }
 

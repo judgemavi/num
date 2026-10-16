@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const maxInterestMilliPct = 1_000_000;
+const maxInterestMilliPct = 1_000_000;
 
 export const interestRateMilliPctSchema = z.number().int().min(0).max(maxInterestMilliPct);
 

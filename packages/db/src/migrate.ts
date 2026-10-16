@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -7,9 +8,7 @@ import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 
 const migrationsFolder = join(import.meta.dir, "..", "migrations");
 
-type Journal = {
-  entries: { tag: string }[];
-};
+const journalSchema = z.object({ entries: z.array(z.object({ tag: z.string().min(1) })) });
 
 function migrationHash(tag: string) {
   const sql = readFileSync(join(migrationsFolder, `${tag}.sql`), "utf8");
@@ -17,12 +16,12 @@ function migrationHash(tag: string) {
 }
 
 function assertJournalApplied(sqlite: Database) {
-  const journal = JSON.parse(readFileSync(join(migrationsFolder, "meta", "_journal.json"), "utf8")) as Journal;
+  const journal = journalSchema.parse(JSON.parse(readFileSync(join(migrationsFolder, "meta", "_journal.json"), "utf8")));
   const applied = new Set(
     sqlite
-      .query("select hash from __drizzle_migrations")
+      .query<{ hash: string }, []>("select hash from __drizzle_migrations")
       .all()
-      .map((row) => (row as { hash: string }).hash),
+      .map((row) => row.hash),
   );
   for (const entry of journal.entries) {
     if (!applied.has(migrationHash(entry.tag))) {

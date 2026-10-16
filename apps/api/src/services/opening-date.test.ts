@@ -88,7 +88,6 @@ test("an import of older rows moves the effective opening date", () => {
       automaticOpeningDate: "2026-01-14",
     });
 
-
     importCsv(book.db, book.dir, account.id, "december.csv", ["12/01/2025,Older shop,-4.00"]);
     expect(getAccount(book.db, account.id).openingDate).toBe("2025-11-30");
   } finally {
@@ -121,7 +120,7 @@ test("a user-set opening date does not move when older rows are imported", () =>
 });
 
 test("an automatic opening uses the supplied local date on both sides of UTC midnight", () => {
-  for (const [at, asOf] of [["2026-10-08T00:30:00Z", "2026-10-07"], ["2026-10-07T23:30:00Z", "2026-10-08"]]) {
+  for (const [at, asOf] of [["2026-10-08T00:30:00Z", "2026-10-07"], ["2026-10-07T23:30:00Z", "2026-10-08"]] as const) {
     const book = tempBook();
     try {
       const account = createAccount(book.db, {

@@ -56,7 +56,7 @@ export function scheduleOf(db: Reader, id: string): Schedule | null {
   if (!row) {
     return null;
   }
-  const { bucketId, ...fields } = row;
+  const { bucketId: _bucketId, ...fields } = row;
   return fields;
 }
 

@@ -5,9 +5,9 @@ import { proposalSubject, type PlanProposal } from "./recurring-detect";
 import { amountSchema } from "./money";
 import { monthDaySchema, toleranceSchema } from "./schedule";
 
-export const occurrenceStatuses = ["open", "linked", "skipped", "missed", "changed"] as const;
+const occurrenceStatuses = ["open", "linked", "skipped", "missed", "changed"] as const;
 
-export const occurrenceSchema = z.object({
+const occurrenceSchema = z.object({
   dueDate: isoDateSchema,
   nominalDate: isoDateSchema,
   status: z.enum(occurrenceStatuses),
@@ -44,7 +44,7 @@ export const occurrenceSkipBodySchema = z.object({
   reason: z.string().trim().min(1),
 });
 
-export const changedOccurrenceSchema = z.object({
+const changedOccurrenceSchema = z.object({
   bucketId: z.uuid(),
   dueDate: isoDateSchema,
   transactionId: z.uuid(),
@@ -52,18 +52,18 @@ export const changedOccurrenceSchema = z.object({
   actualAmount: amountSchema,
 });
 
-export const missedOccurrenceSchema = z.object({
+const missedOccurrenceSchema = z.object({
   bucketId: z.uuid(),
   dueDate: isoDateSchema,
 });
 
-export const ambiguousLinkSchema = z.object({
+const ambiguousLinkSchema = z.object({
   bucketId: z.uuid(),
   dueDate: isoDateSchema,
   transactionIds: z.array(z.uuid()),
 });
 
-export const planProposalSchema = z.object({
+const planProposalSchema = z.object({
   accountId: z.uuid(),
   merchantId: z.uuid().nullable(),
   categoryId: z.uuid().nullable(),
@@ -98,9 +98,6 @@ export const autoLinkResultSchema = z.object({
 export type Occurrence = z.infer<typeof occurrenceSchema>;
 export type OccurrenceLink = z.infer<typeof occurrenceLinkSchema>;
 export type OccurrenceStatus = (typeof occurrenceStatuses)[number];
-export type OccurrenceList = z.infer<typeof occurrenceListSchema>;
 export type UpcomingList = z.infer<typeof upcomingListSchema>;
-export type ChangedOccurrence = z.infer<typeof changedOccurrenceSchema>;
-export type MissedOccurrence = z.infer<typeof missedOccurrenceSchema>;
 export type RecurringSignals = z.infer<typeof recurringSignalsSchema>;
 export type { PlanProposal };

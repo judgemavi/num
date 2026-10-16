@@ -34,8 +34,6 @@ export function policyLabel(policy: PaymentPolicy): string {
   return policyLabels[policy];
 }
 
-export { formatMoney };
-
 export function formatBalance(currency: string, kind: AccountKind, balance: number): string {
   const owed = accountClass(kind) === "liability" && balance < 0;
   const formatted = formatMoney(currency, owed ? -balance : balance);

@@ -166,7 +166,9 @@ export function parseCsvStatement(text: string, map: ColumnMap, digits: number):
     }
   }
 
-  const newestFirst = rows.length > 1 && rows[0]!.date > rows[rows.length - 1]!.date;
+  const first = rows.at(0);
+  const last = rows.at(-1);
+  const newestFirst = first !== undefined && last !== undefined && first.date > last.date;
   const end = closing(balances, newestFirst);
   return {
     rows,

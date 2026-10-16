@@ -1,7 +1,7 @@
 import { accountClass, accountKinds, type Account, type AccountKind } from "@num/shared";
 import type { Hue } from "@/components/hue";
 
-export const groupOrder = ["cash", "assets", "liabilities"] as const;
+const groupOrder = ["cash", "assets", "liabilities"] as const;
 
 export type AccountGroupId = (typeof groupOrder)[number];
 
@@ -22,7 +22,7 @@ export function sameClassKinds(kind: AccountKind): AccountKind[] {
   return accountKinds.filter((item) => accountClass(item) === current);
 }
 
-export function accountGroup(kind: AccountKind): AccountGroupId {
+function accountGroup(kind: AccountKind): AccountGroupId {
   switch (kind) {
     case "chequing":
     case "savings":

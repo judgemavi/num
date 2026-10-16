@@ -3,7 +3,7 @@ import { ServiceError } from "../service-error";
 import { fieldParams } from "../validation";
 
 /** The stored values with the fields of the patch. A field that the patch leaves out keeps its stored value. */
-export function patched<T extends object>(stored: T, patch: Partial<T>): T {
+function patched<T extends object>(stored: T, patch: Partial<T>): T {
   const changed = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
   return { ...stored, ...changed };
 }

@@ -9,11 +9,9 @@ import { maxPageSize } from "./list";
 
 const itemKey = z.string().trim().min(1).max(500);
 
-export const reviewQuestions = ["transfer_pair", "recurring_ambiguous", "refund_purchase", "categorize"] as const;
+const reviewQuestions = ["transfer_pair", "recurring_ambiguous", "refund_purchase", "categorize"] as const;
 
-export type ReviewQuestion = (typeof reviewQuestions)[number];
-
-export const reviewTransferSchema = z.object({
+const reviewTransferSchema = z.object({
   otherId: z.uuid(),
   otherAccountId: z.uuid(),
   otherPayee: z.string(),
@@ -21,12 +19,12 @@ export const reviewTransferSchema = z.object({
   otherDate: isoDateSchema,
 });
 
-export const reviewRecurringSchema = z.object({
+const reviewRecurringSchema = z.object({
   bucketId: z.uuid(),
   dueDate: isoDateSchema,
 });
 
-export const reviewRefundSchema = z.object({
+const reviewRefundSchema = z.object({
   itemKey,
   purchases: z.array(
     z.object({

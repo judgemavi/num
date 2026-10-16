@@ -16,10 +16,10 @@ const automaticThreshold = 850;
 
 export const suggestionFloor = 600;
 export const likelyMinimum = 750;
-export const leadMinimum = 200;
+const leadMinimum = 200;
 export const similarFactor = 0.9;
-export const familyFactor = 0.85;
-export const recurringConfidence = 0.99;
+const familyFactor = 0.85;
+const recurringConfidence = 0.99;
 
 /**
  * One confirmed answer. `categoryId` is the learned id. In the category rows of a payee, null is the label
@@ -50,7 +50,7 @@ export type RecurringSignal = {
 };
 
 /** A learned payee that the new payee contains with other words left. */
-export type SimilarPayee = {
+type SimilarPayee = {
   scores: readonly LearnedScore[];
   transferRows: readonly { id: string; date: string; transferAccountId: string }[];
 };
@@ -79,7 +79,7 @@ export type ScoreInput = {
   amountGuard: boolean;
 };
 
-export type MatchSignal = {
+type MatchSignal = {
   reason: AutoReason;
   confidence: number;
   categoryId: string | null;

@@ -121,7 +121,7 @@ export function toTransaction(db: Reader, row: TransactionRow, lines: StoredLine
 }
 
 /** The audit log keeps the stored fields. It leaves out the id and the fields that the read adds. */
-function snapshot({ id, refundOf, refundedAmount, ...stored }: Transaction) {
+function snapshot({ id: _id, refundOf: _refundOf, refundedAmount: _refundedAmount, ...stored }: Transaction) {
   return stored;
 }
 

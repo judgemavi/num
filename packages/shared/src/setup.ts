@@ -3,7 +3,7 @@ import { currencyCodeSchema } from "./currency";
 
 export const categorySets = ["default", "none"] as const;
 
-export const categorySetSchema = z.enum(categorySets);
+const categorySetSchema = z.enum(categorySets);
 
 export type CategorySet = z.infer<typeof categorySetSchema>;
 

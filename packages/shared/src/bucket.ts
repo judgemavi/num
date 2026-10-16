@@ -35,7 +35,7 @@ export const sinkingRepeats = ["none", "yearly"] as const;
 export type SinkingRepeat = (typeof sinkingRepeats)[number];
 
 /** The events that the user makes. The fill makes `cover` and `recede`. */
-export const manualEventKinds = ["fund", "move", "release"] as const;
+const manualEventKinds = ["fund", "move", "release"] as const;
 export const bucketEventKinds = [...manualEventKinds, "cover", "recede"] as const;
 
 export type BucketEventKind = (typeof bucketEventKinds)[number];
@@ -232,7 +232,7 @@ export const bucketListSchema = pagedResponseSchema(bucketSchema).extend({
   nextColor: z.enum(bucketColors),
 });
 
-export const overspentBucketSchema = z.object({
+const overspentBucketSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   color: z.enum(bucketColors),

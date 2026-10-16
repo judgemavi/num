@@ -44,7 +44,7 @@ export function withoutSortKey<T extends { sortKey: string }>(row: T | undefined
   if (!row) {
     return undefined;
   }
-  const { sortKey, ...rest } = row;
+  const { sortKey: _sortKey, ...rest } = row;
   return rest;
 }
 

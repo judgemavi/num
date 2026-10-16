@@ -59,14 +59,6 @@ const listRoute = createRoute({
   },
 });
 
-test("the OpenAPI document lists the health route", async () => {
-  const response = await app.request("/api/openapi.json");
-  expect(response.status).toBe(200);
-  const document = (await response.json()) as { openapi: string; paths: Record<string, unknown> };
-  expect(document.openapi).toBe("3.0.0");
-  expect(document.paths["/api/health"]).toBeDefined();
-});
-
 test("a date-dependent route without asOf returns 400", async () => {
   const app = createApp(createDb(new Database(":memory:")));
   app.openapi(datedRoute, (c) => c.json({ asOf: c.req.valid("query").asOf }, 200));

@@ -6,8 +6,7 @@ import { openingSuggestionSchema } from "./opening";
 import { presetSchema, unreadableRowSchema } from "./statement";
 import { amountSchema } from "./money";
 
-
-export const importCountsSchema = z.object({
+const importCountsSchema = z.object({
   created: z.number().int().nonnegative(),
   matched: z.number().int().nonnegative(),
   duplicate: z.number().int().nonnegative(),
@@ -17,7 +16,7 @@ export const importCountsSchema = z.object({
 
 export type ImportCounts = z.infer<typeof importCountsSchema>;
 
-export const importViewStatuses = ["imported", "undone", "needs_you"] as const;
+const importViewStatuses = ["imported", "undone", "needs_you"] as const;
 
 export type ImportViewStatus = (typeof importViewStatuses)[number];
 
@@ -27,7 +26,7 @@ export type ImportRowOutcome = (typeof importRowOutcomes)[number];
 
 const timestampSchema = z.string().refine(isUtcTimestamp);
 
-export const importBatchSchema = z.object({
+const importBatchSchema = z.object({
   id: z.uuid(),
   accountId: z.uuid(),
   documentId: z.uuid().nullable(),
@@ -53,18 +52,18 @@ export const importPresetListSchema = z.object({
   presets: z.array(presetSchema),
 });
 
-export const importedBatchSchema = importBatchSchema.extend({
+const importedBatchSchema = importBatchSchema.extend({
   kind: z.literal("batch"),
   alreadyImported: z.boolean(),
   openingSuggestion: openingSuggestionSchema.nullable(),
 });
 
-export const importPreviewSchema = z.object({
+const importPreviewSchema = z.object({
   kind: z.literal("preview"),
   rows: z.array(z.array(z.string())),
 });
 
-export const importUnreadableSchema = z.object({
+const importUnreadableSchema = z.object({
   kind: z.literal("unreadable"),
   unreadable: z.array(unreadableRowSchema),
 });
@@ -77,7 +76,7 @@ export const importResultSchema = z.discriminatedUnion("kind", [
 
 export type ImportResult = z.infer<typeof importResultSchema>;
 
-export const undoBlockReasons = ["edited"] as const;
+const undoBlockReasons = ["edited"] as const;
 
 export const importUndoSchema = z.object({
   batch: importBatchSchema,
@@ -95,7 +94,7 @@ export const importUndoSchema = z.object({
 export type ImportUndo = z.infer<typeof importUndoSchema>;
 export type UndoBlockReason = (typeof undoBlockReasons)[number];
 
-export const importViewSortColumns = ["date"] as const;
+const importViewSortColumns = ["date"] as const;
 
 export const importViewQuerySchema = listQuerySchema(importViewSortColumns).extend({
   accountId: queryId,
@@ -106,7 +105,7 @@ export const importViewQuerySchema = listQuerySchema(importViewSortColumns).exte
 
 export type ImportViewQuery = z.output<typeof importViewQuerySchema>;
 
-export const importViewItemSchema = z.object({
+const importViewItemSchema = z.object({
   id: z.uuid(),
   accountId: z.uuid(),
   accountName: z.string(),
@@ -127,7 +126,7 @@ export type ImportViewItem = z.infer<typeof importViewItemSchema>;
 
 export const importViewListSchema = pagedResponseSchema(importViewItemSchema);
 
-export const importDetailRowSchema = z.object({
+const importDetailRowSchema = z.object({
   id: z.uuid(),
   rowIndex: z.number().int().nonnegative(),
   date: isoDateSchema,
@@ -149,7 +148,7 @@ export const importDetailRowSchema = z.object({
 
 export type ImportDetailRow = z.infer<typeof importDetailRowSchema>;
 
-export const importDetailUnreadableSchema = unreadableRowSchema.extend({
+const importDetailUnreadableSchema = unreadableRowSchema.extend({
   decision: z.enum(["not_a_transaction"]).nullable(),
 });
 

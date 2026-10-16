@@ -1,5 +1,5 @@
 import { useAccountActivitySearch } from "@/accounts/use-account-activity";
-import { accountClass, type TransactionListItem, type TransactionListQuery, type TransactionReviewListQuery } from "@num/shared";
+import { accountClass, type TransactionListItem, type TransactionReviewListQuery } from "@num/shared";
 import { cn } from "cn";
 import { Amount } from "@/components/amount";
 import { ArrowDown, ArrowUp } from "lucide-react";
@@ -16,8 +16,6 @@ import { formatDate } from "@/date-format";
 import { refundOfText, refundedText, reviewText } from "@/transactions/format";
 import { selectable, useSelection } from "@/transactions/selection-state";
 import { useOnReview, useTransactionSearch } from "@/transactions/use-transaction-list";
-
-export type TransactionSort = SortChoice<NonNullable<TransactionListQuery["sort"]>>;
 
 /** The sort order of the table. The Needs review page also sorts by confidence. */
 type TableSort = SortChoice<NonNullable<TransactionReviewListQuery["sort"]>>;

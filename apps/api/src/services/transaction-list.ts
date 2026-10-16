@@ -1,4 +1,3 @@
-import { showsRunningBalance } from "@num/shared";
 import { accounts, categories, lineTags, merchants, transactionLines, transactions } from "@num/db";
 import type {
   TransactionFilter,
@@ -166,7 +165,7 @@ function toItem(
   review: TransactionReview | null,
   runningBalance: number | null,
 ): TransactionListItem {
-  const { accountOpening, refundOfKey, refundOfDate, refundOfAmount, refundedAmount, ...head } = row;
+  const { accountOpening: _accountOpening, refundOfKey, refundOfDate, refundOfAmount, refundedAmount, ...head } = row;
   return {
     ...head,
     runningBalance,
@@ -181,7 +180,7 @@ function toItem(
 }
 
 function usesTransactionBalance(db: Db, accountId: string) {
-  return showsRunningBalance(valuationAccountIds(db, [accountId]).has(accountId));
+  return !valuationAccountIds(db, [accountId]).has(accountId);
 }
 
 /** The balance of the account after each row: the opening balance and all the rows up to it. One window query. */
@@ -221,7 +220,7 @@ function runningBalances(db: Db, accountId: string, rows: readonly ListRow[]) {
 }
 
 /** Needs review rows that also match the other filters. Bulk approval and the review list use the same set. */
-export function filteredReviewHits(db: Db, filter: TransactionFilter, asOf: string): NeedsReviewHit[] {
+function filteredReviewHits(db: Db, filter: TransactionFilter, asOf: string): NeedsReviewHit[] {
   const hits = listNeedsReview(db, asOf);
   const where = filters(filter);
   if (where === undefined || hits.length === 0) {

@@ -7,7 +7,7 @@ import { createAccount } from "./accounts";
 import { map } from "./import-test-book";
 import { getTransaction } from "./transactions";
 
-export const at = "2026-10-07T16:00:00Z";
+const at = "2026-10-07T16:00:00Z";
 
 export const saved = { source: "ui" as const, at };
 

@@ -2,7 +2,7 @@ import type { MoneyDirection } from "./amount-sign";
 import type { CategoryKind } from "./category";
 import type { Suggestion } from "./suggest";
 
-export const whatChoices = ["spending", "income", "refund", "transfer", "loan_payment"] as const;
+const whatChoices = ["spending", "income", "refund", "transfer", "loan_payment"] as const;
 
 export type WhatChoice = (typeof whatChoices)[number];
 

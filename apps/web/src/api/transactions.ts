@@ -59,7 +59,7 @@ export function refundPurchasesQuery(asOf: string, payee: string) {
 }
 
 /** Confirm the automatic label of a transaction. */
-export function looksRight(id: string) {
+function looksRight(id: string) {
   return unwrap(api.transactions[":id"]["looks-right"].$post({ param: { id } }));
 }
 

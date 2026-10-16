@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.app.json",
   "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
     "types": [
       "vite/client",
       "bun"

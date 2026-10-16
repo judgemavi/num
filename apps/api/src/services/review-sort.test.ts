@@ -69,7 +69,7 @@ function sample(db: Db) {
   expect(hits.get(into.id)?.question).toBe("transfer_pair");
   expect(hits.get(noneOld.id)?.level).toBe("none");
   expect(hits.get(noneNew.id)?.level).toBe("none");
-  return [noneNew.id, noneOld.id, into.id, out.id, maybe.id, likely.id, sureLow, sureHigh];
+  return { noneNew: noneNew.id, noneOld: noneOld.id, into: into.id, out: out.id, maybe: maybe.id, likely: likely.id, sureLow, sureHigh };
 }
 
 /** All the rows of the review read, two pages of four rows. */
@@ -83,7 +83,7 @@ function readAll(db: Db, sort: Pick<TransactionReviewListQuery, "sort" | "dir">)
 
 test("the review read sorts by confidence: the level first, then the score, then the newest date; high to low by default", () => {
   withBook((db) => {
-    const [noneNew, noneOld, into, out, maybe, likely, sureLow, sureHigh] = sample(db);
+    const { noneNew, noneOld, into, out, maybe, likely, sureLow, sureHigh } = sample(db);
     expect(readAll(db, { sort: "confidence", dir: "asc" })).toEqual([noneNew, noneOld, into, out, maybe, likely, sureLow, sureHigh]);
     expect(readAll(db, { sort: "confidence" })).toEqual([noneNew, noneOld, into, out, maybe, likely, sureLow, sureHigh]);
     expect(readAll(db, { sort: "confidence", dir: "desc" })).toEqual([sureHigh, sureLow, likely, maybe, into, out, noneNew, noneOld]);

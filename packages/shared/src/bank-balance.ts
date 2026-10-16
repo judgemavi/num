@@ -20,7 +20,7 @@ export const bankBalanceSchema = z.object({
 });
 
 /** The latest bank balance of an account against the calculated balance on its date. */
-export const bankStatusSchema = z.object({
+const bankStatusSchema = z.object({
   accountId: z.uuid(),
   date: isoDateSchema,
   bankBalance: amountSchema,

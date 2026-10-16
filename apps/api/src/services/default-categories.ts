@@ -1,4 +1,4 @@
-export type CategorySeed = {
+type CategorySeed = {
   name: string;
   kind: "income" | "expense";
 };

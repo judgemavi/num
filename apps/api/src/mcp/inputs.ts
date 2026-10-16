@@ -26,7 +26,7 @@ function unionOptions(schema: z.ZodType | undefined): z.ZodType[] {
   return schema instanceof z.ZodUnion ? schema.options.filter(isZodSchema) : [];
 }
 
-export function fieldSchema(schema: z.ZodType | undefined, key: string): z.ZodType | undefined {
+function fieldSchema(schema: z.ZodType | undefined, key: string): z.ZodType | undefined {
   const direct = shapeOf(schema)[key];
   if (direct) {
     return direct;

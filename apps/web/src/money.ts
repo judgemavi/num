@@ -42,7 +42,7 @@ export function moneyParts(currency: string, milli: number): { currency: string;
 }
 
 /** The rule for the decimal places of an amount in the currency. */
-export function decimalsRule(currency: string): string {
+function decimalsRule(currency: string): string {
   const digits = requireCurrencyDigits(currency);
   return digits === 0 ? "Use whole amounts." : `Use no more than ${digits} decimal${digits === 1 ? "" : "s"}.`;
 }

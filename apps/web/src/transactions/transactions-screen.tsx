@@ -1,4 +1,3 @@
-import { showsRunningBalance } from "@num/shared";
 import { Plus } from "lucide-react";
 import { Boundary } from "@/components/boundary";
 import { ListEmpty } from "@/components/list-card";
@@ -90,7 +89,7 @@ function TransactionList() {
       ) : (
         <TransactionsTable
           rows={page.items}
-          showBalance={selectedAccount !== undefined && showsRunningBalance(selectedAccount.hasValuation)}
+          showBalance={selectedAccount !== undefined && !selectedAccount.hasValuation}
         />
       )}
     </Card>

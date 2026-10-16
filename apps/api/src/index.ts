@@ -17,5 +17,3 @@ const app = serveWeb(createApp(db, { dataDir }));
 console.log(`Num http://${hostname}:${port}`);
 
 export default { hostname, port, fetch: app.fetch };
-
-export type { AppType } from "./app";

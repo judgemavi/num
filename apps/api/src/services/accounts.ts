@@ -23,9 +23,8 @@ import { write, type WriteInput } from "./write";
 import { setArchived, byColumn, byName, pagedOf, totalOf, windowOf, withoutSortKey } from "./list-sql";
 import { requireWholeAmounts } from "./book-step";
 
-
 function toAccount(row: AccountRow, balance: number, automatic: AutomaticOpening, hasValuation: boolean): Account {
-  const { id, name, institution, kind, onBudget, openingDate, createdAt, createdOn, ...rest } = withoutSortKey(row);
+  const { id, name, institution, kind, onBudget, openingDate, createdAt: _createdAt, createdOn: _createdOn, ...rest } = withoutSortKey(row);
   return {
     id,
     name,

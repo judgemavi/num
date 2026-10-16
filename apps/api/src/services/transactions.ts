@@ -74,7 +74,7 @@ function headerFor(input: TransactionCreate, lines: ReturnType<typeof normalizeL
   return header;
 }
 
-export function insertTransaction(tx: WriteTx, input: TransactionCreate, source: AuditSource, spread = true): Transaction {
+function insertTransaction(tx: WriteTx, input: TransactionCreate, source: AuditSource, spread = true): Transaction {
   const typed = input.lines.map(normalizeLine);
   const recordSourceName = recordSource(source);
   const id = crypto.randomUUID();

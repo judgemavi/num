@@ -9,7 +9,7 @@ import { withForm } from "@/forms/form-hook";
 import { fieldValue } from "@/forms/form-values";
 import { useStore } from "@tanstack/react-form";
 
-export const mortgageTermsHelp = "Add the terms to see the payment schedule and the interest and principal of each payment.";
+const mortgageTermsHelp = "Add the terms to see the payment schedule and the interest and principal of each payment.";
 export const openingDateHelp = "Use the date of the last payment before the first payment in Num. Use the amount owed after that payment.";
 const firstPaymentWarning =
   "The first payment is not one payment period after the opening date. The first payment gets more or less interest than a regular payment.";

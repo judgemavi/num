@@ -4,9 +4,7 @@ import { queryNumber } from "./list";
 import { addDays, dayDistance } from "./date";
 import { reviewLevel, reviewLevels } from "./review-level";
 
-export const suggestionReasons = [...autoReasons, "none"] as const;
-
-export type SuggestionReason = (typeof suggestionReasons)[number];
+const suggestionReasons = [...autoReasons, "none"] as const;
 
 export const suggestionSchema = z.object({
   merchantId: z.uuid().nullable(),
@@ -83,12 +81,9 @@ function pairAmount(group: TransferCandidate[]) {
   const pairs: TransferPair[] = [];
   let incomingIndex = 0;
   for (const row of outgoing) {
-    while (
-      incomingIndex < incoming.length &&
-      incoming[incomingIndex] !== undefined &&
-      incoming[incomingIndex]!.date < row.date &&
-      dayDistance(row.date, incoming[incomingIndex]!.date) > matchDateWindowDays
-    ) {
+    while (true) {
+      const candidate = incoming[incomingIndex];
+      if (!candidate || candidate.date >= row.date || dayDistance(row.date, candidate.date) <= matchDateWindowDays) break;
       incomingIndex += 1;
     }
     for (let cursor = incomingIndex; cursor < incoming.length; cursor += 1) {

@@ -105,7 +105,7 @@ export function syncImportRows(
   return changed ? next : null;
 }
 
-export function sameFormat(left: StatementFormat, right: StatementFormat): boolean {
+function sameFormat(left: StatementFormat, right: StatementFormat): boolean {
   if (left.kind === "preset" && right.kind === "preset") {
     return left.presetId === right.presetId;
   }

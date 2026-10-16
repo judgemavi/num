@@ -1,4 +1,4 @@
-export const moneyDirections = ["out", "in"] as const;
+const moneyDirections = ["out", "in"] as const;
 
 export type MoneyDirection = (typeof moneyDirections)[number];
 

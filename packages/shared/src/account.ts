@@ -23,7 +23,7 @@ export const accountKinds = [
 
 export type AccountKind = (typeof accountKinds)[number];
 
-export const accountClasses = ["asset", "liability"] as const;
+const accountClasses = ["asset", "liability"] as const;
 
 export type AccountClass = (typeof accountClasses)[number];
 
@@ -36,11 +36,6 @@ const liabilityKinds = new Set<AccountKind>(["credit_card", "mortgage", "loan", 
 const budgetKinds = new Set<AccountKind>(["chequing", "savings", "cash", "credit_card"]);
 
 const interestKinds = new Set<AccountKind>(["savings", "loan"]);
-
-/** A valuation prevents a balance based only on the transaction history. */
-export function showsRunningBalance(hasValuation: boolean): boolean {
-  return !hasValuation;
-}
 
 /** These accounts use a valuation before subsequent transactions. */
 export function usesValuation(kind: AccountKind): boolean {
@@ -202,5 +197,4 @@ export const accountListSchema = pagedResponseSchema(accountSchema);
 export type Account = z.infer<typeof accountSchema>;
 export type AccountCreate = z.infer<typeof accountCreateSchema>;
 export type AccountUpdate = z.infer<typeof accountUpdateSchema>;
-export type AccountActivityQuery = z.output<typeof accountActivityQuerySchema>;
 export type AccountListQuery = z.output<typeof accountListQuerySchema>;

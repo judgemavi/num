@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const errorCodes = [
+const errorCodes = [
   "as_of_required",
   "as_of_invalid",
   "month_invalid",

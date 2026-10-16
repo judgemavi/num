@@ -4,7 +4,7 @@ import { optionalQuery, queryDate, queryId, queryIdOrNone } from "./list";
 import { isMonthKey } from "./month";
 import { amountSchema as money } from "./money";
 
-export const insightWindows = ["1", "3", "6", "12", "all", "custom"] as const;
+const insightWindows = ["1", "3", "6", "12", "all", "custom"] as const;
 
 export type InsightWindow = (typeof insightWindows)[number];
 
@@ -17,9 +17,7 @@ export type InsightListMode = (typeof insightListModes)[number];
 
 export const defaultInsightListMode: InsightListMode = "groups";
 
-export const insightRowKinds = ["item", "none", "uncategorized"] as const;
-
-export type InsightRowKind = (typeof insightRowKinds)[number];
+const insightRowKinds = ["item", "none", "uncategorized"] as const;
 
 const insightsSearchFields = z.object({
   window: optionalQuery(z.enum(insightWindows)),

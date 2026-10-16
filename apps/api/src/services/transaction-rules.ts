@@ -10,7 +10,6 @@ export type NormalizedLine = {
   tagIds: string[];
 };
 
-
 export function requireText(value: string, field: string): string {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
@@ -42,7 +41,7 @@ export function normalizeLine(input: TransactionLineInput): NormalizedLine {
   };
 }
 
-export function lineTotal(lines: { amount: number }[]): number {
+function lineTotal(lines: { amount: number }[]): number {
   let sum = 0;
   for (const line of lines) {
     if (!Number.isSafeInteger(line.amount)) {

@@ -332,9 +332,8 @@ test("a cash account that was never imported does not fail", () => {
   });
 });
 
-
 test("import age follows the supplied local date on both sides of UTC midnight", () => {
-  for (const [at, importedOn] of [["2026-10-08T00:30:00Z", "2026-10-07"], ["2026-10-07T23:30:00Z", "2026-10-08"]]) {
+  for (const [at, importedOn] of [["2026-10-08T00:30:00Z", "2026-10-07"], ["2026-10-07T23:30:00Z", "2026-10-08"]] as const) {
     withBook((db, dir) => {
       const cash = account(db, "chequing", "Cash", 0);
       importStatement(db, dir, {

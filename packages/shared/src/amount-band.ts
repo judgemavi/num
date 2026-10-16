@@ -1,7 +1,7 @@
 import { candidateKey, learnedConfidence, newestFirst, type LearnedRow, type LearnedScore } from "./matching";
 
 /** The newest confirmed amounts of a learned label make its band. */
-export const bandSize = 6;
+const bandSize = 6;
 
 /** A null category is the label "no category". */
 export type BandRow = LearnedRow<string | null> & { amount: number };

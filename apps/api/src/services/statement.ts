@@ -7,7 +7,7 @@ export type StatementRow = {
   bankId: string | null;
 };
 
-export type StatementOpeningRow = {
+type StatementOpeningRow = {
   date: string;
   amount: number;
   balance: number;

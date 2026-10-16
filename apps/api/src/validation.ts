@@ -31,7 +31,7 @@ function queryError(error: ZodError, query: Query): ErrorBody {
   return { code: "invalid_query", params: fieldParams(error) };
 }
 
-export function validationError(error: ZodError, target: Target, query: Query): ErrorBody {
+function validationError(error: ZodError, target: Target, query: Query): ErrorBody {
   switch (target) {
     case "query":
       return queryError(error, query);

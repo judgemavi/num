@@ -8,11 +8,13 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "generate": "drizzle-kit generate"
   },
   "dependencies": {
     "@num/shared": "workspace:*",
-    "drizzle-orm": "^0.45.3"
+    "drizzle-orm": "^0.45.3",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",

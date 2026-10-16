@@ -3,7 +3,7 @@ import { z } from "zod";
 import { daysBetween, isoDateSchema } from "./date";
 import { amountSchema } from "./money";
 
-export const refundWindowDays = 90;
+const refundWindowDays = 90;
 
 export type RefundPurchase = {
   id: string;
@@ -15,13 +15,12 @@ export type RefundPurchase = {
   categoryId: string | null;
 };
 
-
 export const refundPurchaseQuerySchema = z.object({
   asOf: isoDateSchema,
   payee: z.string().trim().optional(),
 });
 
-export const refundPurchaseItemSchema = z.object({
+const refundPurchaseItemSchema = z.object({
   id: z.uuid(),
   date: isoDateSchema,
   amount: amountSchema,
@@ -114,7 +113,7 @@ export type RefundSubject = {
   categoryId: string | null;
 };
 
-export function refundReversalStart(date: string): string {
+function refundReversalStart(date: string): string {
   return Temporal.PlainDate.from(date).subtract({ days: reversalWindowDays }).toString();
 }
 

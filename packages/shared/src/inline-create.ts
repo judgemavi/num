@@ -1,4 +1,4 @@
-export const inlineCreateMaxDepth = 2;
+const inlineCreateMaxDepth = 2;
 
 export type InlineCreateResult = {
   expanded: false;

@@ -12,7 +12,7 @@ import type { Reader } from "./write";
 const historyMonths = 6;
 const fewestMonths = 3;
 
-export function emergencyBucket(db: Reader) {
+function emergencyBucket(db: Reader) {
   return db.select().from(buckets).where(eq(buckets.kind, "emergency")).get();
 }
 

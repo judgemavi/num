@@ -35,7 +35,6 @@
         "class-variance-authority": "^0.7.1",
         "cmdk": "^1.1.1",
         "cn": "^0.4.0",
-        "date-fns": "^4.4.0",
         "hono": "^4.13.12",
         "lucide-react": "^0.544.0",
         "radix-ui": "^1.7.0",
@@ -68,6 +67,7 @@
       "dependencies": {
         "@num/shared": "workspace:*",
         "drizzle-orm": "^0.45.3",
+        "zod": "^4.6.5",
       },
       "devDependencies": {
         "@types/bun": "^1.4.2",

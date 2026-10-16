@@ -15,7 +15,6 @@ export const categoryGroups = sqliteTable(
     index("category_groups_sort_key_idx").on(table.sortKey, table.name, table.id),
   ],
 );
-export type CategoryGroupRow = typeof categoryGroups.$inferSelect;
 
 export const categories = sqliteTable(
   "categories",
@@ -33,7 +32,6 @@ export const categories = sqliteTable(
     index("categories_sort_key_idx").on(table.sortKey, table.name, table.id),
   ],
 );
-export type CategoryRow = typeof categories.$inferSelect;
 
 export const tags = sqliteTable(
   "tags",
@@ -49,7 +47,6 @@ export const tags = sqliteTable(
     index("tags_sort_key_idx").on(table.sortKey, table.name, table.id),
   ],
 );
-export type TagRow = typeof tags.$inferSelect;
 
 export const merchants = sqliteTable(
   "merchants",

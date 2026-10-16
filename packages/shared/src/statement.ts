@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isIsoDate } from "./date";
 
-export const unreadableReasons = [
+const unreadableReasons = [
   "date_unreadable",
   "amount_unreadable",
   "too_many_decimals",
@@ -19,25 +19,25 @@ export const unreadableRowSchema = z.object({
 
 export type UnreadableRow = z.infer<typeof unreadableRowSchema>;
 
-export const signConventions = ["account", "inverted"] as const;
+const signConventions = ["account", "inverted"] as const;
 
 export type SignConvention = (typeof signConventions)[number];
 
-export const dateOrders = ["dmy", "mdy"] as const;
+const dateOrders = ["dmy", "mdy"] as const;
 
 export type DateOrder = (typeof dateOrders)[number];
 
-export const dateFormats = ["iso", "mdy", "dmy"] as const;
+const dateFormats = ["iso", "mdy", "dmy"] as const;
 
 export type DateFormat = (typeof dateFormats)[number];
 
-export const decimalSeparators = [".", ","] as const;
+const decimalSeparators = [".", ","] as const;
 
 export type DecimalSeparator = (typeof decimalSeparators)[number];
 
 const columnSchema = z.number().int().nonnegative();
 
-export const hasHeaderSchema = z.union([z.literal("auto"), z.boolean()]).default("auto");
+const hasHeaderSchema = z.union([z.literal("auto"), z.boolean()]).default("auto");
 
 /** Day, month and year fields in a statement, before the date order is applied. */
 export const statementDatePattern = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/;

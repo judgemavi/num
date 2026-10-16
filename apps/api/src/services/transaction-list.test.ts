@@ -202,7 +202,7 @@ test("sort follows the column and keeps id as the tie break", () => {
     expect(byPayee.items.map((item) => item.payeeRaw)).toEqual(["A", "B"]);
     const byAmount = listTransactions(fixture.db, { ...page, sort: "amount", dir: "desc" });
     expect(byAmount.items.every((item) => item.amount === -50)).toBe(true);
-    const ids = [...byAmount.items.map((item) => item.id)].sort();
+    const ids = byAmount.items.map((item) => item.id).sort();
     expect(byAmount.items.map((item) => item.id)).toEqual([...ids].reverse());
   } finally {
     fixture.close();

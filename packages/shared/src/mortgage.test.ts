@@ -238,10 +238,12 @@ describe("mortgage schedule", () => {
     expect(schedule.nonAmortizing).toBe(false);
     expect(schedule.payments.length).toBeGreaterThan(1000);
     const first = schedule.payments[0];
+    if (!first) throw new Error("The first payment is missing.");
     expect(first).toMatchObject({ date: "2024-05-01", payment: 785_580, principal: 0, interest: 785_580 });
     expect(first.balance).toBeGreaterThan(stubLoan.principal);
     const regular = mortgagePeriodRate(4_990, "semiannual", "weekly");
     const second = schedule.payments[1];
+    if (!second) throw new Error("The second payment is missing.");
     expect(second.interest).toBe(roundToStep(first.balance * regular, 10));
     expect(second.principal).toBe(785_580 - second.interest);
     expect(second.principal).toBeGreaterThan(0);
@@ -281,8 +283,11 @@ describe("opening balance and opening date", () => {
   test("a different opening balance changes the schedule and the split", () => {
     const base = mortgageSchedule(mortgageLoan(terms, { balance: -hundredThousand, date: "2000-01-01" }, 10));
     const lower = mortgageSchedule(mortgageLoan(terms, { balance: -50_000_000, date: "2000-01-01" }, 10));
-    expect(lower.payments[0].interest).toBeLessThan(base.payments[0].interest);
-    expect(lower.payments[0].balance).toBeLessThan(base.payments[0].balance);
+    const firstLower = lower.payments[0];
+    const firstBase = base.payments[0];
+    if (!firstLower || !firstBase) throw new Error("The first payments are missing.");
+    expect(firstLower.interest).toBeLessThan(firstBase.interest);
+    expect(firstLower.balance).toBeLessThan(firstBase.balance);
     const split = (balance: number) =>
       mortgageSplitForDate({
         terms: { ...terms, accountId: "00000000-0000-4000-8000-000000000001" },
@@ -300,7 +305,10 @@ describe("opening balance and opening date", () => {
   test("a later opening date charges interest from that date", () => {
     const early = mortgageSchedule(mortgageLoan(terms, { balance: -hundredThousand, date: "2000-01-01" }, 10));
     const late = mortgageSchedule(mortgageLoan(terms, { balance: -hundredThousand, date: "2000-01-16" }, 10));
-    expect(late.payments[0].interest).toBeLessThan(early.payments[0].interest);
+    const firstLate = late.payments[0];
+    const firstEarly = early.payments[0];
+    if (!firstLate || !firstEarly) throw new Error("The first payments are missing.");
+    expect(firstLate.interest).toBeLessThan(firstEarly.interest);
   });
 
   test("the first payment warning fires when the first payment is not one period after the opening date", () => {

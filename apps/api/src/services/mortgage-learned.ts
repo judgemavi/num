@@ -109,8 +109,8 @@ export function mortgageLinesFor(db: Reader, mortgageAccountId: string, fromAcco
   }
   const sign = amount < 0 ? -1 : 1;
   return [
-    { amount: sign * fitted.interest, memo: null, categoryId: split.interestCategoryId, transferAccountId: null, tagIds: [] as string[] },
-    { amount: sign * fitted.principal, memo: null, categoryId: null, transferAccountId: mortgageAccountId, tagIds: [] as string[] },
+    { amount: sign * fitted.interest, memo: null, categoryId: split.interestCategoryId, transferAccountId: null, tagIds: [] },
+    { amount: sign * fitted.principal, memo: null, categoryId: null, transferAccountId: mortgageAccountId, tagIds: [] },
   ];
 }
 

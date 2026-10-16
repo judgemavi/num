@@ -8,16 +8,13 @@ import { reviewCountSchema, transactionReviewSchema } from "./review";
 
 export const transactionStatuses = ["open", "cleared"] as const;
 
-export type TransactionStatus = (typeof transactionStatuses)[number];
-
 export const transactionSources = ["import", "manual", "mcp"] as const;
 
 export type TransactionSource = (typeof transactionSources)[number];
 
-
 const optionalText = z.string().trim().min(1).nullable().optional();
 
-export const transactionLineInputSchema = z
+const transactionLineInputSchema = z
   .object({
     amount: amountSchema,
     memo: optionalText,
@@ -27,7 +24,7 @@ export const transactionLineInputSchema = z
   })
   .refine((line) => line.categoryId == null || line.transferAccountId == null, { path: ["categoryId"] });
 
-export const transactionLineSchema = z.object({
+const transactionLineSchema = z.object({
   id: z.uuid(),
   amount: amountSchema,
   memo: z.string().nullable(),
@@ -60,7 +57,7 @@ export const transactionCreateSchema = transactionWriteSchema.extend({
  * - `refund_purchase`: a refund with a purchase links it. No purchase records `not_linked`.
  * - `recurring_ambiguous`: the transaction is the payment of the occurrence. Send it only when the person chose it.
  */
-export const reviewAnswerSchema = z.discriminatedUnion("question", [
+const reviewAnswerSchema = z.discriminatedUnion("question", [
   z.object({ question: z.literal("transfer_pair"), otherId: z.uuid(), asOf: isoDateSchema }),
   z.object({ question: z.literal("refund_purchase") }),
   z.object({ question: z.literal("recurring_ambiguous"), bucketId: z.uuid(), dueDate: isoDateSchema }),
@@ -104,9 +101,9 @@ export const transactionSchema = z.object({
   lines: z.array(transactionLineSchema),
 });
 
-export const transactionSortColumns = ["date", "amount", "payeeRaw"] as const;
+const transactionSortColumns = ["date", "amount", "payeeRaw"] as const;
 
-export const transactionFilterSchema = z.object({
+const transactionFilterSchema = z.object({
   q: queryText,
   accountId: queryId,
   categoryId: queryId,
@@ -127,7 +124,7 @@ export const transactionListApiQuerySchema = transactionListQuerySchema.extend({
 });
 
 /** The Needs review list also sorts by confidence. */
-export const reviewSortColumns = [...transactionSortColumns, "confidence"] as const;
+const reviewSortColumns = [...transactionSortColumns, "confidence"] as const;
 
 /** The Needs review list: the same filters and pages as the transaction list, and one more sort column. */
 export const transactionReviewListQuerySchema = listQuerySchema(reviewSortColumns).extend(transactionFilterSchema.shape);
@@ -135,7 +132,7 @@ export const transactionReviewListQuerySchema = listQuerySchema(reviewSortColumn
 /** The query of the Needs review read: the list query and `asOf`. */
 export const transactionReviewQuerySchema = transactionReviewListQuerySchema.extend(asOfQuerySchema.shape);
 
-export const transactionListItemSchema = z.object({
+const transactionListItemSchema = z.object({
   id: z.uuid(),
   accountId: z.uuid(),
   accountName: z.string(),
@@ -175,7 +172,6 @@ export const transactionReviewReadSchema = z.object({
 
 export type TransactionFilter = z.output<typeof transactionFilterSchema>;
 export type TransactionLineInput = z.infer<typeof transactionLineInputSchema>;
-export type TransactionLine = z.infer<typeof transactionLineSchema>;
 export type TransactionCreate = z.infer<typeof transactionCreateSchema>;
 export type TransactionUpdate = z.infer<typeof transactionUpdateSchema>;
 export type ReviewAnswer = z.infer<typeof reviewAnswerSchema>;

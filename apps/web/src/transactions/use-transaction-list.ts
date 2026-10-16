@@ -39,7 +39,7 @@ function useAllPage() {
 }
 
 /** The page of the Needs review page, with the counts of the levels on all pages. */
-export function useReviewPage() {
+function useReviewPage() {
   const list = useReviewSearch();
   return { ...list, page: useSuspenseQuery(transactionReviewListQuery(list.shown, localAsOf())).data };
 }

@@ -16,7 +16,7 @@ import type { LedgerLine } from "./ledger-lines";
 export type TimelineScope = { categoryId: string | null; tagged: boolean };
 
 /** Actual income and spending of each month in the period. With a category or a tag, only the spending. */
-export function actualMonths(facts: readonly LedgerLine[], period: Period, scope: TimelineScope): Map<string, InsightFlow> {
+function actualMonths(facts: readonly LedgerLine[], period: Period, scope: TimelineScope): Map<string, InsightFlow> {
   const months = new Map<string, InsightFlow>(periodMonths(period.from, period.to).map((month) => [month, { income: 0, spending: 0 }]));
   const spendingOnly = scope.categoryId !== null || scope.tagged;
   for (const fact of facts) {
@@ -38,7 +38,7 @@ export function actualMonths(facts: readonly LedgerLine[], period: Period, scope
  * One row for each month from the start of the period to the last forecast month.
  * The month of asOf has an actual part (to asOf) and a forecast part (the forecast days in that month).
  */
-export function timelineMonths(period: Period, actual: Map<string, InsightFlow>, forecast: readonly ForecastMonth[]): InsightTimelineMonth[] {
+function timelineMonths(period: Period, actual: Map<string, InsightFlow>, forecast: readonly ForecastMonth[]): InsightTimelineMonth[] {
   const last = forecast.at(-1)?.month ?? period.to.slice(0, 7);
   const end = last > period.to.slice(0, 7) ? `${last}-01` : period.to;
   const planned = new Map(forecast.map((item) => [item.month, { income: item.income, spending: item.spending }]));

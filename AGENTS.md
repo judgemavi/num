@@ -212,6 +212,7 @@ bun test
 bun run --filter api typecheck
 bun run --filter web build
 bun run --filter web lint
+bunx oxlint apps/api/src packages/db/src packages/shared/src
 bun run --filter @num/shared typecheck
 bun run --filter @num/db typecheck
 bun run --filter web typecheck:tests

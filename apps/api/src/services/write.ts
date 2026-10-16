@@ -20,7 +20,7 @@ function jsonText(value: unknown) {
 
 export type AuditSource = (typeof auditSources)[number];
 
-export type AuditEntry = {
+type AuditEntry = {
   entity: string;
   entityId: string;
   action: string;
@@ -42,7 +42,7 @@ export type WriteInput = {
 export type Reader = Db | WriteTx;
 
 /** The audit log keeps a row without its id. The id is in `entityId`. */
-export function withoutId<T extends { id: string }>({ id, ...rest }: T) {
+export function withoutId<T extends { id: string }>({ id: _id, ...rest }: T) {
   return rest;
 }
 
@@ -53,7 +53,7 @@ export function keepOmitted<T>(next: T | undefined, stored: T) {
 
 const auditSourceOverride = new AsyncLocalStorage<AuditSource>();
 
-export function currentAuditSource(): AuditSource | undefined {
+function currentAuditSource(): AuditSource | undefined {
   return auditSourceOverride.getStore();
 }
 
