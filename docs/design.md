@@ -41,6 +41,7 @@ Put these in `apps/web/src/index.css` as CSS variables. Map them to the shadcn v
 | pos (green) | `#2B7A4E` | — |
 | pos-soft | `#E4F2E9` | positive pill fill |
 | est | `#7C7B88` | neutral chart colour (Uncategorized) |
+| no-group | `#A9A8B3` | neutral chart colour (No group) |
 | row-hover | `#EFEFFC` | list row hover |
 | scrim | `rgb(23 23 28 / .45)` | dialog overlay |
 | shadow | `0 1px 2px rgb(0 0 0/.05), 0 16px 40px rgb(23 23 28/.14)` | dialogs, popovers, the action bar |
@@ -132,7 +133,7 @@ global component CSS (AGENTS.md).
 |---|---|
 | Button | Height ≥ 44px, pill shape, weight 600. Variants: primary (iris), secondary (surface + `control` border), ghost (muted text). One primary button in each decision. |
 | Chip | Toggle choice in a row. It is the shadcn `ToggleGroup` item (and `Toggle`). Separate pills with a gap, never joined segments. Pill, 44px, `control` border. Selected: iris fill, white text, weight 600. Can show a small secondary value. The colour and icon pickers of a bucket use the same `ToggleGroup` with swatches. |
-| Pill | Status label, 24px high. Neutral, positive (pos-soft/pos) or attention (attn-soft/attn). |
+| Pill | Status label, 24px high. Neutral, positive (pos-soft/pos), attention (attn-soft/attn), or butter (butter fill/glyph, rising trend icon) for a spending increase. |
 | Count | Tomato badge with ink text. Only for "needs you" counts. |
 | Amount | Formats with `Intl` in the browser. Tabular figures. "Owed" label for liabilities. 16px/600. In a secondary line (13px, normal weight) it has the size and the weight of the line. |
 | ListCard | One card. Each row is a shadcn `Item`. A row that opens has one target that covers the row. Rows: min height 60px (48px simple lists, 36px dense lists; 44px dense on a touch screen), hairline between rows, `row-hover` on hover, the name in iris on hover. Group header rows: 12px uppercase label left, group total right; never doubled lines. All lists use one row style: the name column is flexible, the columns after it have fixed widths and line up. Long secondary text goes below the name. The More menu (⋯) is an icon-only ghost button at the end of line 1, after the amount; it adds no height and does not cover the amount. A row with no menu in a list with menus keeps the empty space. In a narrow row, the amount goes on line 1 after the name, and a bar takes a full line under the text. The name truncates first; a date and an amount never wrap. Bucket rows: line 1 icon, name, balance; line 2 muted detail (a bill: "Due <date> · of <amount>" and the short or fill text), breaking only after a "·"; then a thin full-width bar (not for an income). A dense list has a dot, the name and the amount on one line. |
@@ -209,7 +210,8 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
   The `asOf` marker is `muted`, dashed.
 - Spending donut: two rings. The inner ring is the groups. Each slice uses its group's chart colour at full opacity.
   The outer ring is the categories. Each uses its group's shades in order, darkest first, repeating after five.
-  No group uses slate. "Uncategorized" is `est`. The list dots use the same colours as the slices.
+  "No group" uses `no-group`; its categories mix that grey with 5%, 10%, 15%, 20% and 25% white, then repeat.
+  "Uncategorized" is `est`. Keep white separators between slices. The list dots use the same colours as the slices.
   A slice has a hover tooltip in the style of the timeline tooltip.
 
 ## 6a. Transaction editor
@@ -329,15 +331,13 @@ give each one an accessible label, or `aria-hidden` when the text already says t
   transfer = butter, imports = teal, goals and savings rate = mint, emergency fund and savings used = pink,
   over budget, a short bill, a short pool and an account that does not match its bank = attention (tomato).
 
-The increase pill on a category row of the Spending list uses butter fill and glyph, with a rising trend icon.
-
 **Home "Needs you":** one ListCard with a tomato count badge. Each row: an IconTile with the hue of its kind, a title,
 one short detail line and a chevron. The whole row opens the screen of its fix. Home is read-only: a row has no buttons
 and no menu. With no item, the "Needs you" section does not show. A section title "Spending" (display font, uppercase) starts the Spending
 part of Home.
 - **Buckets and category groups:** each has a `color` from the identity palette. The user picks it. A bucket also has an
   `icon` from a fixed lucide set. A new bucket or group gets the next colour in palette order, from the number of
-  stored buckets or groups. Setup gives the default groups colours in the same rotation. Bills and incomes use all 12 colours.
+  stored buckets or groups. Setup gives the default groups colours in list order with the same rotation.
 
 ## 9. Account kind picker
 

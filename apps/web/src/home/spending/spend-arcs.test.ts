@@ -50,3 +50,23 @@ test("group colours stay fixed when spending changes their order", () => {
   expect(first).toEqual(second);
   expect(first.get("item-g2")?.value).toBe("var(--color-pink-chart)");
 });
+
+test("No group uses neutral grey shades, separate from slate and Uncategorized", () => {
+  const none = { ...group("none", [item("c1", 10_000), item("c2", 5_000)]), id: null, kind: "none" as const, color: null };
+  const slate = { ...group("g12", [item("c3", 10_000)]), color: "slate" as const };
+  const uncategorized = { ...none, kind: "uncategorized" as const, categories: [] };
+  const { colors } = spendArcs([none, slate, uncategorized]);
+  expect(colors.get("none-")?.value).toBe("var(--color-no-group)");
+  expect(colors.get("item-c1")?.value).toBe("var(--color-no-group-1)");
+  expect(colors.get("item-c2")?.value).toBe("var(--color-no-group-2)");
+  expect(colors.get("item-g12")?.value).toBe("var(--color-slate-chart)");
+  expect(colors.get("uncategorized-")?.value).toBe("var(--est)");
+});
+
+test("only rows with an arc get a coloured dot", () => {
+  const positive = group("positive", [item("spent", 10_000), item("zero", 0), item("refund", -5_000)]);
+  const zero = group("zero-group", [item("zero-category", 0)]);
+  const negative = group("negative-group", [item("refunded-category", -10_000)]);
+  const { colors } = spendArcs([positive, zero, negative]);
+  expect([...colors.keys()]).toEqual(["item-positive", "item-spent"]);
+});

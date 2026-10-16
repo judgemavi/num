@@ -6,6 +6,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+    --color-no-group: #A9A8B3;
+    --color-no-group-1: color-mix(in srgb, var(--color-no-group) 95%, white);
+    --color-no-group-2: color-mix(in srgb, var(--color-no-group) 90%, white);
+    --color-no-group-3: color-mix(in srgb, var(--color-no-group) 85%, white);
+    --color-no-group-4: color-mix(in srgb, var(--color-no-group) 80%, white);
+    --color-no-group-5: color-mix(in srgb, var(--color-no-group) 75%, white);
+
     --color-sky-fill: #DCF4FF;
     --color-sky-glyph: #005E8F;
     --color-sky-chart: #248FCC;

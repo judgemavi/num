@@ -8,7 +8,7 @@ import { readNeedsYou } from "./needs-you";
 import { createTransaction } from "./transactions";
 import { tempDatabase } from "./test-support";
 
-test("only the three largest increases are on this month's category rows, with the whole-book median", () => {
+test("only the three largest increases are on this month's category rows, with no tag", () => {
   const { db, close } = tempDatabase();
   try {
     const cash = account(db, "Cash", "chequing", 1_000_000);
@@ -32,7 +32,7 @@ test("only the three largest increases are on this month's category rows, with t
       { delta: 40_000, median: 20_000 }, { delta: 30_000, median: 20_000 }, { delta: 20_000, median: 20_000 }, null,
     ]);
     expect(report.groups[0]?.color).toBe("olive");
-    expect(readInsights(db, { ...query, tagId: tag.id }).groups.flatMap((group) => group.categories).map((row) => row.increase)).toEqual(rows.map((row) => row.increase));
+    expect(readInsights(db, { ...query, tagId: tag.id }).groups.flatMap((group) => group.categories).map((row) => row.increase)).toEqual([null, null, null, null]);
     expect(readInsights(db, { ...query, category: categories[0]?.id }).groups).toEqual(report.groups);
     for (const period of [{ window: "3" }, { window: "3", month: "2026-10" }, { window: "custom", from: "2026-09-01", to: "2026-10-08" }] as const) {
       expect(readInsights(db, { asOf: query.asOf, ...period }).groups.flatMap((group) => group.categories).every((row) => row.increase === null)).toBe(true);

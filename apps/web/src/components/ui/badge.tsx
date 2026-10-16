@@ -11,6 +11,7 @@ const badgeVariants = cva(
         neutral: "h-6 rounded-full border-0 bg-sunken px-2 text-xs font-semibold text-muted-foreground",
         positive: "h-6 rounded-full border-0 bg-pos-soft px-2 text-xs font-semibold text-pos",
         attention: "h-6 rounded-full border-0 bg-attn-soft px-2 text-xs font-semibold text-attn",
+        butter: "h-6 rounded-full border-0 bg-butter-fill px-2 text-xs font-semibold text-butter-glyph",
         count: "h-[22px] min-w-[22px] rounded-full border-0 bg-attn-fill px-1.5 text-xs font-bold text-foreground",
       },
     },

@@ -1,3 +1,4 @@
+import type { InsightGroupRow } from "@num/shared";
 import { TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ReactNode } from "react";
@@ -13,7 +14,7 @@ export type SpendListRow = {
   name: string;
   amount: number;
   inflow: number | null;
-  increase: { delta: number; median: number } | null;
+  increase: InsightGroupRow["categories"][number]["increase"];
   color: SliceColor | undefined;
   current: boolean;
   onOpen: () => void;
@@ -44,7 +45,7 @@ export function CategorySpendList({ title, rows, actions }: { title: string; row
               {row.inflow === null ? null : <span className="text-[13px] font-normal text-muted-foreground"> · In {formatMoney(currency, row.inflow)}</span>}
             </span>
             {row.increase ? (
-              <Badge className="bg-butter-fill text-butter-glyph">
+              <Badge variant="butter">
                 <TrendingUp aria-hidden="true" />
                 Up {formatMoney(currency, row.increase.delta)} from {formatMoney(currency, row.increase.median)}
               </Badge>

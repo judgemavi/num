@@ -4,7 +4,7 @@ import { choiceIn } from "@/components/choice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCategoryNames, useGroupNames } from "@/editors/lookups";
-import { CategorySpendList, type SpendListRow } from "@/home/spending/category-spend-list";
+import { CategorySpendList } from "@/home/spending/category-spend-list";
 import { monthTitle } from "@/home/spending/format";
 import { rowKey, spendArcs, type Arc } from "@/home/spending/spend-arcs";
 import { SpendDonut } from "@/home/spending/spend-donut";
@@ -143,7 +143,8 @@ export function SelectedSpendList() {
     ? selectedGroup.categories.map((row) => categoryRow(row))
     : byCategory
       ? data.groups
-          .flatMap<SpendListRow>((group) => (group.kind === "uncategorized" ? [groupRow(group)] : group.categories.map((row) => categoryRow(row))))
+          .map((group) => (group.kind === "uncategorized" ? [groupRow(group)] : group.categories.map((row) => categoryRow(row))))
+          .flat()
           .sort((a, b) => b.amount - a.amount)
       : data.groups.map(groupRow);
   const title = [search.month ? monthTitle(search.month) : null, selectedGroup ? groupName(selectedGroup) : null].filter(Boolean).join(": ") || "Groups and categories";

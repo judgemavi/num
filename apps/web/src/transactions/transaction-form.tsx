@@ -147,7 +147,7 @@ export function TransactionForm({
           ) : null}
           {transaction?.autoReason ? (
             <div>
-              <ReviewPill text={levelLabel("sure")} />
+              <ReviewPill review={{ text: levelLabel("sure"), tone: "positive" }} />
             </div>
           ) : null}
           {imported ? (

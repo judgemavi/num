@@ -48,7 +48,12 @@ function insertSetting(tx: WriteTx, key: (typeof settings.$inferInsert)["key"], 
 }
 
 function insertDefaultCategories(tx: WriteTx) {
-  for (const [index, group] of defaultCategoryGroups.entries()) {
+  const groups = [...defaultCategoryGroups].sort((left, right) => {
+    const a = foldName(left.name);
+    const b = foldName(right.name);
+    return a < b ? -1 : a > b ? 1 : left.name < right.name ? -1 : left.name > right.name ? 1 : 0;
+  });
+  for (const [index, group] of groups.entries()) {
     const color = nextIdentityColor(index);
     const groupId = crypto.randomUUID();
     tx.insert(categoryGroups).values({ id: groupId, name: group.name, color, sortKey: foldName(group.name) }).run();

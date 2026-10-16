@@ -38,7 +38,6 @@ function sliceLines(currency: string, arc: Arc, nameOf: SpendDonutProps["nameOf"
 /** The tooltip of a slice, in the chart tooltip style. */
 function SliceTooltip({ shown, lines }: { shown: Shown; lines: string[] }) {
   const [title, ...rest] = lines;
-  // The tooltip is outside the chart box, where the chart colour variables are not set. It uses the token itself.
   const color = shown.arc.color.value;
   const left = Math.min(80, Math.max(20, (shown.x / shown.size) * 100));
   return (

@@ -1,17 +1,5 @@
-import { z } from "zod";
-import { amountSchema as money } from "./money";
-import { expenseSpending, isExpenseLine, monthKeySchema, priorMonths, type FlowLine } from "./month";
+import { expenseSpending, isExpenseLine, priorMonths, type FlowLine } from "./month";
 import { medianAmount } from "./recurring-calc";
-
-export const spendingIncreaseSchema = z.object({
-  categoryId: z.uuid(),
-  month: monthKeySchema,
-  amount: money,
-  median: money,
-  delta: money,
-});
-
-export type SpendingIncrease = z.infer<typeof spendingIncreaseSchema>;
 
 function divRoundHalfAway(numerator: bigint, denominator: bigint) {
   const negative = numerator < 0n !== denominator < 0n;
@@ -59,7 +47,7 @@ function compareId(left: string, right: string): number {
 /**
  * The 3 largest increases of one month by category, against the median of the 3 months before it. The Spending list shows them.
  */
-export function spendingIncreases(month: string, lines: readonly FlowLine[]): SpendingIncrease[] {
+export function spendingIncreases(month: string, lines: readonly FlowLine[]) {
   const byMonth = expenseByMonth(lines);
   const earlier = priorMonths(month);
   const ids = new Set<string>();
@@ -72,7 +60,7 @@ export function spendingIncreases(month: string, lines: readonly FlowLine[]): Sp
     .map((categoryId) => {
       const amount = byMonth.get(month)?.get(categoryId) ?? 0;
       const median = medianAmount(earlier.map((key) => byMonth.get(key)?.get(categoryId) ?? 0), 1);
-      return { categoryId, month, amount, median, delta: amount - median };
+      return { categoryId, median, delta: amount - median };
     })
     .filter((row) => row.delta > 0)
     .sort((left, right) => right.delta - left.delta || compareId(left.categoryId, right.categoryId))

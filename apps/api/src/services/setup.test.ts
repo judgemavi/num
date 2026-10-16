@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { accounts, migrateDatabase, openDatabase, transactions } from "@num/db";
-import { storedPayee } from "@num/shared";
+import { nextIdentityColor, storedPayee } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
 import { ServiceError } from "../service-error";
@@ -122,5 +122,20 @@ test("a currency change after the first transaction is a relabel and keeps the s
     expect(db.sqlite.query("select amount from transactions").all()).toEqual([{ amount: -1000 }]);
   } finally {
     db.close();
+  }
+});
+
+test("setup assigns group colours in the same list order as the migration", () => {
+  const book = tempDatabase();
+  try {
+    runSetup(book.db, { asOf: "2026-10-07", currency: "CAD", categorySet: "default", source: "ui", at });
+    const groups = book.sqlite.query<{ id: string; color: string }, []>("select id, color from category_groups order by sort_key, name, id").all();
+    expect(groups.map((group) => group.color)).toEqual(groups.map((_, index) => nextIdentityColor(index)));
+    for (const group of groups) {
+      const entry = book.sqlite.query<{ after_json: string }, [string]>("select [after] as after_json from audit_log where entity = 'category_groups' and entity_id = ?").get(group.id);
+      expect(JSON.parse(entry?.after_json ?? "null")).toMatchObject({ color: group.color });
+    }
+  } finally {
+    book.close();
   }
 });

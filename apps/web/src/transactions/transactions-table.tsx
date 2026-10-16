@@ -169,7 +169,7 @@ export function TransactionsTable(props: Props) {
           {/* The review text does not truncate: the label before it truncates. */}
           <div className="flex items-center gap-1 text-[13px] text-muted-foreground">
             <span className="min-w-0 truncate">{[formatDate(row.date), label, row.status === "open" ? "Pending" : null].filter(Boolean).join(" · ")}</span>
-            <ReviewPill text={review} />
+            <ReviewPill review={review} />
             {balance ? <small className="ml-auto shrink-0 pl-1 text-[13px]">{balance}</small> : null}
           </div>
         </TableCell>

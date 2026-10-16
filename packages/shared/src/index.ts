@@ -155,7 +155,7 @@ export {
   type FlowLine,
 } from "./month";
 export {
-  savingsRateMilliPct, spendingIncreases, type SpendingIncrease,
+  savingsRateMilliPct, spendingIncreases,
 } from "./spending-increases";
 export * from "./pool";
 export * from "./needs-you";

@@ -41,3 +41,9 @@ export function colorLabel(color: Hue): string {
 export function hueVars(hue: Hue) {
   return { "--hb": hueColor[hue].fill, "--hf": hueColor[hue].glyph };
 }
+
+/** Neutral colours for categories that have no group, separate from slate and Uncategorized. */
+export const noGroupColor = {
+  chart: "var(--color-no-group)",
+  shades: ["var(--color-no-group-1)", "var(--color-no-group-2)", "var(--color-no-group-3)", "var(--color-no-group-4)", "var(--color-no-group-5)"],
+};

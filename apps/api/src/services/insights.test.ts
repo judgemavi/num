@@ -255,7 +255,7 @@ test("a tag limits the report to its spending lines: two tags count in full for 
 
     const atWork = readInsights(book.db, { ...query, tagId: work.id });
     expect(atWork.spending).toBe(40_000);
-    expect(atWork.groups).toEqual([{ id: null, kind: "none", color: null, amount: 40_000, inflow: null, categories: [{ id: dining.id, kind: "item", amount: 40_000, inflow: null, increase: { delta: 110_000, median: 0 } }] }]);
+    expect(atWork.groups).toEqual([{ id: null, kind: "none", color: null, amount: 40_000, inflow: null, categories: [{ id: dining.id, kind: "item", amount: 40_000, inflow: null, increase: null }] }]);
 
     const tripDining = readInsights(book.db, { ...query, tagId: trip.id, category: dining.id });
     expect(tripDining.timeline).toMatchObject({ categoryId: dining.id, forecastEnd: null });

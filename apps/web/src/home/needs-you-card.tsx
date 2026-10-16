@@ -153,7 +153,6 @@ function useRows(items: readonly NeedsYouItem[]): Row[] {
             void go({ to: "/", search: month ? { window: "6", month } : {} });
           },
         }];
-
     }
   });
 }

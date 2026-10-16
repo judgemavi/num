@@ -16,22 +16,26 @@ export function levelLabel(level: ReviewLevel): string {
   return "No suggestion";
 }
 
+function reviewStatus(text: string, tone: "positive" | "neutral" | "attention") {
+  return { text, tone };
+}
+
 /**
  * The review text of a row in the table. On the All page: the level of a suggestion or of an automatic label, and
  * "Needs review" for a question or no suggestion. On the Needs review page: "Question" for a question, the level, and
  * nothing for no suggestion. A row that does not need review has no text.
  */
-export function reviewText(review: TransactionReview | null, onReview: boolean): string | null {
+export function reviewText(review: TransactionReview | null, onReview: boolean) {
   if (review === null) {
     return null;
   }
   if (review.question !== "categorize") {
-    return onReview ? "Question" : "Needs review";
+    return reviewStatus(onReview ? "Question" : "Needs review", "attention");
   }
   if (review.level === "none") {
-    return onReview ? null : "Needs review";
+    return onReview ? null : reviewStatus("Needs review", "attention");
   }
-  return levelLabel(review.level);
+  return reviewStatus(levelLabel(review.level), review.level === "sure" ? "positive" : review.level === "likely" ? "neutral" : "attention");
 }
 
 /** The text of the toast after approve or a bulk edit: "10 approved · 2 skipped". */

@@ -17,7 +17,7 @@ export function GroupForm({ group, initialName = "", inline = false, idPrefix = 
   const form = useAppForm({
     defaultValues: start,
     validators: {
-      onSubmit: ({ value }) => categoryGroupCreateSchema.safeParse(value).success ? undefined : "Check the fields.",
+      onSubmit: categoryGroupCreateSchema.required({ color: true }),
     },
     onSubmit: async ({ value, formApi }) => {
       const body = { name: value.name.trim(), color: value.color };

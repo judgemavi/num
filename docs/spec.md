@@ -730,7 +730,8 @@ It has the same sort orders, and also a sort by confidence. The page has only th
 "Needs review · N". The search of both pages matches the description and the merchant name.
 - **Review stripe and review text:** on the All page and on the page of an account, a row that needs review has a
   stripe in the attention colour at its left edge. The Needs review page has no stripe: all its rows need review. On
-  both pages, the review text of the row is a pill after the category: Sure is positive, Likely is neutral, and Maybe, Needs review and Question use attention. On the All page it is the level (Sure,
+  both pages, the review text of the row is a pill after the category: Sure is positive, Likely is neutral, and Maybe,
+  Needs review and Question use attention. On the All page it is the level (Sure,
   Likely, Maybe) when the row has a suggestion or an automatic label, and "Needs review" when it has a question or no
   suggestion. Other rows have no stripe and no review text. The table has no Status column.
 - **Needs review page:** the review text is the level, "Question" for a question, and nothing for a row with no
@@ -950,7 +951,8 @@ Spending is a part of Home (§14). It has no screen of its own.
   summary shows only the range and the spending of the tag (example: "Jun 2026 – Sep 2026 · $3,240 spent on Italy
   Vacation 2026"). It shows no income and no savings rate.
 - **Increases.** The 3 largest increases by category in the month of `asOf`, compared with the median of the 3 months
-  before it. They show on category rows of the Spending list, only for the month of `asOf` ("This month"). There are no decreases and no new merchants.
+  before it. They show on category rows of the Spending list, only with "This month" and no tag selected. There are no
+  decreases and no new merchants.
 - **Period.** One selector: 1 (default, "This month"), 3, 6 or 12 months, All, or Custom (From and To). "1" is the
   month of `asOf`.
   "All" starts at the first transaction. The breakdowns use the period up to `asOf`.
@@ -960,7 +962,7 @@ Spending is a part of Home (§14). It has no screen of its own.
   with more than one tag counts in full for each of its tags. A refund line with the tag decreases the spending.
   Transfers are not spending. The URL keeps the tag (`tagId`), as it keeps the period. A tag id that is not valid goes
   back to the default. The spending report query of the API takes an optional `tagId`. With a tag, the report has no
-  income, no savings and no savings rate. Increases and the Needs you checks (§10) do not use the tag.
+  income, no savings and no savings rate. The Needs you checks (§10) do not use the tag.
 - **Clear.** One "Clear" button in the row of the period selector and the tag selector. It shows only when a month
   bar, a donut slice (a group or a category) or a tag is selected. A click removes the month, the group, the category
   and the tag. It does not change the period or the "Groups | Categories" choice of the list.

@@ -34,7 +34,7 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
   const tagId = query.tagId ?? null;
   const facts = loadLedgerLines(db, { from: period.from, through: period.to, tagId: query.tagId });
   const totals = spendTotals(facts, range);
-  const increases = new Map((window === "1" ? readSpendingIncreases(db, query.asOf) : []).map((row) => [row.categoryId, { delta: row.delta, median: row.median }]));
+  const increases = new Map((window === "1" && tagId === null ? readSpendingIncreases(db, query.asOf) : []).map((row) => [row.categoryId, { delta: row.delta, median: row.median }]));
   const colors = new Map(db.select({ id: categoryGroups.id, color: categoryGroups.color }).from(categoryGroups).all().map((row) => [row.id, row.color]));
   const groups = groupRows(facts, range, colors).map((group) => ({
     ...group,
