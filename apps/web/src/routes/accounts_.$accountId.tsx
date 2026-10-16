@@ -1,4 +1,5 @@
-import { accountActivityQuerySchema, searchWithDefaults } from "@num/shared";
+import { valuationListQuery } from "@/api/valuations";
+import { accountActivityQuerySchema, searchWithDefaults, usesValuation } from "@num/shared";
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
 import { AccountScreen } from "@/accounts/account-screen";
 import { accountQuery } from "@/api/accounts";
@@ -10,9 +11,11 @@ export const Route = createFileRoute("/accounts_/$accountId")({
   search: {
     middlewares: [stripSearchParams({ page: 1 })],
   },
-  // The lists of the page are under the account. Their reads start here, thus they do not wait for the read of the account.
+  // Start the page reads here. Start valuations as soon as the account kind is known.
   loader: ({ context: { queryClient }, params: { accountId } }) => {
-    void queryClient.prefetchQuery(accountQuery(accountId));
+    void queryClient.ensureQueryData(accountQuery(accountId)).then((account) => {
+      if (usesValuation(account.kind)) void queryClient.prefetchQuery(valuationListQuery(accountId));
+    }).catch(() => undefined);
     void queryClient.prefetchQuery(bankBalanceListQuery(accountId));
     void queryClient.prefetchQuery(accountImportsQuery(accountId));
   },

@@ -1,3 +1,5 @@
+import { usesValuation } from "@num/shared";
+import { ValuationHistory } from "@/accounts/valuation-history";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
@@ -71,6 +73,7 @@ function AccountPage() {
       <div className="grid items-start gap-5">
         {row.kind === "mortgage" ? <MortgagePanel accountId={row.id} /> : null}
         <AccountTransactions />
+        {usesValuation(row.kind) ? <ValuationHistory accountId={row.id} /> : null}
         <BankBalanceHistory accountId={row.id} />
         <AccountImports accountId={row.id} />
       </div>

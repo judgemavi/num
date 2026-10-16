@@ -18,6 +18,7 @@ export {
 export * from "./amount-sign";
 export * from "./category";
 export * from "./bank-balance";
+export * from "./valuation";
 export {
   openingFromFirstRow, openingFromBankBalance, type OpeningSuggestion,
 } from "./opening";

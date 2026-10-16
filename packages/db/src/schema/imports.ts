@@ -83,7 +83,6 @@ export const valuations = sqliteTable(
     date: text("date").notNull(),
     balance: integer("balance").notNull(),
     note: text("note"),
-    documentId: text("document_id").references(() => documents.id),
   },
   (table) => [uniqueIndex("valuations_account_date").on(table.accountId, table.date)],
 );

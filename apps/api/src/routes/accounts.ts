@@ -89,6 +89,7 @@ const updateRoute = createRoute({
     },
     400: errorResponse,
     404: errorResponse,
+    409: errorResponse,
   },
 });
 

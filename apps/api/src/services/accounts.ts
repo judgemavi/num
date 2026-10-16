@@ -9,6 +9,7 @@ import {
   type AccountListQuery,
   type AccountUpdate,
   utcNow,
+  usesValuation,
 } from "@num/shared";
 import { eq, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
@@ -114,6 +115,9 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
     const storedTerms = readTerms(tx, id) ?? null;
     const next = mergedWrite(accountCreateSchema, { ...existing, mortgageTerms: storedTerms }, input);
     assertSameClass(existing.kind, next.kind);
+    if (usesValuation(existing.kind) && !usesValuation(next.kind) && valuationAccountIds(tx, [id]).has(id)) {
+      throw new ServiceError("account_has_valuations", 409);
+    }
     const openingDate = next.openingDate ?? null;
     const openingBalance = next.openingBalance ?? existing.openingBalance;
     // A mortgage with terms has a fixed opening date and balance. Only a write with the terms changes them.

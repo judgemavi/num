@@ -22,6 +22,7 @@ export type EditorInput = {
   import: { accountId: string | null };
   /** Add a bank balance of an account, or change one. It is not in the URL. */
   bankBalance: { accountId: string; id: string | null };
+  valuation: { accountId: string; id: string | null };
   assignMoney: { bucketId: string; kind: Extract<BucketEventKind, "fund" | "release"> };
   moveMoney: { fromId: string | null };
   importInfo: Pick<ImportBatch, "filename" | "counts" | "unreadable">;

@@ -43,6 +43,9 @@ function bodyOf(route: RouteConfig): { schema?: z.ZodType; multipart: boolean } 
 }
 
 const destructiveOperations = new Set([
+  "delete_accounts_id_valuations_valuationid",
+  "post_accounts_id_valuations",
+  "patch_accounts_id_valuations_valuationid",
   "delete_accounts_id_bank_balances_balanceid",
   "delete_category_groups_id",
   "delete_documents_id",

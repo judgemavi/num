@@ -15,6 +15,7 @@ export const editors: { [K in EditorKind]: { Component: (input: EditorInput[K]) 
   commitment: retryLazy(() => import("@/editors/schedule-editors").then((module) => ({ default: module.CommitmentEditor }))),
   income: retryLazy(() => import("@/editors/schedule-editors").then((module) => ({ default: module.IncomeEditor }))),
   import: retryLazy(() => import("@/accounts/import-dialog").then((module) => ({ default: module.ImportForm }))),
+  valuation: retryLazy(() => import("@/accounts/valuation-editor").then((module) => ({ default: module.ValuationEditor }))),
   bankBalance: retryLazy(() => import("@/accounts/bank-balance-editor").then((module) => ({ default: module.BankBalanceEditor }))),
   assignMoney: retryLazy(() => import("@/editors/bucket-editors").then((module) => ({ default: module.AssignEditor }))),
   moveMoney: retryLazy(() => import("@/buckets/move-money").then((module) => ({ default: module.MoveMoney }))),

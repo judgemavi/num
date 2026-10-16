@@ -6,6 +6,7 @@ import { mcpRoutes } from "./catalog";
 // Every registered route has an explicit reviewed classification. A new route must enter this list.
 const classifications = [
   ["delete_accounts_id_bank_balances_balanceid", "delete", "/api/accounts/{id}/bank-balances/{balanceId}", true],
+  ["delete_accounts_id_valuations_valuationid", "delete", "/api/accounts/{id}/valuations/{valuationId}", true],
   ["delete_category_groups_id", "delete", "/api/category-groups/{id}", true],
   ["delete_documents_id", "delete", "/api/documents/{id}", true],
   ["delete_transactions_id", "delete", "/api/transactions/{id}", true],
@@ -14,6 +15,7 @@ const classifications = [
   ["get_accounts_id_imports", "get", "/api/accounts/{id}/imports", false],
   ["get_accounts_id_mortgage", "get", "/api/accounts/{id}/mortgage", false],
   ["get_accounts_id_mortgage_terms", "get", "/api/accounts/{id}/mortgage-terms", false],
+  ["get_accounts_id_valuations", "get", "/api/accounts/{id}/valuations", false],
   ["get_ai_access", "get", "/api/settings/ai", false],
   ["get_bank_balances_status", "get", "/api/bank-balances/status", false],
   ["get_buckets_bills", "get", "/api/buckets/bills", false],
@@ -54,6 +56,7 @@ const classifications = [
   ["list_occurrences", "get", "/api/buckets/{id}/occurrences", false],
   ["list_upcoming_occurrences", "get", "/api/buckets/upcoming", false],
   ["patch_accounts_id", "patch", "/api/accounts/{id}", true],
+  ["patch_accounts_id_valuations_valuationid", "patch", "/api/accounts/{id}/valuations/{valuationId}", true],
   ["patch_ai_access", "patch", "/api/settings/ai", false],
   ["patch_buckets_id", "patch", "/api/buckets/{id}", false],
   ["patch_categories_id", "patch", "/api/categories/{id}", false],
@@ -66,6 +69,7 @@ const classifications = [
   ["post_accounts_id_archive", "post", "/api/accounts/{id}/archive", true],
   ["post_accounts_id_bank_balances", "post", "/api/accounts/{id}/bank-balances", true],
   ["post_accounts_id_restore", "post", "/api/accounts/{id}/restore", true],
+  ["post_accounts_id_valuations", "post", "/api/accounts/{id}/valuations", true],
   ["post_buckets", "post", "/api/buckets", false],
   ["post_buckets_auto_link", "post", "/api/buckets/auto-link", false],
   ["post_buckets_id_archive", "post", "/api/buckets/{id}/archive", false],

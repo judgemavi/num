@@ -16,6 +16,7 @@ const loadText: { [K in EditorKind]: { loading: string; failed: string } } = {
   commitment: { loading: "Loading the bill.", failed: "The bill did not load." },
   income: { loading: "Loading the income.", failed: "The income did not load." },
   import: { loading: "Loading the import.", failed: "The import did not load." },
+  valuation: { loading: "Loading the valuation.", failed: "The valuation did not load." },
   bankBalance: { loading: "Loading the account.", failed: "The account did not load." },
   assignMoney: { loading: "Loading the bucket.", failed: "The bucket did not load." },
   moveMoney: { loading: "Loading buckets.", failed: "The buckets did not load." },

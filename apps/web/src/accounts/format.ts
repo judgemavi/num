@@ -71,6 +71,8 @@ export function accountError(code: ErrorCode | undefined): string {
   switch (code) {
     case "amount_too_precise":
       return "An amount has more decimal places than the currency has.";
+    case "account_has_valuations":
+      return "Delete the valuations of this account first.";
     case "kind_class_mismatch":
       return "Choose a kind in the same group.";
     case "archive_confirmation_required":
@@ -122,4 +124,21 @@ export const owedToYouWarning = "This shows money owed to you. Check the amount 
 /** True when a mortgage or a loan has a positive balance. A loan that the person owes has a negative balance. */
 export function owedToYou(account: { kind: AccountKind; balance: number }) {
   return (account.kind === "mortgage" || account.kind === "loan") && account.balance > 0;
+}
+
+export function valuationError(code: ErrorCode | undefined): string {
+  switch (code) {
+    case "valuation_exists":
+      return "There is already a valuation for this date. Change that one.";
+    case "valuation_not_found":
+      return "That valuation is not in the book.";
+    case "account_kind_no_valuations":
+      return "This kind of account does not use valuations.";
+    case "amount_too_precise":
+      return "An amount has more decimal places than the currency has.";
+    case "invalid_body":
+      return "Check the valuation fields.";
+    default:
+      return "The valuation did not save. Try again.";
+  }
 }
