@@ -55,11 +55,11 @@ function AccountsPage() {
         actions={
           <>
             <Button type="button" variant="secondary" asChild>
-              <Link to="/accounts/imports">Imports</Link>
+              <Link to="/accounts/imports">Past Imports</Link>
             </Button>
             <Button type="button" variant="secondary" onClick={() => void openEditor("import", { accountId: null })}>
               <Upload size={20} strokeWidth={1.8} aria-hidden="true" />
-              Import a statement
+              Import
             </Button>
             <Button type="button" onClick={() => void openEditor("account", { id: null })}>
               <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
