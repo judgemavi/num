@@ -15,6 +15,7 @@ function schedule(day: number, closed: string[] = []): FillSchedule {
 const income = { ...schedule(1, [asOf]), schedule: { ...schedule(1).schedule, freq: "weekly" as const, interval: 2, endDate: "2026-10-15" } };
 function row(id: string, kind: FillBucket["kind"], monthly: number, priority: number, day = 1): FillBucket {
   return {
+    essential: kind === "spending" || kind === "commitment" ? true : null,
     id, kind, priority, monthly, funded: 0, owed: monthly, balance: 0, paused: false,
     commitment: kind === "commitment" ? { ...schedule(day), amount: monthly } : null,
   };
@@ -100,7 +101,27 @@ test("closed and expired bill occurrences wait until pass three", () => {
   expect(plan(100_000, [closed, expired, food], "2026-10-20")).toEqual([{ bucketId: "food", amount: 100_000 }]);
 });
 
-test("each pass respects priority and spending comes before emergency even with a lower priority", () => {
+test("each pass respects priority and essential spending comes before emergency even with a lower priority", () => {
   const rows = [row("first", "spending", 600_000, 2), row("last", "spending", 600_000, 3), row("emergency", "emergency", 1_000_000, 0)];
   expect(plan(400_000, rows)).toEqual([{ bucketId: "first", amount: 290_330 }, { bucketId: "last", amount: 109_670 }]);
+});
+
+
+test("non-essential spending after emergency waits until the emergency owed amount is paid", () => {
+  const emergency = row("emergency", "emergency", 1_000_000, 2);
+  const fun = { ...row("fun", "spending", 600_000, 3), essential: false };
+  expect(plan(400_000, [fun, emergency])).toEqual([{ bucketId: "emergency", amount: 400_000 }]);
+  expect(plan(1_100_000, [fun, emergency])).toEqual([
+    { bucketId: "emergency", amount: 1_000_000 }, { bucketId: "fun", amount: 100_000 },
+  ]);
+});
+
+test("only essential spending gets its share before a bill due after the October 15 horizon", () => {
+  const phone = row("phone", "commitment", 100_000, 0, 28);
+  const food = row("food", "spending", 600_000, 1);
+  expect(payHorizon(asOf, [income])).toBe("2026-10-15");
+  expect(plan(200_000, [food, phone])).toEqual([{ bucketId: "food", amount: 200_000 }]);
+  expect(plan(200_000, [{ ...food, essential: false }, phone])).toEqual([
+    { bucketId: "phone", amount: 100_000 }, { bucketId: "food", amount: 100_000 },
+  ]);
 });

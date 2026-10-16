@@ -24,7 +24,7 @@ function paydayBook(unassigned: number) {
   linkOccurrence(book.db, income.id, "2026-10-01", pay.id, saved);
   const rent = addSchedule(book.db, { name: "Rent", kind: "commitment", accountId: cash.id, expectedAmount: -1_500_000, startDate: "2026-10-01", freq: "monthly", interval: 1, monthDay: 1 });
   const phone = addSchedule(book.db, { name: "Phone", kind: "commitment", accountId: cash.id, expectedAmount: -100_000, startDate: "2026-10-28", freq: "monthly", interval: 1, monthDay: 28 });
-  const food = spend(book.db, "Groceries", 600_000, { priority: 1, startDate: "2026-10-01" });
+  const food = spend(book.db, "Groceries", 600_000, { essential: true, priority: 1, startDate: "2026-10-01" });
   const fund = emergency(book.db, 1, { priority: 2, startDate: "2026-10-01" });
   return { ...book, cash, payCategory, income, rent, phone, food, fund };
 }
@@ -79,6 +79,20 @@ test("the bill preview uses monthly amounts after negative balances are covered"
     expect(fill(book)).toEqual({ paid: 1_700_000, payments: 4 });
     expect(readBucket(book.db, book.phone.id).balance).toBe(54_830);
     expect(readBucket(book.db, book.food.id).balance).toBe(145_170);
+  } finally {
+    book.close();
+  }
+});
+
+
+test("non-essential spending waits for the later bill in both the preview and the fill", () => {
+  const book = paydayBook(1_700_000);
+  try {
+    updateBucket(book.db, book.food.id, { essential: false, ...saved });
+    expect(listBillNeeds(book.db, "2026-10-01").items.find((item) => item.bucketId === book.phone.id)).toMatchObject({ covered: 100_000, short: 0 });
+    expect(fill(book)).toEqual({ paid: 1_700_000, payments: 3 });
+    expect(readBucket(book.db, book.phone.id).balance).toBe(100_000);
+    expect(readBucket(book.db, book.food.id).balance).toBe(100_000);
   } finally {
     book.close();
   }

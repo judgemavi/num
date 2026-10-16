@@ -13,6 +13,7 @@ export type FillBucket = {
   id: string;
   kind: BucketKind;
   priority: number;
+  essential: boolean | null;
   paused: boolean;
   monthly: number;
   funded: number;
@@ -47,7 +48,7 @@ function billToHorizon(bucket: FillBucket, asOf: string, horizon: string): numbe
   return Math.max(0, due.length * bill.amount - bucket.balance);
 }
 
-/** Bills to the horizon, spending to the horizon, then the rest. Each pass uses bucket priority order. */
+/** Bills to the horizon, essential spending to the horizon, then the rest. Each pass uses bucket priority order. */
 export function fillPlan(input: {
   asOf: string;
   incomes: readonly FillSchedule[];
@@ -74,7 +75,7 @@ export function fillPlan(input: {
     }
   }
   for (const bucket of order) {
-    if (bucket.kind === "spending") {
+    if (bucket.kind === "spending" && bucket.essential === true) {
       const share = divideAmount(bucket.monthly * date.day, date.daysInMonth, input.step, "up");
       pay(bucket, share - bucket.funded);
     }

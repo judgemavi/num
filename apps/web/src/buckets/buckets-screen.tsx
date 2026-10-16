@@ -137,7 +137,7 @@ function BucketList() {
       ) : (
         groupOrder.map((group) => {
           const kept = rows.filter((bucket) => group.kinds.includes(bucket.kind));
-          // The bills show in fill order.
+          // The bills show in priority order.
           const items = group.id === "commitments" ? [...kept].sort(comparePriority) : kept;
           if (items.length === 0) {
             return null;

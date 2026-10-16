@@ -29,6 +29,7 @@ export function fundingPlan(db: Reader, asOf: string, reads = createFundingReads
         id: bucket.id,
         kind: bucket.kind,
         priority: bucket.priority,
+        essential: bucket.essential,
         paused: bucket.pausedAt !== null,
         monthly,
         funded,
