@@ -1,6 +1,6 @@
 const inlineCreateMaxDepth = 2;
 
-export type InlineCreateResult = {
+type InlineCreateResult = {
   expanded: false;
   selectedId: string | null;
 };

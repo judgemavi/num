@@ -8,7 +8,7 @@ export const businessDayShifts = ["none", "next", "previous"] as const;
 
 export type AmountMode = (typeof amountModes)[number];
 export type PlanFrequency = (typeof planFrequencies)[number];
-export type BusinessDayShift = (typeof businessDayShifts)[number];
+type BusinessDayShift = (typeof businessDayShifts)[number];
 
 export type PlanSchedule = {
   startDate: string;

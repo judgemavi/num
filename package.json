@@ -10,6 +10,10 @@
   "scripts": {
     "dev": "bun run --parallel --filter './apps/*' dev",
     "dev:api": "bun run --filter api dev",
-    "dev:web": "bun run --filter web dev"
+    "dev:web": "bun run --filter web dev",
+    "lint:packages": "oxlint apps/api/src packages/db/src packages/shared/src"
+  },
+  "devDependencies": {
+    "oxlint": "1.87.0"
   }
 }

@@ -33,7 +33,7 @@ export type MortgageTerms = z.infer<typeof mortgageTermsSchema>;
 export type MortgageTermsWrite = z.infer<typeof mortgageTermsWriteSchema>;
 
 /** The amount owed and the date of the account's opening balance. The schedule starts here. */
-export type MortgageOpening = {
+type MortgageOpening = {
   balance: number;
   date: string;
 };
@@ -43,7 +43,7 @@ export type MortgageValuation = {
   balance: number;
 };
 
-export type MortgageLumpSum = {
+type MortgageLumpSum = {
   date: string;
   amount: number;
 };
@@ -75,7 +75,7 @@ export function mortgageLoan(terms: MortgageTermsWrite, opening: MortgageOpening
   };
 }
 
-export type MortgagePaymentRow = {
+type MortgagePaymentRow = {
   date: string;
   payment: number;
   principal: number;
@@ -83,7 +83,7 @@ export type MortgagePaymentRow = {
   balance: number;
 };
 
-export type MortgageSchedule = {
+type MortgageSchedule = {
   payments: MortgagePaymentRow[];
   payoffDate: string | null;
   totalInterest: number;
@@ -91,7 +91,7 @@ export type MortgageSchedule = {
   nonAmortizing: boolean;
 };
 
-export type MortgageSplit = {
+type MortgageSplit = {
   principal: number;
   interest: number;
   interestCategoryId: string;

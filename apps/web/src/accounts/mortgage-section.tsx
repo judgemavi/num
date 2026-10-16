@@ -73,7 +73,13 @@ export const MortgageSection = withForm({
             {(field) => (
               <Field>
                 <FieldLabel htmlFor="mortgage-interest">Interest category</FieldLabel>
-                <CategoryPicker id="mortgage-interest" value={field.state.value} onChange={field.handleChange} kind="expense" allowEmpty={false} depth={1} />
+                <CategoryPicker
+                  id="mortgage-interest"
+                  value={field.state.value}
+                  onChange={field.handleChange}
+                  kind="expense"
+                  allowEmpty={false}
+                />
               </Field>
             )}
           </form.Field>

@@ -25,8 +25,8 @@ export function useEditors(): HostApi {
 }
 
 type FrameApi = {
-  /** Close the form. The result goes to the code that opened it: the id of the saved record, true for a save of several records, or nothing. */
-  close: (result?: string | true | null) => void;
+  /** Close a record form with its saved id, or no result when it is cancelled. */
+  close: (result?: string | null) => void;
 };
 
 /**
@@ -39,6 +39,17 @@ export function useEditorFrame(): FrameApi {
   const value = useContext(EditorFrameContext);
   if (!value) {
     throw new Error("The form is not in an editor frame.");
+  }
+  return value;
+}
+
+/** Only the dialog host supplies a frame for a write of several records. */
+export const BulkEditorFrameContext = createContext<{ close: (result?: true | null) => void } | null>(null);
+
+export function useBulkEditorFrame() {
+  const value = useContext(BulkEditorFrameContext);
+  if (!value) {
+    throw new Error("The bulk editor is not in a dialog frame.");
   }
   return value;
 }

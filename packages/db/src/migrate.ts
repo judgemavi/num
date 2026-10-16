@@ -1,10 +1,10 @@
-import { z } from "zod";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
+import { z } from "zod";
 
 const migrationsFolder = join(import.meta.dir, "..", "migrations");
 

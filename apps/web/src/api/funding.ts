@@ -13,7 +13,7 @@ export function fundingOwedQuery(asOf: string) {
 /** Available to spend and its parts. */
 export function availableQuery(asOf: string) {
   return queryOptions({
-    queryKey: ["funding-available", asOf],
+    queryKey: ["funding", "available", asOf],
     queryFn: () => unwrap(api.funding.available.$get({ query: { asOf } })),
   });
 }

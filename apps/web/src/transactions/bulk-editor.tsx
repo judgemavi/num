@@ -6,7 +6,7 @@ import { transactionQuery, useBulkEdit } from "@/api/transactions";
 import { Amount } from "@/components/amount";
 import { ListRow } from "@/components/list-card";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useEditorFrame } from "@/editors/editor-api";
+import { useBulkEditorFrame } from "@/editors/editor-api";
 import type { EditorInput } from "@/editors/editor-types";
 import { DialogBody, FormCancel } from "@/editors/form-chrome";
 import { useAccountLabels } from "@/editors/lookups";
@@ -64,7 +64,7 @@ function dateRange(rows: Transaction[]) {
 }
 
 function BulkForm({ rows }: { rows: Transaction[] }) {
-  const { close } = useEditorFrame();
+  const { close } = useBulkEditorFrame();
   const save = useBulkEdit();
   const accountLabels = useAccountLabels();
   const ids = rows.map((row) => row.id);

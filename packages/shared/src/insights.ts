@@ -13,7 +13,7 @@ export const defaultInsightWindow: InsightWindow = "1";
 /** The rows of the spending list when no group or category is selected: one row for each group, or all categories. */
 export const insightListModes = ["groups", "categories"] as const;
 
-export type InsightListMode = (typeof insightListModes)[number];
+type InsightListMode = (typeof insightListModes)[number];
 
 export const defaultInsightListMode: InsightListMode = "groups";
 

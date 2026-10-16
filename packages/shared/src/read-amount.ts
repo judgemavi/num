@@ -3,7 +3,7 @@ import type { DecimalSeparator, UnreadableReason } from "./statement";
 
 export type AmountProblem = Exclude<UnreadableReason, "date_unreadable">;
 
-export type AmountRead =
+type AmountRead =
   | { kind: "empty" }
   | { kind: "value"; amount: number }
   | { kind: "error"; reason: AmountProblem };

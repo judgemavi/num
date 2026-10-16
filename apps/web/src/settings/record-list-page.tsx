@@ -8,32 +8,40 @@ import { useEditors } from "@/editors/editor-api";
 import { SettingsBack } from "@/settings/settings-nav";
 
 export function RecordListPage({ title, kind, children }: {
-  title: string; kind: "tag" | "merchant" | "group"; children: ReactNode;
+  title: string;
+  kind: "tag" | "merchant" | "group";
+  children: ReactNode;
 }) {
   const { openEditor } = useEditors();
-  return <>
-    <SettingsBack />
-    <PageHeader kicker="Settings" title={title} actions={
-      <Button type="button" onClick={() => void openEditor(kind, { id: null })}>
-        <Plus size={20} strokeWidth={1.8} aria-hidden="true" />New
-      </Button>
-    } />
-    <Boundary loading={`Loading ${title.toLowerCase()}.`} failed={`The ${title.toLowerCase()} did not load.`}>
-      {children}
-    </Boundary>
-  </>;
+  return (
+    <>
+      <SettingsBack />
+      <PageHeader
+        kicker="Settings"
+        title={title}
+        actions={
+          <Button type="button" onClick={() => void openEditor(kind, { id: null })}>
+            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
+            New
+          </Button>
+        }
+      />
+      <Boundary loading={`Loading ${title.toLowerCase()}.`} failed={`The ${title.toLowerCase()} did not load.`}>
+        {children}
+      </Boundary>
+    </>
+  );
 }
 
 export function SettingsRows({ title, children }: { title: string; children: ReactNode }) {
   return <ListCard label={title}>{children}</ListCard>;
 }
 
-/** The two archived lists have the same empty state and row layout. Each slot reads its own resource. */
-export function ArchivedSettingsList<Row extends { id: string }>({ title, useRows, children }: {
-  title: string; useRows: () => { items: Row[]; archived: boolean }; children: (row: Row) => ReactNode;
-}) {
-  const { items, archived } = useRows();
-  return <ListCard label={title}>
-    {items.length === 0 ? <ListEmpty>{archived ? `No archived ${title.toLowerCase()}.` : `No ${title.toLowerCase()} yet.`}</ListEmpty> : items.map((row) => children(row))}
-  </ListCard>;
+/** The archived lists use the same empty text. */
+export function SettingsEmpty({ title, archived }: { title: string; archived: boolean }) {
+  return (
+    <ListEmpty>
+      {archived ? `No archived ${title.toLowerCase()}.` : `No ${title.toLowerCase()} yet.`}
+    </ListEmpty>
+  );
 }

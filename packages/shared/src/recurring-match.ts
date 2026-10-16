@@ -22,13 +22,13 @@ export type LinkTransaction = {
   merchantId: string | null;
 };
 
-export type UniqueLink = {
+type UniqueLink = {
   bucketId: string;
   dueDate: string;
   transactionId: string;
 };
 
-export type AmbiguousLink = {
+type AmbiguousLink = {
   bucketId: string;
   dueDate: string;
   transactionIds: string[];

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { accountKinds } from "./account";
 import { asOfQuerySchema, isoDateSchema } from "./date";
-import { listQuerySchema, pagedResponseSchema, queryDate, queryFlag, queryId, queryIdOrNone, queryText } from "./list";
+import { listQuerySchema, pagedResponseSchema, queryDate, queryFlag, queryId, queryIdOrNone, queryText, transactionSortColumns } from "./list";
 import { autoReasons } from "./matching";
 import { amountSchema } from "./money";
 import { reviewCountSchema, transactionReviewSchema } from "./review";
@@ -100,8 +100,6 @@ export const transactionSchema = z.object({
   refundedAmount: amountSchema.nullable(),
   lines: z.array(transactionLineSchema),
 });
-
-const transactionSortColumns = ["date", "amount", "payeeRaw"] as const;
 
 const transactionFilterSchema = z.object({
   q: queryText,

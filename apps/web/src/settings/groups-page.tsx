@@ -11,7 +11,11 @@ function countLabel(count: number) {
 }
 
 export function GroupsPage() {
-  return <RecordListPage title="Groups" kind="group"><Groups /></RecordListPage>;
+  return (
+    <RecordListPage title="Groups" kind="group">
+      <Groups />
+    </RecordListPage>
+  );
 }
 
 function Groups() {

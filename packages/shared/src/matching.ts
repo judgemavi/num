@@ -39,7 +39,7 @@ export type LearnedScore<Label extends string | null = string> = {
   sourceId: string;
 };
 
-export type MatchLevel = "automatic" | "suggestion" | "none";
+type MatchLevel = "automatic" | "suggestion" | "none";
 
 export type RecurringSignal = {
   bucketId: string;

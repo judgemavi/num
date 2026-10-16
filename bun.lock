@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "num",
+      "devDependencies": {
+        "oxlint": "1.87.0",
+      },
     },
     "apps/api": {
       "name": "api",

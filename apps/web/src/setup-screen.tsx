@@ -12,8 +12,6 @@ import { RadioGroup } from "@/components/ui/radio-group";
 
 function messageFor(code: ErrorCode | undefined) {
   switch (code) {
-    case "setup_already_complete":
-      return "Setup is already complete.";
     case "invalid_body":
       return "Check the currency and the category choice.";
     default:

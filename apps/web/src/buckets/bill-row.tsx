@@ -66,7 +66,9 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
           )}
           <ArchiveMenuItem
             archived={bucket.archivedAt !== null}
-            noun="bill" name={bucket.name}
+            noun="bill"
+            name={bucket.name}
+            archiveDescription="The balance must be zero."
             onConfirm={(restore) => archive.mutate({ id: bucket.id, restore })}
           />
         </RowMenu>

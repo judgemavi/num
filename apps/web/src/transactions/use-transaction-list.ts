@@ -1,3 +1,4 @@
+import { useAccountActivitySearch } from "@/accounts/use-account-activity";
 import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, useMatch } from "@tanstack/react-router";
 import { transactionListQuery, transactionReviewListQuery } from "@/api/transactions";
@@ -65,4 +66,11 @@ function usePrefetchReview() {
 export function usePrefetchTransactionPage() {
   const usePrefetchOfPage = useOnReview() ? usePrefetchReview : usePrefetchAll;
   usePrefetchOfPage();
+}
+
+/** The route gives the sort state of the table. Display options do not change its source. */
+export function useTableSearch() {
+  const onAccount = useMatch({ from: "/accounts_/$accountId", shouldThrow: false }) !== undefined;
+  const useSearchOfPage = onAccount ? useAccountActivitySearch : useTransactionSearch;
+  return useSearchOfPage();
 }

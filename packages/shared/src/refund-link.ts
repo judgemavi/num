@@ -5,7 +5,7 @@ import { amountSchema } from "./money";
 
 const refundWindowDays = 90;
 
-export type RefundPurchase = {
+type RefundPurchase = {
   id: string;
   date: string;
   amount: number;
@@ -103,7 +103,7 @@ export type RefundCandidate = {
 export const reversalWindowDays = 3;
 
 /** "payee": same payee key within 90 days. "reversal": same account, category and amount within 3 days. */
-export type RefundCandidateKind = "payee" | "reversal";
+type RefundCandidateKind = "payee" | "reversal";
 
 export type RefundSubject = {
   date: string;

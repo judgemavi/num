@@ -48,11 +48,14 @@ export function ManagedPicker({
   const offer = Boolean(renderForm) && canOfferInlineCreate(depth);
 
   /** The inline form closed. A saved record becomes the selected option. */
-  function finishCreate(savedId: string | true | null = null) {
-    if (typeof savedId === "string" && draft !== null) {
+  function finishCreate(savedId: string | null = null) {
+    if (savedId !== null && draft !== null) {
       const option = { id: createdId(savedId), label: draft.trim().length > 0 ? draft.trim() : `New ${noun}` };
-      setAdded((current) => [...current, option]);
-      onCreated?.(option);
+      if (onCreated) {
+        onCreated(option);
+      } else {
+        setAdded((current) => [...current, option]);
+      }
       onChange(finishInlineCreate(value, option.id).selectedId);
     }
     setDraft(null);

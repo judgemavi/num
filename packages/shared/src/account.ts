@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { columnMapSchema } from "./statement";
-import { archivedQuery, listQuerySchema, pagedResponseSchema, queryNumber } from "./list";
+import { archivedQuery, listQuerySchema, pagedResponseSchema, queryNumber, transactionSortColumns } from "./list";
 import { interestRateMilliPctSchema } from "./rate";
 import { isUtcTimestamp } from "./time";
 import { amountSchema, nonNegativeAmountSchema } from "./money";
@@ -25,7 +25,7 @@ export type AccountKind = (typeof accountKinds)[number];
 
 const accountClasses = ["asset", "liability"] as const;
 
-export type AccountClass = (typeof accountClasses)[number];
+type AccountClass = (typeof accountClasses)[number];
 
 export const paymentPolicies = ["full", "fixed", "manual"] as const;
 
@@ -188,7 +188,7 @@ export const accountListApiQuerySchema = accountListQuerySchema.extend({ asOf: i
 
 export const accountActivityQuerySchema = z.object({
   page: queryNumber().min(1).default(1),
-  sort: z.enum(["date", "payeeRaw", "amount"]).optional(),
+  sort: z.enum(transactionSortColumns).optional(),
   dir: z.enum(["asc", "desc"]).optional(),
 });
 

@@ -32,7 +32,7 @@ export function recedeDefault(kind: BucketKind): boolean | null {
 
 export const sinkingRepeats = ["none", "yearly"] as const;
 
-export type SinkingRepeat = (typeof sinkingRepeats)[number];
+type SinkingRepeat = (typeof sinkingRepeats)[number];
 
 /** The events that the user makes. The fill makes `cover` and `recede`. */
 const manualEventKinds = ["fund", "move", "release"] as const;

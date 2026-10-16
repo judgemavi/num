@@ -1,4 +1,6 @@
-import { ArchivedFilterBar } from "@/lists/archived-filter-bar";
+import { useArchivedFilter } from "@/lists/archived-filter";
+import { FilterBar } from "@/components/filter-bar";
+import { SortSelect } from "@/lists/sort-select";
 import { useBucketSearch } from "@/buckets/use-board";
 
 const sortOptions = [
@@ -8,5 +10,20 @@ const sortOptions = [
 ] as const;
 
 export function BucketFilterBar() {
-  return <ArchivedFilterBar useList={useBucketSearch} switchId="filter-archived-buckets" sortId="bucket-sort" sortOptions={sortOptions} />;
+  const list = useBucketSearch();
+  const filter = useArchivedFilter(list.search.archived, list.patch, "filter-archived-buckets");
+  return (
+    <FilterBar
+      {...filter}
+      sort={
+        <SortSelect
+          id="bucket-sort"
+          label="Sort buckets"
+          value={list.sort}
+          options={sortOptions}
+          onChange={list.setSort}
+        />
+      }
+    />
+  );
 }

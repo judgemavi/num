@@ -14,7 +14,7 @@ export const transferHintSchema = z.object({
   accountId: z.uuid().nullable(),
 });
 
-export type OppositeRow = {
+type OppositeRow = {
   id: string;
   accountId: string;
   date: string;

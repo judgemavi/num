@@ -7,20 +7,23 @@ type ArchiveMenuItemProps = {
   noun: string;
   name: string;
   archiveDescription?: string;
+  restoreDescription?: string;
   /** The person confirmed. Do the write. */
   onConfirm: (restore: boolean) => void;
 };
 
 /** The "Archive" or "Restore" item of a row menu. It asks for a confirmation before the write. */
-export function ArchiveMenuItem({ archived, noun, name, archiveDescription, onConfirm }: ArchiveMenuItemProps) {
+export function ArchiveMenuItem({ archived, noun, name, archiveDescription, restoreDescription, onConfirm }: ArchiveMenuItemProps) {
   const { confirm } = useEditors();
   return (
     <DropdownMenuItem
       className="min-h-11"
       onSelect={() => {
         void confirm({
-          title: `${archived ? "Restore" : "Archive"} this ${noun}?`,
-          description: !archived && archiveDescription ? archiveDescription : `${name}. ${archived ? "It returns to the active list." : "It leaves the active list. You can restore it later."}`,
+          title: `${archived ? "Restore" : "Archive"} ${name}?`,
+          description: archived
+            ? (restoreDescription ?? `The ${noun} returns to the active list.`)
+            : (archiveDescription ?? `The ${noun} leaves the active list. You can restore it later.`),
           confirmLabel: archived ? "Restore" : "Archive",
         }).then((ok) => {
           if (ok) {

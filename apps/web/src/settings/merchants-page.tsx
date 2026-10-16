@@ -1,4 +1,4 @@
-import { RecordListPage, ArchivedSettingsList } from "@/settings/record-list-page";
+import { RecordListPage, SettingsRows, SettingsEmpty } from "@/settings/record-list-page";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { merchantListQuery, useArchiveMerchant } from "@/api/merchants";
@@ -7,7 +7,9 @@ import { ListRow, listName } from "@/components/list-card";
 import { RowMenu } from "@/components/row-menu";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useEditors } from "@/editors/editor-api";
-import { ArchivedFilterBar } from "@/lists/archived-filter-bar";
+import { useArchivedFilter } from "@/lists/archived-filter";
+import { FilterBar } from "@/components/filter-bar";
+import { SortSelect } from "@/lists/sort-select";
 import { nameSortOptions } from "@/lists/list-search";
 import { useListSearch } from "@/lists/use-list-search";
 
@@ -18,7 +20,11 @@ function useMerchantsSearch() {
 }
 
 export function MerchantsPage() {
-  return <RecordListPage title="Merchants" kind="merchant"><Merchants /></RecordListPage>;
+  return (
+    <RecordListPage title="Merchants" kind="merchant">
+      <Merchants />
+    </RecordListPage>
+  );
 }
 
 function useMerchantsRows() {
@@ -28,37 +34,67 @@ function useMerchantsRows() {
 }
 
 function Merchants() {
-  return <>
-    <ArchivedFilterBar useList={useMerchantsSearch} switchId="filter-archived-merchants" sortId="merchant-sort" sortOptions={nameSortOptions} />
-    <ArchivedSettingsList title="Merchants" useRows={useMerchantsRows}>
-      {(merchant) => <MerchantRow key={merchant.id} merchant={merchant} />}
-    </ArchivedSettingsList>
-  </>;
+  const { items, archived } = useMerchantsRows();
+  return (
+    <>
+      <MerchantsFilterBar />
+      <SettingsRows title="Merchants">
+        {items.length === 0 ? (
+          <SettingsEmpty title="Merchants" archived={archived} />
+        ) : (
+          items.map((merchant) => <MerchantRow key={merchant.id} merchant={merchant} />)
+        )}
+      </SettingsRows>
+    </>
+  );
+}
+
+function MerchantsFilterBar() {
+  const list = useMerchantsSearch();
+  const filter = useArchivedFilter(list.search.archived, list.patch, "filter-archived-merchants");
+  return (
+    <FilterBar
+      {...filter}
+      sort={
+        <SortSelect
+          id="merchant-sort"
+          label="Sort merchants"
+          value={list.sort}
+          options={nameSortOptions}
+          onChange={list.setSort}
+        />
+      }
+    />
+  );
 }
 
 function MerchantRow({ merchant }: { merchant: ReturnType<typeof useMerchantsRows>["items"][number] }) {
   const { openEditor } = useEditors();
   const archive = useArchiveMerchant();
   return (
-            <ListRow
-              key={merchant.id}
-              size="simple"
-              label={merchant.name}
-              onOpen={() => void openEditor("merchant", { id: merchant.id })}
-              menu={
-                <RowMenu label={`Actions for ${merchant.name}`}>
-                  <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("mergeMerchant", { merchantId: merchant.id })}>
-                    Merge
-                  </DropdownMenuItem>
-                  <ArchiveMenuItem
-                    archived={merchant.archivedAt !== null}
-                    noun="merchant" name={merchant.name}
-                    onConfirm={(restore) => archive.mutate({ id: merchant.id, restore })}
-                  />
-                </RowMenu>
-              }
-            >
-              <div className={listName}>{merchant.name}</div>
-            </ListRow>
+    <ListRow
+      key={merchant.id}
+      size="simple"
+      label={merchant.name}
+      onOpen={() => void openEditor("merchant", { id: merchant.id })}
+      menu={
+        <RowMenu label={`Actions for ${merchant.name}`}>
+          <DropdownMenuItem
+            className="min-h-11"
+            onSelect={() => void openEditor("mergeMerchant", { merchantId: merchant.id })}
+          >
+            Merge
+          </DropdownMenuItem>
+          <ArchiveMenuItem
+            archived={merchant.archivedAt !== null}
+            noun="merchant"
+            name={merchant.name}
+            onConfirm={(restore) => archive.mutate({ id: merchant.id, restore })}
+          />
+        </RowMenu>
+      }
+    >
+      <div className={listName}>{merchant.name}</div>
+    </ListRow>
   );
 }

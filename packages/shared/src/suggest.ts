@@ -64,7 +64,7 @@ export function suggestionFromMatch(result: MatchResult): Suggestion {
   };
 }
 
-export type TransferCandidate = {
+type TransferCandidate = {
   id: string;
   accountId: string;
   onBudget: boolean;

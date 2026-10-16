@@ -3,6 +3,8 @@ import { isoDateSchema } from "./date";
 
 export const sortDirections = ["asc", "desc"] as const;
 
+export const transactionSortColumns = ["date", "amount", "payeeRaw"] as const;
+
 /**
  * An optional query value. A value with only spaces is the same as no value. Then `schema` checks the value.
  * The input type is the input of `schema` or an empty text.

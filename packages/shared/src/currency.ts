@@ -169,16 +169,15 @@ const currencyCodeList = [
   "ZWG",
 ] as const satisfies readonly CurrencyCode[];
 
-export const currencyCodes: readonly CurrencyCode[] = currencyCodeList;
+/** This assignment fails if the tuple omits a currency key. `satisfies` above rejects extra keys. */
+export const currencyCodes: readonly CurrencyCode[] = currencyCodeList satisfies readonly CurrencyCode[] &
+  (Exclude<CurrencyCode, (typeof currencyCodeList)[number]> extends never ? unknown : never);
 
 /** A stored amount is an integer number of milliunits: thousandths of the major unit. */
 export const milliunitDigits = 3;
 
 /** The number of minor-unit digits of the currency (ISO 4217). */
 export function currencyDigits(code: string): number | undefined {
-  if (!Object.hasOwn(currencyMinorUnits, code)) {
-    return undefined;
-  }
   const known = currencyCodeList.find((item) => item === code);
   return known === undefined ? undefined : currencyMinorUnits[known];
 }

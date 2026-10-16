@@ -55,7 +55,10 @@ export function BucketRow({ bucket }: { bucket: Bucket }) {
             )}
             <ArchiveMenuItem
               archived={bucket.archivedAt !== null}
-              noun="bucket" name={bucket.name}
+              noun="bucket"
+              name={bucket.name}
+              archiveDescription="The balance must be zero. Categories leave this bucket."
+              restoreDescription="Its categories are not put back."
               onConfirm={(restore) => archive.mutate({ id: bucket.id, restore })}
             />
           </RowMenu>

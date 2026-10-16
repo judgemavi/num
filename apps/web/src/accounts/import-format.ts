@@ -74,8 +74,8 @@ export function formatImportPeriod(start: string, end: string): string {
   return `${formatStatementDate(start)} to ${formatStatementDate(end)}`;
 }
 
-export function formatStatementDate(iso: string | null): string {
-  return iso === null ? "No date" : formatDate(iso);
+export function formatStatementDate(iso: string): string {
+  return formatDate(iso);
 }
 
 export function importError(code: ErrorCode | undefined): string {

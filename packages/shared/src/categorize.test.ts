@@ -1,3 +1,4 @@
+import { preselectTransfer } from "./categorize";
 import { expect, test } from "bun:test";
 import {
   categoryKindForChoice,
@@ -5,7 +6,6 @@ import {
   defaultChoice,
   merchantForChoice,
   merchantNameFromPayee,
-  preselectTransfer,
   resolveEditorChoice,
   type Suggestion,
 } from "./index";

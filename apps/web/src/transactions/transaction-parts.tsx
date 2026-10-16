@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { choiceIn } from "@/components/choice";
 import { choicesForDirection, defaultChoice, merchantForChoice } from "@num/shared";
 import { Ellipsis } from "lucide-react";
@@ -108,7 +109,8 @@ export const MoneySection = withForm({
 export function TagsField({ id = "txn-tag", label = "Tags", tagIds, onTags }: { id?: string; label?: string; tagIds: string[]; onTags: (ids: string[]) => void }) {
   const archiveTag = useArchiveTag();
   const tags = useTags();
-  const allTags = tags;
+  const [created, setCreated] = useState<typeof tags>([]);
+  const allTags = [...tags, ...created.filter((tag) => !tags.some((item) => item.id === tag.id))];
   const selected = allTags.filter((tag) => tagIds.includes(tag.id));
   const options = allTags.filter((tag) => tag.archivedAt === null && !tagIds.includes(tag.id)).map((tag) => ({ id: tag.id, label: tag.name }));
   return (
@@ -127,6 +129,7 @@ export function TagsField({ id = "txn-tag", label = "Tags", tagIds, onTags }: { 
             onTags([...tagIds, tagId]);
           }
         }}
+        onCreated={(option) => setCreated((current) => [...current, { id: option.id, name: option.label, archivedAt: null }])}
         renderForm={(name) => <TagForm inline id={null} idPrefix="inline-tag-name" initialName={name} />}
       />
       {selected.length > 0 ? (

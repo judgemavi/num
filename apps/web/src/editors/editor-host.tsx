@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { formatEditParam, isRecordEditorKind, parseEditParam, type RecordEditorKind } from "@/editors/edit-url";
-import { EditorContext, EditorFrameContext } from "@/editors/editor-api";
+import { BulkEditorFrameContext, EditorContext, EditorFrameContext } from "@/editors/editor-api";
 import { EditorBody } from "@/editors/editor-registry";
 import { preloadEditor } from "@/editors/editor-chunks";
 import { createEditorStore } from "@/editors/editor-store";
@@ -145,7 +145,9 @@ export function EditorHost({ children }: { children: ReactNode }) {
           {/* Most editors have no description. An editor that has one shows it under the title. */}
           <DialogContent aria-describedby={undefined} className={panelClass(editor.frame.kind)}>
             <EditorFrameContext key={editor.key} value={{ close: (result = null) => host.close(editor.key, result) }}>
-              <EditorBody {...editor.frame} />
+              <BulkEditorFrameContext value={{ close: (result = null) => host.close(editor.key, result) }}>
+                <EditorBody {...editor.frame} />
+              </BulkEditorFrameContext>
             </EditorFrameContext>
           </DialogContent>
         </Dialog>
