@@ -60,7 +60,7 @@ export {
   type InsightTimelineMonth, type InsightTimeline, type Insights,
 } from "./insights";
 export {
-  chosenPresetId, isOfxFile, splitCsvLine,
+  ofxPresetId, chosenPresetId, isOfxFile, splitCsvLine,
   sampleCsvRows, detectStatementFormat, firstStatementDate,
   orderByFirstDate, guessImportAccount, type StatementFormat,
 } from "./detect-format";

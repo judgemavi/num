@@ -9,6 +9,7 @@ import { unbucketedSpending } from "./forecast-spending";
 import { createAccount } from "./accounts";
 import { createBucket } from "./buckets";
 import { createCategory } from "./categories";
+import { poolChecks } from "./pool-checks";
 import { readForecast } from "./forecast";
 import { linkOccurrence } from "./recurring-links";
 import { createSchedule } from "./schedule-test-book";
@@ -226,10 +227,10 @@ test("monthly SQL sums keep the line outlier limit, missing months and refunds",
   }
 });
 
-test("forecast months include loan commitments and exclude transfers between open budget accounts", () => {
+test("loan commitments leave the pool without adding forecast spending", () => {
   const book = tempDatabase();
   try {
-    const cash = cashAccount(book.db, "Cash", 1_000_000);
+    const cash = cashAccount(book.db, "Cash", 5_000);
     const loan = createAccount(book.db, { name: "Loan", kind: "loan", asOf: "2026-10-01", ...saved });
     const card = createAccount(book.db, { name: "Card", kind: "credit_card", paymentPolicy: "full", asOf: "2026-10-01", ...saved });
     for (const target of [loan, card]) {
@@ -240,9 +241,11 @@ test("forecast months include loan commitments and exclude transfers between ope
       });
     }
     const forecast = readForecast(book.db, "2026-10-01");
-    expect(forecast.months.find((month) => month.month === "2026-10")?.spending).toBe(10_000);
-    expect(forecast.months.find((month) => month.month === "2026-11")?.spending).toBe(10_000);
-    expect(forecast.total[forecast.dates.indexOf("2026-10-15")]).toBe(990_000);
+    expect(forecast.months.find((month) => month.month === "2026-10")?.spending).toBe(0);
+    expect(forecast.months.find((month) => month.month === "2026-11")?.spending).toBe(0);
+    expect(forecast.total[forecast.dates.indexOf("2026-10-15")]).toBe(-5_000);
+    const pool = poolChecks(book.db, "2026-10-01").find((check) => check.code === "pool_short");
+    expect(pool).toMatchObject({ pass: false, date: "2026-10-15", short: 25_000 });
   } finally {
     book.close();
   }

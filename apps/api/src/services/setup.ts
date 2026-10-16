@@ -71,7 +71,8 @@ function insertDefaultCategories(tx: WriteTx) {
         .values({
           id,
           name: category.name,
-          sortKey: foldName(category.name), nameKey: nameKey(category.name),
+          sortKey: foldName(category.name),
+          nameKey: nameKey(category.name),
           kind: category.kind,
           groupId,
         })

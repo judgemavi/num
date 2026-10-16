@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { accounts, documents, importBatches, importRows, settings, transactions, type AccountRow } from "@num/db";
 import {
   chosenPresetId,
+  ofxPresetId,
   detectStatementFormat,
   isOfxFile,
   currencyDigits,
@@ -111,8 +112,8 @@ function resolveParse(
       columnMap: request.columnMap,
     };
   }
-  if (request.presetId === "ofx") {
-    return { parser: "ofx", statement: parseOfxStatement(text, digits), presetId: "ofx", columnMap: null };
+  if (request.presetId === ofxPresetId) {
+    return { parser: "ofx", statement: parseOfxStatement(text, digits), presetId: ofxPresetId, columnMap: null };
   }
   if (request.presetId) {
     return {

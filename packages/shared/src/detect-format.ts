@@ -9,9 +9,11 @@ export type StatementFormat =
   | { kind: "ambiguous"; candidates: string[] }
   | { kind: "unknown" };
 
+export const ofxPresetId = "ofx";
+
 export function chosenPresetId(format: StatementFormat): string | null {
   if (format.kind === "ofx") {
-    return "ofx";
+    return ofxPresetId;
   }
   if (format.kind === "preset") {
     return format.presetId;

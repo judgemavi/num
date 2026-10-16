@@ -18,14 +18,11 @@ import { lastCompleteMonths } from "./complete-months";
 import { bookStep } from "./book-step";
 import { activeSchedules, scheduleAmounts, type ScheduleView } from "./schedules";
 
-function scheduleFlows(schedule: ScheduleView, date: string, amount: number, accountIds: ReadonlySet<string>): ForecastFlow[] {
+function scheduleFlows(schedule: ScheduleView, date: string, amount: number): ForecastFlow[] {
   if (schedule.kind === "income") {
     return [{ date, income: amount, spending: 0, bucketId: schedule.id }];
   }
-  if (schedule.transferAccountId && accountIds.has(schedule.transferAccountId)) {
-    return [];
-  }
-  return [{ date, income: 0, spending: -amount, bucketId: schedule.id }];
+  return schedule.transferAccountId === null ? [{ date, income: 0, spending: -amount, bucketId: schedule.id }] : [];
 }
 
 export function readForecast(db: Db, asOf: string): Forecast {
@@ -34,8 +31,10 @@ export function readForecast(db: Db, asOf: string): Forecast {
 
 /**
  * The input of the forecast (spec §8). Each flow has its bucket: a commitment, an income or a spending bucket.
+ * `transfersOut` are the commitment payments by transfer to an account that is not an open on-budget account (a loan
+ * payment, for example). They leave the pool, but they are not spending in the forecast.
  */
-export function forecastInput(db: Db, asOf: string, accountBalances?: ReadonlyMap<string, number>): ForecastInput {
+export function forecastInput(db: Db, asOf: string, accountBalances?: ReadonlyMap<string, number>): ForecastInput & { transfersOut: ForecastFlow[] } {
   const step = bookStep(db);
   const dates = forecastDates(asOf);
   const horizonEnd = dates[dates.length - 1] ?? asOf;
@@ -50,6 +49,7 @@ export function forecastInput(db: Db, asOf: string, accountBalances?: ReadonlyMa
   const { skippedKeys: skipped, postedKeys: posted } = loadLinkIndex(db);
   const deltas: ForecastDelta[] = [];
   const flows: ForecastFlow[] = [];
+  const transfersOut: ForecastFlow[] = [];
   for (const schedule of schedules) {
     const amount = amounts.get(schedule.id)?.forecast ?? schedule.expectedAmount;
     for (const date of occurrenceDates(schedule, horizonEnd, asOf)) {
@@ -58,7 +58,10 @@ export function forecastInput(db: Db, asOf: string, accountBalances?: ReadonlyMa
       }
       if (accountIds.has(schedule.accountId)) {
         deltas.push({ date: date.dueDate, amount });
-        flows.push(...scheduleFlows(schedule, date.dueDate, amount, accountIds));
+        flows.push(...scheduleFlows(schedule, date.dueDate, amount));
+        if (schedule.kind === "commitment" && schedule.transferAccountId && !accountIds.has(schedule.transferAccountId)) {
+          transfersOut.push({ date: date.dueDate, income: 0, spending: -amount, bucketId: schedule.id });
+        }
       }
       if (schedule.transferAccountId && accountIds.has(schedule.transferAccountId)) {
         deltas.push({ date: date.dueDate, amount: -amount });
@@ -93,5 +96,6 @@ export function forecastInput(db: Db, asOf: string, accountBalances?: ReadonlyMa
     balance,
     deltas,
     flows,
+    transfersOut,
   };
 }

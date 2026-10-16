@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { accounts, documents, importBatches, importRows, transactionLines, transactions } from "@num/db";
-import { normalizePayee, storedPayee, type ColumnMap, type ImportBatch, type MatchResult, type UnreadableRow } from "@num/shared";
+import { ofxPresetId, normalizePayee, storedPayee, type ColumnMap, type ImportBatch, type MatchResult, type UnreadableRow } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountAuditSnapshot } from "./account-snapshot";
@@ -318,7 +318,7 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
         linkAutomatic(tx, newId);
       }
       autoLinkInTransaction(tx, input.asOf, input.accountId);
-      saveFormat(tx, input.accountId, input.parser === "ofx" ? "ofx" : input.presetId, input.columnMap);
+      saveFormat(tx, input.accountId, input.parser === "ofx" ? ofxPresetId : input.presetId, input.columnMap);
       const batch = tx.select().from(importBatches).where(eq(importBatches.id, batchId)).get();
       if (!batch) {
         throw new Error("Import batch is missing");

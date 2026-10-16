@@ -60,6 +60,7 @@ export function spendingIncreases(month: string, lines: readonly FlowLine[], ste
   return [...ids]
     .map((categoryId) => {
       const amount = byMonth.get(month)?.get(categoryId) ?? 0;
+      // An odd-length median keeps its stored precision. Round it to the current currency step.
       const median = roundToStep(medianAmount(earlier.map((key) => byMonth.get(key)?.get(categoryId) ?? 0), step), step);
       return { categoryId, median, delta: amount - median };
     })

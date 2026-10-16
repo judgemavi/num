@@ -1,5 +1,5 @@
 import { accounts, importRows, settings } from "@num/db";
-import { accountListApiQuerySchema, detectStatementFormat, guessImportAccount, importViewQuerySchema } from "@num/shared";
+import { ofxPresetId, accountListApiQuerySchema, detectStatementFormat, guessImportAccount, importViewQuerySchema } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { archiveAccount, createAccount, getAccount, listAccounts } from "./accounts";
@@ -48,11 +48,11 @@ test("an OFX import saves its format, opens manual entries and selects its only 
     const text = "<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST><STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20260401<TRNAMT>-10.00<FITID>synthetic-1<NAME>Example</STMTTRN></BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>";
     const result = importStatement(book.db, book.dir, {
       accountId: book.account.id, filename: "statement.ofx", mimeType: "application/x-ofx",
-      bytes: new TextEncoder().encode(text), presetId: "ofx", asOf: "2026-10-07", source: "import", at,
+      bytes: new TextEncoder().encode(text), presetId: ofxPresetId, asOf: "2026-10-07", source: "import", at,
     });
     expect(result.kind).toBe("batch");
     const stored = book.db.select().from(accounts).all();
-    expect(stored[0]?.importPreset).toBe("ofx");
+    expect(stored[0]?.importPreset).toBe(ofxPresetId);
     const manual = createTransaction(book.db, {
       accountId: book.account.id, date: "2026-05-01", amount: -5_000, payeeRaw: "Manual",
       lines: [{ amount: -5_000 }], ...saved,
@@ -60,7 +60,7 @@ test("an OFX import saves its format, opens manual entries and selects its only 
     expect(manual.status).toBe("open");
     expect(guessImportAccount(stored, detectStatementFormat("statement.ofx", text, []), [])).toBe(book.account.id);
     const other = createAccount(book.db, { name: "Other", kind: "cash", asOf: "2026-10-07", ...saved });
-    book.db.update(accounts).set({ importPreset: "ofx" }).where(eq(accounts.id, other.id)).run();
+    book.db.update(accounts).set({ importPreset: ofxPresetId }).where(eq(accounts.id, other.id)).run();
     expect(guessImportAccount(book.db.select().from(accounts).all(), { kind: "ofx" }, [])).toBeNull();
   } finally {
     book.close();

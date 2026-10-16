@@ -55,3 +55,15 @@ test("the savings rate is thousandths of a percent, and it is null when income i
   expect(savingsRateMilliPct(10_000, 15_000)).toBe(-50_000);
   expect(savingsRateMilliPct(0, 100)).toBeNull();
 });
+
+
+test("the prior three-month median rounds to the currency step, with halves away from zero", () => {
+  const history = [
+    line("2026-01", -1001, groceries, "expense"),
+    line("2026-02", -1505, groceries, "expense"),
+    line("2026-03", -2500, groceries, "expense"),
+    line("2026-04", -5000, groceries, "expense"),
+  ];
+  expect(spendingIncreases("2026-04", history, 10)).toEqual([{ categoryId: groceries, median: 1510, delta: 3490 }]);
+  expect(spendingIncreases("2026-04", history, 1000)).toEqual([{ categoryId: groceries, median: 2000, delta: 3000 }]);
+});

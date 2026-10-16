@@ -16,13 +16,8 @@ export function startHomeReads(queryClient: QueryClient, search: InsightsSearch)
   const asOf = localAsOf();
   void queryClient.prefetchQuery(availableQuery(asOf));
   void queryClient.prefetchQuery(needsYouQuery(asOf));
-  if (search.tagId) {
-    void queryClient.fetchQuery(tagOptionsQuery()).then((tags) => {
-      const tagId = tags.some((tag) => tag.id === search.tagId) ? search.tagId : undefined;
-      return queryClient.prefetchQuery(insightsQuery(asOf, { ...search, tagId }));
-    }).catch(() => undefined);
-  } else {
-    void queryClient.prefetchQuery(tagOptionsQuery());
+  void queryClient.prefetchQuery(tagOptionsQuery());
+  if (!search.tagId) {
     void queryClient.prefetchQuery(insightsQuery(asOf, search));
   }
 }
