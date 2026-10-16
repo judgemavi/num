@@ -1,6 +1,5 @@
 import {
   asOfQuerySchema,
-  bucketCoverSchema,
   bucketCreateSchema,
   bucketEventCreateSchema,
   bucketEventSchema,
@@ -15,7 +14,7 @@ import {
 } from "@num/shared";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { coverBucket, createBucketEvent, undoBucketEvent } from "../services/bucket-events";
+import { createBucketEvent, undoBucketEvent } from "../services/bucket-events";
 import { listBillNeeds } from "../services/bills";
 import { pauseBucket, resumeBucket } from "../services/bucket-pause";
 import { readEmergencyFund } from "../services/emergency-fund";
@@ -227,26 +226,6 @@ const undoRoute = createRoute({
   },
 });
 
-const coverRoute = createRoute({
-  operationId: "post_buckets_id_cover",
-  description: "Cover an overspent bucket with the amount that it is over, with a move from a second bucket (fromBucketId). The source must have the whole amount. This does not change records outside this action.",
-  method: "post",
-  path: "/api/buckets/{id}/cover",
-  request: {
-    params: idParams,
-    body: { required: true, content: { "application/json": { schema: bucketCoverSchema } } },
-  },
-  responses: {
-    200: {
-      description: "The move that covers the bucket",
-      content: { "application/json": { schema: bucketEventSchema } },
-    },
-    400: errorResponse,
-    404: errorResponse,
-    409: errorResponse,
-  },
-});
-
 const readRoute = createRoute({
   operationId: "get_buckets_id",
   description: "Read buckets. This does not create, change or delete a record.",
@@ -296,9 +275,5 @@ export function bucketRoutes(db: Db) {
     .openapi(undoRoute, (c) => {
       const { id, eventId } = c.req.valid("param");
       return c.json(undoBucketEvent(db, id, eventId, { source: "ui" }), 200);
-    })
-    .openapi(coverRoute, (c) => {
-      const { id } = c.req.valid("param");
-      return c.json(coverBucket(db, id, { ...c.req.valid("json"), source: "ui" }), 200);
     });
 }

@@ -75,8 +75,6 @@ const errorCodes = [
   "bucket_fields_invalid",
   "bucket_emergency_exists",
   "bucket_same",
-  "bucket_not_overspent",
-  "bucket_short",
   "bucket_balance",
   "bucket_paused",
   "bucket_not_paused",

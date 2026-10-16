@@ -46,10 +46,10 @@ export function entry(
 export function countWrites(sqlite: Database, run: () => void): number {
   const original = sqlite.transaction.bind(sqlite);
   let count = 0;
-  sqlite.transaction = ((fn: () => unknown) => {
+  sqlite.transaction = (fn) => {
     count += 1;
     return original(fn);
-  }) as typeof sqlite.transaction;
+  };
   try {
     run();
   } finally {

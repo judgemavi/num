@@ -3,9 +3,9 @@ import { bucketEvents } from "@num/db";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
 import { createAccount } from "./accounts";
-import { coverBucket, createBucketEvent, undoBucketEvent } from "./bucket-events";
+import { createBucketEvent, undoBucketEvent } from "./bucket-events";
 import { readBucket } from "./buckets";
-import { at, saved, expense, spending, purchase } from "./bucket-test-book";
+import { at, saved, spending } from "./bucket-test-book";
 
 test("undo is rejected for an event of the monthly fill", () => {
   const book = tempDatabase();
@@ -33,31 +33,6 @@ test("undo is rejected for an event of the monthly fill", () => {
   }
 });
 
-test("cover rejects the same bucket, a bucket that is not overspent, and a short source", () => {
-  const book = tempDatabase();
-  try {
-    const account = createAccount(book.db, {
-      asOf: "2026-10-07",
-      name: "Cash",
-      kind: "chequing",
-      openingDate: "2026-01-01",
-      openingBalance: 200_000,
-      ...saved,
-    });
-    const dining = expense(book.db, "Dining");
-    const meals = spending(book.db, "Dining", [dining.id]);
-    const food = spending(book.db, "Groceries", []);
-    createBucketEvent(book.db, food.id, { kind: "fund", amount: 10_000, date: "2026-03-01", asOf: "2026-03-01", ...saved });
-    expectCode(() => coverBucket(book.db, meals.id, { fromBucketId: meals.id, date: "2026-03-02", ...saved }), "bucket_same");
-    expectCode(() => coverBucket(book.db, food.id, { fromBucketId: meals.id, date: "2026-03-02", ...saved }), "bucket_not_overspent");
-    purchase(book.db, account.id, dining.id, -42_000);
-    expectCode(() => coverBucket(book.db, meals.id, { fromBucketId: food.id, date: "2026-03-02", ...saved }), "bucket_short");
-    expect(readBucket(book.db, meals.id).balance).toBe(-42_000);
-    expect(readBucket(book.db, food.id).balance).toBe(10_000);
-  } finally {
-    book.close();
-  }
-});
 
 test("undo of a move sets undoneAt and restores both balances", () => {
   const book = tempDatabase();
@@ -89,35 +64,6 @@ test("undo of a move sets undoneAt and restores both balances", () => {
     expect(readBucket(book.db, food.id).balance).toBe(50_000);
     expect(readBucket(book.db, other.id).balance).toBe(0);
     expectCode(() => undoBucketEvent(book.db, food.id, move.id, saved), "event_undone");
-  } finally {
-    book.close();
-  }
-});
-
-test("cover moves the shortfall from another bucket", () => {
-  const book = tempDatabase();
-  try {
-    const account = createAccount(book.db, {
-      asOf: "2026-10-07",
-      name: "Cash",
-      kind: "chequing",
-      openingDate: "2026-01-01",
-      openingBalance: 200_000,
-      ...saved,
-    });
-    const dining = expense(book.db, "Dining");
-    const groceries = expense(book.db, "Groceries");
-    const meals = spending(book.db, "Dining", [dining.id]);
-    const food = spending(book.db, "Groceries", [groceries.id]);
-    createBucketEvent(book.db, food.id, { kind: "fund", amount: 80_000, date: "2026-03-01", asOf: "2026-03-01", ...saved });
-    purchase(book.db, account.id, dining.id, -42_000);
-    const cover = coverBucket(book.db, meals.id, { fromBucketId: food.id, date: "2026-03-02", ...saved });
-    expect(cover.kind).toBe("move");
-    expect(cover.amount).toBe(42_000);
-    expect(cover.bucketId).toBe(food.id);
-    expect(cover.otherBucketId).toBe(meals.id);
-    expect(readBucket(book.db, meals.id).balance).toBe(0);
-    expect(readBucket(book.db, food.id).balance).toBe(38_000);
   } finally {
     book.close();
   }

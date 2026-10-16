@@ -332,3 +332,29 @@ test("a payee learned in the opposite direction links the only imported pair", (
     expect(out?.autoReason).toBe("transfer_match");
   });
 });
+
+
+test("a transfer learned between two accounts does not automatically link a third account", () => {
+  withBook((db, ids) => {
+    learnTransfer(db, ids, "MOVE FUNDS");
+    const third = createAccount(db, { asOf, name: "Third account", kind: "savings", openingBalance: 0, ...saved });
+    statement(db, ids, ids.cheque, "out", ["03/10/2026,MOVE FUNDS,-50.00"]);
+    statement(db, ids, third.id, "in", ["03/11/2026,DEPOSIT,50.00"]);
+    const [out] = rowsOf(db, -50_000);
+    expect(out?.transferPeerId).toBeNull();
+    expect(review(db, out?.id ?? "")?.question).toBe("transfer_pair");
+  });
+});
+
+
+test("an automatic pair link has no age limit", () => {
+  withBook((db, ids) => {
+    learnTransfer(db, ids, "MOVE FUNDS");
+    statement(db, ids, ids.cheque, "old-out", ["02/01/2025,MOVE FUNDS,-50.00"]);
+    statement(db, ids, ids.savings, "old-in", ["02/02/2025,DEPOSIT,50.00"]);
+    const [out] = rowsOf(db, -50_000);
+    const [incoming] = rowsOf(db, 50_000);
+    expect(out?.transferPeerId).toBe(incoming?.id ?? "missing");
+    expect(out?.autoReason).toBe("transfer_match");
+  });
+});

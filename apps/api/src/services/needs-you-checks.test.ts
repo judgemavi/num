@@ -241,18 +241,14 @@ test("the savings rate uses the last 3 complete months: not older months, not th
     post(db, cash.id, "2026-04-05", -50_000, food.id);
     const row = check(db, "2026-04-30", "savings_rate");
     expect(row.pass).toBe(true);
-    expect(row.months).toEqual([
-      { month: "2026-03", savingsRateMilliPct: 100_000, savings: 10_000 },
-      { month: "2026-02", savingsRateMilliPct: 100_000, savings: 10_000 },
-      { month: "2026-01", savingsRateMilliPct: 100_000, savings: 10_000 },
-    ]);
+    expect(row.savingsRateMilliPct).toBe(100_000);
     const next = check(db, "2026-05-01", "savings_rate");
     expect(next.pass).toBe(false);
-    expect(next.months[0]).toEqual({ month: "2026-04", savingsRateMilliPct: null, savings: -50_000 });
+    expect(next.savingsRateMilliPct).toBe(-150_000);
   });
 });
 
-test("the savings rate fails when one of the last 3 complete months spent more than it received", () => {
+test("the savings rate fails when total spending exceeds total income over 3 complete months", () => {
   withBook((db) => {
     const cash = account(db, "chequing", "Cash", 0);
     const pay = createCategory(db, { name: "Pay", kind: "income", ...saved });
@@ -260,10 +256,10 @@ test("the savings rate fails when one of the last 3 complete months spent more t
     for (const month of ["2026-01", "2026-02"]) {
       post(db, cash.id, `${month}-05`, 10_000, pay.id);
     }
-    post(db, cash.id, "2026-03-05", -20_000, food.id);
+    post(db, cash.id, "2026-03-05", -30_000, food.id);
     const row = check(db, "2026-04-15", "savings_rate");
     expect(row.pass).toBe(false);
-    expect(row.months[0]).toMatchObject({ month: "2026-03", savings: -20_000, savingsRateMilliPct: null });
+    expect(row.savingsRateMilliPct).toBe(-50_000);
   });
 });
 
@@ -274,10 +270,8 @@ test("the savings rate does not count months before the first transaction", () =
     const food = expense(db, "Food");
     post(db, cash.id, "2026-03-05", 10_000, pay.id);
     post(db, cash.id, "2026-03-06", -2_500, food.id);
-    expect(check(db, "2026-03-20", "savings_rate")).toMatchObject({ pass: true, months: [] });
-    expect(check(db, "2026-04-15", "savings_rate").months).toEqual([
-      { month: "2026-03", savingsRateMilliPct: 75_000, savings: 7_500 },
-    ]);
+    expect(check(db, "2026-03-20", "savings_rate")).toMatchObject({ pass: true, savingsRateMilliPct: null });
+    expect(check(db, "2026-04-15", "savings_rate").savingsRateMilliPct).toBe(75_000);
   });
 });
 
@@ -347,4 +341,18 @@ test("import age follows the supplied local date on both sides of UTC midnight",
       expect(nextDay.items[0]?.ageDays).toBe(importedOn === "2026-10-07" ? 2 : 1);
     });
   }
+});
+
+
+test("one negative month passes when the savings of the 3 months together are positive", () => {
+  withBook((db) => {
+    const cash = account(db, "chequing", "Cash", 0);
+    const pay = createCategory(db, { name: "Pay", kind: "income", ...saved });
+    const food = expense(db, "Food");
+    for (const [month, spending] of [["2026-07", 88_000], ["2026-08", 104_000], ["2026-09", 90_000]] as const) {
+      post(db, cash.id, `${month}-05`, 100_000, pay.id);
+      post(db, cash.id, `${month}-06`, -spending, food.id);
+    }
+    expect(check(db, "2026-10-16", "savings_rate")).toMatchObject({ pass: true, savingsRateMilliPct: 6_000 });
+  });
 });

@@ -89,12 +89,6 @@ export function bucketError(code: ErrorCode | undefined): string {
   if (code === "bucket_not_archived") {
     return "That bucket is not archived.";
   }
-  if (code === "bucket_not_overspent") {
-    return "This bucket is no longer overspent.";
-  }
-  if (code === "bucket_short") {
-    return "That bucket does not have enough to cover this.";
-  }
   if (code === "bucket_paused") {
     return "That bucket is already paused.";
   }

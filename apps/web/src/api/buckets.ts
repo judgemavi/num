@@ -1,4 +1,4 @@
-import type { BucketCover, BucketCreate, BucketEventCreate, BucketListQuery, BucketUpdate } from "@num/shared";
+import type { BucketCreate, BucketEventCreate, BucketListQuery, BucketUpdate } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { useArchiveWrite } from "@/api/archive";
 import { undoToast } from "@/components/undo-toast";
@@ -25,13 +25,6 @@ export function bucketOptionsQuery() {
   return queryOptions({
     queryKey: ["buckets", "category-map"],
     queryFn: ({ client }) => activeAndArchived((archived) => client.fetchQuery(bucketListQuery({ archived }))),
-  });
-}
-
-export function overspentQuery() {
-  return queryOptions({
-    queryKey: ["buckets", "overspent"],
-    queryFn: async () => (await unwrap(api.buckets.overspent.$get())).items,
   });
 }
 
@@ -106,15 +99,5 @@ function useUndoBucketEvent() {
     meta: { errorText: bucketError },
     mutationFn: ({ bucketId, eventId }: { bucketId: string; eventId: string }) =>
       unwrap(api.buckets[":id"].events[":eventId"].undo.$post({ param: { id: bucketId, eventId } })),
-  });
-}
-
-/** Cover an overspent bucket with money from a second bucket. */
-export function useCoverBucket() {
-  const undo = useUndoBucketEvent();
-  return useMutation({
-    meta: formWrite,
-    onSuccess: (event) => undoToast("Bucket covered.", () => undo.mutate({ bucketId: event.bucketId, eventId: event.id })),
-    mutationFn: ({ id, body }: { id: string; body: BucketCover }) => unwrap(api.buckets[":id"].cover.$post({ param: { id }, json: body })),
   });
 }

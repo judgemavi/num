@@ -1,5 +1,5 @@
-import { bucketEvents, buckets, type BucketEventRow } from "@num/db";
-import { isIsoDate, utcNow, type BucketCover, type BucketEvent, type BucketEventCreate } from "@num/shared";
+import { bucketEvents, buckets } from "@num/db";
+import { isIsoDate, utcNow, type BucketEvent, type BucketEventCreate } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -114,49 +114,5 @@ export function undoBucketEvent(db: Db, bucketId: string, eventId: string, input
       after: withoutId(next),
     });
     return next;
-  });
-}
-
-/** Cover an overspent bucket with the amount that it is over: a move from a second bucket. The source must have the whole amount. */
-export function coverBucket(db: Db, bucketId: string, input: BucketCover & WriteInput): BucketEvent {
-  if (!isIsoDate(input.date)) {
-    throw new ServiceError("bucket_fields_invalid", 400);
-  }
-  const { fromBucketId } = input;
-  if (fromBucketId === bucketId) {
-    throw new ServiceError("bucket_same", 400);
-  }
-  const id = crypto.randomUUID();
-  return write(db, { source: input.source, at: input.at }, (tx) => {
-    requireActiveBucket(tx, bucketId);
-    requireActiveBucket(tx, fromBucketId);
-    const balances = bucketBalances(tx, undefined, [bucketId, fromBucketId]);
-    const balance = balances.get(bucketId) ?? 0;
-    if (balance >= 0) {
-      throw new ServiceError("bucket_not_overspent", 409);
-    }
-    const need = -balance;
-    if ((balances.get(fromBucketId) ?? 0) < need) {
-      throw new ServiceError("bucket_short", 409);
-    }
-    const row: BucketEventRow = {
-      id,
-      kind: "move",
-      bucketId: fromBucketId,
-      otherBucketId: bucketId,
-      amount: need,
-      date: input.date,
-      month: null,
-      undoneAt: null,
-    };
-    tx.insert(bucketEvents).values(row).run();
-    tx.audit({
-      entity: "bucket_events",
-      entityId: id,
-      action: "create",
-      before: null,
-      after: withoutId(row),
-    });
-    return row;
   });
 }

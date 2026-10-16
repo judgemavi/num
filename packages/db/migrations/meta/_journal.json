@@ -8,6 +8,13 @@
       "when": 1792165487804,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792173859108,
+      "tag": "0001_faithful_tinkerer",
+      "breakpoints": true
     }
   ]
 }

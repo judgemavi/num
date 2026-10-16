@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
-import { monthKeySchema } from "./month";
 import { amountSchema as money } from "./money";
 
 const nonNegative = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
@@ -50,10 +49,10 @@ const needsYouItemSchema = z.discriminatedUnion("code", [
     recede: z.array(z.object({ bucketId: z.uuid(), amount: nonNegative })),
     uncovered: nonNegative,
   }),
-  /** The complete months with a savings rate below 0%. */
+  /** One savings rate over the last 3 complete months together, below 0%. */
   z.object({
     code: z.literal("savings_rate"),
-    months: z.array(z.object({ month: monthKeySchema, savingsRateMilliPct: z.number().int().nullable() })),
+    savingsRateMilliPct: z.number().int().nullable(),
   }),
 ]);
 

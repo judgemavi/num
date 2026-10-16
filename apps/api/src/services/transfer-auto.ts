@@ -1,7 +1,7 @@
 import { idIn } from "./list-sql";
 import { accounts, inboxDecisions, transactionLines, transactions } from "@num/db";
 import { addDays, matchDateWindowDays, matchHistoryDays, automaticLinkConfidence } from "@num/shared";
-import { and, eq, gte, isNull, lte, ne, type SQL } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, ne, or, type SQL } from "drizzle-orm";
 import { pairKey } from "./decision-keys";
 import { ServiceError } from "../service-error";
 import { loadLines, replaceLines } from "./transaction-lines";
@@ -111,8 +111,8 @@ function candidates(tx: WriteTx, row: Row) {
   return found.filter((other) => !decided.has(pairKey(row.id, other.id)));
 }
 
-/** The normalized payee is a confirmed transfer, in either direction. Automatic links do not teach. */
-function learnedTransfer(tx: WriteTx, payee: string) {
+/** The normalized payee is a confirmed transfer between these accounts, in either direction. Automatic links do not teach. */
+function learnedTransfer(tx: WriteTx, payee: string, accountId: string, peerAccountId: string) {
   if (payee.length === 0) {
     return false;
   }
@@ -123,6 +123,10 @@ function learnedTransfer(tx: WriteTx, payee: string) {
     .where(
       and(
         eq(transactions.payeeNormalized, payee),
+        or(
+          and(eq(transactions.accountId, accountId), eq(transactionLines.transferAccountId, peerAccountId)),
+          and(eq(transactions.accountId, peerAccountId), eq(transactionLines.transferAccountId, accountId)),
+        ),
         eq(transactions.mirror, literal(0)),
         isNull(transactions.autoReason),
         hasTransferLine(transactions.id),
@@ -136,8 +140,8 @@ function learnedTransfer(tx: WriteTx, payee: string) {
 
 /**
  * Links the row and its opposite row as a transfer pair (no new mirror) when exactly one candidate
- * exists for each, no "no" is recorded, and one payee is a learned transfer. Both rows become an automatic label.
- * A read never calls this. The 90-day limit of the pair list does not apply: a write has no `asOf`.
+ * exists for each, no "no" is recorded, and one payee is a learned transfer between the same accounts. Both rows become an automatic label.
+ * A read never calls this. The 90-day limit of the pair list does not apply: the automatic link has no age limit.
  */
 export function linkTransferIfSure(tx: WriteTx, transactionId: string): void {
   const row = openRows(tx, eq(transactions.id, transactionId))[0];
@@ -156,7 +160,7 @@ export function linkTransferIfSure(tx: WriteTx, transactionId: string): void {
   if (!row.imported && !peer.imported) {
     return;
   }
-  if (!learnedTransfer(tx, row.payee) && !learnedTransfer(tx, peer.payee)) {
+  if (!learnedTransfer(tx, row.payee, row.accountId, peer.accountId) && !learnedTransfer(tx, peer.payee, row.accountId, peer.accountId)) {
     return;
   }
   linkTransferPair(tx, row.id, peer.id, null);

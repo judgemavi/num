@@ -65,8 +65,7 @@ export function readNeedsYou(db: Db, asOf: string): NeedsYou {
   items.push(...poolItems(failed));
   const savings = failed.find((check) => check.code === "savings_rate");
   if (savings) {
-    const months = savings.months.filter((item) => item.savings < 0);
-    items.push({ code: "savings_rate", months: months.map(({ month, savingsRateMilliPct }) => ({ month, savingsRateMilliPct })) });
+    items.push({ code: "savings_rate", savingsRateMilliPct: savings.savingsRateMilliPct });
   }
   return { asOf, items };
 }

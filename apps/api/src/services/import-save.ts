@@ -83,7 +83,7 @@ function insertCreated(
       active: true,
     })
     .run();
-  const categoryId = applied && "categoryId" in applied ? applied.categoryId : null;
+  const categoryId = applied && "categoryId" in applied ? (applied.categoryId ?? null) : null;
   tx.insert(transactions)
     .values({
       id: transactionId,
@@ -103,8 +103,9 @@ function insertCreated(
       autoConfidence: applied?.autoConfidence ?? null,
     })
     .run();
+  const transferAccountId = applied && result.reason === "recurring" ? result.transferAccountId : null;
   const lines = planned.mortgage ?? [
-    { amount: row.amount, memo: null, categoryId, transferAccountId: null, tagIds: [] },
+    { amount: row.amount, memo: null, categoryId, transferAccountId, tagIds: [] },
   ];
   for (const line of lines) {
     tx.insert(transactionLines)
@@ -118,7 +119,7 @@ function insertCreated(
       })
       .run();
   }
-  const principal = planned.mortgage?.find((line) => line.transferAccountId);
+  const principal = lines.find((line) => line.transferAccountId);
   if (principal?.transferAccountId) {
     insertMirror(
       tx,
@@ -168,6 +169,7 @@ function insertMatched(tx: WriteTx, batchId: string, accountId: string, row: Pla
       transactionId: row.transactionId,
       active: true,
       previousStatus: before.status,
+      previousMirror: before.mirror,
     })
     .run();
   tx.update(transactions).set({ importRowId: rowId, mirror: false, status: "cleared" }).where(eq(transactions.id, row.transactionId)).run();
@@ -338,6 +340,7 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
           periodEnd: batch.periodEnd,
           closingBalance: batch.closingBalance,
           closingDate: batch.closingDate,
+          previousBankBalance: batch.previousBankBalance,
           counts: countOutcomes(input.rows, input.unreadable.length),
         },
       });

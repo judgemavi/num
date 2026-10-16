@@ -1,6 +1,7 @@
 import { errorSchema, type ErrorBody, type ErrorCode } from "@num/shared";
 import type { AppType } from "api/routes";
-import { hc, type ClientResponse } from "hono/client";
+import { hc, parseResponse, type ClientResponse } from "hono/client";
+import type { StatusCode } from "hono/utils/http-status";
 
 /**
  * The typed client for all calls to the API. The types come from the API routes. No API code is in the bundle.
@@ -50,16 +51,13 @@ export class ApiError extends Error {
   }
 }
 
-type OkBody<R> = R extends ClientResponse<infer T, 200, "json"> ? T : never;
-
 /** Give the typed body of a successful response. Throw an `ApiError` with the error code for each other response. */
-export async function unwrap<R extends ClientResponse<unknown, number, string>>(request: Promise<R>): Promise<OkBody<R>> {
+export async function unwrap<R extends ClientResponse<unknown, StatusCode, "json">>(request: Promise<R>) {
   const response = await request;
   if (!response.ok) {
     throw new ApiError(errorSchema.parse(await response.json()));
   }
-  // Hono leaves the generic response body as unknown after the status check.
-  return (await response.json()) as OkBody<R>;
+  return parseResponse<R>(response);
 }
 
 /** The error code of a failed query or mutation. A failure with no API error body has no code. */

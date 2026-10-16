@@ -1,7 +1,7 @@
 import { comparePriority, type BucketKind } from "@num/shared";
 import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { billNeedsQuery, bucketListQuery, emergencyFundQuery, overspentQuery } from "@/api/buckets";
+import { billNeedsQuery, bucketListQuery, emergencyFundQuery } from "@/api/buckets";
 import { availableQuery, fundingOwedQuery } from "@/api/funding";
 import { feasibilityQuery } from "@/api/feasibility";
 import { scheduleSignalsQuery, upcomingQuery } from "@/api/schedules";
@@ -10,7 +10,6 @@ import { BillRow } from "@/buckets/bill-row";
 import { BucketRow } from "@/buckets/bucket-row";
 import { BucketFilterBar } from "@/buckets/filters";
 import { GoalFeasibility } from "@/buckets/goal-feasibility";
-import { OverspentPanel } from "@/buckets/overspent-panel";
 import { useBucketBoard, useBucketSearch } from "@/buckets/use-board";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
@@ -38,7 +37,6 @@ export function BucketsScreen() {
   usePrefetchQuery(bucketListQuery(useBucketSearch().shown));
   usePrefetchQuery(availableQuery(asOf));
   usePrefetchQuery(feasibilityQuery(asOf));
-  usePrefetchQuery(overspentQuery());
   usePrefetchQuery(emergencyFundQuery(asOf));
   usePrefetchQuery(fundingOwedQuery(asOf));
   usePrefetchQuery(billNeedsQuery(asOf));
@@ -54,7 +52,7 @@ export function BucketsScreen() {
 }
 
 /**
- * The lists, and the side column: Detected, Upcoming and, while a bucket is overspent, Overspent. The automatic fill
+ * The lists, and the side column: Upcoming, then Detected. The automatic fill
  * links the transactions that match an occurrence, and the reads load again when it links one.
  */
 function BucketsBody() {
@@ -67,9 +65,8 @@ function BucketsBody() {
         <BucketList />
       </div>
       <div className="grid gap-5">
-        <OverspentPanel />
-        <DetectedList />
         <UpcomingOccurrences />
+        <DetectedList />
       </div>
     </div>
   );

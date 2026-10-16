@@ -56,7 +56,6 @@ const destructiveOperations = new Set([
   "post_accounts_id_bank_balances",
   "post_accounts_id_restore",
   "post_buckets_id_events",
-  "post_buckets_id_cover",
   "post_buckets_id_events_eventid_undo",
   "post_funding_fill",
   "post_imports",
@@ -75,6 +74,8 @@ export function mcpRoutes(app: OpenAPIHono): McpRoute[] {
       continue;
     }
     const route = definition.route;
+    // Only the UI can change AI access.
+    if (route.operationId === "patch_ai_access") continue;
     if (!isMethod(route.method)) {
       throw new Error(`MCP method is not supported for ${route.path}`);
     }

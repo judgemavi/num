@@ -49,7 +49,7 @@ export function applyLinkedSchedule(
   const mortgage =
     schedule.transferAccountId !== null &&
     tx.select({ kind: accounts.kind }).from(accounts).where(eq(accounts.id, schedule.transferAccountId)).get()?.kind === "mortgage";
-  if (!mortgage && schedule.categoryId === null) {
+  if (!mortgage && schedule.categoryId === null && schedule.transferAccountId === null) {
     return;
   }
   const result = {
@@ -61,13 +61,23 @@ export function applyLinkedSchedule(
     sourceId: schedule.id,
     categoryId: mortgage ? null : schedule.categoryId,
     merchantId: schedule.merchantId,
-    transferAccountId: mortgage ? schedule.transferAccountId : null,
+    transferAccountId: schedule.transferAccountId,
     keep: false,
     mortgage,
     signals: [],
   };
   const before = readTransaction(tx, transactionId);
-  const lines = mortgage ? mortgageSplitLines(tx, result, txn.accountId, txn.date, txn.amount) : null;
+  const lines = mortgage
+    ? mortgageSplitLines(tx, result, txn.accountId, txn.date, txn.amount)
+    : schedule.transferAccountId
+      ? [{
+          amount: txn.amount,
+          memo: before.lines[0]?.memo ?? null,
+          categoryId: null,
+          transferAccountId: schedule.transferAccountId,
+          tagIds: [...new Set(before.lines.flatMap((line) => line.tagIds))],
+        }]
+      : null;
   if (mortgage && !lines) {
     return;
   }
@@ -129,7 +139,7 @@ export function labelFields(result: MatchResult, merchantId: string | null) {
   if (result.level !== "automatic" || result.reason === null) {
     return null;
   }
-  if (result.mortgage) {
+  if (result.mortgage || (result.reason === "recurring" && result.transferAccountId !== null)) {
     return {
       merchantId: merchantId ?? result.merchantId,
       autoReason: result.reason,

@@ -5,6 +5,7 @@ import { expense, saved } from "./bucket-test-book";
 import { fillBuckets } from "./funding-fill";
 import { account, addSchedule, money, spend } from "./funding-test-book";
 import { readNeedsYou } from "./needs-you";
+import { createCategory } from "./categories";
 import { createTransaction } from "./transactions";
 
 const asOf = "2026-10-08";
@@ -53,5 +54,27 @@ test("each check that fails is an item, in the order of Home", () => {
     ]);
   } finally {
     close();
+  }
+});
+
+
+test("Home shows one savings rate for the 3 complete months together", () => {
+  const book = tempDatabase();
+  try {
+    const cash = account(book.db, "Cash", "chequing", 0);
+    const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
+    const food = expense(book.db, "Food");
+    for (const [month, spending] of [["2026-07", 88_000], ["2026-08", 104_000], ["2026-09", 90_000]] as const) {
+      money(book.db, cash.id, pay.id, `${month}-05`, 100_000, "Income");
+      money(book.db, cash.id, food.id, `${month}-06`, -spending, "Spending");
+    }
+    const savings = () => readNeedsYou(book.db, asOf).items.filter((item) => item.code === "savings_rate");
+    expect(savings()).toEqual([]);
+    money(book.db, cash.id, food.id, "2026-09-07", -18_000, "Spending");
+    expect(savings()).toEqual([]);
+    money(book.db, cash.id, food.id, "2026-09-08", -30_000, "Spending");
+    expect(savings()).toEqual([{ code: "savings_rate", savingsRateMilliPct: -10_000 }]);
+  } finally {
+    book.close();
   }
 });

@@ -48,17 +48,15 @@ function reviewAge(state: ReviewState, asOf: string) {
   return { code: "review" as const, pass: oldCount === 0, oldCount };
 }
 
-/** The last 3 complete months, newest first. */
+/** One savings rate over the last 3 complete months together. */
 function savingsRate(db: Db, asOf: string) {
-  const months = lastCompleteMonths(db, asOf, 3).reverse();
-  const oldest = months[months.length - 1];
-  const newest = months[0];
-  const facts = oldest && newest ? loadLedgerLines(db, { from: `${oldest}-01`, through: monthLastDay(newest) }) : [];
-  const rows = months.map((month) => {
-    const totals = spendTotals(facts, { from: `${month}-01`, to: monthLastDay(month) });
-    return { month, savingsRateMilliPct: totals.savingsRateMilliPct, savings: totals.savings };
-  });
-  return { code: "savings_rate" as const, pass: rows.every((item) => item.savings >= 0), months: rows };
+  const months = lastCompleteMonths(db, asOf, 3);
+  const oldest = months[0];
+  const newest = months[months.length - 1];
+  const period = oldest && newest ? { from: `${oldest}-01`, to: monthLastDay(newest) } : null;
+  const facts = period ? loadLedgerLines(db, { from: period.from, through: period.to }) : [];
+  const totals = spendTotals(facts, period ?? { from: asOf, to: asOf });
+  return { code: "savings_rate" as const, pass: totals.savings >= 0, savingsRateMilliPct: totals.savingsRateMilliPct };
 }
 
 /** The fill covers a negative bucket from Unassigned. The check fails when a bucket stays negative. */

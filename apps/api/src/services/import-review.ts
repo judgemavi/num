@@ -97,7 +97,7 @@ export function resolveImportReview(
         throw new ServiceError("import_match_invalid", 409);
       }
       const before = readTransaction(tx, txn.id);
-      tx.update(importRows).set({ outcome: "matched", transactionId: txn.id, previousStatus: txn.status }).where(eq(importRows.id, row.id)).run();
+      tx.update(importRows).set({ outcome: "matched", transactionId: txn.id, previousStatus: txn.status, previousMirror: txn.mirror }).where(eq(importRows.id, row.id)).run();
       tx.update(transactions).set({ importRowId: row.id, mirror: false, status: "cleared" }).where(eq(transactions.id, txn.id)).run();
       auditTransaction(tx, txn.id, "update", before, readTransaction(tx, txn.id));
       return { importRowId: row.id, transactionId: txn.id };

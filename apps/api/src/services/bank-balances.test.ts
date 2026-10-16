@@ -140,7 +140,7 @@ test("a bank balance has one row for each date, and each change is audited in on
   }
 });
 
-test("an import with a closing balance saves a bank balance, replaces one on the same date, and undo removes it", () => {
+test("an import with a closing balance saves a bank balance, replaces one on the same date, and undo restores it", () => {
   const book = tempBook();
   try {
     createBankBalance(book.db, book.account.id, { date: "2026-01-31", balance: 10, ...saved });
@@ -154,7 +154,9 @@ test("an import with a closing balance saves a bank balance, replaces one on the
     expect(statusOf(book)).toMatchObject({ date: "2026-01-31", difference: 0 });
 
     undoImportBatch(book.db, batch.id, { source: "ui", at });
-    expect(book.db.select().from(bankBalances).all().map((row) => row.date)).toEqual(["2026-01-10"]);
+    expect(book.db.select().from(bankBalances).orderBy(bankBalances.date).all().map((row) => [row.date, row.balance, row.importBatchId])).toEqual([
+      ["2026-01-10", 7_000, null], ["2026-01-31", 10, null],
+    ]);
   } finally {
     book.close();
   }

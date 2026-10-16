@@ -3,7 +3,7 @@ import { utcNow, type ImportUndo, type UndoBlockReason } from "@num/shared";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { removeImportBankBalance } from "./bank-balances";
+import { restoreImportBankBalance } from "./bank-balances";
 import { presentBatch } from "./import-read";
 import { removeTransaction } from "./transaction-erase";
 import { auditTransaction, readTransaction } from "./transaction-record";
@@ -65,7 +65,7 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
     dropIds.push(row.id);
   }
 
-  if (removeIds.length === 0 && unlinkIds.length === 0 && dropIds.length === 0) {
+  if (blocked.length > 0 && removeIds.length === 0 && unlinkIds.length === 0 && dropIds.length === 0) {
     return { batch: presentBatch(db, batch), blocked };
   }
 
@@ -88,7 +88,7 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
         const current = tx.select().from(transactions).where(eq(transactions.id, row.transactionId)).get();
         if (current) {
           const before = readTransaction(tx, current.id);
-          tx.update(transactions).set({ importRowId: null, status: row.previousStatus ?? current.status }).where(eq(transactions.id, current.id)).run();
+          tx.update(transactions).set({ importRowId: null, status: row.previousStatus ?? current.status, mirror: row.previousMirror ?? current.mirror }).where(eq(transactions.id, current.id)).run();
           auditTransaction(tx, current.id, "update", before, readTransaction(tx, current.id));
         }
       }
@@ -107,7 +107,7 @@ export function undoImportBatch(db: Db, id: string, input: { source: AuditSource
     const undoneAt = stillActive.length === 0 ? at : null;
     if (undoneAt) {
       tx.update(importBatches).set({ undoneAt }).where(eq(importBatches.id, id)).run();
-      removeImportBankBalance(tx, id);
+      restoreImportBankBalance(tx, id);
     }
     const next = tx.select().from(importBatches).where(eq(importBatches.id, id)).get();
     if (!next) {

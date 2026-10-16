@@ -294,13 +294,6 @@ export const bucketEventCreateSchema = z
   })
   .refine((value) => (value.kind === "move") === (value.otherBucketId != null), { path: ["otherBucketId"] });
 
-export const bucketCoverSchema = z.object({
-  /** The bucket that gives the money. */
-  fromBucketId: z.uuid(),
-  date: isoDateSchema,
-});
-
-
 export type Bucket = z.infer<typeof bucketSchema>;
 export type BucketWrite = z.infer<typeof bucketWriteSchema>;
 export type BucketUpdate = z.infer<typeof bucketUpdateSchema>;
@@ -308,6 +301,5 @@ export type BucketCreate = z.infer<typeof bucketCreateSchema>;
 export type BucketListQuery = z.output<typeof bucketListQuerySchema>;
 export type BucketEvent = z.infer<typeof bucketEventSchema>;
 export type BucketEventCreate = z.infer<typeof bucketEventCreateSchema>;
-export type BucketCover = z.infer<typeof bucketCoverSchema>;
 export type EmergencyFund = z.infer<typeof emergencyFundSchema>;
 export type OverspentBucket = z.infer<typeof overspentBucketSchema>;

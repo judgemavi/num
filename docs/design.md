@@ -167,7 +167,7 @@ ListCard rows.
   the person must know ("Fund from Unassigned").
 
 **Messages after a write:** shadcn `Sonner` toasts, one `Toaster` at the app root, bottom centre.
-- A write that has no form (a row action, a one-click answer, archive, undo, cover) shows an error toast when it
+- A write that has no form (a row action, a one-click answer, archive, undo) shows an error toast when it
   fails. Do not show the error of such a write in the page.
 - A form shows the error of its write in the form (`FormError`). It shows no toast.
 - A write that can be undone with an existing route shows a success toast with an "Undo" action. Other writes show no

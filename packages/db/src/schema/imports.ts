@@ -7,7 +7,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
-import { importRowOutcomes, transactionStatuses, type UnreadableRow } from "@num/shared";
+import { importRowOutcomes, transactionStatuses, type BankBalance, type UnreadableRow } from "@num/shared";
 import { accounts } from "./accounts";
 import { transactions } from "./ledger";
 
@@ -35,6 +35,7 @@ export const importBatches = sqliteTable("import_batches", {
   periodEnd: text("period_end").notNull(),
   closingBalance: integer("closing_balance"),
   closingDate: text("closing_date"),
+  previousBankBalance: text("previous_bank_balance", { mode: "json" }).$type<BankBalance>(),
   unreadableJson: text("unreadable_json", { mode: "json" }).$type<UnreadableRow[]>().notNull().default([]),
   importedOn: text("imported_on").notNull(),
   createdAt: text("created_at").notNull(),
@@ -62,6 +63,7 @@ export const importRows = sqliteTable(
     transactionId: text("transaction_id").references((): AnySQLiteColumn => transactions.id),
     active: integer("active", { mode: "boolean" }).notNull().default(true),
     previousStatus: text("previous_status", { enum: transactionStatuses }),
+    previousMirror: integer("previous_mirror", { mode: "boolean" }),
   },
   (table) => [
     uniqueIndex("import_rows_batch_row_unique").on(table.batchId, table.rowIndex),

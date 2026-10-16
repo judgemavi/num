@@ -65,7 +65,7 @@ test("signals for one candidate combine and a small lead stays a suggestion", ()
   expect(matchLevel(990, 1000, true)).toBe("suggestion");
 });
 
-test("a recurring category label is automatic and a transfer is not", () => {
+test("recurring category and transfer labels are automatic", () => {
   const labeled = score({
     recurring: {
       bucketId: "plan",
@@ -90,10 +90,13 @@ test("a recurring category label is automatic and a transfer is not", () => {
       transferAccountId: "savings",
       mortgage: false,
     },
+    payeeScores: learnedConfidence([row("confirmed", "2026-01-01", "rent")]),
   });
-  expect(transfer.level).toBe("suggestion");
+  expect(transfer.level).toBe("automatic");
   expect(transfer.transferAccountId).toBe("savings");
   expect(transfer.categoryId).toBeNull();
+  expect(transfer.signals).toHaveLength(1);
+  expect(reviewLevel(true, transfer.confidenceMilli)).toBe("sure");
 });
 
 test("a recurring mortgage item is an automatic split", () => {

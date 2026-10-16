@@ -93,13 +93,18 @@ function dataOf(body: Rpc): Record<string, unknown> {
   return data;
 }
 
-test("every route has a tool when AI writes are on", async () => {
+test("every permitted route has a tool when AI writes are on", async () => {
   const book = tempBook();
   try {
     allowWrites(book.db);
     const listed = await post(book.app, "tools/list", {});
     const tools = listed.body.result?.tools ?? [];
     expect(tools.map((tool) => tool.name).sort()).toEqual(mcpRoutes(book.app).map((route) => route.operationId).sort());
+    expect(tools.some((tool) => tool.name === "patch_ai_access")).toBe(false);
+    expect(tools.some((tool) => tool.name === "get_ai_access")).toBe(true);
+    const refused = await callTool(book.app, "patch_ai_access", { aiCanWrite: false });
+    expect(refused.result?.isError === true || refused.error !== undefined).toBe(true);
+    expect(dataOf(await callTool(book.app, "get_ai_access", {}))).toMatchObject({ aiCanWrite: true });
     expect(tools.find((tool) => tool.name === "get_forecast")?.annotations?.readOnlyHint).toBe(true);
     expect(tools.find((tool) => tool.name === "post_imports")?.annotations?.destructiveHint).toBe(true);
     expect(tools.find((tool) => tool.name === "delete_transactions_id")?.annotations?.destructiveHint).toBe(true);

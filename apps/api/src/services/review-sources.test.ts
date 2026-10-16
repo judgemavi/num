@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
 import { createAccount } from "./accounts";
-import { coverBucket, createBucketEvent } from "./bucket-events";
+import { createBucketEvent } from "./bucket-events";
 import { createBucket, listOverspent, updateBucket } from "./buckets";
 import { createCategory } from "./categories";
 import { getImportDetail } from "./import-list";
@@ -218,7 +218,7 @@ test("each review source appears and leaves after its action", () => {
     pay(sample.db, cash.id, "2026-03-08", -42000, "Dining out", dining.id);
     createBucketEvent(sample.db, spare.id, { kind: "fund", amount: 50000, date: "2026-03-01", asOf, ...saved });
     expect(overspentIds(sample.db)).toEqual([meals.id]);
-    coverBucket(sample.db, meals.id, { fromBucketId: spare.id, date: asOf, ...saved });
+    createBucketEvent(sample.db, spare.id, { kind: "move", otherBucketId: meals.id, amount: 42_000, date: asOf, ...saved });
     expect(overspentIds(sample.db)).toEqual([]);
 
     const changedPlan = createSchedule(sample.db, { ...planFields(cash.id, null, -10000, "2026-03-15"), ...saved });

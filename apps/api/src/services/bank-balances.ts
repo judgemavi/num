@@ -1,5 +1,5 @@
 import { idIn } from "./list-sql";
-import { accounts, bankBalances, mortgageTerms, valuations, type AccountRow } from "@num/db";
+import { accounts, bankBalances, importBatches, mortgageTerms, valuations, type AccountRow } from "@num/db";
 import { dayBefore, openingFromBankBalance, utcNow, type BankBalance, type BankBalanceInput, type BankStatus } from "@num/shared";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
@@ -168,6 +168,7 @@ export function saveImportBankBalance(
     .where(and(eq(bankBalances.accountId, input.accountId), eq(bankBalances.date, input.date)))
     .get();
   if (existing) {
+    tx.update(importBatches).set({ previousBankBalance: existing }).where(eq(importBatches.id, input.batchId)).run();
     tx.delete(bankBalances).where(eq(bankBalances.id, existing.id)).run();
     tx.audit({ entity: "bank_balances", entityId: existing.id, action: "delete", before: withoutId(existing), after: null });
   }
@@ -183,12 +184,17 @@ export function saveImportBankBalance(
   tx.audit({ entity: "bank_balances", entityId: row.id, action: "create", before: null, after: withoutId(row) });
 }
 
-/** Undo of a batch removes the bank balance that the batch saved. */
-export function removeImportBankBalance(tx: WriteTx, batchId: string): void {
+/** Undo removes the balance of the batch and restores the balance that it replaced. */
+export function restoreImportBankBalance(tx: WriteTx, batchId: string): void {
   const row = tx.select().from(bankBalances).where(eq(bankBalances.importBatchId, batchId)).get();
   if (!row) {
     return;
   }
   tx.delete(bankBalances).where(eq(bankBalances.id, row.id)).run();
   tx.audit({ entity: "bank_balances", entityId: row.id, action: "delete", before: withoutId(row), after: null });
+  const previous = tx.select().from(importBatches).where(eq(importBatches.id, batchId)).get()?.previousBankBalance;
+  if (previous) {
+    tx.insert(bankBalances).values(previous).run();
+    tx.audit({ entity: "bank_balances", entityId: previous.id, action: "create", before: null, after: withoutId(previous) });
+  }
 }

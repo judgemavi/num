@@ -10,7 +10,7 @@ import { IconTile } from "@/components/icon-tile";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { Badge } from "@/components/ui/badge";
 import { useAccountLabels, useActiveSchedules, useBookCurrency, useBucketNames } from "@/editors/lookups";
-import { monthTitle, rateText } from "@/home/spending/format";
+import { rateText } from "@/home/spending/format";
 import { formatMoney } from "@/money";
 import { formatDate } from "@/date-format";
 
@@ -147,11 +147,8 @@ function useRows(items: readonly NeedsYouItem[]): Row[] {
           hue: "mint",
           icon: PiggyBank,
           title: "Savings rate below 0%",
-          detail: item.months.map((row) => `${monthTitle(row.month)} ${rateText(row.savingsRateMilliPct)}`).join(" · "),
-          open: () => {
-            const month = item.months[0]?.month;
-            void go({ to: "/", search: month ? { window: "6", month } : {} });
-          },
+          detail: `${rateText(item.savingsRateMilliPct)} over the last 3 complete months`,
+          open: () => void go({ to: "/", search: { window: "3" } }),
         }];
     }
   });

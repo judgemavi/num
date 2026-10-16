@@ -274,6 +274,7 @@ function collectSignals(input: ScoreInput) {
       keep: false,
       sourceId: input.recurring.bucketId,
     });
+    return signals;
   }
   pushLearned(signals, input.amountScores, "learned_amount", 1);
   pushLearned(signals, input.payeeScores, "learned_payee", 0.95);
@@ -345,7 +346,7 @@ function resultFrom(candidate: Candidate, second: number | null, mortgage: boole
   const similar = candidate.signals.some((signal) => signal.reason === "similar" || signal.reason === "family");
   const guarded = amountGuard && candidate.signals.every((signal) => signal.reason !== "recurring");
   return {
-    level: mortgage ? "automatic" : matchLevel(milli, leadMilli, transfer || similar || guarded),
+    level: mortgage ? "automatic" : matchLevel(milli, leadMilli, (transfer && top.reason !== "recurring") || similar || guarded),
     confidence: candidate.confidence,
     confidenceMilli: milli,
     leadMilli,

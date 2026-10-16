@@ -33,10 +33,10 @@ export {
   bucketCreateSchema, bucketSchema, bucketListQuerySchema,
   bucketListSchema, emergencyFundSchema, billNeedListSchema,
   overspentListSchema, bucketEventSchema, manualBucketEventSchema,
-  bucketEventCreateSchema, bucketCoverSchema, type Bucket,
+  bucketEventCreateSchema, type Bucket,
   type BucketWrite, type BucketUpdate, type BucketCreate,
   type BucketListQuery, type BucketEvent, type BucketEventCreate,
-  type BucketCover, type EmergencyFund, type OverspentBucket,
+  type EmergencyFund, type OverspentBucket,
 } from "./bucket";
 export {
   positiveBalances, unassigned, monthlyAmount,
