@@ -111,8 +111,8 @@ Every main screen has, from top to bottom:
 
 Inside 32px page padding. 20px gaps between cards.
 
-**Width:** no page, list or table scrolls sideways at any width. A row follows the width of its card (a container
-query), not the width of the screen. A narrow card (a phone, a tablet, a half-screen window) shows the narrow row.
+**Width:** no page or record list scrolls sideways. The import column-map preview can scroll inside its own box.
+A row follows the width of its card. A narrow card shows the narrow row, on a phone, a tablet or a half-screen window.
 A name, a date and an amount never wrap one word on each line: the name truncates with an ellipsis, and a date and an
 amount do not wrap.
 
@@ -141,7 +141,8 @@ global component CSS (AGENTS.md).
 | Reveal | A sub-section that shows only after a choice (example: card details). `bg` fill, hairline border, radius 14px. |
 | ActionBar | Actions for the selected rows of a table. A floating `ink` pill with white text, bottom centre of the screen, with the dialog shadow. Left: "N selected". Then 44px buttons: an outline button on the dark fill (white text, white border at low opacity), one primary (iris) button, and a ghost "Clear". It shows only while one or more rows are selected. The page gets space at its end, thus the bar does not cover the last rows and the pager. |
 
-Use shadcn `Table` only for the Transactions list. All other record lists use ListCard rows.
+Use shadcn `Table` only for the Transactions list and the column-map preview of an import. All other record lists use
+ListCard rows.
 
 **Actions in lists:**
 - Click a row to open it (edit dialog or detail). The whole row is the target.

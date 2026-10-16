@@ -1,6 +1,7 @@
 import { columnMapSchema, statementDate, type ColumnMap, type DateOrder, type DecimalSeparator, type SignConvention } from "@num/shared";
 import { useStore } from "@tanstack/react-form";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DialogFooter } from "@/components/ui/dialog";
 import { DialogBody, DialogPanel } from "@/editors/form-chrome";
 import { useAppForm } from "@/forms/form-hook";
@@ -121,29 +122,29 @@ export function ImportMapForm({ rows, onBack, onImport }: ImportMapFormProps) {
     <form.AppForm>
       <DialogPanel>
         <DialogBody>
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="w-full min-w-[28rem] text-left text-sm">
-              <thead>
-                <tr className="border-b text-muted-foreground">
+          <div className="min-w-0 overflow-hidden rounded-xl border">
+            <Table className="min-w-[28rem]">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
                   {columns.map((column) => (
-                    <th key={column.value} className="px-3 py-2 font-semibold">
+                    <TableHead key={column.value}>
                       {column.label}
-                    </th>
+                    </TableHead>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {rows.map((row, rowIndex) => (
-                  <tr key={rowIndex} className="border-b last:border-b-0">
+                  <TableRow key={rowIndex} className="hover:bg-transparent">
                     {Array.from({ length: width }, (_, index) => (
-                      <td key={index} className="px-3 py-2">
+                      <TableCell key={index}>
                         {row[index] ?? ""}
-                      </td>
+                      </TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
           <form.AppField name="headerChoice">
             {(field) => (

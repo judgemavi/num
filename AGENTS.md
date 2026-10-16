@@ -63,7 +63,8 @@ in docs or code. Git history keeps the records. An idea that the owner refuses g
   - Short lists of options: `Select`.
   - Long lists of options: the one Combobox, `OptionCombobox` (`Command` + `Popover`). Do not build a second one.
   - Create and edit: `Dialog`.
-  - Lists of records: ListCard rows (`docs/design.md` §6), built on `Item`. `Table` only for the Transactions list.
+  - Lists of records: ListCard rows (`docs/design.md` §6), built on `Item`. `Table` only for the Transactions list
+    and the column-map preview of an import.
   - Empty lists: `ListEmpty` (shadcn `Empty`, one line).
   - Chips: `ToggleGroup` (and `Toggle`).
   - Field controls: the `fieldControl` look (`components/field-control.ts`).
