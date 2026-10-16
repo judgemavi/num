@@ -12,6 +12,7 @@ CREATE TABLE `accounts` (
 	`interest_rate_milli_pct` integer,
 	`import_preset` text,
 	`column_map` text,
+	`created_on` text NOT NULL,
 	`created_at` text NOT NULL,
 	`sort_key` text NOT NULL
 );
@@ -28,7 +29,6 @@ CREATE TABLE `audit_log` (
 	`at` text NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `audit_log_entity` ON `audit_log` (`entity`,`entity_id`);--> statement-breakpoint
 CREATE TABLE `bank_balances` (
 	`id` text PRIMARY KEY NOT NULL,
 	`account_id` text NOT NULL,
@@ -55,7 +55,6 @@ CREATE TABLE `bucket_events` (
 	`other_bucket_id` text,
 	`amount` integer NOT NULL,
 	`date` text NOT NULL,
-	`note` text,
 	`month` text,
 	`undone_at` text,
 	FOREIGN KEY (`bucket_id`) REFERENCES `buckets`(`id`) ON UPDATE no action ON DELETE no action,
@@ -92,7 +91,6 @@ CREATE TABLE `categories` (
 	`name` text NOT NULL,
 	`kind` text NOT NULL,
 	`group_id` text,
-	`essential` integer NOT NULL,
 	`archived_at` text,
 	`sort_key` text NOT NULL,
 	FOREIGN KEY (`group_id`) REFERENCES `category_groups`(`id`) ON UPDATE no action ON DELETE no action
@@ -129,6 +127,7 @@ CREATE TABLE `import_batches` (
 	`closing_balance` integer,
 	`closing_date` text,
 	`unreadable_json` text DEFAULT '[]' NOT NULL,
+	`imported_on` text NOT NULL,
 	`created_at` text NOT NULL,
 	`undone_at` text,
 	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
@@ -157,6 +156,7 @@ CREATE TABLE `import_rows` (
 CREATE UNIQUE INDEX `import_rows_batch_row_unique` ON `import_rows` (`batch_id`,`row_index`);--> statement-breakpoint
 CREATE UNIQUE INDEX `import_rows_account_identity_active` ON `import_rows` (`account_id`,`identity`) WHERE "import_rows"."active" = 1 and "import_rows"."outcome" <> 'duplicate';--> statement-breakpoint
 CREATE INDEX `import_rows_batch` ON `import_rows` (`batch_id`);--> statement-breakpoint
+CREATE INDEX `import_rows_transaction` ON `import_rows` (`transaction_id`);--> statement-breakpoint
 CREATE TABLE `inbox_decisions` (
 	`item_key` text PRIMARY KEY NOT NULL,
 	`decision` text NOT NULL,
@@ -260,7 +260,8 @@ CREATE TABLE `transaction_lines` (
 	FOREIGN KEY (`transfer_account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `transaction_lines_transaction` ON `transaction_lines` (`transaction_id`);--> statement-breakpoint
+CREATE INDEX `transaction_lines_transfer_account` ON `transaction_lines` (`transfer_account_id`) WHERE "transaction_lines"."transfer_account_id" IS NOT NULL;--> statement-breakpoint
+CREATE INDEX `transaction_lines_transaction` ON `transaction_lines` (`transaction_id`,`id`,`category_id`,`transfer_account_id`);--> statement-breakpoint
 CREATE INDEX `transaction_lines_category` ON `transaction_lines` (`category_id`);--> statement-breakpoint
 CREATE INDEX `transaction_lines_uncategorized` ON `transaction_lines` (`transaction_id`) WHERE "transaction_lines"."category_id" is null and "transaction_lines"."transfer_account_id" is null;--> statement-breakpoint
 CREATE UNIQUE INDEX `transaction_lines_one_transfer` ON `transaction_lines` (`transaction_id`) WHERE "transaction_lines"."transfer_account_id" is not null;--> statement-breakpoint
@@ -291,20 +292,20 @@ CREATE TABLE `transactions` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX `transactions_import_row_id_unique` ON `transactions` (`import_row_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `transactions_transfer_peer_id_unique` ON `transactions` (`transfer_peer_id`);--> statement-breakpoint
+CREATE INDEX `transactions_auto_reason` ON `transactions` (`auto_reason`) WHERE "transactions"."auto_reason" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX `transactions_refund_of` ON `transactions` (`refund_of_id`);--> statement-breakpoint
 CREATE INDEX `transactions_date` ON `transactions` (`date`,`id`);--> statement-breakpoint
 CREATE INDEX `transactions_account_date` ON `transactions` (`account_id`,`date`,`id`,`amount`);--> statement-breakpoint
 CREATE INDEX `transactions_merchant_date` ON `transactions` (`merchant_id`,`date`,`id`);--> statement-breakpoint
 CREATE INDEX `transactions_payee_normalized` ON `transactions` (`payee_normalized`,`date`,`id`);--> statement-breakpoint
+CREATE INDEX `transactions_confirmed_history` ON `transactions` (`id`,`date`,`amount`,`payee_normalized`,`merchant_id`) WHERE "transactions"."mirror" = 0 and "transactions"."auto_reason" is null;--> statement-breakpoint
 CREATE TABLE `valuations` (
 	`id` text PRIMARY KEY NOT NULL,
 	`account_id` text NOT NULL,
 	`date` text NOT NULL,
 	`balance` integer NOT NULL,
 	`note` text,
-	`document_id` text,
-	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`document_id`) REFERENCES `documents`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `valuations_account_date` ON `valuations` (`account_id`,`date`);

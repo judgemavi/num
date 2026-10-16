@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8d04c417-f96a-4611-b8e2-1bda3acbf773",
+  "id": "1cd60a41-4eef-4ef1-913e-32ecc9074bb4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "accounts": {
@@ -98,6 +98,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "created_on": {
+          "name": "created_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -189,16 +196,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "audit_log_entity": {
-          "name": "audit_log_entity",
-          "columns": [
-            "entity",
-            "entity_id"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -386,13 +384,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "month": {
@@ -642,13 +633,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "essential": {
-          "name": "essential",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "archived_at": {
           "name": "archived_at",
           "type": "text",
@@ -883,6 +867,13 @@
           "autoincrement": false,
           "default": "'[]'"
         },
+        "imported_on": {
+          "name": "imported_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -1049,6 +1040,13 @@
           "name": "import_rows_batch",
           "columns": [
             "batch_id"
+          ],
+          "isUnique": false
+        },
+        "import_rows_transaction": {
+          "name": "import_rows_transaction",
+          "columns": [
+            "transaction_id"
           ],
           "isUnique": false
         }
@@ -1786,10 +1784,21 @@
         }
       },
       "indexes": {
+        "transaction_lines_transfer_account": {
+          "name": "transaction_lines_transfer_account",
+          "columns": [
+            "transfer_account_id"
+          ],
+          "isUnique": false,
+          "where": "\"transaction_lines\".\"transfer_account_id\" IS NOT NULL"
+        },
         "transaction_lines_transaction": {
           "name": "transaction_lines_transaction",
           "columns": [
-            "transaction_id"
+            "transaction_id",
+            "id",
+            "category_id",
+            "transfer_account_id"
           ],
           "isUnique": false
         },
@@ -2001,6 +2010,14 @@
           ],
           "isUnique": true
         },
+        "transactions_auto_reason": {
+          "name": "transactions_auto_reason",
+          "columns": [
+            "auto_reason"
+          ],
+          "isUnique": false,
+          "where": "\"transactions\".\"auto_reason\" IS NOT NULL"
+        },
         "transactions_refund_of": {
           "name": "transactions_refund_of",
           "columns": [
@@ -2043,6 +2060,18 @@
             "id"
           ],
           "isUnique": false
+        },
+        "transactions_confirmed_history": {
+          "name": "transactions_confirmed_history",
+          "columns": [
+            "id",
+            "date",
+            "amount",
+            "payee_normalized",
+            "merchant_id"
+          ],
+          "isUnique": false,
+          "where": "\"transactions\".\"mirror\" = 0 and \"transactions\".\"auto_reason\" is null"
         }
       },
       "foreignKeys": {
@@ -2153,13 +2182,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "document_id": {
-          "name": "document_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {
@@ -2179,19 +2201,6 @@
           "tableTo": "accounts",
           "columnsFrom": [
             "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "valuations_document_id_documents_id_fk": {
-          "name": "valuations_document_id_documents_id_fk",
-          "tableFrom": "valuations",
-          "tableTo": "documents",
-          "columnsFrom": [
-            "document_id"
           ],
           "columnsTo": [
             "id"

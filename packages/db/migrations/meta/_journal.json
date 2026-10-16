@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1792090005779,
+      "when": 1792159443244,
       "tag": "0000_baseline",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1792092356836,
-      "tag": "0001_drop_unused_fields",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1792112504311,
-      "tag": "0002_wandering_alex_power",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1792112960493,
-      "tag": "0003_soft_thundra",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1792157279809,
-      "tag": "0004_woozy_kronos",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1792157520095,
-      "tag": "0005_far_payback",
       "breakpoints": true
     }
   ]
