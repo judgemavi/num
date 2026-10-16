@@ -26,14 +26,15 @@ type MortgageExtra = { extra: number; lumpSum: number; lumpDate: string };
 /** The mortgage schedule of an account, or null when the account has no terms. An extra amount shows its effect. */
 export function mortgageViewQuery(accountId: string, asOf: string, { extra, lumpSum, lumpDate }: MortgageExtra) {
   const lump = lumpSum > 0 && lumpDate.length > 0;
+  const request = { asOf, extra: extra > 0 ? extra : undefined, lumpSum: lump ? lumpSum : undefined, lumpDate: lump ? lumpDate : undefined };
   return queryOptions({
-    queryKey: ["mortgage-view", accountId, asOf, extra, lumpSum, lumpDate],
+    queryKey: ["mortgage-view", accountId, request],
     queryFn: () =>
       orNoTerms(
         unwrap(
           api.accounts[":id"].mortgage.$get({
             param: { id: accountId },
-            query: { asOf, extra: extra > 0 ? extra : undefined, lumpSum: lump ? lumpSum : undefined, lumpDate: lump ? lumpDate : undefined },
+            query: request,
           }),
         ),
       ),

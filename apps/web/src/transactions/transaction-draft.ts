@@ -17,6 +17,7 @@ import { suggestionQuery, transferHintQuery } from "@/api/suggestions";
 import { localAsOf } from "@/as-of";
 import { useCategories } from "@/editors/lookups";
 import { fieldValue } from "@/forms/form-values";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { decimalsError } from "@/money";
 
 /** A change that the form makes, not the person. It does not mark the field as changed and does not start the listeners. */
@@ -136,8 +137,12 @@ type SuggestionInput = {
  */
 export function useSuggestion(input: SuggestionInput) {
   const categories = useCategories();
-  const { data: suggestion = null } = useQuery(suggestionQuery(input));
-  const transferHint = useQuery(transferHintQuery(input));
+  const payee = useDebouncedValue(input.payee);
+  const amount = useDebouncedValue(input.amount);
+  const settled = payee === input.payee && amount === input.amount;
+  const draft = { ...input, payee, amount };
+  const { data: suggestion = null } = useQuery(suggestionQuery(draft));
+  const transferHint = useQuery(transferHintQuery(draft));
   const hintReady = input.amount === null || input.amount === 0 || transferHint.isSuccess || transferHint.isError;
   const oppositeAccountId = transferHint.data?.accountId ?? null;
   const { direction } = input;
@@ -154,5 +159,5 @@ export function useSuggestion(input: SuggestionInput) {
     });
     return { ...resolved, merchantId: merchantForChoice(resolved.choice, resolved.merchantId) };
   }, [suggestion, hintReady, direction, categories, oppositeAccountId]);
-  return { suggestion, choice };
+  return { suggestion: settled ? suggestion : null, choice: settled ? choice : null };
 }

@@ -2,6 +2,7 @@ import type { BulkEdit, Transaction, TransactionCreate, TransactionListQuery, Tr
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, formWrite, unwrap } from "@/api/client";
+import { fullPage } from "@/api/pages";
 import { localAsOf } from "@/as-of";
 import { countText, transactionError } from "@/transactions/format";
 
@@ -36,7 +37,7 @@ export function transactionReviewQuery(id: string, asOf: string) {
 export function linkCandidatesQuery(accountId: string) {
   return queryOptions({
     queryKey: ["transactions", "link-candidates", accountId],
-    queryFn: async () => (await unwrap(api.transactions.$get({ query: { accountId, pageSize: 200 } }))).items,
+    queryFn: async () => (await unwrap(api.transactions.$get({ query: { accountId, pageSize: fullPage } }))).items,
   });
 }
 
@@ -49,10 +50,11 @@ export function transactionQuery(id: string) {
 
 /** The recent purchases that a refund can link to. */
 export function refundPurchasesQuery(asOf: string, payee: string) {
+  const request = { asOf, payee: payee.trim().length > 0 ? payee : undefined };
   return queryOptions({
-    queryKey: ["refund-purchases", asOf, payee],
+    queryKey: ["refund-purchases", request],
     queryFn: async () =>
-      (await unwrap(api.transactions["refund-purchases"].$get({ query: { asOf, payee: payee.trim().length > 0 ? payee : undefined } }))).items,
+      (await unwrap(api.transactions["refund-purchases"].$get({ query: request }))).items,
   });
 }
 

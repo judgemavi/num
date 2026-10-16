@@ -6,6 +6,7 @@ import { refundPurchasesQuery } from "@/api/transactions";
 import { Boundary } from "@/components/boundary";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { useBookCurrency, useCategoryNames, useMerchantNames } from "@/editors/lookups";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { withForm } from "@/forms/form-hook";
 import { fieldValue } from "@/forms/form-values";
 import { refundPurchaseLabel } from "@/transactions/format";
@@ -40,7 +41,7 @@ const RefundOf = withForm({
     const categoryName = useCategoryNames().get(categoryId ?? "");
     const merchantName = useMerchantNames().get(merchantId ?? "");
     // The purchases on the screen stay while the purchases for a new payee text load.
-    const { data: purchases } = useSuspenseQuery(refundPurchasesQuery(date, useDeferredValue(payee)));
+    const { data: purchases } = useSuspenseQuery(refundPurchasesQuery(date, useDeferredValue(useDebouncedValue(payee))));
     const label = (item: { id: string; payeeRaw: string; date: string; amount: number }) => ({
       id: item.id,
       label: refundPurchaseLabel(currency, item.payeeRaw, item.date, item.amount),

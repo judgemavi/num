@@ -1,38 +1,28 @@
-import { createElement, type ReactNode } from "react";
+import { createElement, lazy, type ReactNode } from "react";
 import { Boundary } from "@/components/boundary";
-import { BankBalanceEditor } from "@/accounts/bank-balance-editor";
-import { ImportForm } from "@/accounts/import-dialog";
-import { AccountEditor, ImportInfoEditor } from "@/editors/account-editors";
-import { MoveMoney } from "@/buckets/move-money";
-import { AssignEditor, BucketEditor } from "@/editors/bucket-editors";
 import type { EditorFrame, EditorInput, EditorKind } from "@/editors/editor-types";
-import { CommitmentEditor, IncomeEditor, LinkOccurrenceEditor, SkipOccurrenceEditor } from "@/editors/schedule-editors";
-import { SkipNext } from "@/schedules/skip-next";
-import { CategoryEditor, GroupEditor, MergeEditor, MerchantEditor, TagEditor } from "@/editors/settings-editors";
-import { BulkEditor } from "@/transactions/bulk-editor";
-import { TransactionEditor } from "@/transactions/transaction-editor";
 
 /** The editor component of each kind. The input of the kind is the props of the component. */
 const editors: { [K in EditorKind]: (input: EditorInput[K]) => ReactNode } = {
-  transaction: TransactionEditor,
-  bulkEdit: BulkEditor,
-  account: AccountEditor,
-  category: CategoryEditor,
-  group: GroupEditor,
-  tag: TagEditor,
-  merchant: MerchantEditor,
-  bucket: BucketEditor,
-  commitment: CommitmentEditor,
-  income: IncomeEditor,
-  import: ImportForm,
-  bankBalance: BankBalanceEditor,
-  assignMoney: AssignEditor,
-  moveMoney: MoveMoney,
-  importInfo: ImportInfoEditor,
-  mergeMerchant: MergeEditor,
-  skipNext: SkipNext,
-  skipOccurrence: SkipOccurrenceEditor,
-  linkOccurrence: LinkOccurrenceEditor,
+  transaction: lazy(() => import("@/transactions/transaction-editor").then((module) => ({ default: module.TransactionEditor }))),
+  bulkEdit: lazy(() => import("@/transactions/bulk-editor").then((module) => ({ default: module.BulkEditor }))),
+  account: lazy(() => import("@/editors/account-editors").then((module) => ({ default: module.AccountEditor }))),
+  category: lazy(() => import("@/editors/settings-editors").then((module) => ({ default: module.CategoryEditor }))),
+  group: lazy(() => import("@/editors/settings-editors").then((module) => ({ default: module.GroupEditor }))),
+  tag: lazy(() => import("@/editors/settings-editors").then((module) => ({ default: module.TagEditor }))),
+  merchant: lazy(() => import("@/editors/settings-editors").then((module) => ({ default: module.MerchantEditor }))),
+  bucket: lazy(() => import("@/editors/bucket-editors").then((module) => ({ default: module.BucketEditor }))),
+  commitment: lazy(() => import("@/editors/schedule-editors").then((module) => ({ default: module.CommitmentEditor }))),
+  income: lazy(() => import("@/editors/schedule-editors").then((module) => ({ default: module.IncomeEditor }))),
+  import: lazy(() => import("@/accounts/import-dialog").then((module) => ({ default: module.ImportForm }))),
+  bankBalance: lazy(() => import("@/accounts/bank-balance-editor").then((module) => ({ default: module.BankBalanceEditor }))),
+  assignMoney: lazy(() => import("@/editors/bucket-editors").then((module) => ({ default: module.AssignEditor }))),
+  moveMoney: lazy(() => import("@/buckets/move-money").then((module) => ({ default: module.MoveMoney }))),
+  importInfo: lazy(() => import("@/editors/account-editors").then((module) => ({ default: module.ImportInfoEditor }))),
+  mergeMerchant: lazy(() => import("@/editors/settings-editors").then((module) => ({ default: module.MergeEditor }))),
+  skipNext: lazy(() => import("@/schedules/skip-next").then((module) => ({ default: module.SkipNext }))),
+  skipOccurrence: lazy(() => import("@/editors/schedule-editors").then((module) => ({ default: module.SkipOccurrenceEditor }))),
+  linkOccurrence: lazy(() => import("@/editors/schedule-editors").then((module) => ({ default: module.LinkOccurrenceEditor }))),
 };
 
 /** The text of each kind while the editor loads its data, and the text after a read fails. */

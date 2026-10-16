@@ -1,5 +1,5 @@
 import type { Bucket } from "@num/shared";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQueries } from "@tanstack/react-query";
 import { emergencyFundQuery } from "@/api/buckets";
 import { fundingOwedQuery } from "@/api/funding";
 import { localAsOf } from "@/as-of";
@@ -15,8 +15,7 @@ import { formatMoney } from "@/money";
 export function useBucketFigures(bucket: Bucket) {
   const currency = useBookCurrency();
   const asOf = localAsOf();
-  const { data: fund } = useSuspenseQuery(emergencyFundQuery(asOf));
-  const { data: owed } = useSuspenseQuery(fundingOwedQuery(asOf));
+  const [{ data: fund }, { data: owed }] = useSuspenseQueries({ queries: [emergencyFundQuery(asOf), fundingOwedQuery(asOf)] });
   const still = owed.items.find((item) => item.bucketId === bucket.id)?.owed ?? 0;
   const base = bucketDetail(bucket, currency, fund?.monthly ?? 0);
   const target = bucket.kind === "emergency" ? (fund?.target ?? 0) : bucketTarget(bucket);

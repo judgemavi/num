@@ -1,5 +1,5 @@
 import { billFillsOn, type Bucket } from "@num/shared";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQueries } from "@tanstack/react-query";
 import { billNeedsQuery, useArchiveBucket } from "@/api/buckets";
 import { scheduleSignalsQuery } from "@/api/schedules";
 import { localAsOf } from "@/as-of";
@@ -28,8 +28,7 @@ export function BillRow({ bucket }: { bucket: Bucket }) {
   const archive = useArchiveBucket();
   const currency = useBookCurrency();
   const asOf = localAsOf();
-  const { data: needs } = useSuspenseQuery(billNeedsQuery(asOf));
-  const { data: signals } = useSuspenseQuery(scheduleSignalsQuery(asOf));
+  const [{ data: needs }, { data: signals }] = useSuspenseQueries({ queries: [billNeedsQuery(asOf), scheduleSignalsQuery(asOf)] });
   const need = needs.find((item) => item.bucketId === bucket.id);
   const amount = need?.amount ?? 0;
   const changed = signals.changed.some((item) => item.bucketId === bucket.id);

@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { billNeedsQuery, bucketListQuery, emergencyFundQuery, overspentQuery } from "@/api/buckets";
 import { availableQuery, fundingOwedQuery } from "@/api/funding";
 import { feasibilityQuery } from "@/api/feasibility";
-import { upcomingQuery } from "@/api/schedules";
+import { scheduleSignalsQuery, upcomingQuery } from "@/api/schedules";
 import { localAsOf } from "@/as-of";
 import { BillRow } from "@/buckets/bill-row";
 import { BucketRow } from "@/buckets/bucket-row";
@@ -42,6 +42,7 @@ export function BucketsScreen() {
   usePrefetchQuery(emergencyFundQuery(asOf));
   usePrefetchQuery(fundingOwedQuery(asOf));
   usePrefetchQuery(billNeedsQuery(asOf));
+  usePrefetchQuery(scheduleSignalsQuery(asOf));
   return (
     <Boundary loading="Loading buckets." failed="The buckets did not load.">
       <BucketsHeader />

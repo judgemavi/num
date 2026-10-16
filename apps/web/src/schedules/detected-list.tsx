@@ -15,8 +15,7 @@ import { scheduleLabel } from "@/schedules/format";
 
 /**
  * The schedules that the app detected. "Add" and a click on the row open the bill or income editor, filled with the
- * suggestion. The person checks the values, then saves. The screen reads the same signals, thus
- * this read does not start a request.
+ * suggestion. The person checks the values, then saves. The screen starts this read before the list renders.
  */
 export function DetectedList() {
   const asOf = localAsOf();
