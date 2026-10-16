@@ -1,6 +1,8 @@
 import {
   loanPaymentDefaultsQuerySchema,
   loanPaymentDefaultsSchema,
+  mortgageScheduleQuerySchema,
+  mortgageScheduleSchema,
   mortgageTermsSchema,
   mortgageViewQuerySchema,
   mortgageViewSchema,
@@ -8,7 +10,7 @@ import {
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
 import { loanPaymentDefaults } from "../services/loan-payment";
-import { getMortgageTerms, mortgageAccountView } from "../services/mortgage";
+import { getMortgageTerms, mortgageAccountView, mortgageScheduleOfYear } from "../services/mortgage";
 import { validationHook } from "../validation";
 import { errorResponse, idParams } from "./common";
 
@@ -39,8 +41,27 @@ const viewRoute = createRoute({
   },
   responses: {
     200: {
-      description: "Mortgage balance, schedule and payoff",
+      description: "Mortgage balance, payoff and the years of the payment schedule",
       content: { "application/json": { schema: mortgageViewSchema } },
+    },
+    400: errorResponse,
+    404: errorResponse,
+  },
+});
+
+const scheduleRoute = createRoute({
+  operationId: "get_accounts_id_mortgage_schedule",
+  description: "Read the payment schedule of a mortgage account in one calendar year. Each past scheduled payment shows the actual payment nearest to its date, or none. An actual payment that matches no scheduled payment is its own row. This does not create, change or delete a record.",
+  method: "get",
+  path: "/api/accounts/{id}/mortgage/schedule",
+  request: {
+    params: idParams,
+    query: mortgageScheduleQuerySchema,
+  },
+  responses: {
+    200: {
+      description: "The rows of the payment schedule in the year, in date order",
+      content: { "application/json": { schema: mortgageScheduleSchema } },
     },
     400: errorResponse,
     404: errorResponse,
@@ -73,6 +94,11 @@ export function mortgageRoutes(db: Db) {
         mortgageAccountView(db, id, query.asOf, { extra: query.extra, lumpSum: query.lumpSum, lumpDate: query.lumpDate }),
         200,
       );
+    })
+    .openapi(scheduleRoute, (c) => {
+      const { id } = c.req.valid("param");
+      const query = c.req.valid("query");
+      return c.json(mortgageScheduleOfYear(db, id, query.asOf, query.year), 200);
     })
     .openapi(loanDefaultsRoute, (c) => {
       const query = c.req.valid("query");

@@ -23,7 +23,7 @@ export function mortgageTermsQuery(accountId: string) {
 
 type MortgageExtra = { extra: number; lumpSum: number; lumpDate: string };
 
-/** The mortgage schedule of an account, or null when the account has no terms. An extra amount shows its effect. */
+/** The mortgage of an account, or null when the account has no terms. An extra amount shows its effect. */
 export function mortgageViewQuery(accountId: string, asOf: string, { extra, lumpSum, lumpDate }: MortgageExtra) {
   const lump = lumpSum > 0 && lumpDate.length > 0;
   const request = { asOf, extra: extra > 0 ? extra : undefined, lumpSum: lump ? lumpSum : undefined, lumpDate: lump ? lumpDate : undefined };
@@ -38,6 +38,14 @@ export function mortgageViewQuery(accountId: string, asOf: string, { extra, lump
           }),
         ),
       ),
+  });
+}
+
+/** The rows of the payment schedule of a mortgage in one calendar year, with the actual payments. */
+export function mortgageScheduleQuery(accountId: string, asOf: string, year: number) {
+  return queryOptions({
+    queryKey: ["mortgage-schedule", accountId, { asOf, year }],
+    queryFn: () => unwrap(api.accounts[":id"].mortgage.schedule.$get({ param: { id: accountId }, query: { asOf, year } })),
   });
 }
 

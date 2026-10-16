@@ -262,10 +262,6 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
   };
 }
 
-export function mortgageNextPayments(schedule: MortgageSchedule, asOf: string, count: number): MortgagePaymentRow[] {
-  return schedule.payments.filter((row) => row.date >= asOf).slice(0, count);
-}
-
 export function mortgageExtraEffect(
   loan: MortgageLoan,
   valuations: MortgageValuation[],
@@ -329,24 +325,38 @@ const mortgagePaymentSchema = z.object({
   balance: money,
 });
 
+const mortgageActualSchema = z.object({
+  id: z.uuid(),
+  date: isoDateSchema,
+  amount: money,
+});
+
+const calendarYearSchema = z.number().int().min(1).max(9999);
+
+/** One row of the payment schedule: a scheduled payment, an actual payment, or both. */
+export const mortgageScheduleSchema = z.array(
+  z.object({
+    date: isoDateSchema,
+    scheduled: mortgagePaymentSchema.nullable(),
+    actual: mortgageActualSchema.nullable(),
+  }),
+);
+
+export const mortgageScheduleQuerySchema = z.object({
+  asOf: isoDateSchema,
+  year: queryNumber().min(1).max(9999),
+});
+
 export const mortgageViewSchema = z.object({
   balance: amountSchema,
   rateMilliPct: interestRateMilliPctSchema,
   payoffDate: isoDateSchema.nullable(),
   nonAmortizing: z.boolean(),
-  totalInterest: money,
   termEnd: isoDateSchema,
   paymentAmount: positiveAmountSchema,
   paymentFrequency: z.enum(paymentFrequencies),
-  nextPayments: z.array(mortgagePaymentSchema),
-  payments: z.array(mortgagePaymentSchema),
-  actualPayments: z.array(
-    z.object({
-      id: z.uuid(),
-      date: isoDateSchema,
-      amount: money,
-    }),
-  ),
+  /** The first and the last calendar year with a row in the schedule. Null when the schedule has no row. */
+  years: z.object({ first: calendarYearSchema, last: calendarYearSchema }).nullable(),
   extra: z
     .object({
       amount: money,

@@ -14,6 +14,7 @@ const classifications = [
   ["get_accounts_id_bank_balances", "get", "/api/accounts/{id}/bank-balances", false],
   ["get_accounts_id_imports", "get", "/api/accounts/{id}/imports", false],
   ["get_accounts_id_mortgage", "get", "/api/accounts/{id}/mortgage", false],
+  ["get_accounts_id_mortgage_schedule", "get", "/api/accounts/{id}/mortgage/schedule", false],
   ["get_accounts_id_mortgage_terms", "get", "/api/accounts/{id}/mortgage-terms", false],
   ["get_accounts_id_valuations", "get", "/api/accounts/{id}/valuations", false],
   ["get_ai_access", "get", "/api/settings/ai", false],

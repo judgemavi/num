@@ -1,9 +1,11 @@
 import { accounts, mortgageTerms, transactionLines, transactions, valuations } from "@num/db";
 import {
+  matchMortgageActuals,
   mortgageExtraEffect,
   mortgageLoan,
-  mortgageNextPayments,
+  mortgageRowsOfYear,
   mortgageSchedule,
+  mortgageScheduleYears,
   type MortgageTerms,
   type MortgageValuation,
   type MortgageView,
@@ -64,17 +66,24 @@ function actualPayments(db: Db, accountId: string) {
     .all();
 }
 
+/** The schedule of a mortgage with its actual payments. Matching uses the full schedule: a match can cross the end of a year. */
+function matchedSchedule(db: Db, accountId: string, asOf: string) {
+  const account = requireMortgage(db, accountId);
+  const terms = getMortgageTerms(db, accountId);
+  const loan = mortgageLoan(terms, { balance: account.openingBalance, date: storedOpeningDate(account) }, bookStep(db));
+  const dated = activeValuations(db, accountId);
+  const schedule = mortgageSchedule(loan, dated);
+  const rows = matchMortgageActuals(schedule.payments, actualPayments(db, accountId), asOf);
+  return { account, terms, loan, dated, schedule, rows };
+}
+
 export function mortgageAccountView(
   db: Db,
   accountId: string,
   asOf: string,
   options: { extra?: number; lumpSum?: number; lumpDate?: string },
 ): MortgageView {
-  const account = requireMortgage(db, accountId);
-  const terms = getMortgageTerms(db, accountId);
-  const loan = mortgageLoan(terms, { balance: account.openingBalance, date: storedOpeningDate(account) }, bookStep(db));
-  const dated = activeValuations(db, accountId);
-  const schedule = mortgageSchedule(loan, dated);
+  const { account, terms, loan, dated, schedule, rows } = matchedSchedule(db, accountId, asOf);
   const perPayment = options.extra ?? 0;
   const lump = options.lumpSum && options.lumpSum > 0 && options.lumpDate ? { date: options.lumpDate, amount: options.lumpSum } : null;
   const effect = perPayment > 0 || lump ? mortgageExtraEffect(loan, dated, { perPayment, lumpSum: lump }) : null;
@@ -83,13 +92,10 @@ export function mortgageAccountView(
     rateMilliPct: terms.rateMilliPct,
     payoffDate: schedule.payoffDate,
     nonAmortizing: schedule.nonAmortizing,
-    totalInterest: schedule.totalInterest,
     termEnd: terms.termEnd,
     paymentAmount: terms.paymentAmount,
     paymentFrequency: terms.paymentFrequency,
-    nextPayments: mortgageNextPayments(schedule, asOf, 6),
-    payments: schedule.payments,
-    actualPayments: actualPayments(db, accountId),
+    years: mortgageScheduleYears(rows),
     extra: effect
       ? {
           amount: perPayment,
@@ -100,4 +106,9 @@ export function mortgageAccountView(
         }
       : null,
   };
+}
+
+/** The rows of the payment schedule in one calendar year, with the actual payment of each past row. */
+export function mortgageScheduleOfYear(db: Db, accountId: string, asOf: string, year: number) {
+  return mortgageRowsOfYear(matchedSchedule(db, accountId, asOf).rows, year);
 }

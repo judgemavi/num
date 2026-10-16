@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { createDb } from "../db";
 import { createAccount, getAccount, updateAccount } from "./accounts";
 import { createCategory } from "./categories";
-import { mortgageAccountView } from "./mortgage";
+import { mortgageScheduleOfYear } from "./mortgage";
 import { bankOpeningSuggestion, importOpeningSuggestion } from "./opening-suggestion";
 
 const at = "2026-10-08T16:00:00.000Z";
@@ -61,9 +61,9 @@ test("the schedule starts from the opening balance on the opening date", () => {
   const sample = book();
   try {
     const mortgage = createAccount(sample.db, { asOf: "2026-10-07", ...mortgageFields(-100_000_000, sample.terms), onBudget: undefined });
-    const view = mortgageAccountView(sample.db, mortgage.id, asOf, {});
-    expect(view.payments[0]).toMatchObject({ date: "2026-03-01", interest: 412_390, principal: 169_210 });
-    expect(view.payments[0]?.balance).toBe(100_000_000 - 169_210);
+    const first = mortgageScheduleOfYear(sample.db, mortgage.id, asOf, 2026)[0]?.scheduled;
+    expect(first).toMatchObject({ date: "2026-03-01", interest: 412_390, principal: 169_210 });
+    expect(first?.balance).toBe(100_000_000 - 169_210);
   } finally {
     sample.close();
   }
@@ -73,11 +73,11 @@ test("a change of the opening balance changes the schedule", () => {
   const sample = book();
   try {
     const mortgage = createAccount(sample.db, { asOf: "2026-10-07", ...mortgageFields(-100_000_000, sample.terms), onBudget: undefined });
-    const before = mortgageAccountView(sample.db, mortgage.id, asOf, {});
+    const before = mortgageScheduleOfYear(sample.db, mortgage.id, asOf, 2026)[0]?.scheduled;
     updateAccount(sample.db, mortgage.id, mortgageFields(-50_000_000, sample.terms));
-    const after = mortgageAccountView(sample.db, mortgage.id, asOf, {});
-    expect(after.payments[0]?.interest).toBeLessThan(before.payments[0]?.interest ?? 0);
-    expect(after.payments[0]?.balance).toBe(50_000_000 - (after.payments[0]?.principal ?? 0));
+    const after = mortgageScheduleOfYear(sample.db, mortgage.id, asOf, 2026)[0]?.scheduled;
+    expect(after?.interest).toBeLessThan(before?.interest ?? 0);
+    expect(after?.balance).toBe(50_000_000 - (after?.principal ?? 0));
   } finally {
     sample.close();
   }

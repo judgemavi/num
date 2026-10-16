@@ -173,12 +173,13 @@ export {
 } from "./review";
 export {
   mortgageLoan, mortgageFirstPaymentOffPeriod, mortgageSchedule,
-  mortgageNextPayments, mortgageExtraEffect, mortgagePrefillLines,
+  mortgageExtraEffect, mortgagePrefillLines,
   mortgageSplitForDate, compounding, paymentFrequencies,
   type Compounding, type PaymentFrequency, mortgageTermsWriteSchema,
   mortgageTermsSchema, type MortgageTerms, type MortgageTermsWrite,
   type MortgageValuation, mortgageViewSchema, loanPaymentDefaultsSchema,
   mortgageViewQuerySchema, loanPaymentDefaultsQuerySchema, type MortgageView,
+  mortgageScheduleSchema, mortgageScheduleQuerySchema,
 } from "./mortgage";
 export * from "./mortgage-match";
 export {

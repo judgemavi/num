@@ -313,9 +313,9 @@ owed after that payment." When the first payment date is not one payment period 
 shows the warning "The first payment is not one payment period after the opening date. The first payment gets more
 or less interest than a regular payment." The person can save. There is no separate mortgage terms editor.
 
-**Mortgage schedule:** one ListCard for each year. Each row shows the date, the payment, the interest, the principal and
-the balance after the payment. A past row also shows the actual payment or "No payment". Past years are collapsed
-(`Collapsible`). On a phone, interest and principal go on the second line of the row.
+**Mortgage schedule:** one ListCard shows one year. A year control (`Select`) is next to the title. It starts at the
+current year. Each row shows the date, the payment, the interest, the principal and the balance after the payment. A
+past row also shows the actual payment or "No payment". On a phone, interest and principal go on the second line of the row.
 
 ## 7. Illustrations
 

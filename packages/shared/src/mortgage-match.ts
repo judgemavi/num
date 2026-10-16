@@ -77,3 +77,24 @@ export function matchMortgageActuals(
   });
   return rows;
 }
+
+function yearOf(date: string) {
+  return Number(date.slice(0, 4));
+}
+
+/** The first and the last calendar year with a row. Null when there is no row. The rows are in date order. */
+export function mortgageScheduleYears(rows: readonly MortgageScheduleMatch[]) {
+  const first = rows.at(0);
+  const last = rows.at(-1);
+  return first && last ? { first: yearOf(first.date), last: yearOf(last.date) } : null;
+}
+
+/** The rows of one calendar year. */
+export function mortgageRowsOfYear(rows: readonly MortgageScheduleMatch[], year: number) {
+  return rows.filter((row) => yearOf(row.date) === year);
+}
+
+/** The year when it is in the range. Else the nearest year of the range. */
+export function clampMortgageYear(year: number, years: { first: number; last: number }) {
+  return Math.min(Math.max(year, years.first), years.last);
+}
