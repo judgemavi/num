@@ -180,15 +180,18 @@ type CoverRow = { bucketId: string; bill: { gap: number; dueDate: string; paused
 
 /**
  * The part of each bill gap that Unassigned (on `asOf`) covers, and the rest (short). The app gives Unassigned to the
- * gaps in fill order. Before each bill, each bucket that is not a bill and comes before it takes its owed amount of the
- * month of the bill's payment (`owed`). A paused bill gets no money: its whole gap is short.
+ * gaps with the shared fill plan for the current month. For a later month, each earlier bucket that is not a bill
+ * takes its owed amount of that month (`owed`). A paused bill gets no money: its whole gap is short.
  */
 export function coverBills(input: {
   unassigned: number;
+  asOf: string;
+  funding: readonly { bucketId: string; amount: number }[];
   order: readonly CoverRow[];
   owed: (bucketId: string, month: string) => number;
 }): Map<string, { covered: number; short: number }> {
   const parts = new Map<string, { covered: number; short: number }>();
+  const funding = new Map(input.funding.map((item) => [item.bucketId, item.amount]));
   let used = 0;
   input.order.forEach((row, index) => {
     const bill = row.bill;
@@ -196,9 +199,12 @@ export function coverBills(input: {
       return;
     }
     const month = bill.dueDate.slice(0, 7);
-    const taken = input.order.slice(0, index).reduce((sum, other) => sum + (other.bill ? 0 : input.owed(other.bucketId, month)), 0);
-    const free = bill.paused ? 0 : Math.max(0, input.unassigned - used - taken);
-    const covered = Math.min(bill.gap, free);
+    let free = funding.get(row.bucketId) ?? 0;
+    if (month !== input.asOf.slice(0, 7)) {
+      const taken = input.order.slice(0, index).reduce((sum, other) => sum + (other.bill ? 0 : input.owed(other.bucketId, month)), 0);
+      free = Math.max(0, input.unassigned - used - taken);
+    }
+    const covered = bill.paused ? 0 : Math.min(bill.gap, free);
     used += covered;
     parts.set(row.bucketId, { covered, short: bill.gap - covered });
   });

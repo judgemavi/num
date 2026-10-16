@@ -518,8 +518,8 @@ decision of that item, as a save in the editor does.
   (§10 Bills: the next payment, when it is due in the next 30 days after `asOf`). A negative balance counts as 0.
   The whole gap counts, also the part that Unassigned covers.
   Available to spend, the bill row on Buckets and the Bills check use this one calculation.
-- **Cover of the bill gaps.** The app gives Unassigned on `asOf` to the gaps of the bills in fill priority order (§7.6).
-  Before a bill, each bucket that is not a bill and comes before it in the fill order takes its owed amount (§7.6) for
+- **Cover of the bill gaps.** For the month of `asOf`, the app gives Unassigned to the gaps in the fill order (§7.6).
+  For a payment in a later month, use bucket priority order. Before a bill, each earlier bucket that is not a bill takes its owed amount (§7.6) for
   the month of the bill's payment. For a month after the month of `asOf`, that owed amount uses the balance on `asOf`
   as the start balance. The part of a gap that Unassigned covers is **covered**. The rest is **short**.
   A paused bill gets no money from the fill, thus Unassigned does not cover its gap: all of its gap is short.
@@ -866,8 +866,19 @@ at unlinked, not deleted transactions from the last 90 days from `asOf`. Each tr
    time. With fewer than 3 such months, use the planned figure: the yearly amount / 12 of the essential commitments + the `refillTo` of the essential spending buckets.
    When the balance is more than the target, the money stays and funding stops.
 3. **Owed.** Owed for a month = the monthly amount − the funding of that month (§5.9).
-4. **Fill.** The fill pays the owed amounts from Unassigned in bucket priority order. It stops when Unassigned is used.
-   A bucket with a lower priority waits for more money. The user does not confirm or edit a payment.
+4. **Fill.** The fill pays the owed amounts from Unassigned in three passes. Each pass uses bucket priority order (§5.8).
+   It stops when Unassigned is used. The user does not confirm or edit a payment.
+   The pay horizon `H` is the earliest due date after `asOf` of an active income occurrence that is not linked or skipped.
+   If there is none in the month of `asOf`, use the last day of that month. `H` is never after that day.
+   1. Bills due by `H`: for each active commitment, pay the smaller of owed and need. Need is the sum of its occurrences
+      in the month of `asOf`, due on or before `H`, that are not linked or skipped and whose window is still open,
+      minus its balance, minimum 0. A late occurrence with an open window counts. A variable amount uses the safe amount (§5.7).
+   2. Spending to `H`: for each active spending bucket, pay the smaller of owed and `share − funded`, minimum 0.
+      Share is the monthly amount × `d / D`, rounded up to a whole minor unit of the book currency. `d` is the number of
+      days from the first day of the month to `H`, both included. `D` is the number of days in the month.
+      Funded is the funding of this bucket in this month (§5.9).
+   3. The rest: pay what is still owed in bucket priority order. The emergency bucket takes what is left up to its owed
+      amount. The buckets after it take the rest.
    - The fill is one write with `asOf` from the request. The browser sends it when the app opens and after each
      successful write. A read never writes.
    - It funds only the month of `asOf`. It never pays a past month. A month that the app did not fill is not paid later:
@@ -875,10 +886,7 @@ at unlinked, not deleted transactions from the last 90 days from `asOf`. Each tr
    - It pays only what is still owed, thus it is idempotent. It never takes money back. When
      nothing is owed or Unassigned is 0, it writes nothing.
    - Before it pays, it covers the negative buckets (§7.7).
-   - The emergency bucket takes what is left, up to its owed amount. The buckets after it take the rest. An owed
-     amount that Unassigned cannot pay waits for income. It does not take money from a savings bucket.
-   - The commitments come first in the priority order (§5.8). When Unassigned is short, a commitment with a lower
-     priority waits.
+   - An owed amount that Unassigned cannot pay waits for income. It does not take money from a savings bucket.
 5. **Paychecks.** A paycheck makes no funding. Its link, unlink or delete does not change funding.
 6. **Manual funding.** The user can fund, move or release money of a bucket at any time (§5.8). This does not count as
    the funding of a month.

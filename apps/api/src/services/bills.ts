@@ -4,6 +4,8 @@ import { billNeed, comparePriority, coverBills } from "@num/shared";
 import { and, isNull, ne } from "drizzle-orm";
 import type { Db } from "../db";
 import { createFundingReads, type FundingReads } from "./funding-reads";
+import { coverEvents } from "./funding-covers";
+import { fundingPlan } from "./funding-plan";
 import { activeSchedules, scheduleAmounts } from "./schedules";
 import type { Reader } from "./write";
 
@@ -54,6 +56,8 @@ export function listBillNeeds(db: Reader, asOf: string, shared?: FundingReads) {
     }),
   );
   const parts = coverBills({
+    asOf,
+    funding: fundingPlan(db, asOf, createFundingReads(db, asOf, coverEvents(db, asOf))),
     unassigned: reads.position.unassigned,
     // A bill with no next payment has no gap and takes no money.
     order: rows

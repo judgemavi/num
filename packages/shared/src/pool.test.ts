@@ -143,7 +143,7 @@ const coverOrder = [
 const owed = (bucketId: string, month: string) => (bucketId === "food" ? (month === "2026-10" ? 100 : 1_000) : 0);
 
 test("Unassigned covers the gaps of the bills in fill order", () => {
-  const parts = coverBills({ unassigned: 2_700, order: coverOrder, owed: () => 0 });
+  const parts = coverBills({ asOf: "2026-09-01", funding: [], unassigned: 2_700, order: coverOrder, owed: () => 0 });
   expect(parts).toEqual(
     new Map([
       ["rent", { covered: 2_000, short: 0 }],
@@ -151,22 +151,22 @@ test("Unassigned covers the gaps of the bills in fill order", () => {
       ["gym", { covered: 200, short: 100 }],
     ]),
   );
-  expect(coverBills({ unassigned: 0, order: coverOrder, owed: () => 0 }).get("rent")).toEqual({ covered: 0, short: 2_000 });
-  expect(coverBills({ unassigned: -500, order: coverOrder, owed: () => 0 }).get("rent")).toEqual({ covered: 0, short: 2_000 });
+  expect(coverBills({ asOf: "2026-09-01", funding: [], unassigned: 0, order: coverOrder, owed: () => 0 }).get("rent")).toEqual({ covered: 0, short: 2_000 });
+  expect(coverBills({ asOf: "2026-09-01", funding: [], unassigned: -500, order: coverOrder, owed: () => 0 }).get("rent")).toEqual({ covered: 0, short: 2_000 });
 });
 
 test("a bucket that is not a bill and comes first takes its owed amount of the month of the bill's payment first", () => {
-  const parts = coverBills({ unassigned: 3_000, order: coverOrder, owed });
+  const parts = coverBills({ asOf: "2026-09-01", funding: [], unassigned: 3_000, order: coverOrder, owed });
   // Rent comes before Food. Phone (October): Food takes 100 of October. Gym (November): Food takes 1 000 of November.
   expect(parts.get("rent")).toEqual({ covered: 2_000, short: 0 });
   expect(parts.get("phone")).toEqual({ covered: 500, short: 0 });
   expect(parts.get("gym")).toEqual({ covered: 0, short: 300 });
-  expect(coverBills({ unassigned: 2_500, order: coverOrder, owed }).get("phone")).toEqual({ covered: 400, short: 100 });
+  expect(coverBills({ asOf: "2026-09-01", funding: [], unassigned: 2_500, order: coverOrder, owed }).get("phone")).toEqual({ covered: 400, short: 100 });
 });
 
 test("a paused bill gets no money and does not take Unassigned from the bills after it", () => {
   const order = [{ bucketId: "gym", bill: { gap: 300, dueDate: "2026-10-20", paused: true } }, ...coverOrder.slice(0, 1)];
-  expect(coverBills({ unassigned: 2_000, order, owed })).toEqual(
+  expect(coverBills({ asOf: "2026-09-01", funding: [], unassigned: 2_000, order, owed })).toEqual(
     new Map([
       ["gym", { covered: 0, short: 300 }],
       ["rent", { covered: 2_000, short: 0 }],

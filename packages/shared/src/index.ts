@@ -195,3 +195,4 @@ export {
 export {
   readAmount, type AmountProblem,
 } from "./read-amount";
+export { fillPlan, payHorizon, type FillBucket, type FillSchedule } from "./fill-plan";

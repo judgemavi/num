@@ -9,7 +9,7 @@ import { createAccount } from "./accounts";
 import { fillBuckets } from "./funding-fill";
 import { readOwed } from "./funding-months";
 import { createTransaction } from "./transactions";
-import { account, addSchedule, emergency, money, spend } from "./funding-test-book";
+import { account, addSchedule, emergency, goal, money, spend } from "./funding-test-book";
 import { linkOccurrence } from "./recurring-links";
 
 const asOf = "2026-10-08";
@@ -156,7 +156,7 @@ test("the emergency bucket takes the free pool up to its target, and a bucket af
   try {
     updateBucket(book.db, book.food.id, { refillTo: 0, ...saved });
     const fund = emergency(book.db, 1, { priority: 2, startDate: "2026-10-01" });
-    const trip = spend(book.db, "Trip", 4_000_000, { priority: 3, startDate: "2026-10-01" });
+    const trip = goal(book.db, "Trip", 4_000_000, 4_000_000, { priority: 3, startDate: "2026-10-01" });
     fill(book, "2026-10-08");
     expect(fundedBy(book, fund.id)).toEqual([1_000_000]);
     expect(fundedBy(book, trip.id)).toEqual([3_000_000]);

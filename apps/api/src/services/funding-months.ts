@@ -35,7 +35,7 @@ export function monthlyRows(
   db: Reader,
   asOf: string,
   month = asOf.slice(0, 7),
-  reads?: { balances: ReadonlyMap<string, number>; emergencyFund: () => EmergencyFund | null },
+  reads?: { balances: ReadonlyMap<string, number>; emergencyFund: () => EmergencyFund | null; covers?: readonly { bucketId: string; amount: number }[] },
 ): MonthlyRow[] {
   const start = monthStart(month);
   const balances = new Map(reads?.balances ?? bucketBalances(db, month > asOf.slice(0, 7) ? asOf : addDays(start, -1)));
@@ -45,7 +45,7 @@ export function monthlyRows(
     .from(bucketEvents)
     .where(and(eq(bucketEvents.kind, "cover"), eq(bucketEvents.date, start), isNull(bucketEvents.undoneAt)))
     .all();
-  for (const cover of covers) {
+  for (const cover of [...covers, ...(reads?.covers ?? [])]) {
     balances.set(cover.bucketId, (balances.get(cover.bucketId) ?? 0) + cover.amount);
   }
   const funded = fundedByBucket(db, month);

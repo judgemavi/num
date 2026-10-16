@@ -1,11 +1,10 @@
-import { bucketEvents, buckets, settings } from "@num/db";
-import { monthStart, comparePriority, floorToStep, isIsoDate, positiveBalances, recedeOrder, unassigned, type FillResult } from "@num/shared";
-import { eq, isNull } from "drizzle-orm";
+import { bucketEvents, settings } from "@num/db";
+import { monthStart, isIsoDate, type FillResult } from "@num/shared";
+import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { bookStep } from "./book-step";
-import { positionOn } from "./funding-book";
-import { monthlyRows } from "./funding-months";
+import { coverEvents, type FillEvent } from "./funding-covers";
+import { fundingPlan } from "./funding-plan";
 import { withoutId, write, type Reader, type WriteInput, type WriteTx } from "./write";
 
 function requireSetup(db: Reader) {
@@ -14,78 +13,15 @@ function requireSetup(db: Reader) {
   }
 }
 
-/** A recede has the covered bucket in `otherBucketId`. */
-type FillEvent = { kind: "cover" | "fund" | "recede"; bucketId: string; otherBucketId: string | null; amount: number; month: string | null };
-
-/** The bucket balances on `asOf` in memory, and Unassigned on `asOf` after the events that are added. */
-function pool(db: Reader, asOf: string) {
-  const { onBudgetTotal: total, balances } = positionOn(db, asOf);
-  const events: FillEvent[] = [];
-  const balanceOf = (id: string) => balances.get(id) ?? 0;
-  return {
-    events,
-    balanceOf,
-    free: () => unassigned(total, positiveBalances([...balances.values()])),
-    add(event: FillEvent) {
-      events.push(event);
-      balances.set(event.bucketId, balanceOf(event.bucketId) + (event.kind === "recede" ? -event.amount : event.amount));
-    },
-  };
-}
-
 /**
- * The covers: N − S in total, in priority order. S is the part of the negative
- * balances that cash did not cover (the negative Unassigned). When a bucket stays short, the savings buckets with
- * `canRecede` give the missing part, the lowest priority first, each down to 0. Then the cover is written. A bucket
- * does not cover itself.
- */
-function coverEvents(db: Reader, asOf: string): FillEvent[] {
-  const state = pool(db, asOf);
-  const active = db.select().from(buckets).where(isNull(buckets.archivedAt)).all().sort(comparePriority);
-  const givers = recedeOrder(active);
-  const recede = (bucketId: string, short: number) => {
-    let given = 0;
-    for (const giver of givers) {
-      if (given >= short) {
-        break;
-      }
-      const amount = giver.id === bucketId ? 0 : Math.min(short - given, Math.max(0, state.balanceOf(giver.id)));
-      if (amount > 0) {
-        state.add({ kind: "recede", bucketId: giver.id, otherBucketId: bucketId, amount, month: null });
-        given += amount;
-      }
-    }
-    return given;
-  };
-  const negative = active.flatMap((bucket) => (state.balanceOf(bucket.id) < 0 ? [{ bucket, need: -state.balanceOf(bucket.id) }] : []));
-  const needs = negative.reduce((sum, item) => sum + item.need, 0);
-  let cover = needs - Math.min(needs, Math.max(0, -state.free()));
-  for (const { bucket, need } of negative) {
-    const paid = Math.min(need, cover);
-    cover -= paid;
-    const amount = paid + recede(bucket.id, need - paid);
-    if (amount > 0) {
-      state.add({ kind: "cover", bucketId: bucket.id, otherBucketId: null, amount, month: null });
-    }
-  }
-  return state.events;
-}
-
-/**
- * The owed amounts of the month of `asOf`, in priority order, from Unassigned. It reads the covers of
+ * The owed amounts of the month of `asOf`, in the shared three-pass order, from Unassigned. It reads the covers of
  * the month, thus the covers are written first. An owed amount never causes a recede.
  */
 function fundEvents(db: Reader, asOf: string): FillEvent[] {
   const month = asOf.slice(0, 7);
-  const step = bookStep(db);
-  const state = pool(db, asOf);
-  for (const row of monthlyRows(db, asOf)) {
-    const amount = Math.min(row.owed, floorToStep(state.free(), step));
-    if (amount > 0) {
-      state.add({ kind: "fund", bucketId: row.bucket.id, otherBucketId: null, amount, month });
-    }
-  }
-  return state.events;
+  return fundingPlan(db, asOf).map(({ bucketId, amount }) => ({
+    kind: "fund", bucketId, otherBucketId: null, amount, month,
+  }));
 }
 
 /** Write events of the fill. Each event has the date of the first day of the month of `asOf`. */
