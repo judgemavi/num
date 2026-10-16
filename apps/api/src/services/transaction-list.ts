@@ -1,4 +1,4 @@
-import { usesValuation } from "@num/shared";
+import { showsRunningBalance } from "@num/shared";
 import { accounts, categories, lineTags, merchants, transactionLines, transactions } from "@num/db";
 import type {
   TransactionFilter,
@@ -9,6 +9,7 @@ import type {
 } from "@num/shared";
 import { and, asc, count, desc, eq, exists, gte, inArray, isNotNull, isNull, lte, notExists, or, sql, type SQL } from "drizzle-orm";
 import { alias, QueryBuilder, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
+import { valuationAccountIds } from "./account-balance";
 import { idIn } from "./list-sql";
 import type { Db } from "../db";
 import { linesForIds } from "./transaction-list-lines";
@@ -180,8 +181,7 @@ function toItem(
 }
 
 function usesTransactionBalance(db: Db, accountId: string) {
-  const row = db.select({ kind: accounts.kind }).from(accounts).where(eq(accounts.id, accountId)).get();
-  return row !== undefined && !usesValuation(row.kind);
+  return showsRunningBalance(valuationAccountIds(db, [accountId]).has(accountId));
 }
 
 /** The balance of the account after each row: the opening balance and all the rows up to it. One window query. */

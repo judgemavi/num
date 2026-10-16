@@ -34,7 +34,7 @@ type Rpc = {
     isError?: boolean;
     structuredContent?: Record<string, unknown>;
     content?: { type: string; text: string }[];
-    tools?: { name: string; inputSchema?: { required?: string[]; properties?: Record<string, { format?: string; pattern?: string }> } }[];
+    tools?: { name: string; description?: string; inputSchema?: { required?: string[]; properties?: Record<string, { format?: string; pattern?: string }> } }[];
   };
   error?: { code: number; message: string };
 };
@@ -182,7 +182,7 @@ test("a read tool returns the same data as REST", async () => {
   try {
     const { accountId, bucketId } = seed(book.db, book.dir);
     const cases: [string, Record<string, unknown>, string][] = [
-      ["list_accounts", { sort: "name", dir: "asc" }, "/api/accounts?sort=name&dir=asc"],
+      ["list_accounts", { sort: "name", dir: "asc", asOf }, `/api/accounts?sort=name&dir=asc&asOf=${asOf}`],
       [
         "search_transactions",
         { q: "north", accountId, from: "2026-03-01", to: "2026-03-31", page: 1, pageSize: 10 },
@@ -211,12 +211,11 @@ test("tools that need today require asOf", async () => {
   try {
     const listed = await post(book.app, "tools/list", {});
     const tools = listed.body.result?.tools ?? [];
-    for (const name of ["list_occurrences", "get_forecast", "get_insights", "get_needs_you"]) {
+    for (const name of ["list_occurrences", "get_forecast", "get_insights", "get_needs_you", "list_accounts"]) {
       const schema = tools.find((tool) => tool.name === name)?.inputSchema;
       expect(schema?.required).toContain("asOf");
       expect(schema?.properties?.asOf).toMatchObject({ format: "date", pattern: String.raw`^\d{4}-\d{2}-\d{2}$` });
     }
-    expect(tools.find((tool) => tool.name === "list_accounts")?.inputSchema?.required ?? []).not.toContain("asOf");
     expect(tools.find((tool) => tool.name === "list_buckets")?.inputSchema?.required ?? []).not.toContain("asOf");
   } finally {
     book.close();
@@ -227,24 +226,24 @@ test("date tools reject a call without asOf", async () => {
   const book = tempBook();
   try {
     const { bucketId } = seed(book.db, book.dir);
-    for (const name of ["list_occurrences", "get_forecast", "get_insights", "get_needs_you"] as const) {
+    for (const name of ["list_occurrences", "get_forecast", "get_insights", "get_needs_you", "list_accounts"] as const) {
       const missing = await callTool(book.app, name, name === "list_occurrences" ? { id: bucketId } : {});
       expect(missing.result?.isError).toBe(true);
       expect(missing.result?.structuredContent).toEqual({ code: "as_of_required", params: {} });
     }
-    const accounts = await callTool(book.app, "list_accounts", {});
+    const accounts = await callTool(book.app, "list_accounts", { asOf });
     expect(accounts.error).toBeUndefined();
-    expect(dataOf(accounts).items).toEqual((await restJson(book.app, "/api/accounts")).items);
+    expect(dataOf(accounts).items).toEqual((await restJson(book.app, `/api/accounts?asOf=${asOf}`)).items);
   } finally {
     book.close();
   }
 });
 
-test("the money sentence is only on tools that carry amounts", async () => {
+test("OpenAPI and MCP use the same money descriptions from schema metadata", async () => {
   const book = tempBook();
   try {
     const listed = await post(book.app, "tools/list", {});
-    const tools = (listed.body.result?.tools ?? []) as { name: string; description?: string }[];
+    const tools = listed.body.result?.tools ?? [];
     const sentence = "Amounts are integer milliunits: 1000 is one unit of the book currency. Money that enters the account is positive.";
     function text(name: string): string {
       return tools.find((tool) => tool.name === name)?.description ?? "";
@@ -254,6 +253,12 @@ test("the money sentence is only on tools that carry amounts", async () => {
     expect(text("get_forecast")).toContain(sentence);
     expect(text("list_accounts")).toContain(sentence);
     expect(text("search_transactions")).toContain(sentence);
+    const document = book.app.getOpenAPIDocument({ openapi: "3.0.0", info: { title: "Num", version: "test" } });
+    expect(document.paths?.["/api/forecast"]?.get?.description).toBe(text("get_forecast"));
+    expect(document.paths?.["/api/accounts"]?.get?.description).toBe(text("list_accounts"));
+    expect(document.paths?.["/api/transactions"]?.get?.description).toBe(text("search_transactions"));
+    expect(document.paths?.["/api/health"]?.get?.description).toBe(text("get_health"));
+    expect(document.paths?.["/api/tags"]?.get?.description).toBe(text("get_tags"));
   } finally {
     book.close();
   }

@@ -114,7 +114,7 @@ export function listNeedsReview(
       }
     }
   }
-  const refundById = refundQuestions(db, hidden, asOf, scope.only);
+  const refundById = refundQuestions(db, hidden, scope.only);
   const openIds = db.select({ id: transactionLines.transactionId }).from(transactionLines)
     .where(and(isNull(transactionLines.categoryId), isNull(transactionLines.transferAccountId),
       only ? idIn(transactionLines.transactionId, [...only]) : undefined))

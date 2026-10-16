@@ -3,7 +3,6 @@ import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { isMonthKey } from "./month";
 import { roundToStep } from "./currency";
-import { medianAmount } from "./recurring-calc";
 import { amountSchema } from "./money";
 
 export const forecastDayCount = 90;
@@ -50,28 +49,6 @@ export type ForecastInput = {
 export function forecastDates(asOf: string): string[] {
   const start = Temporal.PlainDate.from(asOf);
   return Array.from({ length: forecastDayCount }, (_, index) => start.add({ days: index }).toString());
-}
-
-/** `step` is the milliunits in one minor unit of the book currency. The result is a whole number of minor units. */
-export function unbucketedMonthly(months: readonly string[], lines: readonly { month: string; amount: number }[], step: number): number {
-  if (months.length === 0 || lines.length === 0) {
-    return 0;
-  }
-  const medianLine = medianAmount(lines.map((line) => line.amount), 1);
-  const limit = Math.abs(medianLine) * 3;
-  const totals = new Map<string, number>(months.map((month) => [month, 0]));
-  for (const line of lines) {
-    if (Math.abs(line.amount) > limit) {
-      continue;
-    }
-    const current = totals.get(line.month);
-    if (current === undefined) {
-      continue;
-    }
-    totals.set(line.month, current + line.amount);
-  }
-  const median = medianAmount(months.map((month) => totals.get(month) ?? 0), step);
-  return median < 0 ? -median : 0;
 }
 
 /** The daily deltas of each monthly spending item. Each delta keeps the bucket of its item. */

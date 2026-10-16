@@ -1,7 +1,7 @@
 import { accounts, bankBalances, importBatches, type AccountRow } from "@num/db";
 import { openingFromBankBalance, openingFromFirstRow, type OpeningSuggestion } from "@num/shared";
 import { and, eq, isNotNull, isNull, lt } from "drizzle-orm";
-import { balancesAt } from "./account-balance";
+import { balancesAt, valuationAccountIds } from "./account-balance";
 import { hasTerms } from "./mortgage-terms";
 import { earliestTransactionDate, effectiveOpeningDate } from "./opening-date";
 import type { Reader } from "./write";
@@ -59,7 +59,7 @@ export function bankOpeningSuggestion(
   latest: { date: string; balance: number },
   calculated: number,
 ): OpeningSuggestion | null {
-  if (hasTerms(db, account.id)) {
+  if (hasTerms(db, account.id) || valuationAccountIds(db, [account.id], latest.date).has(account.id)) {
     return null;
   }
   const first = earliestTransactionDate(db, account.id);

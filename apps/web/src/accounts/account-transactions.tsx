@@ -1,4 +1,4 @@
-import { usesValuation } from "@num/shared";
+import { showsRunningBalance } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useDeferredValue, useState } from "react";
@@ -64,7 +64,7 @@ function AccountActivity() {
       ) : (
         <TransactionsTable
           rows={rows}
-          showBalance={!usesValuation(account.kind)}
+          showBalance={showsRunningBalance(account.hasValuation)}
           hideAccount
           sort={sort}
           onSort={sortBy}

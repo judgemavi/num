@@ -48,7 +48,7 @@ export function readAmount(raw: string, digits: number, decimal: DecimalSeparato
   if (hasUnknownLetters(text)) {
     return invalid("amount_unreadable");
   }
-  text = text.replace(/\p{L}+/gu, "").replace(/[\p{Sc}\s]/gu, "");
+  text = text.replace(/\p{L}+/gu, "").replace(/[\p{Sc}\s'’]/gu, "");
   if (/[^\d.,+\-()]/.test(text)) {
     return invalid("amount_unreadable");
   }

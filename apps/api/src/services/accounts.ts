@@ -13,7 +13,7 @@ import {
 import { eq, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { balanceOf, balancesOf } from "./account-balance";
+import { balanceOf, balancesOf, valuationAccountIds } from "./account-balance";
 import { assertCanArchive, assertSameClass, cardFields, interestRate } from "./account-rules";
 import { accountAuditSnapshot } from "./account-snapshot";
 import { readTerms, resolveTerms, saveTerms } from "./mortgage-terms";
@@ -24,7 +24,7 @@ import { setArchived, byColumn, byName, pagedOf, totalOf, windowOf, withoutSortK
 import { requireWholeAmounts } from "./book-step";
 
 
-function toAccount(row: AccountRow, balance: number, automatic: AutomaticOpening): Account {
+function toAccount(row: AccountRow, balance: number, automatic: AutomaticOpening, hasValuation: boolean): Account {
   const { id, name, institution, kind, onBudget, openingDate, createdAt, createdOn, ...rest } = withoutSortKey(row);
   return {
     id,
@@ -38,10 +38,11 @@ function toAccount(row: AccountRow, balance: number, automatic: AutomaticOpening
     automaticFollowsTransactions: automatic.followsTransactions,
     ...rest,
     balance,
+    hasValuation,
   };
 }
 
-export function listAccounts(db: Db, query: AccountListQuery) {
+export function listAccounts(db: Db, query: AccountListQuery & { asOf: string }) {
   const where = query.archived ? isNotNull(accounts.archivedAt) : isNull(accounts.archivedAt);
   const order = query.sort === "kind" ? byColumn(accounts.kind, accounts.id, query.dir) : byName(accounts, query.dir);
   const { limit, offset } = windowOf(query);
@@ -50,17 +51,18 @@ export function listAccounts(db: Db, query: AccountListQuery) {
     db,
     rows.map((row) => row.id),
   );
-  const items = balancesOf(db, rows).map(({ account, balance }) => {
+  const valued = valuationAccountIds(db, rows.map((row) => row.id));
+  const items = balancesOf(db, rows, query.asOf).map(({ account, balance }) => {
     const automatic = openings.get(account.id);
     if (!automatic) {
       throw new ServiceError("account_not_found", 404);
     }
-    return toAccount(account, balance, automatic);
+    return toAccount(account, balance, automatic, valued.has(account.id));
   });
   return pagedOf(items, totalOf(db, accounts, where), query);
 }
 
-export function createAccount(db: Db, input: AccountCreate & WriteInput): Account {
+export function createAccount(db: Db, input: AccountCreate & WriteInput & { asOf: string }): Account {
   requireWholeAmounts(db, [input.openingBalance, input.fixedPayment, input.mortgageTerms?.paymentAmount]);
   const card = cardFields(input.kind, input);
   const rate = interestRate(input.kind, input.interestRateMilliPct);
@@ -95,7 +97,7 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
     });
     saveTerms(tx, id, { date: row.openingDate, balance: row.openingBalance }, terms);
   });
-  return toAccount(row, row.openingBalance, automaticOpening(db, id));
+  return toAccount(row, row.openingBalance, automaticOpening(db, id), false);
 }
 
 /**
@@ -111,7 +113,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
       throw new ServiceError("account_not_found", 404);
     }
     const storedTerms = readTerms(tx, id) ?? null;
-    const next = mergedWrite(accountCreateSchema, { ...existing, asOf: existing.createdOn, mortgageTerms: storedTerms }, input);
+    const next = mergedWrite(accountCreateSchema, { ...existing, mortgageTerms: storedTerms }, input);
     assertSameClass(existing.kind, next.kind);
     const openingDate = next.openingDate ?? null;
     const openingBalance = next.openingBalance ?? existing.openingBalance;
@@ -140,7 +142,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
       after: accountAuditSnapshot(saved),
     });
     saveTerms(tx, id, { date: openingDate, balance: openingBalance }, next.mortgageTerms ?? null);
-    return toAccount(saved, balanceOf(tx, saved), automaticOpening(tx, id));
+    return toAccount(saved, balanceOf(tx, saved), automaticOpening(tx, id), valuationAccountIds(tx, [id]).has(id));
   });
 }
 
@@ -160,7 +162,7 @@ export function archiveAccount(
       beforeChange: () => assertCanArchive(balance, input.confirm),
       snapshot: accountAuditSnapshot,
     });
-    return toAccount(next, balance, automaticOpening(tx, id));
+    return toAccount(next, balance, automaticOpening(tx, id), valuationAccountIds(tx, [id]).has(id));
   });
 }
 
@@ -171,7 +173,7 @@ export function restoreAccount(db: Db, id: string, input: WriteInput): Account {
       throw new ServiceError("account_not_found", 404);
     }
     const next = setArchived(tx, accounts, existing, "accounts", null, { snapshot: accountAuditSnapshot });
-    return toAccount(next, balanceOf(tx, existing), automaticOpening(tx, id));
+    return toAccount(next, balanceOf(tx, existing), automaticOpening(tx, id), valuationAccountIds(tx, [id]).has(id));
   });
 }
 
@@ -180,5 +182,5 @@ export function getAccount(db: Db, id: string): Account {
   if (!row) {
     throw new ServiceError("account_not_found", 404);
   }
-  return toAccount(row, balanceOf(db, row), automaticOpening(db, id));
+  return toAccount(row, balanceOf(db, row), automaticOpening(db, id), valuationAccountIds(db, [id]).has(id));
 }

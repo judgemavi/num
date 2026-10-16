@@ -177,3 +177,23 @@ test("currency symbols use the same amount parser for detection and import", () 
   expect(detectStatementFormat("statement.csv", "2026-10-01,Synthetic Shop,₹12.34", [preset]))
     .toEqual({ kind: "preset", presetId: "synthetic" });
 });
+
+
+test("preset detection rejects amounts with the wrong decimal or malformed grouping", () => {
+  const base = {
+    name: "Synthetic format", dateFormat: "iso", hasHeader: false,
+    date: 0, description: 1, amount: 2, dateOrder: "mdy", signConvention: "account",
+  };
+  const dot = presetSchema.parse({ ...base, id: "dot", decimalSeparator: "." });
+  const comma = presetSchema.parse({ ...base, id: "comma", decimalSeparator: "," });
+  const detect = (amount: string, presets = [dot, comma]) =>
+    detectStatementFormat("synthetic.csv", `2026-10-01,Example shop,"${amount}"`, presets);
+  for (const amount of ["1 234,56", "12,34", "1,2,3"]) expect(detect(amount, [dot])).toEqual({ kind: "unknown" });
+  for (const amount of ["12.34", "1.2345"]) expect(detect(amount, [comma])).toEqual({ kind: "unknown" });
+  for (const amount of ["12.34", "1,234.56", "₹12.34", "1'234.50", "1’234.50"]) {
+    expect(detect(amount)).toEqual({ kind: "preset", presetId: "dot" });
+  }
+  for (const amount of ["12,34", "1.234,56", "1 234,56", "1’234,50"]) {
+    expect(detect(amount)).toEqual({ kind: "preset", presetId: "comma" });
+  }
+});

@@ -38,11 +38,11 @@ test("accounts, categories, groups and tags sort an accented name with its plain
       createCategoryGroup(db, { name, ...saved });
       createTag(db, { name, ...saved });
     }
-    expect(listAccounts(db, first).items.map((item) => item.name)).toEqual(sorted);
-    expect(listAccounts(db, { ...first, dir: "desc", pageSize: 2 }).items.map((item) => item.name)).toEqual(["Fable", "École"]);
-    expect(listAccounts(db, { ...first, sort: "kind" }).total).toBe(3);
-    expect(Object.keys(listAccounts(db, first).items[0] ?? {})).not.toContain("createdAt");
-    expect(Object.keys(listAccounts(db, first).items[0] ?? {})).not.toContain("sortKey");
+    expect(listAccounts(db, { ...first, asOf: "2026-10-07" }).items.map((item) => item.name)).toEqual(sorted);
+    expect(listAccounts(db, { ...first, asOf: "2026-10-07", dir: "desc", pageSize: 2 }).items.map((item) => item.name)).toEqual(["Fable", "École"]);
+    expect(listAccounts(db, { ...first, asOf: "2026-10-07", sort: "kind" }).total).toBe(3);
+    expect(Object.keys(listAccounts(db, { ...first, asOf: "2026-10-07" }).items[0] ?? {})).not.toContain("createdAt");
+    expect(Object.keys(listAccounts(db, { ...first, asOf: "2026-10-07" }).items[0] ?? {})).not.toContain("sortKey");
     expect(listCategories(db, first).items.map((item) => item.name)).toEqual(sorted);
     expect(listCategories(db, { ...first, page: 2, pageSize: 2 })).toMatchObject({ total: 3, items: [{ name: "Fable" }] });
     expect(listCategoryGroups(db).items.map((item) => item.name)).toEqual(sorted);

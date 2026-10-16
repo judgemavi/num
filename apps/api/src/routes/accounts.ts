@@ -1,6 +1,7 @@
 import {
   accountCreateSchema,
-  accountListQuerySchema,
+  accountListApiQuerySchema,
+  isoDateSchema,
   accountListSchema,
   accountSchema,
   accountUpdateSchema,
@@ -18,7 +19,7 @@ const listRoute = createRoute({
   method: "get",
   path: "/api/accounts",
   request: {
-    query: accountListQuerySchema,
+    query: accountListApiQuerySchema,
   },
   responses: {
     200: {
@@ -43,7 +44,7 @@ const createRouteDef = createRoute({
       required: true,
       content: {
         "application/json": {
-          schema: accountCreateSchema,
+          schema: accountCreateSchema.safeExtend({ asOf: isoDateSchema }),
         },
       },
     },

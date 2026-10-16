@@ -22,11 +22,3 @@ export function loadPresets(directory = presetsDirectory()): Preset[] {
   }
   return presets;
 }
-
-export function loadPreset(id: string, directory = presetsDirectory()): Preset {
-  const preset = loadPresets(directory).find((item) => item.id === id);
-  if (!preset) {
-    throw new Error(`Preset not found: ${id}`);
-  }
-  return preset;
-}

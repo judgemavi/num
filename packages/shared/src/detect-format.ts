@@ -262,6 +262,13 @@ function amountsFit(row: string[], preset: Preset) {
 }
 
 function looksLikeAmount(raw: string, decimal: DecimalSeparator) {
+  const text = raw.replace(/[^\d.,]/g, "");
+  if (text.length > 0) {
+    const pattern = decimal === ","
+      ? /^(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d+)?$/
+      : /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/;
+    if (!pattern.test(text)) return false;
+  }
   return readAmount(raw, milliunitDigits, decimal).kind !== "error";
 }
 

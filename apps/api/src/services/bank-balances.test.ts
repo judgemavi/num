@@ -182,3 +182,26 @@ test("bank status uses the valuation on its date for each valuation account kind
     book.close();
   }
 });
+
+
+test("a bank opening suggestion stops at the valuation date", () => {
+  const book = tempBook();
+  try {
+    for (const kind of ["investment", "property", "mortgage", "loan"] as const) {
+      const account = createAccount(book.db, { asOf: "2026-10-07", name: kind, kind, openingBalance: 10_000, ...saved });
+      book.db.insert(valuations).values({ id: crypto.randomUUID(), accountId: account.id, date: "2026-03-01", balance: 20_000 }).run();
+      createBankBalance(book.db, account.id, { date: "2026-02-28", balance: 15_000, ...saved });
+      const before = listBankBalances(book.db, account.id).status;
+      expect(before?.openingSuggestion).toEqual({ amount: 15_000, date: "2026-10-07" });
+      expect(listBankStatuses(book.db).items.find((row) => row.accountId === account.id) ?? null).toEqual(before);
+      for (const date of ["2026-03-01", "2026-03-02"]) {
+        createBankBalance(book.db, account.id, { date, balance: 25_000, ...saved });
+        const after = listBankBalances(book.db, account.id).status;
+        expect(after).toMatchObject({ difference: -5_000, openingSuggestion: null });
+        expect(listBankStatuses(book.db).items.find((row) => row.accountId === account.id) ?? null).toEqual(after);
+      }
+    }
+  } finally {
+    book.close();
+  }
+});

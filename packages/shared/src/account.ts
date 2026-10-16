@@ -37,6 +37,11 @@ const budgetKinds = new Set<AccountKind>(["chequing", "savings", "cash", "credit
 
 const interestKinds = new Set<AccountKind>(["savings", "loan"]);
 
+/** A valuation prevents a balance based only on the transaction history. */
+export function showsRunningBalance(hasValuation: boolean): boolean {
+  return !hasValuation;
+}
+
 /** These accounts use a valuation before subsequent transactions. */
 export function usesValuation(kind: AccountKind): boolean {
   return kind === "investment" || kind === "property" || kind === "mortgage" || kind === "loan";
@@ -150,7 +155,7 @@ const accountWriteFields = z.object({
   onBudget: z.boolean().optional(),
 });
 
-export const accountCreateSchema = accountWriteFields.extend({ asOf: isoDateSchema }).superRefine(cardAndRateOk);
+export const accountCreateSchema = accountWriteFields.superRefine(cardAndRateOk);
 
 /** A PATCH body: only the fields that change. The API checks the fields together on the stored account with the patch. */
 export const accountUpdateSchema = accountWriteFields.partial();
@@ -177,11 +182,14 @@ export const accountSchema = z.object({
   importPreset: z.string().nullable(),
   columnMap: columnMapSchema.nullable(),
   balance: amountSchema,
+  hasValuation: z.boolean(),
 });
 
 export const accountListQuerySchema = listQuerySchema(["name", "kind"]).extend({
   ...archivedQuery,
 });
+
+export const accountListApiQuerySchema = accountListQuerySchema.extend({ asOf: isoDateSchema });
 
 export const accountActivityQuerySchema = z.object({
   page: queryNumber().min(1).default(1),

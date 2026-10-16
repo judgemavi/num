@@ -10,7 +10,7 @@ import {
   type RefundCandidate,
   type RefundSubject,
 } from "@num/shared";
-import { and, eq, exists, gt, gte, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, eq, exists, gt, gte, isNull, lt, lte, notExists, sql } from "drizzle-orm";
 import { alias, QueryBuilder, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { idIn } from "./list-sql";
 import { auditTransaction, readTransaction } from "./transaction-record";
@@ -60,7 +60,7 @@ export function refundItemKey(transactionId: string): string {
 }
 
 /** Refunds: money in, one expense-category line, no linked purchase. Give an id to read one row. */
-function loadRefunds(db: Reader, id?: string, scope?: { from?: string; only?: readonly string[] }) {
+function loadRefunds(db: Reader, id?: string, only?: readonly string[]) {
   return db
     .select({
       id: transactions.id,
@@ -78,8 +78,9 @@ function loadRefunds(db: Reader, id?: string, scope?: { from?: string; only?: re
         isNull(transactions.refundOfId),
         hasOneExpenseLine(transactions.id),
         id ? eq(transactions.id, id) : undefined,
-        scope?.from ? gte(transactions.date, scope.from) : undefined,
-        scope?.only ? idIn(transactions.id, scope.only) : undefined,
+        notExists(subquery.select({ id: inboxDecisions.itemKey }).from(inboxDecisions)
+          .where(eq(inboxDecisions.itemKey, sql`'refund_link:' || ${transactions.id}`))),
+        only ? idIn(transactions.id, only) : undefined,
       ),
     )
     .all();
@@ -165,9 +166,9 @@ export type RefundAsk = {
 };
 
 /** Refunds that need the question "Refund of which purchase?". A read: it never writes. */
-export function refundQuestions(db: Reader, hidden: ReadonlySet<string>, asOf: string, only?: readonly string[]): Map<string, RefundAsk> {
+export function refundQuestions(db: Reader, hidden: ReadonlySet<string>, only?: readonly string[]): Map<string, RefundAsk> {
   const asks = new Map<string, RefundAsk>();
-  const refunds = loadRefunds(db, undefined, only ? { only } : { from: refundWindowStart(asOf) }).filter((row) => !hidden.has(refundItemKey(row.id)));
+  const refunds = loadRefunds(db, undefined, only).filter((row) => !hidden.has(refundItemKey(row.id)));
   if (refunds.length === 0) {
     return asks;
   }

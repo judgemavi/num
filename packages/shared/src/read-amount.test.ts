@@ -19,3 +19,18 @@ test("typed and statement amounts share the safe integer boundary", () => {
   expect(() => parseAmount("KWD", "9007199254740.992")).toThrow("Amount is too large");
   expect(readAmount("9007199254740.992", 3, ".")).toEqual({ kind: "error", reason: "amount_too_large" });
 });
+
+
+test("statement amounts accept ASCII and curly apostrophes as grouping marks", () => {
+  for (const value of ["1'234.50", "1’234.50"]) {
+    expect(readAmount(value, 2, ".")).toEqual({ kind: "value", amount: 1_234_500 });
+  }
+  expect(readAmount("1’234,50", 2, ",")).toEqual({ kind: "value", amount: 1_234_500 });
+});
+
+test("grouping does not permit unknown text, misplaced signs or excess decimals", () => {
+  for (const value of ["1'234.50oops", "1’234.50-", "1’234.50*", "1’234.50 CR"]) {
+    expect(readAmount(value, 2, ".").kind).toBe("error");
+  }
+  expect(readAmount("1’234.501", 2, ".")).toEqual({ kind: "error", reason: "too_many_decimals" });
+});

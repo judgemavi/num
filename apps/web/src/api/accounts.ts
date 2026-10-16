@@ -8,7 +8,7 @@ import { accountError } from "@/accounts/format";
 
 /** The Accounts list. It reads all pages. The key has only the values that the request uses. */
 export function accountListQuery({ archived, sort, dir }: ListFilters<AccountListQuery>) {
-  const filters = { archived, sort, dir };
+  const filters = { archived, sort, dir, asOf: localAsOf() };
   return queryOptions({
     queryKey: ["accounts", filters],
     queryFn: () => allPages((page) => unwrap(api.accounts.$get({ query: { ...filters, page, pageSize: fullPage } }))),
@@ -38,7 +38,7 @@ export function accountQuery(id: string) {
 export function useSaveAccount() {
   return useMutation({
     meta: formWrite,
-    mutationFn: (input: { id: null; body: Omit<AccountCreate, "asOf"> } | { id: string; body: AccountUpdate }) =>
+    mutationFn: (input: { id: null; body: AccountCreate } | { id: string; body: AccountUpdate }) =>
       unwrap(input.id === null ? api.accounts.$post({ json: { ...input.body, asOf: localAsOf() } }) : api.accounts[":id"].$patch({ param: { id: input.id }, json: input.body })),
   });
 }

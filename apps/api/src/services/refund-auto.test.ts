@@ -10,6 +10,8 @@ import { createCategory } from "./categories";
 import { decideInboxItem } from "./inbox-decisions";
 import { bulkEdit } from "./bulk-edit";
 import { createMerchant } from "./merchants";
+import { transactionListQuerySchema } from "@num/shared";
+import { listTransactions } from "./transaction-list";
 import { refundQuestions } from "./refund-auto";
 import { listNeedsReview } from "./needs-review";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
@@ -235,15 +237,53 @@ test("a transfer question comes before the refund question", () => {
 });
 
 
-test("the review window keeps day 90 and a scoped read can answer an older refund", () => {
+test("an unanswered refund older than 90 days has the same full and scoped question", () => {
   withBook((db, ids) => {
-    money(db, ids.account, "2025-12-20", -50_000, ids.food);
+    const purchase = money(db, ids.account, "2025-12-20", -50_000, ids.food);
     const older = money(db, ids.account, "2026-01-01", 10_000, ids.food);
-    const boundary = money(db, ids.account, "2026-01-02", 10_000, ids.food);
-    const open = refundQuestions(db, new Set(), asOf);
-    expect(open.has(older.id)).toBe(false);
-    expect(open.has(boundary.id)).toBe(true);
-    expect(refundQuestions(db, new Set(), asOf, [older.id]).has(older.id)).toBe(true);
-    expect(refundQuestions(db, new Set(), asOf, []).size).toBe(0);
+    const full = refundQuestions(db, new Set());
+    const scoped = refundQuestions(db, new Set(), [older.id]);
+    expect(full.get(older.id)?.purchases.map((row) => row.id)).toEqual([purchase.id]);
+    expect(scoped.get(older.id)).toEqual(full.get(older.id));
+    expect(refundQuestions(db, new Set(), []).size).toBe(0);
+    const fullReview = listNeedsReview(db, asOf).find((hit) => hit.id === older.id);
+    if (!fullReview) throw new Error("Missing refund review");
+    expect(fullReview.review.question).toBe("refund_purchase");
+    expect(listNeedsReview(db, asOf, { only: [older.id] })).toEqual([fullReview]);
+    decideInboxItem(db, asOf, `refund_link:${older.id}`, "not_linked", saved);
+    expect(refundQuestions(db, new Set()).has(older.id)).toBe(false);
+    expect(refundQuestions(db, new Set(), [older.id]).has(older.id)).toBe(false);
+  });
+});
+
+test("a transaction page keeps a refund question whose purchase is on another page", () => {
+  withBook((db, ids) => {
+    const purchase = money(db, ids.account, "2026-03-01", -50_000, ids.food);
+    const refund = money(db, ids.account, "2026-03-20", 10_000, ids.food);
+    const full = listNeedsReview(db, asOf).find((hit) => hit.id === refund.id);
+    if (!full) throw new Error("Missing refund review");
+    const page = listTransactions(db, { ...transactionListQuerySchema.parse({ pageSize: 1, sort: "date", dir: "desc", accountId: ids.account }), asOf });
+    expect(page.items.map((row) => row.id)).toEqual([refund.id]);
+    expect(page.items[0]?.review?.refund?.purchases.map((row) => row.id)).toEqual([purchase.id]);
+    expect(page.items[0]?.review).toEqual(full.review);
+  });
+});
+
+test("one side of a transfer in scope keeps the other side and the full review result", () => {
+  withBook((db, ids) => {
+    const savings = createAccount(db, { asOf, name: "Example reserve", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+    const left = money(db, ids.account, "2026-03-06", -50_000, ids.food);
+    db.update(transactions).set({ source: "import" }).where(eq(transactions.id, left.id)).run();
+    const right = money(db, savings.id, "2026-03-06", 50_000, ids.food);
+    const full = listNeedsReview(db, asOf);
+    for (const [subject, other] of [[left, right], [right, left]]) {
+      if (!subject || !other) throw new Error("Missing transfer side");
+      const expected = full.find((hit) => hit.id === subject.id);
+      if (!expected) throw new Error("Missing transfer review");
+      const scoped = listNeedsReview(db, asOf, { only: [subject.id] });
+      expect(scoped).toEqual([expected]);
+      expect(scoped[0]?.review.question).toBe("transfer_pair");
+      expect(scoped[0]?.review.transfer?.otherId).toBe(other.id);
+    }
   });
 });

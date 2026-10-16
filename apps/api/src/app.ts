@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { dataDirectory, type Db } from "./db";
+import { addMoneyDescriptions } from "./route-descriptions";
 import { registerMcp } from "./mcp/register";
 import { accountRoutes } from "./routes/accounts";
 import { bucketRoutes } from "./routes/buckets";
@@ -64,6 +65,7 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
     .route("/", merchantRoutes(db))
     .route("/", suggestionRoutes(db))
     .route("/", transactionRoutes(db));
+  addMoneyDescriptions(app);
   registerMcp(app, db);
 
   app.doc("/api/openapi.json", {

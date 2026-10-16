@@ -117,3 +117,11 @@ export function balancesAt(db: Reader, points: readonly { account: BalanceRow; d
     });
   });
 }
+
+
+/** Accounts with a valuation, optionally limited to the requested date. */
+export function valuationAccountIds(db: Reader, ids: readonly string[], asOf?: string) {
+  const rows = db.selectDistinct({ accountId: valuations.accountId }).from(valuations)
+    .where(and(idIn(valuations.accountId, ids), asOf ? lte(valuations.date, asOf) : undefined)).all();
+  return new Set(rows.map((row) => row.accountId));
+}

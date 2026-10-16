@@ -4,10 +4,17 @@ import { columnMapSchema, readAmount, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
 import { parseCsvStatement } from "./parse-csv";
 import { parseOfxStatement } from "./parse-ofx";
-import { loadPreset, presetsDirectory } from "./presets";
+import { loadPresets, presetsDirectory } from "./presets";
 
 function fixture(name: string): string {
   return readFileSync(join(presetsDirectory(), "fixtures", name), "utf8");
+}
+
+const presets = loadPresets();
+function preset(id: string) {
+  const found = presets.find((item) => item.id === id);
+  if (!found) throw new Error(`Missing test preset: ${id}`);
+  return found;
 }
 
 const digits = 2;
@@ -21,7 +28,7 @@ test("a statement amount reads as milliunits with the decimal places of the curr
 });
 
 test("TD chequing or savings preset reads a chequing file", () => {
-  const result = parseCsvStatement(fixture("td-chequing.csv"), loadPreset("td-bank-account"), digits);
+  const result = parseCsvStatement(fixture("td-chequing.csv"), preset("td-bank-account"), digits);
   expect(result.rows).toEqual([
     { date: "2026-01-02", description: "NORTH MARKET, UNIT 1", amount: -12500, bankId: null },
     { date: "2026-01-03", description: "PAY DEPOSIT", amount: 200000, bankId: null },
@@ -32,7 +39,7 @@ test("TD chequing or savings preset reads a chequing file", () => {
 });
 
 test("TD chequing or savings preset reads a savings file", () => {
-  const result = parseCsvStatement(fixture("td-savings.csv"), loadPreset("td-bank-account"), digits);
+  const result = parseCsvStatement(fixture("td-savings.csv"), preset("td-bank-account"), digits);
   expect(result.rows).toEqual([
     { date: "2026-03-15", description: "PAY DEPOSIT", amount: 50000, bankId: null },
     { date: "2026-03-16", description: "NORTH MARKET", amount: -8400, bankId: null },
@@ -42,7 +49,7 @@ test("TD chequing or savings preset reads a savings file", () => {
 });
 
 test("TD credit card preset reads dates, signs and the closing balance", () => {
-  const result = parseCsvStatement(fixture("td-credit-card.csv"), loadPreset("td-credit-card"), digits);
+  const result = parseCsvStatement(fixture("td-credit-card.csv"), preset("td-credit-card"), digits);
   expect(result.rows).toEqual([
     { date: "2026-01-05", description: "NORTH MARKET", amount: -24000, bankId: null },
     { date: "2026-01-06", description: "CARD PAYMENT", amount: 30000, bankId: null },
@@ -52,7 +59,7 @@ test("TD credit card preset reads dates, signs and the closing balance", () => {
 });
 
 test("CIBC credit card preset reads dates and signs", () => {
-  const result = parseCsvStatement(fixture("cibc-credit-card.csv"), loadPreset("cibc-credit-card"), digits);
+  const result = parseCsvStatement(fixture("cibc-credit-card.csv"), preset("cibc-credit-card"), digits);
   expect(result.rows).toEqual([
     { date: "2026-02-01", description: "NORTH MARKET", amount: -15000, bankId: null },
     { date: "2026-02-02", description: "CARD PAYMENT", amount: 40000, bankId: null },

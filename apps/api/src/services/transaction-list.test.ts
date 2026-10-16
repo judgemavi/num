@@ -1,11 +1,11 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { merchants, migrateDatabase, openDatabase, settings } from "@num/db";
+import { merchants, migrateDatabase, openDatabase, settings, valuations } from "@num/db";
 import type { TransactionListQuery } from "@num/shared";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
-import { createAccount } from "./accounts";
+import { createAccount, getAccount } from "./accounts";
 import { createCategory, createCategoryGroup } from "./categories";
 import { createTag } from "./tags";
 import { listTransactions } from "./transaction-list";
@@ -276,16 +276,20 @@ test("running balance includes the opening balance and ignores other accounts an
   }
 });
 
-test("running balance is absent for valuation accounts and present for chequing", () => {
+test("running balance follows valuation presence for every account kind", () => {
   const fixture = book();
   try {
-    for (const kind of ["investment", "property", "mortgage", "loan"] as const) {
-      const valuedAccount = createAccount(fixture.db, {
-        asOf: "2026-10-07",
-        name: kind, kind, openingDate: "2026-01-01", openingBalance: 50000, ...saved,
+    for (const kind of ["investment", "property", "mortgage", "loan", "chequing"] as const) {
+      const account = createAccount(fixture.db, {
+        asOf: "2026-10-07", name: kind, kind, openingDate: "2026-01-01", openingBalance: 50000, ...saved,
       });
-      add(fixture.db, { accountId: valuedAccount.id, date: "2026-02-01", amount: 2000, payeeRaw: "Adjustment" });
-      const valued = listTransactions(fixture.db, { ...page, accountId: valuedAccount.id });
+      add(fixture.db, { accountId: account.id, date: "2026-02-01", amount: 2000, payeeRaw: "Adjustment" });
+      expect(getAccount(fixture.db, account.id).hasValuation).toBe(false);
+      const plain = listTransactions(fixture.db, { ...page, accountId: account.id });
+      expect(plain.items[0]?.runningBalance).toBe(52000);
+      fixture.db.insert(valuations).values({ id: crypto.randomUUID(), accountId: account.id, date: "2026-03-01", balance: 60000 }).run();
+      expect(getAccount(fixture.db, account.id).hasValuation).toBe(true);
+      const valued = listTransactions(fixture.db, { ...page, accountId: account.id });
       expect(valued.items).toHaveLength(1);
       expect(valued.items[0]?.runningBalance).toBeNull();
     }

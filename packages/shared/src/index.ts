@@ -1,6 +1,7 @@
 export {
   accountClass,
   usesValuation,
+  showsRunningBalance,
   balanceFromEntry,
   entryFromBalance,
   netWorthOf,
@@ -8,6 +9,7 @@ export {
   accountCreateSchema,
   accountKinds,
   accountListQuerySchema,
+  accountListApiQuerySchema,
   accountListSchema,
   accountSchema,
   accountUpdateSchema,
@@ -380,7 +382,6 @@ export {
   forecastDates,
   forecastSchema,
   spendDeltas,
-  unbucketedMonthly,
   type Forecast,
   type ForecastDelta,
   type ForecastFlow,

@@ -166,6 +166,7 @@ An account is a real account at a bank or other institution.
 
 Fields:
 - `name`, `institution?`, `kind`, `onBudget` (boolean), `openingDate`, `openingBalance` (milliunits), `archivedAt?`
+- `createdOn`: the local creation date, from the required request `asOf`.
 - Display name: `institution` + `name` ("TD Chequing"). If `name` already starts with the institution, show `name` only.
   The browser makes the display name; every place that shows an account uses it.
 - `kind`: `chequing | savings | cash | credit_card | mortgage | loan | investment | property | receivable | other_asset | other_liability`
@@ -183,6 +184,7 @@ Rules:
 - Balance of a transaction account = `openingBalance` + the sum of the transaction amounts in the account.
 - Balance of an `investment`, `property`, `mortgage` or `loan` account = the latest valuation (§5.10) + the transactions after the valuation date.
   If the account has no valuation, use the transaction account formula.
+  A transaction list shows a running balance only when the account has no valuation.
 
 The opening balance is a field. It is not a transaction. There is no equity account.
 The opening balance is optional when the user creates an account. The default is 0. The default opening date is the day
@@ -192,6 +194,7 @@ The app helps the user set it, always with one click and never without the user:
   Value = the first row's balance − the first row's amount, dated the day before the first row.
 - On the account, when the bank balance and the calculated balance are different (§5.13) and the account has no earlier
   bank balance that is equal: "Start this account from the bank's balance" (opening balance + the difference).
+  The app does not offer this suggestion when a valuation is on or before the bank-balance date.
 - The app does not offer these two suggestions for a mortgage with terms. Its opening date is fixed (§5.2).
 - A suggestion changes only `openingDate` and `openingBalance` (a `PATCH` of the account). On a mortgage with terms,
   a change of these two fields must include the terms.
@@ -424,6 +427,7 @@ The user enters a valuation (in the UI or through MCP).
 
 Batch fields: `accountId`, `documentId`, `parser`, `periodStart`, `periodEnd`, `closingBalance?`, `closingDate?`,
 `unreadableJson` (the unreadable rows: line, raw text, reason), `createdAt`, `undoneAt?`.
+- `importedOn`: the local import date, from the required request `asOf`.
 - A batch has a document (the uploaded file). An MCP client uploads a file the same way as the UI (§12).
 
 Row fields: `batchId`, `rowIndex`, `date`, `amount`, `payeeRaw`, `bankId?`, `identity`,

@@ -25,7 +25,7 @@ function tempDatabase() {
 
 const at = "2026-10-07T16:00:00Z";
 
-function base(kind: AccountKind, openingBalance = 0): AccountCreate & { source: "ui"; at: string } {
+function base(kind: AccountKind, openingBalance = 0): AccountCreate & { source: "ui"; at: string; asOf: string } {
   return {
     asOf: "2026-10-07",
     name: "Example account",
@@ -38,7 +38,7 @@ function base(kind: AccountKind, openingBalance = 0): AccountCreate & { source: 
   };
 }
 
-function card(kind: AccountKind = "credit_card"): AccountCreate & { source: "ui"; at: string } {
+function card(kind: AccountKind = "credit_card"): AccountCreate & { source: "ui"; at: string; asOf: string } {
   return {
     ...base(kind),
     paymentPolicy: "full",
@@ -72,7 +72,7 @@ function addValuation(db: Db, accountId: string, date: string, balance: number) 
 }
 
 function balanceOf(db: Db, id: string): number {
-  const page = listAccounts(db, { page: 1, pageSize: 50, archived: false });
+  const page = listAccounts(db, { asOf: "2026-10-07", page: 1, pageSize: 50, archived: false });
   const account = page.items.find((item) => item.id === id);
   if (!account) {
     throw new Error("Account is missing");
@@ -230,18 +230,40 @@ test("the account list shows active accounts unless archived is requested", () =
     const closed = createAccount(book.db, { ...base("savings"), name: "Closed account" });
     archiveAccount(book.db, closed.id, { confirm: false, source: "ui", at });
 
-    const active = listAccounts(book.db, { page: 1, pageSize: 50, archived: false });
+    const active = listAccounts(book.db, { asOf: "2026-10-07", page: 1, pageSize: 50, archived: false });
     expect(active.total).toBe(1);
     expect(active.items.map((item) => item.name)).toEqual(["Open account"]);
 
-    const archived = listAccounts(book.db, { page: 1, pageSize: 50, archived: true });
+    const archived = listAccounts(book.db, { asOf: "2026-10-07", page: 1, pageSize: 50, archived: true });
     expect(archived.total).toBe(1);
     expect(archived.items.map((item) => item.name)).toEqual(["Closed account"]);
 
     const restored = restoreAccount(book.db, closed.id, { source: "ui", at });
     expect(restored.archivedAt).toBeNull();
-    expect(listAccounts(book.db, { page: 1, pageSize: 50, archived: false }).total).toBe(2);
+    expect(listAccounts(book.db, { asOf: "2026-10-07", page: 1, pageSize: 50, archived: false }).total).toBe(2);
     expectCode(() => restoreAccount(book.db, closed.id, { source: "ui", at }), "account_not_archived");
+  } finally {
+    book.close();
+  }
+});
+
+
+test("account lists use their requested date for transactions and valuations", () => {
+  const book = tempDatabase();
+  try {
+    for (const kind of ["chequing", "investment", "mortgage", "loan"] as const) {
+      const account = createAccount(book.db, { ...base(kind, 10_000), name: kind });
+      addTransaction(book.db, account.id, "2026-02-01", -1_000);
+      addTransaction(book.db, account.id, "2026-04-01", -2_000);
+      if (kind !== "chequing") addValuation(book.db, account.id, "2026-03-01", 30_000);
+    }
+    const before = listAccounts(book.db, { page: 1, pageSize: 50, archived: false, asOf: "2026-02-15" });
+    expect(before.items.every((row) => row.balance === 9_000)).toBe(true);
+    const after = listAccounts(book.db, { page: 1, pageSize: 50, archived: false, asOf: "2026-03-15" });
+    for (const row of after.items) {
+      expect(row.balance).toBe(row.kind === "chequing" ? 9_000 : 30_000);
+      expect(row.hasValuation).toBe(row.kind !== "chequing");
+    }
   } finally {
     book.close();
   }

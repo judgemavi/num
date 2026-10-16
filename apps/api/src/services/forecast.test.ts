@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { auditLog, migrateDatabase, openDatabase, settings } from "@num/db";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
-import { unbucketedMonthly } from "@num/shared";
+import { medianAmount } from "@num/shared";
 import { unbucketedSpending } from "./forecast-spending";
 import { createAccount } from "./accounts";
 import { createBucket } from "./buckets";
@@ -13,6 +13,29 @@ import { readForecast } from "./forecast";
 import { linkOccurrence } from "./recurring-links";
 import { createSchedule } from "./schedule-test-book";
 import { createTransaction } from "./transactions";
+
+// Test oracle: the line-based forecast rule, independent of the SQL aggregate.
+/** `step` is the milliunits in one minor unit of the book currency. The result is a whole number of minor units. */
+function unbucketedMonthly(months: readonly string[], lines: readonly { month: string; amount: number }[], step: number): number {
+  if (months.length === 0 || lines.length === 0) {
+    return 0;
+  }
+  const medianLine = medianAmount(lines.map((line) => line.amount), 1);
+  const limit = Math.abs(medianLine) * 3;
+  const totals = new Map<string, number>(months.map((month) => [month, 0]));
+  for (const line of lines) {
+    if (Math.abs(line.amount) > limit) {
+      continue;
+    }
+    const current = totals.get(line.month);
+    if (current === undefined) {
+      continue;
+    }
+    totals.set(line.month, current + line.amount);
+  }
+  const median = medianAmount(months.map((month) => totals.get(month) ?? 0), step);
+  return median < 0 ? -median : 0;
+}
 
 const at = "2026-10-08T16:00:00Z";
 const saved = { source: "ui" as const, at };

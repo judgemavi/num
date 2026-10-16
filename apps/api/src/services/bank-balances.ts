@@ -1,5 +1,5 @@
 import { idIn } from "./list-sql";
-import { accounts, bankBalances, mortgageTerms, type AccountRow } from "@num/db";
+import { accounts, bankBalances, mortgageTerms, valuations, type AccountRow } from "@num/db";
 import { dayBefore, openingFromBankBalance, utcNow, type BankBalance, type BankBalanceInput, type BankStatus } from "@num/shared";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
@@ -69,15 +69,19 @@ export function listBankStatuses(db: Db): { items: BankStatus[] } {
     grouped.set(point.account.id, entries);
   }
   const withTerms = new Set(db.select({ accountId: mortgageTerms.accountId }).from(mortgageTerms).all().map((row) => row.accountId));
+  const firstValuation = new Map(db.select({ accountId: valuations.accountId, date: sql<string>`min(${valuations.date})` })
+    .from(valuations).where(idIn(valuations.accountId, ids)).groupBy(valuations.accountId).all()
+    .map((row) => [row.accountId, row.date]));
   const items = open.flatMap(({ account, firstDate }) => {
     const entries = grouped.get(account.id) ?? [];
     const latest = entries[0];
     if (!latest) return [];
     const difference = latest.calculated - latest.bank.balance;
+    const valuationDate = firstValuation.get(account.id);
     return [{
       accountId: account.id, date: latest.bank.date, bankBalance: latest.bank.balance,
       calculatedBalance: latest.calculated, difference,
-      openingSuggestion: difference === 0 || withTerms.has(account.id) ? null : openingFromBankBalance({
+      openingSuggestion: difference === 0 || withTerms.has(account.id) || (valuationDate !== undefined && valuationDate <= latest.bank.date) ? null : openingFromBankBalance({
         hasMatchingBankBalance: entries.slice(1).some((row) => row.bank.balance === row.calculated),
         openingBalance: account.openingBalance, calculatedBalance: latest.calculated, bankBalance: latest.bank.balance,
         date: firstDate ? dayBefore(firstDate) : account.openingDate ?? account.createdOn,
