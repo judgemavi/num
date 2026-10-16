@@ -1,7 +1,7 @@
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
 import { Component, Suspense, type ReactNode } from "react";
-import { Loading } from "@/components/loading";
+import { FieldsSkeleton, PageSkeleton, RowsSkeleton } from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { LoadError, LoadingLine } from "@/editors/load-state";
 
@@ -38,10 +38,10 @@ class Catch extends Component<CatchProps, { error: Error | null }> {
   }
 }
 
-/** The look of the loading text and of the error text: on the full screen, on a page, in the rows of a list card, in a panel, or in a dialog. */
+/** The look of the loading skeleton and of the error text: on the full screen, on a page, in the rows of a list card, in a panel, or in a dialog. */
 const looks = {
   screen: {
-    loading: (label: string) => <Loading label={label} className="mx-auto min-h-svh justify-center px-4" />,
+    loading: (label: string) => <PageSkeleton label={label} className="mx-auto min-h-svh w-full max-w-3xl px-4 py-8" />,
     failed: (label: string, retry: () => void) => (
       <div className="mx-auto grid min-h-svh w-full max-w-xl content-center gap-3 px-4">
         <p role="alert">{label}</p>
@@ -52,7 +52,7 @@ const looks = {
     ),
   },
   page: {
-    loading: (label: string) => <Loading label={label} />,
+    loading: (label: string) => <PageSkeleton label={label} />,
     failed: (label: string, retry: () => void) => (
       <div className="grid content-start gap-5">
         <p role="alert">{label}</p>
@@ -63,7 +63,7 @@ const looks = {
     ),
   },
   rows: {
-    loading: (label: string) => <Loading label={label} className="px-5 py-5" />,
+    loading: (label: string) => <RowsSkeleton label={label} />,
     failed: (label: string, retry: () => void) => (
       <div className="grid justify-items-start gap-3 px-5 py-5">
         <p role="alert">{label}</p>
@@ -74,7 +74,7 @@ const looks = {
     ),
   },
   panel: {
-    loading: (label: string) => <Loading label={label} className="text-sm" />,
+    loading: (label: string) => <FieldsSkeleton label={label} count={2} />,
     failed: (label: string, retry: () => void) => (
       <div className="grid gap-3">
         <p role="alert" className="text-sm">
@@ -94,11 +94,11 @@ const looks = {
 
 type BoundaryProps = {
   look?: keyof typeof looks;
-  /** The text while a child loads its data. Null shows nothing: use it for a part that shows only when it has data. */
+  /** The screen reader text of the skeleton while a child loads its data. Null shows nothing: use it for a part that shows only when it has data. */
   loading: string | null;
   /** The text after a read fails, with "Try again". A function gives the text for the error, or all of the content. */
   failed: string | ((failure: Failure) => ReactNode);
-  /** The content around the loading text and the error text, when they need more than the text. */
+  /** The content around the skeleton and the error text, when they need more. */
   frame?: (content: ReactNode) => ReactNode;
   /** A value that is not in the URL and that the children load data for. A new value shows the children again. */
   resetKey?: string;

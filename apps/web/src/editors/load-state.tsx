@@ -1,4 +1,4 @@
-import { Loading } from "@/components/loading";
+import { FieldsSkeleton } from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogBody } from "@/editors/form-chrome";
@@ -10,7 +10,7 @@ export function LoadingLine({ label }: { label: string }) {
         <DialogTitle className="sr-only">{label}</DialogTitle>
       </DialogHeader>
       <DialogBody>
-        <Loading label={label} />
+        <FieldsSkeleton label={label} count={4} />
       </DialogBody>
     </>
   );

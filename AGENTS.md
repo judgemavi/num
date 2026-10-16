@@ -85,7 +85,7 @@ in docs or code. Git history keeps the records. An idea that the owner refuses g
   - A read is a `useSuspenseQuery` (or `useSuspenseQueries` for reads that start together). A write is a
     `useMutation`. The data of a read is always defined. Do not write `isPending` or `isError` branches for a read,
     and do not write a fallback value for data that is not loaded.
-  - A `Boundary` (`components/boundary.tsx`) shows the loading text and the error text with "Try again". Each screen
+  - A `Boundary` (`components/boundary.tsx`) shows a loading skeleton and the error text with "Try again". Each screen
     has one. The editor host has one. A card or a panel that loads by itself has its own.
   - A component that reads data after a parent has read its data makes the reads wait in sequence. Start the read
     earlier: `usePrefetchQuery` in the parent, or `prefetchQuery` in the loader of the route.
