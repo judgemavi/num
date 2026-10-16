@@ -10,6 +10,9 @@ export type StatementFormat =
   | { kind: "unknown" };
 
 export function chosenPresetId(format: StatementFormat): string | null {
+  if (format.kind === "ofx") {
+    return "ofx";
+  }
   if (format.kind === "preset") {
     return format.presetId;
   }

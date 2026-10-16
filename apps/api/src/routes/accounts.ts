@@ -2,6 +2,7 @@ import {
   accountCreateSchema,
   accountListApiQuerySchema,
   isoDateSchema,
+  asOfQuerySchema,
   accountListSchema,
   accountSchema,
   accountUpdateSchema,
@@ -118,7 +119,7 @@ const readRoute = createRoute({
   description: "Read accounts. This does not create, change or delete a record.",
   method: "get",
   path: "/api/accounts/{id}",
-  request: { params: idParams },
+  request: { params: idParams, query: asOfQuerySchema },
   responses: {
     200: {
       description: "One account and its balance",
@@ -128,6 +129,7 @@ const readRoute = createRoute({
         },
       },
     },
+    400: errorResponse,
     404: errorResponse,
   },
 });
@@ -168,7 +170,7 @@ export function accountRoutes(db: Db) {
     .openapi(listRoute, (c) => c.json(listAccounts(db, c.req.valid("query")), 200))
     .openapi(readRoute, (c) => {
       const { id } = c.req.valid("param");
-      return c.json(getAccount(db, id), 200);
+      return c.json(getAccount(db, id, c.req.valid("query").asOf), 200);
     })
     .openapi(createRouteDef, (c) => {
       const body = c.req.valid("json");
@@ -182,7 +184,7 @@ export function accountRoutes(db: Db) {
     .openapi(archiveRoute, (c) => {
       const body = c.req.valid("json");
       const { id } = c.req.valid("param");
-      return c.json(archiveAccount(db, id, { confirm: body.confirm, source: "ui" }), 200);
+      return c.json(archiveAccount(db, id, { ...body, source: "ui" }), 200);
     })
     .openapi(restoreRoute, (c) => {
       const { id } = c.req.valid("param");

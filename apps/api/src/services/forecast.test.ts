@@ -225,3 +225,25 @@ test("monthly SQL sums keep the line outlier limit, missing months and refunds",
     book.close();
   }
 });
+
+test("forecast months include loan commitments and exclude transfers between open budget accounts", () => {
+  const book = tempDatabase();
+  try {
+    const cash = cashAccount(book.db, "Cash", 1_000_000);
+    const loan = createAccount(book.db, { name: "Loan", kind: "loan", asOf: "2026-10-01", ...saved });
+    const card = createAccount(book.db, { name: "Card", kind: "credit_card", paymentPolicy: "full", asOf: "2026-10-01", ...saved });
+    for (const target of [loan, card]) {
+      createSchedule(book.db, {
+        name: target.name, kind: "commitment", accountId: cash.id, transferAccountId: target.id,
+        expectedAmount: -10_000, tolerance: 0, amountMode: "fixed", startDate: "2026-10-15",
+        freq: "monthly", interval: 1, monthDay: 15, businessDayShift: "none", ...saved,
+      });
+    }
+    const forecast = readForecast(book.db, "2026-10-01");
+    expect(forecast.months.find((month) => month.month === "2026-10")?.spending).toBe(10_000);
+    expect(forecast.months.find((month) => month.month === "2026-11")?.spending).toBe(10_000);
+    expect(forecast.total[forecast.dates.indexOf("2026-10-15")]).toBe(990_000);
+  } finally {
+    book.close();
+  }
+});

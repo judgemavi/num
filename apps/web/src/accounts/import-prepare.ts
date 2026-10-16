@@ -24,8 +24,8 @@ export function formatFromChoice(value: string): StatementFormat {
   return { kind: "preset", presetId: value };
 }
 
-export function rowNeedsColumnMap(row: ImportFileRow): boolean {
-  return row.phase === "ready" && row.format.kind === "unknown" && row.columnMap === null && row.accountId.length > 0;
+export function rowNeedsColumnMap(row: ImportFileRow, account: { columnMap: ColumnMap | null } | undefined): boolean {
+  return row.phase === "ready" && row.format.kind === "unknown" && row.columnMap === null && !account?.columnMap && row.accountId.length > 0;
 }
 
 export function totalCounts(rows: readonly ImportFileRow[]): ImportCounts {

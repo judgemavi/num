@@ -9,6 +9,7 @@ import { formatImportDate, importCountText, unreadableLabel } from "@/accounts/i
 import { useEditorFrame } from "@/editors/editor-api";
 import { useBookCurrency } from "@/editors/lookups";
 import { formatMoney } from "@/money";
+import { activeAccountsQuery } from "@/api/accounts";
 import { rowNeedsColumnMap } from "@/accounts/import-prepare";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -181,7 +182,9 @@ function OpeningBalanceButton({ row, onApplied }: { row: ImportFileRow; onApplie
 
 function FileStatus({ row, onOpeningApplied }: { row: ImportFileRow; onOpeningApplied: () => void }) {
   const { close } = useEditorFrame();
-  const message = statusMessage(row);
+  const { data: accounts } = useSuspenseQuery(activeAccountsQuery());
+  const account = accounts.items.find((account) => account.id === row.accountId);
+  const message = statusMessage(row, account);
   return (
     <div className="grid gap-1">
       <p className={row.phase === "error" ? "text-sm text-attn" : "text-sm"} role={row.phase === "error" ? "alert" : undefined}>
@@ -217,7 +220,7 @@ function FileStatus({ row, onOpeningApplied }: { row: ImportFileRow; onOpeningAp
   );
 }
 
-function statusMessage(row: ImportFileRow) {
+function statusMessage(row: ImportFileRow, account: { columnMap: ColumnMap | null } | undefined) {
   if (row.phase === "importing") {
     return "Importing";
   }
@@ -233,7 +236,7 @@ function statusMessage(row: ImportFileRow) {
   if (row.accountId.length === 0) {
     return "Choose an account";
   }
-  if (rowNeedsColumnMap(row)) {
+  if (rowNeedsColumnMap(row, account)) {
     return "Set columns";
   }
   return "Ready";

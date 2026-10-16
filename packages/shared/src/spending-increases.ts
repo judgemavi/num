@@ -1,4 +1,5 @@
 import { expenseSpending, isExpenseLine, priorMonths, type FlowLine } from "./month";
+import { roundToStep } from "./currency";
 import { medianAmount } from "./recurring-calc";
 
 function divRoundHalfAway(numerator: bigint, denominator: bigint) {
@@ -47,7 +48,7 @@ function compareId(left: string, right: string): number {
 /**
  * The 3 largest increases of one month by category, against the median of the 3 months before it. The Spending list shows them.
  */
-export function spendingIncreases(month: string, lines: readonly FlowLine[]) {
+export function spendingIncreases(month: string, lines: readonly FlowLine[], step: number) {
   const byMonth = expenseByMonth(lines);
   const earlier = priorMonths(month);
   const ids = new Set<string>();
@@ -59,7 +60,7 @@ export function spendingIncreases(month: string, lines: readonly FlowLine[]) {
   return [...ids]
     .map((categoryId) => {
       const amount = byMonth.get(month)?.get(categoryId) ?? 0;
-      const median = medianAmount(earlier.map((key) => byMonth.get(key)?.get(categoryId) ?? 0), 1);
+      const median = roundToStep(medianAmount(earlier.map((key) => byMonth.get(key)?.get(categoryId) ?? 0), step), step);
       return { categoryId, median, delta: amount - median };
     })
     .filter((row) => row.delta > 0)

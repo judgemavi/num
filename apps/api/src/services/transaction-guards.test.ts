@@ -165,7 +165,7 @@ test("an archived account is rejected", () => {
     const chequing = account(book.db, "Chequing", "chequing");
     const savings = account(book.db, "Savings", "savings");
     const closed = account(book.db, "Closed", "cash");
-    archiveAccount(book.db, closed.id, { confirm: false, ...saved });
+    archiveAccount(book.db, closed.id, { asOf: "2026-10-07", confirm: false, ...saved });
 
     expectCode(
       () => createTransaction(book.db, lines(closed.id, -100, [{ amount: -100 }])),

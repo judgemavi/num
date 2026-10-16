@@ -158,23 +158,23 @@ test("archive of a non-zero balance needs confirmation", () => {
   try {
     const open = createAccount(book.db, base("chequing", 1000));
     expectCode(
-      () => archiveAccount(book.db, open.id, { confirm: false, source: "ui", at }),
+      () => archiveAccount(book.db, open.id, { asOf: "2026-10-07", confirm: false, source: "ui", at }),
       "archive_confirmation_required",
     );
-    const archived = archiveAccount(book.db, open.id, { confirm: true, source: "ui", at });
+    const archived = archiveAccount(book.db, open.id, { asOf: "2026-10-07", confirm: true, source: "ui", at });
     expect(archived.archivedAt).toBe(at);
     expect(archived.balance).toBe(1000);
 
     const settled = createAccount(book.db, { ...base("savings", 400), name: "Settled" });
     addTransaction(book.db, settled.id, "2026-04-01", -400);
-    const zero = archiveAccount(book.db, settled.id, { confirm: false, source: "ui", at });
+    const zero = archiveAccount(book.db, settled.id, { asOf: "2026-10-07", confirm: false, source: "ui", at });
     expect(zero.balance).toBe(0);
     expect(zero.archivedAt).toBe(at);
 
     const valued = createAccount(book.db, { ...base("property", 0), name: "House" });
     addValuation(book.db, valued.id, "2026-06-01", 2500000);
     expectCode(
-      () => archiveAccount(book.db, valued.id, { confirm: false, source: "ui", at }),
+      () => archiveAccount(book.db, valued.id, { asOf: "2026-10-07", confirm: false, source: "ui", at }),
       "archive_confirmation_required",
     );
   } finally {
@@ -228,7 +228,7 @@ test("the account list shows active accounts unless archived is requested", () =
   try {
     createAccount(book.db, { ...base("chequing"), name: "Open account" });
     const closed = createAccount(book.db, { ...base("savings"), name: "Closed account" });
-    archiveAccount(book.db, closed.id, { confirm: false, source: "ui", at });
+    archiveAccount(book.db, closed.id, { asOf: "2026-10-07", confirm: false, source: "ui", at });
 
     const active = listAccounts(book.db, { asOf: "2026-10-07", page: 1, pageSize: 50, archived: false });
     expect(active.total).toBe(1);

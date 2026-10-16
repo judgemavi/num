@@ -33,7 +33,7 @@ test("the 3 largest increases use the median of the previous 3 months", () => {
     });
     history.push(line("2026-04", -row.current, row.id, "expense"));
   }
-  const result = spendingIncreases("2026-04", history);
+  const result = spendingIncreases("2026-04", history, 10);
   expect(result.map((row) => row.categoryId)).toEqual([groceries, dining, fuel]);
   expect(result[0]).toMatchObject({ median: 2000, delta: 6000 });
   expect(result.some((row) => [rent, travel, gifts, hobbies].includes(row.categoryId))).toBe(false);
@@ -45,7 +45,7 @@ test("income, transfer and uncategorized lines are not category increases", () =
     line("2026-04", -9000, groceries, "expense", true),
     line("2026-04", -7000, null, null),
     line("2026-04", -3000, dining, "expense"),
-  ]);
+  ], 10);
   expect(result).toEqual([{ categoryId: dining, median: 0, delta: 3000 }]);
 });
 

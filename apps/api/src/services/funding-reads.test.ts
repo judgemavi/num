@@ -35,7 +35,7 @@ test("the forecast uses only open accounts from the shared on-budget balances", 
   try {
     account(book.db, "Example open cash", "chequing", 100_000);
     const archived = account(book.db, "Example archived cash", "chequing", 50_000);
-    archiveAccount(book.db, archived.id, { confirm: true, ...saved });
+    archiveAccount(book.db, archived.id, { asOf: "2026-10-07", confirm: true, ...saved });
     const reads = createFundingReads(book.db, "2026-10-08");
     expect(reads.position.onBudgetTotal).toBe(150_000);
     const forecast = forecastInput(book.db, "2026-10-08", reads.position.accountBalances);

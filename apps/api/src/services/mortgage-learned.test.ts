@@ -235,3 +235,29 @@ test("the mortgage view gives a negative balance that the view schema accepts", 
     sample.close();
   }
 });
+
+test("conflicting mortgage answers still give a Likely suggestion and review level", () => {
+  const sample = book();
+  try {
+    confirmSplit(sample, "2026-03-01", -581_600);
+    const otherMortgage = createAccount(sample.db, {
+      asOf, name: "Other mortgage", kind: "mortgage", openingDate: "2026-02-01", openingBalance: -100_000_000,
+      mortgageTerms: sample.terms, ...saved,
+    });
+    const interest = interestOn(sample, "2026-04-01");
+    createTransaction(sample.db, {
+      accountId: sample.account.id, date: "2026-04-01", amount: -581_600, payeeRaw: "STRIVE MTG",
+      lines: [
+        { amount: -interest, categoryId: sample.interest.id },
+        { amount: -581_600 + interest, transferAccountId: otherMortgage.id },
+      ], ...saved,
+    });
+    const next = open(sample.db, sample.account.id, "2026-05-01", -581_600);
+    const review = reviewOf(sample.db, next.id);
+    expect(review?.suggestion).toMatchObject({ mortgage: true, level: "likely" });
+    expect(review?.suggestion?.confidence).toBeLessThan(750);
+    expect(review?.level).toBe("likely");
+  } finally {
+    sample.close();
+  }
+});

@@ -28,9 +28,10 @@ export function accountOptionsQuery() {
 }
 
 export function accountQuery(id: string) {
+  const asOf = localAsOf();
   return queryOptions({
-    queryKey: ["account", id],
-    queryFn: () => unwrap(api.accounts[":id"].$get({ param: { id } })),
+    queryKey: ["account", id, asOf],
+    queryFn: () => unwrap(api.accounts[":id"].$get({ param: { id }, query: { asOf } })),
   });
 }
 
@@ -46,7 +47,7 @@ export function useSaveAccount() {
 export function useArchiveAccount() {
   return useArchiveWrite("Account archived.", accountError, ({ id, restore }) =>
     unwrap(
-      restore ? api.accounts[":id"].restore.$post({ param: { id } }) : api.accounts[":id"].archive.$post({ param: { id }, json: { confirm: true } }),
+      restore ? api.accounts[":id"].restore.$post({ param: { id } }) : api.accounts[":id"].archive.$post({ param: { id }, json: { confirm: true, asOf: localAsOf() } }),
     ),
   );
 }

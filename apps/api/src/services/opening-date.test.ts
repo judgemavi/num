@@ -74,7 +74,7 @@ test("an import of older rows moves the effective opening date", () => {
       ...saved,
     });
     expect(storedOpening(book.db, account.id)).toBeNull();
-    expect(getAccount(book.db, account.id)).toMatchObject({
+    expect(getAccount(book.db, account.id, "2026-10-07")).toMatchObject({
       openingDate: "2026-10-07",
       openingAutomatic: true,
       automaticOpeningDate: "2026-10-07",
@@ -82,14 +82,14 @@ test("an import of older rows moves the effective opening date", () => {
 
     importCsv(book.db, book.dir, account.id, "january.csv", ["01/15/2026,Shop,-12.50"]);
     expect(storedOpening(book.db, account.id)).toBeNull();
-    expect(getAccount(book.db, account.id)).toMatchObject({
+    expect(getAccount(book.db, account.id, "2026-10-07")).toMatchObject({
       openingDate: "2026-01-14",
       openingAutomatic: true,
       automaticOpeningDate: "2026-01-14",
     });
 
     importCsv(book.db, book.dir, account.id, "december.csv", ["12/01/2025,Older shop,-4.00"]);
-    expect(getAccount(book.db, account.id).openingDate).toBe("2025-11-30");
+    expect(getAccount(book.db, account.id, "2026-10-07").openingDate).toBe("2025-11-30");
   } finally {
     book.close();
   }
@@ -109,7 +109,7 @@ test("a user-set opening date does not move when older rows are imported", () =>
     });
     importCsv(book.db, book.dir, account.id, "january.csv", ["01/15/2026,Shop,-12.50"]);
     expect(storedOpening(book.db, account.id)).toBe("2026-06-01");
-    expect(getAccount(book.db, account.id)).toMatchObject({
+    expect(getAccount(book.db, account.id, "2026-10-07")).toMatchObject({
       openingDate: "2026-06-01",
       openingAutomatic: false,
       automaticOpeningDate: "2026-01-14",
@@ -127,7 +127,7 @@ test("an automatic opening uses the supplied local date on both sides of UTC mid
         name: "Cash", kind: "chequing", openingBalance: 0, source: "ui", at, asOf,
       });
       book.db.delete(auditLog).run();
-      expect(getAccount(book.db, account.id).automaticOpeningDate).toBe(asOf);
+      expect(getAccount(book.db, account.id, "2026-10-07").automaticOpeningDate).toBe(asOf);
       expect(book.db.select({ createdAt: accounts.createdAt, createdOn: accounts.createdOn }).from(accounts).get()).toEqual({ createdAt: at, createdOn: asOf });
     } finally {
       book.close();

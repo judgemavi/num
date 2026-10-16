@@ -111,8 +111,8 @@ function candidates(tx: WriteTx, row: Row) {
   return found.filter((other) => !decided.has(pairKey(row.id, other.id)));
 }
 
-/** The payee is a confirmed transfer from this account to the other account. An automatic link has an auto reason, so it does not count. */
-function learnedTransfer(tx: WriteTx, payee: string, fromAccountId: string, toAccountId: string) {
+/** The normalized payee is a confirmed transfer, in either direction. Automatic links do not teach. */
+function learnedTransfer(tx: WriteTx, payee: string) {
   if (payee.length === 0) {
     return false;
   }
@@ -125,8 +125,7 @@ function learnedTransfer(tx: WriteTx, payee: string, fromAccountId: string, toAc
         eq(transactions.payeeNormalized, payee),
         eq(transactions.mirror, literal(0)),
         isNull(transactions.autoReason),
-        eq(transactions.accountId, fromAccountId),
-        eq(transactionLines.transferAccountId, toAccountId),
+        hasTransferLine(transactions.id),
         eq(lineCount(transactions.id), literal(1)),
       ),
     )
@@ -157,7 +156,7 @@ export function linkTransferIfSure(tx: WriteTx, transactionId: string): void {
   if (!row.imported && !peer.imported) {
     return;
   }
-  if (!learnedTransfer(tx, row.payee, row.accountId, peer.accountId) && !learnedTransfer(tx, peer.payee, peer.accountId, row.accountId)) {
+  if (!learnedTransfer(tx, row.payee) && !learnedTransfer(tx, peer.payee)) {
     return;
   }
   linkTransferPair(tx, row.id, peer.id, null);

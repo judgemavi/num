@@ -111,6 +111,9 @@ function resolveParse(
       columnMap: request.columnMap,
     };
   }
+  if (request.presetId === "ofx") {
+    return { parser: "ofx", statement: parseOfxStatement(text, digits), presetId: "ofx", columnMap: null };
+  }
   if (request.presetId) {
     return {
       parser: "csv",

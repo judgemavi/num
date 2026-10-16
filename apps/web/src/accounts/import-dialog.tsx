@@ -125,7 +125,7 @@ export function ImportForm({ accountId }: EditorInput["import"]) {
 
   async function importAll() {
     dispatch({ type: "batchStarted", rows });
-    const result = await runImportBatch(rows, { presets, asOf: localAsOf(), post: importFile.mutateAsync, askForMap, onRow: changeRow });
+    const result = await runImportBatch(rows, { presets, accounts: loaded, asOf: localAsOf(), post: importFile.mutateAsync, askForMap, onRow: changeRow });
     if (result.stopped) {
       dispatch({ type: "batchStopped" });
       return;

@@ -44,6 +44,7 @@ function editor(answers: (ImportAnswer | Error)[], maps: ColumnMap[] = []) {
   const log = { posted, asked, changes };
   const io: Parameters<typeof runImportBatch>[1] = {
     presets: [],
+    accounts: [],
     asOf: "2026-03-10",
     post: async (input) => {
       log.posted.push({ name: input.file.name, columnMap: input.columnMap });

@@ -318,7 +318,7 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
         linkAutomatic(tx, newId);
       }
       autoLinkInTransaction(tx, input.asOf, input.accountId);
-      saveFormat(tx, input.accountId, input.presetId, input.columnMap);
+      saveFormat(tx, input.accountId, input.parser === "ofx" ? "ofx" : input.presetId, input.columnMap);
       const batch = tx.select().from(importBatches).where(eq(importBatches.id, batchId)).get();
       if (!batch) {
         throw new Error("Import batch is missing");

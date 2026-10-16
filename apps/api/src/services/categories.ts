@@ -3,6 +3,7 @@ import {
   categoryCreateSchema,
   categoryGroupCreateSchema,
   foldName,
+  nameKey,
   nextIdentityColor,
   utcNow,
   type Category,
@@ -73,7 +74,7 @@ export function createCategoryGroup(db: Db, input: CategoryGroupCreate & WriteIn
     const total = tx.select({ count: count() }).from(categoryGroups).get()?.count ?? 0;
     const row = { id, name: input.name.trim(), color: input.color ?? nextIdentityColor(total) };
     assertUniqueName(tx, categoryGroups, row.name, "group_name_taken");
-    tx.insert(categoryGroups).values({ ...row, sortKey: foldName(row.name) }).run();
+    tx.insert(categoryGroups).values({ ...row, sortKey: foldName(row.name), nameKey: nameKey(row.name) }).run();
     tx.audit({
       entity: "category_groups",
       entityId: id,
@@ -98,7 +99,7 @@ export function updateCategoryGroup(
     const merged = mergedWrite(categoryGroupCreateSchema, existing, input);
     const next = { name: merged.name, color: merged.color ?? existing.color };
     assertUniqueName(tx, categoryGroups, next.name, "group_name_taken", id);
-    tx.update(categoryGroups).set({ name: next.name, color: next.color, sortKey: foldName(next.name) }).where(eq(categoryGroups.id, id)).run();
+    tx.update(categoryGroups).set({ name: next.name, color: next.color, sortKey: foldName(next.name), nameKey: nameKey(next.name) }).where(eq(categoryGroups.id, id)).run();
     tx.audit({
       entity: "category_groups",
       entityId: id,
@@ -161,7 +162,7 @@ export function createCategory(db: Db, input: CategoryCreate & WriteInput): Cate
   write(db, { source: input.source, at: input.at }, (tx) => {
     assertGroup(tx, row.groupId);
     assertUniqueName(tx, categories, row.name, "category_name_taken");
-    tx.insert(categories).values({ ...row, sortKey: foldName(row.name) }).run();
+    tx.insert(categories).values({ ...row, sortKey: foldName(row.name), nameKey: nameKey(row.name) }).run();
     tx.audit({
       entity: "categories",
       entityId: id,
@@ -190,7 +191,7 @@ export function updateCategory(db: Db, id: string, input: CategoryUpdate & Write
     assertGroup(tx, next.groupId);
     assertUniqueName(tx, categories, next.name, "category_name_taken", id);
     tx.update(categories)
-      .set({ name: next.name, sortKey: foldName(next.name), kind: next.kind, groupId: next.groupId })
+      .set({ name: next.name, sortKey: foldName(next.name), nameKey: nameKey(next.name), kind: next.kind, groupId: next.groupId })
       .where(eq(categories.id, id))
       .run();
     tx.audit({

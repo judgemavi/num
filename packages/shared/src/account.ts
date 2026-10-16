@@ -156,6 +156,7 @@ export const accountCreateSchema = accountWriteFields.superRefine(cardAndRateOk)
 export const accountUpdateSchema = accountWriteFields.partial();
 
 export const archiveAccountSchema = z.object({
+  asOf: isoDateSchema,
   confirm: z.boolean().default(false),
 });
 

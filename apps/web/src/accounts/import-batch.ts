@@ -1,4 +1,4 @@
-import { chosenPresetId, firstStatementDate, orderByFirstDate, sampleCsvRows, type ColumnMap, type Preset } from "@num/shared";
+import { chosenPresetId, firstStatementDate, orderByFirstDate, sampleCsvRows, type ColumnMap, type Account, type Preset } from "@num/shared";
 import type { ImportFileRow } from "@/accounts/import-file-list";
 import { importError } from "@/accounts/import-format";
 import { rowNeedsColumnMap } from "@/accounts/import-prepare";
@@ -48,6 +48,7 @@ export function importBatchReducer(batch: ImportBatch, event: ImportBatchEvent):
 
 type BatchIo = {
   presets: readonly Preset[];
+  accounts: readonly Account[];
   /** Send one file to the API. */
   post: typeof importFile;
   asOf: string;
@@ -125,7 +126,7 @@ export async function runImportBatch(start: readonly ImportFileRow[], io: BatchI
     }
   }
 
-  for (const row of start.filter(rowNeedsColumnMap)) {
+  for (const row of start.filter((row) => rowNeedsColumnMap(row, io.accounts.find((account) => account.id === row.accountId)))) {
     const map = await io.askForMap(row, sampleCsvRows(row.text));
     if (!map) {
       return result(true);

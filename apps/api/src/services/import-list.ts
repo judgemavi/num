@@ -130,8 +130,8 @@ function loadItems(db: Db, where: SQL | undefined, newest: boolean, window?: { l
 export function listImportView(db: Db, query: ImportViewQuery) {
   const where = and(
     query.accountId ? eq(importBatches.accountId, query.accountId) : undefined,
-    query.from ? gte(sql`substr(${importBatches.createdAt}, 1, 10)`, query.from) : undefined,
-    query.to ? lte(sql`substr(${importBatches.createdAt}, 1, 10)`, query.to) : undefined,
+    query.from ? gte(importBatches.importedOn, query.from) : undefined,
+    query.to ? lte(importBatches.importedOn, query.to) : undefined,
     query.status ? sql`${statusSql} = ${query.status}` : undefined,
   );
   const items = loadItems(db, where, newestFirst(query), windowOf(query));

@@ -152,7 +152,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
 export function archiveAccount(
   db: Db,
   id: string,
-  input: { confirm: boolean } & WriteInput,
+  input: { confirm: boolean; asOf: string } & WriteInput,
 ): Account {
   const at = input.at ?? utcNow();
   return write(db, { source: input.source, at }, (tx) => {
@@ -160,7 +160,7 @@ export function archiveAccount(
     if (!existing) {
       throw new ServiceError("account_not_found", 404);
     }
-    const balance = balanceOf(tx, existing);
+    const balance = balanceOf(tx, existing, input.asOf);
     const next = setArchived(tx, accounts, existing, "accounts", at, {
       beforeChange: () => assertCanArchive(balance, input.confirm),
       snapshot: accountAuditSnapshot,
@@ -180,10 +180,10 @@ export function restoreAccount(db: Db, id: string, input: WriteInput): Account {
   });
 }
 
-export function getAccount(db: Db, id: string): Account {
+export function getAccount(db: Db, id: string, asOf: string): Account {
   const row = db.select().from(accounts).where(eq(accounts.id, id)).get();
   if (!row) {
     throw new ServiceError("account_not_found", 404);
   }
-  return toAccount(row, balanceOf(db, row), automaticOpening(db, id), valuationAccountIds(db, [id]).has(id));
+  return toAccount(row, balanceOf(db, row, asOf), automaticOpening(db, id), valuationAccountIds(db, [id]).has(id));
 }

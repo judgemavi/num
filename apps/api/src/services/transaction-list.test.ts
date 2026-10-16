@@ -53,7 +53,7 @@ function book() {
   const trip = createTag(db, { name: "Trip", ...saved });
   const merchantId = crypto.randomUUID();
   db.insert(merchants)
-    .values({ id: merchantId, name: "Blue Harbor", sortKey: "blue harbor", archivedAt: null })
+    .values({ id: merchantId, name: "Blue Harbor", sortKey: "blue harbor", nameKey: "blue harbor", archivedAt: null })
     .run();
   return { ...handle, db, chequing, savings, food, trip, merchantId };
 }
@@ -284,11 +284,11 @@ test("running balance follows valuation presence for every account kind", () => 
         asOf: "2026-10-07", name: kind, kind, openingDate: "2026-01-01", openingBalance: 50000, ...saved,
       });
       add(fixture.db, { accountId: account.id, date: "2026-02-01", amount: 2000, payeeRaw: "Adjustment" });
-      expect(getAccount(fixture.db, account.id).hasValuation).toBe(false);
+      expect(getAccount(fixture.db, account.id, "2026-10-07").hasValuation).toBe(false);
       const plain = listTransactions(fixture.db, { ...page, accountId: account.id });
       expect(plain.items[0]?.runningBalance).toBe(52000);
       fixture.db.insert(valuations).values({ id: crypto.randomUUID(), accountId: account.id, date: "2026-03-01", balance: 60000 }).run();
-      expect(getAccount(fixture.db, account.id).hasValuation).toBe(true);
+      expect(getAccount(fixture.db, account.id, "2026-10-07").hasValuation).toBe(true);
       const valued = listTransactions(fixture.db, { ...page, accountId: account.id });
       expect(valued.items).toHaveLength(1);
       expect(valued.items[0]?.runningBalance).toBeNull();

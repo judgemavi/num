@@ -55,6 +55,8 @@ const destructiveOperations = new Set([
   "post_accounts_id_archive",
   "post_accounts_id_bank_balances",
   "post_accounts_id_restore",
+  "post_buckets_id_events",
+  "post_buckets_id_cover",
   "post_buckets_id_events_eventid_undo",
   "post_funding_fill",
   "post_imports",

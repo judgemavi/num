@@ -1,9 +1,10 @@
 import type { InsightsSearch } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useDeferredValue, useMemo } from "react";
+import { useDeferredValue, useEffect, useMemo } from "react";
 import { insightsQuery } from "@/api/insights";
 import { localAsOf } from "@/as-of";
+import { useTags } from "@/editors/lookups";
 import { pageQuery } from "@/editors/page-search";
 
 const homeRoute = getRouteApi("/");
@@ -12,7 +13,15 @@ const homeRoute = getRouteApi("/");
 export function useSpendingSearch() {
   const urlSearch = homeRoute.useSearch();
   const navigate = homeRoute.useNavigate();
-  const search = useMemo(() => pageQuery(urlSearch), [urlSearch]);
+  const tags = useTags();
+  const invalidTag = urlSearch.tagId !== undefined && !tags.some((tag) => tag.id === urlSearch.tagId);
+  const search = useMemo(() => ({ ...pageQuery(urlSearch), ...(invalidTag ? { tagId: undefined } : {}) }), [urlSearch, invalidTag]);
+
+  useEffect(() => {
+    if (invalidTag) {
+      void navigate({ search: (prev) => ({ ...prev, tagId: undefined }), replace: true });
+    }
+  }, [invalidTag, navigate]);
 
   function patchSearch(patch: InsightsSearch) {
     void navigate({ search: (prev) => ({ ...prev, ...patch }) });

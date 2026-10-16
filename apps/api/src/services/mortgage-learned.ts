@@ -4,7 +4,6 @@ import {
   learnedConfidence,
   mortgagePrefillLines,
   mortgageSplitForDate,
-  reviewLevel,
   type LearnedRow,
   type Suggestion,
 } from "@num/shared";
@@ -116,7 +115,7 @@ export function mortgageLinesFor(db: Reader, mortgageAccountId: string, fromAcco
 
 export type MortgageRow = { payee: string; accountId: string; date: string; amount: number };
 
-/** The "Mortgage payment" suggestion for an uncategorized money-out row. Always Likely at most. */
+/** The "Mortgage payment" suggestion for an uncategorized money-out row. Always Likely. */
 export function mortgageSuggestion(
   db: Reader,
   hit: MortgageHit | null,
@@ -126,16 +125,12 @@ export function mortgageSuggestion(
     return null;
   }
   const confidence = confidenceMilli(hit.confidence);
-  const level = reviewLevel(false, confidence);
-  if (level === "none") {
-    return null;
-  }
   return {
     merchantId: null,
     categoryId: null,
     transferAccountId: hit.accountId,
     reason: hit.similarTo ? "similar" : "learned_payee",
-    level,
+    level: "likely",
     sourceId: hit.sourceId,
     confidence,
     mortgage: true,

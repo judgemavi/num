@@ -45,7 +45,7 @@ function poolShort(db: Db, asOf: string, reads: FundingReads) {
     asOf,
     dates: forecastDates(asOf),
     unassigned,
-    flows: [...input.flows, ...input.transfersOut],
+    flows: input.flows,
     balances,
     step,
   });

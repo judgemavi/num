@@ -1,6 +1,7 @@
 import { merchants, type MerchantRow } from "@num/db";
 import {
   foldName,
+  nameKey,
   merchantCreateSchema,
   utcNow,
   type Merchant,
@@ -51,7 +52,7 @@ export function createMerchant(db: Db, input: MerchantCreate & WriteInput): Merc
   };
   write(db, { source: input.source, at: input.at }, (tx) => {
     assertUniqueName(tx, merchants, row.name, "merchant_name_taken");
-    tx.insert(merchants).values({ ...row, sortKey: foldName(row.name) }).run();
+    tx.insert(merchants).values({ ...row, sortKey: foldName(row.name), nameKey: nameKey(row.name) }).run();
     tx.audit({ entity: "merchants", entityId: id, action: "create", before: null, after: withoutId(row) });
   });
   return row;
@@ -65,7 +66,7 @@ export function updateMerchant(db: Db, id: string, input: MerchantUpdate & Write
       archivedAt: existing.archivedAt,
     };
     assertUniqueName(tx, merchants, next.name, "merchant_name_taken", id);
-    tx.update(merchants).set({ name: next.name, sortKey: foldName(next.name) }).where(eq(merchants.id, id)).run();
+    tx.update(merchants).set({ name: next.name, sortKey: foldName(next.name), nameKey: nameKey(next.name) }).where(eq(merchants.id, id)).run();
     tx.audit({
       entity: "merchants",
       entityId: id,

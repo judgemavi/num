@@ -55,10 +55,10 @@ test("after the last valuation is deleted the balance and bank status use transa
     }
     createBankBalance(book.db, account.id, { date: "2026-03-01", balance: 14_000, ...saved });
     const valuation = createValuation(book.db, account.id, entry);
-    expect(getAccount(book.db, account.id).balance).toBe(52_000);
+    expect(getAccount(book.db, account.id, "2026-10-07").balance).toBe(52_000);
     expect(listBankBalances(book.db, account.id).status?.difference).toBe(38_000);
     deleteValuation(book.db, account.id, valuation.id, saved);
-    expect(getAccount(book.db, account.id).balance).toBe(14_000);
+    expect(getAccount(book.db, account.id, "2026-10-07").balance).toBe(14_000);
     expect(listBankBalances(book.db, account.id).status?.difference).toBe(0);
   } finally { book.close(); }
 });

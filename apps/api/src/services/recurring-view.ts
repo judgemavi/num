@@ -139,11 +139,11 @@ function covers(schedule: ScheduleView, proposal: PlanProposal) {
   if (proposal.merchantId || schedule.merchantId) {
     return schedule.merchantId === proposal.merchantId;
   }
-  if (proposal.transferAccountId || schedule.transferAccountId) {
-    return schedule.transferAccountId === proposal.transferAccountId;
-  }
   if (proposal.categoryId || schedule.categoryId) {
     return schedule.categoryId === proposal.categoryId;
+  }
+  if (proposal.transferAccountId || schedule.transferAccountId) {
+    return schedule.transferAccountId === proposal.transferAccountId;
   }
   return withinTolerance(proposal.expectedAmount, schedule.expectedAmount, schedule.tolerance);
 }

@@ -316,3 +316,19 @@ test("Approve confirms an automatic pair as one transfer", () => {
     expect(rowsOf(db, 50_000)[0]?.autoReason).toBeNull();
   });
 });
+
+
+test("a payee learned in the opposite direction links the only imported pair", () => {
+  withBook((db, ids) => {
+    createTransaction(db, {
+      accountId: ids.savings, date: "2026-01-05", amount: -10_000, payeeRaw: "MOVE FUNDS",
+      lines: [{ amount: -10_000, transferAccountId: ids.cheque }], ...saved,
+    });
+    pairImport(db, ids, "MOVE FUNDS", "DEPOSIT");
+    const [out] = rowsOf(db, -50_000);
+    const [incoming] = rowsOf(db, 50_000);
+    expect(out?.transferPeerId).toBe(incoming?.id ?? "missing");
+    expect(incoming?.transferPeerId).toBe(out?.id ?? "missing");
+    expect(out?.autoReason).toBe("transfer_match");
+  });
+});

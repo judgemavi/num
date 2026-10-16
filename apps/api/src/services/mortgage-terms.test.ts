@@ -87,7 +87,7 @@ test("saving terms fixes the opening date, and leaving the terms out keeps them"
   const sample = book();
   try {
     const mortgage = createAccount(sample.db, { asOf: "2026-10-07", name: "Home loan", kind: "mortgage", openingBalance: -100_000_000, ...saved });
-    expect(getAccount(sample.db, mortgage.id).openingAutomatic).toBe(true);
+    expect(getAccount(sample.db, mortgage.id, "2026-10-07").openingAutomatic).toBe(true);
     const withTerms = updateAccount(sample.db, mortgage.id, mortgageFields(-100_000_000, sample.terms));
     expect(withTerms.openingAutomatic).toBe(false);
     expect(withTerms.openingDate).toBe("2026-02-01");
@@ -170,7 +170,7 @@ test("a mortgage with terms gets no opening balance suggestion, and the apply is
     expect(importOpeningSuggestion(sample.db, mortgage.id, row)).toBeNull();
     expect(bankOpeningSuggestion(sample.db, mortgage, { date: "2026-04-02", balance: -90_000_000 }, -100_000_000)).toBeNull();
     expect(() => updateAccount(sample.db, mortgage.id, { openingBalance: -90_000_000, openingDate: "2026-04-01", ...saved })).toThrow();
-    expect(getAccount(sample.db, mortgage.id).openingDate).toBe("2026-02-01");
+    expect(getAccount(sample.db, mortgage.id, "2026-10-07").openingDate).toBe("2026-02-01");
     const plain = createAccount(sample.db, { asOf: "2026-10-07", name: "Plain", kind: "mortgage", openingBalance: -100_000_000, ...saved });
     expect(importOpeningSuggestion(sample.db, plain.id, row)).not.toBeNull();
   } finally {

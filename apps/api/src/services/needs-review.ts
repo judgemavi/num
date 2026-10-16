@@ -63,7 +63,7 @@ function loadBases(db: Db, ids: readonly string[]) {
 
 /** A row is Likely only when Approve can apply its suggestion. Other rows with a suggestion are Maybe. */
 function rowLevel(row: Base, automatic: boolean, suggestion: Suggestion | null) {
-  const level = reviewLevel(automatic, suggestion ? suggestion.confidence : null);
+  const level = suggestion?.mortgage && !automatic ? "likely" : reviewLevel(automatic, suggestion ? suggestion.confidence : null);
   if (level !== "likely") {
     return level;
   }

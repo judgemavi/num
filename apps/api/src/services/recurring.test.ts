@@ -2,8 +2,9 @@ import { expectCode } from "./test-support";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { merchants, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
-import { foldName, storedPayee } from "@num/shared";
+import { schedules, merchants, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
+import { nameKey, foldName, storedPayee } from "@num/shared";
+import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
 import { createAccount } from "./accounts";
@@ -46,7 +47,7 @@ function account(db: ReturnType<typeof tempDatabase>["db"], name = "Chequing") {
 
 function merchant(db: ReturnType<typeof tempDatabase>["db"], name: string) {
   const id = crypto.randomUUID();
-  db.insert(merchants).values({ id, name, sortKey: foldName(name), archivedAt: null }).run();
+  db.insert(merchants).values({ id, name, sortKey: foldName(name), nameKey: nameKey(name), archivedAt: null }).run();
   return id;
 }
 
@@ -254,6 +255,7 @@ test("a payment with no merchant is detected by its category until a plan with t
   const { db, close } = tempDatabase();
   try {
     const chequing = account(db);
+    const target = account(db, "Target");
     const rent = createCategory(db, { name: "Rent", kind: "expense", source: "ui", at });
     for (const date of ["2026-07-02", "2026-08-04", "2026-09-01", "2026-10-01"]) {
       createTransaction(db, {
@@ -271,7 +273,7 @@ test("a payment with no merchant is detected by its category until a plan with t
     expect(proposals).toHaveLength(1);
     expect(proposals[0]).toMatchObject({ merchantId: null, categoryId: rent.id, freq: "monthly", expectedAmount: -1_800_000 });
 
-    createSchedule(db, {
+    const plan = createSchedule(db, {
       name: "Rent",
       kind: "commitment",
       accountId: chequing.id,
@@ -287,6 +289,8 @@ test("a payment with no merchant is detected by its category until a plan with t
       source: "ui",
       at,
     });
+    // A stored schedule with both fields still covers the category before its transfer target.
+    db.update(schedules).set({ transferAccountId: target.id }).where(eq(schedules.bucketId, plan.id)).run();
     expect(recurringSignals(db, "2026-10-14").proposals).toEqual([]);
   } finally {
     close();
