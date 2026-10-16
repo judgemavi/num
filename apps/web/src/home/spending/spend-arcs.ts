@@ -1,6 +1,6 @@
 import type { InsightGroupRow, InsightRow } from "@num/shared";
 
-import { hueColor, noGroupColor } from "@/components/hue";
+import { debtPaymentColor, hueColor, noGroupColor } from "@/components/hue";
 
 export type SliceColor = { value: string };
 
@@ -22,11 +22,12 @@ export function rowKey(row: InsightRow): string {
 }
 
 function groupColor(group: InsightGroupRow): SliceColor {
+  if (group.kind === "debt") return { value: debtPaymentColor.chart };
   return { value: group.kind === "uncategorized" ? "var(--est)" : (group.color === null ? noGroupColor : hueColor[group.color]).chart };
 }
 
 export function categoryColor(group: InsightGroupRow, index: number): SliceColor {
-  const palette = group.color === null ? noGroupColor : hueColor[group.color];
+  const palette = group.kind === "debt" ? debtPaymentColor : group.color === null ? noGroupColor : hueColor[group.color];
   return { value: palette.shades[index % palette.shades.length] ?? palette.chart };
 }
 

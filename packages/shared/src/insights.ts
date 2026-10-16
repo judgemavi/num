@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { identityColors } from "./identity";
 import { isoDateSchema } from "./date";
-import { optionalQuery, queryDate, queryId, queryIdOrNone } from "./list";
+import { optionalQuery, queryDate, queryId } from "./list";
 import { isMonthKey } from "./month";
 import { amountSchema as money } from "./money";
 
@@ -18,14 +18,14 @@ type InsightListMode = (typeof insightListModes)[number];
 
 export const defaultInsightListMode: InsightListMode = "groups";
 
-const insightRowKinds = ["item", "none", "uncategorized"] as const;
+const insightRowKinds = ["item", "none", "uncategorized", "debt", "account"] as const;
 
 const insightsSearchFields = z.object({
   window: optionalQuery(z.enum(insightWindows)),
   from: queryDate,
   to: queryDate,
   month: optionalQuery(z.string().refine(isMonthKey)),
-  group: queryIdOrNone,
+  group: optionalQuery(z.union([z.uuid(), z.literal("none"), z.literal("debt")])),
   category: queryId,
   tagId: queryId,
   by: optionalQuery(z.enum(insightListModes)),
@@ -95,6 +95,7 @@ export const insightsSchema = z.object({
   savings: money.nullable(),
   savingsRateMilliPct: z.number().int().nullable(),
   groups: z.array(groupRowSchema),
+  debtPayments: z.array(z.object({ accountId: z.uuid(), amount: money })),
   timeline: timelineSchema,
 });
 

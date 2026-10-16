@@ -47,7 +47,7 @@ export function spendTotals(facts: readonly LedgerLine[], period: Period) {
     if (isIncomeLine(fact)) {
       income += fact.amount;
     }
-    if (isExpenseLine(fact)) {
+    if (isExpenseLine(fact) || fact.debtAccountId !== null) {
       spending += expenseSpending(fact.amount);
     }
   }
@@ -86,4 +86,16 @@ export function groupRows(facts: readonly LedgerLine[], period: Period, colors: 
     rows.push({ id: null, kind: "uncategorized", amount: flows.spent, inflow: flows.inflow, color: null, categories: [] });
   }
   return rows;
+}
+
+/** Principal paid from an on-budget account, by mortgage or loan account. */
+export function debtPaymentRows(facts: readonly LedgerLine[], period: Period) {
+  const totals = new Map<string, number>();
+  for (const fact of facts) {
+    if (inPeriod(fact, period) && fact.debtAccountId !== null) {
+      addTo(totals, fact.debtAccountId, -fact.amount);
+    }
+  }
+  return [...totals].map(([accountId, amount]) => ({ accountId, amount }))
+    .sort((a, b) => b.amount - a.amount || (a.accountId < b.accountId ? -1 : a.accountId > b.accountId ? 1 : 0));
 }

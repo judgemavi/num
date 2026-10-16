@@ -229,10 +229,11 @@ The terms do not create transactions.
 - Lists of groups and categories sort by name, without case. There is no manual order.
 - The user can delete a group. After a confirmation, its categories move to no group.
 - The user can change the kind of a category only when no transaction line uses it and it is not in a bucket.
-- **Spending** = the sum of the lines in expense categories.
-  A refund is a positive line in an expense category. A refund decreases spending.
+- **Spending** = expense category lines + debt payments. A debt payment is a negative line in an on-budget account
+  that transfers to a mortgage or loan account: principal of a loan payment or an extra payment. Count only the
+  on-budget side. A refund is a positive expense line and decreases spending.
 - **Income** = the sum of the lines in income categories.
-- Transfers are not spending. Transfers are not income.
+- Other transfers are not spending. Transfers are not income, including money in from a mortgage or loan.
 
 ### 5.4 Transaction and lines
 
@@ -373,7 +374,7 @@ Settings for each kind:
 - `goal`: `target`, `targetDate?`, `fixedAmount?`. The monthly amount is the shortfall over the months until the target date.
   If there is no target date, the goal has a fixed amount for each month (§7.6).
 - `emergency`: `months` (default 3). A book has exactly one emergency bucket. It has no categories. The setup makes it
-  (§7.0). Target = `months` × the monthly essential spending (§7.6). The user can change the name, the colour, the icon,
+  (§7.0). Target = `months` × the monthly essential cost (§7.6). The user can change the name, the colour, the icon,
   the priority and the settings. The user cannot make a second one.
 
 Bucket events (append only):
@@ -858,7 +859,7 @@ at unlinked, not deleted transactions from the last 90 days from `asOf`. Each tr
    - Emergency: `target − balance`, minimum 0. The balance is the balance on `asOf`, thus it includes the funding of
      the month, and owed is this amount.
    Round each amount up to a whole minor unit of the currency (§4).
-2. **Emergency target.** Target = `months` × the monthly essential spending. The monthly essential spending is the median
+2. **Emergency target.** Target = `months` × the monthly essential cost. The monthly essential cost is the median
    of the last 6 complete months before the date of the calculation. A month counts when it has expense lines in the
    transactions that are linked to active essential commitments (the full amount) or expense lines in the categories of the active
    essential spending buckets. Only commitments and spending buckets have `essential` (§5.8). Count each transaction one
@@ -938,7 +939,8 @@ A card payment is a transfer between two on-budget accounts. It does not change 
 
 **Output:**
 - The total of each day.
-- The monthly income and spending of the 90 days. Do not show daily values after 90 days.
+- The monthly income and spending of the 90 days. Include the full expected amount of unlinked commitments paid
+  by transfer to a mortgage or loan. Other transfers are not spending. Do not show daily values after 90 days.
 
 The timeline (§9) shows the forecast. The pool check (§10) uses the same occurrences and variable spending.
 
@@ -964,7 +966,7 @@ Spending is a part of Home (§14). It has no screen of its own.
   list has the active tags, then the archived tags with "(archived)" after the name. With a tag selected, the summary,
   the timeline, the donut and the list of groups and categories use only the spending lines that have that tag. A line
   with more than one tag counts in full for each of its tags. A refund line with the tag decreases the spending.
-  Transfers are not spending. The URL keeps the tag (`tagId`), as it keeps the period. A tag id that is not valid goes
+  The URL keeps the tag (`tagId`), as it keeps the period. A tag id that is not valid goes
   back to the default. The spending report query of the API takes an optional `tagId`. With a tag, the report has no
   income, no savings and no savings rate. The Needs you checks (§10) do not use the tag.
 - **Clear.** One "Clear" button in the row of the period selector and the tag selector. It shows only when a month
@@ -972,13 +974,17 @@ Spending is a part of Home (§14). It has no screen of its own.
   and the tag. It does not change the period or the "Groups | Categories" choice of the list.
 - **Timeline.** One chart: monthly income and spending bars.
   After `asOf`, it shows the forecast (§8, 90 days): the bar of the month of `asOf` has an actual part and a forecast
-  part. Forecast income is the unlinked income occurrences. Forecast spending is the unlinked commitments and the
-  variable spending. Card payments are not spending. A click on a month bar limits the breakdowns to that month.
+  part. Forecast income and spending follow §8. Card payments are not spending.
+  A click on a month bar limits the breakdowns to that month.
   With a tag selected, the timeline shows only the spending bars. It shows no income bars and no forecast part. A
   forecast has no tags.
 - **Spending donut.** Two rings. The inner ring is the groups. The outer ring is the categories, each inside the arc
   of its group. Groups and categories go largest first. Categories with no group are one inner slice, "No group".
-  Uncategorized lines are one inner slice, "Uncategorized", that cannot be selected. A group or category with spending
+  Debt payments are one fixed inner slice, "Debt payments"; its outer slices are the mortgage and loan accounts,
+  with their display names (§5.1). Select it as a group to show its accounts in the list. "Categories" includes one
+  row for each of these accounts. A click on an account row or outer slice opens Transactions for that account and
+  period. The spending report returns debt payments separately by account id, as integers; the browser makes the text.
+  Uncategorized lines are one inner slice, "Uncategorized", that cannot be selected. A group, category or account with spending
   of 0 or less is not a slice, but it stays in the list. A click on a group highlights it and limits the list to its
   categories.
   A click on a category limits the timeline to that category. On a wide screen, the timeline and the

@@ -42,6 +42,7 @@ Put these in `apps/web/src/index.css` as CSS variables. Map them to the shadcn v
 | pos-soft | `#E4F2E9` | positive pill fill |
 | est | `#7C7B88` | neutral chart colour (Uncategorized) |
 | no-group | `#A9A8B3` | neutral chart colour (No group) |
+| debt-payments | `#8C6D46` | fixed chart colour (Debt payments) |
 | row-hover | `#EFEFFC` | list row hover |
 | scrim | `rgb(23 23 28 / .45)` | dialog overlay |
 | shadow | `0 1px 2px rgb(0 0 0/.05), 0 16px 40px rgb(23 23 28/.14)` | dialogs, popovers, the action bar |
@@ -203,7 +204,7 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 
 **Full height:** the app shell fills the viewport height. The desktop sidebar is full height and stays in place when the page scrolls.
 
-**Charts:** use the identity palette, `est` and `attn`.
+**Charts:** use the identity palette and the fixed chart colours below.
 - Spending timeline (Home): income bars use teal shade 3 (`#21AF9B`), spending bars use ocean shade 1 (`#425FA9`).
   Forecast bars use the same colour at a lower opacity (lighter tone).
   When the forecast ends inside a month, the forecast part of that bar also has a dashed outline in the same colour.
@@ -211,6 +212,7 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 - Spending donut: two rings. The inner ring is the groups. Each slice uses its group's chart colour at full opacity.
   The outer ring is the categories. Each uses its group's shades in order, darkest first, repeating after five.
   "No group" uses `no-group`; its categories mix that grey with 5%, 10%, 15%, 20% and 25% white, then repeat.
+  "Debt payments" uses `debt-payments`; its accounts mix that colour with 5%, 10%, 15%, 20% and 25% white, then repeat.
   "Uncategorized" is `est`. Keep white separators between slices. The list dots use the same colours as the slices.
   A slice has a hover tooltip in the style of the timeline tooltip.
 

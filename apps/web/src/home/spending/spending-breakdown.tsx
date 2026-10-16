@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { choiceIn } from "@/components/choice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useCategoryNames, useGroupNames } from "@/editors/lookups";
+import { useAccountLabels, useCategoryNames, useGroupNames } from "@/editors/lookups";
 import { CategorySpendList } from "@/home/spending/category-spend-list";
 import { monthTitle } from "@/home/spending/format";
 import { rowKey, spendArcs, type Arc } from "@/home/spending/spend-arcs";
@@ -11,7 +11,7 @@ import { SpendDonut } from "@/home/spending/spend-donut";
 import { useSpendingReport, useSpendingSearch } from "@/home/spending/use-spending";
 
 function idOrNone(row: InsightRow) {
-  return row.kind === "none" ? "none" : (row.id ?? undefined);
+  return row.kind === "debt" ? "debt" : row.kind === "none" ? "none" : (row.id ?? undefined);
 }
 
 /** The arcs, the selected group and the actions of the spending donut. The donut card and the list call this hook. */
@@ -20,16 +20,26 @@ function useSpendSelection() {
   const { data, search, patchSearch } = useSpendingReport();
   const groupNames = useGroupNames();
   const categoryNames = useCategoryNames();
+  const accountLabels = useAccountLabels();
+  const groups: InsightGroupRow[] = [...data.groups];
+  if (data.debtPayments.length > 0) {
+    groups.push({
+      id: null, kind: "debt", color: null, inflow: null,
+      amount: data.debtPayments.reduce((sum, row) => sum + row.amount, 0),
+      categories: data.debtPayments.map((row) => ({ id: row.accountId, kind: "account", amount: row.amount, inflow: null, increase: null })),
+    });
+    groups.sort((a, b) => b.amount - a.amount);
+  }
   const category = search.category ?? null;
-  const { arcs, colors } = spendArcs(data.groups);
-  const categoryGroup = category ? data.groups.find((group) => group.categories.some((row) => row.id === category)) : undefined;
-  const selectedGroup = categoryGroup ?? (search.group ? data.groups.find((group) => idOrNone(group) === search.group) : undefined);
+  const { arcs, colors } = spendArcs(groups);
+  const categoryGroup = category ? groups.find((group) => group.categories.some((row) => row.id === category)) : undefined;
+  const selectedGroup = categoryGroup ?? (search.group ? groups.find((group) => idOrNone(group) === search.group) : undefined);
   const selectedKey = selectedGroup ? `${selectedGroup.kind}-${selectedGroup.id ?? ""}` : null;
 
   const groupName = (row: InsightRow) =>
-    row.kind === "uncategorized" ? "Uncategorized" : row.kind === "none" ? "No group" : (groupNames.get(row.id ?? "") ?? "Unknown");
-  const categoryName = (row: InsightRow) => categoryNames.get(row.id ?? "") ?? "Unknown";
-  const parentName = (arc: Arc) => groupName(data.groups.find((group) => `${group.kind}-${group.id ?? ""}` === arc.groupKey) ?? arc.row);
+    row.kind === "debt" ? "Debt payments" : row.kind === "uncategorized" ? "Uncategorized" : row.kind === "none" ? "No group" : (groupNames.get(row.id ?? "") ?? "Unknown");
+  const categoryName = (row: InsightRow) => (row.kind === "account" ? accountLabels : categoryNames).get(row.id ?? "") ?? "Unknown";
+  const parentName = (arc: Arc) => groupName(groups.find((group) => `${group.kind}-${group.id ?? ""}` === arc.groupKey) ?? arc.row);
 
   /** Open the transactions of the period and the tag of the report that match the filter. */
   function openTransactions(filter: Partial<TransactionFilter>) {
@@ -37,7 +47,9 @@ function useSpendSelection() {
   }
 
   function selectArc(arc: Arc) {
-    if (arc.ring === "category") {
+    if (arc.row.kind === "account") {
+      openTransactions({ accountId: arc.row.id ?? undefined });
+    } else if (arc.ring === "category") {
       patchSearch({ category: arc.row.id === category ? undefined : (arc.row.id ?? undefined) });
     } else if (search.group === idOrNone(arc.row) && !category) {
       patchSearch({ group: undefined, category: undefined });
@@ -60,7 +72,7 @@ function useSpendSelection() {
     return arc.ring === "category" ? arc.row.id === category : !category && search.group === idOrNone(arc.row);
   }
 
-  return { data, search, patchSearch, arcs, colors, category, selectedGroup, groupName, categoryName, parentName, openTransactions, selectArc, isLit, isPressed };
+  return { data, groups, search, patchSearch, arcs, colors, category, selectedGroup, groupName, categoryName, parentName, openTransactions, selectArc, isLit, isPressed };
 }
 
 export function SpendDonutCard() {
@@ -115,7 +127,7 @@ function ListModeToggle() {
  * and highlights the selected category. A month bar limits it to that month.
  */
 export function SelectedSpendList() {
-  const { data, search, colors, category, selectedGroup, groupName, categoryName, openTransactions } = useSpendSelection();
+  const { groups, search, colors, category, selectedGroup, groupName, categoryName, openTransactions, patchSearch } = useSpendSelection();
   // Each category uses the same shade in the list and the donut.
   const categoryRow = (row: InsightGroupRow["categories"][number]) => ({
     key: rowKey(row),
@@ -125,7 +137,7 @@ export function SelectedSpendList() {
     inflow: null,
     color: colors.get(rowKey(row)),
     current: category !== null && row.id === category,
-    onOpen: () => openTransactions({ categoryId: row.id ?? undefined }),
+    onOpen: () => openTransactions(row.kind === "account" ? { accountId: row.id ?? undefined } : { categoryId: row.id ?? undefined }),
   });
   const groupRow = (row: InsightGroupRow) => ({
     key: rowKey(row),
@@ -135,18 +147,24 @@ export function SelectedSpendList() {
     inflow: row.kind === "uncategorized" ? (row.inflow ?? 0) : null,
     color: colors.get(rowKey(row)),
     current: false,
-    onOpen: () => openTransactions(row.kind === "uncategorized" ? { uncategorized: true } : { groupId: idOrNone(row) }),
+    onOpen: () => {
+      if (row.kind === "debt") {
+        patchSearch({ group: "debt", category: undefined });
+      } else {
+        openTransactions(row.kind === "uncategorized" ? { uncategorized: true } : { groupId: row.kind === "none" ? "none" : (row.id ?? undefined) });
+      }
+    },
   });
   const byCategory = (search.by ?? defaultInsightListMode) === "categories";
   // Uncategorized has no categories. It stays in the flat list as one row, thus the list shows all spending.
   const rows = selectedGroup
     ? selectedGroup.categories.map((row) => categoryRow(row))
     : byCategory
-      ? data.groups
+      ? groups
           .map((group) => (group.kind === "uncategorized" ? [groupRow(group)] : group.categories.map((row) => categoryRow(row))))
           .flat()
           .sort((a, b) => b.amount - a.amount)
-      : data.groups.map(groupRow);
+      : groups.map(groupRow);
   const title = [search.month ? monthTitle(search.month) : null, selectedGroup ? groupName(selectedGroup) : null].filter(Boolean).join(": ") || "Groups and categories";
   return (
     <CategorySpendList

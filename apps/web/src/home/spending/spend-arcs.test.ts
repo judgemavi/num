@@ -70,3 +70,21 @@ test("only rows with an arc get a coloured dot", () => {
   const { colors } = spendArcs([positive, zero, negative]);
   expect([...colors.keys()]).toEqual(["item-positive", "item-spent"]);
 });
+
+test("debt account arcs fill the fixed debt slice and keep separate keys from category rows", () => {
+  const debt: InsightGroupRow = {
+    id: null, kind: "debt", color: null, inflow: null, amount: 800_000,
+    categories: [
+      { id: "mortgage", kind: "account", amount: 600_000, inflow: null, increase: null },
+      { id: "loan", kind: "account", amount: 200_000, inflow: null, increase: null },
+    ],
+  };
+  const { arcs, colors } = spendArcs([debt, group("interest", [item("mortgage", 200_000)])]);
+  expect(arcs[0]).toMatchObject({ key: "debt-", start: 0, end: 0.8 });
+  expect(arcs[1]).toMatchObject({ key: "account-mortgage", groupKey: "debt-", start: 0, end: 0.6, ofGroup: 0.75 });
+  expect(arcs[2]).toMatchObject({ key: "account-loan", start: 0.6, end: 0.8, ofGroup: 0.25 });
+  expect(colors.get("debt-")?.value).toBe("var(--color-debt-payments)");
+  expect(colors.get("account-mortgage")?.value).toBe("var(--color-debt-payments-1)");
+  expect(colors.get("account-loan")?.value).toBe("var(--color-debt-payments-2)");
+  expect(colors.get("item-mortgage")?.value).toBe("var(--color-sky-1)");
+});

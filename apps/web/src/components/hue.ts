@@ -47,3 +47,9 @@ export const noGroupColor = {
   chart: "var(--color-no-group)",
   shades: ["var(--color-no-group-1)", "var(--color-no-group-2)", "var(--color-no-group-3)", "var(--color-no-group-4)", "var(--color-no-group-5)"],
 };
+
+/** The fixed Debt payments slice and its account shades. */
+export const debtPaymentColor = {
+  chart: "var(--color-debt-payments)",
+  shades: ["var(--color-debt-payments-1)", "var(--color-debt-payments-2)", "var(--color-debt-payments-3)", "var(--color-debt-payments-4)", "var(--color-debt-payments-5)"],
+};

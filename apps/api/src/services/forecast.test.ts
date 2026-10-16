@@ -227,7 +227,7 @@ test("monthly SQL sums keep the line outlier limit, missing months and refunds",
   }
 });
 
-test("loan commitments leave the pool without adding forecast spending", () => {
+test("loan commitments count as forecast spending and leave the pool once", () => {
   const book = tempDatabase();
   try {
     const cash = cashAccount(book.db, "Cash", 5_000);
@@ -241,8 +241,8 @@ test("loan commitments leave the pool without adding forecast spending", () => {
       });
     }
     const forecast = readForecast(book.db, "2026-10-01");
-    expect(forecast.months.find((month) => month.month === "2026-10")?.spending).toBe(0);
-    expect(forecast.months.find((month) => month.month === "2026-11")?.spending).toBe(0);
+    expect(forecast.months.find((month) => month.month === "2026-10")?.spending).toBe(10_000);
+    expect(forecast.months.find((month) => month.month === "2026-11")?.spending).toBe(10_000);
     expect(forecast.total[forecast.dates.indexOf("2026-10-15")]).toBe(-5_000);
     const pool = poolChecks(book.db, "2026-10-01").find((check) => check.code === "pool_short");
     expect(pool).toMatchObject({ pass: false, date: "2026-10-15", short: 25_000 });

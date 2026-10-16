@@ -6,6 +6,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+    --color-debt-payments: #8C6D46;
+    --color-debt-payments-1: color-mix(in srgb, var(--color-debt-payments) 95%, white);
+    --color-debt-payments-2: color-mix(in srgb, var(--color-debt-payments) 90%, white);
+    --color-debt-payments-3: color-mix(in srgb, var(--color-debt-payments) 85%, white);
+    --color-debt-payments-4: color-mix(in srgb, var(--color-debt-payments) 80%, white);
+    --color-debt-payments-5: color-mix(in srgb, var(--color-debt-payments) 75%, white);
+
     --color-no-group: #A9A8B3;
     --color-no-group-1: color-mix(in srgb, var(--color-no-group) 95%, white);
     --color-no-group-2: color-mix(in srgb, var(--color-no-group) 90%, white);

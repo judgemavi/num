@@ -5,7 +5,7 @@ import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { loadLedgerLines } from "./ledger-lines";
 import { breakdownRange, firstTransactionDate, windowPeriod } from "./insights-period";
-import { groupRows, spendTotals } from "./insights-spend";
+import { debtPaymentRows, groupRows, spendTotals } from "./insights-spend";
 import { readTimeline } from "./insights-timeline";
 import { readSpendingIncreases } from "./spending-increases";
 
@@ -52,6 +52,7 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
     savings: tagId ? null : totals.savings,
     savingsRateMilliPct: tagId ? null : totals.savingsRateMilliPct,
     groups,
+    debtPayments: debtPaymentRows(facts, range),
     timeline: readTimeline(db, facts, period, query.asOf, { categoryId: query.category ?? null, tagged: tagId !== null }),
   };
 }

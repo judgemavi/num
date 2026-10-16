@@ -10,7 +10,7 @@ import {
   type ForecastFlow,
   type ForecastInput,
 } from "@num/shared";
-import { and, eq, gt, isNull, lte } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
 import { spendingCaps, unbucketedSpending } from "./forecast-spending";
 import { balancesOf } from "./account-balance";
@@ -18,11 +18,11 @@ import { lastCompleteMonths } from "./complete-months";
 import { bookStep } from "./book-step";
 import { activeSchedules, scheduleAmounts, type ScheduleView } from "./schedules";
 
-function scheduleFlows(schedule: ScheduleView, date: string, amount: number): ForecastFlow[] {
+function scheduleFlows(schedule: ScheduleView, date: string, amount: number, debtAccounts: ReadonlySet<string>): ForecastFlow[] {
   if (schedule.kind === "income") {
     return [{ date, income: amount, spending: 0, bucketId: schedule.id }];
   }
-  return schedule.transferAccountId === null ? [{ date, income: 0, spending: -amount, bucketId: schedule.id }] : [];
+  return (schedule.transferAccountId === null || debtAccounts.has(schedule.transferAccountId)) ? [{ date, income: 0, spending: -amount, bucketId: schedule.id }] : [];
 }
 
 export function readForecast(db: Db, asOf: string): Forecast {
@@ -31,8 +31,8 @@ export function readForecast(db: Db, asOf: string): Forecast {
 
 /**
  * The input of the forecast (spec §8). Each flow has its bucket: a commitment, an income or a spending bucket.
- * `transfersOut` are the commitment payments by transfer to an account that is not an open on-budget account (a loan
- * payment, for example). They leave the pool, but they are not spending in the forecast.
+ * `transfersOut` are the commitment payments by transfer to an account that is not an open on-budget account (an
+ * investment payment, for example). Debt payments are already in `flows`.
  */
 export function forecastInput(db: Db, asOf: string, accountBalances?: ReadonlyMap<string, number>): ForecastInput & { transfersOut: ForecastFlow[] } {
   const step = bookStep(db);
@@ -44,6 +44,8 @@ export function forecastInput(db: Db, asOf: string, accountBalances?: ReadonlyMa
     .where(and(eq(accounts.onBudget, true), isNull(accounts.archivedAt)))
     .all();
   const accountIds = new Set(openAccounts.map((row) => row.id));
+  const debtAccounts = new Set(db.select({ id: accounts.id }).from(accounts)
+    .where(inArray(accounts.kind, ["mortgage", "loan"])).all().map((row) => row.id));
   const schedules = activeSchedules(db);
   const amounts = scheduleAmounts(db, schedules, asOf);
   const { skippedKeys: skipped, postedKeys: posted } = loadLinkIndex(db);
@@ -58,8 +60,8 @@ export function forecastInput(db: Db, asOf: string, accountBalances?: ReadonlyMa
       }
       if (accountIds.has(schedule.accountId)) {
         deltas.push({ date: date.dueDate, amount });
-        flows.push(...scheduleFlows(schedule, date.dueDate, amount));
-        if (schedule.kind === "commitment" && schedule.transferAccountId && !accountIds.has(schedule.transferAccountId)) {
+        flows.push(...scheduleFlows(schedule, date.dueDate, amount, debtAccounts));
+        if (schedule.kind === "commitment" && schedule.transferAccountId && !accountIds.has(schedule.transferAccountId) && !debtAccounts.has(schedule.transferAccountId)) {
           transfersOut.push({ date: date.dueDate, income: 0, spending: -amount, bucketId: schedule.id });
         }
       }

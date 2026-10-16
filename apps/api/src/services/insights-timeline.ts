@@ -24,7 +24,7 @@ function actualMonths(facts: readonly LedgerLine[], period: Period, scope: Timel
     if (!flow || fact.date < period.from || fact.date > period.to) {
       continue;
     }
-    if (isExpenseLine(fact) && (scope.categoryId === null || fact.categoryId === scope.categoryId)) {
+    if ((isExpenseLine(fact) || fact.debtAccountId !== null) && (scope.categoryId === null || fact.categoryId === scope.categoryId)) {
       flow.spending += expenseSpending(fact.amount);
     }
     if (!spendingOnly && isIncomeLine(fact)) {
