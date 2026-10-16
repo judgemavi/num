@@ -67,7 +67,7 @@ export function TimelineLegend({ kinds, forecast }: { kinds: BarKind[]; forecast
       {kinds.map((kind) => (
         <Key key={kind.key} swatch={`size-2.5 rounded-sm ${kind.key === "income" ? "bg-chart-3" : "bg-chart-2"}`} label={kind.label} />
       ))}
-      {forecast ? <Key swatch="size-2.5 rounded-sm bg-chart-2/35" label="Forecast (lighter)" /> : null}
+      {forecast ? <Key swatch="size-2.5 rounded-sm bg-chart-2/35" label="Forecast" /> : null}
     </div>
   );
 }
