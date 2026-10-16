@@ -52,6 +52,7 @@ function book() {
 
 function account(db: Db, name: string) {
   return createAccount(db, {
+    asOf: "2026-10-07",
     name,
     institution: null,
     kind: "chequing",
@@ -170,6 +171,7 @@ test("each no decision hides its review item until undo", () => {
     }
 
     importStatement(sample.db, sample.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,

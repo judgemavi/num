@@ -155,6 +155,7 @@ test("a CSV upload through MCP imports like the UI", async () => {
   try {
     allowWrites(mcpBook.db);
     const mcpAccount = createAccount(mcpBook.db, {
+      asOf: "2026-10-07",
       name: "Everyday",
       kind: "chequing",
       openingDate: "2026-01-01",
@@ -162,6 +163,7 @@ test("a CSV upload through MCP imports like the UI", async () => {
       ...saved,
     });
     const restAccount = createAccount(restBook.db, {
+      asOf: "2026-10-07",
       name: "Everyday",
       kind: "chequing",
       openingDate: "2026-01-01",

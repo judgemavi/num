@@ -1,4 +1,4 @@
-import { auditLog, bankBalances } from "@num/db";
+import { auditLog, bankBalances, valuations } from "@num/db";
 import { columnMapSchema } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -41,6 +41,7 @@ function spend(book: ReturnType<typeof tempBook>, date: string, amount: number) 
 
 function importWithBalance(book: ReturnType<typeof tempBook>, filename: string, lines: string[]) {
   const result = importStatement(book.db, book.dir, {
+    asOf: "2026-10-07",
     source: "import",
     at,
     accountId: book.account.id,
@@ -88,7 +89,7 @@ test("a bank balance is saved when it is different, and the status is calculated
 test("the status uses the latest bank balance and only accounts with a bank balance have one", () => {
   const book = tempBook();
   try {
-    const other = createAccount(book.db, { name: "Other", kind: "savings", openingBalance: 0, ...saved });
+    const other = createAccount(book.db, { asOf: "2026-10-07", name: "Other", kind: "savings", openingBalance: 0, ...saved });
     createBankBalance(book.db, book.account.id, { date: "2026-03-01", balance: 5_000, ...saved });
     createBankBalance(book.db, book.account.id, { date: "2026-05-01", balance: 0, ...saved });
     createBankBalance(book.db, book.account.id, { date: "2026-04-01", balance: 9_000, ...saved });
@@ -149,6 +150,27 @@ test("an import with a closing balance saves a bank balance, replaces one on the
 
     undoImportBatch(book.db, batch.id, { source: "ui", at });
     expect(book.db.select().from(bankBalances).all().map((row) => row.date)).toEqual(["2026-01-10"]);
+  } finally {
+    book.close();
+  }
+});
+
+
+test("bank status uses the valuation on its date for each valuation account kind", () => {
+  const book = tempBook();
+  try {
+    for (const kind of ["investment", "property", "mortgage", "loan"] as const) {
+      const account = createAccount(book.db, { asOf: "2026-10-07", name: kind, kind, openingBalance: 80_000, ...saved });
+      for (const [date, balance] of [["2026-02-01", 40_000], ["2026-04-01", 90_000]] as const) {
+        book.db.insert(valuations).values({ id: crypto.randomUUID(), accountId: account.id, date, balance }).run();
+      }
+      createTransaction(book.db, {
+        accountId: account.id, date: "2026-02-02", amount: 2_000,
+        payeeRaw: "Adjustment", lines: [{ amount: 2_000 }], ...saved,
+      });
+      createBankBalance(book.db, account.id, { date: "2026-03-01", balance: 42_000, ...saved });
+      expect(listBankBalances(book.db, account.id).status).toMatchObject({ calculatedBalance: 42_000, difference: 0 });
+    }
   } finally {
     book.close();
   }

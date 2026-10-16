@@ -36,6 +36,7 @@ export const importBatches = sqliteTable("import_batches", {
   closingBalance: integer("closing_balance"),
   closingDate: text("closing_date"),
   unreadableJson: text("unreadable_json", { mode: "json" }).$type<UnreadableRow[]>().notNull().default([]),
+  importedOn: text("imported_on").notNull(),
   createdAt: text("created_at").notNull(),
   undoneAt: text("undone_at"),
 });

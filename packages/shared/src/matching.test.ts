@@ -133,15 +133,15 @@ test("confidence millis stay inside 0 to 1000", () => {
   expect(confidenceMilli(-1)).toBe(0);
 });
 
-test("a similar payee is never automatic, even when combined with a merchant default", () => {
+test("a similar payee stays a suggestion when learned payee evidence agrees", () => {
   const scores = learnedConfidence([row("a", "2026-01-01", "fares"), row("b", "2026-01-02", "fares"), row("c", "2026-01-03", "fares")]);
   const similar = { scores, transferRows: [] };
   const alone = score({ similar });
   expect(alone.reason).toBe("similar");
   expect(alone.confidence).toBeCloseTo((scores[0]?.confidence ?? 0) * 0.9, 10);
   expect(alone.level).toBe("suggestion");
-  const merchant = { id: "m", name: "Presto", categoryId: "fares" };
-  const combined = score({ similar, merchant });
+  const combined = score({ similar, payeeScores: scores });
+  expect(combined.confidence).toBeGreaterThan(alone.confidence);
   expect(combined.confidence).toBeGreaterThan(0.75);
   expect(combined.level).toBe("suggestion");
 });
@@ -152,8 +152,8 @@ test("a brand family suggestion uses the lowest confidence times 0.85 and is nev
   expect(alone.reason).toBe("family");
   expect(alone.confidence).toBeCloseTo(0.91 * 0.85, 10);
   expect(alone.level).toBe("suggestion");
-  const merchant = { id: "m", name: "Presto", categoryId: "transit" };
-  const combined = score({ family, merchant });
+  const combined = score({ family, payeeScores: learnedConfidence([row("b", "2026-01-01", "transit")]) });
+  expect(combined.confidence).toBeGreaterThan(alone.confidence);
   expect(combined.confidence).toBeGreaterThan(0.75);
   expect(combined.level).toBe("suggestion");
 });

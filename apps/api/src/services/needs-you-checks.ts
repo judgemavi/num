@@ -59,12 +59,12 @@ function emergencyFund(db: Db, asOf: string) {
 }
 
 function importsCurrent(db: Db, asOf: string) {
-  const imported = new Map(importFreshness(db, asOf).map((row) => [row.accountId, row.lastImportAt]));
+  const imported = new Map(importFreshness(db, asOf).map((row) => [row.accountId, row.lastImportedOn]));
   const items = accounts(db)
     .filter((account) => account.onBudget)
     .map((account) => {
       const at = imported.get(account.id) ?? null;
-      const age = at && at.slice(0, 10) <= asOf ? ageDays(asOf, at.slice(0, 10)) : null;
+      const age = at && at <= asOf ? ageDays(asOf, at) : null;
       return { accountId: account.id, ageDays: age, pass: age === null || age <= staleImportDays };
     });
   return { code: "imports_current" as const, pass: items.every((item) => item.pass), items };

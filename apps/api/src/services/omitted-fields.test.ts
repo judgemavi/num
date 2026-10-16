@@ -30,6 +30,7 @@ function withBook(run: (db: Db) => void) {
 test("an account update keeps the fields that it leaves out and clears the fields that are null", () => {
   withBook((db) => {
     const account = createAccount(db, {
+      asOf: "2026-10-07",
       name: "Rainy day",
       institution: "Example Bank",
       kind: "savings",
@@ -61,7 +62,7 @@ test("an account update keeps the fields that it leaves out and clears the field
 
 test("a kind change must clear a stored rate that the new kind does not allow", () => {
   withBook((db) => {
-    const account = createAccount(db, { name: "Rainy day", kind: "savings", interestRateMilliPct: 2_500, ...saved });
+    const account = createAccount(db, { asOf: "2026-10-07", name: "Rainy day", kind: "savings", interestRateMilliPct: 2_500, ...saved });
     expect(() => updateAccount(db, account.id, { kind: "chequing", ...saved })).toThrow(
       expect.objectContaining({ code: "invalid_body", params: { field: "interestRateMilliPct" } }),
     );
@@ -74,6 +75,7 @@ test("a kind change must clear a stored rate that the new kind does not allow", 
 test("the card fields are checked together on the stored card with the patch", () => {
   withBook((db) => {
     const card = createAccount(db, {
+      asOf: "2026-10-07",
       name: "Card",
       kind: "credit_card",
       openingBalance: -20_000,
@@ -102,6 +104,7 @@ test("the card fields are checked together on the stored card with the patch", (
 test("a patch with the opening date and the opening balance changes only these fields", () => {
   withBook((db) => {
     const card = createAccount(db, {
+      asOf: "2026-10-07",
       name: "Card",
       institution: "Example Bank",
       kind: "credit_card",
@@ -131,7 +134,7 @@ const scheduleBody = (accountId: string) => ({
 
 test("a schedule update keeps the fields that it leaves out and replaces the schedule when it is given", () => {
   withBook((db) => {
-    const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
+    const account = createAccount(db, { asOf: "2026-10-07", name: "Everyday", kind: "chequing", ...saved });
     const category = createCategory(db, { name: "Example bills", kind: "expense", ...saved });
     const merchant = createMerchant(db, { name: "Example stream", ...saved });
     const commitment = createSchedule(db, {
@@ -157,7 +160,7 @@ test("a schedule update keeps the fields that it leaves out and replaces the sch
 
 test("a commitment cannot become an income", () => {
   withBook((db) => {
-    const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
+    const account = createAccount(db, { asOf: "2026-10-07", name: "Everyday", kind: "chequing", ...saved });
     const commitment = createSchedule(db, { ...scheduleBody(account.id), ...saved });
     expect(() => updateBucket(db, commitment.id, { kind: "income", ...saved })).toThrow();
   });
@@ -165,7 +168,7 @@ test("a commitment cannot become an income", () => {
 
 test("a commitment is money out and an income is money in", () => {
   withBook((db) => {
-    const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
+    const account = createAccount(db, { asOf: "2026-10-07", name: "Everyday", kind: "chequing", ...saved });
     const sign = expect.objectContaining({ code: "bucket_fields_invalid" });
     expect(() => createSchedule(db, { ...scheduleBody(account.id), expectedAmount: 10_000, ...saved })).toThrow(sign);
     expect(() => createSchedule(db, { ...scheduleBody(account.id), kind: "income", expectedAmount: -10_000, ...saved })).toThrow(sign);
@@ -175,7 +178,7 @@ test("a commitment is money out and an income is money in", () => {
 
 test("a schedule patch is checked with the stored fields that it leaves out", () => {
   withBook((db) => {
-    const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
+    const account = createAccount(db, { asOf: "2026-10-07", name: "Everyday", kind: "chequing", ...saved });
     const commitment = createSchedule(db, { ...scheduleBody(account.id), freq: "monthly", monthDay: 15, ...saved });
     const schedule = commitment.schedule;
     if (!schedule) {
@@ -192,7 +195,7 @@ test("a schedule patch is checked with the stored fields that it leaves out", ()
 
 test("a transaction update keeps the merchant that it leaves out and clears it when it is null", () => {
   withBook((db) => {
-    const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
+    const account = createAccount(db, { asOf: "2026-10-07", name: "Everyday", kind: "chequing", ...saved });
     const merchant = createMerchant(db, { name: "Example shop", ...saved });
     const body = {
       accountId: account.id,
@@ -215,7 +218,7 @@ test("a transaction update keeps the merchant that it leaves out and clears it w
 
 test("a transaction patch keeps the lines that it leaves out and checks the amount with the stored lines", () => {
   withBook((db) => {
-    const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
+    const account = createAccount(db, { asOf: "2026-10-07", name: "Everyday", kind: "chequing", ...saved });
     const category = createCategory(db, { name: "Example food", kind: "expense", ...saved });
     const created = createTransaction(db, {
       accountId: account.id,

@@ -1,5 +1,6 @@
 export {
   accountClass,
+  usesValuation,
   balanceFromEntry,
   entryFromBalance,
   netWorthOf,

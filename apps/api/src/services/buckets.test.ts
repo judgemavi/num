@@ -12,6 +12,7 @@ test("bucket balance is funds, moves, releases and category lines", () => {
   const book = tempDatabase();
   try {
     const account = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
@@ -68,6 +69,7 @@ test("a card purchase lowers the bucket and a card payment does not", () => {
   const book = tempDatabase();
   try {
     const card = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Card",
       kind: "credit_card",
       openingDate: "2026-01-01",
@@ -76,6 +78,7 @@ test("a card purchase lowers the bucket and a card payment does not", () => {
       ...saved,
     });
     const cash = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
@@ -169,6 +172,7 @@ test("archive needs a zero balance and removes category mappings", () => {
   const book = tempDatabase();
   try {
     createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",

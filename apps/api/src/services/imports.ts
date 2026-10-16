@@ -22,7 +22,6 @@ import { parseCsvStatement } from "./parse-csv";
 import { importOpeningSuggestion } from "./opening-suggestion";
 import { parseOfxStatement } from "./parse-ofx";
 import { loadPreset, loadPresets } from "./presets";
-import { autoLink } from "./recurring-view";
 import type { ParsedStatement } from "./statement";
 import type { AuditSource } from "./write";
 
@@ -35,7 +34,7 @@ type ImportInput = {
   bytes: Uint8Array;
   presetId?: string | null;
   columnMap?: ColumnMap | null;
-  asOf?: string;
+  asOf: string;
 };
 
 type ReadyParse = {
@@ -282,14 +281,7 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     unreadable: resolved.statement.unreadable,
     presetId: resolved.presetId,
     columnMap: resolved.columnMap,
-    asOf: input.asOf ?? null,
+    asOf: input.asOf,
   });
-  if (input.asOf) {
-    try {
-      autoLink(db, input.asOf, { source: input.source, at, accountId: account.id });
-    } catch (error) {
-      console.error("Recurring auto-link failed after import", error);
-    }
-  }
   return { kind: "batch", alreadyImported: false, openingSuggestion, ...batch };
 }

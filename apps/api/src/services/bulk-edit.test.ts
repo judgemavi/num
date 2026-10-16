@@ -26,8 +26,8 @@ function withBook(run: (db: Db, ids: { cash: string; savings: string; food: stri
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
   try {
-    const cash = createAccount(db, { name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
-    const savings = createAccount(db, { name: "Savings", kind: "savings", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+    const cash = createAccount(db, { asOf: "2026-10-07", name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+    const savings = createAccount(db, { asOf: "2026-10-07", name: "Savings", kind: "savings", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
     const salary = createCategory(db, { name: "Salary", kind: "income", ...saved });
     run(db, { cash: cash.id, savings: savings.id, food: food.id, salary: salary.id });
@@ -53,7 +53,7 @@ function pay(db: Db, accountId: string, date: string, amount: number, payee: str
 
 /** A loan payment: the interest on a category line and the principal on a transfer line to a loan. */
 function loanPayment(db: Db, accountId: string, date: string, payee: string) {
-  const loan = createAccount(db, { name: `Loan ${date}`, kind: "loan", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+  const loan = createAccount(db, { asOf: "2026-10-07", name: `Loan ${date}`, kind: "loan", openingDate: "2026-01-01", openingBalance: 0, ...saved });
   const interest = createCategory(db, { name: `Interest ${date}`, kind: "expense", ...saved });
   const payment = pay(db, accountId, date, -3000, payee, {
     lines: [
@@ -99,7 +99,7 @@ test("a transfer skips a loan payment, the transfer target and a row of another 
     const open = pay(db, ids.cash, "2026-03-01", -4000, "Cafe");
     const loan = loanPayment(db, ids.cash, "2026-03-03", "Cafe").payment;
     const target = pay(db, ids.savings, "2026-03-04", -700, "Cafe");
-    const visa = createAccount(db, { name: "Other", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+    const visa = createAccount(db, { asOf: "2026-10-07", name: "Other", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const elsewhere = pay(db, visa.id, "2026-03-05", -900, "Cafe");
     const result = bulkEdit(db, asOf, {
       transactionIds: [open.id, loan.id, target.id, elsewhere.id],

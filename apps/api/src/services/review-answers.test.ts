@@ -27,8 +27,8 @@ function withBook(run: (db: Db, ids: { cash: string; savings: string; food: stri
   db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   try {
     const opening = { kind: "chequing" as const, openingDate: "2026-01-01", openingBalance: 500_000, ...saved };
-    const cash = createAccount(db, { name: "Cash", ...opening });
-    const savings = createAccount(db, { name: "Savings", ...opening });
+    const cash = createAccount(db, { asOf: "2026-10-07", name: "Cash", ...opening });
+    const savings = createAccount(db, { asOf: "2026-10-07", name: "Savings", ...opening });
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
     run(db, { cash: cash.id, savings: savings.id, food: food.id });
   } finally {

@@ -21,7 +21,7 @@ function book() {
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
-  const chequing = createAccount(db, { name: "Everyday", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+  const chequing = createAccount(db, { asOf: "2026-10-07", name: "Everyday", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
   const interest = createCategory(db, { name: "Interest", kind: "expense", ...saved });
   const terms: MortgageTermsWrite = {
     rateMilliPct: 5000,
@@ -60,7 +60,7 @@ function mortgageFields(openingBalance: number, mortgageTerms?: MortgageTermsWri
 test("the schedule starts from the opening balance on the opening date", () => {
   const sample = book();
   try {
-    const mortgage = createAccount(sample.db, { ...mortgageFields(-100_000_000, sample.terms), onBudget: undefined });
+    const mortgage = createAccount(sample.db, { asOf: "2026-10-07", ...mortgageFields(-100_000_000, sample.terms), onBudget: undefined });
     const view = mortgageAccountView(sample.db, mortgage.id, asOf, {});
     expect(view.payments[0]).toMatchObject({ date: "2026-03-01", interest: 412_390, principal: 169_210 });
     expect(view.payments[0]?.balance).toBe(100_000_000 - 169_210);
@@ -72,7 +72,7 @@ test("the schedule starts from the opening balance on the opening date", () => {
 test("a change of the opening balance changes the schedule", () => {
   const sample = book();
   try {
-    const mortgage = createAccount(sample.db, { ...mortgageFields(-100_000_000, sample.terms), onBudget: undefined });
+    const mortgage = createAccount(sample.db, { asOf: "2026-10-07", ...mortgageFields(-100_000_000, sample.terms), onBudget: undefined });
     const before = mortgageAccountView(sample.db, mortgage.id, asOf, {});
     updateAccount(sample.db, mortgage.id, mortgageFields(-50_000_000, sample.terms));
     const after = mortgageAccountView(sample.db, mortgage.id, asOf, {});
@@ -86,7 +86,7 @@ test("a change of the opening balance changes the schedule", () => {
 test("saving terms fixes the opening date, and leaving the terms out keeps them", () => {
   const sample = book();
   try {
-    const mortgage = createAccount(sample.db, { name: "Home loan", kind: "mortgage", openingBalance: -100_000_000, ...saved });
+    const mortgage = createAccount(sample.db, { asOf: "2026-10-07", name: "Home loan", kind: "mortgage", openingBalance: -100_000_000, ...saved });
     expect(getAccount(sample.db, mortgage.id).openingAutomatic).toBe(true);
     const withTerms = updateAccount(sample.db, mortgage.id, mortgageFields(-100_000_000, sample.terms));
     expect(withTerms.openingAutomatic).toBe(false);
@@ -103,7 +103,7 @@ test("saving terms fixes the opening date, and leaving the terms out keeps them"
 test("a patch is checked on the stored mortgage: terms need the kind mortgage and an opening date", () => {
   const sample = book();
   try {
-    const mortgage = createAccount(sample.db, { ...mortgageFields(-10_000_000, sample.terms), onBudget: undefined });
+    const mortgage = createAccount(sample.db, { asOf: "2026-10-07", ...mortgageFields(-10_000_000, sample.terms), onBudget: undefined });
     expect(() => updateAccount(sample.db, mortgage.id, { kind: "loan", ...saved })).toThrow(
       expect.objectContaining({ code: "invalid_body", params: { field: "mortgageTerms" } }),
     );
@@ -111,7 +111,7 @@ test("a patch is checked on the stored mortgage: terms need the kind mortgage an
       expect.objectContaining({ code: "opening_date_fixed" }),
     );
     expect(updateAccount(sample.db, mortgage.id, { kind: "loan", mortgageTerms: null, ...saved }).kind).toBe("loan");
-    const undated = createAccount(sample.db, { name: "Undated", kind: "mortgage", openingBalance: -10_000_000, ...saved });
+    const undated = createAccount(sample.db, { asOf: "2026-10-07", name: "Undated", kind: "mortgage", openingBalance: -10_000_000, ...saved });
     expect(() => updateAccount(sample.db, undated.id, { mortgageTerms: sample.terms, ...saved })).toThrow(
       expect.objectContaining({ code: "invalid_body", params: { field: "openingDate" } }),
     );
@@ -123,7 +123,7 @@ test("a patch is checked on the stored mortgage: terms need the kind mortgage an
 test("null removes the terms in the same audit transaction as the account write", () => {
   const sample = book();
   try {
-    const mortgage = createAccount(sample.db, { ...mortgageFields(-100_000_000, sample.terms), onBudget: undefined });
+    const mortgage = createAccount(sample.db, { asOf: "2026-10-07", ...mortgageFields(-100_000_000, sample.terms), onBudget: undefined });
     updateAccount(sample.db, mortgage.id, mortgageFields(-100_000_000, null));
     expect(sample.db.select().from(mortgageTerms).where(eq(mortgageTerms.accountId, mortgage.id)).all()).toHaveLength(0);
     const entries = sample.db.select().from(auditLog).where(eq(auditLog.entityId, mortgage.id)).all();
@@ -138,7 +138,7 @@ test("null removes the terms in the same audit transaction as the account write"
 test("terms with a first payment before the opening date are not saved", () => {
   const sample = book();
   try {
-    const mortgage = createAccount(sample.db, { name: "Home loan", kind: "mortgage", openingBalance: -100_000_000, ...saved });
+    const mortgage = createAccount(sample.db, { asOf: "2026-10-07", name: "Home loan", kind: "mortgage", openingBalance: -100_000_000, ...saved });
     expect(() =>
       updateAccount(sample.db, mortgage.id, mortgageFields(-100_000_000, { ...sample.terms, firstPaymentDate: "2026-01-15" })),
     ).toThrow();
@@ -151,7 +151,7 @@ test("terms with a first payment before the opening date are not saved", () => {
 test("terms need an amount owed and a first payment after the opening date", () => {
   const sample = book();
   try {
-    const mortgage = createAccount(sample.db, { name: "Home loan", kind: "mortgage", openingBalance: -100_000_000, ...saved });
+    const mortgage = createAccount(sample.db, { asOf: "2026-10-07", name: "Home loan", kind: "mortgage", openingBalance: -100_000_000, ...saved });
     expect(() => updateAccount(sample.db, mortgage.id, mortgageFields(0, sample.terms))).toThrow();
     expect(() =>
       updateAccount(sample.db, mortgage.id, mortgageFields(-100_000_000, { ...sample.terms, firstPaymentDate: "2026-02-01" })),
@@ -165,13 +165,13 @@ test("terms need an amount owed and a first payment after the opening date", () 
 test("a mortgage with terms gets no opening balance suggestion, and the apply is refused", () => {
   const sample = book();
   try {
-    const mortgage = createAccount(sample.db, { ...mortgageFields(-100_000_000, sample.terms), onBudget: undefined });
+    const mortgage = createAccount(sample.db, { asOf: "2026-10-07", ...mortgageFields(-100_000_000, sample.terms), onBudget: undefined });
     const row = { date: "2026-04-02", amount: -5_000, balance: -90_000_000 };
     expect(importOpeningSuggestion(sample.db, mortgage.id, row)).toBeNull();
     expect(bankOpeningSuggestion(sample.db, mortgage, { date: "2026-04-02", balance: -90_000_000 }, -100_000_000)).toBeNull();
     expect(() => updateAccount(sample.db, mortgage.id, { openingBalance: -90_000_000, openingDate: "2026-04-01", ...saved })).toThrow();
     expect(getAccount(sample.db, mortgage.id).openingDate).toBe("2026-02-01");
-    const plain = createAccount(sample.db, { name: "Plain", kind: "mortgage", openingBalance: -100_000_000, ...saved });
+    const plain = createAccount(sample.db, { asOf: "2026-10-07", name: "Plain", kind: "mortgage", openingBalance: -100_000_000, ...saved });
     expect(importOpeningSuggestion(sample.db, plain.id, row)).not.toBeNull();
   } finally {
     sample.close();

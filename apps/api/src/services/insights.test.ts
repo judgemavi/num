@@ -30,7 +30,7 @@ function tempDatabase() {
 const saved = { source: "ui" as const, at: "2026-06-30T16:00:00Z" };
 
 function account(db: Db, name: string, kind: "chequing" | "savings" | "property" | "mortgage", openingDate: string, openingBalance = 0) {
-  return createAccount(db, { name, kind, openingDate, openingBalance, ...saved });
+  return createAccount(db, { asOf: "2026-10-07", name, kind, openingDate, openingBalance, ...saved });
 }
 
 function spend(

@@ -33,7 +33,7 @@ function withBook(run: (db: Db) => void) {
 }
 
 function account(db: Db, name: string) {
-  return createAccount(db, { name, kind: "chequing", openingDate: "2026-01-01", openingBalance: 500_000, ...saved });
+  return createAccount(db, { asOf: "2026-10-07", name, kind: "chequing", openingDate: "2026-01-01", openingBalance: 500_000, ...saved });
 }
 
 function pay(db: Db, accountId: string, date: string, amount: number, payee: string, categoryId?: string) {

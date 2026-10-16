@@ -36,6 +36,7 @@ function book() {
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
   const account = createAccount(db, {
+    asOf: "2026-10-07",
     name: "Everyday",
     institution: null,
     kind: "chequing",
@@ -56,6 +57,7 @@ function book() {
 
 function importCsv(db: Db, dir: string, accountId: string, filename: string, lines: string[]) {
   return importStatement(db, dir, {
+    asOf: "2026-10-07",
     source: "import",
     at,
     accountId,
@@ -78,6 +80,7 @@ test("accepting a transfer pair clears the automatic reason", () => {
   const sample = book();
   try {
     const other = createAccount(sample.db, {
+      asOf: "2026-10-07",
       name: "Savings",
       institution: null,
       kind: "savings",

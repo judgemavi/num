@@ -110,7 +110,7 @@ test("a payment is counted one time, a non-essential commitment is not counted, 
       monthDay: 10,
       essential: false,
     });
-    const loan = createAccount(book.db, { name: "Loan", kind: "mortgage", openingDate: "2026-01-01", openingBalance: 0, paymentPolicy: null, ...saved });
+    const loan = createAccount(book.db, { asOf: "2026-10-07", name: "Loan", kind: "mortgage", openingDate: "2026-01-01", openingBalance: 0, paymentPolicy: null, ...saved });
     const mortgage = addSchedule(book.db, {
       name: "Mortgage",
       kind: "commitment",

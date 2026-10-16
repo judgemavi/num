@@ -1,13 +1,9 @@
 import { accounts, transactions } from "@num/db";
-import { dayBefore, Temporal } from "@num/shared";
+import { dayBefore } from "@num/shared";
 import { eq, inArray, min, sql } from "drizzle-orm";
 import { QueryBuilder } from "drizzle-orm/sqlite-core";
 import { ServiceError } from "../service-error";
 import type { Reader } from "./write";
-
-function plainDate(at: string) {
-  return Temporal.Instant.from(at).toZonedDateTimeISO("UTC").toPlainDate().toString();
-}
 
 export function earliestTransactionDate(db: Reader, accountId: string): string | null {
   const row = db
@@ -30,7 +26,7 @@ export type AutomaticOpening = { date: string; followsTransactions: boolean };
  */
 export function automaticOpenings(db: Reader, accountIds: readonly string[]): Map<string, AutomaticOpening> {
   const rows = db
-    .select({ id: accounts.id, firstDate: sql<string | null>`${firstDate}`, createdAt: accounts.createdAt })
+    .select({ id: accounts.id, firstDate: sql<string | null>`${firstDate}`, createdOn: accounts.createdOn })
     .from(accounts)
     .where(inArray(accounts.id, [...accountIds]))
     .all();
@@ -39,7 +35,7 @@ export function automaticOpenings(db: Reader, accountIds: readonly string[]): Ma
     if (row.firstDate) {
       found.set(row.id, { date: dayBefore(row.firstDate), followsTransactions: true });
     } else {
-      found.set(row.id, { date: plainDate(row.createdAt), followsTransactions: false });
+      found.set(row.id, { date: row.createdOn, followsTransactions: false });
     }
   }
   return found;

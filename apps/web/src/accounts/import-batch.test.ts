@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { ApiError } from "../api/client";
+import type { ColumnMap } from "@num/shared";
+import type { ImportFileRow } from "./import-file-list";
 import { emptyImportBatch, importBatchReducer, runImportBatch } from "./import-batch";
 
-const columnMap = { date: 0, description: 1, amount: 2, hasHeader: false, dateOrder: "mdy", signConvention: "account", decimalSeparator: "." };
+const columnMap: ColumnMap = { date: 0, description: 1, amount: 2, hasHeader: false, dateOrder: "mdy", signConvention: "account", decimalSeparator: "." };
 const counts = { created: 1, matched: 0, duplicate: 0, needsReview: 0, unreadable: 0 };
 
-function row(key, text, patch = {}) {
+function row(key: string, text: string, patch: Partial<ImportFileRow> = {}): ImportFileRow {
   return {
     key,
     file: new File([text], `${key}.csv`),
@@ -28,14 +30,17 @@ function row(key, text, patch = {}) {
   };
 }
 
-function imported(id) {
-  return { kind: "imported", id, createdAt: "2026-03-01T00:00:00.000Z", counts, alreadyImported: false, unreadable: [], openingSuggestion: null };
+function imported(id: string): Awaited<ReturnType<Parameters<typeof runImportBatch>[1]["post"]>> {
+  return { accountId: "account-1", documentId: null, filename: "synthetic.csv", parser: "csv", periodStart: "2026-03-01", periodEnd: "2026-03-01", closingBalance: null, closingDate: null, undoneAt: null, kind: "batch", id, createdAt: "2026-03-01T00:00:00.000Z", counts, alreadyImported: false, unreadable: [], openingSuggestion: null };
 }
 
 /** The parts of the editor that the batch uses. `answers` are the answers of the API, in order. */
-function editor(answers, maps = []) {
-  const log = { posted: [], asked: [], changes: [] };
-  const io = {
+function editor(answers: (Awaited<ReturnType<Parameters<typeof runImportBatch>[1]["post"]>> | Error)[], maps: ColumnMap[] = []) {
+  const posted: { name: string; columnMap: ColumnMap | null }[] = [];
+  const asked: string[] = [];
+  const changes: (Partial<ImportFileRow> & { key: string })[] = [];
+  const log = { posted, asked, changes };
+  const io: Parameters<typeof runImportBatch>[1] = {
     presets: [],
     asOf: "2026-03-10",
     post: async (input) => {
@@ -43,6 +48,9 @@ function editor(answers, maps = []) {
       const answer = answers.shift();
       if (answer instanceof Error) {
         throw answer;
+      }
+      if (!answer) {
+        throw new Error("No import answer remains");
       }
       return answer;
     },
@@ -120,7 +128,7 @@ describe("import batch", () => {
   });
 
   test("a second preview for one file is an error, and the batch goes to the next file", async () => {
-    const preview = { kind: "preview", rows: [] };
+    const preview = { kind: "preview", rows: [] } satisfies Awaited<ReturnType<Parameters<typeof runImportBatch>[1]["post"]>>;
     const { io } = editor([preview, preview, imported("batch-2")], [columnMap]);
     const result = await runImportBatch([row("a", "03/01/2026,Tea,-4.00", { format: { kind: "ofx" }, columnMap: null }), row("b", "03/02/2026,Bus,-3.00")], io);
 
@@ -138,7 +146,7 @@ describe("import batch", () => {
   });
 
   test("a file with an error or with no account gets a message, and the other files are imported", async () => {
-    const { io, log } = editor([new ApiError({ code: "document_too_large" }), imported("batch-3")]);
+    const { io, log } = editor([new ApiError({ code: "document_too_large", params: {} }), imported("batch-3")]);
     const result = await runImportBatch(
       [row("a", "03/01/2026,Tea,-4.00"), row("none", "03/02/2026,Bus,-3.00", { accountId: "" }), row("c", "03/03/2026,Jam,-2.00")],
       io,
@@ -150,7 +158,7 @@ describe("import batch", () => {
   });
 
   test("a file with only unreadable rows is done with no import", async () => {
-    const unreadable = [{ line: 1, raw: "x", reason: "date" }];
+    const unreadable = [{ line: 1, raw: "x", reason: "date_unreadable" }] satisfies ImportFileRow["unreadable"];
     const { io } = editor([{ kind: "unreadable", unreadable }]);
     const result = await runImportBatch([row("a", "03/01/2026,Tea,-4.00")], io);
 

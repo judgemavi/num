@@ -33,7 +33,7 @@ test("accounts, categories, groups and tags sort an accented name with its plain
   const { db, close } = tempDatabase();
   try {
     for (const name of names) {
-      createAccount(db, { name, institution: null, kind: "chequing", openingBalance: 0, ...saved });
+      createAccount(db, { asOf: "2026-10-07", name, institution: null, kind: "chequing", openingBalance: 0, ...saved });
       createCategory(db, { name, kind: "expense", ...saved });
       createCategoryGroup(db, { name, ...saved });
       createTag(db, { name, ...saved });

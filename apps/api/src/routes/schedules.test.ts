@@ -17,7 +17,7 @@ function tempBook() {
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
   runSetup(db, { asOf: "2026-10-07", currency: "CAD", categorySet: "default", ...saved });
-  const account = createAccount(db, { name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+  const account = createAccount(db, { asOf: "2026-10-07", name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
   return {
     accountId: account.id,
     app: createApp(db, { dataDir: dir }),

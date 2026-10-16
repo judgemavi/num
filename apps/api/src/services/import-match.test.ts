@@ -128,6 +128,7 @@ test("a later import matches a mirror and clears the mirror flag", () => {
   const book = tempBook();
   try {
     const savings = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Savings",
       institution: null,
       kind: "savings",
@@ -171,6 +172,7 @@ test("a transfer suggestion at import does not create a transfer", () => {
   const book = tempBook();
   try {
     const visa = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Visa",
       institution: null,
       kind: "savings",

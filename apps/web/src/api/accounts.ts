@@ -1,6 +1,7 @@
 import type { AccountCreate, AccountListQuery, AccountUpdate, OpeningSuggestion } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
 import { useArchiveWrite } from "@/api/archive";
+import { localAsOf } from "@/as-of";
 import { api, formWrite, unwrap } from "@/api/client";
 import { activeAndArchived, allPages, fullPage, type ListFilters } from "@/api/pages";
 import { accountError } from "@/accounts/format";
@@ -37,8 +38,8 @@ export function accountQuery(id: string) {
 export function useSaveAccount() {
   return useMutation({
     meta: formWrite,
-    mutationFn: (input: { id: null; body: AccountCreate } | { id: string; body: AccountUpdate }) =>
-      unwrap(input.id === null ? api.accounts.$post({ json: input.body }) : api.accounts[":id"].$patch({ param: { id: input.id }, json: input.body })),
+    mutationFn: (input: { id: null; body: Omit<AccountCreate, "asOf"> } | { id: string; body: AccountUpdate }) =>
+      unwrap(input.id === null ? api.accounts.$post({ json: { ...input.body, asOf: localAsOf() } }) : api.accounts[":id"].$patch({ param: { id: input.id }, json: input.body })),
   });
 }
 

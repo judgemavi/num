@@ -37,7 +37,7 @@ function book() {
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
-  const account = createAccount(db, { name: "Everyday", institution: null, kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+  const account = createAccount(db, { asOf: "2026-10-07", name: "Everyday", institution: null, kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
   const rental = createCategory(db, { name: "Rental Income", kind: "income", ...saved });
   const other = createCategory(db, { name: "Other income", kind: "income", ...saved });
   const groceries = createCategory(db, { name: "Groceries", kind: "expense", ...saved });
@@ -65,6 +65,7 @@ function book() {
   const hit = (id: string) => listNeedsReview(db, asOf).find((item) => item.id === id);
   const importRows = (lines: string[]) =>
     importStatement(db, dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: account.id,
@@ -235,13 +236,13 @@ test("a later confirmation scores an automatic no category again", () => {
 test("the similar payee and brand family signals ignore no category labels", () => {
   const sample = book();
   try {
-    sample.keep("2026-05-01", -40_000, "COSTCO WHOLESALE");
-    expect(sample.score(-40_000, "COSTCO WHOLESALE W535 TORONTO").level).toBe("none");
-    sample.keep("2026-05-01", -4_000, "PRESTO SHEPPARD STN");
-    sample.keep("2026-05-02", -4_000, "PRESTO KING STN");
-    expect(sample.score(-4_000, "PRESTO DUNDAS STN").level).toBe("none");
-    sample.confirm("2026-05-03", -50_000, sample.groceries.id, "COSTCO");
-    const own = sample.score(-40_000, "COSTCO WHOLESALE");
+    sample.keep("2026-05-01", -40_000, "EXAMPLEMART WHOLESALE");
+    expect(sample.score(-40_000, "EXAMPLEMART WHOLESALE W909 EXAMPLEVILLE").level).toBe("none");
+    sample.keep("2026-05-01", -4_000, "DEMOFARE NORTH STN");
+    sample.keep("2026-05-02", -4_000, "DEMOFARE WEST STN");
+    expect(sample.score(-4_000, "DEMOFARE EAST STN").level).toBe("none");
+    sample.confirm("2026-05-03", -50_000, sample.groceries.id, "EXAMPLEMART");
+    const own = sample.score(-40_000, "EXAMPLEMART WHOLESALE");
     expect(own).toMatchObject({ keep: true, reason: "learned_amount" });
     expect(own.signals.every((signal) => signal.reason !== "similar")).toBe(true);
   } finally {

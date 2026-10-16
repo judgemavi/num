@@ -58,7 +58,7 @@ function monthly(db: Db, accountId: string, kind: "income" | "commitment", expec
 test("the month of asOf has an actual part to asOf and a forecast part after it", () => {
   const book = tempDatabase();
   try {
-    const cash = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-08-01", openingBalance: 100_000, ...saved });
+    const cash = createAccount(book.db, { asOf: "2026-10-07", name: "Cash", kind: "chequing", openingDate: "2026-08-01", openingBalance: 100_000, ...saved });
     const pay = createCategory(book.db, { name: "Pay", kind: "income", ...saved });
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
     record(book.db, cash.id, "2026-09-12", -7000, groceries.id);
@@ -99,7 +99,7 @@ test("the month of asOf has an actual part to asOf and a forecast part after it"
 test("a period that ends before asOf has only its own months and no forecast", () => {
   const book = tempDatabase();
   try {
-    const cash = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-08-01", openingBalance: 100_000, ...saved });
+    const cash = createAccount(book.db, { asOf: "2026-10-07", name: "Cash", kind: "chequing", openingDate: "2026-08-01", openingBalance: 100_000, ...saved });
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
     record(book.db, cash.id, "2026-08-12", -7000, groceries.id);
     record(book.db, cash.id, "2026-09-25", -3000, groceries.id);

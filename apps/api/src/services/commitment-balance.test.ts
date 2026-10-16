@@ -41,7 +41,7 @@ test("a loan payment counts with its full amount, the interest line included", (
   const book = tempDatabase();
   try {
     const cash = account(book.db, "Cash", "chequing", 1_000_000);
-    const loan = createAccount(book.db, { name: "Loan", kind: "mortgage", openingDate: "2026-01-01", openingBalance: 0, paymentPolicy: null, ...saved });
+    const loan = createAccount(book.db, { asOf: "2026-10-07", name: "Loan", kind: "mortgage", openingDate: "2026-01-01", openingBalance: 0, paymentPolicy: null, ...saved });
     const interest = createCategory(book.db, { name: "Interest", kind: "expense", ...saved });
     const commitment = addSchedule(book.db, {
       name: "Mortgage",

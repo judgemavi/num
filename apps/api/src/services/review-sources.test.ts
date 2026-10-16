@@ -55,6 +55,7 @@ function book() {
 
 function account(db: Db, name: string) {
   return createAccount(db, {
+    asOf: "2026-10-07",
     name,
     institution: null,
     kind: "chequing",
@@ -271,6 +272,7 @@ test("each review source appears and leaves after its action", () => {
     const older = pay(sample.db, cash.id, "2026-01-09", -5000, "Match one", food.id);
     pay(sample.db, cash.id, "2026-01-11", -5000, "Match two", food.id);
     const imported = importStatement(sample.db, sample.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,
@@ -297,6 +299,7 @@ test("each review source appears and leaves after its action", () => {
     pay(sample.db, cash.id, "2026-02-09", -7000, "Create one", food.id);
     pay(sample.db, cash.id, "2026-02-11", -7000, "Create two", food.id);
     const createBatch = importStatement(sample.db, sample.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,
@@ -320,6 +323,7 @@ test("each review source appears and leaves after its action", () => {
     }
 
     importStatement(sample.db, sample.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,

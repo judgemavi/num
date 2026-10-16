@@ -97,6 +97,7 @@ function addLine(db: ReturnType<typeof tempDatabase>["db"], categoryId: string) 
       openingDate: "2026-01-01",
       openingBalance: 0,
       createdAt: at,
+      createdOn: "2026-10-07",
       sortKey: "cash",
     })
     .run();

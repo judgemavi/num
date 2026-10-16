@@ -4,6 +4,7 @@ import type { PlanSchedule } from "./recurring-calc";
 
 const none: MonthlyBucket = {
   kind: "spending",
+  paused: false,
   startDate: "2000-01-01",
   commitment: null,
   refillTo: null,

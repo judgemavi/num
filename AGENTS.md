@@ -212,6 +212,9 @@ bun test
 bun run --filter api typecheck
 bun run --filter web build
 bun run --filter web lint
+bun run --filter @num/shared typecheck
+bun run --filter @num/db typecheck
+bun run --filter web typecheck:tests
 ```
 
 For UI changes, write a manual check list in the PR for the owner's usability test. Do not say that the UI works if a person did not examine it.

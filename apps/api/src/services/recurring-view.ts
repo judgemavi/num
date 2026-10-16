@@ -25,7 +25,7 @@ import { bookStep } from "./book-step";
 import { decidedKeys } from "./decision-keys";
 import { applyLinkedSchedule, isDecided } from "./match-apply";
 import { activeSchedules, requireSchedule, type ScheduleView } from "./schedules";
-import { withoutId, write, type WriteInput } from "./write";
+import { withoutId, write, type WriteInput, type Reader, type WriteTx } from "./write";
 
 type TxnRow = {
   id: string;
@@ -67,7 +67,7 @@ function transactionsByIds(db: Db, ids: readonly string[]) {
 }
 
 /** The transactions of the accounts from `from` (included) to `before` (not included). */
-function transactionsForAccounts(db: Db, accountIds: readonly string[], from: string, before: string) {
+function transactionsForAccounts(db: Reader, accountIds: readonly string[], from: string, before: string) {
   const rows: TxnRow[] = [];
   for (const accountId of accountIds) {
     rows.push(
@@ -235,7 +235,7 @@ export function listUpcoming(db: Db, asOf: string): UpcomingList {
 }
 
 /** The occurrences with no link or skip that a transaction can match on `asOf`, and the transactions in their windows. */
-function linkInput(db: Db, schedules: ScheduleView[], links: OccurrenceLinkRow[], asOf: string) {
+function linkInput(db: Reader, schedules: ScheduleView[], links: OccurrenceLinkRow[], asOf: string) {
   const occurrences = openOccurrences(schedules, new Set(links.map((link) => `${link.bucketId}|${link.dueDate}`)), asOf);
   const range = linkDateRange(occurrences);
   const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
@@ -288,38 +288,41 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
 }
 
 export function autoLink(db: Db, asOf: string, input: WriteInput & { accountId?: string }): { linked: number } {
-  const schedules = activeSchedules(db).filter((row) => !input.accountId || row.accountId === input.accountId);
+  const unique = automaticLinks(db, asOf, input.accountId);
+  if (unique.pairs.length === 0) return { linked: 0 };
+  return write(db, input, (tx) => saveAutomaticLinks(tx, unique));
+}
+
+function automaticLinks(db: Reader, asOf: string, accountId?: string) {
+  const schedules = activeSchedules(db).filter((row) => !accountId || row.accountId === accountId);
   const open = linkInput(db, schedules, db.select().from(occurrenceLinks).all(), asOf);
-  const unique = matchLinks(open.occurrences, open.candidates).unique;
-  if (unique.length === 0) {
-    return { linked: 0 };
-  }
-  const bySchedule = new Map(schedules.map((schedule) => [schedule.id, schedule]));
-  write(db, { source: input.source, at: input.at }, (tx) => {
-    for (const pair of unique) {
-      const schedule = bySchedule.get(pair.bucketId);
-      // An automatic link labels only a row that the person did not decide.
-      if (schedule && !isDecided(tx, pair.transactionId)) {
-        applyLinkedSchedule(tx, schedule, pair.transactionId);
-      }
-      const id = crypto.randomUUID();
-      const row: OccurrenceLinkRow = {
-        id,
-        bucketId: pair.bucketId,
-        dueDate: pair.dueDate,
-        transactionId: pair.transactionId,
-        skipped: false,
-        reason: null,
-      };
-      tx.insert(occurrenceLinks).values(row).run();
-      tx.audit({
-        entity: "occurrence_links",
-        entityId: id,
-        action: "link",
-        before: null,
-        after: withoutId(row),
-      });
+  return { pairs: matchLinks(open.occurrences, open.candidates).unique, schedules };
+}
+
+/** Import links share the transaction and audit log of the import. */
+export function autoLinkInTransaction(tx: WriteTx, asOf: string, accountId: string) {
+  return saveAutomaticLinks(tx, automaticLinks(tx, asOf, accountId));
+}
+
+function saveAutomaticLinks(tx: WriteTx, links: ReturnType<typeof automaticLinks>): { linked: number } {
+  const bySchedule = new Map(links.schedules.map((schedule) => [schedule.id, schedule]));
+  for (const pair of links.pairs) {
+    const schedule = bySchedule.get(pair.bucketId);
+    // An automatic link labels only a row that the person did not decide.
+    if (schedule && !isDecided(tx, pair.transactionId)) {
+      applyLinkedSchedule(tx, schedule, pair.transactionId);
     }
-  });
-  return { linked: unique.length };
+    const id = crypto.randomUUID();
+    const row: OccurrenceLinkRow = {
+      id,
+      bucketId: pair.bucketId,
+      dueDate: pair.dueDate,
+      transactionId: pair.transactionId,
+      skipped: false,
+      reason: null,
+    };
+    tx.insert(occurrenceLinks).values(row).run();
+    tx.audit({ entity: "occurrence_links", entityId: id, action: "link", before: null, after: withoutId(row) });
+  }
+  return { linked: links.pairs.length };
 }

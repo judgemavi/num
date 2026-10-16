@@ -3,26 +3,26 @@ import { and, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { decidedKeys } from "./decision-keys";
 
-export function importFreshness(db: Db, asOf: string): { accountId: string; lastImportAt: string | null }[] {
+export function importFreshness(db: Db, asOf: string): { accountId: string; lastImportedOn: string | null }[] {
   const open = db.select({ id: accounts.id }).from(accounts).where(isNull(accounts.archivedAt)).all();
   const batches = db
-    .select({ accountId: importBatches.accountId, createdAt: importBatches.createdAt })
+    .select({ accountId: importBatches.accountId, importedOn: importBatches.importedOn })
     .from(importBatches)
     .where(isNull(importBatches.undoneAt))
     .all();
   const latest = new Map<string, string>();
   for (const batch of batches) {
-    if (batch.createdAt.slice(0, 10) > asOf) {
+    if (batch.importedOn > asOf) {
       continue;
     }
     const current = latest.get(batch.accountId);
-    if (!current || current < batch.createdAt) {
-      latest.set(batch.accountId, batch.createdAt);
+    if (!current || current < batch.importedOn) {
+      latest.set(batch.accountId, batch.importedOn);
     }
   }
   return open.map((account) => ({
     accountId: account.id,
-    lastImportAt: latest.get(account.id) ?? null,
+    lastImportedOn: latest.get(account.id) ?? null,
   }));
 }
 

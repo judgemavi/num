@@ -7,6 +7,7 @@ import { saved } from "./bucket-test-book";
 
 export function account(db: Db, name: string, kind: "chequing" | "credit_card" | "property", openingBalance: number) {
   return createAccount(db, {
+    asOf: "2026-10-07",
     name,
     kind,
     openingDate: "2026-01-01",

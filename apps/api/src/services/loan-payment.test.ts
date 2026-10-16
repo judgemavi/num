@@ -24,6 +24,7 @@ function mortgageBook() {
     propertyAccountId: null,
   };
   const mortgage = createAccount(book.db, {
+    asOf: "2026-10-07",
     name: "Mortgage",
     kind: "mortgage",
     openingDate: "2026-02-01",

@@ -24,7 +24,7 @@ function withBook(run: (db: Db, dir: string, accountId: string) => void | Promis
     migrateDatabase(sqlite);
     const db = createDb(sqlite);
     runSetup(db, { asOf: "2026-10-07", currency: "CAD", categorySet: "none", ...saved });
-    const account = createAccount(db, { name: "Everyday", kind: "chequing", ...saved });
+    const account = createAccount(db, { asOf: "2026-10-07", name: "Everyday", kind: "chequing", ...saved });
     try {
       await run(db, dir, account.id);
     } finally {
@@ -35,7 +35,7 @@ function withBook(run: (db: Db, dir: string, accountId: string) => void | Promis
 }
 
 function importFile(db: Db, dir: string, accountId: string) {
-  const result = importStatement(db, dir, { ...saved, accountId, filename: "march.csv", mimeType: "text/csv", bytes, columnMap: map });
+  const result = importStatement(db, dir, { asOf: "2026-10-07", ...saved, accountId, filename: "march.csv", mimeType: "text/csv", bytes, columnMap: map });
   if (result.kind !== "batch") {
     throw new Error("Expected an import batch");
   }

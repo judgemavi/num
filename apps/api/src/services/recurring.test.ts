@@ -33,6 +33,7 @@ function tempDatabase() {
 
 function account(db: ReturnType<typeof tempDatabase>["db"], name = "Chequing") {
   return createAccount(db, {
+    asOf: "2026-10-07",
     name,
     institution: null,
     kind: "chequing",

@@ -23,7 +23,7 @@ function withBook(run: (db: Db, ids: { account: string; food: string; shop: stri
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "CAD" }).run();
   try {
-    const account = createAccount(db, { name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+    const account = createAccount(db, { asOf: "2026-10-07", name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
     const shop = createMerchant(db, { name: "Corner Shop", ...saved });
     run(db, { account: account.id, food: food.id, shop: shop.id });
@@ -222,7 +222,7 @@ test("removing a link records Not linked to a purchase", () => {
 
 test("a transfer question comes before the refund question", () => {
   withBook((db, ids) => {
-    const savings = createAccount(db, { name: "Savings", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+    const savings = createAccount(db, { asOf: "2026-10-07", name: "Savings", kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const left = money(db, ids.account, "2026-03-06", -50_000, ids.food);
     db.update(transactions).set({ source: "import" }).where(eq(transactions.id, left.id)).run();
     const right = money(db, savings.id, "2026-03-06", 50_000, ids.food);

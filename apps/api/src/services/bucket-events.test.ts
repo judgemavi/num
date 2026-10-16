@@ -36,6 +36,7 @@ test("cover rejects the same bucket, a bucket that is not overspent, and a short
   const book = tempDatabase();
   try {
     const account = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
@@ -61,6 +62,7 @@ test("undo of a move sets undoneAt and restores both balances", () => {
   const book = tempDatabase();
   try {
     createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
@@ -95,6 +97,7 @@ test("cover moves the shortfall from another bucket", () => {
   const book = tempDatabase();
   try {
     const account = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",

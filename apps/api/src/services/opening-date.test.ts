@@ -49,6 +49,7 @@ function storedOpening(db: Db, accountId: string): string | null {
 function importCsv(db: Db, dir: string, accountId: string, filename: string, lines: string[]) {
   const bytes = new TextEncoder().encode(["date,description,amount", ...lines].join("\n") + "\n");
   const result = importStatement(db, dir, {
+    asOf: "2026-10-07",
     source: "import",
     at,
     accountId,
@@ -65,6 +66,7 @@ test("an import of older rows moves the effective opening date", () => {
   const book = tempBook();
   try {
     const account = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Everyday",
       institution: null,
       kind: "chequing",
@@ -98,6 +100,7 @@ test("a user-set opening date does not move when older rows are imported", () =>
   const book = tempBook();
   try {
     const account = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Everyday",
       institution: null,
       kind: "chequing",
@@ -117,21 +120,18 @@ test("a user-set opening date does not move when older rows are imported", () =>
   }
 });
 
-test("an account with no opening date and no rows opens on the day of its creation, from its own column", () => {
-  const book = tempBook();
-  try {
-    const account = createAccount(book.db, {
-      name: "Cash",
-      institution: null,
-      kind: "chequing",
-      openingBalance: 0,
-      source: "ui",
-      at: "2026-10-07T23:30:00Z",
-    });
-    book.db.delete(auditLog).run();
-    expect(getAccount(book.db, account.id).automaticOpeningDate).toBe("2026-10-07");
-    expect(book.db.select({ createdAt: accounts.createdAt }).from(accounts).get()).toEqual({ createdAt: "2026-10-07T23:30:00Z" });
-  } finally {
-    book.close();
+test("an automatic opening uses the supplied local date on both sides of UTC midnight", () => {
+  for (const [at, asOf] of [["2026-10-08T00:30:00Z", "2026-10-07"], ["2026-10-07T23:30:00Z", "2026-10-08"]]) {
+    const book = tempBook();
+    try {
+      const account = createAccount(book.db, {
+        name: "Cash", kind: "chequing", openingBalance: 0, source: "ui", at, asOf,
+      });
+      book.db.delete(auditLog).run();
+      expect(getAccount(book.db, account.id).automaticOpeningDate).toBe(asOf);
+      expect(book.db.select({ createdAt: accounts.createdAt, createdOn: accounts.createdOn }).from(accounts).get()).toEqual({ createdAt: at, createdOn: asOf });
+    } finally {
+      book.close();
+    }
   }
 });

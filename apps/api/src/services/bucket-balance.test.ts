@@ -61,6 +61,7 @@ test("bucket balance counts lines from the start date and events on all dates", 
   const book = tempDatabase();
   try {
     const account = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",

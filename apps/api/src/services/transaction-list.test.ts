@@ -34,6 +34,7 @@ function book() {
   const handle = tempDatabase();
   const db = handle.db;
   const chequing = createAccount(db, {
+    asOf: "2026-10-07",
     name: "Everyday",
     kind: "chequing",
     openingDate: "2026-01-01",
@@ -41,6 +42,7 @@ function book() {
     ...saved,
   });
   const savings = createAccount(db, {
+    asOf: "2026-10-07",
     name: "Reserve",
     kind: "savings",
     openingDate: "2026-01-01",
@@ -118,7 +120,7 @@ test("filters match account, category, merchant, tag, date, text and uncategoriz
       payeeRaw: "Move",
       transferAccountId: fixture.savings.id,
     });
-    const loan = createAccount(fixture.db, { name: "Loan", kind: "loan", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+    const loan = createAccount(fixture.db, { asOf: "2026-10-07", name: "Loan", kind: "loan", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const mixed = createTransaction(fixture.db, {
       accountId: fixture.chequing.id,
       date: "2026-04-02",
@@ -274,32 +276,25 @@ test("running balance includes the opening balance and ignores other accounts an
   }
 });
 
-test("running balance is null for an investment account and present for a chequing account", () => {
+test("running balance is absent for valuation accounts and present for chequing", () => {
   const fixture = book();
   try {
-    const investment = createAccount(fixture.db, {
-      name: "Fund",
-      kind: "investment",
-      openingDate: "2026-01-01",
-      openingBalance: 50000,
-      ...saved,
-    });
-    add(fixture.db, {
-      accountId: investment.id,
-      date: "2026-02-01",
-      amount: 2000,
-      payeeRaw: "Buy units",
-    });
+    for (const kind of ["investment", "property", "mortgage", "loan"] as const) {
+      const valuedAccount = createAccount(fixture.db, {
+        asOf: "2026-10-07",
+        name: kind, kind, openingDate: "2026-01-01", openingBalance: 50000, ...saved,
+      });
+      add(fixture.db, { accountId: valuedAccount.id, date: "2026-02-01", amount: 2000, payeeRaw: "Adjustment" });
+      const valued = listTransactions(fixture.db, { ...page, accountId: valuedAccount.id });
+      expect(valued.items).toHaveLength(1);
+      expect(valued.items[0]?.runningBalance).toBeNull();
+    }
     add(fixture.db, {
       accountId: fixture.chequing.id,
       date: "2026-02-01",
       amount: -100,
       payeeRaw: "Fee",
     });
-
-    const valued = listTransactions(fixture.db, { ...page, accountId: investment.id });
-    expect(valued.items).toHaveLength(1);
-    expect(valued.items[0]?.runningBalance).toBeNull();
 
     const cash = listTransactions(fixture.db, { ...page, accountId: fixture.chequing.id });
     expect(cash.items).toHaveLength(1);

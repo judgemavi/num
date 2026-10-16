@@ -11,6 +11,7 @@ import type { PlannedImportRow } from "./import-plan";
 import { labelFields, linkRecurring, mortgageSplitLines } from "./match-apply";
 import { loadMatchBook, recurringForRows, scorePayee } from "./match-book";
 import { insertMirror } from "./transaction-transfer";
+import { autoLinkInTransaction } from "./recurring-view";
 import { linkAutomatic } from "./auto-link";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
@@ -41,7 +42,7 @@ type SaveInput = {
   unreadable: UnreadableRow[];
   presetId: string | null;
   columnMap: ColumnMap | null;
-  asOf: string | null;
+  asOf: string;
 };
 
 function scoredLabel(tx: WriteTx, accountId: string, row: PlannedImportRow, result: MatchResult) {
@@ -277,6 +278,7 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
           closingDate: input.closingDate,
           unreadableJson: input.unreadable,
           createdAt: input.at,
+          importedOn: input.asOf,
           undoneAt: null,
         })
         .run();
@@ -298,7 +300,7 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
         amount: row.amount,
         merchantId: null,
       }));
-      const recurring = input.asOf ? recurringForRows(tx, pending, input.asOf) : new Map();
+      const recurring = recurringForRows(tx, pending, input.asOf);
       const scores = new Map<number, MatchResult>();
       for (const row of created) {
         const hit = recurring.get(`import:${row.rowIndex}`) ?? null;
@@ -319,6 +321,7 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
       for (const newId of createdIds) {
         linkAutomatic(tx, newId);
       }
+      autoLinkInTransaction(tx, input.asOf, input.accountId);
       saveFormat(tx, input.accountId, input.presetId, input.columnMap);
       const batch = tx.select().from(importBatches).where(eq(importBatches.id, batchId)).get();
       if (!batch) {
@@ -334,6 +337,7 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
           accountId: batch.accountId,
           documentId: batch.documentId,
           parser: batch.parser,
+          importedOn: batch.importedOn,
           periodStart: batch.periodStart,
           periodEnd: batch.periodEnd,
           closingBalance: batch.closingBalance,

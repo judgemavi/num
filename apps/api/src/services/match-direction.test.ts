@@ -17,7 +17,7 @@ function book() {
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
-  const account = createAccount(db, { name: "Everyday", institution: null, kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+  const account = createAccount(db, { asOf: "2026-10-07", name: "Everyday", institution: null, kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
   const confirm = (payeeRaw: string, date: string, amount: number, line: { categoryId?: string; transferAccountId?: string }) =>
     createTransaction(db, { accountId: account.id, date, amount, payeeRaw, lines: [{ amount, ...line }], ...saved });
   return {
@@ -52,7 +52,7 @@ test("money in does not learn from money out", () => {
 test("a learned transfer ignores the direction", () => {
   const sample = book();
   try {
-    const savings = createAccount(sample.db, { name: "Savings", institution: null, kind: "savings", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+    const savings = createAccount(sample.db, { asOf: "2026-10-07", name: "Savings", institution: null, kind: "savings", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     sample.confirm("ONLINE TRANSFER", "2026-03-01", -800000, { transferAccountId: savings.id });
     const loaded = loadMatchBook(sample.db);
     expect(scorePayee(loaded, { payee: "ONLINE TRANSFER", amount: -800000, recurring: null }).transferAccountId).toBe(savings.id);

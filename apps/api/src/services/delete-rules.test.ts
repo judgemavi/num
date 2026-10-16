@@ -62,6 +62,7 @@ function assertLedger(sqlite: Database) {
 
 function paycheck(db: Db) {
   const cash = createAccount(db, {
+    asOf: "2026-10-07",
     name: "Cash",
     kind: "chequing",
     openingDate: "2026-01-01",
@@ -135,6 +136,7 @@ test("import undo skips a row the user linked as a transfer", () => {
   const sample = book();
   try {
     const cash = createAccount(sample.db, {
+      asOf: "2026-10-07",
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
@@ -142,6 +144,7 @@ test("import undo skips a row the user linked as a transfer", () => {
       ...saved,
     });
     const savings = createAccount(sample.db, {
+      asOf: "2026-10-07",
       name: "Savings",
       kind: "savings",
       openingDate: "2026-01-01",
@@ -149,6 +152,7 @@ test("import undo skips a row the user linked as a transfer", () => {
       ...saved,
     });
     const imported = importStatement(sample.db, sample.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,
@@ -186,6 +190,7 @@ test("undo of a row with a refund pointing at it clears the link", () => {
   const sample = book();
   try {
     const cash = createAccount(sample.db, {
+      asOf: "2026-10-07",
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
@@ -194,6 +199,7 @@ test("undo of a row with a refund pointing at it clears the link", () => {
     });
     const groceries = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
     const imported = importStatement(sample.db, sample.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,
@@ -244,6 +250,7 @@ test("delete of a transfer removes the mirror and leaves no orphan transfer line
   const sample = book();
   try {
     const cash = createAccount(sample.db, {
+      asOf: "2026-10-07",
       name: "Cash",
       kind: "chequing",
       openingDate: "2026-01-01",
@@ -251,6 +258,7 @@ test("delete of a transfer removes the mirror and leaves no orphan transfer line
       ...saved,
     });
     const savings = createAccount(sample.db, {
+      asOf: "2026-10-07",
       name: "Savings",
       kind: "savings",
       openingDate: "2026-01-01",

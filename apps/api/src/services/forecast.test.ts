@@ -31,7 +31,7 @@ function tempDatabase() {
 }
 
 function cashAccount(db: Db, name: string, openingBalance: number) {
-  return createAccount(db, { name, kind: "chequing", openingDate: "2026-01-01", openingBalance, ...saved });
+  return createAccount(db, { asOf: "2026-10-07", name, kind: "chequing", openingDate: "2026-01-01", openingBalance, ...saved });
 }
 
 function expense(db: Db, name: string) {

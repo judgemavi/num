@@ -44,6 +44,7 @@ function withBook(run: (db: Db, dir: string) => void) {
 
 function account(db: Db, kind: "chequing" | "savings" | "credit_card" | "investment", name: string, openingBalance: number) {
   return createAccount(db, {
+    asOf: "2026-10-07",
     name,
     kind,
     openingDate: "2026-01-01",
@@ -155,7 +156,7 @@ test("imports pass when each on-budget account was imported inside the stale win
   withBook((db, dir) => {
     const cash = account(db, "chequing", "Cash", 0);
     account(db, "investment", "Funds", 0);
-    const result = importStatement(db, dir, {
+    const result = importStatement(db, dir, { asOf: "2026-10-08",
       ...saved,
       at: "2026-10-08T12:00:00Z",
       accountId: cash.id,
@@ -174,7 +175,7 @@ test("imports pass when each on-budget account was imported inside the stale win
 test("imports fail when an on-budget account has no recent import", () => {
   withBook((db, dir) => {
     const cash = account(db, "chequing", "Cash", 0);
-    importStatement(db, dir, {
+    importStatement(db, dir, { asOf: "2026-09-01",
       ...saved,
       at: "2026-09-01T12:00:00Z",
       accountId: cash.id,
@@ -183,7 +184,7 @@ test("imports fail when an on-budget account has no recent import", () => {
       bytes: new TextEncoder().encode("date,description,amount\n09/01/2026,SHOP,-1.00\n"),
       columnMap: map,
     });
-    importStatement(db, dir, {
+    importStatement(db, dir, { asOf: "2026-10-20",
       ...saved,
       at: "2026-10-20T12:00:00Z",
       accountId: cash.id,
@@ -329,4 +330,22 @@ test("a cash account that was never imported does not fail", () => {
     expect(row.pass).toBe(true);
     expect(row.items).toEqual([{ accountId: cash.id, ageDays: null, pass: true }]);
   });
+});
+
+
+test("import age follows the supplied local date on both sides of UTC midnight", () => {
+  for (const [at, importedOn] of [["2026-10-08T00:30:00Z", "2026-10-07"], ["2026-10-07T23:30:00Z", "2026-10-08"]]) {
+    withBook((db, dir) => {
+      const cash = account(db, "chequing", "Cash", 0);
+      importStatement(db, dir, {
+        source: "import", at, asOf: importedOn, accountId: cash.id,
+        filename: "local.csv", mimeType: "text/csv",
+        bytes: new TextEncoder().encode("date,description,amount\n10/01/2026,SHOP,-1.00\n"), columnMap: map,
+      });
+      const onImportDay = check(db, importedOn, "imports_current");
+      expect(onImportDay.items).toEqual([{ accountId: cash.id, ageDays: 0, pass: true }]);
+      const nextDay = check(db, "2026-10-09", "imports_current");
+      expect(nextDay.items[0]?.ageDays).toBe(importedOn === "2026-10-07" ? 2 : 1);
+    });
+  }
 });

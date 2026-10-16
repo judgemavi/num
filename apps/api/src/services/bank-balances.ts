@@ -4,7 +4,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { requireWholeAmounts } from "./book-step";
-import { calculatedBalance } from "./calculated-balance";
+import { balanceOf } from "./account-balance";
 import { bankOpeningSuggestion } from "./opening-suggestion";
 import { withoutId, write, type Reader, type WriteInput, type WriteTx } from "./write";
 
@@ -34,7 +34,7 @@ function rowsOf(db: Reader, accountId: string): BankBalance[] {
 }
 
 function statusOf(db: Reader, account: AccountRow, latest: BankBalance): BankStatus {
-  const calculated = calculatedBalance(db, account, latest.date);
+  const calculated = balanceOf(db, account, latest.date);
   const difference = calculated - latest.balance;
   return {
     accountId: account.id,

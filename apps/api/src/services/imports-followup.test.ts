@@ -39,6 +39,7 @@ function tempBook() {
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
   const account = createAccount(db, {
+    asOf: "2026-10-07",
     name: "Everyday",
     institution: null,
     kind: "chequing",
@@ -64,6 +65,7 @@ function csv(lines: string[]): Uint8Array {
 
 function importCsv(db: Db, dir: string, accountId: string, filename: string, lines: string[]) {
   return importStatement(db, dir, {
+    asOf: "2026-10-07",
     source: "import",
     at,
     accountId,
@@ -83,6 +85,7 @@ test("the same rows with different bytes create no new transactions", () => {
   try {
     const text = "date,description,amount\n01/02/2026,NORTH MARKET,-12.50\n";
     importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
@@ -92,6 +95,7 @@ test("the same rows with different bytes create no new transactions", () => {
       columnMap: map,
     });
     const second = importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
@@ -117,6 +121,7 @@ test("a bank id uses the bank identity", () => {
   try {
     const bankMap = columnMapSchema.parse({ ...map, bankId: 3 });
     importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
@@ -138,6 +143,7 @@ test("undo of every row sets undoneAt and a later file can import the rows again
   try {
     const text = "date,description,amount\n01/08/2026,CITY TRANSIT,-3.25\n";
     const first = importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
@@ -153,6 +159,7 @@ test("undo of every row sets undoneAt and a later file can import the rows again
     expect(undone.blocked).toEqual([]);
     expect(undone.batch.undoneAt).toBe("2026-10-09T16:00:00Z");
     const again = importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at: "2026-10-10T16:00:00Z",
       accountId: book.account.id,
@@ -233,7 +240,7 @@ test("a failed import leaves no document, batch, row or file", () => {
         unreadable: [],
         presetId: null,
         columnMap: null,
-        asOf: null,
+        asOf: "2026-10-07",
       }),
     ).toThrow();
     expect(book.db.select().from(documents).all()).toHaveLength(0);

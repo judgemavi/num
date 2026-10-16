@@ -32,6 +32,7 @@ test("a linked plan labels an open payment and keeps the label that the person c
   const { db, close } = tempDatabase();
   try {
     const account = createAccount(db, {
+      asOf: "2026-10-07",
       name: "Chequing",
       institution: null,
       kind: "chequing",

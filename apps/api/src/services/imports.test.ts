@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { accounts, auditLog, transactions } from "@num/db";
+import { accounts, auditLog, transactions, importBatches, occurrenceLinks } from "@num/db";
 import { columnMapSchema } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
+import { createCategory } from "./categories";
+import { createSchedule } from "./schedule-test-book";
+import { createTransaction } from "./transactions";
 import { createAccount } from "./accounts";
 import { importStatement, listImportBatches } from "./imports";
 import { presetsDirectory } from "./presets";
@@ -15,6 +18,7 @@ test("the same file two times creates no new transactions", () => {
     const lines = ["01/02/2026,NORTH MARKET,-12.50", "01/03/2026,PAY DEPOSIT,20.00"];
     const bytes = csv(lines);
     const first = importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
@@ -24,6 +28,7 @@ test("the same file two times creates no new transactions", () => {
       columnMap: map,
     });
     const second = importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
@@ -99,6 +104,7 @@ test("a column map is saved after the first import", () => {
   try {
     const withBalance = columnMapSchema.parse({ ...map, balance: 3 });
     const first = importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
@@ -117,6 +123,7 @@ test("a column map is saved after the first import", () => {
     expect(saved?.columnMap).toEqual(withBalance);
 
     const second = importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
@@ -144,6 +151,7 @@ test("a saved preset that no longer exists uses detection", () => {
     book.db.update(accounts).set({ importPreset: "td-chequing" }).where(eq(accounts.id, book.account.id)).run();
     const bytes = new TextEncoder().encode(readFileSync(join(presetsDirectory(), "fixtures", "td-chequing.csv"), "utf8"));
     const result = importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
@@ -165,6 +173,7 @@ test("the first import with a running balance suggests the opening balance", () 
   try {
     const withBalance = columnMapSchema.parse({ ...map, balance: 3 });
     const first = importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
@@ -180,6 +189,7 @@ test("the first import with a running balance suggests the opening balance", () 
     expect(first.openingSuggestion).toEqual({ amount: 1_500_000, date: "2026-01-01" });
 
     const card = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Card",
       institution: null,
       kind: "credit_card",
@@ -191,6 +201,7 @@ test("the first import with a running balance suggests the opening balance", () 
     });
     const cardMap = columnMapSchema.parse({ ...withBalance, balanceSign: "inverted" });
     const cardImport = importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: card.id,
@@ -205,6 +216,7 @@ test("the first import with a running balance suggests the opening balance", () 
     }
 
     const second = importStatement(book.db, book.dir, {
+      asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
@@ -217,6 +229,36 @@ test("the first import with a running balance suggests the opening balance", () 
     if (second.kind === "batch") {
       expect(second.openingSuggestion).toBeNull();
     }
+  } finally {
+    book.close();
+  }
+});
+
+
+test("a recurring link failure rolls back the imported batch and its audit entries", () => {
+  const book = tempBook();
+  const saved = { source: "ui" as const, at };
+  try {
+    const category = createCategory(book.db, { name: "Rent", kind: "expense", ...saved });
+    createSchedule(book.db, {
+      name: "Rent", kind: "commitment", accountId: book.account.id, categoryId: category.id,
+      expectedAmount: -10_000, tolerance: 0, amountMode: "fixed", startDate: "2026-03-01",
+      freq: "monthly", interval: 1, monthDay: 1, businessDayShift: "none", ...saved,
+    });
+    const payment = createTransaction(book.db, {
+      accountId: book.account.id, date: "2026-03-01", amount: -10_000,
+      payeeRaw: "Rent", lines: [{ amount: -10_000, categoryId: category.id }], ...saved,
+    });
+    const auditCount = book.db.select().from(auditLog).all().length;
+    book.sqlite.exec("CREATE TRIGGER reject_test_link BEFORE INSERT ON occurrence_links BEGIN SELECT RAISE(ABORT, 'test link failure'); END");
+    expect(() => importStatement(book.db, book.dir, {
+      source: "import", at, accountId: book.account.id, asOf: "2026-03-05",
+      filename: "rent.csv", mimeType: "text/csv", bytes: csv(["03/01/2026,Rent,-10.00"]), columnMap: map,
+    })).toThrow("test link failure");
+    expect(book.db.select().from(importBatches).all()).toHaveLength(0);
+    expect(book.db.select().from(occurrenceLinks).all()).toHaveLength(0);
+    expect(book.db.select().from(auditLog).all()).toHaveLength(auditCount);
+    expect(book.db.select().from(transactions).where(eq(transactions.id, payment.id)).get()?.importRowId).toBeNull();
   } finally {
     book.close();
   }

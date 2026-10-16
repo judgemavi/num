@@ -43,6 +43,7 @@ function expectCode(run: () => void, code: ErrorCode) {
 
 function account(db: Db, name: string, kind: AccountKind) {
   return createAccount(db, {
+    asOf: "2026-10-07",
     name,
     kind,
     openingDate: "2026-01-01",

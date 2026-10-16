@@ -52,7 +52,7 @@ test("transfer is preselected only on evidence", () => {
   expect(fromHistory.transferAccountId).toBeNull();
   const fromRule = resolveEditorChoice({
     direction: "out",
-    suggestion: { merchantId: null, categoryId: null, transferAccountId: savings, reason: "learned_payee", level: "maybe", sourceId: null, confidence: 700 },
+    suggestion: { ...none, merchantId: null, categoryId: null, transferAccountId: savings, reason: "learned_payee", level: "maybe", sourceId: null, confidence: 700 },
     categoryKind: null,
     transferAccountFromRule: savings,
     oppositeAccountId: null,
@@ -93,7 +93,7 @@ test("the category kind follows the choice", () => {
   expect(categoryKindForChoice("loan_payment")).toBeNull();
   const refund = resolveEditorChoice({
     direction: "in",
-    suggestion: { merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "learned_payee", level: "maybe", sourceId: null, confidence: 700 },
+    suggestion: { ...none, merchantId: merchant, categoryId: coffee, transferAccountId: null, reason: "learned_payee", level: "maybe", sourceId: null, confidence: 700 },
     categoryKind: "expense",
     transferAccountFromRule: null,
     oppositeAccountId: null,
@@ -102,7 +102,7 @@ test("the category kind follows the choice", () => {
   expect(refund.categoryId).toBe(coffee);
   const incomeOnOut = resolveEditorChoice({
     direction: "out",
-    suggestion: { merchantId: null, categoryId: coffee, transferAccountId: null, reason: "learned_payee", level: "maybe", sourceId: null, confidence: 600 },
+    suggestion: { ...none, merchantId: null, categoryId: coffee, transferAccountId: null, reason: "learned_payee", level: "maybe", sourceId: null, confidence: 600 },
     categoryKind: "income",
     transferAccountFromRule: null,
     oppositeAccountId: null,

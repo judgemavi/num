@@ -20,7 +20,7 @@ test("an imported refund that comes before its purchase in the file is linked", 
   const db = createDb(sqlite);
   try {
     db.insert(settings).values({ key: "currency", value: "USD" }).run();
-    const account = createAccount(db, { name: "Everyday", kind: "chequing", openingDate: "2025-01-01", openingBalance: 0, ...saved });
+    const account = createAccount(db, { asOf: "2026-10-07", name: "Everyday", kind: "chequing", openingDate: "2025-01-01", openingBalance: 0, ...saved });
     const food = createCategory(db, { name: "Food", kind: "expense", ...saved });
     for (const [date, amount] of [["2025-05-01", -4000], ["2025-05-02", 4000]] as const) {
       createTransaction(db, {

@@ -1,15 +1,10 @@
-import { accountClass, allowsInterestRate, cardFieldIssue, type AccountKind, type PaymentPolicy } from "@num/shared";
+import { accountClass, usesValuation, allowsInterestRate, cardFieldIssue, type AccountKind, type PaymentPolicy } from "@num/shared";
 import { ServiceError } from "../service-error";
 
 type CardInput = {
   paymentPolicy?: PaymentPolicy | null;
   fixedPayment?: number | null;
 };
-
-/** A valuation sets the balance of these kinds (§5.10). */
-export function usesValuation(kind: AccountKind): boolean {
-  return kind === "investment" || kind === "property" || kind === "mortgage";
-}
 
 export function accountBalance(input: {
   kind: AccountKind;

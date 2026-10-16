@@ -23,7 +23,7 @@ function book() {
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
-  const account = createAccount(db, { name: "Everyday", institution: null, kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+  const account = createAccount(db, { asOf: "2026-10-07", name: "Everyday", institution: null, kind: "chequing", openingDate: "2026-01-01", openingBalance: 0, ...saved });
   const interest = createCategory(db, { name: "Interest", kind: "expense", ...saved });
   const other = createCategory(db, { name: "Fees", kind: "expense", ...saved });
   const terms = {
@@ -39,6 +39,7 @@ function book() {
     propertyAccountId: null,
   };
   const mortgage = createAccount(db, {
+    asOf: "2026-10-07",
     name: "Strive Mortgage",
     institution: null,
     kind: "mortgage",

@@ -26,6 +26,7 @@ export function tempBook() {
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
   const account = createAccount(db, {
+    asOf: "2026-10-07",
     name: "Everyday",
     institution: null,
     kind: "chequing",
@@ -60,6 +61,7 @@ export function importCsv(
   columnMap: ColumnMap | null = map,
 ) {
   return importStatement(db, dir, {
+    asOf: "2026-10-07",
     source: "import",
     at,
     accountId,

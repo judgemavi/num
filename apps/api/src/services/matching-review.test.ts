@@ -33,6 +33,7 @@ function book() {
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
   const account = createAccount(db, {
+    asOf: "2026-10-07",
     name: "Everyday",
     institution: null,
     kind: "chequing",
@@ -73,6 +74,7 @@ test("undo removes the mortgage mirror created for an imported payment", () => {
   try {
     const interest = createCategory(sample.db, { name: "Interest", kind: "expense", ...saved });
     const mortgage = createAccount(sample.db, {
+      asOf: "2026-10-07",
       name: "Home loan",
       institution: null,
       kind: "mortgage",
@@ -144,6 +146,7 @@ test("a mortgage import links an existing opposite row", () => {
       propertyAccountId: null,
     };
     const mortgage = createAccount(sample.db, {
+      asOf: "2026-10-07",
       name: "Home loan",
       institution: null,
       kind: "mortgage",
@@ -271,6 +274,7 @@ test("a learned transfer preselects Transfer and is not automatic", () => {
   const sample = book();
   try {
     const visa = createAccount(sample.db, {
+      asOf: "2026-10-07",
       name: "Visa",
       institution: null,
       kind: "savings",
@@ -322,21 +326,21 @@ test("a brand family suggests when 2 learned payees agree, and stops when they d
     const transit = createCategory(sample.db, { name: "Transit", kind: "expense", ...saved });
     const food = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
     const fuel = createCategory(sample.db, { name: "Fuel", kind: "expense", ...saved });
-    learn(sample, "PRESTO SHEPPARD STN", transit.id);
-    learn(sample, "COSTCO WHOLESALE", food.id);
-    learn(sample, "COSTCO GAS", fuel.id);
-    const one = scorePayee(loadMatchBook(sample.db), { payee: "COSTCO BUSINESS CENTRE", amount: -4000, recurring: null });
+    learn(sample, "DEMOFARE NORTH STN", transit.id);
+    learn(sample, "EXAMPLEMART WHOLESALE", food.id);
+    learn(sample, "EXAMPLEMART GAS", fuel.id);
+    const one = scorePayee(loadMatchBook(sample.db), { payee: "EXAMPLEMART BUSINESS CENTRE", amount: -4000, recurring: null });
     expect(one.level).toBe("none");
-    expect(scorePayee(loadMatchBook(sample.db), { payee: "PRESTO DUNDAS STN", amount: -4000, recurring: null }).level).toBe("none");
-    learn(sample, "PRESTO KING STN", transit.id);
+    expect(scorePayee(loadMatchBook(sample.db), { payee: "DEMOFARE EAST STN", amount: -4000, recurring: null }).level).toBe("none");
+    learn(sample, "DEMOFARE WEST STN", transit.id);
     const loaded = loadMatchBook(sample.db);
-    const family = scorePayee(loaded, { payee: "PRESTO DUNDAS STN", amount: -4000, recurring: null });
+    const family = scorePayee(loaded, { payee: "DEMOFARE EAST STN", amount: -4000, recurring: null });
     expect(family.categoryId).toBe(transit.id);
     expect(family.reason).toBe("family");
     expect(family.level).toBe("suggestion");
-    expect(scorePayee(loaded, { payee: "COSTCO BUSINESS CENTRE", amount: -4000, recurring: null }).level).toBe("none");
-    learn(sample, "PRESTO LOAD", fuel.id);
-    expect(scorePayee(loadMatchBook(sample.db), { payee: "PRESTO DUNDAS STN", amount: -4000, recurring: null }).level).toBe("none");
+    expect(scorePayee(loaded, { payee: "EXAMPLEMART BUSINESS CENTRE", amount: -4000, recurring: null }).level).toBe("none");
+    learn(sample, "DEMOFARE LOAD", fuel.id);
+    expect(scorePayee(loadMatchBook(sample.db), { payee: "DEMOFARE EAST STN", amount: -4000, recurring: null }).level).toBe("none");
   } finally {
     sample.close();
   }
@@ -347,10 +351,10 @@ test("containment wins over the brand family", () => {
   try {
     const transit = createCategory(sample.db, { name: "Transit", kind: "expense", ...saved });
     const fuel = createCategory(sample.db, { name: "Fuel", kind: "expense", ...saved });
-    learn(sample, "PRESTO SHEPPARD STN", transit.id);
-    learn(sample, "PRESTO KING STN", transit.id);
-    learn(sample, "PRESTO LOAD", fuel.id);
-    const result = scorePayee(loadMatchBook(sample.db), { payee: "PRESTO LOAD TORONTO", amount: -4000, recurring: null });
+    learn(sample, "DEMOFARE NORTH STN", transit.id);
+    learn(sample, "DEMOFARE WEST STN", transit.id);
+    learn(sample, "DEMOFARE LOAD", fuel.id);
+    const result = scorePayee(loadMatchBook(sample.db), { payee: "DEMOFARE LOAD EXAMPLEVILLE", amount: -4000, recurring: null });
     expect(result.reason).toBe("similar");
     expect(result.categoryId).toBe(fuel.id);
   } finally {
@@ -367,17 +371,17 @@ test("a payee that contains a learned payee is a similar suggestion and never au
         accountId: sample.account.id,
         date,
         amount: -4000,
-        payeeRaw: "COSTCO WHOLESALE",
+        payeeRaw: "EXAMPLEMART WHOLESALE",
         lines: [{ amount: -4000, categoryId: food.id }],
         ...saved,
       });
     }
     const loaded = loadMatchBook(sample.db);
-    const similar = scorePayee(loaded, { payee: "COSTCO WHOLESALE W535 TORONTO", amount: -4000, recurring: null });
+    const similar = scorePayee(loaded, { payee: "EXAMPLEMART WHOLESALE W909 EXAMPLEVILLE", amount: -4000, recurring: null });
     expect(similar.categoryId).toBe(food.id);
     expect(similar.reason).toBe("similar");
     expect(similar.level).toBe("suggestion");
-    expect(scorePayee(loaded, { payee: "COSTCO", amount: -4000, recurring: null }).level).toBe("none");
+    expect(scorePayee(loaded, { payee: "EXAMPLEMART", amount: -4000, recurring: null }).level).toBe("none");
   } finally {
     sample.close();
   }

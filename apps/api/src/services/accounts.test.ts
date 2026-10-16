@@ -27,6 +27,7 @@ const at = "2026-10-07T16:00:00Z";
 
 function base(kind: AccountKind, openingBalance = 0): AccountCreate & { source: "ui"; at: string } {
   return {
+    asOf: "2026-10-07",
     name: "Example account",
     institution: null,
     kind,
@@ -102,10 +103,10 @@ test("a transaction account balance is the opening balance plus transactions", (
   }
 });
 
-test("an investment or property balance uses the latest valuation and later transactions", () => {
+test("a valuation account balance uses the latest valuation and later transactions", () => {
   const book = tempDatabase();
   try {
-    for (const kind of ["investment", "property"] as const) {
+    for (const kind of ["investment", "property", "mortgage", "loan"] as const) {
       const account = createAccount(book.db, { ...base(kind, 9990), name: kind });
       addValuation(book.db, account.id, "2026-03-01", 5000);
       addValuation(book.db, account.id, "2026-06-01", 10000);
@@ -119,7 +120,7 @@ test("an investment or property balance uses the latest valuation and later tran
     addTransaction(book.db, empty.id, "2026-02-01", 500);
     expect(balanceOf(book.db, empty.id)).toBe(10500);
 
-    const mortgage = createAccount(book.db, base("mortgage", -200000));
+    const mortgage = createAccount(book.db, { ...base("mortgage", -200000), name: "Home debt" });
     addValuation(book.db, mortgage.id, "2026-06-01", -150000);
     addTransaction(book.db, mortgage.id, "2026-07-01", 5000);
     expect(balanceOf(book.db, mortgage.id)).toBe(-145000);

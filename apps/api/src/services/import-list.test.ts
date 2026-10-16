@@ -39,6 +39,7 @@ function tempBook() {
 
 function account(db: Db, name: string) {
   return createAccount(db, {
+    asOf: "2026-10-07",
     name,
     institution: null,
     kind: "chequing",
@@ -51,6 +52,7 @@ function account(db: Db, name: string) {
 
 function importCsv(db: Db, dir: string, accountId: string, filename: string, at: string, line: string) {
   const result = importStatement(db, dir, {
+    asOf: "2026-10-07",
     source: "import",
     at,
     accountId,

@@ -37,6 +37,11 @@ const budgetKinds = new Set<AccountKind>(["chequing", "savings", "cash", "credit
 
 const interestKinds = new Set<AccountKind>(["savings", "loan"]);
 
+/** These accounts use a valuation before subsequent transactions. */
+export function usesValuation(kind: AccountKind): boolean {
+  return kind === "investment" || kind === "property" || kind === "mortgage" || kind === "loan";
+}
+
 export function accountClass(kind: AccountKind): AccountClass {
   return liabilityKinds.has(kind) ? "liability" : "asset";
 }
@@ -145,7 +150,7 @@ const accountWriteFields = z.object({
   onBudget: z.boolean().optional(),
 });
 
-export const accountCreateSchema = accountWriteFields.superRefine(cardAndRateOk);
+export const accountCreateSchema = accountWriteFields.extend({ asOf: isoDateSchema }).superRefine(cardAndRateOk);
 
 /** A PATCH body: only the fields that change. The API checks the fields together on the stored account with the patch. */
 export const accountUpdateSchema = accountWriteFields.partial();

@@ -58,9 +58,10 @@ function monthly(db: Db, input: Pick<ScheduleInput, "name" | "kind" | "accountId
 test("forecast months: unlinked income, bills and variable spending; card payments and transfers are not spending", () => {
   const book = tempDatabase();
   try {
-    const cash = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 5_000_000, ...saved });
-    const savings = createAccount(book.db, { name: "Savings", kind: "savings", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+    const cash = createAccount(book.db, { asOf: "2026-10-07", name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 5_000_000, ...saved });
+    const savings = createAccount(book.db, { asOf: "2026-10-07", name: "Savings", kind: "savings", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const card = createAccount(book.db, {
+      asOf: "2026-10-07",
       name: "Card",
       kind: "credit_card",
       openingDate: "2026-01-01",
@@ -125,7 +126,7 @@ test("forecast months: unlinked income, bills and variable spending; card paymen
 test("category spending uses complete months only: not the month of asOf", () => {
   const book = tempDatabase();
   try {
-    const cash = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 5_000_000, ...saved });
+    const cash = createAccount(book.db, { asOf: "2026-10-07", name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 5_000_000, ...saved });
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
     record(book.db, cash.id, "2026-01-15", -31_000, { categoryId: groceries.id });
     record(book.db, cash.id, "2026-02-15", -31_000, { categoryId: groceries.id });
@@ -144,7 +145,7 @@ test("category spending uses complete months only: not the month of asOf", () =>
 test("category spending does not count months before the first transaction", () => {
   const book = tempDatabase();
   try {
-    const cash = createAccount(book.db, { name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 5_000_000, ...saved });
+    const cash = createAccount(book.db, { asOf: "2026-10-07", name: "Cash", kind: "chequing", openingDate: "2026-01-01", openingBalance: 5_000_000, ...saved });
     const groceries = createCategory(book.db, { name: "Groceries", kind: "expense", ...saved });
     record(book.db, cash.id, "2026-03-15", -31_000, { categoryId: groceries.id });
 

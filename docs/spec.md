@@ -181,7 +181,7 @@ Rules:
 - Import fields: `importPreset?` (a preset ID) and `columnMap?` (JSON, §7.2). The app saves them after the first import.
 - `interestRateMilliPct?` is for savings and loans (not for credit cards). It is for information and for payoff calculations.
 - Balance of a transaction account = `openingBalance` + the sum of the transaction amounts in the account.
-- Balance of an `investment` or `property` account = the latest valuation (§5.10) + the transactions after the valuation date.
+- Balance of an `investment`, `property`, `mortgage` or `loan` account = the latest valuation (§5.10) + the transactions after the valuation date.
   If the account has no valuation, use the transaction account formula.
 
 The opening balance is a field. It is not a transaction. There is no equity account.
@@ -419,7 +419,6 @@ Use valuations for:
 An account has a maximum of one active valuation on each date.
 
 The user enters a valuation (in the UI or through MCP).
-For a mortgage, a valuation replaces the calculated balance from its date.
 
 ### 5.11 Import batch and import row
 

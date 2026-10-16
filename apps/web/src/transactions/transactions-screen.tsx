@@ -1,3 +1,4 @@
+import { usesValuation } from "@num/shared";
 import { Plus } from "lucide-react";
 import { Boundary } from "@/components/boundary";
 import { ListEmpty } from "@/components/list-card";
@@ -89,7 +90,7 @@ function TransactionList() {
       ) : (
         <TransactionsTable
           rows={page.items}
-          showBalance={selectedAccount !== undefined && selectedAccount.kind !== "investment" && selectedAccount.kind !== "property"}
+          showBalance={selectedAccount !== undefined && !usesValuation(selectedAccount.kind)}
           sort={sort}
           onSort={sortBy}
         />

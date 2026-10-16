@@ -31,7 +31,7 @@ function blankToNull(value: string | null | undefined) {
 }
 
 function toAccount(row: AccountRow, balance: number, automatic: AutomaticOpening): Account {
-  const { id, name, institution, kind, onBudget, openingDate, createdAt, ...rest } = withoutSortKey(row);
+  const { id, name, institution, kind, onBudget, openingDate, createdAt, createdOn, ...rest } = withoutSortKey(row);
   return {
     id,
     name,
@@ -87,6 +87,7 @@ export function createAccount(db: Db, input: AccountCreate & WriteInput): Accoun
     importPreset: null,
     columnMap: null,
     createdAt: at,
+    createdOn: input.asOf,
     sortKey: foldName(input.name.trim()),
   };
   write(db, { source: input.source, at }, (tx) => {
@@ -116,7 +117,7 @@ export function updateAccount(db: Db, id: string, input: AccountUpdate & WriteIn
       throw new ServiceError("account_not_found", 404);
     }
     const storedTerms = readTerms(tx, id) ?? null;
-    const next = mergedWrite(accountCreateSchema, { ...existing, mortgageTerms: storedTerms }, input);
+    const next = mergedWrite(accountCreateSchema, { ...existing, asOf: existing.createdOn, mortgageTerms: storedTerms }, input);
     assertSameClass(existing.kind, next.kind);
     const openingDate = next.openingDate ?? null;
     const openingBalance = next.openingBalance ?? existing.openingBalance;

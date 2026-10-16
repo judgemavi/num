@@ -18,6 +18,7 @@ export const accounts = sqliteTable(
     interestRateMilliPct: integer("interest_rate_milli_pct"),
     importPreset: text("import_preset"),
     columnMap: text("column_map", { mode: "json" }).$type<ColumnMap>(),
+    createdOn: text("created_on").notNull(),
     createdAt: text("created_at").notNull(),
     /** The folded name (`foldName`). The list sorts by it. */
     sortKey: text("sort_key").notNull(),

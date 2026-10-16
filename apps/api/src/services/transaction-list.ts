@@ -1,3 +1,4 @@
+import { usesValuation } from "@num/shared";
 import { accounts, categories, lineTags, merchants, transactionLines, transactions } from "@num/db";
 import type {
   TransactionFilter,
@@ -179,7 +180,7 @@ function toItem(
 
 function usesTransactionBalance(db: Db, accountId: string) {
   const row = db.select({ kind: accounts.kind }).from(accounts).where(eq(accounts.id, accountId)).get();
-  return row !== undefined && row.kind !== "investment" && row.kind !== "property";
+  return row !== undefined && !usesValuation(row.kind);
 }
 
 /** The balance of the account after each row: the opening balance and all the rows up to it. One window query. */

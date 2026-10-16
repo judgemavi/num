@@ -1,6 +1,6 @@
 import type { CurrencyCode } from "@num/shared";
 import { queryOptions, useMutation } from "@tanstack/react-query";
-import { api, unwrap } from "@/api/client";
+import { api, formWrite, unwrap } from "@/api/client";
 
 export function bookCurrencyQuery() {
   return queryOptions({
@@ -12,6 +12,7 @@ export function bookCurrencyQuery() {
 /** A change of the book currency is a relabel. Amounts do not change. */
 export function useSaveBookCurrency() {
   return useMutation({
+    meta: formWrite,
     mutationFn: (currency: CurrencyCode) => unwrap(api.settings.currency.$patch({ json: { currency } })),
   });
 }
@@ -25,6 +26,7 @@ export function aiAccessQuery() {
 
 export function useSaveAiAccess() {
   return useMutation({
+    meta: { errorText: () => "The AI access setting did not save. Try again." },
     mutationFn: (aiCanWrite: boolean) => unwrap(api.settings.ai.$patch({ json: { aiCanWrite } })),
   });
 }

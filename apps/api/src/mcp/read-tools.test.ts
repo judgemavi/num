@@ -104,6 +104,7 @@ async function restJson(app: OpenAPIHono, path: string): Promise<Record<string, 
 
 function seed(db: Db, dir: string) {
   const account = createAccount(db, {
+    asOf: "2026-10-07",
     name: "Everyday",
     kind: "chequing",
     openingDate: "2026-01-01",

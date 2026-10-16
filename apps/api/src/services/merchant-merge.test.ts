@@ -34,6 +34,7 @@ test("merge moves transactions, bills and incomes, then archives the source", ()
   const { db, close } = tempDatabase();
   try {
     const account = createAccount(db, {
+      asOf: "2026-10-07",
       name: "Chequing",
       institution: null,
       kind: "chequing",

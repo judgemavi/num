@@ -34,6 +34,7 @@ function book() {
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
   const account = createAccount(db, {
+    asOf: "2026-10-07",
     name: "Everyday",
     institution: null,
     kind: "chequing",
@@ -54,6 +55,7 @@ function book() {
 
 function importCsv(db: Db, dir: string, accountId: string, filename: string, lines: string[]) {
   return importStatement(db, dir, {
+    asOf: "2026-10-07",
     source: "import",
     at,
     accountId,
@@ -121,8 +123,9 @@ test("a transfer and a loan payment are never labeled automatically", () => {
   const sample = book();
   try {
     const food = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
-    const loan = createAccount(sample.db, { name: "Loan", institution: null, kind: "loan", openingDate: "2026-01-01", openingBalance: 0, ...saved });
+    const loan = createAccount(sample.db, { asOf: "2026-10-07", name: "Loan", institution: null, kind: "loan", openingDate: "2026-01-01", openingBalance: 0, ...saved });
     const visa = createAccount(sample.db, {
+      asOf: "2026-10-07",
       name: "Visa",
       institution: null,
       kind: "savings",

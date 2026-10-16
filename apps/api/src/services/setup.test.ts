@@ -98,6 +98,7 @@ test("a currency change after the first transaction is a relabel and keeps the s
         openingDate: "2026-01-01",
         openingBalance: 0,
         createdAt: at,
+      createdOn: "2026-10-07",
         sortKey: "cash",
       })
       .run();
