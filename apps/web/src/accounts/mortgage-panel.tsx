@@ -28,18 +28,19 @@ function readAmount(currency: string, text: string) {
 }
 
 /** The extra amounts of the form for the schedule, or the text of the error. */
-function readExtra(currency: string, value: { lump: string; lumpDate: string }) {
+function readExtra(currency: string, value: { extra: string; lump: string; lumpDate: string }) {
+  const extra = readAmount(currency, value.extra);
   const lumpSum = readAmount(currency, value.lump);
-  if (lumpSum === null) {
-    return { error: decimalsError(currency, value.lump) ?? "Enter the extra amount as a number." };
+  if (extra === null || lumpSum === null) {
+    return { error: decimalsError(currency, value.extra) ?? decimalsError(currency, value.lump) ?? "Enter the extra amount as a number." };
   }
-  if (lumpSum < 0) {
+  if (extra < 0 || lumpSum < 0) {
     return { error: "Enter the extra amount as a positive number." };
   }
   if ((lumpSum > 0) !== (value.lumpDate.length > 0)) {
     return { error: "Enter the one-time extra and its date." };
   }
-  return { effect: { extra: 0, lumpSum, lumpDate: value.lumpDate } };
+  return { effect: { extra, lumpSum, lumpDate: value.lumpDate } };
 }
 
 function formatDay(iso: string) {
@@ -58,7 +59,7 @@ function MortgageView({ accountId }: { accountId: string }) {
   const { openEditor } = useEditors();
   const currency = useBookCurrency();
   const form = useAppForm({
-    defaultValues: { lump: "", lumpDate: "", effect: { extra: 0, lumpSum: 0, lumpDate: "" } },
+    defaultValues: { extra: "", lump: "", lumpDate: "", effect: { extra: 0, lumpSum: 0, lumpDate: "" } },
     validators: {
       onSubmit: ({ value }) => {
         const extra = readExtra(currency, value);
@@ -123,6 +124,7 @@ function MortgageView({ accountId }: { accountId: string }) {
         <MortgageSchedule payments={row.payments} actuals={row.actualPayments} />
         <form.AppForm>
           <form.FormShell className="grid gap-3 sm:grid-cols-2">
+            <form.AppField name="extra">{(field) => <field.MoneyField id="mortgage-extra" label="Extra on each payment" />}</form.AppField>
             <form.AppField name="lump">{(field) => <field.MoneyField id="mortgage-lump" label="One-time extra" />}</form.AppField>
             <form.AppField name="lumpDate">{(field) => <field.DateInputField id="mortgage-lump-date" label="Date of the one-time extra" />}</form.AppField>
             <form.SubmitButton>

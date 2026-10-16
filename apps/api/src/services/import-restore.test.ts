@@ -11,11 +11,11 @@ import { createTransaction, getTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at };
 
-function withBalance(book: ReturnType<typeof tempBook>, amount = "-10.00", balance = "90.00") {
+function withBalance(book: ReturnType<typeof tempBook>, amount = "-10.00", balance = "90.00", date = "03/01/2026") {
   const result = importStatement(book.db, book.dir, {
     asOf: "2026-10-07", source: "import", at, accountId: book.account.id,
     filename: "statement.csv", mimeType: "text/csv",
-    bytes: csv([`03/01/2026,Example,${amount},${balance}`], true), columnMap: { ...map, balance: 3 },
+    bytes: csv([`${date},Example,${amount},${balance}`], true), columnMap: { ...map, balance: 3 },
   });
   if (result.kind !== "batch") throw new Error("Expected a batch");
   return result;
@@ -84,6 +84,35 @@ for (const reviewed of [false, true]) {
       undoImportBatch(book.db, batch.id, saved);
       expect(getTransaction(book.db, source.transferPeerId)).toEqual(before);
       expect(book.db.select().from(transactions).where(eq(transactions.id, source.id)).get()?.transferPeerId).toBe(source.transferPeerId);
+    } finally {
+      book.close();
+    }
+  });
+}
+
+
+for (const olderFirst of [true, false]) {
+  test(`undo of overlapping imports leaves no balance: ${olderFirst ? "A then B" : "B then A"}`, () => {
+    const book = tempBook();
+    try {
+      const a = withBalance(book, "-20.00", "80.00", "09/30/2026");
+      const balanceA = listBankBalances(book.db, book.account.id).items;
+      const b = withBalance(book, "-10.00", "90.00", "09/30/2026");
+      expect(listBankBalances(book.db, book.account.id).items[0]).toMatchObject({
+        date: "2026-09-30", balance: 90_000, importBatchId: b.id,
+      });
+      const first = undoImportBatch(book.db, olderFirst ? a.id : b.id, saved);
+      expect(first.blocked).toEqual([]);
+      expect(first.batch.undoneAt).toBe(at);
+      if (olderFirst) {
+        expect(listBankBalances(book.db, book.account.id).items[0]?.importBatchId).toBe(b.id);
+      } else {
+        expect(listBankBalances(book.db, book.account.id).items).toEqual(balanceA);
+      }
+      const second = undoImportBatch(book.db, olderFirst ? b.id : a.id, saved);
+      expect(second.blocked).toEqual([]);
+      expect(second.batch.undoneAt).toBe(at);
+      expect(listBankBalances(book.db, book.account.id).items).toEqual([]);
     } finally {
       book.close();
     }

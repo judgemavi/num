@@ -184,7 +184,7 @@ export function saveImportBankBalance(
   tx.audit({ entity: "bank_balances", entityId: row.id, action: "create", before: null, after: withoutId(row) });
 }
 
-/** Undo removes the balance of the batch and restores the balance that it replaced. */
+/** Undo restores the replaced balance only if its source batch has not been undone. */
 export function restoreImportBankBalance(tx: WriteTx, batchId: string): void {
   const row = tx.select().from(bankBalances).where(eq(bankBalances.importBatchId, batchId)).get();
   if (!row) {
@@ -193,6 +193,12 @@ export function restoreImportBankBalance(tx: WriteTx, batchId: string): void {
   tx.delete(bankBalances).where(eq(bankBalances.id, row.id)).run();
   tx.audit({ entity: "bank_balances", entityId: row.id, action: "delete", before: withoutId(row), after: null });
   const previous = tx.select().from(importBatches).where(eq(importBatches.id, batchId)).get()?.previousBankBalance;
+  if (previous?.importBatchId) {
+    const source = tx.select({ undoneAt: importBatches.undoneAt }).from(importBatches).where(eq(importBatches.id, previous.importBatchId)).get();
+    if (source?.undoneAt) {
+      return;
+    }
+  }
   if (previous) {
     tx.insert(bankBalances).values(previous).run();
     tx.audit({ entity: "bank_balances", entityId: previous.id, action: "create", before: null, after: withoutId(previous) });
