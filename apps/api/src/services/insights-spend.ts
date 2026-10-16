@@ -5,6 +5,7 @@ import {
   isUncategorizedLine,
   savingsRateMilliPct,
   uncategorizedFlows,
+  type IdentityColor,
   type InsightGroupRow,
   type InsightRow,
 } from "@num/shared";
@@ -58,7 +59,7 @@ export function spendTotals(facts: readonly LedgerLine[], period: Period) {
  * with lines stays in the list, also when its spending is zero or less. Categories with no group are the "none"
  * group. Uncategorized lines are one last row with no categories.
  */
-export function groupRows(facts: readonly LedgerLine[], period: Period): InsightGroupRow[] {
+export function groupRows(facts: readonly LedgerLine[], period: Period, colors: ReadonlyMap<string, IdentityColor>): InsightGroupRow[] {
   const groups = new Map<string, Map<string, number>>();
   const uncategorized: number[] = [];
   for (const fact of facts) {
@@ -77,12 +78,12 @@ export function groupRows(facts: readonly LedgerLine[], period: Period): Insight
   const rows = [...groups].map(([key, totals]): InsightGroupRow => {
     const categories = itemRows(totals);
     const amount = categories.reduce((sum, row) => sum + row.amount, 0);
-    return { id: key === "" ? null : key, kind: key === "" ? "none" : "item", amount, inflow: null, categories };
+    return { id: key === "" ? null : key, kind: key === "" ? "none" : "item", amount, inflow: null, color: colors.get(key) ?? null, categories };
   });
   rows.sort(compareRows);
   if (uncategorized.length > 0) {
     const flows = uncategorizedFlows(uncategorized);
-    rows.push({ id: null, kind: "uncategorized", amount: flows.spent, inflow: flows.inflow, categories: [] });
+    rows.push({ id: null, kind: "uncategorized", amount: flows.spent, inflow: flows.inflow, color: null, categories: [] });
   }
   return rows;
 }

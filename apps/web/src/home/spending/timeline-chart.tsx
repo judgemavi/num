@@ -11,8 +11,8 @@ import { formatMoney } from "@/money";
 
 /** The series of the timeline and their chart tokens (design §6 Charts). */
 const config = {
-  income: { label: "Income", color: "var(--chart-3)" },
-  spending: { label: "Spending", color: "var(--chart-2)" },
+  income: { label: "Income", color: "var(--color-teal-3)" },
+  spending: { label: "Spending", color: "var(--color-ocean-1)" },
 } satisfies ChartConfig;
 
 const forecastOpacity = 0.35;

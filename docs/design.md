@@ -10,7 +10,7 @@ Status: **approved**. This file is the source of truth for the look of the web a
    - Iris: "you can do this" (main buttons, selection, progress, links).
    - Tomato: "this needs you" (needs-review count, over budget, old imports).
    - Green: "this is on track" (paid, on track).
-2. **Pastel colour is identity.** Each bucket, account group and Home item kind has its own hue everywhere.
+2. **Pastel colour is identity.** Each bucket, category group, account group and Home item kind has its own hue everywhere.
    Always a soft fill with a deep glyph.
 3. **Everything else is neutral:** text, borders, group labels, navigation.
 4. **One page pattern** on every main screen (§5).
@@ -45,16 +45,22 @@ Put these in `apps/web/src/index.css` as CSS variables. Map them to the shadcn v
 | scrim | `rgb(23 23 28 / .45)` | dialog overlay |
 | shadow | `0 1px 2px rgb(0 0 0/.05), 0 16px 40px rgb(23 23 28/.14)` | dialogs, popovers, the action bar |
 
-**Identity hues** (soft fill / deep glyph):
+**Identity palette** (fill, glyph, chart and category shades, darkest first):
 
-| Name | Fill | Glyph |
-|---|---|---|
-| sky | `#E1F0FA` | `#1F6E9E` |
-| mint | `#E2F3E8` | `#25734A` |
-| lilac | `#EEE9FD` | `#5B3FC4` |
-| butter | `#FDF1CF` | `#8A5B00` |
-| pink | `#FCE7F1` | `#A3326B` |
-| teal | `#DDF3F1` | `#11706A` |
+| Name | Fill | Glyph | Chart | Shades |
+|---|---|---|---|---|
+| sky | `#DCF4FF` | `#005E8F` | `#248FCC` | `#006AA2` `#0C82BF` `#4BA1D9` `#78BDEC` `#A3D5F8` |
+| ocean | `#E5F0FF` | `#3B5495` | `#6182D4` | `#425FA9` `#5676C7` `#7696E1` `#97B3F3` `#B8CDFE` |
+| lilac | `#F0ECFF` | `#5A4A90` | `#8976CD` | `#6653A3` `#7D6AC0` `#9A8ADA` `#B5A9EE` `#CEC6F9` |
+| plum | `#FBE9FF` | `#73417E` | `#A86AB6` | `#82498E` `#9C5EAA` `#B880C5` `#D0A0DB` `#E3BFEB` |
+| pink | `#FFE7F3` | `#843B61` | `#BF6291` | `#95416D` `#B25785` `#CE79A2` `#E49BBD` `#F3BBD4` |
+| amber | `#FFEDD7` | `#7E4B00` | `#B77610` | `#8F5400` `#AA6A00` `#C68A3E` `#DCA96D` `#EDC69B` |
+| butter | `#F7F1D6` | `#6B5600` | `#9E8500` | `#796100` `#917900` `#AE9837` `#C7B46A` `#DBCE99` |
+| olive | `#ECF4DB` | `#4E6103` | `#79922B` | `#586D00` `#6E861B` `#8CA44C` `#AABE77` `#C6D6A2` |
+| mint | `#E0F7E4` | `#1D6835` | `#429C5A` | `#1D763B` `#348F4F` `#5FAC71` `#86C693` `#ADDCB5` |
+| teal | `#D8F8F1` | `#006B5A` | `#009F89` | `#007966` `#00927D` `#21AF9B` `#66C9B6` `#99DECF` |
+| cyan | `#D6F7FD` | `#00677A` | `#009AB1` | `#00748A` `#008DA4` `#05ABC0` `#5FC5D6` `#96DBE8` |
+| slate | `#EAF1F8` | `#4C5A69` | `#77889B` | `#576573` `#6D7C8C` `#8C9AA9` `#AAB6C2` `#C6CFD8` |
 
 **Page tints** (summary strip background only): Home `#FFEFE7`, Accounts `#FFF6D6`, Buckets `#E6F4EC`.
 Other screens use the surface colour.
@@ -196,16 +202,15 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 
 **Full height:** the app shell fills the viewport height. The desktop sidebar is full height and stays in place when the page scrolls.
 
-**Charts:** use only the chart tokens `chart-1` to `chart-5`, `est` and `attn`.
-- Spending timeline (Home): income bars `chart-3`, spending bars `chart-2`.
+**Charts:** use the identity palette, `est` and `attn`.
+- Spending timeline (Home): income bars use teal shade 3 (`#21AF9B`), spending bars use ocean shade 1 (`#425FA9`).
   Forecast bars use the same colour at a lower opacity (lighter tone).
   When the forecast ends inside a month, the forecast part of that bar also has a dashed outline in the same colour.
   The `asOf` marker is `muted`, dashed.
-- Spending donut: two rings. The inner ring is the groups: slices take `chart-1` to `chart-5` in order.
-  After 5 slices, the colours repeat at a lower opacity. "Uncategorized" is `est`. The outer ring is the categories.
-  A category takes the colour of its group at a lower opacity. The opacity is lower for each next category of the group.
-  The list next to the donut shows the same colour as a dot in each row. A slice has a hover tooltip, in the style of
-  the timeline tooltip.
+- Spending donut: two rings. The inner ring is the groups. Each slice uses its group's chart colour at full opacity.
+  The outer ring is the categories. Each uses its group's shades in order, darkest first, repeating after five.
+  No group uses slate. "Uncategorized" is `est`. The list dots use the same colours as the slices.
+  A slice has a hover tooltip in the style of the timeline tooltip.
 
 ## 6a. Transaction editor
 
@@ -315,7 +320,7 @@ Three small duotone illustrations, one for each tinted summary strip: wallet and
 Stroke ink 2.5px, fills from the identity hues and `#F4CD55` as the one warm highlight. They are decoration:
 give each one an accessible label, or `aria-hidden` when the text already says the same thing.
 
-## 8. Identity hue assignment
+## 8. Identity colour assignment
 
 - **Account groups:** Cash = sky, Assets = butter, Liabilities = lilac.
   Group by kind: chequing, savings, cash → Cash. Investment, property, receivable, other asset → Assets.
@@ -328,8 +333,9 @@ give each one an accessible label, or `aria-hidden` when the text already says t
 one short detail line and a chevron. The whole row opens the screen of its fix. Home is read-only: a row has no buttons
 and no menu. With no item, the "Needs you" section does not show. A section title "Spending" (display font, uppercase) starts the Spending
 part of Home.
-- **Buckets:** each bucket has a `color` (one identity hue) and an `icon` (from a fixed lucide set). The user picks them.
-  The app suggests a hue in rotation for a new bucket.
+- **Buckets and category groups:** each has a `color` from the identity palette. The user picks it. A bucket also has an
+  `icon` from a fixed lucide set. A new bucket or group gets the next colour in palette order, from the number of
+  stored buckets or groups. Setup gives the default groups colours in the same rotation. Bills and incomes use all 12 colours.
 
 ## 9. Account kind picker
 

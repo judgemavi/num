@@ -1,5 +1,5 @@
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { bucketColors, bucketEventKinds, bucketIcons, bucketKinds, sinkingRepeats } from "@num/shared";
+import { identityColors, bucketEventKinds, bucketIcons, bucketKinds, sinkingRepeats } from "@num/shared";
 import { categories } from "./categories";
 
 export const buckets = sqliteTable(
@@ -11,7 +11,7 @@ export const buckets = sqliteTable(
     priority: integer("priority").notNull(),
     /** Commitment and spending only. Null for the other kinds. */
     essential: integer("essential", { mode: "boolean" }),
-    color: text("color", { enum: bucketColors }).notNull(),
+    color: text("color", { enum: identityColors }).notNull(),
     icon: text("icon", { enum: bucketIcons }).notNull(),
     startDate: text("start_date").notNull(),
     archivedAt: text("archived_at"),

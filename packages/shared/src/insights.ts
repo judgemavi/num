@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { identityColors } from "./identity";
 import { isoDateSchema } from "./date";
 import { optionalQuery, queryDate, queryId, queryIdOrNone } from "./list";
 import { isMonthKey } from "./month";
@@ -56,7 +57,7 @@ const rowSchema = z.object({
   inflow: money.nullable(),
 });
 
-const groupRowSchema = rowSchema.extend({ categories: z.array(rowSchema) });
+const groupRowSchema = rowSchema.extend({ color: z.enum(identityColors).nullable(), categories: z.array(rowSchema) });
 
 const flowSchema = z.object({
   income: money,

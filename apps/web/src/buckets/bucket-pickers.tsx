@@ -1,52 +1,13 @@
-import { bucketColors, bucketIcons, type BucketColor, type BucketIcon } from "@num/shared";
-import { colorLabel, iconLabel } from "@/buckets/format";
+import { bucketIcons, type IdentityColor, type BucketIcon } from "@num/shared";
+import { iconLabel } from "@/buckets/format";
 import { BucketGlyph } from "@/buckets/icons";
 import { choiceIn } from "@/components/choice";
-import { hueColor } from "@/components/hue";
 import { IconTile } from "@/components/icon-tile";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-/**
- * The colour of a bucket, a commitment or an income. Use it inside `form.Field` (AGENTS: a picker gets
- * `field.state.value` and `field.handleChange`). `suggest` tells that the colour is the next one in the rotation.
- */
-export function ColorPicker({ value, onChange, suggest }: { value: BucketColor; onChange: (color: BucketColor) => void; suggest: boolean }) {
-  return (
-    <Field>
-      <FieldLabel>Colour</FieldLabel>
-      <ToggleGroup
-        type="single"
-        value={value}
-        aria-label="Colour"
-        className="flex-wrap"
-        onValueChange={(next) => {
-          const color = choiceIn(bucketColors, next);
-          if (color) {
-            onChange(color);
-          }
-        }}
-      >
-        {bucketColors.map((item) => (
-          <ToggleGroupItem
-            key={item}
-            value={item}
-            aria-label={colorLabel(item)}
-            className="size-11 rounded-full border-2 p-0"
-            style={{
-              background: hueColor[item].fill,
-              borderColor: value === item ? hueColor[item].glyph : "transparent",
-            }}
-          />
-        ))}
-      </ToggleGroup>
-      {suggest ? <FieldDescription>The suggested colour is the next one in the rotation.</FieldDescription> : null}
-    </Field>
-  );
-}
-
 /** The icon of a bucket, a commitment or an income, drawn in the chosen colour. Use it inside `form.Field`. */
-export function IconPicker({ value, color, onChange }: { value: BucketIcon; color: BucketColor; onChange: (icon: BucketIcon) => void }) {
+export function IconPicker({ value, color, onChange }: { value: BucketIcon; color: IdentityColor; onChange: (icon: BucketIcon) => void }) {
   return (
     <Field>
       <FieldLabel>Icon</FieldLabel>

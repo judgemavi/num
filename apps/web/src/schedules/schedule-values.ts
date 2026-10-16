@@ -1,4 +1,4 @@
-import { amountText, bucketWriteSchema, parseAmount, type Bucket, type BucketColor, type PlanProposal } from "@num/shared";
+import { amountText, bucketWriteSchema, parseAmount, type Bucket, type IdentityColor, type PlanProposal } from "@num/shared";
 import { localAsOf } from "@/as-of";
 import { editPatch, keptAmount } from "@/forms/form-values";
 import { decimalsError } from "@/money";
@@ -20,7 +20,7 @@ function monthValue(day: number | null | undefined) {
 }
 
 /** The start values of the Commitment and Income forms: a saved bucket, a proposal, or a new bucket. */
-export function scheduleValues(kind: ScheduleKind, draft: Bucket | ScheduleSeed | "new", nextColor: BucketColor) {
+export function scheduleValues(kind: ScheduleKind, draft: Bucket | ScheduleSeed | "new", nextColor: IdentityColor) {
   const saved = draft !== "new" && "id" in draft ? draft : null;
   const seed = draft !== "new" && !("id" in draft) ? draft : null;
   const schedule = saved?.schedule ?? null;

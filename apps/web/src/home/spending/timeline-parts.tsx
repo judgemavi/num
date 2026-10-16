@@ -65,9 +65,9 @@ export function TimelineLegend({ kinds, forecast }: { kinds: BarKind[]; forecast
   return (
     <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
       {kinds.map((kind) => (
-        <Key key={kind.key} swatch={`size-2.5 rounded-sm ${kind.key === "income" ? "bg-chart-3" : "bg-chart-2"}`} label={kind.label} />
+        <Key key={kind.key} swatch={`size-2.5 rounded-sm ${kind.key === "income" ? "bg-teal-3" : "bg-ocean-1"}`} label={kind.label} />
       ))}
-      {forecast ? <Key swatch="size-2.5 rounded-sm bg-chart-2/35" label="Forecast" /> : null}
+      {forecast ? <Key swatch="size-2.5 rounded-sm bg-ocean-1/35" label="Forecast" /> : null}
     </div>
   );
 }

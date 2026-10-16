@@ -1,5 +1,5 @@
 import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { categoryQuery, groupQuery } from "@/api/categories";
+import { categoryQuery, groupQuery, groupListQuery } from "@/api/categories";
 import { merchantQuery } from "@/api/merchants";
 import { inboxDecisionsQuery } from "@/api/review";
 import { tagQuery } from "@/api/tags";
@@ -23,15 +23,16 @@ function SavedCategory({ id }: { id: string }) {
 }
 
 export function GroupEditor({ id, name }: EditorInput["group"]) {
+  usePrefetchQuery(groupListQuery());
   if (id === null) {
-    return <GroupForm id={null} initialName={name ?? ""} />;
+    return <GroupForm group={null} initialName={name ?? ""} />;
   }
   return <SavedGroup id={id} />;
 }
 
 function SavedGroup({ id }: { id: string }) {
   const { data: group } = useSuspenseQuery(groupQuery(id));
-  return <GroupForm id={id} initialName={group.name} />;
+  return <GroupForm group={group} />;
 }
 
 export function TagEditor({ id, name }: EditorInput["tag"]) {

@@ -100,7 +100,7 @@ export function CategoryForm({ category, initialName, initialKind, inline = fals
                   noun="group"
                   depth={depth}
                   onChange={field.handleChange}
-                  renderForm={(typed) => <GroupForm inline id={null} idPrefix={`${fieldId}-group-name`} initialName={typed} />}
+                  renderForm={(typed) => <GroupForm inline group={null} idPrefix={`${fieldId}-group-name`} initialName={typed} />}
                 />
               </Field>
             )}

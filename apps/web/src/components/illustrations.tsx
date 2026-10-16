@@ -1,12 +1,13 @@
+import { hueColor } from "@/components/hue";
 import type { ReactNode } from "react";
 
 const ink = "#17171C";
 const paper = "#FFFFFF";
 const gold = "#F4CD55";
-const lilac = "#EEE9FD";
-const pink = "#FCE7F1";
-const mint = "#E2F3E8";
-const sky = "#E1F0FA";
+const lilac = hueColor.lilac.fill;
+const pink = hueColor.pink.fill;
+const mint = hueColor.mint.fill;
+const sky = hueColor.sky.fill;
 
 function stroke(fill: string, width = 2.5) {
   return {

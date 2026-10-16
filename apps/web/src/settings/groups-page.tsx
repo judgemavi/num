@@ -1,3 +1,5 @@
+import { Folder } from "lucide-react";
+import { IconTile } from "@/components/icon-tile";
 import { RecordListPage, SettingsRows } from "@/settings/record-list-page";
 import { useDeleteGroup } from "@/api/categories";
 import { useEditors } from "@/editors/editor-api";
@@ -65,6 +67,7 @@ function Groups() {
                 </RowMenu>
               }
             >
+              <IconTile hue={group.color}><Folder /></IconTile>
               <div className={listName}>
                 {group.name}
                 <small>{countLabel(counts.get(group.id) ?? 0)}</small>

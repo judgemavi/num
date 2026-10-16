@@ -20,8 +20,8 @@ function Dot({ color }: { color: SliceColor | undefined }) {
   return (
     <i
       aria-hidden="true"
-      className={`block size-2.5 shrink-0 rounded-full ${color ? color.dot : "bg-sunken"}`}
-      style={color ? { opacity: color.opacity } : undefined}
+      className="block size-2.5 shrink-0 rounded-full bg-sunken"
+      style={color ? { backgroundColor: color.value } : undefined}
     />
   );
 }

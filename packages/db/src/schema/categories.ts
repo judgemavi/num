@@ -1,12 +1,13 @@
 import { sql } from "drizzle-orm";
 import { index, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import { categoryKinds } from "@num/shared";
+import { categoryKinds, identityColors } from "@num/shared";
 
 export const categoryGroups = sqliteTable(
   "category_groups",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
+    color: text("color", { enum: identityColors }).notNull(),
     /** The folded name (`foldName`). The list sorts by it. */
     sortKey: text("sort_key").notNull(),
   },

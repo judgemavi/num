@@ -1,4 +1,4 @@
-import { bucketWriteSchema, amountText, emergencyDefaults, isSavings, parseAmount, type Bucket, type BucketColor } from "@num/shared";
+import { bucketWriteSchema, amountText, emergencyDefaults, isSavings, parseAmount, type Bucket, type IdentityColor } from "@num/shared";
 import { localAsOf } from "@/as-of";
 import { editPatch, keptAmount } from "@/forms/form-values";
 import { decimalsError } from "@/money";
@@ -11,7 +11,7 @@ function money(milli: number | null) {
  * The start values of the Bucket form. A new bucket gets the next colour of the rotation and the priority after the
  * last active bucket.
  */
-export function bucketValues(bucket: Bucket | null, nextColor: BucketColor, lastPriority: number) {
+export function bucketValues(bucket: Bucket | null, nextColor: IdentityColor, lastPriority: number) {
   return {
     name: bucket?.name ?? "",
     kind: bucket?.kind ?? "spending",

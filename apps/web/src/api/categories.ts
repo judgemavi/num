@@ -1,4 +1,4 @@
-import type { CategoryCreate, CategoryListQuery, CategoryUpdate } from "@num/shared";
+import type { CategoryCreate, CategoryListQuery, CategoryUpdate, CategoryGroupCreate, CategoryGroupUpdate } from "@num/shared";
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useArchiveWrite } from "@/api/archive";
 import { api, formWrite, unwrap } from "@/api/client";
@@ -59,13 +59,13 @@ export function groupQuery(id: string) {
   });
 }
 
-/** Create a group (`id` is null) or rename a group. */
+/** Create or change a group. */
 export function useSaveGroup() {
   return useMutation({
     meta: formWrite,
-    mutationFn: ({ id, name }: { id: string | null; name: string }) =>
+    mutationFn: (input: { id: null; body: CategoryGroupCreate } | { id: string; body: CategoryGroupUpdate }) =>
       unwrap(
-        id ? api["category-groups"][":id"].$patch({ param: { id }, json: { name } }) : api["category-groups"].$post({ json: { name } }),
+        input.id === null ? api["category-groups"].$post({ json: input.body }) : api["category-groups"][":id"].$patch({ param: { id: input.id }, json: input.body }),
       ),
   });
 }

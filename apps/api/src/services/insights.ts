@@ -1,4 +1,4 @@
-import { categories, tags } from "@num/db";
+import { categories, categoryGroups, tags } from "@num/db";
 import { defaultInsightWindow, type Insights, type InsightsQuery } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
@@ -44,7 +44,7 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
     spending: totals.spending,
     savings: tagId ? null : totals.savings,
     savingsRateMilliPct: tagId ? null : totals.savingsRateMilliPct,
-    groups: groupRows(facts, range),
+    groups: groupRows(facts, range, new Map(db.select({ id: categoryGroups.id, color: categoryGroups.color }).from(categoryGroups).all().map((row) => [row.id, row.color]))),
     timeline: readTimeline(db, facts, period, query.asOf, { categoryId: query.category ?? null, tagged: tagId !== null }),
   };
 }

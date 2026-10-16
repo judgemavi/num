@@ -116,13 +116,13 @@ function ListModeToggle() {
  */
 export function SelectedSpendList() {
   const { data, search, colors, category, selectedGroup, groupName, categoryName, openTransactions } = useSpendSelection();
-  // A category of the selected group has the colour of its slice. In the flat list it has the colour of its group.
-  const categoryRow = (row: InsightRow, colorOf: InsightRow) => ({
+  // Each category uses the same shade in the list and the donut.
+  const categoryRow = (row: InsightRow) => ({
     key: rowKey(row),
     name: categoryName(row),
     amount: row.amount,
     inflow: null,
-    color: colors.get(rowKey(colorOf)),
+    color: colors.get(rowKey(row)),
     current: category !== null && row.id === category,
     onOpen: () => openTransactions({ categoryId: row.id ?? undefined }),
   });
@@ -138,10 +138,10 @@ export function SelectedSpendList() {
   const byCategory = (search.by ?? defaultInsightListMode) === "categories";
   // Uncategorized has no categories. It stays in the flat list as one row, thus the list shows all spending.
   const rows = selectedGroup
-    ? selectedGroup.categories.map((row) => categoryRow(row, row))
+    ? selectedGroup.categories.map((row) => categoryRow(row))
     : byCategory
       ? data.groups
-          .flatMap((group) => (group.kind === "uncategorized" ? [groupRow(group)] : group.categories.map((row) => categoryRow(row, group))))
+          .flatMap((group) => (group.kind === "uncategorized" ? [groupRow(group)] : group.categories.map((row) => categoryRow(row))))
           .sort((a, b) => b.amount - a.amount)
       : data.groups.map(groupRow);
   const title = [search.month ? monthTitle(search.month) : null, selectedGroup ? groupName(selectedGroup) : null].filter(Boolean).join(": ") || "Groups and categories";

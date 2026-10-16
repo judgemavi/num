@@ -1,19 +1,8 @@
 import type { InsightGroupRow, InsightRow } from "@num/shared";
 
-/** `token` is the chart token of the slice. `dot` is the class of the same colour for the dot in the list. */
-type Tone = { token: "chart-1" | "chart-2" | "chart-3" | "chart-4" | "chart-5" | "est"; dot: string };
+import { hueColor } from "@/components/hue";
 
-const palette: Tone[] = [
-  { token: "chart-1", dot: "bg-chart-1" },
-  { token: "chart-2", dot: "bg-chart-2" },
-  { token: "chart-3", dot: "bg-chart-3" },
-  { token: "chart-4", dot: "bg-chart-4" },
-  { token: "chart-5", dot: "bg-chart-5" },
-];
-
-const neutralTone: Tone = { token: "est", dot: "bg-est" };
-
-export type SliceColor = Tone & { opacity: number };
+export type SliceColor = { value: string };
 
 export type Arc = {
   key: string;
@@ -32,16 +21,13 @@ export function rowKey(row: InsightRow): string {
   return `${row.kind}-${row.id ?? ""}`;
 }
 
-function groupColor(kind: InsightRow["kind"], next: number): SliceColor {
-  if (kind === "uncategorized") {
-    return { ...neutralTone, opacity: 1 };
-  }
-  const round = Math.floor(next / palette.length);
-  return { ...(palette[next % palette.length] ?? neutralTone), opacity: round === 0 ? 1 : round === 1 ? 0.6 : 0.35 };
+function groupColor(group: InsightGroupRow): SliceColor {
+  return { value: group.kind === "uncategorized" ? "var(--est)" : hueColor[group.color ?? "slate"].chart };
 }
 
-function categoryColor(group: SliceColor, index: number): SliceColor {
-  return { ...group, opacity: group.opacity * Math.max(0.35, 0.8 - 0.1 * index) };
+export function categoryColor(group: InsightGroupRow, index: number): SliceColor {
+  const palette = hueColor[group.color ?? "slate"];
+  return { value: palette.shades[index % palette.shades.length] ?? palette.chart };
 }
 
 /**
@@ -55,11 +41,14 @@ export function spendArcs(groups: readonly InsightGroupRow[]) {
   const total = shown.reduce((sum, group) => sum + group.amount, 0);
   const arcs: Arc[] = [];
   let used = 0;
-  let next = 0;
+  const colors = new Map<string, SliceColor>();
+  for (const group of groups) {
+    colors.set(rowKey(group), groupColor(group));
+    group.categories.forEach((category, index) => colors.set(rowKey(category), categoryColor(group, index)));
+  }
   for (const group of shown) {
     const key = rowKey(group);
-    const color = groupColor(group.kind, next);
-    next += group.kind === "uncategorized" ? 0 : 1;
+    const color = groupColor(group);
     const start = used / total;
     used += group.amount;
     const end = used / total;
@@ -71,8 +60,8 @@ export function spendArcs(groups: readonly InsightGroupRow[]) {
       const from = start + ((end - start) * inside) / sum;
       inside += category.amount;
       const to = start + ((end - start) * inside) / sum;
-      arcs.push({ key: rowKey(category), ring: "category", groupKey: key, row: category, start: from, end: to, ofGroup: category.amount / sum, color: categoryColor(color, index) });
+      arcs.push({ key: rowKey(category), ring: "category", groupKey: key, row: category, start: from, end: to, ofGroup: category.amount / sum, color: categoryColor(group, index) });
     });
   }
-  return { arcs, colors: new Map(arcs.map((arc) => [arc.key, arc.color])) };
+  return { arcs, colors };
 }

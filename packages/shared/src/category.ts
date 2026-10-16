@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { identityColors } from "./identity";
 import { archivedQuery, listQuerySchema, pagedResponseSchema, queryIdOrNone } from "./list";
 import { isUtcTimestamp } from "./time";
 
@@ -11,6 +12,7 @@ const nameSchema = z.string().trim().min(1);
 export const categoryGroupSchema = z.object({
   id: z.uuid(),
   name: z.string(),
+  color: z.enum(identityColors),
 });
 
 export const categoryGroupListSchema = z.object({
@@ -18,6 +20,7 @@ export const categoryGroupListSchema = z.object({
 });
 
 export const categoryGroupCreateSchema = z.object({
+  color: z.enum(identityColors).optional(),
   name: nameSchema,
 });
 

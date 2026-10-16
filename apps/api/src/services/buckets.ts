@@ -5,7 +5,7 @@ import {
   foldName,
   hasSchedule,
   kindFieldsValid,
-  nextBucketColor,
+  nextIdentityColor,
   recedeDefault,
   utcNow,
   type Bucket,
@@ -179,7 +179,7 @@ export function listBuckets(db: Db, query: BucketListQuery) {
   const { limit, offset } = windowOf(query);
   const rows = db.select().from(buckets).where(where).orderBy(...order).limit(limit).offset(offset).all();
   const items = rows.map((row) => toBucket(withoutSortKey(row), categoriesByBucket.get(row.id) ?? [], schedulesByBucket.get(row.id) ?? null, balances.get(row.id) ?? 0));
-  return { ...pagedOf(items, totalOf(db, buckets, where), query), nextColor: nextBucketColor(bucketCount(db)) };
+  return { ...pagedOf(items, totalOf(db, buckets, where), query), nextColor: nextIdentityColor(bucketCount(db)) };
 }
 
 /** The balance is a calculated value, thus the balance sort runs in code. The rows come in name order, and the sort is stable. */

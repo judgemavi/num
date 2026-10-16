@@ -1,5 +1,5 @@
 import { categories, categoryGroups, settings } from "@num/db";
-import { foldName, currencyDigits, isIsoDate, type CategorySet, type CurrencyCode } from "@num/shared";
+import { foldName, nextIdentityColor, currencyDigits, isIsoDate, type CategorySet, type CurrencyCode } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -48,15 +48,16 @@ function insertSetting(tx: WriteTx, key: (typeof settings.$inferInsert)["key"], 
 }
 
 function insertDefaultCategories(tx: WriteTx) {
-  for (const group of defaultCategoryGroups) {
+  for (const [index, group] of defaultCategoryGroups.entries()) {
+    const color = nextIdentityColor(index);
     const groupId = crypto.randomUUID();
-    tx.insert(categoryGroups).values({ id: groupId, name: group.name, sortKey: foldName(group.name) }).run();
+    tx.insert(categoryGroups).values({ id: groupId, name: group.name, color, sortKey: foldName(group.name) }).run();
     tx.audit({
       entity: "category_groups",
       entityId: groupId,
       action: "create",
       before: null,
-      after: { name: group.name },
+      after: { name: group.name, color },
     });
 
     for (const category of group.categories) {

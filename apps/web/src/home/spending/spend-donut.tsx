@@ -1,21 +1,11 @@
 import { memo, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { Label, Pie, PieChart, Sector, type PieSectorShapeProps } from "recharts";
-import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { useBookCurrency } from "@/editors/lookups";
 import { ChartTip } from "@/home/spending/chart-tip";
 import type { Arc } from "@/home/spending/spend-arcs";
 import { formatMoney } from "@/money";
-
-/** The chart tokens of the slices. The arcs give the token and the opacity of each slice. */
-const config = {
-  "chart-1": { color: "var(--chart-1)" },
-  "chart-2": { color: "var(--chart-2)" },
-  "chart-3": { color: "var(--chart-3)" },
-  "chart-4": { color: "var(--chart-4)" },
-  "chart-5": { color: "var(--chart-5)" },
-  est: { color: "var(--est)" },
-} satisfies ChartConfig;
 
 const rings = { group: { innerRadius: "43%", outerRadius: "67%" }, category: { innerRadius: "70%", outerRadius: "97%" } };
 
@@ -49,7 +39,7 @@ function sliceLines(currency: string, arc: Arc, nameOf: SpendDonutProps["nameOf"
 function SliceTooltip({ shown, lines }: { shown: Shown; lines: string[] }) {
   const [title, ...rest] = lines;
   // The tooltip is outside the chart box, where the chart colour variables are not set. It uses the token itself.
-  const color = `var(--${shown.arc.color.token})`;
+  const color = shown.arc.color.value;
   const left = Math.min(80, Math.max(20, (shown.x / shown.size) * 100));
   return (
     <div className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[115%] whitespace-nowrap" style={{ left: `${left}%`, top: `${(shown.y / shown.size) * 100}%` }}>
@@ -59,7 +49,7 @@ function SliceTooltip({ shown, lines }: { shown: Shown; lines: string[] }) {
         payload={[{ name: shown.arc.key, value: shown.arc.end - shown.arc.start, graphicalItemId: shown.arc.ring, color }]}
         formatter={() => (
           <div className="grid gap-0.5">
-            <ChartTip color={color} opacity={shown.arc.color.opacity} text={title ?? ""} />
+            <ChartTip color={color} text={title ?? ""} />
             {rest.map((line) => (
               <p key={line} className="pl-[18px] tabular-nums">
                 {line}
@@ -100,7 +90,7 @@ const Rings = memo(function Rings({ arcs, nameOf, isLit, isPressed, canSelect, o
         element.focus();
       }
     };
-    const opacity = isLit(arc) ? arc.color.opacity : arc.color.opacity * 0.35;
+    const opacity = isLit(arc) ? 1 : 0.35;
     return (
       <g
         ref={active ? keepFocus : undefined}
@@ -130,7 +120,7 @@ const Rings = memo(function Rings({ arcs, nameOf, isLit, isPressed, canSelect, o
           hide();
         }}
       >
-        <Sector {...props} fill={`var(--color-${arc.color.token})`} fillOpacity={opacity} stroke="var(--card)" strokeWidth={2} />
+        <Sector {...props} fill={arc.color.value} fillOpacity={opacity} stroke="var(--card)" strokeWidth={2} />
       </g>
     );
   }
@@ -147,7 +137,7 @@ export function SpendDonut({ centerLabel, ...props }: SpendDonutProps) {
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   return (
     <div ref={setHost} className="relative mx-auto w-full max-w-[280px]">
-      <ChartContainer config={config} role="group" aria-label={centerLabel} className="aspect-square w-full">
+      <ChartContainer config={{}} role="group" aria-label={centerLabel} className="aspect-square w-full">
         <PieChart accessibilityLayer={false}>
           {/* The ring under the slices: grey when there is no spending. It also holds the label in the centre. */}
           <Pie

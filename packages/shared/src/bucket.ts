@@ -1,3 +1,4 @@
+import { identityColors } from "./identity";
 import { z } from "zod";
 import { isoDateSchema } from "./date";
 import { monthKeySchema } from "./month";
@@ -40,9 +41,6 @@ export const bucketEventKinds = [...manualEventKinds, "cover", "recede"] as cons
 
 export type BucketEventKind = (typeof bucketEventKinds)[number];
 
-export const bucketColors = ["sky", "mint", "lilac", "butter", "pink", "teal"] as const;
-
-export type BucketColor = (typeof bucketColors)[number];
 
 export const bucketIcons = [
   "shopping-cart",
@@ -93,7 +91,7 @@ const bucketFields = {
   kind: z.enum(bucketKinds),
   priority: z.number().int().min(0).max(1_000_000),
   essential: z.boolean().nullable(),
-  color: z.enum(bucketColors),
+  color: z.enum(identityColors),
   icon: z.enum(bucketIcons),
   categoryIds: z.array(z.uuid()),
   startDate: isoDateSchema,
@@ -229,13 +227,13 @@ export const bucketSchema = z.object({
 export const bucketListQuerySchema = listQuerySchema(["name", "priority", "kind"]).extend(archivedQuery);
 
 export const bucketListSchema = pagedResponseSchema(bucketSchema).extend({
-  nextColor: z.enum(bucketColors),
+  nextColor: z.enum(identityColors),
 });
 
 const overspentBucketSchema = z.object({
   id: z.uuid(),
   name: z.string(),
-  color: z.enum(bucketColors),
+  color: z.enum(identityColors),
   icon: z.enum(bucketIcons),
   balance: z.number().int().negative(),
 });
@@ -302,10 +300,6 @@ export const bucketCoverSchema = z.object({
   date: isoDateSchema,
 });
 
-export function nextBucketColor(count: number): BucketColor {
-  const index = ((count % bucketColors.length) + bucketColors.length) % bucketColors.length;
-  return bucketColors[index] ?? "sky";
-}
 
 export type Bucket = z.infer<typeof bucketSchema>;
 export type BucketWrite = z.infer<typeof bucketWriteSchema>;

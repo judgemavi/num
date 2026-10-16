@@ -1,16 +1,7 @@
-import { parseAmount, type Bucket, type BucketColor, type BucketIcon, type ErrorCode } from "@num/shared";
+import { parseAmount, type Bucket, type BucketIcon, type ErrorCode } from "@num/shared";
 import { errorCode } from "@/api/client";
 import { decimalsError, formatMoney } from "@/money";
 import { formatDate } from "@/date-format";
-
-const colors: Record<BucketColor, string> = {
-  sky: "Blue",
-  mint: "Green",
-  lilac: "Purple",
-  butter: "Yellow",
-  pink: "Pink",
-  teal: "Teal",
-};
 
 const icons: Record<BucketIcon, string> = {
   "shopping-cart": "Groceries",
@@ -34,10 +25,6 @@ const icons: Record<BucketIcon, string> = {
   coffee: "Coffee",
   bus: "Transit",
 };
-
-export function colorLabel(color: BucketColor): string {
-  return colors[color];
-}
 
 export function iconLabel(icon: BucketIcon): string {
   return icons[icon];

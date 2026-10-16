@@ -2,7 +2,7 @@ import { DialogBody, FormActions, FormCancel, FormHeading } from "@/editors/form
 import { withForm } from "@/forms/form-hook";
 
 /**
- * The fields of a form that has only a name: a group, a tag or a merchant. The owner of the form gives the validators
+ * The fields of a form that has only a name: a tag or a merchant. The owner of the form gives the validators
  * and the write. `children` shows above the name.
  */
 export const NameFields = withForm({

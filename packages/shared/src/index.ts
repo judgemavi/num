@@ -1,3 +1,4 @@
+export { identityColors, nextIdentityColor, type IdentityColor } from "./identity";
 export {
   usesValuation, accountClass, balanceFromEntry,
   entryFromBalance, netWorthOf, defaultOnBudget,
@@ -24,10 +25,10 @@ export {
 } from "./opening";
 export {
   hasSchedule, isSavings, recedeDefault,
-  comparePriority, kindFieldsValid, nextBucketColor,
+  comparePriority, kindFieldsValid,
   bucketKinds, type BucketKind, sinkingRepeats,
-  bucketEventKinds, type BucketEventKind, bucketColors,
-  type BucketColor, bucketIcons, type BucketIcon,
+  bucketEventKinds, type BucketEventKind,
+  bucketIcons, type BucketIcon,
   emergencyDefaults, bucketWriteSchema, bucketUpdateSchema,
   bucketCreateSchema, bucketSchema, bucketListQuerySchema,
   bucketListSchema, emergencyFundSchema, billNeedListSchema,

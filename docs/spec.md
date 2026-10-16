@@ -225,7 +225,7 @@ The terms do not create transactions.
 
 - Category fields: `name`, `kind` (`income | expense`), `groupId?`, `archivedAt?`.
   The name is unique. The comparison ignores case.
-- Group fields: `name`. The name is unique. The comparison ignores case. Groups are only for display.
+- Group fields: `name`, `color` (the identity palette, §5.8). The name is unique. The comparison ignores case. Groups are only for display.
 - Lists of groups and categories sort by name, without case. There is no manual order.
 - The user can delete a group. After a confirmation, its categories move to no group.
 - The user can change the kind of a category only when no transaction line uses it and it is not in a bucket.
@@ -355,7 +355,7 @@ Fields:
 - `pausedAt?` (all kinds except `income`): a paused bucket keeps its balance. The fill does not fund it: its monthly
   amount is 0 (§7.6). The user pauses and resumes it from the row menu ("Pause" / "Resume") (audited). A paused bucket
   can still give money back (§7.7).
-- `color` (`sky | mint | lilac | butter | pink | teal`) and `icon` (a name from a fixed icon set).
+- `color` (the identity palette for buckets, schedules and category groups: `sky | ocean | lilac | plum | pink | amber | butter | olive | mint | teal | cyan | slate`) and `icon` (a name from a fixed icon set).
 - `categoryIds[]`: each expense category is in a maximum of one bucket. A commitment and an income have no categories.
 - `startDate`: the first date of the lines that the bucket counts. A new bucket uses `asOf`. The user can change it
   (audited). A category that the user adds to a bucket counts from the bucket's `startDate`.

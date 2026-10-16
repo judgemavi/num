@@ -3,6 +3,7 @@ import {
   categoryCreateSchema,
   categoryGroupCreateSchema,
   foldName,
+  nextIdentityColor,
   utcNow,
   type Category,
   type CategoryCreate,
@@ -13,7 +14,7 @@ import {
   type CategoryListQuery,
   type CategoryUpdate,
 } from "@num/shared";
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, count, eq, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { mergedWrite } from "./patch";
@@ -69,7 +70,8 @@ export function listCategoryGroups(db: Db): { items: CategoryGroup[] } {
 export function createCategoryGroup(db: Db, input: CategoryGroupCreate & WriteInput): CategoryGroup {
   const id = crypto.randomUUID();
   return write(db, { source: input.source, at: input.at }, (tx) => {
-    const row = { id, name: input.name.trim() };
+    const total = tx.select({ count: count() }).from(categoryGroups).get()?.count ?? 0;
+    const row = { id, name: input.name.trim(), color: input.color ?? nextIdentityColor(total) };
     assertUniqueName(tx, categoryGroups, row.name, "group_name_taken");
     tx.insert(categoryGroups).values({ ...row, sortKey: foldName(row.name) }).run();
     tx.audit({
@@ -93,9 +95,10 @@ export function updateCategoryGroup(
     if (!existing) {
       throw new ServiceError("group_not_found", 404);
     }
-    const next = mergedWrite(categoryGroupCreateSchema, existing, input);
+    const merged = mergedWrite(categoryGroupCreateSchema, existing, input);
+    const next = { name: merged.name, color: merged.color ?? existing.color };
     assertUniqueName(tx, categoryGroups, next.name, "group_name_taken", id);
-    tx.update(categoryGroups).set({ name: next.name, sortKey: foldName(next.name) }).where(eq(categoryGroups.id, id)).run();
+    tx.update(categoryGroups).set({ name: next.name, color: next.color, sortKey: foldName(next.name) }).where(eq(categoryGroups.id, id)).run();
     tx.audit({
       entity: "category_groups",
       entityId: id,
