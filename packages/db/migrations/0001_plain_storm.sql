@@ -1,1 +1,0 @@
-ALTER TABLE `category_groups` ADD `color` text DEFAULT 'sky' NOT NULL;

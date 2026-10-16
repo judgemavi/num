@@ -101,6 +101,7 @@ CREATE INDEX `categories_sort_key_idx` ON `categories` (`sort_key`,`name`,`id`);
 CREATE TABLE `category_groups` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
+	`color` text NOT NULL,
 	`sort_key` text NOT NULL
 );
 --> statement-breakpoint
