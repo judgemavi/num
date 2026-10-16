@@ -1,0 +1,3 @@
+DROP INDEX `transaction_lines_transaction`;--> statement-breakpoint
+CREATE INDEX `transaction_lines_transaction` ON `transaction_lines` (`transaction_id`,`id`,`category_id`,`transfer_account_id`);--> statement-breakpoint
+CREATE INDEX `transactions_confirmed_history` ON `transactions` (`id`,`date`,`amount`,`payee_normalized`,`merchant_id`) WHERE "transactions"."mirror" = 0 and "transactions"."auto_reason" is null;

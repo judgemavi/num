@@ -17,7 +17,7 @@ import { keepKey } from "./decision-keep";
 import { decidedKeys, pairKey } from "./decision-keys";
 import { loadMatchBook, mortgageLearnedFor, scorePayee } from "./match-book";
 import { refundQuestions } from "./refund-auto";
-import { recurringAmbiguities, recurringSignals } from "./recurring-view";
+import { recurringAmbiguities, recurringReviewSignals } from "./recurring-view";
 import { mortgageSuggestion } from "./mortgage-learned";
 import { listTransferPairs } from "./suggestions";
 import { hasOpenLine, lineCount } from "./transaction-sql";
@@ -207,14 +207,14 @@ export function reviewCounts(hits: readonly NeedsReviewHit[]): ReviewCounts {
 }
 
 export type ReviewState = {
-  signals: RecurringSignals;
+  signals: ReturnType<typeof recurringReviewSignals>;
   hits: NeedsReviewHit[];
 };
 
 /** Reads the review sources once so one request does not compute them again. */
 export function loadReviewState(db: Db, asOf: string): ReviewState {
   requireAsOf(asOf);
-  const signals = recurringSignals(db, asOf);
+  const signals = recurringReviewSignals(db, asOf);
   const pairs = listTransferPairs(db, asOf).items;
   return {
     signals,

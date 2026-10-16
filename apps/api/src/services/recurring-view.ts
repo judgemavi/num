@@ -261,7 +261,8 @@ export function recurringAmbiguities(db: Db, asOf: string, only?: readonly strin
   return matchLinks(open.occurrences, open.candidates).ambiguous;
 }
 
-export function recurringSignals(db: Db, asOf: string): RecurringSignals {
+/** The existing schedules and their review questions, without new schedule detection. */
+export function recurringReviewSignals(db: Db, asOf: string) {
   const schedules = activeSchedules(db);
   const links = loadLinkIndex(db);
   const txnById = transactionsByIds(db, [...links.transactionIds]);
@@ -296,11 +297,17 @@ export function recurringSignals(db: Db, asOf: string): RecurringSignals {
   }
   const open = linkInput(db, schedules, links.links, asOf);
   const ambiguous = matchLinks(open.occurrences, open.candidates).ambiguous;
+  return { changed, missed, ambiguous };
+}
+
+export function recurringSignals(db: Db, asOf: string): RecurringSignals {
+  const signals = recurringReviewSignals(db, asOf);
+  const schedules = activeSchedules(db);
   const declined = decidedKeys(db, "plan_proposal");
   const proposals = detectPlans(detectionTransactions(db, asOf), bookStep(db), asOf).filter((proposal) => {
     return !schedules.some((schedule) => covers(schedule, proposal)) && !declined.has(planProposalKey(proposal));
   });
-  return { changed, missed, ambiguous, proposals };
+  return { ...signals, proposals };
 }
 
 export function autoLink(db: Db, asOf: string, input: WriteInput & { accountId?: string }): { linked: number } {

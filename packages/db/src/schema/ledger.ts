@@ -47,6 +47,9 @@ export const transactions = sqliteTable(
     index("transactions_account_date").on(table.accountId, table.date, table.id, table.amount),
     index("transactions_merchant_date").on(table.merchantId, table.date, table.id),
     index("transactions_payee_normalized").on(table.payeeNormalized, table.date, table.id),
+    index("transactions_confirmed_history")
+      .on(table.id, table.date, table.amount, table.payeeNormalized, table.merchantId)
+      .where(sql`${table.mirror} = 0 and ${table.autoReason} is null`),
   ],
 );
 export type TransactionRow = typeof transactions.$inferSelect;
@@ -65,7 +68,7 @@ export const transactionLines = sqliteTable(
   },
   (table) => [
     index("transaction_lines_transfer_account").on(table.transferAccountId).where(sql`${table.transferAccountId} IS NOT NULL`),
-    index("transaction_lines_transaction").on(table.transactionId),
+    index("transaction_lines_transaction").on(table.transactionId, table.id, table.categoryId, table.transferAccountId),
     index("transaction_lines_category").on(table.categoryId),
     index("transaction_lines_uncategorized")
       .on(table.transactionId)
