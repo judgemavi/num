@@ -1,18 +1,18 @@
-import { accounts, bucketCategories, buckets, categories, occurrenceLinks, transactionLines, transactions } from "@num/db";
+import { accounts, occurrenceLinks, transactions } from "@num/db";
 import {
   buildForecast,
   forecastDates,
   isIsoDate,
   occurrenceDates,
   spendDeltas,
-  unbucketedMonthly,
   type Forecast,
   type ForecastDelta,
   type ForecastFlow,
   type ForecastInput,
 } from "@num/shared";
-import { and, eq, gt, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, eq, gt, isNull, lte } from "drizzle-orm";
 import type { Db } from "../db";
+import { spendingCaps, unbucketedSpending } from "./forecast-spending";
 import { balancesOf } from "./account-balance";
 import { lastCompleteMonths } from "./complete-months";
 import { ServiceError } from "../service-error";
@@ -35,7 +35,7 @@ export function readForecast(db: Db, asOf: string): Forecast {
  * `transfersOut` are the commitment payments by transfer to an account that is not an open on-budget account (a loan
  * payment, for example). They leave the pool, but they are not spending in the forecast.
  */
-export function forecastInput(db: Db, asOf: string): ForecastInput & { transfersOut: ForecastFlow[] } {
+export function forecastInput(db: Db, asOf: string, accountBalances?: ReadonlyMap<string, number>): ForecastInput & { transfersOut: ForecastFlow[] } {
   const step = bookStep(db);
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
@@ -53,7 +53,6 @@ export function forecastInput(db: Db, asOf: string): ForecastInput & { transfers
   const links = db.select().from(occurrenceLinks).all();
   const skipped = new Set(links.filter((link) => link.skipped).map((link) => `${link.bucketId}|${link.dueDate}`));
   const posted = new Set(links.filter((link) => link.transactionId !== null).map((link) => `${link.bucketId}|${link.dueDate}`));
-  const linkedTransactions = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
   const deltas: ForecastDelta[] = [];
   const flows: ForecastFlow[] = [];
   const transfersOut: ForecastFlow[] = [];
@@ -86,68 +85,21 @@ export function forecastInput(db: Db, asOf: string): ForecastInput & { transfers
   }
 
   const months = lastCompleteMonths(db, asOf, 3);
-  const bucketOf = new Map(db.select().from(bucketCategories).all().map((row) => [row.categoryId, row.bucketId]));
-  const spending = db
-    .select()
-    .from(buckets)
-    .all()
-    .filter((row) => row.kind === "spending" && row.archivedAt === null && row.refillTo !== null);
-  const expenseIds = new Set(
-    db
-      .select()
-      .from(categories)
-      .all()
-      .filter((row) => row.kind === "expense" && row.archivedAt === null)
-      .map((row) => row.id),
-  );
-  const lines = db
-    .select({
-      transactionId: transactions.id,
-      accountId: transactions.accountId,
-      date: transactions.date,
-      amount: transactionLines.amount,
-      categoryId: transactionLines.categoryId,
-    })
-    .from(transactionLines)
-    .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
-    .where(and(isNotNull(transactionLines.categoryId)))
-    .all();
-  const monthly: { monthly: number; bucketId: string | null }[] = [];
-  for (const bucket of spending) {
-    const categoryIds = new Set([...bucketOf].filter(([, bucketId]) => bucketId === bucket.id).map(([categoryId]) => categoryId));
-    // A spending bucket counts only when an open on-budget account has a line in its categories.
-    const used = lines.some((line) => line.categoryId !== null && categoryIds.has(line.categoryId) && accountIds.has(line.accountId));
-    if (used && bucket.refillTo) {
-      monthly.push({ monthly: bucket.refillTo, bucketId: bucket.id });
-    }
-  }
-  for (const categoryId of expenseIds) {
-    if (bucketOf.has(categoryId)) {
-      continue;
-    }
-    const rows = lines.filter(
-      (line) =>
-        line.categoryId === categoryId &&
-        accountIds.has(line.accountId) &&
-        !linkedTransactions.has(line.transactionId) &&
-        months.some((month) => line.date.startsWith(month)),
-    );
-    const amount = unbucketedMonthly(
-      months,
-      rows.flatMap((line) => (line.categoryId ? [{ month: line.date.slice(0, 7), amount: line.amount }] : [])),
-      step,
-    );
-    if (amount > 0) {
-      monthly.push({ monthly: amount, bucketId: null });
-    }
-  }
+  const monthly = [...spendingCaps(db), ...unbucketedSpending(db, months, step)];
   const variable = spendDeltas(dates, monthly, step);
   deltas.push(...variable);
   flows.push(...variable.map((delta) => ({ date: delta.date, income: 0, spending: -delta.amount, bucketId: delta.bucketId })));
 
+  const balance = accountBalances
+    ? openAccounts.reduce((sum, account) => {
+        const amount = accountBalances.get(account.id);
+        if (amount === undefined) throw new Error("Balance is missing");
+        return sum + amount;
+      }, 0)
+    : balancesOf(db, openAccounts, asOf).reduce((sum, row) => sum + row.balance, 0);
   return {
     asOf,
-    balance: balancesOf(db, openAccounts, asOf).reduce((sum, row) => sum + row.balance, 0),
+    balance,
     deltas,
     flows,
     transfersOut,

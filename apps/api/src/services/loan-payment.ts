@@ -34,12 +34,13 @@ function scheduleInterest(db: Reader, account: typeof accounts.$inferSelect, dat
 function lastInterestCategory(db: Reader, loanAccountId: string) {
   const row = db
     .select({ categoryId: interestLine.categoryId })
-    .from(transactions)
-    .innerJoin(principalLine, and(eq(principalLine.transactionId, transactions.id), eq(principalLine.transferAccountId, loanAccountId)))
+    .from(principalLine)
+    .innerJoin(transactions, eq(principalLine.transactionId, transactions.id))
     .innerJoin(interestLine, and(eq(interestLine.transactionId, transactions.id), isNotNull(interestLine.categoryId)))
     .innerJoin(categories, and(eq(categories.id, interestLine.categoryId), isNull(categories.archivedAt)))
-    .where(and(eq(transactions.mirror, literal(0)), lt(transactions.amount, literal(0)), eq(lineCount(transactions.id), literal(2))))
+    .where(and(eq(principalLine.transferAccountId, loanAccountId), eq(transactions.mirror, literal(0)), lt(transactions.amount, literal(0)), eq(lineCount(transactions.id), literal(2))))
     .orderBy(desc(transactions.date), desc(transactions.id))
+    .limit(1)
     .get();
   return row?.categoryId ?? null;
 }

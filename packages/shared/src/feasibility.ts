@@ -1,6 +1,6 @@
 import { Temporal } from "temporal-polyfill";
 import { z } from "zod";
-import { floorToStep, divideAmount } from "./currency";
+import { divideAmount } from "./currency";
 import { isoDateSchema } from "./date";
 import { monthlyAmount, type MonthlyBucket } from "./funding";
 import { amountSchema as money } from "./money";
@@ -60,7 +60,8 @@ type Feasibility = NonNullable<z.infer<typeof feasibilitySchema>["feasibility"]>
 
 /** The share of the surplus for each dated goal that does not fit alone. */
 function surplusShares(surplus: number, buckets: readonly { bucketId: string; monthly: number; dueDate: string | null }[], step: number) {
-  const blocked = buckets.filter((bucket) => bucket.dueDate !== null && surplus - (buckets.reduce((sum, item) => sum + item.monthly, 0) - bucket.monthly) <= 0);
+  const monthly = buckets.reduce((sum, item) => sum + item.monthly, 0);
+  const blocked = buckets.filter((bucket) => bucket.dueDate !== null && surplus - (monthly - bucket.monthly) <= 0);
   const shares = new Map<string, number>();
   if (surplus <= 0 || blocked.length === 0) {
     return shares;
@@ -68,7 +69,7 @@ function surplusShares(surplus: number, buckets: readonly { bucketId: string; mo
   const total = blocked.reduce((sum, bucket) => sum + bucket.monthly, 0);
   let left = surplus;
   blocked.forEach((bucket, index) => {
-    const share = index === blocked.length - 1 ? left : floorToStep((surplus * bucket.monthly) / total, step);
+    const share = index === blocked.length - 1 ? left : Number((BigInt(surplus) * BigInt(bucket.monthly)) / (BigInt(total) * BigInt(step))) * step;
     shares.set(bucket.bucketId, share);
     left -= share;
   });

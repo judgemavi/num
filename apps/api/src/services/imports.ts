@@ -21,9 +21,12 @@ import { saveImportBatch } from "./import-save";
 import { parseCsvStatement } from "./parse-csv";
 import { importOpeningSuggestion } from "./opening-suggestion";
 import { parseOfxStatement } from "./parse-ofx";
-import { loadPreset, loadPresets } from "./presets";
+import { loadPresets } from "./presets";
 import type { ParsedStatement } from "./statement";
 import type { AuditSource } from "./write";
+
+const presets = loadPresets();
+const presetsById = new Map(presets.map((preset) => [preset.id, preset]));
 
 type ImportInput = {
   source: AuditSource;
@@ -62,11 +65,11 @@ function previewRows(text: string) {
 }
 
 function presetMap(id: string): ColumnMap {
-  try {
-    return loadPreset(id);
-  } catch {
+  const preset = presetsById.get(id);
+  if (!preset) {
     throw new ServiceError("preset_not_found", 400);
   }
+  return preset;
 }
 
 function savedOrDetectedPreset(
@@ -78,14 +81,14 @@ function savedOrDetectedPreset(
     return null;
   }
   try {
-    return { presetId: importPreset, map: loadPreset(importPreset) };
+    return { presetId: importPreset, map: presetMap(importPreset) };
   } catch {
-    const presetId = chosenPresetId(detectStatementFormat(filename, text, loadPresets()));
+    const presetId = chosenPresetId(detectStatementFormat(filename, text, presets));
     if (!presetId) {
       return null;
     }
     try {
-      return { presetId, map: loadPreset(presetId) };
+      return { presetId, map: presetMap(presetId) };
     } catch {
       return null;
     }
@@ -152,7 +155,7 @@ function dateWindow(dates: readonly string[]) {
 
 export function listImportPresets() {
   return {
-    presets: loadPresets(),
+    presets,
   };
 }
 

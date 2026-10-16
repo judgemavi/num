@@ -217,25 +217,26 @@ function toolDescription(route: McpRoute) {
   return `${base} ${moneyText}`;
 }
 
-export function registerGeneratedTools(server: McpServer, app: OpenAPIHono, db: Db): void {
-  const writes = aiCanWrite(db);
-  for (const route of mcpRoutes(app)) {
-    if (!route.read && !writes) {
-      continue;
-    }
-    server.registerTool(
-      route.operationId,
-      {
-        description: toolDescription(route),
-        inputSchema: inputSchema(route),
-        annotations: {
-          readOnlyHint: route.read,
-          destructiveHint: route.destructive,
-          idempotentHint: route.read,
-          openWorldHint: false,
-        },
+export function buildToolCatalog(app: OpenAPIHono) {
+  return mcpRoutes(app).map((route) => ({
+    route,
+    config: {
+      description: toolDescription(route),
+      inputSchema: inputSchema(route),
+      annotations: {
+        readOnlyHint: route.read,
+        destructiveHint: route.destructive,
+        idempotentHint: route.read,
+        openWorldHint: false,
       },
-      async (args) => callMcpTool(app, db, route, args),
-    );
+    },
+  }));
+}
+
+export function registerGeneratedTools(server: McpServer, app: OpenAPIHono, db: Db, catalog: ReturnType<typeof buildToolCatalog>): void {
+  const writes = aiCanWrite(db);
+  for (const { route, config } of catalog) {
+    if (!route.read && !writes) continue;
+    server.registerTool(route.operationId, config, async (args) => callMcpTool(app, db, route, args));
   }
 }

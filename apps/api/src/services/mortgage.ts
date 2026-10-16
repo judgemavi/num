@@ -1,4 +1,4 @@
-import { accounts, mortgageTerms, transactions, valuations } from "@num/db";
+import { accounts, mortgageTerms, transactionLines, transactions, valuations } from "@num/db";
 import {
   mortgageExtraEffect,
   mortgageLoan,
@@ -13,7 +13,7 @@ import type { Db } from "../db";
 import { bookStep } from "./book-step";
 import { balanceOf } from "./account-balance";
 import { ServiceError } from "../service-error";
-import { hasTransferLine, literal } from "./transaction-sql";
+import { literal } from "./transaction-sql";
 import type { Reader } from "./write";
 
 function requireMortgage(db: Reader, accountId: string) {
@@ -56,8 +56,10 @@ export function getMortgageTerms(db: Db, accountId: string): MortgageTerms {
 function actualPayments(db: Db, accountId: string) {
   return db
     .select({ id: transactions.id, date: transactions.date, amount: sql<number>`-${transactions.amount}` })
-    .from(transactions)
-    .where(and(eq(transactions.mirror, literal(0)), lt(transactions.amount, literal(0)), hasTransferLine(transactions.id, accountId)))
+    .from(transactionLines)
+    .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
+    .where(and(eq(transactionLines.transferAccountId, accountId), eq(transactions.mirror, literal(0)), lt(transactions.amount, literal(0))))
+    .groupBy(transactions.id)
     .orderBy(asc(transactions.date), asc(transactions.id))
     .all();
 }

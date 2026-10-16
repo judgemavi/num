@@ -154,7 +154,7 @@ export function readBucket(db: Reader, id: string): Bucket {
   if (!row) {
     throw new ServiceError("bucket_not_found", 404);
   }
-  const balance = bucketBalances(db).get(id) ?? 0;
+  const balance = bucketBalances(db, undefined, [id]).get(id) ?? 0;
   return toBucket(row, categoryIdsFor(db, id), scheduleOf(db, id), balance);
 }
 
@@ -184,8 +184,7 @@ export function listBuckets(db: Db, query: BucketListQuery) {
 }
 
 /** The balance is a calculated value, thus the balance sort runs in code. The rows come in name order, and the sort is stable. */
-export function listOverspent(db: Db): { items: OverspentBucket[] } {
-  const balances = bucketBalances(db);
+export function listOverspent(db: Db, balances = bucketBalances(db)): { items: OverspentBucket[] } {
   const items = db
     .select()
     .from(buckets)
@@ -322,7 +321,7 @@ export function archiveBucket(db: Db, id: string, input: WriteInput): Bucket {
     if (existing.archivedAt) {
       throw new ServiceError("bucket_archived", 409);
     }
-    const balance = bucketBalances(tx).get(id) ?? 0;
+    const balance = bucketBalances(tx, undefined, [id]).get(id) ?? 0;
     if (balance !== 0) {
       throw new ServiceError("bucket_balance", 409);
     }

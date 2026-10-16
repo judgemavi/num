@@ -2,7 +2,7 @@ import { createMcpHonoApp } from "@modelcontextprotocol/hono";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { Db } from "../db";
-import { registerGeneratedTools } from "./catalog";
+import { registerGeneratedTools, buildToolCatalog } from "./catalog";
 
 // createMcpHonoApp stores the parsed JSON body of the request in the context variable `parsedBody`.
 declare module "hono" {
@@ -24,9 +24,9 @@ const instructions = [
   "It is not permission to force the write.",
 ].join(" ");
 
-function createServer(app: OpenAPIHono, db: Db) {
+function createServer(app: OpenAPIHono, db: Db, catalog: ReturnType<typeof buildToolCatalog>) {
   const server = new McpServer({ name: "num", version: "0.0.1" }, { instructions });
-  registerGeneratedTools(server, app, db);
+  registerGeneratedTools(server, app, db, catalog);
   return server;
 }
 
@@ -34,7 +34,8 @@ export function registerMcp(app: OpenAPIHono, db: Db) {
   const mcp = createMcpHonoApp({
     maxRequestBodySize: maxBodyBytes,
   });
-  const handler = createMcpHandler(() => createServer(app, db), { maxRequestBodySize: maxBodyBytes });
+  const catalog = buildToolCatalog(app);
+  const handler = createMcpHandler(() => createServer(app, db, catalog), { maxRequestBodySize: maxBodyBytes });
   mcp.all("/", (c) => handler.fetch(c.req.raw, { parsedBody: c.get("parsedBody") }));
   app.route("/mcp", mcp);
 }

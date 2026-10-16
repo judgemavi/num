@@ -1,10 +1,10 @@
-import { accounts, bankBalances, type AccountRow } from "@num/db";
-import { utcNow, type BankBalance, type BankBalanceInput, type BankStatus } from "@num/shared";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { accounts, bankBalances, mortgageTerms, type AccountRow } from "@num/db";
+import { dayBefore, openingFromBankBalance, utcNow, type BankBalance, type BankBalanceInput, type BankStatus } from "@num/shared";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { requireWholeAmounts } from "./book-step";
-import { balanceOf } from "./account-balance";
+import { balanceOf, balancesAt } from "./account-balance";
 import { bankOpeningSuggestion } from "./opening-suggestion";
 import { withoutId, write, type Reader, type WriteInput, type WriteTx } from "./write";
 
@@ -47,15 +47,42 @@ function statusOf(db: Reader, account: AccountRow, latest: BankBalance): BankSta
 }
 
 export function listBankStatuses(db: Db): { items: BankStatus[] } {
-  const items = db
-    .select()
-    .from(accounts)
-    .where(isNull(accounts.archivedAt))
-    .all()
-    .flatMap((account) => {
-      const latest = rowsOf(db, account.id)[0];
-      return latest ? [statusOf(db, account, latest)] : [];
-    });
+  const open = db.select({
+    account: accounts,
+    firstDate: sql<string | null>`(SELECT t.date FROM transactions t WHERE t.account_id = "accounts"."id" ORDER BY t.date LIMIT 1)`,
+  }).from(accounts).where(isNull(accounts.archivedAt)).all();
+  const ids = open.map(({ account }) => account.id);
+  const rows = db.select().from(bankBalances).where(inArray(bankBalances.accountId, ids)).orderBy(desc(bankBalances.date)).all();
+  const byId = new Map(open.map((row) => [row.account.id, row]));
+  const points = rows.flatMap((bank) => {
+    const found = byId.get(bank.accountId);
+    return found ? [{ account: found.account, date: bank.date, bank }] : [];
+  });
+  const calculated = balancesAt(db, points);
+  const grouped = new Map<string, { bank: BankBalance; calculated: number }[]>();
+  for (const [index, point] of points.entries()) {
+    const balance = calculated[index];
+    if (balance === undefined) throw new Error("Balance is missing");
+    const entries = grouped.get(point.account.id) ?? [];
+    entries.push({ bank: point.bank, calculated: balance });
+    grouped.set(point.account.id, entries);
+  }
+  const withTerms = new Set(db.select({ accountId: mortgageTerms.accountId }).from(mortgageTerms).all().map((row) => row.accountId));
+  const items = open.flatMap(({ account, firstDate }) => {
+    const entries = grouped.get(account.id) ?? [];
+    const latest = entries[0];
+    if (!latest) return [];
+    const difference = latest.calculated - latest.bank.balance;
+    return [{
+      accountId: account.id, date: latest.bank.date, bankBalance: latest.bank.balance,
+      calculatedBalance: latest.calculated, difference,
+      openingSuggestion: difference === 0 || withTerms.has(account.id) ? null : openingFromBankBalance({
+        hasMatchingBankBalance: entries.slice(1).some((row) => row.bank.balance === row.calculated),
+        openingBalance: account.openingBalance, calculatedBalance: latest.calculated, bankBalance: latest.bank.balance,
+        date: firstDate ? dayBefore(firstDate) : account.openingDate ?? account.createdOn,
+      }),
+    }];
+  });
   return { items };
 }
 

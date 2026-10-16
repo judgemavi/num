@@ -115,7 +115,12 @@ test("needs review returns each kind and leaves out confirmed rows and a recorde
     const phoneA = pay(db, savings.id, "2026-03-19", -10_000, "Phone a", food.id);
     const phoneB = pay(db, savings.id, "2026-03-21", -10_000, "Phone b", food.id);
 
-    const questions = new Map(listNeedsReview(db, asOf).map((hit) => [hit.id, hit.review.question]));
+    const full = listNeedsReview(db, asOf);
+    for (const id of [sure.id, likely.id, none.id, left.id, right.id, phoneA.id, phoneB.id, quiet.id, confirmed.id]) {
+      expect(listNeedsReview(db, asOf, { only: [id] })).toEqual(full.filter((hit) => hit.id === id));
+    }
+    expect(listNeedsReview(db, asOf, { only: [] })).toEqual([]);
+    const questions = new Map(full.map((hit) => [hit.id, hit.review.question]));
     expect(questions.get(sure.id)).toBe("categorize");
     expect(listNeedsReview(db, asOf).find((hit) => hit.id === sure.id)?.review.level).toBe("sure");
     expect(questions.get(likely.id)).toBe("categorize");

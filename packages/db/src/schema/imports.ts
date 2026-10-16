@@ -69,6 +69,7 @@ export const importRows = sqliteTable(
       .on(table.accountId, table.identity)
       .where(sql`${table.active} = 1 and ${table.outcome} <> 'duplicate'`),
     index("import_rows_batch").on(table.batchId),
+    index("import_rows_transaction").on(table.transactionId),
   ],
 );
 

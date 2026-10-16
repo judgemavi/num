@@ -2,7 +2,7 @@ import { buckets } from "@num/db";
 import { isIsoDate, type Available } from "@num/shared";
 import { ServiceError } from "../service-error";
 import { listBillNeeds } from "./bills";
-import { positionOn } from "./funding-book";
+import { createFundingReads } from "./funding-reads";
 import type { Reader } from "./write";
 
 /**
@@ -13,7 +13,8 @@ export function readAvailable(db: Reader, asOf: string): Available {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
-  const { onBudgetTotal, balances, unassigned: free } = positionOn(db, asOf);
+  const reads = createFundingReads(db, asOf);
+  const { onBudgetTotal, balances, unassigned: free } = reads.position;
   const totals = { savings: 0, held: 0 };
   for (const row of db.select({ id: buckets.id, kind: buckets.kind }).from(buckets).all()) {
     const positive = Math.max(0, balances.get(row.id) ?? 0);
@@ -24,7 +25,7 @@ export function readAvailable(db: Reader, asOf: string): Available {
     }
   }
   // The whole gap: the part that Unassigned covers is not free to spend.
-  const gap = listBillNeeds(db, asOf).items.reduce((sum, item) => sum + item.gap, 0);
+  const gap = listBillNeeds(db, asOf, reads).items.reduce((sum, item) => sum + item.gap, 0);
   const billsSetAside = totals.held + gap;
   return {
     asOf,

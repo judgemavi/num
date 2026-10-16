@@ -58,7 +58,7 @@ export function refundItemKey(transactionId: string): string {
 }
 
 /** Refunds: money in, one expense-category line, no linked purchase. Give an id to read one row. */
-function loadRefunds(db: Reader, id?: string) {
+function loadRefunds(db: Reader, id?: string, scope?: { from?: string; only?: readonly string[] }) {
   return db
     .select({
       id: transactions.id,
@@ -76,6 +76,8 @@ function loadRefunds(db: Reader, id?: string) {
         isNull(transactions.refundOfId),
         hasOneExpenseLine(transactions.id),
         id ? eq(transactions.id, id) : undefined,
+        scope?.from ? gte(transactions.date, scope.from) : undefined,
+        scope?.only ? sql`${transactions.id} in (select value from json_each(${JSON.stringify(scope.only)}))` : undefined,
       ),
     )
     .all();
@@ -109,7 +111,7 @@ function loadPurchases(db: Reader, payees: readonly string[], from: string) {
  * Same-day reversal candidates: spending in the same account and expense category, the same
  * absolute amount, dated 0 to 3 days before the refund. One indexed join; give an id to read one refund.
  */
-function loadReversals(db: Reader, id?: string) {
+function loadReversals(db: Reader, id?: string, only?: readonly string[]) {
   const rows = db
     .select({ ...purchaseColumns, refundId: incoming.id, categoryId: incomingLine.categoryId })
     .from(incoming)
@@ -134,6 +136,7 @@ function loadReversals(db: Reader, id?: string) {
         isNull(incoming.refundOfId),
         eq(transactions.mirror, literal(0)),
         id ? eq(incoming.id, id) : undefined,
+        only ? sql`${incoming.id} in (select value from json_each(${JSON.stringify(only)}))` : undefined,
         hasOneExpenseLine(incoming.id),
         hasOneExpenseLine(transactions.id),
       ),
@@ -171,9 +174,9 @@ export type RefundAsk = {
 };
 
 /** Refunds that need the question "Refund of which purchase?". A read: it never writes. */
-export function refundQuestions(db: Reader, hidden: ReadonlySet<string>): Map<string, RefundAsk> {
+export function refundQuestions(db: Reader, hidden: ReadonlySet<string>, asOf: string, only?: readonly string[]): Map<string, RefundAsk> {
   const asks = new Map<string, RefundAsk>();
-  const refunds = loadRefunds(db).filter((row) => !hidden.has(refundItemKey(row.id)));
+  const refunds = loadRefunds(db, undefined, only ? { only } : { from: refundWindowStart(asOf) }).filter((row) => !hidden.has(refundItemKey(row.id)));
   if (refunds.length === 0) {
     return asks;
   }
@@ -182,7 +185,7 @@ export function refundQuestions(db: Reader, hidden: ReadonlySet<string>): Map<st
   for (const row of loadPurchases(db, refunds.map((item) => item.payee), refundWindowStart(earliest))) {
     byPayee.set(row.payeeNormalized, [...(byPayee.get(row.payeeNormalized) ?? []), row]);
   }
-  const reversals = loadReversals(db);
+  const reversals = loadReversals(db, undefined, refunds.map((row) => row.id));
   for (const refund of refunds) {
     const found = candidatesFor(refund, byPayee.get(refund.payee) ?? [], reversals.get(refund.id) ?? []);
     if (found.length > 0) {

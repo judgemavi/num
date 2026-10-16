@@ -1,5 +1,5 @@
 import { bucketCategories, bucketEvents, buckets, occurrenceLinks, transactionLines, transactions } from "@num/db";
-import { and, eq, gte, isNotNull, isNull, lte, notExists, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lte, notExists, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { Reader } from "./write";
 
@@ -11,7 +11,7 @@ const owner = alias(buckets, "link_owner");
 
 // Spec §5.8 (a recede is money back to Unassigned, as a release is): events count on all dates. Lines count only from the bucket's start date.
 // A commitment counts the full amount of its linked payments. Its payment does not count in a category bucket.
-export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
+export function bucketBalances(db: Reader, asOf?: string, bucketIds?: readonly string[]): Map<string, number> {
   const balances = new Map<string, number>();
   const events = db
     .select({
@@ -24,6 +24,7 @@ export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
     .where(
       and(
         isNull(bucketEvents.undoneAt),
+        bucketIds ? or(inArray(bucketEvents.bucketId, [...bucketIds]), inArray(bucketEvents.otherBucketId, [...bucketIds])) : undefined,
         asOf ? lte(bucketEvents.date, asOf) : undefined,
       ),
     )
@@ -51,6 +52,7 @@ export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
     .innerJoin(buckets, eq(bucketCategories.bucketId, buckets.id))
     .where(
       and(
+        bucketIds ? inArray(buckets.id, [...bucketIds]) : undefined,
         gte(transactions.date, buckets.startDate),
         asOf ? lte(transactions.date, asOf) : undefined,
         notExists(
@@ -81,6 +83,7 @@ export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
       and(
         isNotNull(occurrenceLinks.transactionId),
         eq(buckets.kind, "commitment"),
+        bucketIds ? inArray(buckets.id, [...bucketIds]) : undefined,
         gte(transactions.date, buckets.startDate),
         asOf ? lte(transactions.date, asOf) : undefined,
       ),
@@ -91,5 +94,6 @@ export function bucketBalances(db: Reader, asOf?: string): Map<string, number> {
   for (const payment of payments) {
     add(balances, payment.bucketId, payment.total);
   }
+  if (bucketIds) return new Map(bucketIds.map((id) => [id, balances.get(id) ?? 0]));
   return balances;
 }

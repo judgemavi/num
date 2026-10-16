@@ -8,15 +8,15 @@ import {
   type Suggestion,
   type TransactionReview,
 } from "@num/shared";
-import { transactions } from "@num/db";
-import { and, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
+import { transactionLines, transactions } from "@num/db";
+import { and, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { keepKey } from "./decision-keep";
 import { decidedKeys, pairKey } from "./decision-keys";
 import { loadMatchBook, mortgageLearnedFor, scorePayee } from "./match-book";
 import { refundQuestions } from "./refund-auto";
-import { recurringSignals } from "./recurring-view";
+import { recurringAmbiguities, recurringSignals } from "./recurring-view";
 import { mortgageSuggestion } from "./mortgage-learned";
 import { listTransferPairs } from "./suggestions";
 import { hasOpenLine, lineCount } from "./transaction-sql";
@@ -94,19 +94,20 @@ function emptyReview(level: ReviewLevel, reason: TransactionReview["reason"]): T
 
 /**
  * The rows that need review. `signals` and `pairs` are the review sources when the caller has them already.
- * `only` limits the rows to these ids: the review sources stay the same, but only these rows get a score.
+ * `only` limits the review sources and scores to the accounts, amounts and refunds that these ids can use.
  */
 export function listNeedsReview(
   db: Db,
   asOf: string,
-  scope: { signals?: RecurringSignals; pairs?: { leftId: string; rightId: string }[]; only?: readonly string[] } = {},
+  scope: { signals?: Pick<RecurringSignals, "ambiguous">; pairs?: { leftId: string; rightId: string }[]; only?: readonly string[] } = {},
 ): NeedsReviewHit[] {
   requireAsOf(asOf);
   const hidden = decidedKeys(db);
   const only = scope.only ? new Set(scope.only) : null;
   const wanted = (id: string) => only === null || only.has(id);
-  const signals = scope.signals ?? recurringSignals(db, asOf);
-  const pairs = (scope.pairs ?? listTransferPairs(db, asOf).items).filter((pair) => !hidden.has(pairKey(pair.leftId, pair.rightId)));
+  if (scope.only?.length === 0) return [];
+  const signals = scope.signals ?? { ambiguous: recurringAmbiguities(db, asOf, scope.only) };
+  const pairs = (scope.pairs ?? listTransferPairs(db, asOf, scope.only).items).filter((pair) => !hidden.has(pairKey(pair.leftId, pair.rightId)));
   const pairById = new Map<string, { otherId: string; itemKey: string }>();
   for (const pair of pairs) {
     const itemKey = pairKey(pair.leftId, pair.rightId);
@@ -121,10 +122,13 @@ export function listNeedsReview(
       }
     }
   }
-  const refundById = refundQuestions(db, hidden);
-  const open = or(isNotNull(transactions.autoReason), hasOpenLine(transactions.id));
-  const openRows = (where: SQL | undefined) => db.select({ id: transactions.id }).from(transactions).where(where).all();
-  const openIds = only ? chunks([...only], 400).flatMap((group) => openRows(and(inArray(transactions.id, group), open))) : openRows(open);
+  const refundById = refundQuestions(db, hidden, asOf, scope.only);
+  const openIds = db.select({ id: transactionLines.transactionId }).from(transactionLines)
+    .where(and(isNull(transactionLines.categoryId), isNull(transactionLines.transferAccountId),
+      only ? sql`${transactionLines.transactionId} in (select value from json_each(${JSON.stringify([...only])}))` : undefined))
+    .union(db.select({ id: transactions.id }).from(transactions)
+      .where(and(isNotNull(transactions.autoReason), only ? sql`${transactions.id} in (select value from json_each(${JSON.stringify([...only])}))` : undefined)))
+    .all();
   const ids = [...openIds.map((row) => row.id), ...pairById.keys(), ...ambiguousById.keys(), ...refundById.keys()].filter(wanted);
   const otherIds = ids.flatMap((id) => {
     const pair = pairById.get(id);
@@ -132,14 +136,14 @@ export function listNeedsReview(
   });
   const others = new Map(loadBases(db, otherIds).map((row) => [row.id, row]));
   const bases = loadBases(db, ids);
-  const book = loadMatchBook(db);
+  const book = bases.some((row) => row.autoReason === null && row.openLine) ? loadMatchBook(db) : null;
   const scored = new Map<string, Suggestion>();
   const hits: NeedsReviewHit[] = [];
   for (const row of bases) {
     const reason = row.autoReason;
     const automatic = reason !== null;
     let suggestion: Suggestion | null = null;
-    if (!automatic && row.openLine) {
+    if (!automatic && row.openLine && book) {
       const key = `${row.payee}\u0000${row.amount}`;
       let cached = scored.get(key);
       if (!cached) {

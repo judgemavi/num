@@ -75,8 +75,7 @@ export function splitCsvLine(line: string): string[] {
 }
 
 export function sampleCsvRows(text: string, limit = 6): string[][] {
-  return contentLines(text)
-    .slice(0, limit)
+  return contentLines(text, limit)
     .map((line) => splitCsvLine(line));
 }
 
@@ -289,13 +288,23 @@ function columnWidth(preset: Preset) {
   return width;
 }
 
-function contentLines(text: string) {
-  const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-  return source.split(/\r?\n/).filter((line) => line.trim().length > 0);
+function contentLines(text: string, limit: number) {
+  const lines: string[] = [];
+  let start = text.charCodeAt(0) === 0xfeff ? 1 : 0;
+  while (start < text.length && lines.length < limit) {
+    const newline = text.indexOf("\n", start);
+    const end = newline < 0 ? text.length : newline;
+    const line = text.slice(start, end).replace(/\r$/, "");
+    if (line.trim().length > 0) {
+      lines.push(line);
+    }
+    start = end + 1;
+  }
+  return lines;
 }
 
 function firstOfxDate(text: string) {
-  const head = contentLines(text).slice(0, dateScanLines).join("\n");
+  const head = contentLines(text, dateScanLines).join("\n");
   const match = /<DTPOSTED>\s*(\d{4})(\d{2})(\d{2})/i.exec(head);
   if (!match?.[1] || !match[2] || !match[3]) {
     return null;

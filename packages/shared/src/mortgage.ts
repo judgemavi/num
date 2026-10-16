@@ -169,7 +169,7 @@ function sortedValuations(valuations: MortgageValuation[]) {
   return [...valuations].sort((left, right) => (left.date < right.date ? -1 : left.date > right.date ? 1 : 0));
 }
 
-export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuation[] = []): MortgageSchedule {
+export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuation[] = [], through?: string): MortgageSchedule {
   if (loan.firstPaymentDate < loan.principalAsOf) {
     throw new Error("The first payment is before the principal date");
   }
@@ -205,6 +205,9 @@ export function mortgageSchedule(loan: MortgageLoan, valuations: MortgageValuati
   const limit = 50 * periods;
   for (let index = 0; index < limit && balance > 0; index += 1) {
     const date = mortgagePaymentDate(loan.firstPaymentDate, index, frequency);
+    if (through && date > through) {
+      break;
+    }
     while (cursor < dated.length && dated[cursor].date < date) {
       const valuation = dated[cursor];
       cursor += 1;
@@ -310,8 +313,8 @@ export function mortgageSplitForDate(input: {
   if (input.fromAccountId !== input.terms.paymentAccountId || input.toAccountId !== input.terms.accountId) {
     return null;
   }
-  const schedule = mortgageSchedule(mortgageLoan(input.terms, input.opening, input.step), input.valuations);
-  const row = schedule.payments.filter((payment) => payment.date <= input.date).at(-1);
+  const schedule = mortgageSchedule(mortgageLoan(input.terms, input.opening, input.step), input.valuations, input.date);
+  const row = schedule.payments.at(-1);
   if (!row) {
     return null;
   }

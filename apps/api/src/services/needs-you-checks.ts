@@ -1,9 +1,8 @@
-import { monthLastDay, reviewAgeDays, staleImportDays, Temporal, type AccountListQuery } from "@num/shared";
+import { monthLastDay, reviewAgeDays, staleImportDays, Temporal } from "@num/shared";
 import type { Db } from "../db";
-import { listAccounts } from "./accounts";
 import { listOverspent } from "./buckets";
 import { lastCompleteMonths } from "./complete-months";
-import { emergencyBucket, readEmergencyFund } from "./emergency-fund";
+import { createFundingReads, type FundingReads } from "./funding-reads";
 import { poolChecks } from "./pool-checks";
 import { billsShortCheck } from "./bills";
 import { importFreshness } from "./book-settings";
@@ -11,40 +10,14 @@ import { spendTotals } from "./insights-spend";
 import { loadLedgerLines } from "./ledger-lines";
 import { loadReviewState, type ReviewState } from "./needs-review";
 
-const pageSize = 200;
-
-function pagesOf<T>(load: (page: number) => { items: T[]; total: number }) {
-  const first = load(1);
-  const items = [...first.items];
-  let page = 2;
-  while (items.length < first.total) {
-    const next = load(page);
-    if (next.items.length === 0) {
-      break;
-    }
-    items.push(...next.items);
-    page += 1;
-  }
-  return items;
-}
-
-function accounts(db: Db) {
-  const query = { pageSize, archived: false, sort: "name", dir: "asc" } as const;
-  return pagesOf((page) => listAccounts(db, { ...query, page } satisfies AccountListQuery));
-}
-
 function ageDays(asOf: string, day: string) {
   const days = Temporal.PlainDate.from(day).until(Temporal.PlainDate.from(asOf), { largestUnit: "day" }).days;
   return days < 0 ? 0 : days;
 }
 
-function emergencyFund(db: Db, asOf: string) {
-  const bucket = emergencyBucket(db);
-  if (!bucket || bucket.archivedAt) {
-    return [];
-  }
-  const fund = readEmergencyFund(db, asOf);
-  if (!fund || fund.target === 0) {
+function emergencyFund(reads: FundingReads) {
+  const fund = reads.emergencyFund();
+  if (!fund || fund.archived || fund.target === 0) {
     return [];
   }
   return [
@@ -59,13 +32,12 @@ function emergencyFund(db: Db, asOf: string) {
 }
 
 function importsCurrent(db: Db, asOf: string) {
-  const imported = new Map(importFreshness(db, asOf).map((row) => [row.accountId, row.lastImportedOn]));
-  const items = accounts(db)
+  const items = importFreshness(db, asOf)
     .filter((account) => account.onBudget)
     .map((account) => {
-      const at = imported.get(account.id) ?? null;
+      const at = account.lastImportedOn;
       const age = at && at <= asOf ? ageDays(asOf, at) : null;
-      return { accountId: account.id, ageDays: age, pass: age === null || age <= staleImportDays };
+      return { accountId: account.accountId, ageDays: age, pass: age === null || age <= staleImportDays };
     });
   return { code: "imports_current" as const, pass: items.every((item) => item.pass), items };
 }
@@ -90,8 +62,8 @@ function savingsRate(db: Db, asOf: string) {
 }
 
 /** The fill covers a negative bucket from Unassigned. The check fails when a bucket stays negative. */
-function overspent(db: Db) {
-  const items = listOverspent(db).items;
+function overspent(db: Db, reads: FundingReads) {
+  const items = listOverspent(db, reads.balancesOn()).items;
   const balance = items.reduce((sum, item) => sum + item.balance, 0);
   return { code: "overspent" as const, pass: items.length === 0, count: items.length, balance };
 }
@@ -100,15 +72,15 @@ function overspent(db: Db) {
  * The checks of Needs you (§10). Needs you shows a check only when it fails. `state` is the review state that the
  * caller already read.
  */
-export function needsYouChecks(db: Db, asOf: string, state: ReviewState = loadReviewState(db, asOf)) {
+export function needsYouChecks(db: Db, asOf: string, state: ReviewState = loadReviewState(db, asOf), reads = createFundingReads(db, asOf)) {
   return [
-    ...emergencyFund(db, asOf),
-    billsShortCheck(db, asOf),
-    ...poolChecks(db, asOf),
+    ...emergencyFund(reads),
+    billsShortCheck(db, asOf, reads),
+    ...poolChecks(db, asOf, reads),
     importsCurrent(db, asOf),
     reviewAge(state, asOf),
     savingsRate(db, asOf),
-    overspent(db),
+    overspent(db, reads),
   ];
 }
 

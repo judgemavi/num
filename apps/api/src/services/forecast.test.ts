@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { auditLog, migrateDatabase, openDatabase, settings } from "@num/db";
 import { expect, test } from "bun:test";
 import { createDb, type Db } from "../db";
+import { unbucketedMonthly } from "@num/shared";
+import { unbucketedSpending } from "./forecast-spending";
 import { createAccount } from "./accounts";
 import { createBucket } from "./buckets";
 import { createCategory } from "./categories";
@@ -173,3 +175,30 @@ test("variable income uses the median of the last 6 actuals", () => {
   }
 });
 
+
+
+test("monthly SQL sums keep the line outlier limit, missing months and refunds", () => {
+  const book = tempDatabase();
+  try {
+    const cash = cashAccount(book.db, "Cash", 1_000_000);
+    const months = ["2026-07", "2026-08", "2026-09"];
+    const cases = [
+      [-1_000, -1_000, -2_000, -10_000],
+      [-1_000, 1_000, -1_000],
+      [-1_000, -1_010, -1_020, -100_000],
+      [1_000, 1_000, 1_000],
+      [-2_000],
+    ];
+    const expected: number[] = [];
+    for (const [index, amounts] of cases.entries()) {
+      const category = expense(book.db, `Synthetic ${index}`);
+      const rows = amounts.map((amount, i) => ({ amount, month: months[i % months.length] ?? "2026-07" }));
+      for (const row of rows) spend(book.db, cash.id, category.id, `${row.month}-15`, row.amount);
+      const monthly = unbucketedMonthly(months, rows, 10);
+      if (monthly > 0) expected.push(monthly);
+    }
+    expect(unbucketedSpending(book.db, months, 10).map((row) => row.monthly).sort((a, b) => a - b)).toEqual(expected.sort((a, b) => a - b));
+  } finally {
+    book.close();
+  }
+});

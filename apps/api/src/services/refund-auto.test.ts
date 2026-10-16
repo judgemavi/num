@@ -10,6 +10,7 @@ import { createCategory } from "./categories";
 import { decideInboxItem } from "./inbox-decisions";
 import { bulkEdit } from "./bulk-edit";
 import { createMerchant } from "./merchants";
+import { refundQuestions } from "./refund-auto";
 import { listNeedsReview } from "./needs-review";
 import { acceptLooksRight, createTransaction, deleteTransaction, getTransaction, updateTransaction } from "./transactions";
 
@@ -230,5 +231,19 @@ test("a transfer question comes before the refund question", () => {
     const [low, high] = left.id < right.id ? [left.id, right.id] : [right.id, left.id];
     decideInboxItem(db, asOf, `transfer_pair:${low}:${high}`, "not_transfer", saved);
     expect(questionOf(db, right.id)?.question).toBe("refund_purchase");
+  });
+});
+
+
+test("the review window keeps day 90 and a scoped read can answer an older refund", () => {
+  withBook((db, ids) => {
+    money(db, ids.account, "2025-12-20", -50_000, ids.food);
+    const older = money(db, ids.account, "2026-01-01", 10_000, ids.food);
+    const boundary = money(db, ids.account, "2026-01-02", 10_000, ids.food);
+    const open = refundQuestions(db, new Set(), asOf);
+    expect(open.has(older.id)).toBe(false);
+    expect(open.has(boundary.id)).toBe(true);
+    expect(refundQuestions(db, new Set(), asOf, [older.id]).has(older.id)).toBe(true);
+    expect(refundQuestions(db, new Set(), asOf, []).size).toBe(0);
   });
 });

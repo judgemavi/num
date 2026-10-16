@@ -4,6 +4,7 @@ import {
   planProposalKey,
   detectPlans,
   isInboxMissed,
+  isLinkCandidate,
   linkDateRange,
   matchLinks,
   missedCandidates,
@@ -19,7 +20,7 @@ import {
   type RecurringSignals,
   type UpcomingList,
 } from "@num/shared";
-import { and, eq, gte, inArray, lt, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { bookStep } from "./book-step";
 import { decidedKeys } from "./decision-keys";
@@ -195,15 +196,19 @@ function statusFor(
 export function listOccurrences(db: Db, bucketId: string, asOf: string) {
   const row = requireSchedule(db, bucketId);
   const links = db.select().from(occurrenceLinks).where(eq(occurrenceLinks.bucketId, bucketId)).all();
-  const byDue = new Map(links.map((link) => [link.dueDate, link]));
   const txns = transactionsByIds(
     db,
     links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])),
   );
+  return occurrenceList(row, links, txns, asOf, row.amountMode === "variable" ? bookStep(db) : 1, horizon(asOf));
+}
+
+function occurrenceList(row: ScheduleView, links: OccurrenceLinkRow[], txns: Map<string, TxnRow>, asOf: string, step: number, until: string, from?: string) {
+  const byDue = new Map(links.map((link) => [link.dueDate, link]));
   const actuals = amountsByDue(links, txns, asOf);
   const amounts =
-    row.amountMode === "variable" ? variableAmounts(actuals, row.expectedAmount, bookStep(db)) : { forecast: row.expectedAmount, safe: row.expectedAmount };
-  const items: Occurrence[] = occurrenceWindows(row, horizon(asOf)).map((window) => {
+    row.amountMode === "variable" ? variableAmounts(actuals, row.expectedAmount, step) : { forecast: row.expectedAmount, safe: row.expectedAmount };
+  const items: Occurrence[] = occurrenceWindows(row, until, from).map((window) => {
     const link = byDue.get(window.dueDate);
     const txn = link?.transactionId ? txns.get(link.transactionId) : undefined;
     const actual = txn ? txn.amount : null;
@@ -224,8 +229,22 @@ const upcomingDays = 30;
 /** The occurrences of all active schedules from `asOf` to 30 days later, by date. */
 export function listUpcoming(db: Db, asOf: string): UpcomingList {
   const until = Temporal.PlainDate.from(asOf).add({ days: upcomingDays }).toString();
-  const items = activeSchedules(db).flatMap((row) => {
-    const list = listOccurrences(db, row.id, asOf);
+  const schedules = activeSchedules(db);
+  const ids = JSON.stringify(schedules.map((row) => row.id));
+  const scope = sql`${occurrenceLinks.bucketId} in (select value from json_each(${ids}))`;
+  const links = db.select().from(occurrenceLinks).where(scope).all();
+  const linkedTransactions = db.select({ transaction: transactions }).from(transactions)
+    .innerJoin(occurrenceLinks, eq(occurrenceLinks.transactionId, transactions.id)).where(scope).all();
+  const txns = new Map(linkedTransactions.map(({ transaction }) => [transaction.id, transaction]));
+  const byBucket = new Map<string, OccurrenceLinkRow[]>();
+  for (const link of links) {
+    const rows = byBucket.get(link.bucketId) ?? [];
+    rows.push(link);
+    byBucket.set(link.bucketId, rows);
+  }
+  const step = schedules.some((row) => row.amountMode === "variable") ? bookStep(db) : 1;
+  const items = schedules.flatMap((row) => {
+    const list = occurrenceList(row, byBucket.get(row.id) ?? [], txns, asOf, step, until, asOf);
     return list.items
       .filter((item) => item.dueDate >= asOf && item.dueDate <= until)
       .map((item) => ({ ...item, bucketId: row.id, accountId: row.accountId, forecastAmount: list.forecastAmount }));
@@ -235,13 +254,25 @@ export function listUpcoming(db: Db, asOf: string): UpcomingList {
 }
 
 /** The occurrences with no link or skip that a transaction can match on `asOf`, and the transactions in their windows. */
-function linkInput(db: Reader, schedules: ScheduleView[], links: OccurrenceLinkRow[], asOf: string) {
-  const occurrences = openOccurrences(schedules, new Set(links.map((link) => `${link.bucketId}|${link.dueDate}`)), asOf);
+function linkInput(db: Reader, schedules: ScheduleView[], links: OccurrenceLinkRow[], asOf: string, only?: readonly TxnRow[]) {
+  const occurrences = openOccurrences(schedules, new Set(links.map((link) => `${link.bucketId}|${link.dueDate}`)), asOf)
+    .filter((occurrence) => !only || only.some((row) => isLinkCandidate(occurrence, row)));
   const range = linkDateRange(occurrences);
   const taken = new Set(links.flatMap((link) => (link.transactionId ? [link.transactionId] : [])));
   const accountIds = [...new Set(occurrences.map((item) => item.accountId))];
   const candidates = range ? transactionsForAccounts(db, accountIds, range.from, range.before).filter((txn) => !taken.has(txn.id)) : [];
   return { occurrences, candidates };
+}
+
+/** Only the schedule accounts that can match a requested transaction; all competing candidates stay in scope. */
+export function recurringAmbiguities(db: Db, asOf: string, only?: readonly string[]): RecurringSignals["ambiguous"] {
+  const wanted = only ? transactionsByIds(db, only) : null;
+  const accounts = wanted ? new Set([...wanted.values()].map((row) => row.accountId)) : null;
+  const schedules = activeSchedules(db).filter((row) => accounts === null || accounts.has(row.accountId));
+  if (schedules.length === 0) return [];
+  const links = db.select().from(occurrenceLinks).all();
+  const open = linkInput(db, schedules, links, asOf, wanted ? [...wanted.values()] : undefined);
+  return matchLinks(open.occurrences, open.candidates).ambiguous;
 }
 
 export function recurringSignals(db: Db, asOf: string): RecurringSignals {

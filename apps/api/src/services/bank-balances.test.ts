@@ -56,7 +56,11 @@ function importWithBalance(book: ReturnType<typeof tempBook>, filename: string, 
   return result;
 }
 
-const statusOf = (book: ReturnType<typeof tempBook>) => listBankBalances(book.db, book.account.id).status;
+function statusOf(book: ReturnType<typeof tempBook>) {
+  const single = listBankBalances(book.db, book.account.id).status;
+  expect(listBankStatuses(book.db).items.find((row) => row.accountId === book.account.id) ?? null).toEqual(single);
+  return single;
+}
 
 test("a bank balance is saved when it is different, and the status is calculated each time", () => {
   const book = tempBook();
@@ -169,7 +173,9 @@ test("bank status uses the valuation on its date for each valuation account kind
         payeeRaw: "Adjustment", lines: [{ amount: 2_000 }], ...saved,
       });
       createBankBalance(book.db, account.id, { date: "2026-03-01", balance: 42_000, ...saved });
-      expect(listBankBalances(book.db, account.id).status).toMatchObject({ calculatedBalance: 42_000, difference: 0 });
+      const status = listBankBalances(book.db, account.id).status;
+      expect(status).toMatchObject({ calculatedBalance: 42_000, difference: 0 });
+      expect(listBankStatuses(book.db).items.find((row) => row.accountId === account.id) ?? null).toEqual(status);
     }
   } finally {
     book.close();

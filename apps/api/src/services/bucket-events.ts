@@ -58,7 +58,7 @@ export function createBucketEvent(db: Db, bucketId: string, input: BucketEventCr
       }
     }
     if (input.kind === "release") {
-      const balance = bucketBalances(tx).get(bucketId) ?? 0;
+      const balance = bucketBalances(tx, undefined, [bucketId]).get(bucketId) ?? 0;
       if (input.amount > balance) {
         throw new ServiceError("release_over_balance", 409);
       }
@@ -130,7 +130,7 @@ export function coverBucket(db: Db, bucketId: string, input: BucketCover & Write
   return write(db, { source: input.source, at: input.at }, (tx) => {
     requireActiveBucket(tx, bucketId);
     requireActiveBucket(tx, fromBucketId);
-    const balances = bucketBalances(tx);
+    const balances = bucketBalances(tx, undefined, [bucketId, fromBucketId]);
     const balance = balances.get(bucketId) ?? 0;
     if (balance >= 0) {
       throw new ServiceError("bucket_not_overspent", 409);

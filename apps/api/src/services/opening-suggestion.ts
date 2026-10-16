@@ -1,7 +1,7 @@
 import { accounts, bankBalances, importBatches, type AccountRow } from "@num/db";
 import { openingFromBankBalance, openingFromFirstRow, type OpeningSuggestion } from "@num/shared";
 import { and, eq, isNotNull, isNull, lt } from "drizzle-orm";
-import { balanceOf } from "./account-balance";
+import { balancesAt } from "./account-balance";
 import { hasTerms } from "./mortgage-terms";
 import { earliestTransactionDate, effectiveOpeningDate } from "./opening-date";
 import type { Reader } from "./write";
@@ -14,12 +14,10 @@ function hasMatchingBankBalance(db: Reader, account: OpeningAccount, before?: st
   if (before !== undefined) {
     filters.push(lt(bankBalances.date, before));
   }
-  return db
-    .select({ date: bankBalances.date, balance: bankBalances.balance })
-    .from(bankBalances)
-    .where(and(...filters))
-    .all()
-    .some((row) => balanceOf(db, account, row.date) === row.balance);
+  const rows = db.select({ date: bankBalances.date, balance: bankBalances.balance }).from(bankBalances)
+    .where(and(...filters)).all();
+  const calculated = balancesAt(db, rows.map((row) => ({ account, date: row.date })));
+  return rows.some((row, index) => calculated[index] === row.balance);
 }
 
 function hadRunningBalanceImport(db: Reader, accountId: string) {
@@ -35,6 +33,7 @@ function hadRunningBalanceImport(db: Reader, accountId: string) {
           isNotNull(importBatches.closingBalance),
         ),
       )
+      .limit(1)
       .get() !== undefined
   );
 }

@@ -31,7 +31,7 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
   const period = windowPeriod(query.asOf, window, query, firstTransactionDate(db));
   const range = breakdownRange(period, query.month);
   const tagId = query.tagId ?? null;
-  const facts = loadLedgerLines(db, { tagId: query.tagId });
+  const facts = loadLedgerLines(db, { from: period.from, through: period.to, tagId: query.tagId });
   const totals = spendTotals(facts, range);
   return {
     asOf: query.asOf,

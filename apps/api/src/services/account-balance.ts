@@ -84,3 +84,35 @@ export function balanceOf(db: Reader, row: BalanceRow, asOf?: string): number {
   }
   return found.balance;
 }
+
+/** Balances at different dates in one query. Each point keeps the position of its input. */
+export function balancesAt(db: Reader, points: readonly { account: BalanceRow; date: string }[]) {
+  if (points.length === 0) return [];
+  const input = JSON.stringify(points.map(({ account, date }) => ({ id: account.id, date })));
+  const rows = db.all<{ index: number; total: number; valuation: number | null; after: number }>(sql`
+    WITH points AS MATERIALIZED (
+      SELECT key AS idx, json_extract(value, '$.id') AS accountId, json_extract(value, '$.date') AS date
+      FROM json_each(${input})
+    )
+    SELECT points.idx AS "index",
+      (SELECT coalesce(sum(t.amount), 0) FROM transactions t WHERE t.account_id = points.accountId AND t.date <= points.date) AS total,
+      latest.balance AS valuation,
+      CASE WHEN latest.id IS NULL THEN 0 ELSE
+        (SELECT coalesce(sum(t.amount), 0) FROM transactions t WHERE t.account_id = points.accountId AND t.date > latest.date AND t.date <= points.date)
+      END AS "after"
+    FROM points LEFT JOIN valuations latest ON latest.id = (
+      SELECT v.id FROM valuations v WHERE v.account_id = points.accountId AND v.date <= points.date ORDER BY v.date DESC LIMIT 1
+    )
+  `);
+  const byIndex = new Map(rows.map((row) => [row.index, row]));
+  return points.map(({ account }, index) => {
+    const row = byIndex.get(index);
+    if (!row) throw new Error("Balance is missing");
+    return accountBalance({
+      kind: account.kind,
+      openingBalance: account.openingBalance,
+      transactionTotal: row.total,
+      valuation: row.valuation === null ? null : { balance: row.valuation, transactionsAfter: row.after },
+    });
+  });
+}

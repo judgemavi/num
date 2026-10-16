@@ -48,7 +48,7 @@ function isOpen(db: Db, asOf: string, itemKey: string) {
     case "import_unreadable":
       return openUnreadableKeys(db).includes(itemKey);
     case "refund_link":
-      return [...refundQuestions(db, new Set()).values()].some((ask) => ask.itemKey === itemKey);
+      return [...refundQuestions(db, new Set(), asOf, [itemKey.slice("refund_link:".length)]).values()].some((ask) => ask.itemKey === itemKey);
     case "uncategorized":
       return isUncategorized(db, itemKey.slice(keepPrefix.length));
     default:

@@ -375,7 +375,7 @@ export {
   type PlanSchedule,
 } from "./recurring-calc";
 export { isInboxMissed, missedCandidates, occurrenceWindows, windowEnded, type OccurrenceWindow } from "./recurring-window";
-export { linkDateRange, matchLinks, openOccurrences, type LinkTransaction, type OpenOccurrence } from "./recurring-match";
+export { isLinkCandidate, linkDateRange, matchLinks, openOccurrences, type LinkTransaction, type OpenOccurrence } from "./recurring-match";
 export type { Schedule } from "./schedule";
 export { detectPlans, type DetectionTransaction } from "./recurring-detect";
 export {

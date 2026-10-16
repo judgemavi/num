@@ -248,10 +248,12 @@ function readPage(
   where: SQL | undefined,
   sortOrder: SQL[],
   review: (ids: string[]) => Map<string, TransactionReview>,
+  ranks?: string,
 ) {
   const counted = db.select({ total: count() }).from(transactions).$dynamic();
   const total = (query.q ? counted.leftJoin(merchants, onMerchant) : counted).where(where).get()?.total ?? 0;
-  const rows = selectRows(db)
+  const selected = selectRows(db).$dynamic();
+  const rows = (ranks ? selected.innerJoin(sql`json_each(${ranks}) as review_rank`, sql`review_rank.key = ${transactions.id}`) : selected)
     .where(where)
     .orderBy(...sortOrder)
     .limit(query.pageSize)
@@ -298,9 +300,8 @@ function confidenceRank({ review, autoConfidence }: NeedsReviewHit) {
  * The confidence order of the review rows: the level first, then the score. Equal rows are newest first.
  * One parameter: a JSON object of the rank of each id that SQLite reads with `json_each`.
  */
-function confidenceOrder(hits: readonly NeedsReviewHit[], dir: TransactionReviewListQuery["dir"]) {
-  const ranks = JSON.stringify(Object.fromEntries(hits.map((hit) => [hit.id, confidenceRank(hit)])));
-  const rank = sql`(select value from json_each(${ranks}) where key = ${transactions.id})`;
+function confidenceOrder(dir: TransactionReviewListQuery["dir"]) {
+  const rank = sql`review_rank.value`;
   return [(dir === "desc" ? desc : asc)(rank), desc(transactions.date), desc(transactions.id)];
 }
 
@@ -314,11 +315,13 @@ export function listReviewTransactions(db: Db, query: TransactionReviewListQuery
   const where = hits.length === 0 ? sql`0` : idIn(hits.map((hit) => hit.id));
   const sortOrder =
     query.sort === undefined
-      ? confidenceOrder(hits, query.dir ?? "desc")
+      ? confidenceOrder(query.dir ?? "desc")
       : query.sort === "confidence"
-        ? confidenceOrder(hits, query.dir)
+        ? confidenceOrder(query.dir)
         : order({ ...query, sort: query.sort });
-  return { ...readPage(db, query, where, sortOrder, () => reviews), reviewCounts: reviewCounts(hits) };
+  const ranks = query.sort === undefined || query.sort === "confidence"
+    ? JSON.stringify(Object.fromEntries(hits.map((hit) => [hit.id, confidenceRank(hit)]))) : undefined;
+  return { ...readPage(db, query, where, sortOrder, () => reviews, ranks), reviewCounts: reviewCounts(hits) };
 }
 
 /** The review of one transaction: the question and the proposed answer that the editor shows. */

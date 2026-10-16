@@ -11,15 +11,15 @@ import type { Reader } from "./write";
  * Goal feasibility for the month of `asOf` (spec §7.8). The buckets use their balance on the day before the month
  * starts, thus funding and spending inside the month do not change it.
  */
-export function readFeasibility(db: Reader, asOf: string) {
+export function readFeasibility(db: Reader, asOf: string, suppliedBalances?: ReadonlyMap<string, number>) {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
   const month = asOf.slice(0, 7);
+  const balances = suppliedBalances ?? bucketBalances(db, addDays(`${month}-01`, -1));
   const active = activeSchedules(db);
   const amounts = scheduleAmounts(db, active, asOf);
   const schedules = active.map((schedule) => ({ kind: schedule.kind, safe: Math.abs(amounts.get(schedule.id)?.safe ?? 0), schedule }));
-  const balances = bucketBalances(db, addDays(`${month}-01`, -1));
   const rows = db
     .select()
     .from(buckets)

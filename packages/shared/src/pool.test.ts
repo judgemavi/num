@@ -179,3 +179,19 @@ test("the covered part fills on the first day of the month of the payment, or on
   expect(billFillsOn("2026-10-20", "2026-10-15")).toBe("2026-10-15");
   expect(billFillsOn("2026-09-30", "2026-10-03")).toBe("2026-10-03");
 });
+
+
+test("a bill counts the whole next month even when four intervals end before the last due date", () => {
+  expect(billNeed({
+    schedule: { startDate: "2026-04-03", endDate: null, freq: "weekly", interval: 1, monthDay: null, businessDayShift: "none" },
+    startDate: "2026-04-03", amount: 1_000, balance: 0, closed: new Set(), asOf: "2026-04-29",
+  })).toEqual({ dueDate: "2026-05-01", amount: 5_000, gap: 5_000 });
+});
+
+test("a bill does not select a payment after its four-interval search", () => {
+  expect(billNeed({
+    schedule: { startDate: "2026-04-03", endDate: null, freq: "weekly", interval: 1, monthDay: null, businessDayShift: "none" },
+    startDate: "2026-04-03", amount: 1_000, balance: 0,
+    closed: new Set(["2026-05-01", "2026-05-08", "2026-05-15", "2026-05-22"]), asOf: "2026-04-29",
+  })).toBeNull();
+});

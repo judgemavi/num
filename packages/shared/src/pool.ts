@@ -162,14 +162,15 @@ type BillNeedInput = {
 export function billNeed(input: BillNeedInput): { dueDate: string; amount: number; gap: number } | null {
   const later = (left: string, right: string) => (left > right ? left : right);
   const from = later(input.startDate, addPeriods(input.schedule, input.asOf, -1));
-  const open = (until: string) =>
-    occurrenceWindows(input.schedule, until, from).filter((item) => item.dueDate >= input.startDate && !input.closed.has(item.dueDate) && !windowEnded(item, input.asOf));
-  const next = open(addPeriods(input.schedule, later(input.startDate, input.asOf), 4))[0];
+  const until = addPeriods(input.schedule, later(input.startDate, input.asOf), 4);
+  const open = occurrenceWindows(input.schedule, monthLastDay(until.slice(0, 7)), from)
+    .filter((item) => item.dueDate >= input.startDate && !input.closed.has(item.dueDate) && !windowEnded(item, input.asOf));
+  const next = open.find((item) => item.dueDate <= until);
   if (!next) {
     return null;
   }
   const month = next.dueDate.slice(0, 7);
-  const amount = open(monthLastDay(month)).filter((item) => item.dueDate.slice(0, 7) === month).length * input.amount;
+  const amount = open.filter((item) => item.dueDate.slice(0, 7) === month).length * input.amount;
   const soon = next.dueDate <= addDays(input.asOf, billGapDays);
   return { dueDate: next.dueDate, amount, gap: soon ? Math.max(0, amount - Math.max(0, input.balance)) : 0 };
 }

@@ -30,9 +30,12 @@ export function addPeriods(plan: PlanSchedule, date: string, count: number): str
  * before the due date as the window ends after it. The end date of the schedule does not change a window.
  */
 export function occurrenceWindow(plan: PlanSchedule, index: number): OccurrenceWindow {
-  const here = occurrenceAt(plan, index);
-  const after = daysBetween(here.dueDate, occurrenceAt(plan, index + 1).dueDate);
-  const before = index > 0 ? daysBetween(occurrenceAt(plan, index - 1).dueDate, here.dueDate) : after;
+  return windowBetween(occurrenceAt(plan, index), index > 0 ? occurrenceAt(plan, index - 1) : null, occurrenceAt(plan, index + 1));
+}
+
+function windowBetween(here: OccurrenceDate, previous: OccurrenceDate | null, next: OccurrenceDate): OccurrenceWindow {
+  const after = daysBetween(here.dueDate, next.dueDate);
+  const before = previous ? daysBetween(previous.dueDate, here.dueDate) : after;
   const due = Temporal.PlainDate.from(here.dueDate);
   return {
     ...here,
@@ -43,7 +46,12 @@ export function occurrenceWindow(plan: PlanSchedule, index: number): OccurrenceW
 
 /** The windows of the occurrences due from `from` to `to`. */
 export function occurrenceWindows(plan: PlanSchedule, to: string, from?: string): OccurrenceWindow[] {
-  return indexedOccurrences(plan, to, from).map((item) => occurrenceWindow(plan, item.index));
+  const dates = indexedOccurrences(plan, to, from);
+  const byIndex = new Map(dates.map((item) => [item.index, item]));
+  const at = (index: number) => byIndex.get(index) ?? occurrenceAt(plan, index);
+  return dates.map(({ index, nominalDate, dueDate }) => windowBetween(
+    { nominalDate, dueDate }, index > 0 ? at(index - 1) : null, at(index + 1),
+  ));
 }
 
 /** The window has ended when its end is on or before `asOf`. */

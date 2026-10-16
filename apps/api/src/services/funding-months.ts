@@ -1,5 +1,5 @@
 import { bucketEvents, buckets, type BucketRow } from "@num/db";
-import { addDays, comparePriority, isIsoDate, monthlyAmount, type Owed } from "@num/shared";
+import { addDays, comparePriority, isIsoDate, monthlyAmount, type Owed, type EmergencyFund } from "@num/shared";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -37,9 +37,14 @@ function fundedByBucket(db: Reader, month: string) {
  * For a `month` after the month of `asOf`, the start balance is the balance on `asOf`: the app does not know the
  * balance at the start of that month yet.
  */
-export function monthlyRows(db: Reader, asOf: string, month = asOf.slice(0, 7)): MonthlyRow[] {
+export function monthlyRows(
+  db: Reader,
+  asOf: string,
+  month = asOf.slice(0, 7),
+  reads?: { balances: ReadonlyMap<string, number>; emergencyFund: () => EmergencyFund | null },
+): MonthlyRow[] {
   const start = monthStart(month);
-  const balances = bucketBalances(db, month > asOf.slice(0, 7) ? asOf : addDays(start, -1));
+  const balances = new Map(reads?.balances ?? bucketBalances(db, month > asOf.slice(0, 7) ? asOf : addDays(start, -1)));
   // A cover of this month brings a negative balance back to 0 before the amounts are calculated. It is not funding.
   const covers = db
     .select({ bucketId: bucketEvents.bucketId, amount: bucketEvents.amount })
@@ -58,7 +63,7 @@ export function monthlyRows(db: Reader, asOf: string, month = asOf.slice(0, 7)):
     .all()
     .filter((bucket) => bucket.kind !== "income" && bucket.startDate.slice(0, 7) <= month)
     .sort(comparePriority);
-  const fund = rows.some((bucket) => bucket.kind === "emergency") ? readEmergencyFund(db, asOf) : null;
+  const fund = rows.some((bucket) => bucket.kind === "emergency") ? (reads ? reads.emergencyFund() : readEmergencyFund(db, asOf)) : null;
   const commitments = commitmentsOf(db, start);
   return rows.map((bucket) => {
     const paid = funded.get(bucket.id) ?? 0;

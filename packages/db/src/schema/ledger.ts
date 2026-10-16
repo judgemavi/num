@@ -41,6 +41,7 @@ export const transactions = sqliteTable(
     editedAt: text("edited_at"),
   },
   (table) => [
+    index("transactions_auto_reason").on(table.autoReason).where(sql`${table.autoReason} IS NOT NULL`),
     index("transactions_refund_of").on(table.refundOfId),
     index("transactions_date").on(table.date, table.id),
     index("transactions_account_date").on(table.accountId, table.date, table.id, table.amount),
@@ -63,6 +64,7 @@ export const transactionLines = sqliteTable(
     transferAccountId: text("transfer_account_id").references(() => accounts.id),
   },
   (table) => [
+    index("transaction_lines_transfer_account").on(table.transferAccountId).where(sql`${table.transferAccountId} IS NOT NULL`),
     index("transaction_lines_transaction").on(table.transactionId),
     index("transaction_lines_category").on(table.categoryId),
     index("transaction_lines_uncategorized")

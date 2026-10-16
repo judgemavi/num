@@ -3,9 +3,7 @@ import { billNeed, comparePriority, coverBills, isIsoDate } from "@num/shared";
 import { and, isNull, ne } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { bucketBalances } from "./bucket-balance";
-import { positionOn } from "./funding-book";
-import { monthlyRows } from "./funding-months";
+import { createFundingReads, type FundingReads } from "./funding-reads";
 import { activeSchedules, scheduleAmounts } from "./schedules";
 import type { Reader } from "./write";
 
@@ -21,12 +19,12 @@ function closedDates(db: Reader) {
 }
 
 /** The owed amount of each bucket for a month, read one time for each month. */
-function owedByMonth(db: Reader, asOf: string) {
+function owedByMonth(reads: FundingReads) {
   const months = new Map<string, Map<string, number>>();
   return (bucketId: string, month: string) => {
     let owed = months.get(month);
     if (!owed) {
-      owed = new Map(monthlyRows(db, asOf, month).map((row) => [row.bucket.id, row.owed]));
+      owed = new Map(reads.monthlyRows(month).map((row) => [row.bucket.id, row.owed]));
       months.set(month, owed);
     }
     return owed.get(bucketId) ?? 0;
@@ -38,13 +36,14 @@ function owedByMonth(db: Reader, asOf: string) {
  * is due in the next 30 days. Unassigned on `asOf` covers the gaps in fill order (§6): `covered` and `short`. A paused
  * bill is in the list. A `variable` amount uses the safe amount, as the monthly amount does (§7.6).
  */
-export function listBillNeeds(db: Reader, asOf: string) {
+export function listBillNeeds(db: Reader, asOf: string, shared?: FundingReads) {
   if (!isIsoDate(asOf)) {
     throw new ServiceError("as_of_invalid", 400, { asOf });
   }
+  const reads = shared ?? createFundingReads(db, asOf);
   const views = new Map(activeSchedules(db).filter((view) => view.kind === "commitment").map((view) => [view.id, view]));
   const amounts = scheduleAmounts(db, [...views.values()], asOf);
-  const balances = bucketBalances(db, asOf);
+  const balances = reads.position.balances;
   const closed = closedDates(db);
   const rows = db
     .select()
@@ -69,7 +68,7 @@ export function listBillNeeds(db: Reader, asOf: string) {
     }),
   );
   const parts = coverBills({
-    unassigned: positionOn(db, asOf).unassigned,
+    unassigned: reads.position.unassigned,
     // A bill with no next payment has no gap and takes no money.
     order: rows
       .filter((bucket) => bucket.kind !== "commitment" || needs.has(bucket.id))
@@ -77,15 +76,15 @@ export function listBillNeeds(db: Reader, asOf: string) {
         const need = needs.get(bucket.id);
         return { bucketId: bucket.id, bill: need ? { gap: need.gap, dueDate: need.dueDate, paused: bucket.pausedAt !== null } : null };
       }),
-    owed: owedByMonth(db, asOf),
+    owed: owedByMonth(reads),
   });
   const items = [...needs].map(([bucketId, need]) => ({ bucketId, ...need, covered: 0, short: 0, ...parts.get(bucketId) }));
   return { items };
 }
 
 /** The bills with a short part: the part of the gap that Unassigned does not cover. */
-export function billsShortCheck(db: Db, asOf: string) {
-  const items = listBillNeeds(db, asOf)
+export function billsShortCheck(db: Db, asOf: string, reads?: FundingReads) {
+  const items = listBillNeeds(db, asOf, reads)
     .items.filter((item) => item.short > 0)
     .map((item) => ({ bucketId: item.bucketId, dueDate: item.dueDate, short: item.short }));
   return { code: "bills_short" as const, pass: items.length === 0, items };

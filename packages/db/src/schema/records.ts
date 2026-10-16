@@ -1,4 +1,4 @@
-import { index, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { inboxDecisionCodes } from "@num/shared";
 import { auditSources } from "./codes";
 
@@ -20,7 +20,6 @@ export const auditLog = sqliteTable(
     source: text("source", { enum: auditSources }).notNull(),
     at: text("at").notNull(),
   },
-  (table) => [index("audit_log_entity").on(table.entity, table.entityId)],
 );
 
 export const settings = sqliteTable("settings", {

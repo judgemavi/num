@@ -1,5 +1,6 @@
-import type { NeedsYou, NeedsYouItem } from "@num/shared";
+import { addDays, type NeedsYou, type NeedsYouItem } from "@num/shared";
 import type { Db } from "../db";
+import { createFundingReads } from "./funding-reads";
 import { listBankStatuses } from "./bank-balances";
 import { needsYouChecks, type NeedsYouCheck } from "./needs-you-checks";
 import { readSpendingIncreases } from "./spending-increases";
@@ -31,7 +32,8 @@ function poolItems(failed: readonly NeedsYouCheck[]): NeedsYouItem[] {
 export function readNeedsYou(db: Db, asOf: string): NeedsYou {
   requireAsOf(asOf);
   const state = loadReviewState(db, asOf);
-  const failed = needsYouChecks(db, asOf, state).filter((check) => !check.pass);
+  const reads = createFundingReads(db, asOf);
+  const failed = needsYouChecks(db, asOf, state, reads).filter((check) => !check.pass);
   const items: NeedsYouItem[] = [];
   if (state.hits.length > 0) {
     const old = failed.find((check) => check.code === "review");
@@ -54,7 +56,7 @@ export function readNeedsYou(db: Db, asOf: string): NeedsYou {
   if (overspent) {
     items.push({ code: "overspent", count: overspent.count, balance: overspent.balance });
   }
-  const shortfall = readFeasibility(db, asOf).feasibility?.shortfall ?? 0;
+  const shortfall = readFeasibility(db, asOf, reads.balancesOn(addDays(`${asOf.slice(0, 7)}-01`, -1))).feasibility?.shortfall ?? 0;
   if (shortfall > 0) {
     items.push({ code: "goals_short", shortfall });
   }

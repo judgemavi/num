@@ -117,8 +117,8 @@ function learnedTransfer(tx: WriteTx, payee: string, fromAccountId: string, toAc
   }
   const learned = tx
     .select({ id: transactions.id })
-    .from(transactions)
-    .innerJoin(transactionLines, eq(transactionLines.transactionId, transactions.id))
+    .from(transactionLines)
+    .innerJoin(transactions, eq(transactionLines.transactionId, transactions.id))
     .where(
       and(
         eq(transactions.payeeNormalized, payee),

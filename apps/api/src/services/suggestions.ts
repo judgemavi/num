@@ -65,7 +65,7 @@ export function suggestForPayee(db: Db, accountId: string, rawPayee: string, amo
   return mortgage && mortgage.confidence > base.confidence ? mortgage : base;
 }
 
-export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[] } {
+export function listTransferPairs(db: Db, asOf: string, only?: readonly string[]): { items: TransferPair[] } {
   const start = Temporal.PlainDate.from(asOf).subtract({ days: 90 }).toString();
   const rows = db
     .select({
@@ -84,6 +84,7 @@ export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[]
         ne(transactions.amount, literal(0)),
         gte(transactions.date, start),
         lte(transactions.date, asOf),
+        only ? sql`abs(${transactions.amount}) in (select abs(amount) from transactions where id in (select value from json_each(${JSON.stringify(only)})))` : undefined,
       ),
     )
     .orderBy(sql`abs(${transactions.amount})`, transactions.date, transactions.id)
@@ -92,7 +93,7 @@ export function listTransferPairs(db: Db, asOf: string): { items: TransferPair[]
     items: transferPairs(
       rows.map((row) => ({ ...row, onBudget: true, linked: false })),
       asOf,
-    ),
+    ).filter((pair) => !only || only.includes(pair.leftId) || only.includes(pair.rightId)),
   };
 }
 

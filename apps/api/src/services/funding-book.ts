@@ -8,11 +8,11 @@ import { scheduleAmounts, type ScheduleView } from "./schedules";
 import type { Reader } from "./write";
 
 /** The on-budget total, the bucket balances and Unassigned, all on `asOf`. Each Unassigned of the app comes from here. */
-export function positionOn(db: Reader, asOf: string) {
+export function positionOn(db: Reader, asOf: string, balances = bucketBalances(db, asOf)) {
   const onBudget = db.select().from(accounts).where(eq(accounts.onBudget, true)).all();
-  const onBudgetTotal = balancesOf(db, onBudget, asOf).reduce((total, item) => total + item.balance, 0);
-  const balances = bucketBalances(db, asOf);
-  return { onBudgetTotal, balances, unassigned: unassigned(onBudgetTotal, positiveBalances([...balances.values()])) };
+  const accountBalances = new Map(balancesOf(db, onBudget, asOf).map((item) => [item.account.id, item.balance]));
+  const onBudgetTotal = [...accountBalances.values()].reduce((total, balance) => total + balance, 0);
+  return { onBudgetTotal, accountBalances, balances, unassigned: unassigned(onBudgetTotal, positiveBalances([...balances.values()])) };
 }
 
 /** The yearly amount of a schedule divided by 12, with its safe amount. */

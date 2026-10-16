@@ -80,14 +80,14 @@ export function spendDeltas(
   items: readonly { monthly: number; bucketId: string | null }[],
   step: number,
 ): (ForecastDelta & { bucketId: string | null })[] {
+  const days = dates.map((date) => ({ date, day: Temporal.PlainDate.from(date) }));
   const shares = new Map<string, number[]>();
   const deltas: (ForecastDelta & { bucketId: string | null })[] = [];
   for (const item of items) {
     if (item.monthly <= 0) {
       continue;
     }
-    for (const date of dates) {
-      const day = Temporal.PlainDate.from(date);
+    for (const { date, day } of days) {
       const key = `${item.monthly}|${day.year}-${day.month}`;
       let monthShares = shares.get(key);
       if (!monthShares) {

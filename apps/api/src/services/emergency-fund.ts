@@ -119,7 +119,7 @@ function monthlyEssential(db: Reader, asOf: string): { monthly: number; basis: E
 }
 
 /** The emergency fund and its calculation on `asOf`. Null when the book has no emergency bucket. */
-export function readEmergencyFund(db: Reader, asOf: string): EmergencyFund | null {
+export function readEmergencyFund(db: Reader, asOf: string, balances?: ReadonlyMap<string, number>): EmergencyFund | null {
   const bucket = emergencyBucket(db);
   if (!bucket || bucket.months === null) {
     return null;
@@ -128,7 +128,7 @@ export function readEmergencyFund(db: Reader, asOf: string): EmergencyFund | nul
   return {
     bucketId: bucket.id,
     archived: bucket.archivedAt !== null,
-    balance: bucketBalances(db, asOf).get(bucket.id) ?? 0,
+    balance: (balances ?? bucketBalances(db, asOf)).get(bucket.id) ?? 0,
     months: bucket.months,
     monthly,
     target: bucket.months * monthly,
