@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { schedules, merchants, migrateDatabase, openDatabase, settings, transactions } from "@num/db";
-import { nameKey, foldName, storedPayee } from "@num/shared";
+import { foldName, storedPayee } from "@num/shared";
 import { eq } from "drizzle-orm";
 import { expect, test } from "bun:test";
 import { createDb } from "../db";
@@ -47,7 +47,7 @@ function account(db: ReturnType<typeof tempDatabase>["db"], name = "Chequing") {
 
 function merchant(db: ReturnType<typeof tempDatabase>["db"], name: string) {
   const id = crypto.randomUUID();
-  db.insert(merchants).values({ id, name, sortKey: foldName(name), nameKey: nameKey(name), archivedAt: null }).run();
+  db.insert(merchants).values({ id, name, sortKey: foldName(name), archivedAt: null }).run();
   return id;
 }
 

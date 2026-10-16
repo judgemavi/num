@@ -13,6 +13,17 @@ const entities = [
 ] as const;
 
 for (const entity of entities) {
+  test(`${entity.code}: an accented name can follow its plain name`, () => {
+    const book = tempDatabase();
+    try {
+      entity.create(book.db, { name: "Ecole", kind: "expense", color: "sky", ...saved });
+      expect(entity.create(book.db, { name: "École", kind: "expense", color: "sky", ...saved }).name).toBe("École");
+      expectCode(() => entity.create(book.db, { name: "éCOLE", kind: "expense", color: "sky", ...saved }), entity.code);
+    } finally {
+      book.close();
+    }
+  });
+
   test(`${entity.code}: names ignore Unicode case and use NFC on create and rename`, () => {
     const book = tempDatabase();
     try {

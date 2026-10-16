@@ -8,13 +8,6 @@
       "when": 1792165487804,
       "tag": "0000_baseline",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1792171150198,
-      "tag": "0001_opposite_forge",
-      "breakpoints": true
     }
   ]
 }

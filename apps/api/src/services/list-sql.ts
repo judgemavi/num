@@ -1,5 +1,5 @@
 import { accounts, buckets, categories, categoryGroups, merchants, tags } from "@num/db";
-import { nameKey, type ErrorCode } from "@num/shared";
+import { foldName, nameKey, type ErrorCode } from "@num/shared";
 import { asc, count, desc, eq, sql, type SQL } from "drizzle-orm";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import { ServiceError } from "../service-error";
@@ -37,14 +37,14 @@ export function pagedOf<T>(items: T[], total: number, query: { page: number; pag
   return { items, page: query.page, pageSize: query.pageSize, total };
 }
 
-/** The name and sort keys are for the database. The API and the audit log do not show them. */
-export function withoutSortKey<T extends { sortKey: string; nameKey?: string }>(row: T): Omit<T, "sortKey" | "nameKey">;
-export function withoutSortKey<T extends { sortKey: string; nameKey?: string }>(row: T | undefined): Omit<T, "sortKey" | "nameKey"> | undefined;
-export function withoutSortKey<T extends { sortKey: string; nameKey?: string }>(row: T | undefined) {
+/** The sort key is for the database. The API and the audit log do not show it. */
+export function withoutSortKey<T extends { sortKey: string }>(row: T): Omit<T, "sortKey">;
+export function withoutSortKey<T extends { sortKey: string }>(row: T | undefined): Omit<T, "sortKey"> | undefined;
+export function withoutSortKey<T extends { sortKey: string }>(row: T | undefined) {
   if (!row) {
     return undefined;
   }
-  const { sortKey: _sortKey, nameKey: _nameKey, ...rest } = row;
+  const { sortKey: _sortKey, ...rest } = row;
   return rest;
 }
 
@@ -60,8 +60,11 @@ export function assertUniqueName(
   code: ErrorCode,
   exceptId?: string,
 ) {
-  const row = tx.select({ id: table.id }).from(table).where(eq(table.nameKey, nameKey(name))).get();
-  if (row && row.id !== exceptId) throw new ServiceError(code, 409);
+  const rows = tx.select({ id: table.id, name: table.name }).from(table).where(eq(table.sortKey, foldName(name))).all();
+  const key = nameKey(name);
+  if (rows.some((row) => row.id !== exceptId && nameKey(row.name) === key)) {
+    throw new ServiceError(code, 409);
+  }
 }
 
 const archiveErrors = {

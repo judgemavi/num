@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { auditLog, importRows, merchants, migrateDatabase, occurrenceLinks, openDatabase, settings, transactions } from "@num/db";
-import { columnMapSchema, nameKey, foldName, type ColumnMap } from "@num/shared";
+import { columnMapSchema, foldName, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../db";
@@ -71,7 +71,7 @@ function category(db: Db, name: string) {
 
 function merchant(db: Db, name: string) {
   const id = crypto.randomUUID();
-  db.insert(merchants).values({ id, name, sortKey: foldName(name), nameKey: nameKey(name), archivedAt: null }).run();
+  db.insert(merchants).values({ id, name, sortKey: foldName(name), archivedAt: null }).run();
   return id;
 }
 

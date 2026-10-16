@@ -1,5 +1,5 @@
 import { tags } from "@num/db";
-import { nameKey, foldName, tagCreateSchema, utcNow, type Tag, type TagCreate, type TagListQuery, type TagUpdate } from "@num/shared";
+import { foldName, tagCreateSchema, utcNow, type Tag, type TagCreate, type TagListQuery, type TagUpdate } from "@num/shared";
 import { eq, isNotNull, isNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -27,7 +27,7 @@ export function createTag(db: Db, input: TagCreate & WriteInput): Tag {
   const row = { id, name: input.name.trim(), archivedAt: null };
   write(db, { source: input.source, at: input.at }, (tx) => {
     assertUniqueName(tx, tags, row.name, "tag_name_taken");
-    tx.insert(tags).values({ ...row, sortKey: foldName(row.name), nameKey: nameKey(row.name) }).run();
+    tx.insert(tags).values({ ...row, sortKey: foldName(row.name) }).run();
     tx.audit({
       entity: "tags",
       entityId: id,
@@ -48,7 +48,7 @@ export function updateTag(db: Db, id: string, input: TagUpdate & WriteInput): Ta
     const { name } = mergedWrite(tagCreateSchema, existing, input);
     assertUniqueName(tx, tags, name, "tag_name_taken", id);
     const next = { name, archivedAt: existing.archivedAt };
-    tx.update(tags).set({ name, sortKey: foldName(name), nameKey: nameKey(name) }).where(eq(tags.id, id)).run();
+    tx.update(tags).set({ name, sortKey: foldName(name) }).where(eq(tags.id, id)).run();
     tx.audit({
       entity: "tags",
       entityId: id,
