@@ -1,11 +1,18 @@
 import { Temporal } from "@num/shared";
 import { CalendarIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { fieldControl, fieldControlIcon } from "@/components/field-control";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
+import { Boundary } from "@/components/boundary";
+import { retryLazy } from "@/components/retry-lazy";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "cn";
+
+const calendar = retryLazy<ComponentProps<typeof import("@/components/ui/calendar").Calendar>>(() => import("@/components/ui/calendar").then((module) => ({ default: module.Calendar })));
+
+function preloadCalendar() {
+  void calendar.preload().catch(() => undefined);
+}
 
 type DateFieldProps = {
   id: string;
@@ -54,6 +61,8 @@ const calendarLabels = {
 
 export function DateField({ id, value, onChange, disabled, required, placeholder = "Pick a date", className }: DateFieldProps) {
   const [open, setOpen] = useState(false);
+  const calendarFrame = useRef<HTMLDivElement>(null);
+  useEffect(preloadCalendar, []);
   const selected = toCalendarDate(value);
 
   return (
@@ -65,26 +74,47 @@ export function DateField({ id, value, onChange, disabled, required, placeholder
           variant="outline"
           disabled={disabled}
           aria-required={required}
+          onFocus={preloadCalendar}
+          onPointerEnter={preloadCalendar}
           className={cn(fieldControl, selected ? "" : "text-muted-foreground", className)}
         >
           <span className="truncate">{selected ? showDate(selected) : placeholder}</span>
           <CalendarIcon className={fieldControlIcon} aria-hidden="true" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          formatters={calendarFormatters}
-          labels={calendarLabels}
-          selected={selected}
-          defaultMonth={selected}
-          onSelect={(date) => {
-            if (date) {
-              onChange(fromCalendarDate(date));
-              setOpen(false);
-            }
-          }}
-        />
+      <PopoverContent
+        className="w-auto p-0"
+        align="start"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          if (!calendarFrame.current?.contains(document.activeElement)) calendarFrame.current?.focus();
+        }}
+      >
+        <div ref={calendarFrame} tabIndex={-1} className="h-84 w-64 outline-none">
+          <Boundary
+            look="panel"
+            loading="Loading calendar."
+            failed="The calendar did not load."
+            onRetry={calendar.retry}
+          >
+            <calendar.Component
+              mode="single"
+              autoFocus
+              fixedWeeks
+              classNames={{ root: "size-full" }}
+              formatters={calendarFormatters}
+              labels={calendarLabels}
+              selected={selected}
+              defaultMonth={selected}
+              onSelect={(date) => {
+                if (date) {
+                  onChange(fromCalendarDate(date));
+                  setOpen(false);
+                }
+              }}
+            />
+          </Boundary>
+        </div>
         {!required && selected ? (
           <div className="border-t p-2">
             <Button

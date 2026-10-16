@@ -9,7 +9,7 @@ import { Boundary } from "@/components/boundary";
 import { EditorHost } from "@/editors/editor-host";
 import { useStartSharedLists } from "@/editors/lookups";
 import { phoneTabs, primaryNav, settingsNav, type NavPath } from "@/nav";
-import { SetupScreen } from "@/setup-screen";
+import { setupScreen } from "@/setup-lazy";
 import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
@@ -179,7 +179,7 @@ function AppShell() {
 function Book() {
   const setup = useSuspenseQuery(setupStatusQuery());
   if (!setup.data.complete) {
-    return <SetupScreen />;
+    return <setupScreen.Component />;
   }
   return (
     <EditorHost>
@@ -190,7 +190,7 @@ function Book() {
 
 export function RootLayout() {
   return (
-    <Boundary look="screen" loading="Loading setup." failed="The setup status did not load.">
+    <Boundary onRetry={setupScreen.retry} look="screen" loading="Loading setup." failed="Setup did not load.">
       <Book />
     </Boundary>
   );
