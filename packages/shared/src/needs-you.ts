@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { isoDateSchema } from "./date";
-import { spendingIncreaseSchema } from "./spending-increases";
 import { monthKeySchema } from "./month";
 import { amountSchema as money } from "./money";
 
@@ -56,8 +55,6 @@ const needsYouItemSchema = z.discriminatedUnion("code", [
     code: z.literal("savings_rate"),
     months: z.array(z.object({ month: monthKeySchema, savingsRateMilliPct: z.number().int().nullable() })),
   }),
-  /** One category that went up in the month of `asOf` against its median. */
-  spendingIncreaseSchema.extend({ code: z.literal("spending_up") }),
 ]);
 
 export const needsYouSchema = z.object({

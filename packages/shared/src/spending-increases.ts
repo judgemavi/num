@@ -57,7 +57,7 @@ function compareId(left: string, right: string): number {
 }
 
 /**
- * The 3 largest increases of one month by category, against the median of the 3 months before it. Home "Needs you" shows them.
+ * The 3 largest increases of one month by category, against the median of the 3 months before it. The Spending list shows them.
  */
 export function spendingIncreases(month: string, lines: readonly FlowLine[]): SpendingIncrease[] {
   const byMonth = expenseByMonth(lines);

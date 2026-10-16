@@ -3,7 +3,6 @@ import type { Db } from "../db";
 import { createFundingReads } from "./funding-reads";
 import { listBankStatuses } from "./bank-balances";
 import { needsYouChecks, type NeedsYouCheck } from "./needs-you-checks";
-import { readSpendingIncreases } from "./spending-increases";
 import { readFeasibility } from "./feasibility";
 import { loadReviewState, requireAsOf } from "./needs-review";
 
@@ -68,9 +67,6 @@ export function readNeedsYou(db: Db, asOf: string): NeedsYou {
   if (savings) {
     const months = savings.months.filter((item) => item.savings < 0);
     items.push({ code: "savings_rate", months: months.map(({ month, savingsRateMilliPct }) => ({ month, savingsRateMilliPct })) });
-  }
-  for (const increase of readSpendingIncreases(db, asOf)) {
-    items.push({ code: "spending_up", ...increase });
   }
   return { asOf, items };
 }

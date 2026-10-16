@@ -135,11 +135,11 @@ test("group totals: refunds reduce spending, transfers are excluded, No group an
         inflow: null,
         color: home.color,
         categories: [
-          { id: groceries.id, kind: "item", amount: 75_000, inflow: null },
-          { id: repairs.id, kind: "item", amount: -10_000, inflow: null },
+          { id: groceries.id, kind: "item", amount: 75_000, inflow: null, increase: { delta: 75_000, median: 0 } },
+          { id: repairs.id, kind: "item", amount: -10_000, inflow: null, increase: null },
         ],
       },
-      { id: null, kind: "none", color: null, amount: 20_000, inflow: null, categories: [{ id: fun.id, kind: "item", amount: 20_000, inflow: null }] },
+      { id: null, kind: "none", color: null, amount: 20_000, inflow: null, categories: [{ id: fun.id, kind: "item", amount: 20_000, inflow: null, increase: { delta: 20_000, median: 0 } }] },
       { id: null, kind: "uncategorized", color: null, amount: 30_000, inflow: 0, categories: [] },
     ]);
     expect(sums.uncategorized).toBe(-30_000);
@@ -170,8 +170,8 @@ test("groups and their categories are largest first, and the order does not depe
     ]);
     expect(groups[0]?.categories.map((row) => row.id)).toEqual([rent.id, power.id]);
     expect(groups[1]?.categories).toEqual([
-      { id: dining.id, kind: "item", amount: 50_000, inflow: null },
-      { id: refunded.id, kind: "item", amount: -5_000, inflow: null },
+      { id: dining.id, kind: "item", amount: 50_000, inflow: null, increase: { delta: 50_000, median: 0 } },
+      { id: refunded.id, kind: "item", amount: -5_000, inflow: null, increase: null },
     ]);
   } finally {
     book.close();
@@ -255,7 +255,7 @@ test("a tag limits the report to its spending lines: two tags count in full for 
 
     const atWork = readInsights(book.db, { ...query, tagId: work.id });
     expect(atWork.spending).toBe(40_000);
-    expect(atWork.groups).toEqual([{ id: null, kind: "none", color: null, amount: 40_000, inflow: null, categories: [{ id: dining.id, kind: "item", amount: 40_000, inflow: null }] }]);
+    expect(atWork.groups).toEqual([{ id: null, kind: "none", color: null, amount: 40_000, inflow: null, categories: [{ id: dining.id, kind: "item", amount: 40_000, inflow: null, increase: { delta: 110_000, median: 0 } }] }]);
 
     const tripDining = readInsights(book.db, { ...query, tagId: trip.id, category: dining.id });
     expect(tripDining.timeline).toMatchObject({ categoryId: dining.id, forecastEnd: null });

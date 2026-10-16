@@ -57,7 +57,11 @@ const rowSchema = z.object({
   inflow: money.nullable(),
 });
 
-const groupRowSchema = rowSchema.extend({ color: z.enum(identityColors).nullable(), categories: z.array(rowSchema) });
+const categoryRowSchema = rowSchema.extend({
+  increase: z.object({ delta: money, median: money }).nullable(),
+});
+
+const groupRowSchema = rowSchema.extend({ color: z.enum(identityColors).nullable(), categories: z.array(categoryRowSchema) });
 
 const flowSchema = z.object({
   income: money,

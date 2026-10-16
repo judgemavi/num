@@ -7,7 +7,7 @@ function item(id: string, amount: number): InsightRow {
 }
 
 function group(id: string, categories: InsightRow[]): InsightGroupRow {
-  return { ...item(id, categories.reduce((sum, row) => sum + row.amount, 0)), color: "sky", categories };
+  return { ...item(id, categories.reduce((sum, row) => sum + row.amount, 0)), color: "sky", categories: categories.map((row) => ({ ...row, increase: null })) };
 }
 
 test("category arcs fill the arc of their group, also when a refund makes the group total smaller", () => {

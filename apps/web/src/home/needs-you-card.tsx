@@ -2,14 +2,14 @@ import { reviewAgeDays, staleImportDays, type NeedsYouItem } from "@num/shared";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
-import { CalendarX, ChevronRight, CircleAlert, Landmark, LifeBuoy, ListChecks, PiggyBank, ReceiptText, Target, TrendingUp, Upload } from "lucide-react";
+import { CalendarX, ChevronRight, CircleAlert, Landmark, LifeBuoy, ListChecks, PiggyBank, ReceiptText, Target, Upload } from "lucide-react";
 import { needsYouQuery } from "@/api/needs-you";
 import { localAsOf } from "@/as-of";
 import type { Hue } from "@/components/hue";
 import { IconTile } from "@/components/icon-tile";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { Badge } from "@/components/ui/badge";
-import { useAccountLabels, useActiveSchedules, useBookCurrency, useBucketNames, useCategoryNames } from "@/editors/lookups";
+import { useAccountLabels, useActiveSchedules, useBookCurrency, useBucketNames } from "@/editors/lookups";
 import { monthTitle, rateText } from "@/home/spending/format";
 import { formatMoney } from "@/money";
 import { formatDate } from "@/date-format";
@@ -33,11 +33,9 @@ function useRows(items: readonly NeedsYouItem[]): Row[] {
   const currency = useBookCurrency();
   const money = (value: number) => formatMoney(currency, value);
   const accountLabels = useAccountLabels();
-  const categoryNames = useCategoryNames();
   const schedules = useActiveSchedules();
   const bucketNames = useBucketNames();
   const bucketName = (id: string) => bucketNames.get(id) ?? "Bucket";
-  const asOf = localAsOf();
   const toBuckets = () => void go({ to: "/buckets" });
 
   return items.flatMap((item): Row[] => {
@@ -155,15 +153,7 @@ function useRows(items: readonly NeedsYouItem[]): Row[] {
             void go({ to: "/", search: month ? { window: "6", month } : {} });
           },
         }];
-      case "spending_up":
-        return [{
-          key: `${item.code}-${item.categoryId}`,
-          hue: "butter",
-          icon: TrendingUp,
-          title: categoryNames.get(item.categoryId) ?? "Category",
-          detail: `Up ${money(item.delta)} from your usual ${money(item.median)} this month`,
-          open: () => void go({ to: "/transactions", search: { categoryId: item.categoryId, from: `${item.month}-01`, to: asOf } }),
-        }];
+
     }
   });
 }

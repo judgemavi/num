@@ -7,7 +7,7 @@ import { errorResponse } from "./common";
 
 const insightsRoute = createRoute({
   operationId: "get_insights",
-  description: "Read the spending report of a period (Home \"Spending\"): the income, the spending, the savings and the savings rate; the spending of each group and its categories; and the timeline: the income and spending of each month, the daily total balance of the on-budget accounts and, for a period that ends on asOf, the 90-day forecast. With a category, the timeline shows only the spending of that category. With a tagId, each part uses only the spending lines that have that tag (a line with more than one tag counts in full for each tag); income, savings and the savings rate are null, and the timeline shows only spending, with no forecast. This does not create, change or delete a record.",
+  description: "Read the spending report of a period (Home \"Spending\"): the income, the spending, the savings and the savings rate; the colour and spending of each group and its categories, with the three largest increases (delta and median) on category rows only for This month; and the timeline: the income and spending of each month, the daily total balance of the on-budget accounts and, for a period that ends on asOf, the 90-day forecast. With a category, the timeline shows only the spending of that category. Increases use the whole book, also with a tagId. With a tagId, the spending totals use only the spending lines that have that tag (a line with more than one tag counts in full for each tag); income, savings and the savings rate are null, and the timeline shows only spending, with no forecast. This does not create, change or delete a record.",
   method: "get",
   path: "/api/insights",
   request: { query: insightsQuerySchema },

@@ -326,8 +326,10 @@ give each one an accessible label, or `aria-hidden` when the text already says t
   Group by kind: chequing, savings, cash → Cash. Investment, property, receivable, other asset → Assets.
   Credit card, mortgage, loan, other liability → Liabilities. The Liabilities group total has the "OWED" label (§3).
 - **Review and Home item kinds:** categorize and review = sky, recurring change and missed payment = lilac,
-  transfer and spending that went up = butter, imports = teal, goals and savings rate = mint, emergency fund and savings used = pink,
+  transfer = butter, imports = teal, goals and savings rate = mint, emergency fund and savings used = pink,
   over budget, a short bill, a short pool and an account that does not match its bank = attention (tomato).
+
+The increase pill on a category row of the Spending list uses butter fill and glyph, with a rising trend icon.
 
 **Home "Needs you":** one ListCard with a tomato count badge. Each row: an IconTile with the hue of its kind, a title,
 one short detail line and a chevron. The whole row opens the screen of its fix. Home is read-only: a row has no buttons

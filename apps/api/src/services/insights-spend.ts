@@ -78,7 +78,7 @@ export function groupRows(facts: readonly LedgerLine[], period: Period, colors: 
   const rows = [...groups].map(([key, totals]): InsightGroupRow => {
     const categories = itemRows(totals);
     const amount = categories.reduce((sum, row) => sum + row.amount, 0);
-    return { id: key === "" ? null : key, kind: key === "" ? "none" : "item", amount, inflow: null, color: colors.get(key) ?? null, categories };
+    return { id: key === "" ? null : key, kind: key === "" ? "none" : "item", amount, inflow: null, color: colors.get(key) ?? null, categories: categories.map((row) => ({ ...row, increase: null })) };
   });
   rows.sort(compareRows);
   if (uncategorized.length > 0) {

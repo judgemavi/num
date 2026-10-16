@@ -1,3 +1,5 @@
+import { TrendingUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { ReactNode } from "react";
 import { Amount } from "@/components/amount";
 import { ListCard, ListEmpty, ListRow, listName } from "@/components/list-card";
@@ -11,6 +13,7 @@ export type SpendListRow = {
   name: string;
   amount: number;
   inflow: number | null;
+  increase: { delta: number; median: number } | null;
   color: SliceColor | undefined;
   current: boolean;
   onOpen: () => void;
@@ -35,9 +38,17 @@ export function CategorySpendList({ title, rows, actions }: { title: string; row
       {rows.map((row) => (
         <ListRow key={row.key} size="dense" current={row.current} label={row.name} onOpen={row.onOpen}>
           <Dot color={row.color} />
-          <span className={listName}>
-            {row.name}
-            {row.inflow === null ? null : <span className="text-[13px] font-normal text-muted-foreground"> · In {formatMoney(currency, row.inflow)}</span>}
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className={`${listName} basis-auto truncate`}>
+              {row.name}
+              {row.inflow === null ? null : <span className="text-[13px] font-normal text-muted-foreground"> · In {formatMoney(currency, row.inflow)}</span>}
+            </span>
+            {row.increase ? (
+              <Badge className="bg-butter-fill text-butter-glyph">
+                <TrendingUp aria-hidden="true" />
+                Up {formatMoney(currency, row.increase.delta)} from {formatMoney(currency, row.increase.median)}
+              </Badge>
+            ) : null}
           </span>
           <Amount value={row.amount} className="shrink-0 text-right" />
         </ListRow>

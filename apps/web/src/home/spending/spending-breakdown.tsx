@@ -4,7 +4,7 @@ import { choiceIn } from "@/components/choice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCategoryNames, useGroupNames } from "@/editors/lookups";
-import { CategorySpendList } from "@/home/spending/category-spend-list";
+import { CategorySpendList, type SpendListRow } from "@/home/spending/category-spend-list";
 import { monthTitle } from "@/home/spending/format";
 import { rowKey, spendArcs, type Arc } from "@/home/spending/spend-arcs";
 import { SpendDonut } from "@/home/spending/spend-donut";
@@ -117,9 +117,10 @@ function ListModeToggle() {
 export function SelectedSpendList() {
   const { data, search, colors, category, selectedGroup, groupName, categoryName, openTransactions } = useSpendSelection();
   // Each category uses the same shade in the list and the donut.
-  const categoryRow = (row: InsightRow) => ({
+  const categoryRow = (row: InsightGroupRow["categories"][number]) => ({
     key: rowKey(row),
     name: categoryName(row),
+    increase: row.increase,
     amount: row.amount,
     inflow: null,
     color: colors.get(rowKey(row)),
@@ -129,6 +130,7 @@ export function SelectedSpendList() {
   const groupRow = (row: InsightGroupRow) => ({
     key: rowKey(row),
     name: groupName(row),
+    increase: null,
     amount: row.amount,
     inflow: row.kind === "uncategorized" ? (row.inflow ?? 0) : null,
     color: colors.get(rowKey(row)),
@@ -141,7 +143,7 @@ export function SelectedSpendList() {
     ? selectedGroup.categories.map((row) => categoryRow(row))
     : byCategory
       ? data.groups
-          .flatMap((group) => (group.kind === "uncategorized" ? [groupRow(group)] : group.categories.map((row) => categoryRow(row))))
+          .flatMap<SpendListRow>((group) => (group.kind === "uncategorized" ? [groupRow(group)] : group.categories.map((row) => categoryRow(row))))
           .sort((a, b) => b.amount - a.amount)
       : data.groups.map(groupRow);
   const title = [search.month ? monthTitle(search.month) : null, selectedGroup ? groupName(selectedGroup) : null].filter(Boolean).join(": ") || "Groups and categories";

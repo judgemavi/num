@@ -7,6 +7,7 @@ import { loadLedgerLines } from "./ledger-lines";
 import { breakdownRange, firstTransactionDate, windowPeriod } from "./insights-period";
 import { groupRows, spendTotals } from "./insights-spend";
 import { readTimeline } from "./insights-timeline";
+import { readSpendingIncreases } from "./spending-increases";
 
 function assertFilters(db: Db, query: InsightsQuery) {
   if (query.category) {
@@ -33,6 +34,12 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
   const tagId = query.tagId ?? null;
   const facts = loadLedgerLines(db, { from: period.from, through: period.to, tagId: query.tagId });
   const totals = spendTotals(facts, range);
+  const increases = new Map((window === "1" ? readSpendingIncreases(db, query.asOf) : []).map((row) => [row.categoryId, { delta: row.delta, median: row.median }]));
+  const colors = new Map(db.select({ id: categoryGroups.id, color: categoryGroups.color }).from(categoryGroups).all().map((row) => [row.id, row.color]));
+  const groups = groupRows(facts, range, colors).map((group) => ({
+    ...group,
+    categories: group.categories.map((row) => ({ ...row, increase: increases.get(row.id ?? "") ?? null })),
+  }));
   return {
     asOf: query.asOf,
     window,
@@ -44,7 +51,7 @@ export function readInsights(db: Db, query: InsightsQuery): Insights {
     spending: totals.spending,
     savings: tagId ? null : totals.savings,
     savingsRateMilliPct: tagId ? null : totals.savingsRateMilliPct,
-    groups: groupRows(facts, range, new Map(db.select({ id: categoryGroups.id, color: categoryGroups.color }).from(categoryGroups).all().map((row) => [row.id, row.color]))),
+    groups,
     timeline: readTimeline(db, facts, period, query.asOf, { categoryId: query.category ?? null, tagged: tagId !== null }),
   };
 }
