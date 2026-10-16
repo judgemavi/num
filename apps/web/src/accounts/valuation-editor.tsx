@@ -1,5 +1,5 @@
-import { editPatch, keptAmount } from "@/forms/form-values";
-import { accountClass, amountText, valuationInputSchema, parseAmount, entryFromBalance } from "@num/shared";
+import { valuationBody } from "@/accounts/valuation-values";
+import { accountClass, amountText, entryFromBalance } from "@num/shared";
 import { useSuspenseQueries } from "@tanstack/react-query";
 import { accountQuery } from "@/api/accounts";
 import { valuationListQuery, useSaveValuation } from "@/api/valuations";
@@ -14,18 +14,6 @@ import { useBookCurrency } from "@/editors/lookups";
 import { useAppForm } from "@/forms/form-hook";
 import { decimalsError } from "@/money";
 
-/** The values of the form as a valuation. Null when the date or the balance is not valid. */
-function valuationOf(currency: string, value: { date: string; amount: string; note: string }, start: { text: string; amount: number } | null) {
-  let balance;
-  try {
-    balance = keptAmount(value.amount, start, (text) => parseAmount(currency, text.trim()));
-  } catch {
-    return null;
-  }
-  const parsed = valuationInputSchema.safeParse({ date: value.date, balance, note: value.note.trim() || null });
-  return parsed.success ? parsed.data : null;
-}
-
 export function ValuationEditor({ accountId, id }: EditorInput["valuation"]) {
   const { close } = useEditorFrame();
   const currency = useBookCurrency();
@@ -37,7 +25,6 @@ export function ValuationEditor({ accountId, id }: EditorInput["valuation"]) {
   const owed = accountClass(kind) === "liability";
   const saved = list.items.find((item) => item.id === id);
   if (id !== null && !saved) throw new Error("That valuation is not in the book.");
-  const start = saved ? { text: amountText(entryFromBalance(kind, saved.balance)), amount: entryFromBalance(kind, saved.balance) } : null;
   const form = useAppForm({
     defaultValues: {
       date: saved?.date ?? "",
@@ -46,23 +33,23 @@ export function ValuationEditor({ accountId, id }: EditorInput["valuation"]) {
     },
     validators: {
       onSubmit: ({ value }) =>
-        valuationOf(currency, value, start) ? undefined : (decimalsError(currency, value.amount) ?? "Enter a date and a balance."),
+        valuationBody(currency, kind, value, saved ?? null) ? undefined : (decimalsError(currency, value.amount) ?? "Enter a date and a balance."),
     },
     onSubmit: async ({ value, formApi }) => {
-      const body = valuationOf(currency, value, start);
-      if (!body) {
+      const request = valuationBody(currency, kind, value, saved ?? null);
+      if (!request) {
         return;
       }
       try {
         if (saved) {
-          const patch = editPatch(body, { date: saved.date, balance: entryFromBalance(kind, saved.balance), note: saved.note });
+          const { patch } = request;
           if (!patch) {
             close();
             return;
           }
           close((await save.mutateAsync({ accountId, id: saved.id, body: patch })).id);
         } else {
-          close((await save.mutateAsync({ accountId, id: null, body })).id);
+          close((await save.mutateAsync({ accountId, id: null, body: request.body })).id);
         }
       } catch (error) {
         formApi.setErrorMap({ onSubmit: { form: valuationError(errorCode(error)), fields: {} } });

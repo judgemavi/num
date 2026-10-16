@@ -1,5 +1,5 @@
 import type { ValuationInput, ValuationUpdate } from "@num/shared";
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation } from "@tanstack/react-query";
 import { valuationError } from "@/accounts/format";
 import { api, formWrite, unwrap } from "@/api/client";
 
@@ -23,13 +23,9 @@ export function useSaveValuation() {
 }
 
 export function useDeleteValuation() {
-  const client = useQueryClient();
   return useMutation({
     meta: { errorText: valuationError },
-    mutationFn: async ({ accountId, id }: { accountId: string; id: string }) => {
-      const removed = await unwrap(api.accounts[":id"].valuations[":valuationId"].$delete({ param: { id: accountId, valuationId: id } }));
-      client.removeQueries({ queryKey: ["valuations", accountId, id] });
-      return removed;
-    },
+    mutationFn: ({ accountId, id }: { accountId: string; id: string }) =>
+      unwrap(api.accounts[":id"].valuations[":valuationId"].$delete({ param: { id: accountId, valuationId: id } })),
   });
 }

@@ -1,5 +1,5 @@
 import { accounts, valuations } from "@num/db";
-import { balanceFromEntry, entryFromBalance, usesValuation, utcNow, valuationInputSchema, type ValuationInput, type ValuationUpdate } from "@num/shared";
+import { usesValuation, utcNow, valuationInputSchema, type ValuationInput, type ValuationUpdate } from "@num/shared";
 import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
@@ -35,11 +35,11 @@ export function listValuations(db: Db, accountId: string) {
 export function createValuation(db: Db, accountId: string, input: ValuationInput & WriteInput) {
   requireWholeAmounts(db, [input.balance]);
   return write(db, { source: input.source, at: input.at ?? utcNow() }, (tx) => {
-    const account = requireAccount(tx, accountId);
+    requireAccount(tx, accountId);
     requireFreeDate(tx, accountId, input.date);
     const row = {
       id: crypto.randomUUID(), accountId, date: input.date,
-      balance: balanceFromEntry(account.kind, input.balance), note: blankToNull(input.note),
+      balance: input.balance, note: blankToNull(input.note),
     };
     tx.insert(valuations).values(row).run();
     tx.audit({ entity: "valuations", entityId: row.id, action: "create", before: null, after: withoutId(row) });
@@ -50,11 +50,11 @@ export function createValuation(db: Db, accountId: string, input: ValuationInput
 export function updateValuation(db: Db, accountId: string, id: string, input: ValuationUpdate & WriteInput) {
   requireWholeAmounts(db, [input.balance]);
   return write(db, { source: input.source, at: input.at ?? utcNow() }, (tx) => {
-    const account = requireAccount(tx, accountId);
+    requireAccount(tx, accountId);
     const before = requireValuation(tx, accountId, id);
-    const next = mergedWrite(valuationInputSchema, { ...before, balance: entryFromBalance(account.kind, before.balance) }, input);
+    const next = mergedWrite(valuationInputSchema, before, input);
     requireFreeDate(tx, accountId, next.date, id);
-    const row = { ...before, ...next, balance: balanceFromEntry(account.kind, next.balance), note: blankToNull(next.note) };
+    const row = { ...before, ...next, note: blankToNull(next.note) };
     tx.update(valuations).set({ date: row.date, balance: row.balance, note: row.note }).where(eq(valuations.id, id)).run();
     tx.audit({ entity: "valuations", entityId: id, action: "update", before: withoutId(before), after: withoutId(row) });
     return row;

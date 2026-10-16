@@ -263,7 +263,10 @@ export function recurringAmbiguities(db: Db, asOf: string, only?: readonly strin
 
 /** The existing schedules and their review questions, without new schedule detection. */
 export function recurringReviewSignals(db: Db, asOf: string) {
-  const schedules = activeSchedules(db);
+  return reviewSignals(db, asOf, activeSchedules(db));
+}
+
+function reviewSignals(db: Db, asOf: string, schedules: ScheduleView[]) {
   const links = loadLinkIndex(db);
   const txnById = transactionsByIds(db, [...links.transactionIds]);
   const changed: RecurringSignals["changed"] = [];
@@ -301,8 +304,8 @@ export function recurringReviewSignals(db: Db, asOf: string) {
 }
 
 export function recurringSignals(db: Db, asOf: string): RecurringSignals {
-  const signals = recurringReviewSignals(db, asOf);
   const schedules = activeSchedules(db);
+  const signals = reviewSignals(db, asOf, schedules);
   const declined = decidedKeys(db, "plan_proposal");
   const proposals = detectPlans(detectionTransactions(db, asOf), bookStep(db), asOf).filter((proposal) => {
     return !schedules.some((schedule) => covers(schedule, proposal)) && !declined.has(planProposalKey(proposal));

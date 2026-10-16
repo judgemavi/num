@@ -33,7 +33,7 @@ export function ValuationHistory({ accountId }: { accountId: string }) {
 function ValuationRows({ accountId }: { accountId: string }) {
   const { openEditor, confirm } = useEditors();
   const remove = useDeleteValuation();
-  // The route starts the two reads together.
+  // The loader starts valuations after it knows the account kind.
   const { data: account } = useSuspenseQuery(accountQuery(accountId));
   const { data: list } = useSuspenseQuery(valuationListQuery(accountId));
   const owed = accountClass(account.kind) === "liability";
@@ -63,7 +63,7 @@ function ValuationRows({ accountId }: { accountId: string }) {
           menu={
             <RowMenu label={`Actions for the valuation on ${formatDate(item.date)}`}>
               <DropdownMenuItem className="min-h-11" onSelect={() => void openEditor("valuation", { accountId, id: item.id })}>
-                Change
+                Edit
               </DropdownMenuItem>
               <DropdownMenuItem className="min-h-11" onSelect={() => void confirmDelete(item)}>
                 Delete

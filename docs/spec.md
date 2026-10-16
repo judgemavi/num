@@ -416,7 +416,7 @@ its `month`. The event has the date of the first day of the month. A funding rec
 Fields: `accountId`, `date`, `balance`, `note?`.
 
 - Only `investment`, `property`, `mortgage` and `loan` accounts use valuations. Other kinds return 400.
-- An account has a maximum of one valuation on each date. A delete removes the valuation.
+- An account has a maximum of one valuation on each date.
 - The user adds, changes and deletes valuations on the account page or through MCP. The audit log records each change.
 - The UI calls it "Valuation".
 - A kind change to a kind that does not use valuations returns 409 while the account has valuations.

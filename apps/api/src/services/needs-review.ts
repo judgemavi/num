@@ -206,13 +206,10 @@ export function reviewCounts(hits: readonly NeedsReviewHit[]): ReviewCounts {
   return counts;
 }
 
-export type ReviewState = {
-  signals: ReturnType<typeof recurringReviewSignals>;
-  hits: NeedsReviewHit[];
-};
+export type ReviewState = ReturnType<typeof loadReviewState>;
 
 /** Reads the review sources once so one request does not compute them again. */
-export function loadReviewState(db: Db, asOf: string): ReviewState {
+export function loadReviewState(db: Db, asOf: string) {
   requireAsOf(asOf);
   const signals = recurringReviewSignals(db, asOf);
   const pairs = listTransferPairs(db, asOf).items;
