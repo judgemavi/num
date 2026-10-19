@@ -7,7 +7,7 @@ import { errorResponse } from "./common";
 
 const feasibilityRoute = createRoute({
   operationId: "get_goals_feasibility",
-  description: "Read goal feasibility for the month of asOf: the monthly income, the bills and the spending refills, the surplus, what the goals and sinking funds need, the shortfall, and a later date that fits for each one. It is null when the book has no active income. This does not create, change or delete a record.",
+  description: "Read goal feasibility for the month of asOf: the monthly income, the bills and the spending refills, the surplus, what the goals and sinking funds need, the shortfall, and a later date that fits for each one. The monthly income is the yearly amount of the active incomes / 12 (a pay every two weeks counts 26 times), thus it is not the income of one calendar month. Bills also use their yearly amount / 12. It is null when the book has no active income. This does not create, change or delete a record.",
   method: "get",
   path: "/api/goals/feasibility",
   request: { query: asOfQuerySchema },

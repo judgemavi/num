@@ -44,7 +44,7 @@ const listRoute = createRoute({
 
 const emergencyRoute = createRoute({
   operationId: "get_buckets_emergency",
-  description: "Read the emergency fund bucket: its balance, the months to keep, the monthly essential spending and the target (months times monthly). This does not create, change or delete a record.",
+  description: "Read the emergency fund bucket: its balance, the months to keep, the monthly essential spending and the target (months times monthly). basis history: monthly is the median essential spending of the last 6 complete months. basis plan: there are fewer than 3 such months, thus monthly is the yearly amount / 12 of the essential bills plus the refills of the essential spending buckets. This does not create, change or delete a record.",
   method: "get",
   path: "/api/buckets/emergency",
   request: { query: asOfQuerySchema },
