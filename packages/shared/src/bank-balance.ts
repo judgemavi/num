@@ -19,12 +19,12 @@ export const bankBalanceSchema = z.object({
   createdAt: z.string().refine(isUtcTimestamp),
 });
 
-/** The latest bank balance of an account against the calculated balance on its date. */
+/** The latest bank balance of an account against the cleared balance on its date. */
 const bankStatusSchema = z.object({
   accountId: z.uuid(),
   date: isoDateSchema,
   bankBalance: amountSchema,
-  calculatedBalance: amountSchema,
+  clearedBalance: amountSchema,
   difference: amountSchema,
   openingSuggestion: openingSuggestionSchema.nullable(),
 });

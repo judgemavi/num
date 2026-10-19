@@ -24,7 +24,7 @@ const balanceParams = z.object({
 
 const statusRoute = createRoute({
   operationId: "get_bank_balances_status",
-  description: `Read the latest bank balance of each account that has one, and the calculated balance of the account on its date. A difference of 0 means that Num agrees with the bank. This does not create, change or delete a record.`,
+  description: `Read the latest bank balance of each account that has one, and the cleared balance of the account on its date. The cleared balance counts only cleared transactions; open transactions do not count. A difference of 0 means that Num agrees with the bank. This does not create, change or delete a record.`,
   method: "get",
   path: "/api/bank-balances/status",
   responses: {
@@ -37,7 +37,7 @@ const statusRoute = createRoute({
 
 const listRoute = createRoute({
   operationId: "get_accounts_id_bank_balances",
-  description: `Read the bank balances of an account and its status (the latest bank balance against the calculated balance on its date). This does not create, change or delete a record.`,
+  description: `Read the bank balances of an account and its status (the latest bank balance against the cleared balance on its date; open transactions do not count). This does not create, change or delete a record.`,
   method: "get",
   path: "/api/accounts/{id}/bank-balances",
   request: { params: idParams },
@@ -52,7 +52,7 @@ const listRoute = createRoute({
 
 const createRouteDef = createRoute({
   operationId: "post_accounts_id_bank_balances",
-  description: `Save a balance that the bank shows on a date. The app saves it also when it is not equal to the calculated balance. An account has one bank balance for each date.`,
+  description: `Save a balance that the bank shows on a date. The app saves it also when it is not equal to the cleared balance. An account has one bank balance for each date.`,
   method: "post",
   path: "/api/accounts/{id}/bank-balances",
   request: {

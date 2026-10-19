@@ -16,5 +16,5 @@ export function useBankStatusText(kind: AccountKind, status: BankStatus) {
     return `Matches your bank on ${formatDate(status.date)}`;
   }
   const different = formatBalance(currency, "chequing", Math.abs(status.difference));
-  return `Your bank says ${formatBalance(currency, kind, status.bankBalance)}. Num says ${formatBalance(currency, kind, status.calculatedBalance)}. ${different} different.`;
+  return `Your bank says ${formatBalance(currency, kind, status.bankBalance)}. Cleared in Num: ${formatBalance(currency, kind, status.clearedBalance)}. ${different} different.`;
 }

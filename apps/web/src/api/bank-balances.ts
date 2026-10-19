@@ -3,7 +3,7 @@ import { queryOptions, useMutation } from "@tanstack/react-query";
 import { bankBalanceError } from "@/accounts/format";
 import { api, formWrite, unwrap } from "@/api/client";
 
-/** The latest bank balance of each active account that has one, against the calculated balance on its date. */
+/** The latest bank balance of each active account that has one, against the cleared balance on its date. */
 export function bankStatusesQuery() {
   return queryOptions({
     queryKey: ["bank-balances", "status"],

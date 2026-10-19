@@ -5,7 +5,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { requireWholeAmounts } from "./book-step";
-import { balanceOf, balancesAt } from "./account-balance";
+import { clearedBalancesAt } from "./account-balance";
 import { bankOpeningSuggestion } from "./opening-suggestion";
 import { withoutId, write, type Reader, type WriteInput, type WriteTx } from "./write";
 
@@ -35,15 +35,16 @@ function rowsOf(db: Reader, accountId: string): BankBalance[] {
 }
 
 function statusOf(db: Reader, account: AccountRow, latest: BankBalance): BankStatus {
-  const calculated = balanceOf(db, account, latest.date);
-  const difference = calculated - latest.balance;
+  const [cleared] = clearedBalancesAt(db, [{ account, date: latest.date }]);
+  if (cleared === undefined) throw new Error("Balance is missing");
+  const difference = cleared - latest.balance;
   return {
     accountId: account.id,
     date: latest.date,
     bankBalance: latest.balance,
-    calculatedBalance: calculated,
+    clearedBalance: cleared,
     difference,
-    openingSuggestion: difference === 0 ? null : bankOpeningSuggestion(db, account, latest, calculated),
+    openingSuggestion: difference === 0 ? null : bankOpeningSuggestion(db, account, latest, cleared),
   };
 }
 
@@ -59,13 +60,13 @@ export function listBankStatuses(db: Db): { items: BankStatus[] } {
     const found = byId.get(bank.accountId);
     return found ? [{ account: found.account, date: bank.date, bank }] : [];
   });
-  const calculated = balancesAt(db, points);
-  const grouped = new Map<string, { bank: BankBalance; calculated: number }[]>();
+  const cleared = clearedBalancesAt(db, points);
+  const grouped = new Map<string, { bank: BankBalance; cleared: number }[]>();
   for (const [index, point] of points.entries()) {
-    const balance = calculated[index];
+    const balance = cleared[index];
     if (balance === undefined) throw new Error("Balance is missing");
     const entries = grouped.get(point.account.id) ?? [];
-    entries.push({ bank: point.bank, calculated: balance });
+    entries.push({ bank: point.bank, cleared: balance });
     grouped.set(point.account.id, entries);
   }
   const withTerms = new Set(db.select({ accountId: mortgageTerms.accountId }).from(mortgageTerms).all().map((row) => row.accountId));
@@ -76,14 +77,14 @@ export function listBankStatuses(db: Db): { items: BankStatus[] } {
     const entries = grouped.get(account.id) ?? [];
     const latest = entries[0];
     if (!latest) return [];
-    const difference = latest.calculated - latest.bank.balance;
+    const difference = latest.cleared - latest.bank.balance;
     const valuationDate = firstValuation.get(account.id);
     return [{
       accountId: account.id, date: latest.bank.date, bankBalance: latest.bank.balance,
-      calculatedBalance: latest.calculated, difference,
+      clearedBalance: latest.cleared, difference,
       openingSuggestion: difference === 0 || withTerms.has(account.id) || (valuationDate !== undefined && valuationDate <= latest.bank.date) ? null : openingFromBankBalance({
-        hasMatchingBankBalance: entries.slice(1).some((row) => row.bank.balance === row.calculated),
-        openingBalance: account.openingBalance, calculatedBalance: latest.calculated, bankBalance: latest.bank.balance,
+        hasMatchingBankBalance: entries.slice(1).some((row) => row.bank.balance === row.cleared),
+        openingBalance: account.openingBalance, clearedBalance: latest.cleared, bankBalance: latest.bank.balance,
         date: firstDate ? dayBefore(firstDate) : account.openingDate ?? account.createdOn,
       }),
     }];

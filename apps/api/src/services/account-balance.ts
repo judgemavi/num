@@ -86,8 +86,11 @@ export function balanceOf(db: Reader, row: BalanceRow, asOf?: string): number {
   return found.balance;
 }
 
-/** Balances at different dates in one query. Each point keeps the position of its input. */
-export function balancesAt(db: Reader, points: readonly { account: BalanceRow; date: string }[]) {
+/**
+ * Cleared balances at different dates in one query: the bank balance comparisons count only `cleared` transactions.
+ * Each point keeps the position of its input.
+ */
+export function clearedBalancesAt(db: Reader, points: readonly { account: BalanceRow; date: string }[]) {
   if (points.length === 0) return [];
   const input = JSON.stringify(points.map(({ account, date }) => ({ id: account.id, date })));
   const rows = db.all<{ index: number; total: number; valuation: number | null; after: number }>(sql`
@@ -96,10 +99,10 @@ export function balancesAt(db: Reader, points: readonly { account: BalanceRow; d
       FROM json_each(${input})
     )
     SELECT points.idx AS "index",
-      (SELECT coalesce(sum(t.amount), 0) FROM transactions t WHERE t.account_id = points.accountId AND t.date <= points.date) AS total,
+      (SELECT coalesce(sum(t.amount), 0) FROM transactions t WHERE t.account_id = points.accountId AND t.status = 'cleared' AND t.date <= points.date) AS total,
       latest.balance AS valuation,
       CASE WHEN latest.id IS NULL THEN 0 ELSE
-        (SELECT coalesce(sum(t.amount), 0) FROM transactions t WHERE t.account_id = points.accountId AND t.date > latest.date AND t.date <= points.date)
+        (SELECT coalesce(sum(t.amount), 0) FROM transactions t WHERE t.account_id = points.accountId AND t.status = 'cleared' AND t.date > latest.date AND t.date <= points.date)
       END AS "after"
     FROM points LEFT JOIN valuations latest ON latest.id = (
       SELECT v.id FROM valuations v WHERE v.account_id = points.accountId AND v.date <= points.date ORDER BY v.date DESC LIMIT 1

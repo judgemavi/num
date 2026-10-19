@@ -20,7 +20,7 @@ test("the bank balance suggestion makes the bank balance and is absent after a m
     openingFromBankBalance({
       hasMatchingBankBalance: false,
       openingBalance: 10_000,
-      calculatedBalance: 5000,
+      clearedBalance: 5000,
       bankBalance: 4000,
       date: "2026-01-31",
     }),
@@ -30,7 +30,7 @@ test("the bank balance suggestion makes the bank balance and is absent after a m
     openingFromBankBalance({
       hasMatchingBankBalance: false,
       openingBalance: 0,
-      calculatedBalance: 4000,
+      clearedBalance: 4000,
       bankBalance: 4000,
       date: "2026-01-31",
     }),
@@ -40,7 +40,7 @@ test("the bank balance suggestion makes the bank balance and is absent after a m
     openingFromBankBalance({
       hasMatchingBankBalance: true,
       openingBalance: 10_000,
-      calculatedBalance: 5000,
+      clearedBalance: 5000,
       bankBalance: 4000,
       date: "2026-01-31",
     }),

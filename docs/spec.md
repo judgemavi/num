@@ -192,7 +192,7 @@ before the first transaction of the account (or the creation date when there is 
 The app helps the user set it, always with one click and never without the user:
 - After the first import of a file with a running balance: "Set the opening balance from this statement".
   Value = the first row's balance − the first row's amount, dated the day before the first row.
-- On the account, when the bank balance and the calculated balance are different (§5.13) and the account has no earlier
+- On the account, when the bank balance and the cleared balance are different (§5.13) and the account has no earlier
   bank balance that is equal: "Start this account from the bank's balance" (opening balance + the difference).
   The app does not offer this suggestion when a valuation is on or before the bank-balance date.
 - The app does not offer these two suggestions for a mortgage with terms. Its opening date is fixed (§5.2).
@@ -458,13 +458,15 @@ There is no upload without an import: a file comes in through an import (§7.2).
 
 Bank balance fields: `accountId`, `date`, `balance`, `importBatchId?`, `createdAt`. An account has a maximum of one bank
 balance on each date. The UI calls it "Bank balance".
-- A bank balance is a fact from the bank. The app saves it also when the calculated balance on `date` is not equal.
+- A bank balance is a fact from the bank. The app saves it also when the cleared balance on `date` is not equal.
 - An import with a closing balance saves a bank balance for its closing date with its `importBatchId` (§7.2). For an
   account whose files have no balance, the user adds one on the account page: the date and the balance. The user can
   change and delete a bank balance. The audit log records each change.
-- **Status.** The app compares the calculated balance on the date of the latest bank balance with that balance. It
+- **Cleared balance** on a date: the balance of §5.1 with only the `cleared` transactions on or before that date. `open`
+  transactions do not count. Each comparison with a bank balance uses it. All other balances count `open` too.
+- **Status.** The app compares the cleared balance on the date of the latest bank balance with that balance. It
   calculates the status for each request; it does not store it. The status is "Matches your bank on <date>", or
-  "Your bank says <x>. Num says <y>. <difference> different."
+  "Your bank says <x>. Cleared in Num: <y>. <difference> different."
 - **Actions when not equal.** "Compare transactions" opens Transactions for the account up to the date of the bank
   balance. "Start this account from the bank's balance" sets the opening balance (§5.1). The app does not show it for a
   mortgage with terms, or when an earlier bank balance is equal.

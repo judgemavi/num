@@ -72,7 +72,7 @@ test("a bank balance is saved when it is different, and the status is calculated
     expect(statusOf(book)).toMatchObject({
       date: "2026-02-15",
       bankBalance: -37_120,
-      calculatedBalance: -20_000,
+      clearedBalance: -20_000,
       difference: 17_120,
     });
     updateTransaction(book.db, shop.id, {
@@ -83,7 +83,7 @@ test("a bank balance is saved when it is different, and the status is calculated
       lines: [{ amount: -37_120 }],
       ...saved,
     });
-    expect(statusOf(book)).toMatchObject({ calculatedBalance: -37_120, difference: 0, openingSuggestion: null });
+    expect(statusOf(book)).toMatchObject({ clearedBalance: -37_120, difference: 0, openingSuggestion: null });
     spend(book, "2026-02-10", -1_000);
     expect(statusOf(book)?.difference).toBe(-1_000);
   } finally {
@@ -177,7 +177,7 @@ test("bank status uses the valuation on its date for each valuation account kind
       });
       createBankBalance(book.db, account.id, { date: "2026-03-01", balance: 42_000, ...saved });
       const status = listBankBalances(book.db, account.id).status;
-      expect(status).toMatchObject({ calculatedBalance: 42_000, difference: 0 });
+      expect(status).toMatchObject({ clearedBalance: 42_000, difference: 0 });
       expect(listBankStatuses(book.db).items.find((row) => row.accountId === account.id) ?? null).toEqual(status);
     }
   } finally {

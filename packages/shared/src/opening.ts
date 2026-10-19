@@ -19,18 +19,18 @@ export function openingFromFirstRow(input: { balance: number; amount: number; da
   return { amount, date: dayBefore(input.date) };
 }
 
-/** The opening balance that makes the calculated balance equal the bank balance (opening balance + the difference). */
+/** The opening balance that makes the cleared balance equal the bank balance (opening balance + the difference). */
 export function openingFromBankBalance(input: {
   hasMatchingBankBalance: boolean;
   openingBalance: number;
-  calculatedBalance: number;
+  clearedBalance: number;
   bankBalance: number;
   date: string;
 }): OpeningSuggestion | null {
-  if (input.hasMatchingBankBalance || input.calculatedBalance === input.bankBalance) {
+  if (input.hasMatchingBankBalance || input.clearedBalance === input.bankBalance) {
     return null;
   }
-  const amount = input.openingBalance - (input.calculatedBalance - input.bankBalance);
+  const amount = input.openingBalance - (input.clearedBalance - input.bankBalance);
   if (!Number.isSafeInteger(amount)) {
     return null;
   }
