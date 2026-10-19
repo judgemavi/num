@@ -1,7 +1,10 @@
 import { preselectTransfer } from "./categorize";
 import { expect, test } from "bun:test";
 import {
+  accountFitsChoice,
+  accountKinds,
   categoryKindForChoice,
+  choiceDirection,
   choicesForDirection,
   defaultChoice,
   merchantForChoice,
@@ -115,4 +118,22 @@ test("merchant name comes from the payee", () => {
   expect(merchantNameFromPayee("SQ *BLUE BOTTLE 0423")).toBe("Blue Bottle");
   expect(merchantNameFromPayee("sq *  blue bottle")).toBe("Blue Bottle");
   expect(merchantNameFromPayee("POS 0423")).toBe("");
+});
+
+test("the type gives the sign; a transfer has two sides", () => {
+  expect(choiceDirection("spending")).toBe("out");
+  expect(choiceDirection("loan_payment")).toBe("out");
+  expect(choiceDirection("income")).toBe("in");
+  expect(choiceDirection("refund")).toBe("in");
+  expect(choiceDirection("transfer")).toBeNull();
+});
+
+test("the type sets the accounts of a manual transaction", () => {
+  const everyday = ["chequing", "savings", "cash", "credit_card"];
+  for (const kind of accountKinds) {
+    expect(accountFitsChoice("transfer", kind)).toBe(true);
+    for (const choice of ["spending", "income", "refund", "loan_payment"] as const) {
+      expect(accountFitsChoice(choice, kind)).toBe(everyday.includes(kind));
+    }
+  }
 });

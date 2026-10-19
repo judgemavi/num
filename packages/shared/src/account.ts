@@ -33,7 +33,7 @@ export type PaymentPolicy = (typeof paymentPolicies)[number];
 
 const liabilityKinds = new Set<AccountKind>(["credit_card", "mortgage", "loan", "other_liability"]);
 
-const budgetKinds = new Set<AccountKind>(["chequing", "savings", "cash", "credit_card"]);
+const everydayKinds = new Set<AccountKind>(["chequing", "savings", "cash", "credit_card"]);
 
 const interestKinds = new Set<AccountKind>(["savings", "loan"]);
 
@@ -73,8 +73,13 @@ export function netWorthOf(accounts: readonly { kind: AccountKind; balance: numb
   return { have, owe, net: have - owe };
 }
 
+/** An everyday account holds the money that a person spends and gets: chequing, savings, cash and credit card. */
+export function isEverydayKind(kind: AccountKind): boolean {
+  return everydayKinds.has(kind);
+}
+
 export function defaultOnBudget(kind: AccountKind): boolean {
-  return budgetKinds.has(kind);
+  return isEverydayKind(kind);
 }
 
 export function allowsInterestRate(kind: AccountKind): boolean {

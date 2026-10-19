@@ -1,4 +1,5 @@
 import {
+  choiceDirection,
   choiceForCategory,
   amountText,
   merchantForChoice,
@@ -10,6 +11,7 @@ import {
   type MoneyDirection,
   type Transaction,
   type TransactionReview,
+  type WhatChoice,
 } from "@num/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -76,7 +78,11 @@ export function transactionValues(categories: Category[], transaction: Transacti
   return {
     accountId: transaction?.accountId ?? accountId,
     date: transaction?.date ?? localAsOf(),
-    direction: transaction ? moneyDirection(transaction.amount) : "out",
+    /**
+     * The side of this transaction in a transfer. It does not change: a saved transaction keeps its side, and a new
+     * transaction is the From side (money out).
+     */
+    transferSide: transaction ? moneyDirection(transaction.amount) : "out",
     amount: transaction ? amountText(Math.abs(transaction.amount)) : "",
     payee: transaction?.payeeRaw ?? "",
     suggestionPayee: transaction?.payeeRaw ?? "",
@@ -102,6 +108,11 @@ export function answerFilled(review: TransactionReview | null): boolean {
 }
 
 export type TransactionValues = ReturnType<typeof transactionValues>;
+
+/** The direction of the money: the type gives it, and a transfer keeps the side of this transaction. */
+export function directionOf(values: { choice: WhatChoice; transferSide: MoneyDirection }): MoneyDirection {
+  return choiceDirection(values.choice) ?? values.transferSide;
+}
 
 /** The values of a new transaction. A form part made with `withForm` gets the type of the form values from them. */
 export const blankTransaction = transactionValues([], null, "");

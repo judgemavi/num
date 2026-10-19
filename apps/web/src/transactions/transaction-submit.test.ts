@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Transaction } from "@num/shared";
-import { transactionValues } from "./transaction-draft";
+import { directionOf, signedTotal, transactionValues } from "./transaction-draft";
 import { buildTransactionSave, reviewAnswer } from "./transaction-submit";
 
 const id = "00000000-0000-4000-8000-000000000001";
@@ -130,5 +130,41 @@ describe("a loan payment", () => {
     expect(start.interest).toBe("400");
     expect(start.interestCategoryId).toBe(interestCategory);
     expect(buildTransactionSave({ ...start, currency: "USD", transaction: saved, totalMilli: saved.amount })).toEqual({ ok: true, save: null });
+  });
+});
+
+describe("the type gives the sign", () => {
+  const savings = "00000000-0000-4000-8000-000000000012";
+
+  test("a new transaction is money out for Spending and Loan payment, money in for Income and Refund, and the From side of a transfer", () => {
+    const start = transactionValues([], null, savings);
+    expect(start.choice).toBe("spending");
+    expect(directionOf(start)).toBe("out");
+    expect(directionOf({ ...start, choice: "loan_payment" })).toBe("out");
+    expect(directionOf({ ...start, choice: "income" })).toBe("in");
+    expect(directionOf({ ...start, choice: "refund" })).toBe("in");
+    expect(directionOf({ ...start, choice: "transfer" })).toBe("out");
+    expect(signedTotal("USD", null, "40", directionOf({ ...start, choice: "income" }))).toBe(40_000);
+    expect(signedTotal("USD", null, "40", directionOf(start))).toBe(-40_000);
+  });
+
+  test("a saved money-in transfer opens as the To side, and a save with no change has no write", () => {
+    const saved: Transaction = {
+      ...stored(null, null),
+      source: "manual",
+      lines: [{ id: "00000000-0000-4000-8000-000000000013", amount: 40_000, memo: null, categoryId: null, transferAccountId: savings, tagIds: [] }],
+    };
+    const start = transactionValues([], saved, "");
+    expect(start.choice).toBe("transfer");
+    expect(start.transferSide).toBe("in");
+    expect(start.transferAccountId).toBe(savings);
+    expect(directionOf(start)).toBe("in");
+    expect(buildTransactionSave({ ...start, currency: "USD", transaction: saved, totalMilli: saved.amount })).toEqual({ ok: true, save: null });
+  });
+
+  test("a saved money-in transaction that becomes Spending is money out", () => {
+    const start = transactionValues([], stored(category, null), "");
+    expect(directionOf(start)).toBe("in");
+    expect(directionOf({ ...start, choice: "spending" })).toBe("out");
   });
 });

@@ -1,6 +1,6 @@
 import { useDraftReview, useDraftSuggestion } from "@/transactions/use-draft-suggestion";
 import { DecisionNotes } from "@/review/decision-notes";
-import { amountText, moneyDirection, type MoneyDirection, type Transaction } from "@num/shared";
+import { accountFitsChoice, amountText, moneyDirection, type Transaction } from "@num/shared";
 import { useStore } from "@tanstack/react-form";
 import { useEffect } from "react";
 import { errorCode } from "@/api/client";
@@ -19,9 +19,9 @@ import { formatDate } from "@/date-format";
 import { levelLabel, refundedText, transactionError } from "@/transactions/format";
 import { DeleteMenu, MoneySection, TagsField } from "@/transactions/transaction-parts";
 import { PaymentForField } from "@/transactions/payment-for-field";
-import { alreadyChosen, answerFilled, interestLine, quietChange, signedTotal, transactionValues } from "@/transactions/transaction-draft";
+import { alreadyChosen, answerFilled, directionOf, interestLine, quietChange, signedTotal, transactionValues, type TransactionValues } from "@/transactions/transaction-draft";
 import { buildTransactionSave, reviewAnswer } from "@/transactions/transaction-submit";
-import { WhatIsThis } from "@/transactions/what-is-this";
+import { ChoiceFields, WhatIsThis } from "@/transactions/what-is-this";
 
 type TransactionFormProps = {
   transaction: Transaction | null;
@@ -33,8 +33,8 @@ type TransactionFormProps = {
   deleteKind?: "plain" | "mirror" | "linked";
 };
 
-/** The fields that the person sets to answer "What is this?". A change to one of them stops the suggestion. */
-const choiceFields = ["choice", "categoryId", "transferAccountId", "merchantId", "refundOfId"] as const;
+/** The fields that the person sets for the type. A change to one of them stops the suggestion. */
+const choiceFields = ["categoryId", "transferAccountId", "merchantId", "refundOfId"] as const;
 
 export function TransactionForm({
   transaction,
@@ -55,16 +55,23 @@ export function TransactionForm({
   const imported = transaction?.source === "import";
   // An imported transaction keeps its amount. An amount that the person did not change keeps its stored value.
   const startAmount = transaction ? amountText(Math.abs(transaction.amount)) : null;
-  const storedTotal = (value: { amount: string; direction: MoneyDirection }) =>
-    transaction && (imported || (value.amount === startAmount && value.direction === moneyDirection(transaction.amount))) ? transaction.amount : null;
+  const storedTotal = (value: Pick<TransactionValues, "amount" | "choice" | "transferSide">) =>
+    transaction && (imported || (value.amount === startAmount && directionOf(value) === moneyDirection(transaction.amount))) ? transaction.amount : null;
+  // The Account list keeps the account that the form starts with, also when its kind does not fit the type.
+  const startAccountId = transaction?.accountId ?? initialAccountId ?? null;
 
   const answerOf = (paymentFor: string | null) => reviewAnswer(review, paymentFor, localAsOf());
 
   const form = useAppForm({
-    defaultValues: transactionValues(categories, transaction, initialAccountId ?? accounts.find((item) => !item.archivedAt)?.id ?? "", review),
+    defaultValues: transactionValues(
+      categories,
+      transaction,
+      initialAccountId ?? accounts.find((item) => !item.archivedAt && accountFitsChoice("spending", item.kind))?.id ?? "",
+      review,
+    ),
     validators: {
       onSubmit: ({ value }) => {
-        const total = signedTotal(currency, storedTotal(value), value.amount, value.direction);
+        const total = signedTotal(currency, storedTotal(value), value.amount, directionOf(value));
         if (value.payee.trim().length === 0) {
           return "Enter a description.";
         }
@@ -82,7 +89,7 @@ export function TransactionForm({
       },
     },
     onSubmit: async ({ value, formApi }) => {
-      const total = signedTotal(currency, storedTotal(value), value.amount, value.direction);
+      const total = signedTotal(currency, storedTotal(value), value.amount, directionOf(value));
       const built =
         total === null
           ? null
@@ -108,16 +115,19 @@ export function TransactionForm({
     form.store,
     (state) => alreadyChosen(transaction) || answerFilled(review) || choiceFields.some((name) => state.fieldMeta[name]?.isTouched),
   );
-  const totalMilli = signedTotal(currency, storedTotal(values), values.amount, values.direction);
+  const typeChosen = useStore(form.store, (state) => state.fieldMeta.choice?.isTouched ?? false);
+  const totalMilli = signedTotal(currency, storedTotal(values), values.amount, directionOf(values));
   const suggested = useDraftSuggestion(values, storedTotal({ ...values, amount: values.suggestionAmount }));
 
-  // The suggestion arrives from the API, outside the form. The form takes its choice until the person makes a choice.
-  const suggestedChoice = touched ? null : suggested.choice;
+  // The suggestion arrives from the API, outside the form. The form takes it until the person makes a choice. After the
+  // person chose the type, the form takes only a suggestion of that type.
+  const suggestedChoice = touched || (typeChosen && suggested.choice?.choice !== values.choice) ? null : suggested.choice;
   useEffect(() => {
     if (!suggestedChoice) {
       return;
     }
-    form.setFieldValue("choice", suggestedChoice.choice, quietChange);
+    // The listeners of the type run: the account must be in the list of the suggested type.
+    form.setFieldValue("choice", suggestedChoice.choice, { dontUpdateMeta: true });
     form.setFieldValue("categoryId", suggestedChoice.categoryId, quietChange);
     form.setFieldValue("transferAccountId", suggestedChoice.transferAccountId, quietChange);
     form.setFieldValue("merchantId", suggestedChoice.merchantId, quietChange);
@@ -128,7 +138,7 @@ export function TransactionForm({
     totalMilli === null ||
     ((values.choice === "transfer" || values.choice === "loan_payment") && !values.transferAccountId) ||
     (values.choice === "loan_payment" && (values.interest.trim().length === 0 || !values.interestCategoryId));
-  const summary = `${formatDate(values.date)} · ${accountLabels.get(values.accountId) ?? "Account"} · ${values.direction === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(totalMilli ?? 0))}`;
+  const summary = `${formatDate(values.date)} · ${accountLabels.get(values.accountId) ?? "Account"} · ${directionOf(values) === "out" ? "Money out" : "Money in"} ${formatMoney(currency, Math.abs(totalMilli ?? 0))}`;
 
   return (
     <form.AppForm>
@@ -150,10 +160,11 @@ export function TransactionForm({
               <ReviewPill review={{ text: levelLabel("sure"), tone: "positive" }} />
             </div>
           ) : null}
+          <WhatIsThis form={form} locked={amountLocked} imported={imported} startAccountId={startAccountId} />
           {imported ? (
             <p className="text-sm">{summary}</p>
           ) : (
-            <MoneySection form={form} moneyLocked={amountLocked || imported} />
+            <MoneySection form={form} moneyLocked={amountLocked} transactionId={transaction?.id ?? null} startAccountId={startAccountId} />
           )}
           <form.AppField name="payee" listeners={{
             onChangeDebounceMs: searchDelayMs,
@@ -168,9 +179,10 @@ export function TransactionForm({
               />
             )}
           </form.AppField>
-          <WhatIsThis
+          <ChoiceFields
             form={form}
             locked={amountLocked}
+            imported={imported}
             transactionId={transaction?.id ?? null}
             loanFill={interestLine(transaction) === null}
             storedAmount={storedTotal(values)}

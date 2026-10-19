@@ -103,7 +103,7 @@ export {
   type RecurringSignal, type FamilySignal, type MatchResult,
 } from "./matching";
 export {
-  choicesForDirection, defaultChoice, categoryKindForChoice,
+  whatChoices, choicesForDirection, choiceDirection, accountFitsChoice, defaultChoice, categoryKindForChoice,
   merchantForChoice, choiceForCategory, resolveEditorChoice,
   type WhatChoice,
 } from "./categorize";

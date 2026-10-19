@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { choiceIn } from "@/components/choice";
-import { choicesForDirection, defaultChoice, merchantForChoice } from "@num/shared";
+import { accountFitsChoice } from "@num/shared";
+import { useStore } from "@tanstack/react-form";
 import { Ellipsis } from "lucide-react";
 import { useEditors } from "@/editors/editor-api";
 import { useArchiveTag } from "@/api/tags";
-import { useTags } from "@/editors/lookups";
+import { useBookCurrency, useTags } from "@/editors/lookups";
 import { ManagedPicker } from "@/editors/managed-picker";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,88 +13,103 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { searchDelayMs } from "@/lists/list-search";
 import { withForm } from "@/forms/form-hook";
+import { fieldValue } from "@/forms/form-values";
 import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TagForm } from "@/settings/tag-form";
 import { AccountPicker } from "@/transactions/pickers";
+import { refundPurchaseLabel } from "@/transactions/format";
 import { blankTransaction, quietChange } from "@/transactions/transaction-draft";
+import { useDraftReview } from "@/transactions/use-draft-suggestion";
 
-/** Money out or in, the amount, the account and the date of a transaction that the person enters by hand. */
+/** The other account of a transfer, with the hint of a transfer pair. The list does not have the account of the transaction. */
+export const TransferAccountField = withForm({
+  defaultValues: blankTransaction,
+  props: { label: "", locked: false, transactionId: fieldValue<string | null>(null) },
+  render: function TransferAccountFieldRender({ form, label, locked, transactionId }) {
+    const currency = useBookCurrency();
+    const review = useDraftReview(transactionId);
+    const pair = review?.question === "transfer_pair" ? review.transfer : null;
+    const accountId = useStore(form.store, (state) => state.values.accountId);
+    return (
+      <form.Field name="transferAccountId">
+        {(field) => (
+          <Field>
+            <FieldLabel htmlFor="txn-transfer">{label}</FieldLabel>
+            <AccountPicker id="txn-transfer" value={field.state.value} exceptId={accountId} disabled={locked} onChange={field.handleChange} />
+            {pair && field.state.value === pair.otherAccountId ? (
+              <FieldDescription>{`Links to ${refundPurchaseLabel(currency, pair.otherPayee, pair.otherDate, pair.otherAmount)}.`}</FieldDescription>
+            ) : null}
+          </Field>
+        )}
+      </form.Field>
+    );
+  },
+});
+
+/**
+ * The amount, the account and the date of a transaction that the person enters by hand. The type sets the accounts
+ * in the list. A transfer shows "From account" and "To account": the account of this transaction is the side that
+ * `transferSide` gives.
+ */
 export const MoneySection = withForm({
   defaultValues: blankTransaction,
-  props: { moneyLocked: false },
-  render: function MoneySectionRender({ form, moneyLocked }) {
+  props: {
+    moneyLocked: false,
+    transactionId: fieldValue<string | null>(null),
+    /** The account that the form starts with. It stays in the list for each type. */
+    startAccountId: fieldValue<string | null>(null),
+  },
+  render: function MoneySectionRender({ form, moneyLocked, transactionId, startAccountId }) {
+    const choice = useStore(form.store, (state) => state.values.choice);
+    const side = useStore(form.store, (state) => state.values.transferSide);
+    const otherId = useStore(form.store, (state) => state.values.transferAccountId);
+    const transfer = choice === "transfer";
+    const account = (
+      <form.Field
+        name="accountId"
+        listeners={{
+          // A transfer goes to a different account.
+          onChange: ({ value, fieldApi }) => {
+            if (fieldApi.form.getFieldValue("transferAccountId") === value) {
+              fieldApi.form.setFieldValue("transferAccountId", null, quietChange);
+            }
+          },
+        }}
+      >
+        {(field) => (
+          <Field>
+            <FieldLabel htmlFor="txn-account">{transfer ? (side === "out" ? "From account" : "To account") : "Account"}</FieldLabel>
+            <AccountPicker
+              id="txn-account"
+              value={field.state.value || null}
+              exceptId={transfer ? (otherId ?? undefined) : undefined}
+              only={(item) => item.id === startAccountId || accountFitsChoice(choice, item.kind)}
+              onChange={(id) => {
+                if (id) {
+                  field.handleChange(id);
+                }
+              }}
+            />
+          </Field>
+        )}
+      </form.Field>
+    );
+    const other = (
+      <TransferAccountField form={form} label={side === "out" ? "To account" : "From account"} locked={moneyLocked} transactionId={transactionId} />
+    );
     return (
       <>
-        <form.Field
-          name="direction"
-          listeners={{
-            // The choice must be one of the choices of the direction.
-            onChange: ({ value, fieldApi }) => {
-              if (!choicesForDirection(value).includes(fieldApi.form.getFieldValue("choice"))) {
-                const next = defaultChoice(value);
-                fieldApi.form.setFieldValue("choice", next, quietChange);
-                fieldApi.form.setFieldValue("categoryId", null, quietChange);
-                fieldApi.form.setFieldValue("merchantId", (current) => merchantForChoice(next, current), quietChange);
-              }
-            },
-          }}
-        >
-          {(field) => (
-            <Field>
-              <FieldLabel>Direction</FieldLabel>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                value={field.state.value}
-                disabled={moneyLocked}
-                onValueChange={(value) => {
-                  const next = choiceIn(["out", "in"], value);
-                  if (next) {
-                    field.handleChange(next);
-                  }
-                }}
-              >
-                <ToggleGroupItem value="out">Money out</ToggleGroupItem>
-                <ToggleGroupItem value="in">Money in</ToggleGroupItem>
-              </ToggleGroup>
-            </Field>
-          )}
-        </form.Field>
         <form.AppField name="amount" listeners={{
           onChangeDebounceMs: searchDelayMs,
           onChange: ({ value, fieldApi }) => fieldApi.form.setFieldValue("suggestionAmount", value, quietChange),
         }}>{(field) => <field.MoneyField id="txn-amount" label="Amount" disabled={moneyLocked} />}</form.AppField>
         <div className="grid gap-4 sm:grid-cols-2">
-          <form.Field
-            name="accountId"
-            listeners={{
-              // A transfer goes to a different account.
-              onChange: ({ value, fieldApi }) => {
-                if (fieldApi.form.getFieldValue("transferAccountId") === value) {
-                  fieldApi.form.setFieldValue("transferAccountId", null, quietChange);
-                }
-              },
-            }}
-          >
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="txn-account">Account</FieldLabel>
-                <AccountPicker
-                  id="txn-account"
-                  value={field.state.value || null}
-                  onChange={(id) => {
-                    if (id) {
-                      field.handleChange(id);
-                    }
-                  }}
-                />
-              </Field>
-            )}
-          </form.Field>
+          {transfer && side === "in" ? other : null}
+          {account}
+          {transfer && side === "out" ? other : null}
           <form.AppField name="date">{(field) => <field.DateInputField id="txn-date" label="Date" required />}</form.AppField>
         </div>
       </>

@@ -1,13 +1,27 @@
+import { isEverydayKind, type AccountKind } from "./account";
 import type { MoneyDirection } from "./amount-sign";
 import type { CategoryKind } from "./category";
 import type { Suggestion } from "./suggest";
 
-const whatChoices = ["spending", "income", "refund", "transfer", "loan_payment"] as const;
+export const whatChoices = ["spending", "income", "refund", "transfer", "loan_payment"] as const;
 
 export type WhatChoice = (typeof whatChoices)[number];
 
 export function choicesForDirection(direction: MoneyDirection): WhatChoice[] {
   return direction === "out" ? ["spending", "transfer", "loan_payment"] : ["income", "refund", "transfer"];
+}
+
+/** The type gives the sign: Spending and Loan payment are money out, Income and Refund are money in. A transfer has two sides: null. */
+export function choiceDirection(choice: WhatChoice): MoneyDirection | null {
+  if (choice === "spending" || choice === "loan_payment") {
+    return "out";
+  }
+  return choice === "transfer" ? null : "in";
+}
+
+/** The accounts that a manual transaction of a type can use. A transfer can use every account. */
+export function accountFitsChoice(choice: WhatChoice, kind: AccountKind): boolean {
+  return choice === "transfer" || isEverydayKind(kind);
 }
 
 export function defaultChoice(direction: MoneyDirection): WhatChoice {

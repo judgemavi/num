@@ -697,9 +697,12 @@ The app compares confidence in thousandths (0–1000) with the thresholds.
   applies the interest and the principal from the terms. When the terms give no schedule row for the date, there is no
   suggestion.
 
-**What is this?** The choices follow the direction of the money:
-- Money out: **Spending** (default) · Transfer · Loan payment.
-- Money in: **Income** (default) · Refund · Transfer.
+**What is this?** The type gives the sign: Spending and Loan payment are money out, Income and Refund are money in.
+- Manual: **Spending** (default) · Income · Refund · Transfer · Loan payment. The Account list has chequing, savings,
+  cash and credit card accounts, and all open accounts for Transfer. A type change empties an account that is not in
+  the new list. The list keeps the account of a saved transaction, or of a statement line that the user adds by hand.
+- Imported (the account and the sign stay): money out: **Spending** (default) · Transfer · Loan payment; money in:
+  **Income** (default) · Refund · Transfer.
 
 1. **Spending** and **Refund:** an expense category. The list shows only expense categories.
    **Refund** first asks "Refund of which purchase?" (optional). A linked purchase gives the refund its category and
@@ -715,7 +718,8 @@ The app compares confidence in thousandths (0–1000) with the thresholds.
    - Only an app write (import, automatic label, approval) makes the automatic link. A read never makes it, and a
      category that the user picks in the editor never starts it.
    **Income:** an income category. The list shows only income categories.
-2. **Transfer:** the other account. The app preselects Transfer only on evidence: an opposite transaction in another
+2. **Transfer:** the From account (money out) and the To account (money in). They are different. An imported
+   transaction keeps its account as one side; the user picks the other account. The app preselects Transfer only on evidence: an opposite transaction in another
    account within ±3 days, or a learned transfer for that payee. A transfer has no merchant. If that account has an unlinked transaction with the opposite amount within ±3 days,
    the app links the two (no new mirror). If not, the app creates the mirror transaction. A later import of the other
    account matches the mirror (§7.2 step 4).

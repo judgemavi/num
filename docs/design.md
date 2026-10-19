@@ -221,25 +221,25 @@ A search field inside a Command or Popover has no ring and no fill; the open pop
 The transaction editor is one shared editor (§6b). Home, Transactions, import detail and Buckets open it.
 
 Order, top to bottom:
-1. **Money out / Money in** (ToggleGroup) and **Amount** as a positive number. The sign comes from the toggle.
-   Never ask the user to type a minus sign. For an imported transaction, show this section as a read-only summary:
-   date · account · money out/in amount.
-2. **Account** and **Date** on one row (manual transactions only).
-3. **Description** (text field). For an imported transaction it is disabled, with the hint "From the bank import. It
+1. **What is this?** (ToggleGroup). The choices and the sign come from the type (spec §7.3).
+2. **Amount** as a positive number. Never ask the user to type a minus sign.
+3. **Account** and **Date** on one row. The type sets the accounts in the list (spec §7.3). Transfer: "From account"
+   and "To account" (Combobox) and Date. For an imported transaction, items 2 and 3 are a read-only summary:
+   date · account · money out/in amount. Its Transfer shows only the other account: "To account" (money out) or
+   "From account" (money in).
+4. **Description** (text field). For an imported transaction it is disabled, with the hint "From the bank import. It
    does not change." Never say "bank text" in the UI.
-4. **What is this?** (ToggleGroup). The choices follow the direction (spec §7.3):
-   - Money out: Spending · Transfer · Loan payment. Money in: Income · Refund · Transfer.
+5. The fields of the type:
    - Spending / Refund: expense categories only. Income: income categories only.
-   - Transfer: "To account" / "From account" Combobox (link an existing match or create the mirror). No merchant.
    - Loan payment: "Loan account" Combobox (mortgage and loan accounts that are not archived),
      "Interest" (money field), "Principal" (read-only: the amount minus the interest) and "Interest category"
      (Combobox of expense categories). For a mortgage with terms, Interest starts with the interest of the schedule,
      with the hint "From the payment schedule." Interest category starts with the category of the terms, else the
      category of the last loan payment to that account. No merchant.
-5. **Merchant** Combobox, with the suggestion and its level. Hidden for Transfer and Loan payment.
-6. **Tags**. All fields show; the editor has no collapsed section. There is no "Cleared" control and no "status" word
+6. **Merchant** Combobox, with the suggestion and its level. Hidden for Transfer and Loan payment.
+7. **Tags**. All fields show; the editor has no collapsed section. There is no "Cleared" control and no "status" word
    in the UI: only the app sets the status.
-7. Footer: Save (primary). Delete goes in a More menu (shared confirm).
+8. Footer: Save (primary). Delete goes in a More menu (shared confirm).
    There is one primary button, Save. When the transaction needs review, Save is the user's answer: with no change it
    confirms the automatic label or applies the suggestion shown in the form; with a change it saves and confirms.
    A question is a field filled with the proposed answer: Transfer to the other account of a pair,

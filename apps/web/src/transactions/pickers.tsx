@@ -44,9 +44,16 @@ export function CategoryPicker({ id, value, onChange, disabled, depth = 0, kind,
   );
 }
 
-/** `exceptId` is the account of the transaction. A transfer goes to a different account. */
-export function AccountPicker({ id, value, onChange, disabled, depth = 0, exceptId, kind, emptyLabel }: PickerProps & { exceptId?: string; kind?: AccountKind; emptyLabel?: string }) {
-  const accounts = useAccounts().filter((account) => account.id !== exceptId && (kind === undefined || account.kind === kind));
+/**
+ * `exceptId` is the account of the transaction. A transfer goes to a different account. `only` keeps the accounts
+ * that a transaction can use.
+ */
+export function AccountPicker({
+  id, value, onChange, disabled, depth = 0, exceptId, kind, only, emptyLabel,
+}: PickerProps & { exceptId?: string; kind?: AccountKind; only?: (account: { id: string; kind: AccountKind }) => boolean; emptyLabel?: string }) {
+  const accounts = useAccounts().filter(
+    (account) => account.id !== exceptId && (kind === undefined || account.kind === kind) && (only === undefined || only(account)),
+  );
   const archive = useArchiveAccount();
   return (
     <ManagedPicker
