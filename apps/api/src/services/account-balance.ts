@@ -87,8 +87,9 @@ export function balanceOf(db: Reader, row: BalanceRow, asOf?: string): number {
 }
 
 /**
- * Cleared balances at different dates in one query: the bank balance comparisons count only `cleared` transactions.
- * Each point keeps the position of its input.
+ * Cleared balances at different dates in one query, for the bank balance comparisons. They count the `cleared`
+ * transactions and the `open` transactions dated before the account's first imported transaction: no import can
+ * match those. Each point keeps the position of its input.
  */
 export function clearedBalancesAt(db: Reader, points: readonly { account: BalanceRow; date: string }[]) {
   if (points.length === 0) return [];
@@ -97,14 +98,20 @@ export function clearedBalancesAt(db: Reader, points: readonly { account: Balanc
     WITH points AS MATERIALIZED (
       SELECT key AS idx, json_extract(value, '$.id') AS accountId, json_extract(value, '$.date') AS date
       FROM json_each(${input})
+    ),
+    counted AS MATERIALIZED (
+      SELECT points.*, (
+        SELECT min(t.date) FROM transactions t WHERE t.account_id = points.accountId AND t.import_row_id IS NOT NULL
+      ) AS importStart
+      FROM points
     )
     SELECT points.idx AS "index",
-      (SELECT coalesce(sum(t.amount), 0) FROM transactions t WHERE t.account_id = points.accountId AND t.status = 'cleared' AND t.date <= points.date) AS total,
+      (SELECT coalesce(sum(t.amount), 0) FROM transactions t WHERE t.account_id = points.accountId AND (t.status = 'cleared' OR t.date < points.importStart) AND t.date <= points.date) AS total,
       latest.balance AS valuation,
       CASE WHEN latest.id IS NULL THEN 0 ELSE
-        (SELECT coalesce(sum(t.amount), 0) FROM transactions t WHERE t.account_id = points.accountId AND t.status = 'cleared' AND t.date > latest.date AND t.date <= points.date)
+        (SELECT coalesce(sum(t.amount), 0) FROM transactions t WHERE t.account_id = points.accountId AND (t.status = 'cleared' OR t.date < points.importStart) AND t.date > latest.date AND t.date <= points.date)
       END AS "after"
-    FROM points LEFT JOIN valuations latest ON latest.id = (
+    FROM counted points LEFT JOIN valuations latest ON latest.id = (
       SELECT v.id FROM valuations v WHERE v.account_id = points.accountId AND v.date <= points.date ORDER BY v.date DESC LIMIT 1
     )
   `);

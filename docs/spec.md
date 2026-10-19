@@ -462,8 +462,9 @@ balance on each date. The UI calls it "Bank balance".
 - An import with a closing balance saves a bank balance for its closing date with its `importBatchId` (§7.2). For an
   account whose files have no balance, the user adds one on the account page: the date and the balance. The user can
   change and delete a bank balance. The audit log records each change.
-- **Cleared balance** on a date: the balance of §5.1 with only the `cleared` transactions on or before that date. `open`
-  transactions do not count. Each comparison with a bank balance uses it. All other balances count `open` too.
+- **Cleared balance** on a date: the balance of §5.1 with the transactions on or before that date that are `cleared`,
+  or `open` and dated before the account's first imported transaction (no import can match them). Each comparison with
+  a bank balance uses it. All other balances count all `open` transactions.
 - **Status.** The app compares the cleared balance on the date of the latest bank balance with that balance. It
   calculates the status for each request; it does not store it. The status is "Matches your bank on <date>", or
   "Your bank says <x>. Cleared in Num: <y>. <difference> different."

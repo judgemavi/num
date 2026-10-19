@@ -4,6 +4,7 @@ import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { balanceOf } from "./account-balance";
 import { createBankBalance, listBankBalances, listBankStatuses } from "./bank-balances";
+import { createAccount } from "./accounts";
 import { importStatement } from "./imports";
 import { at, csv, importCsv, tempBook } from "./import-test-book";
 import { undoImportBatch } from "./import-undo";
@@ -23,7 +24,7 @@ function statusOf(book: Book) {
   return single;
 }
 
-test("an open transaction on or before the bank balance date causes no difference, and other balances count it", () => {
+test("in an account with no import history, an open transaction causes no difference, and other balances count it", () => {
   const book = tempBook();
   try {
     getsImports(book.db, book.account.id);
@@ -93,6 +94,31 @@ test("an import undo that sets a matched transaction back to open changes the cl
     expect(statusOf(book)).toMatchObject({ clearedBalance: -10_000, difference: 0 });
     undoImportBatch(book.db, result.id, { source: "import", at: "2026-10-09T16:00:00Z" });
     expect(statusOf(book)).toMatchObject({ clearedBalance: 0, difference: 10_000 });
+  } finally {
+    book.close();
+  }
+});
+
+test("open transactions before the first imported transaction count as cleared, and an undo moves that start", () => {
+  const book = tempBook();
+  try {
+    getsImports(book.db, book.account.id);
+    const source = createAccount(book.db, { name: "Source", kind: "cash", asOf: "2026-10-07", ...saved });
+    const transfer = createTransaction(book.db, {
+      accountId: source.id, date: "2026-01-10", amount: -100_000, payeeRaw: "Transfer",
+      lines: [{ amount: -100_000, transferAccountId: book.account.id }], ...saved,
+    });
+    const mirror = book.db.select().from(transactions).where(eq(transactions.id, transfer.transferPeerId ?? "")).get();
+    expect(mirror).toMatchObject({ mirror: true, status: "open", importRowId: null });
+    const result = importCsv(book.db, book.dir, book.account.id, "feb.csv", ["02/01/2026,Shop,-10.00", "02/03/2026,Cafe,-5.00"]);
+    if (result.kind !== "batch") throw new Error("Expected a batch");
+    spend(book, "2026-02-01", -7_000, "Bakery");
+    spend(book, "2026-02-10", -3_000, "Market");
+    createBankBalance(book.db, book.account.id, { date: "2026-02-28", balance: 85_000, ...saved });
+    expect(statusOf(book)).toMatchObject({ clearedBalance: 85_000, difference: 0, openingSuggestion: null });
+    expect(balanceOf(book.db, book.account, "2026-02-28")).toBe(75_000);
+    undoImportBatch(book.db, result.id, { source: "import", at: "2026-10-09T16:00:00Z" });
+    expect(statusOf(book)).toMatchObject({ clearedBalance: 0, difference: -85_000 });
   } finally {
     book.close();
   }
