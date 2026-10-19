@@ -7,7 +7,7 @@ import { errorResponse, idParams } from "./common";
 
 const listRoute = createRoute({
   operationId: "get_tags",
-  description: "Read tags. This does not create, change or delete a record.",
+  description: "Read tags. A tag marks the spending of a trip or a project. Give its id as tagId to get_insights to get that spending by month. This does not create, change or delete a record.",
   method: "get",
   path: "/api/tags",
   request: { query: tagListQuerySchema },

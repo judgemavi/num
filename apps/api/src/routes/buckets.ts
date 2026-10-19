@@ -29,7 +29,7 @@ const eventParams = z.object({
 
 const listRoute = createRoute({
   operationId: "list_buckets",
-  description: "Read buckets. This does not create, change or delete a record.",
+  description: "Read buckets: the bills (kind commitment, with a schedule, also yearly bills), the incomes, the spending buckets, the savings (sinking, goal) and the emergency fund, each with its balance. A bill or a sinking bucket that holds money for a yearly payment explains a month with a large payment. This does not create, change or delete a record.",
   method: "get",
   path: "/api/buckets",
   request: { query: bucketListQuerySchema },

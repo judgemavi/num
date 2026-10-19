@@ -22,6 +22,8 @@ const instructions = [
   "After an uncertain response, read the state before a retry.",
   "A 409 is a conflict to resolve.",
   "It is not permission to force the write.",
+  "Before you answer a question about the state of the finances, read Needs you, the spending report, the buckets and the tags.",
+  "Explain a month that spends more from its tags and its yearly bills first.",
 ].join(" ");
 
 function createServer(app: OpenAPIHono, db: Db, catalog: ReturnType<typeof buildToolCatalog>) {
