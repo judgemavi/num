@@ -11,36 +11,29 @@ import { importRowOutcomes, transactionStatuses, type BankBalance, type Unreadab
 import { accounts } from "./accounts";
 import { transactions } from "./ledger";
 
-export const documents = sqliteTable("documents", {
-  id: text("id").primaryKey(),
-  filename: text("filename").notNull(),
-  hash: text("hash").notNull().unique(),
-  mimeType: text("mime_type").notNull(),
-  storagePath: text("storage_path").notNull(),
-  uploadedAt: text("uploaded_at").notNull(),
-  deletedAt: text("deleted_at"),
-});
-export type DocumentRow = typeof documents.$inferSelect;
-
-export const importBatches = sqliteTable("import_batches", {
-  id: text("id").primaryKey(),
-  accountId: text("account_id")
-    .notNull()
-    .references(() => accounts.id),
-  documentId: text("document_id")
-    .notNull()
-    .references(() => documents.id),
-  parser: text("parser").notNull(),
-  periodStart: text("period_start").notNull(),
-  periodEnd: text("period_end").notNull(),
-  closingBalance: integer("closing_balance"),
-  closingDate: text("closing_date"),
-  previousBankBalance: text("previous_bank_balance", { mode: "json" }).$type<BankBalance>(),
-  unreadableJson: text("unreadable_json", { mode: "json" }).$type<UnreadableRow[]>().notNull().default([]),
-  importedOn: text("imported_on").notNull(),
-  createdAt: text("created_at").notNull(),
-  undoneAt: text("undone_at"),
-});
+export const importBatches = sqliteTable(
+  "import_batches",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id),
+    filename: text("filename").notNull(),
+    hash: text("hash").notNull(),
+    parser: text("parser").notNull(),
+    periodStart: text("period_start").notNull(),
+    periodEnd: text("period_end").notNull(),
+    closingBalance: integer("closing_balance"),
+    closingDate: text("closing_date"),
+    matchedBefore: integer("matched_before", { mode: "boolean" }).notNull().default(false),
+    previousBankBalance: text("previous_bank_balance", { mode: "json" }).$type<BankBalance>(),
+    unreadableJson: text("unreadable_json", { mode: "json" }).$type<UnreadableRow[]>().notNull().default([]),
+    importedOn: text("imported_on").notNull(),
+    createdAt: text("created_at").notNull(),
+    undoneAt: text("undone_at"),
+  },
+  (table) => [uniqueIndex("import_batches_hash_active").on(table.hash).where(sql`${table.undoneAt} is null`)],
+);
 export type ImportBatchRow = typeof importBatches.$inferSelect;
 
 export const importRows = sqliteTable(

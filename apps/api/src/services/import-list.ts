@@ -1,4 +1,4 @@
-import { accounts, documents, importBatches, importRows, inboxDecisions, transactions } from "@num/db";
+import { accounts, importBatches, importRows, inboxDecisions, transactions } from "@num/db";
 import {
   addDays,
   matchDateWindowDays,
@@ -11,6 +11,7 @@ import {
 import { and, asc, count, desc, eq, gte, isNull, lte, ne, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
+import { balanceChecksOf } from "./import-check";
 import { idIn, pagedOf, totalOf, windowOf } from "./list-sql";
 
 type OutcomeCounts = {
@@ -94,23 +95,20 @@ function loadItems(db: Db, where: SQL | undefined, newest: boolean, window?: { l
       id: importBatches.id,
       accountId: importBatches.accountId,
       accountName: accounts.name,
-      documentId: importBatches.documentId,
-      filename: documents.filename,
-      documentDeletedAt: documents.deletedAt,
-      transactionCount: sql<number>`(
-        select count(*) from ${transactions}
-        inner join ${importRows} on ${importRows.id} = ${transactions.importRowId}
-        where ${importRows.batchId} = ${importBatches.id}
-      )`,
+      filename: importBatches.filename,
       periodStart: importBatches.periodStart,
       periodEnd: importBatches.periodEnd,
       createdAt: importBatches.createdAt,
       status: statusSql,
       unreadableJson: importBatches.unreadableJson,
+      closingBalance: importBatches.closingBalance,
+      closingDate: importBatches.closingDate,
+      matchedBefore: importBatches.matchedBefore,
+      undoneAt: importBatches.undoneAt,
+      account: { id: accounts.id, kind: accounts.kind, openingBalance: accounts.openingBalance },
     })
     .from(importBatches)
     .innerJoin(accounts, eq(accounts.id, importBatches.accountId))
-    .leftJoin(documents, eq(documents.id, importBatches.documentId))
     .where(where)
     .orderBy(order(importBatches.createdAt), order(importBatches.id))
     .$dynamic();
@@ -119,11 +117,18 @@ function loadItems(db: Db, where: SQL | undefined, newest: boolean, window?: { l
     db,
     batches.map((batch) => batch.id),
   );
-  return batches.map(({ unreadableJson, ...batch }) => ({
-    ...batch,
-    filename: batch.filename ?? null,
-    documentDeletedAt: batch.documentDeletedAt ?? null,
-    counts: { ...(byBatch.get(batch.id) ?? emptyCounts()), unreadable: unreadableJson.length },
+  const checks = balanceChecksOf(db, batches);
+  return batches.map((batch, index) => ({
+    id: batch.id,
+    accountId: batch.accountId,
+    accountName: batch.accountName,
+    filename: batch.filename,
+    periodStart: batch.periodStart,
+    periodEnd: batch.periodEnd,
+    createdAt: batch.createdAt,
+    status: batch.status,
+    counts: { ...(byBatch.get(batch.id) ?? emptyCounts()), unreadable: batch.unreadableJson.length },
+    balanceCheck: checks[index] ?? null,
   }));
 }
 

@@ -12,9 +12,9 @@ import { createTransaction, getTransaction } from "./transactions";
 const saved = { source: "ui" as const, at };
 
 function withBalance(book: ReturnType<typeof tempBook>, amount = "-10.00", balance = "90.00", date = "03/01/2026") {
-  const result = importStatement(book.db, book.dir, {
+  const result = importStatement(book.db, {
     asOf: "2026-10-07", source: "import", at, accountId: book.account.id,
-    filename: "statement.csv", mimeType: "text/csv",
+    filename: "statement.csv",
     bytes: csv([`${date},Example,${amount},${balance}`], true), columnMap: { ...map, balance: 3 },
   });
   if (result.kind !== "batch") throw new Error("Expected a batch");
@@ -73,7 +73,7 @@ for (const reviewed of [false, true]) {
           lines: [{ amount: 10_000 }], ...saved,
         });
       }
-      const batch = importCsv(book.db, book.dir, book.account.id, "mirror.csv", ["03/01/2026,Move funds,10.00"]);
+      const batch = importCsv(book.db, book.account.id, "mirror.csv", ["03/01/2026,Move funds,10.00"]);
       if (batch.kind !== "batch") throw new Error("Expected a batch");
       if (reviewed) {
         const row = book.db.select().from(importRows).where(eq(importRows.batchId, batch.id)).get();

@@ -4,21 +4,20 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { errorCode } from "@/api/client";
-import { documentPath } from "@/api/documents";
 import { importDetailQuery, useResolveImportRow } from "@/api/imports";
 import { useDecideItem, useUndoDecision } from "@/api/review";
+import { ImportBalanceProblem } from "@/accounts/import-balance-problem";
 import {
+  brokenMatch,
   formatImportDate,
   formatImportPeriod,
   formatStatementDate,
-  hasRemovableFile,
   importCountText,
   importError,
   importOutcomeLabel,
   importStatusLabel,
   unreadableLabel,
 } from "@/accounts/import-format";
-import { RemoveFileMenuItem } from "@/accounts/remove-file-item";
 import { Amount } from "@/components/amount";
 import { Boundary } from "@/components/boundary";
 import { ListCard, ListRow, listName } from "@/components/list-card";
@@ -71,34 +70,24 @@ function ImportDetailPage() {
   }, [detail]);
 
   const item = detail.item;
-  const filename = item.filename ?? "Statement";
+  const difference = brokenMatch(item.balanceCheck);
 
   return (
     <>
       <PageHeader
         kicker={`${accountLabels.get(item.accountId) ?? item.accountName} · ${formatImportDate(item.createdAt)}`}
-        title={filename}
+        title={item.filename}
         actions={
-          <>
-            {item.documentDeletedAt ? <span className="text-sm text-muted-foreground">File removed</span> : null}
-            {item.documentId && !item.documentDeletedAt ? (
-              <Button type="button" variant="secondary" asChild>
-                <a href={documentPath(item.documentId)}>Download</a>
-              </Button>
-            ) : null}
-            {item.status === "undone" && !hasRemovableFile(item) ? null : (
-              <RowMenu label={`Actions for ${filename}`}>
-                {item.status === "undone" ? null : (
-                  <DropdownMenuItem className="min-h-11" onSelect={() => void undo(item)}>
-                    Undo
-                  </DropdownMenuItem>
-                )}
-                <RemoveFileMenuItem item={item} />
-              </RowMenu>
-            )}
-          </>
+          item.status === "undone" ? null : (
+            <RowMenu label={`Actions for ${item.filename}`}>
+              <DropdownMenuItem className="min-h-11" onSelect={() => void undo(item)}>
+                Undo this import
+              </DropdownMenuItem>
+            </RowMenu>
+          )
         }
       />
+      {difference !== null ? <ImportBalanceProblem difference={difference} /> : null}
       <p className="text-sm text-muted-foreground">
         <Link to="/accounts/imports" className="font-semibold text-primary">
           Imports

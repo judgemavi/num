@@ -53,14 +53,13 @@ function book() {
   };
 }
 
-function importCsv(db: Db, dir: string, accountId: string, filename: string, lines: string[]) {
-  return importStatement(db, dir, {
+function importCsv(db: Db, accountId: string, filename: string, lines: string[]) {
+  return importStatement(db, {
     asOf: "2026-10-07",
     source: "import",
     at,
     accountId,
     filename,
-    mimeType: "text/csv",
     bytes: new TextEncoder().encode(["date,description,amount", ...lines].join("\n")),
     columnMap: map,
   });
@@ -79,7 +78,7 @@ test("the first confirmation labels the payee's other rows and the next import",
   try {
     const food = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
     const shop = createMerchant(sample.db, { name: "North Cafe", ...saved });
-    const imported = importCsv(sample.db, sample.dir, sample.account.id, "a.csv", [
+    const imported = importCsv(sample.db, sample.account.id, "a.csv", [
       "03/01/2026,NORTH CAFE,-4.00",
       "03/02/2026,NORTH CAFE,-5.00",
       "03/03/2026,NORTH CAFE,-6.00",
@@ -107,7 +106,7 @@ test("the first confirmation labels the payee's other rows and the next import",
       expect(savedRow?.lines[0]?.categoryId).toBeNull();
       expect(savedRow?.amount).toBe(row.amount);
     }
-    const next = importCsv(sample.db, sample.dir, sample.account.id, "b.csv", ["03/12/2026,NORTH CAFE,-4.00"]);
+    const next = importCsv(sample.db, sample.account.id, "b.csv", ["03/12/2026,NORTH CAFE,-4.00"]);
     expect(next.kind).toBe("batch");
     const latest = rows(sample.db).find((row) => row.date === "2026-03-12");
     expect(latest?.autoReason).toBe("learned_amount");
@@ -176,7 +175,7 @@ test("a transfer and a loan payment are never labeled automatically", () => {
     expect(transferSaved?.autoReason).toBeNull();
     expect(transferSaved?.lines[0]?.transferAccountId).toBe(visa.id);
     expect(transferSaved?.amount).toBe(-4000);
-    const imported = importCsv(sample.db, sample.dir, sample.account.id, "visa.csv", ["03/04/2026,VISA PAYMENT,-8.00"]);
+    const imported = importCsv(sample.db, sample.account.id, "visa.csv", ["03/04/2026,VISA PAYMENT,-8.00"]);
     expect(imported.kind).toBe("batch");
     const visaRow = rows(sample.db).find((row) => row.payeeRaw === "VISA PAYMENT");
     expect(visaRow?.autoReason).toBeNull();
@@ -274,7 +273,7 @@ test("a correction clears the automatic reason and counts as a confirmation", ()
     expect(corrected?.autoReason).toBeNull();
     expect(corrected?.autoSourceId).toBeNull();
     expect(corrected?.lines[0]?.categoryId).toBe(groceries.id);
-    const imported = importCsv(sample.db, sample.dir, sample.account.id, "d.csv", ["03/12/2026,NORTH CAFE,-7.00"]);
+    const imported = importCsv(sample.db, sample.account.id, "d.csv", ["03/12/2026,NORTH CAFE,-7.00"]);
     expect(imported.kind).toBe("batch");
     const latest = rows(sample.db).find((row) => row.date === "2026-03-12");
     expect(latest?.autoReason).toBeNull();

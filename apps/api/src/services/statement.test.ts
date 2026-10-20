@@ -1,9 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { columnMapSchema, readAmount, type ColumnMap } from "@num/shared";
+import { columnMapSchema, parseCsvStatement, parseOfxStatement, readAmount, type ColumnMap } from "@num/shared";
 import { expect, test } from "bun:test";
-import { parseCsvStatement } from "./parse-csv";
-import { parseOfxStatement } from "./parse-ofx";
 import { loadPresets, presetsDirectory } from "./presets";
 
 function fixture(name: string): string {

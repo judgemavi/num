@@ -62,7 +62,7 @@ export function useImportFile() {
     mutationFn: importFile,
     onSuccess: (result) => {
       if (result.kind === "batch" && !result.alreadyImported) {
-        undoToast(`${result.filename ?? "The file"} is imported.`, () => undo.mutate(result.id));
+        undoToast(`${result.filename} is imported.`, () => undo.mutate(result.id));
       }
     },
   });

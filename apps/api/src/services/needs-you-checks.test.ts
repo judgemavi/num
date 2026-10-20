@@ -28,14 +28,14 @@ const map: ColumnMap = columnMapSchema.parse({
   signConvention: "account",
 });
 
-function withBook(run: (db: Db, dir: string) => void) {
+function withBook(run: (db: Db) => void) {
   const dir = mkdtempSync(join(tmpdir(), "num-needs-you-checks-"));
   const sqlite = openDatabase(join(dir, "num.sqlite"));
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
   db.insert(settings).values({ key: "currency", value: "USD" }).run();
   try {
-    run(db, dir);
+    run(db);
   } finally {
     sqlite.close();
     rmSync(dir, { recursive: true, force: true });
@@ -153,15 +153,14 @@ test("an archived emergency bucket has no emergency fund check", () => {
 });
 
 test("imports pass when each on-budget account was imported inside the stale window", () => {
-  withBook((db, dir) => {
+  withBook((db) => {
     const cash = account(db, "chequing", "Cash", 0);
     account(db, "investment", "Funds", 0);
-    const result = importStatement(db, dir, { asOf: "2026-10-08",
+    const result = importStatement(db, { asOf: "2026-10-08",
       ...saved,
       at: "2026-10-08T12:00:00Z",
       accountId: cash.id,
       filename: "oct.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n10/01/2026,SHOP,-1.00\n"),
       columnMap: map,
     });
@@ -173,23 +172,21 @@ test("imports pass when each on-budget account was imported inside the stale win
 });
 
 test("imports fail when an on-budget account has no recent import", () => {
-  withBook((db, dir) => {
+  withBook((db) => {
     const cash = account(db, "chequing", "Cash", 0);
-    importStatement(db, dir, { asOf: "2026-09-01",
+    importStatement(db, { asOf: "2026-09-01",
       ...saved,
       at: "2026-09-01T12:00:00Z",
       accountId: cash.id,
       filename: "sep.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n09/01/2026,SHOP,-1.00\n"),
       columnMap: map,
     });
-    importStatement(db, dir, { asOf: "2026-10-20",
+    importStatement(db, { asOf: "2026-10-20",
       ...saved,
       at: "2026-10-20T12:00:00Z",
       accountId: cash.id,
       filename: "later.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n10/20/2026,SHOP,-2.00\n"),
       columnMap: map,
     });
@@ -328,11 +325,11 @@ test("a cash account that was never imported does not fail", () => {
 
 test("import age follows the supplied local date on both sides of UTC midnight", () => {
   for (const [at, importedOn] of [["2026-10-08T00:30:00Z", "2026-10-07"], ["2026-10-07T23:30:00Z", "2026-10-08"]] as const) {
-    withBook((db, dir) => {
+    withBook((db) => {
       const cash = account(db, "chequing", "Cash", 0);
-      importStatement(db, dir, {
+      importStatement(db, {
         source: "import", at, asOf: importedOn, accountId: cash.id,
-        filename: "local.csv", mimeType: "text/csv",
+        filename: "local.csv",
         bytes: new TextEncoder().encode("date,description,amount\n10/01/2026,SHOP,-1.00\n"), columnMap: map,
       });
       const onImportDay = check(db, importedOn, "imports_current");

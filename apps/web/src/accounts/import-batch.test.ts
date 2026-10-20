@@ -25,15 +25,17 @@ function row(key: string, text: string, patch: Partial<ImportFileRow> = {}): Imp
     counts: null,
     batchId: null,
     alreadyImported: false,
+    undone: false,
     unreadable: [],
     createdAt: null,
     openingSuggestion: null,
+    balanceCheck: null,
     ...patch,
   };
 }
 
 function imported(id: string): ImportAnswer {
-  return { accountId: "account-1", documentId: null, filename: "synthetic.csv", parser: "csv", periodStart: "2026-03-01", periodEnd: "2026-03-01", closingBalance: null, closingDate: null, undoneAt: null, kind: "batch", id, createdAt: "2026-03-01T00:00:00.000Z", counts, alreadyImported: false, unreadable: [], openingSuggestion: null };
+  return { accountId: "account-1", filename: "synthetic.csv", parser: "csv", periodStart: "2026-03-01", periodEnd: "2026-03-01", closingBalance: null, closingDate: null, balanceCheck: null, undoneAt: null, kind: "batch", id, createdAt: "2026-03-01T00:00:00.000Z", counts, alreadyImported: false, unreadable: [], openingSuggestion: null };
 }
 
 /** The parts of the editor that the batch uses. `answers` are the answers of the API, in order. */
@@ -149,7 +151,7 @@ describe("import batch", () => {
   });
 
   test("a file with an error or with no account gets a message, and the other files are imported", async () => {
-    const { io, log } = editor([new ApiError({ code: "document_too_large", params: {} }), imported("batch-3")]);
+    const { io, log } = editor([new ApiError({ code: "file_too_large", params: {} }), imported("batch-3")]);
     const result = await runImportBatch(
       [row("a", "03/01/2026,Tea,-4.00"), row("none", "03/02/2026,Bus,-3.00", { accountId: "" }), row("c", "03/03/2026,Jam,-2.00")],
       io,

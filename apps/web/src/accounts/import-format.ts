@@ -1,5 +1,5 @@
 import { formatDate } from "@/date-format";
-import type { ImportCounts, ImportRowOutcome, ImportViewStatus, UnreadableReason, UndoBlockReason, ErrorCode, ImportViewItem } from "@num/shared";
+import type { BalanceCheck, ImportCounts, ImportRowOutcome, ImportViewStatus, UnreadableReason, UndoBlockReason, ErrorCode } from "@num/shared";
 
 const unreadableText: Record<UnreadableReason, string> = {
   date_unreadable: "The date could not be read.",
@@ -86,7 +86,7 @@ export function importError(code: ErrorCode | undefined): string {
       return "That bank format is not available.";
     case "statement_empty":
       return "The file has no transactions.";
-    case "document_too_large":
+    case "file_too_large":
       return "The file is larger than 20 MB.";
     case "setup_required":
       return "Finish setup before you import.";
@@ -101,7 +101,11 @@ export function importError(code: ErrorCode | undefined): string {
   }
 }
 
-/** True when the import has a file that the person can remove. */
-export function hasRemovableFile(item: Pick<ImportViewItem, "documentId" | "documentDeletedAt">) {
-  return item.documentId !== null && item.documentDeletedAt === null;
+/** The difference of an import that broke the match with the bank. Null when the import shows no problem. */
+export function brokenMatch(check: BalanceCheck): number | null {
+  return check !== null && check.matchedBefore && check.difference !== 0 ? check.difference : null;
+}
+
+export function sampleSummary(count: number, first: string, last: string): string {
+  return `${count} ${count === 1 ? "row" : "rows"} · ${formatImportPeriod(first, last)}`;
 }

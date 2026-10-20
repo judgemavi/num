@@ -54,7 +54,7 @@ const listRoute = createRoute({
 
 const importRoute = createRoute({
   operationId: "post_imports",
-  description: "Import a statement file. This can create transactions, match existing transactions, skip duplicates and store the file. It does not change buckets, schedules or the book currency.",
+  description: "Import a statement file. This can create transactions, match existing transactions and skip duplicates. The app reads the file and does not store it. It does not change buckets, schedules or the book currency.",
   method: "post",
   path: "/api/imports",
   request: {
@@ -159,13 +159,13 @@ const undoRoute = createRoute({
   },
 });
 
-export function importRoutes(db: Db, dataDir: string) {
+export function importRoutes(db: Db) {
   const app = new OpenAPIHono({ defaultHook: validationHook });
   app.use(
     "/api/imports",
     bodyLimit({
       maxSize: maxUploadBytes,
-      onError: (c) => c.json({ code: "document_too_large" as const, params: {} }, 413),
+      onError: (c) => c.json({ code: "file_too_large" as const, params: {} }, 413),
     }),
   );
   return app
@@ -178,10 +178,9 @@ export function importRoutes(db: Db, dataDir: string) {
     })
     .openapi(importRoute, async (c) => {
       const body = c.req.valid("form");
-      const result = importStatement(db, dataDir, {
+      const result = importStatement(db, {
         accountId: body.accountId,
         filename: body.file.name,
-        mimeType: body.file.type,
         bytes: new Uint8Array(await body.file.arrayBuffer()),
         presetId: body.presetId,
         columnMap: body.columnMap,

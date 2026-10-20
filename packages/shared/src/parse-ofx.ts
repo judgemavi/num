@@ -1,15 +1,12 @@
-import { isIsoDate, readAmount, type UnreadableReason, type UnreadableRow } from "@num/shared";
-import type { ParsedStatement, StatementRow } from "./statement";
+import { isIsoDate } from "./date";
+import { readAmount } from "./read-amount";
+import { stripBom, type ParsedStatement, type StatementRow, type UnreadableReason, type UnreadableRow } from "./statement";
 
 type Block = {
   text: string;
   start: number;
   end: number;
 };
-
-function stripBom(text: string) {
-  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-}
 
 function blocks(text: string, tag: string): Block[] {
   const pattern = new RegExp(`<${tag}>`, "gi");

@@ -30,7 +30,7 @@ test("one recurring transfer labels an imported row as Sure and excludes a learn
       });
     }
     const schedule = plan(book, other.id);
-    const batch = importCsv(book.db, book.dir, book.account.id, "payment.csv", ["10/01/2026,Monthly payment,-50.00"]);
+    const batch = importCsv(book.db, book.account.id, "payment.csv", ["10/01/2026,Monthly payment,-50.00"]);
     if (batch.kind !== "batch") throw new Error("Expected a batch");
     const occurrence = listOccurrences(book.db, schedule.id, "2026-10-07").items.find((row) => row.dueDate === "2026-10-01");
     if (!occurrence?.transactionId) throw new Error("Expected a linked occurrence");

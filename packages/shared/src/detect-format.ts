@@ -314,7 +314,7 @@ function firstOfxDate(text: string) {
   return isIsoDate(iso) ? iso : null;
 }
 
-function columnMapFromPreset(preset: Preset) {
+export function columnMapFromPreset(preset: Preset): ColumnMap {
   return columnMapSchema.parse({
     hasHeader: preset.hasHeader,
     date: preset.date,

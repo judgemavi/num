@@ -152,8 +152,8 @@ The owner tried or examined these ideas and refused them. Do not propose them ag
   When a check fails, the API answers 400 `invalid_body`. The API never clears a field silently: the client sends
   `null` (example: a change from savings to chequing sends `interestRateMilliPct: null`).
 - **IDs:** Use UUID text.
-- **Delete:** A delete removes the record (hard delete). The audit log keeps the record as it was (§11). A document
-  keeps its record when the user removes its file (§5.12). You can archive configuration records (commitments, incomes, buckets).
+- **Delete:** A delete removes the record (hard delete). The audit log keeps the record as it was (§11).
+  You can archive configuration records (commitments, incomes, buckets).
 - **Validation:** The app validates codes and values with the shared Zod schemas. The database enforces only foreign keys
   and unique indexes (no CHECK constraints).
 - **Audit:** Each change writes one `audit_log` row (§11).
@@ -425,10 +425,13 @@ Fields: `accountId`, `date`, `balance`, `note?`.
 
 ### 5.11 Import batch and import row
 
-Batch fields: `accountId`, `documentId`, `parser`, `periodStart`, `periodEnd`, `closingBalance?`, `closingDate?`,
-`unreadableJson` (the unreadable rows: line, raw text, reason), `createdAt`, `undoneAt?`.
+Batch fields: `accountId`, `filename`, `hash`, `parser`, `periodStart`, `periodEnd`, `closingBalance?`, `closingDate?`,
+`matchedBefore`, `unreadableJson` (the unreadable rows: line, raw text, reason), `createdAt`, `undoneAt?`.
 - `importedOn`: the local import date, from the required request `asOf`.
-- A batch has a document (the uploaded file). An MCP client uploads a file the same way as the UI (§12).
+- `hash` is the hash of the file. It is unique over the batches that are not undone. The app does not keep the file.
+  An MCP client sends a file the same way as the UI (§12).
+- `matchedBefore`: before the import, the cleared balance on the date of the latest bank balance was equal to that
+  balance (§5.13).
 
 Row fields: `batchId`, `rowIndex`, `date`, `amount`, `payeeRaw`, `bankId?`, `identity`,
 `outcome` (`created | matched | needs_review | duplicate | ignored`), `transactionId?`.
@@ -442,17 +445,6 @@ Identity:
   An active row has the outcome `created`, `matched`, `needs_review` or `ignored`, and its batch is not undone.
   A `duplicate` row is never active, because it has the same identity as an earlier row.
   An `ignored` row is active. Thus, an ignored row does not come back when the user imports the file again.
-
-### 5.12 Document
-
-A document is an original uploaded file.
-
-Fields: `filename`, `hash` (unique), `mimeType`, `storagePath`, `uploadedAt`.
-
-The user can remove the file of a document. The app deletes the stored file and keeps the record
-(`filename`, `hash`, `uploadedAt`) with the time of the removal in `deletedAt`, for the audit log. The import batch and
-its transactions stay. The download of a removed file answers 404, and the UI shows "File removed".
-There is no upload without an import: a file comes in through an import (§7.2).
 
 ### 5.13 Bank balance
 
@@ -554,11 +546,9 @@ The user can create, edit and archive accounts.
 
 ### 7.2 Import (CSV)
 
-1. The user uploads a file (maximum 20 MB). The app stores it as a Document.
-   If a document with the same hash has an active batch, show that batch. Do not import again. If its batch is undone,
+1. The user uploads a file (maximum 20 MB). The app reads it and does not store it.
+   If a batch that is not undone has the same hash, show that batch. Do not import again. If its batch is undone,
    import the file again.
-   If the file of that document was removed, store the file again and clear `deletedAt` (audited). Then follow the
-   two rules above.
 2. The app selects the parser for the account:
    - **OFX/QFX parser.** It uses the bank transaction ID (`FITID`) as `bankId`. It reads the closing balance (`LEDGERBAL`).
    - **CSV parser with a column map.** The column map gives the columns for date, description, amount
@@ -578,6 +568,11 @@ The user can create, edit and archive accounts.
 6. If the file has a running balance, the app stores `closingBalance` and `closingDate`. It saves a bank balance
    for `closingDate` with the `importBatchId` (§5.13). It replaces a bank balance that has the same date.
 7. The app shows the batch summary. Example: "42 created · 8 matched · 3 duplicates · 2 need review".
+   When the file has a closing balance, the app compares the cleared balance on `closingDate` with it. When the
+   account matched its bank before the import (`matchedBefore`) and the balances are not equal after it, the summary,
+   the Imports view and the import detail say "Num matched the bank before this import. Now it is off by <amount>."
+   with "Undo this import". When the account did not match before, §7.5 applies. When the balances are equal, the
+   app shows nothing.
 8. **Undo batch** (it uses the batch rows, not the audit log):
    - The app removes the transactions that the batch created, if they are not edited after import.
    - The app removes the bank balance that the batch saved and restores the balance it replaced on the same account
@@ -590,6 +585,9 @@ If the user imports the same file again, or a file with overlapping dates, the a
 
 **Several files at once:**
 - The user can choose or drop several files. Each file is one row: file name, detected format, account, status.
+  A file that the app can read shows the number of its rows, its first date and its last date, and its first three
+  rows as they will go into the ledger: date, description, signed amount. They follow the format, the column map and
+  the account of the row. A file that the app cannot read with its format says "Set columns".
 - The app detects the format of each file: OFX, or the preset whose layout fits (column count, date format, header).
   The user can change it.
 - If exactly one account uses the detected format (`importPreset` or `columnMap`), the app selects that account.
@@ -605,7 +603,7 @@ If the user imports the same file again, or a file with overlapping dates, the a
   or unreadable rows are not handled.
 - Filters: account, status, date (compact filter bar).
 - Import detail: each row of the file with its outcome and a link to its transaction (created or matched),
-  the duplicate's earlier row, or the unreadable reason. Actions: download the original file, undo (More menu).
+  the duplicate's earlier row, or the unreadable reason. Action: undo (More menu).
 
 ### 7.3 Categorization
 
@@ -1076,14 +1074,13 @@ To correct other records, the user edits them. The audit log records each edit.
   - `docs/self-hosting.md` must tell this in a warning at the start.
   - The server listens on `HOST` (default `127.0.0.1`) and `PORT` (default `3000`).
     The Docker image sets `HOST=0.0.0.0`.
-- **Storage:** One volume. It contains `num.sqlite` (WAL mode) and `uploads/`.
+- **Storage:** One volume. It contains `num.sqlite` (WAL mode).
 - **Migrations:** Drizzle. At startup, first copy the database to `backups/pre-migrate-<timestamp>.sqlite` on the volume.
   Then apply the migrations with foreign keys off, and run `PRAGMA foreign_key_check` after them. A violation stops
   startup. The hash guard also stops startup when the SQL hash of a journal entry is not in the applied migrations.
 - **Backups:**
   - Optional Litestream replication of SQLite to any S3-compatible storage. Environment variables enable it.
-  - Optional nightly copy of `uploads/` to the same storage.
-  - The Settings screen has "Download backup": one archive with the database and `uploads/`.
+  - The Settings screen has "Download backup": one archive with the database.
   - `docs/self-hosting.md` contains the restore procedure.
 
 ## 14. Screens

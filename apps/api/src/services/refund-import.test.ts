@@ -32,13 +32,12 @@ test("an imported refund that comes before its purchase in the file is linked", 
         ...saved,
       });
     }
-    const result = importStatement(db, dir, {
+    const result = importStatement(db, {
       source: "import",
       at,
       asOf: "2026-03-20",
       accountId: account.id,
       filename: "march.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n03/10/2026,NORTH CAFE,4.00\n03/05/2026,NORTH CAFE,-4.00"),
       columnMap: columnMapSchema.parse({
         hasHeader: true,

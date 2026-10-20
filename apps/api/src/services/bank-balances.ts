@@ -99,6 +99,12 @@ export function listBankBalances(db: Db, accountId: string): { items: BankBalanc
   return { items, status: latest ? statusOf(db, account, latest) : null };
 }
 
+/** The status of the latest bank balance of an account. Null when the account has no bank balance. */
+export function latestBankStatus(db: Reader, account: AccountRow): BankStatus | null {
+  const latest = rowsOf(db, account.id)[0];
+  return latest ? statusOf(db, account, latest) : null;
+}
+
 function dateTaken(db: Reader, accountId: string, date: string, exceptId: string | null) {
   const row = db
     .select({ id: bankBalances.id })

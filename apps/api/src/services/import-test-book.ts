@@ -54,19 +54,17 @@ export function csv(lines: string[], balance = false): Uint8Array {
 
 export function importCsv(
   db: Db,
-  dir: string,
   accountId: string,
   filename: string,
   lines: string[],
   columnMap: ColumnMap | null = map,
 ) {
-  return importStatement(db, dir, {
+  return importStatement(db, {
     asOf: "2026-10-07",
     source: "import",
     at,
     accountId,
     filename,
-    mimeType: "text/csv",
     bytes: csv(lines),
     columnMap,
   });

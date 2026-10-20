@@ -1,8 +1,7 @@
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  documents,
   importBatches,
   importRows,
   migrateDatabase,
@@ -63,14 +62,13 @@ function csv(lines: string[]): Uint8Array {
   return new TextEncoder().encode(["date,description,amount", ...lines].join("\n") + "\n");
 }
 
-function importCsv(db: Db, dir: string, accountId: string, filename: string, lines: string[]) {
-  return importStatement(db, dir, {
+function importCsv(db: Db, accountId: string, filename: string, lines: string[]) {
+  return importStatement(db, {
     asOf: "2026-10-07",
     source: "import",
     at,
     accountId,
     filename,
-    mimeType: "text/csv",
     bytes: csv(lines),
     columnMap: map,
   });
@@ -84,23 +82,21 @@ test("the same rows with different bytes create no new transactions", () => {
   const book = tempBook();
   try {
     const text = "date,description,amount\n01/02/2026,NORTH MARKET,-12.50\n";
-    importStatement(book.db, book.dir, {
+    importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
       filename: "lf.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode(text),
       columnMap: map,
     });
-    const second = importStatement(book.db, book.dir, {
+    const second = importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
       filename: "crlf.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode(text.replaceAll("\n", "\r\n")),
       columnMap: map,
     });
@@ -120,13 +116,12 @@ test("a bank id uses the bank identity", () => {
   const book = tempBook();
   try {
     const bankMap = columnMapSchema.parse({ ...map, bankId: 3 });
-    importStatement(book.db, book.dir, {
+    importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
       filename: "bank.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount,id\n01/02/2026,NORTH MARKET,-12.50,FIT-1\n"),
       columnMap: bankMap,
     });
@@ -142,13 +137,12 @@ test("undo of every row sets undoneAt and a later file can import the rows again
   const book = tempBook();
   try {
     const text = "date,description,amount\n01/08/2026,CITY TRANSIT,-3.25\n";
-    const first = importStatement(book.db, book.dir, {
+    const first = importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
       filename: "once.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode(text),
       columnMap: map,
     });
@@ -158,13 +152,12 @@ test("undo of every row sets undoneAt and a later file can import the rows again
     const undone = undoImportBatch(book.db, first.id, { source: "import", at: "2026-10-09T16:00:00Z" });
     expect(undone.blocked).toEqual([]);
     expect(undone.batch.undoneAt).toBe("2026-10-09T16:00:00Z");
-    const again = importStatement(book.db, book.dir, {
+    const again = importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at: "2026-10-10T16:00:00Z",
       accountId: book.account.id,
       filename: "again.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode(text),
       columnMap: map,
     });
@@ -182,7 +175,7 @@ test("undo of every row sets undoneAt and a later file can import the rows again
 test("a deleted created transaction counts as removed", () => {
   const book = tempBook();
   try {
-    const result = importCsv(book.db, book.dir, book.account.id, "gone.csv", ["01/09/2026,KEEP,-1.00"]);
+    const result = importCsv(book.db, book.account.id, "gone.csv", ["01/09/2026,KEEP,-1.00"]);
     if (result.kind !== "batch") {
       throw new Error("Import did not create a batch");
     }
@@ -201,7 +194,7 @@ test("a deleted created transaction counts as removed", () => {
   }
 });
 
-test("a failed import leaves no document, batch, row or file", () => {
+test("a failed import leaves no batch and no row", () => {
   const book = tempBook();
   try {
     const row = {
@@ -220,19 +213,8 @@ test("a failed import leaves no document, batch, row or file", () => {
         source: "import",
         at,
         accountId: book.account.id,
-        dataDir: book.dir,
-        bytes: new TextEncoder().encode("bad"),
-        document: {
-          id: crypto.randomUUID(),
-          filename: "bad.csv",
-          hash: "abc123",
-          mimeType: "text/csv",
-          storagePath: "uploads/abc123",
-          uploadedAt: at,
-          deletedAt: null,
-        },
-        newFile: true,
-        restoreDocument: false,
+        filename: "bad.csv",
+        hash: "abc123",
         parser: "csv",
         rows: [row, { ...row, rowIndex: 1 }],
         closingBalance: null,
@@ -243,10 +225,8 @@ test("a failed import leaves no document, batch, row or file", () => {
         asOf: "2026-10-07",
       }),
     ).toThrow();
-    expect(book.db.select().from(documents).all()).toHaveLength(0);
     expect(book.db.select().from(importBatches).all()).toHaveLength(0);
     expect(book.db.select().from(importRows).all()).toHaveLength(0);
-    expect(readdirSync(join(book.dir, "uploads"))).toEqual([]);
   } finally {
     book.close();
   }
@@ -255,7 +235,7 @@ test("a failed import leaves no document, batch, row or file", () => {
 test("unreadable rows are stored on the batch and listed", () => {
   const book = tempBook();
   try {
-    const result = importCsv(book.db, book.dir, book.account.id, "mixed.csv", [
+    const result = importCsv(book.db, book.account.id, "mixed.csv", [
       "01/02/2026,NORTH MARKET,-12.50",
       "bad,CITY TRANSIT,-1.00",
     ]);
@@ -286,7 +266,7 @@ test("an imported row is cleared, a match sets cleared, and undo restores the ea
       source: "ui",
       at,
     });
-    const result = importCsv(book.db, book.dir, book.account.id, "mix.csv", [
+    const result = importCsv(book.db, book.account.id, "mix.csv", [
       "04/02/2026,RENT PAYMENT,-10.00",
       "01/09/2026,NEW SHOP,-2.00",
     ]);

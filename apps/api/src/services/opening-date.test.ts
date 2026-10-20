@@ -46,15 +46,14 @@ function storedOpening(db: Db, accountId: string): string | null {
   return row.openingDate;
 }
 
-function importCsv(db: Db, dir: string, accountId: string, filename: string, lines: string[]) {
+function importCsv(db: Db, accountId: string, filename: string, lines: string[]) {
   const bytes = new TextEncoder().encode(["date,description,amount", ...lines].join("\n") + "\n");
-  const result = importStatement(db, dir, {
+  const result = importStatement(db, {
     asOf: "2026-10-07",
     source: "import",
     at,
     accountId,
     filename,
-    mimeType: "text/csv",
     bytes,
     columnMap: map,
   });
@@ -80,7 +79,7 @@ test("an import of older rows moves the effective opening date", () => {
       automaticOpeningDate: "2026-10-07",
     });
 
-    importCsv(book.db, book.dir, account.id, "january.csv", ["01/15/2026,Shop,-12.50"]);
+    importCsv(book.db, account.id, "january.csv", ["01/15/2026,Shop,-12.50"]);
     expect(storedOpening(book.db, account.id)).toBeNull();
     expect(getAccount(book.db, account.id, "2026-10-07")).toMatchObject({
       openingDate: "2026-01-14",
@@ -88,7 +87,7 @@ test("an import of older rows moves the effective opening date", () => {
       automaticOpeningDate: "2026-01-14",
     });
 
-    importCsv(book.db, book.dir, account.id, "december.csv", ["12/01/2025,Older shop,-4.00"]);
+    importCsv(book.db, account.id, "december.csv", ["12/01/2025,Older shop,-4.00"]);
     expect(getAccount(book.db, account.id, "2026-10-07").openingDate).toBe("2025-11-30");
   } finally {
     book.close();
@@ -107,7 +106,7 @@ test("a user-set opening date does not move when older rows are imported", () =>
       openingBalance: 0,
       ...saved,
     });
-    importCsv(book.db, book.dir, account.id, "january.csv", ["01/15/2026,Shop,-12.50"]);
+    importCsv(book.db, account.id, "january.csv", ["01/15/2026,Shop,-12.50"]);
     expect(storedOpening(book.db, account.id)).toBe("2026-06-01");
     expect(getAccount(book.db, account.id, "2026-10-07")).toMatchObject({
       openingDate: "2026-06-01",

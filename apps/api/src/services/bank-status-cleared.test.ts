@@ -45,8 +45,8 @@ test("a change or a delete of a cleared transaction causes a difference", () => 
       hasHeader: true, date: 0, description: 1, amount: 2, balance: 3,
       dateOrder: "mdy", signConvention: "account", decimalSeparator: ".",
     });
-    importStatement(book.db, book.dir, {
-      asOf: "2026-10-07", source: "import", at, accountId: book.account.id, filename: "jan.csv", mimeType: "text/csv",
+    importStatement(book.db, {
+      asOf: "2026-10-07", source: "import", at, accountId: book.account.id, filename: "jan.csv",
       bytes: csv(["01/05/2026,Shop,-10.00,-10.00", "01/31/2026,Cafe,-5.00,-15.00"], true), columnMap: balanceMap,
     });
     expect(statusOf(book)).toMatchObject({ clearedBalance: -15_000, difference: 0 });
@@ -88,7 +88,7 @@ test("an import undo that sets a matched transaction back to open changes the cl
     spend(book, "2026-04-01", -10_000, "RENT");
     createBankBalance(book.db, book.account.id, { date: "2026-04-30", balance: -10_000, ...saved });
     expect(statusOf(book)).toMatchObject({ clearedBalance: 0, difference: 10_000 });
-    const result = importCsv(book.db, book.dir, book.account.id, "april.csv", ["04/02/2026,RENT PAYMENT,-10.00"]);
+    const result = importCsv(book.db, book.account.id, "april.csv", ["04/02/2026,RENT PAYMENT,-10.00"]);
     if (result.kind !== "batch") throw new Error("Expected a batch");
     expect(result.counts.matched).toBe(1);
     expect(statusOf(book)).toMatchObject({ clearedBalance: -10_000, difference: 0 });
@@ -110,7 +110,7 @@ test("open transactions before the first imported transaction count as cleared, 
     });
     const mirror = book.db.select().from(transactions).where(eq(transactions.id, transfer.transferPeerId ?? "")).get();
     expect(mirror).toMatchObject({ mirror: true, status: "open", importRowId: null });
-    const result = importCsv(book.db, book.dir, book.account.id, "feb.csv", ["02/01/2026,Shop,-10.00", "02/03/2026,Cafe,-5.00"]);
+    const result = importCsv(book.db, book.account.id, "feb.csv", ["02/01/2026,Shop,-10.00", "02/03/2026,Cafe,-5.00"]);
     if (result.kind !== "batch") throw new Error("Expected a batch");
     spend(book, "2026-02-01", -7_000, "Bakery");
     spend(book, "2026-02-10", -3_000, "Market");

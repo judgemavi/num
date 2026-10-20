@@ -3,13 +3,15 @@ import { usePrefetchQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { ImportFilterBar } from "@/accounts/import-filters";
 import { useImportSearch } from "@/accounts/use-import-search";
-import { formatImportDate, formatImportPeriod, hasRemovableFile, importCountText, importStatusLabel } from "@/accounts/import-format";
-import { RemoveFileMenuItem } from "@/accounts/remove-file-item";
+import { ImportBalanceProblem } from "@/accounts/import-balance-problem";
+import { brokenMatch, formatImportDate, formatImportPeriod, importCountText, importStatusLabel } from "@/accounts/import-format";
+import { useUndoImportFlow } from "@/accounts/use-undo-import-flow";
 import { activeAccountsQuery } from "@/api/accounts";
 import { importViewQuery } from "@/api/imports";
 import { Boundary } from "@/components/boundary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ListCard, ListRow, listName } from "@/components/list-card";
 import { PageHeader } from "@/components/page-header";
 import { RowMenu } from "@/components/row-menu";
@@ -76,27 +78,29 @@ function ImportViewPage() {
 function ImportListRow({ item }: { item: ImportViewItem }) {
   const navigate = importsRoute.useNavigate();
   const accountName = useAccountLabels().get(item.accountId) ?? item.accountName;
+  const undo = useUndoImportFlow();
+  const difference = brokenMatch(item.balanceCheck);
   return (
     <ListRow
-      label={item.filename ?? "Statement"}
+      label={item.filename}
       onOpen={() => void navigate({ to: "/accounts/imports/$importId", params: { importId: item.id } })}
       menu={
-        hasRemovableFile(item) ? (
-          <RowMenu label={`Actions for ${item.filename ?? "this import"}`}>
-            <RemoveFileMenuItem item={item} />
+        difference !== null ? (
+          <RowMenu label={`Actions for ${item.filename}`}>
+            <DropdownMenuItem className="min-h-11" onSelect={() => void undo(item)}>
+              Undo this import
+            </DropdownMenuItem>
           </RowMenu>
         ) : null
       }
     >
       <div className={listName}>
-        <p>{item.filename ?? "Statement"}</p>
+        <p>{item.filename}</p>
         <small>
           {formatImportDate(item.createdAt)} · {accountName} · {formatImportPeriod(item.periodStart, item.periodEnd)}
         </small>
-        <small>
-          {importCountText(item.counts)}
-          {item.documentDeletedAt ? " · File removed" : ""}
-        </small>
+        <small>{importCountText(item.counts)}</small>
+        {difference !== null ? <ImportBalanceProblem difference={difference} /> : null}
       </div>
       <Badge variant={statusVariant(item.status)}>{importStatusLabel(item.status)}</Badge>
     </ListRow>

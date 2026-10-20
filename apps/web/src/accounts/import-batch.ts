@@ -117,6 +117,7 @@ export async function runImportBatch(start: readonly ImportFileRow[], io: BatchI
         batchId: answer.id,
         createdAt: answer.createdAt,
         openingSuggestion: answer.openingSuggestion,
+        balanceCheck: answer.alreadyImported ? null : answer.balanceCheck,
         message: null,
       });
       return "ok";

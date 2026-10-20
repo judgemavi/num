@@ -1,30 +1,29 @@
 import { createHash } from "node:crypto";
-import { accounts, documents, importBatches, importRows, settings, transactions, type AccountRow } from "@num/db";
+import { accounts, importBatches, importRows, settings, transactions, type AccountRow } from "@num/db";
 import {
   chosenPresetId,
   ofxPresetId,
   detectStatementFormat,
   isOfxFile,
   currencyDigits,
+  parseCsvStatement,
+  parseOfxStatement,
   sampleCsvRows,
   addDays,
   matchDateWindowDays,
   utcNow,
   type ColumnMap,
   type ImportResult,
+  type ParsedStatement,
 } from "@num/shared";
 import { and, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { restoreDocument } from "./documents";
 import { planImportRows } from "./import-plan";
 import { presentBatch } from "./import-read";
 import { saveImportBatch } from "./import-save";
-import { parseCsvStatement } from "./parse-csv";
 import { importOpeningSuggestion } from "./opening-suggestion";
-import { parseOfxStatement } from "./parse-ofx";
 import { loadPresets } from "./presets";
-import type { ParsedStatement } from "./statement";
 import type { AuditSource } from "./write";
 
 const presets = loadPresets();
@@ -35,7 +34,6 @@ type ImportInput = {
   at?: string;
   accountId: string;
   filename: string;
-  mimeType: string;
   bytes: Uint8Array;
   presetId?: string | null;
   columnMap?: ColumnMap | null;
@@ -178,27 +176,25 @@ export function listImportBatches(db: Db, accountId: string) {
   return { items: batches.map((batch) => presentBatch(db, batch)) };
 }
 
-export function importStatement(db: Db, dataDir: string, input: ImportInput): ImportResult {
+/** The same file again: the batch that is not undone with the hash of the file. */
+function activeBatchWithHash(db: Db, hash: string) {
+  return db
+    .select()
+    .from(importBatches)
+    .where(and(eq(importBatches.hash, hash), isNull(importBatches.undoneAt)))
+    .get();
+}
+
+export function importStatement(db: Db, input: ImportInput): ImportResult {
   const account = db.select().from(accounts).where(eq(accounts.id, input.accountId)).get();
   if (!account) {
     throw new ServiceError("account_not_found", 404);
   }
   const at = input.at ?? utcNow();
   const hash = createHash("sha256").update(input.bytes).digest("hex");
-  const stored = db.select().from(documents).where(eq(documents.hash, hash)).get();
-  if (stored) {
-    const existing = db
-      .select()
-      .from(importBatches)
-      .where(eq(importBatches.documentId, stored.id))
-      .all()
-      .find((batch) => batch.undoneAt === null);
-    if (existing) {
-      if (stored.deletedAt) {
-        restoreDocument(db, dataDir, stored, input.bytes, { source: input.source, at });
-      }
-      return { kind: "batch", alreadyImported: true, openingSuggestion: null, ...presentBatch(db, existing) };
-    }
+  const existing = activeBatchWithHash(db, hash);
+  if (existing) {
+    return { kind: "batch", alreadyImported: true, openingSuggestion: null, ...presentBatch(db, existing) };
   }
 
   const text = textOf(input.bytes);
@@ -255,16 +251,6 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     candidates,
   );
   const filename = input.filename.split(/[/\\]/).pop()?.replace(/[\r\n"]/g, "").trim() || "upload";
-  const mimeType = input.mimeType.trim() || "application/octet-stream";
-  const document = stored ?? {
-    id: crypto.randomUUID(),
-    filename,
-    hash,
-    mimeType,
-    storagePath: `uploads/${hash}`,
-    uploadedAt: at,
-    deletedAt: null,
-  };
   const openingSuggestion = importOpeningSuggestion(
     db,
     account.id,
@@ -274,14 +260,8 @@ export function importStatement(db: Db, dataDir: string, input: ImportInput): Im
     source: input.source,
     at,
     accountId: account.id,
-    dataDir,
-    // A new file, or the same file again after its document was erased.
-    bytes: stored && !stored.deletedAt ? null : input.bytes,
-    document: stored
-      ? { ...stored, filename: stored.filename }
-      : { ...document, filename },
-    newFile: !stored,
-    restoreDocument: stored?.deletedAt != null,
+    filename,
+    hash,
     parser: resolved.parser,
     rows: planned,
     closingBalance: resolved.statement.closingBalance,

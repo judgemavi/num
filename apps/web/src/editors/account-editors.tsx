@@ -33,7 +33,7 @@ export function ImportInfoEditor({ filename, counts, unreadable }: EditorInput["
       <DialogHeader>
         <DialogTitle>Import detail</DialogTitle>
         <DialogDescription>
-          {filename ?? "Statement"} · {importCountText(counts)}
+          {filename} · {importCountText(counts)}
         </DialogDescription>
       </DialogHeader>
       <DialogBody>

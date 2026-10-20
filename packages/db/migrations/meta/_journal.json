@@ -15,6 +15,13 @@
       "when": 1792173859108,
       "tag": "0001_faithful_tinkerer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792523133695,
+      "tag": "0002_nifty_catseye",
+      "breakpoints": true
     }
   ]
 }

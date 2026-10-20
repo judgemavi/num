@@ -4,25 +4,29 @@ import { formatStatementDate, undoBlockLabel } from "@/accounts/import-format";
 import { Amount } from "@/components/amount";
 import { useEditors } from "@/editors/editor-api";
 
+/** Ask, then undo an import. The result is the undone import, or null when the person did not confirm or the undo failed. */
 export function useUndoImportFlow() {
   const { confirm } = useEditors();
   const undoImport = useUndoImport();
-  async function undo(item: Pick<ImportBatch, "id" | "filename">) {
+  async function undo(item: Pick<ImportBatch, "id" | "filename">): Promise<ImportUndo | null> {
     const ok = await confirm({
       title: "Undo this import?",
-      description: `Remove the transactions from ${item.filename ?? "this file"} that are still unchanged. Matched rows lose their link.`,
+      description: `Remove the transactions from ${item.filename} that are still unchanged. Matched rows lose their link.`,
       confirmLabel: "Undo",
     });
     if (!ok) {
-      return;
+      return null;
     }
-    undoImport.mutate(item.id, {
-      onSuccess: (result) => {
-        if (result.blocked.length > 0) {
-          void showBlocked(result.blocked);
-        }
-      },
-    });
+    try {
+      const result = await undoImport.mutateAsync(item.id);
+      if (result.blocked.length > 0) {
+        void showBlocked(result.blocked);
+      }
+      return result;
+    } catch {
+      // The mutation shows the error in a toast.
+      return null;
+    }
   }
 
   function showBlocked(blocked: ImportUndo["blocked"]) {

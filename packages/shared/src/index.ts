@@ -62,10 +62,9 @@ export {
 export {
   ofxPresetId, chosenPresetId, isOfxFile, splitCsvLine,
   sampleCsvRows, detectStatementFormat, firstStatementDate,
-  orderByFirstDate, guessImportAccount, type StatementFormat,
+  orderByFirstDate, guessImportAccount, columnMapFromPreset, type StatementFormat,
 } from "./detect-format";
 export * from "./import-batch";
-export * from "./document";
 export * from "./error";
 export {
   listQuerySchema, pagedResponseSchema, searchWithDefaults,
@@ -120,8 +119,10 @@ export {
   stripBom, statementDate, type UnreadableReason,
   type UnreadableRow, type SignConvention, type DateOrder,
   type DecimalSeparator, columnMapSchema, type ColumnMap,
-  presetSchema, type Preset,
+  presetSchema, type Preset, type ParsedStatement, type StatementRow,
 } from "./statement";
+export { parseCsvStatement } from "./parse-csv";
+export { parseOfxStatement } from "./parse-ofx";
 export * from "./recurring";
 export {
   occurrenceDates, withinTolerance, medianAmount,

@@ -48,7 +48,6 @@ const destructiveOperations = new Set([
   "patch_accounts_id_valuations_valuationid",
   "delete_accounts_id_bank_balances_balanceid",
   "delete_category_groups_id",
-  "delete_documents_id",
   "delete_transactions_id",
   "patch_accounts_id",
   "post_accounts",

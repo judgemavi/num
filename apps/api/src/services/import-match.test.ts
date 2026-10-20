@@ -18,7 +18,7 @@ test("one match candidate links the row and several candidates need review", () 
       source: "ui",
       at,
     });
-    const one = importCsv(book.db, book.dir, book.account.id, "one.csv", ["04/02/2026,RENT PAYMENT,-10.00"]);
+    const one = importCsv(book.db, book.account.id, "one.csv", ["04/02/2026,RENT PAYMENT,-10.00"]);
     expect(one.kind).toBe("batch");
     if (one.kind !== "batch") {
       return;
@@ -47,7 +47,7 @@ test("one match candidate links the row and several candidates need review", () 
       source: "ui",
       at,
     });
-    const several = importCsv(book.db, book.dir, book.account.id, "several.csv", ["05/02/2026,POWER BILL,-25.00"]);
+    const several = importCsv(book.db, book.account.id, "several.csv", ["05/02/2026,POWER BILL,-25.00"]);
     expect(several.kind).toBe("batch");
     if (several.kind !== "batch") {
       return;
@@ -79,7 +79,7 @@ test("undo removes only unedited rows", () => {
       source: "ui",
       at,
     });
-    const result = importCsv(book.db, book.dir, book.account.id, "month.csv", [
+    const result = importCsv(book.db, book.account.id, "month.csv", [
       "01/20/2026,KEEP,-1.00",
       "01/21/2026,EDIT,-2.00",
       "01/13/2026,MANUAL MATCH,-4.00",
@@ -151,7 +151,7 @@ test("a later import matches a mirror and clears the mirror flag", () => {
       throw new Error("Mirror is missing");
     }
     expect(getTransaction(book.db, mirrorId)?.mirror).toBe(true);
-    const result = importCsv(book.db, book.dir, savings.id, "savings.csv", ["01/02/2026,CARD PAYMENT,5.00"]);
+    const result = importCsv(book.db, savings.id, "savings.csv", ["01/02/2026,CARD PAYMENT,5.00"]);
     expect(result.kind).toBe("batch");
     if (result.kind !== "batch") {
       return;
@@ -181,7 +181,7 @@ test("a transfer suggestion at import does not create a transfer", () => {
       source: "ui",
       at,
     });
-    const result = importCsv(book.db, book.dir, book.account.id, "chequing.csv", ["01/05/2026,VISA PAYMENT,-8.00"]);
+    const result = importCsv(book.db, book.account.id, "chequing.csv", ["01/05/2026,VISA PAYMENT,-8.00"]);
     expect(result.kind).toBe("batch");
     expect(activeCount(book.db)).toBe(1);
     const row = book.db.select().from(transactions).all()[0];

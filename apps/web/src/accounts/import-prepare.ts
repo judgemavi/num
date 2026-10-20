@@ -1,10 +1,14 @@
 import {
+  columnMapFromPreset,
   detectStatementFormat,
   firstStatementDate,
   guessImportAccount,
+  parseCsvStatement,
+  parseOfxStatement,
   type Account,
   type ColumnMap,
   type ImportCounts,
+  type ParsedStatement,
   type Preset,
   type StatementFormat,
 } from "@num/shared";
@@ -77,6 +81,59 @@ export function dateFor(
   return null;
 }
 
+/**
+ * The statement as the import will read it: the format, the column map (the file's or the account's) and the
+ * account select the parser. Null when the file needs a column map, or when the parser reads no row.
+ */
+export function readStatement(
+  text: string,
+  format: StatementFormat,
+  columnMap: ColumnMap | null,
+  account: ImportFormatOf | null,
+  presets: readonly Preset[],
+  digits: number,
+): ParsedStatement | null {
+  if (text.length === 0) {
+    return null;
+  }
+  const statement = parseWith(text, format, columnMap, account, presets, digits);
+  return statement && statement.rows.length > 0 ? statement : null;
+}
+
+type ImportFormatOf = Pick<Account, "importPreset" | "columnMap">;
+
+function parseWith(
+  text: string,
+  format: StatementFormat,
+  columnMap: ColumnMap | null,
+  account: ImportFormatOf | null,
+  presets: readonly Preset[],
+  digits: number,
+): ParsedStatement | null {
+  if (format.kind === "ofx") {
+    try {
+      return parseOfxStatement(text, digits);
+    } catch {
+      return null;
+    }
+  }
+  const presetId = format.kind === "preset" ? format.presetId : format.kind === "ambiguous" ? format.candidates[0] : account?.importPreset;
+  const preset = presetId ? presets.find((item) => item.id === presetId) : undefined;
+  const map = format.kind === "unknown" ? (columnMap ?? account?.columnMap ?? (preset ? columnMapFromPreset(preset) : null)) : preset ? columnMapFromPreset(preset) : null;
+  return map ? parseCsvStatement(text, map, digits) : null;
+}
+
+/** The first and the last date of the rows of a statement. */
+export function dateRange(statement: ParsedStatement): { first: string; last: string } | null {
+  let first: string | null = null;
+  let last: string | null = null;
+  for (const row of statement.rows) {
+    if (first === null || row.date < first) first = row.date;
+    if (last === null || row.date > last) last = row.date;
+  }
+  return first !== null && last !== null ? { first, last } : null;
+}
+
 export function syncImportRows(
   current: readonly ImportFileRow[],
   presets: readonly Preset[],
@@ -130,9 +187,11 @@ export async function readImportFile(
     counts: null,
     batchId: null,
     alreadyImported: false,
+    undone: false,
     unreadable: [],
     createdAt: null,
     openingSuggestion: null,
+    balanceCheck: null,
   };
   if (file.size > maxBytes) {
     return {
@@ -144,7 +203,7 @@ export async function readImportFile(
       accountTouched: true,
       firstDate: null,
       phase: "error",
-      message: importError("document_too_large"),
+      message: importError("file_too_large"),
     };
   }
   try {

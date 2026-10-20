@@ -19,6 +19,22 @@ export const unreadableRowSchema = z.object({
 
 export type UnreadableRow = z.infer<typeof unreadableRowSchema>;
 
+export type StatementRow = {
+  date: string;
+  description: string;
+  amount: number;
+  bankId: string | null;
+};
+
+/** The rows of a statement file, its closing balance and its earliest row with a running balance. */
+export type ParsedStatement = {
+  rows: StatementRow[];
+  unreadable: UnreadableRow[];
+  closingBalance: number | null;
+  closingDate: string | null;
+  firstRow: { date: string; amount: number; balance: number } | null;
+};
+
 const signConventions = ["account", "inverted"] as const;
 
 export type SignConvention = (typeof signConventions)[number];

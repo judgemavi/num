@@ -41,13 +41,12 @@ function spend(book: ReturnType<typeof tempBook>, date: string, amount: number) 
 }
 
 function importWithBalance(book: ReturnType<typeof tempBook>, filename: string, lines: string[]) {
-  const result = importStatement(book.db, book.dir, {
+  const result = importStatement(book.db, {
     asOf: "2026-10-07",
     source: "import",
     at,
     accountId: book.account.id,
     filename,
-    mimeType: "text/csv",
     bytes: csv(lines, true),
     columnMap: balanceMap,
   });

@@ -271,13 +271,12 @@ test("each review source appears and leaves after its action", () => {
 
     const older = pay(sample.db, cash.id, "2026-01-09", -5000, "Match one", food.id);
     pay(sample.db, cash.id, "2026-01-11", -5000, "Match two", food.id);
-    const imported = importStatement(sample.db, sample.dir, {
+    const imported = importStatement(sample.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,
       filename: "review.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n01/10/2026,MATCH ROW,-5.00\n"),
       columnMap: map,
     });
@@ -298,13 +297,12 @@ test("each review source appears and leaves after its action", () => {
 
     pay(sample.db, cash.id, "2026-02-09", -7000, "Create one", food.id);
     pay(sample.db, cash.id, "2026-02-11", -7000, "Create two", food.id);
-    const createBatch = importStatement(sample.db, sample.dir, {
+    const createBatch = importStatement(sample.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,
       filename: "create.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n02/10/2026,CREATE ROW,-7.00\n"),
       columnMap: map,
     });
@@ -322,13 +320,12 @@ test("each review source appears and leaves after its action", () => {
       expect(reviewRowIds(sample.db, createBatch.id)).toEqual([]);
     }
 
-    importStatement(sample.db, sample.dir, {
+    importStatement(sample.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,
       filename: "bad.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n03/01/2026,GOOD ROW,-1.00\nxx/yy/2026,BAD ROW,1.00\n"),
       columnMap: map,
     });
@@ -351,13 +348,12 @@ test("auto-link runs for the imported account inside the import transaction", ()
     const home = createSchedule(sample.db, { ...planFields(cash.id, null, -12500, "2026-02-15"), name: "Hydro", ...saved });
     const away = createSchedule(sample.db, { ...planFields(other.id, null, -8000, "2026-02-15"), name: "Other bill", ...saved });
     pay(sample.db, other.id, "2026-02-15", -8000, "Other bill", null);
-    importStatement(sample.db, sample.dir, {
+    importStatement(sample.db, {
       source: "import",
       at,
       asOf: "2026-02-16",
       accountId: cash.id,
       filename: "hydro.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n02/15/2026,HYDRO,-12.50\n"),
       columnMap: map,
     });
@@ -375,13 +371,12 @@ test("undo of an import removes occurrence links for the removed transactions", 
   try {
     const cash = account(sample.db, "Cash");
     const plan = createSchedule(sample.db, { ...planFields(cash.id, null, -12500, "2026-02-15"), name: "Hydro", ...saved });
-    const imported = importStatement(sample.db, sample.dir, {
+    const imported = importStatement(sample.db, {
       source: "import",
       at,
       asOf: "2026-02-16",
       accountId: cash.id,
       filename: "hydro.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n02/15/2026,HYDRO,-12.50\n"),
       columnMap: map,
     });

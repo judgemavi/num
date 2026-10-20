@@ -17,23 +17,21 @@ test("the same file two times creates no new transactions", () => {
   try {
     const lines = ["01/02/2026,NORTH MARKET,-12.50", "01/03/2026,PAY DEPOSIT,20.00"];
     const bytes = csv(lines);
-    const first = importStatement(book.db, book.dir, {
+    const first = importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
       filename: "january.csv",
-      mimeType: "text/csv",
       bytes,
       columnMap: map,
     });
-    const second = importStatement(book.db, book.dir, {
+    const second = importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
       filename: "january-copy.csv",
-      mimeType: "text/csv",
       bytes,
       columnMap: map,
     });
@@ -54,11 +52,11 @@ test("the same file two times creates no new transactions", () => {
 test("overlapping files do not create a duplicate transaction", () => {
   const book = tempBook();
   try {
-    importCsv(book.db, book.dir, book.account.id, "week-a.csv", [
+    importCsv(book.db, book.account.id, "week-a.csv", [
       "01/05/2026,NORTH MARKET,-10.00",
       "01/06/2026,PAY DEPOSIT,20.00",
     ]);
-    const second = importCsv(book.db, book.dir, book.account.id, "week-b.csv", [
+    const second = importCsv(book.db, book.account.id, "week-b.csv", [
       "01/05/2026,north   market,-10.00",
       "01/07/2026,CITY TRANSIT,-3.25",
     ]);
@@ -83,7 +81,7 @@ test("overlapping files do not create a duplicate transaction", () => {
 test("two identical rows on one day in one file create two transactions", () => {
   const book = tempBook();
   try {
-    const result = importCsv(book.db, book.dir, book.account.id, "twins.csv", [
+    const result = importCsv(book.db, book.account.id, "twins.csv", [
       "01/02/2026,NORTH MARKET,-12.50",
       "01/02/2026,NORTH MARKET,-12.50",
     ]);
@@ -103,13 +101,12 @@ test("a column map is saved after the first import", () => {
   const book = tempBook();
   try {
     const withBalance = columnMapSchema.parse({ ...map, balance: 3 });
-    const first = importStatement(book.db, book.dir, {
+    const first = importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
       filename: "first.csv",
-      mimeType: "text/csv",
       bytes: csv(["01/02/2026,NORTH MARKET,-12.50,100.00"], true),
       columnMap: withBalance,
     });
@@ -122,13 +119,12 @@ test("a column map is saved after the first import", () => {
     const saved = book.db.select().from(accounts).where(eq(accounts.id, book.account.id)).get();
     expect(saved?.columnMap).toEqual(withBalance);
 
-    const second = importStatement(book.db, book.dir, {
+    const second = importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
       filename: "second.csv",
-      mimeType: "text/csv",
       bytes: csv(["01/04/2026,CITY TRANSIT,-3.25,96.75"], true),
       columnMap: null,
     });
@@ -150,13 +146,12 @@ test("a saved preset that no longer exists uses detection", () => {
   try {
     book.db.update(accounts).set({ importPreset: "td-chequing" }).where(eq(accounts.id, book.account.id)).run();
     const bytes = new TextEncoder().encode(readFileSync(join(presetsDirectory(), "fixtures", "td-chequing.csv"), "utf8"));
-    const result = importStatement(book.db, book.dir, {
+    const result = importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
       filename: "accountactivity.csv",
-      mimeType: "text/csv",
       bytes,
     });
     expect(result.kind).toBe("batch");
@@ -172,13 +167,12 @@ test("the first import with a running balance suggests the opening balance", () 
   const book = tempBook();
   try {
     const withBalance = columnMapSchema.parse({ ...map, balance: 3 });
-    const first = importStatement(book.db, book.dir, {
+    const first = importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
       filename: "january.csv",
-      mimeType: "text/csv",
       bytes: csv(["01/02/2026,NORTH MARKET,-12.50,1487.50", "01/04/2026,PAY DEPOSIT,200.00,1687.50"], true),
       columnMap: withBalance,
     });
@@ -200,13 +194,12 @@ test("the first import with a running balance suggests the opening balance", () 
       at,
     });
     const cardMap = columnMapSchema.parse({ ...withBalance, balanceSign: "inverted" });
-    const cardImport = importStatement(book.db, book.dir, {
+    const cardImport = importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: card.id,
       filename: "card.csv",
-      mimeType: "text/csv",
       bytes: csv(["01/05/2026,NORTH MARKET,-24.00,80.00"], true),
       columnMap: cardMap,
     });
@@ -215,13 +208,12 @@ test("the first import with a running balance suggests the opening balance", () 
       expect(cardImport.openingSuggestion).toEqual({ amount: -56_000, date: "2026-01-04" });
     }
 
-    const second = importStatement(book.db, book.dir, {
+    const second = importStatement(book.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: book.account.id,
       filename: "february.csv",
-      mimeType: "text/csv",
       bytes: csv(["02/02/2026,CITY TRANSIT,-3.25,1684.25"], true),
       columnMap: withBalance,
     });
@@ -251,9 +243,9 @@ test("a recurring link failure rolls back the imported batch and its audit entri
     });
     const auditCount = book.db.select().from(auditLog).all().length;
     book.sqlite.exec("CREATE TRIGGER reject_test_link BEFORE INSERT ON occurrence_links BEGIN SELECT RAISE(ABORT, 'test link failure'); END");
-    expect(() => importStatement(book.db, book.dir, {
+    expect(() => importStatement(book.db, {
       source: "import", at, accountId: book.account.id, asOf: "2026-03-05",
-      filename: "rent.csv", mimeType: "text/csv", bytes: csv(["03/01/2026,Rent,-10.00"]), columnMap: map,
+      filename: "rent.csv", bytes: csv(["03/01/2026,Rent,-10.00"]), columnMap: map,
     })).toThrow("test link failure");
     expect(book.db.select().from(importBatches).all()).toHaveLength(0);
     expect(book.db.select().from(occurrenceLinks).all()).toHaveLength(0);

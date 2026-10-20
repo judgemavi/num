@@ -22,7 +22,7 @@ const at = "2026-03-20T16:00:00.000Z";
 const saved = { source: "ui" as const, at };
 const asOf = "2026-03-20";
 
-type Ids = { dir: string; cheque: string; savings: string; fees: string; other: string };
+type Ids = { cheque: string; savings: string; fees: string; other: string };
 
 function withBook(run: (db: Db, ids: Ids) => void) {
   const dir = mkdtempSync(join(tmpdir(), "num-auto-link-"));
@@ -36,7 +36,7 @@ function withBook(run: (db: Db, ids: Ids) => void) {
     const savings = createAccount(db, { asOf: "2026-10-07", name: "Savings", ...open });
     const fees = createCategory(db, { name: "Fees", kind: "expense", ...saved });
     const other = createCategory(db, { name: "Other", kind: "expense", ...saved });
-    run(db, { dir, cheque: cheque.id, savings: savings.id, fees: fees.id, other: other.id });
+    run(db, { cheque: cheque.id, savings: savings.id, fees: fees.id, other: other.id });
   } finally {
     sqlite.close();
     rmSync(dir, { recursive: true, force: true });
@@ -53,14 +53,13 @@ const columnMap = columnMapSchema.parse({
   decimalSeparator: ".",
 });
 
-function statement(db: Db, ids: Ids, accountId: string, name: string, lines: string[]) {
-  const result = importStatement(db, ids.dir, {
+function statement(db: Db, accountId: string, name: string, lines: string[]) {
+  const result = importStatement(db, {
     source: "import",
     at,
     asOf,
     accountId,
     filename: `${name}.csv`,
-    mimeType: "text/csv",
     bytes: new TextEncoder().encode(["date,description,amount", ...lines].join("\n")),
     columnMap,
   });
@@ -91,8 +90,8 @@ function review(db: Db, id: string) {
 }
 
 function pairImport(db: Db, ids: Ids, outPayee: string, inPayee: string) {
-  const out = statement(db, ids, ids.cheque, "out", [`03/10/2026,${outPayee},-50.00`]);
-  const incoming = statement(db, ids, ids.savings, "in", [`03/11/2026,${inPayee},50.00`]);
+  const out = statement(db, ids.cheque, "out", [`03/10/2026,${outPayee},-50.00`]);
+  const incoming = statement(db, ids.savings, "in", [`03/11/2026,${inPayee},50.00`]);
   return Object.assign(incoming, { outId: out.id });
 }
 
@@ -126,8 +125,8 @@ test("a pair without a learned transfer payee asks", () => {
 test("two candidates ask and do not link", () => {
   withBook((db, ids) => {
     learnTransfer(db, ids, "MOVE TO SAVINGS");
-    statement(db, ids, ids.cheque, "out", ["03/10/2026,MOVE TO SAVINGS,-50.00"]);
-    statement(db, ids, ids.savings, "in", ["03/11/2026,FROM EVERYDAY,50.00", "03/12/2026,DEPOSIT,50.00"]);
+    statement(db, ids.cheque, "out", ["03/10/2026,MOVE TO SAVINGS,-50.00"]);
+    statement(db, ids.savings, "in", ["03/11/2026,FROM EVERYDAY,50.00", "03/12/2026,DEPOSIT,50.00"]);
     for (const row of [...rowsOf(db, -50_000), ...rowsOf(db, 50_000)]) {
       expect(row.transferPeerId).toBeNull();
       expect(row.autoReason).toBeNull();
@@ -255,8 +254,8 @@ test("two same-day fees of the same amount ask which one", () => {
 test("confirming one pair links the other open pairs of the same payee, except a recorded no", () => {
   withBook((db, ids) => {
     const dates = ["02/03", "02/17", "03/03", "03/10"];
-    statement(db, ids, ids.cheque, "out", dates.map((day) => `${day}/2026,CIBC PAYMENT,-50.00`));
-    statement(db, ids, ids.savings, "in", dates.map((day) => `${day}/2026,PAYMENT RECEIVED,50.00`));
+    statement(db, ids.cheque, "out", dates.map((day) => `${day}/2026,CIBC PAYMENT,-50.00`));
+    statement(db, ids.savings, "in", dates.map((day) => `${day}/2026,PAYMENT RECEIVED,50.00`));
     const outs = rowsOf(db, -50_000).sort((a, b) => a.date.localeCompare(b.date));
     const ins = rowsOf(db, 50_000).sort((a, b) => a.date.localeCompare(b.date));
     expect(outs.every((row) => row.transferPeerId === null)).toBe(true);
@@ -288,8 +287,8 @@ test("undoing the second import and then the first both work", () => {
 test("a bulk edit does not auto-link rows of its own batch", () => {
   withBook((db, ids) => {
     const dates = ["01/05", "01/12", "01/19", "01/26", "02/02"];
-    statement(db, ids, ids.cheque, "out", dates.map((day) => `${day}/2026,CIBC PAYMENT,-50.00`));
-    statement(db, ids, ids.savings, "in", dates.map((day) => `${day}/2026,PAYMENT RECEIVED,50.00`));
+    statement(db, ids.cheque, "out", dates.map((day) => `${day}/2026,CIBC PAYMENT,-50.00`));
+    statement(db, ids.savings, "in", dates.map((day) => `${day}/2026,PAYMENT RECEIVED,50.00`));
     const outs = rowsOf(db, -50_000).sort((a, b) => a.date.localeCompare(b.date));
     const result = bulkEdit(db, asOf, {
       transactionIds: outs.map((row) => row.id),
@@ -338,8 +337,8 @@ test("a transfer learned between two accounts does not automatically link a thir
   withBook((db, ids) => {
     learnTransfer(db, ids, "MOVE FUNDS");
     const third = createAccount(db, { asOf, name: "Third account", kind: "savings", openingBalance: 0, ...saved });
-    statement(db, ids, ids.cheque, "out", ["03/10/2026,MOVE FUNDS,-50.00"]);
-    statement(db, ids, third.id, "in", ["03/11/2026,DEPOSIT,50.00"]);
+    statement(db, ids.cheque, "out", ["03/10/2026,MOVE FUNDS,-50.00"]);
+    statement(db, third.id, "in", ["03/11/2026,DEPOSIT,50.00"]);
     const [out] = rowsOf(db, -50_000);
     expect(out?.transferPeerId).toBeNull();
     expect(review(db, out?.id ?? "")?.question).toBe("transfer_pair");
@@ -350,8 +349,8 @@ test("a transfer learned between two accounts does not automatically link a thir
 test("an automatic pair link has no age limit", () => {
   withBook((db, ids) => {
     learnTransfer(db, ids, "MOVE FUNDS");
-    statement(db, ids, ids.cheque, "old-out", ["02/01/2025,MOVE FUNDS,-50.00"]);
-    statement(db, ids, ids.savings, "old-in", ["02/02/2025,DEPOSIT,50.00"]);
+    statement(db, ids.cheque, "old-out", ["02/01/2025,MOVE FUNDS,-50.00"]);
+    statement(db, ids.savings, "old-in", ["02/02/2025,DEPOSIT,50.00"]);
     const [out] = rowsOf(db, -50_000);
     const [incoming] = rowsOf(db, 50_000);
     expect(out?.transferPeerId).toBe(incoming?.id ?? "missing");

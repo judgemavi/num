@@ -26,16 +26,30 @@ export type ImportRowOutcome = (typeof importRowOutcomes)[number];
 
 const timestampSchema = z.string().refine(isUtcTimestamp);
 
+/**
+ * The check of an import that has a closing balance: the cleared balance on the closing date minus the bank's
+ * closing balance, and whether the account matched its latest bank balance before the import. Null when the file
+ * has no closing balance or the import is undone.
+ */
+const balanceCheckSchema = z
+  .object({
+    difference: amountSchema,
+    matchedBefore: z.boolean(),
+  })
+  .nullable();
+
+export type BalanceCheck = z.infer<typeof balanceCheckSchema>;
+
 const importBatchSchema = z.object({
   id: z.uuid(),
   accountId: z.uuid(),
-  documentId: z.uuid().nullable(),
-  filename: z.string().nullable(),
+  filename: z.string(),
   parser: z.string(),
   periodStart: isoDateSchema,
   periodEnd: isoDateSchema,
   closingBalance: amountSchema.nullable(),
   closingDate: isoDateSchema.nullable(),
+  balanceCheck: balanceCheckSchema,
   createdAt: timestampSchema,
   undoneAt: timestampSchema.nullable(),
   counts: importCountsSchema,
@@ -109,17 +123,13 @@ const importViewItemSchema = z.object({
   id: z.uuid(),
   accountId: z.uuid(),
   accountName: z.string(),
-  documentId: z.uuid().nullable(),
-  filename: z.string().nullable(),
-  /** The time the file was erased. The record of the document stays. */
-  documentDeletedAt: timestampSchema.nullable(),
-  /** The transactions that the rows of this import made or matched. They stay when the file is erased. */
-  transactionCount: z.number().int().nonnegative(),
+  filename: z.string(),
   periodStart: isoDateSchema,
   periodEnd: isoDateSchema,
   createdAt: timestampSchema,
   status: z.enum(importViewStatuses),
   counts: importCountsSchema,
+  balanceCheck: balanceCheckSchema,
 });
 
 export type ImportViewItem = z.infer<typeof importViewItemSchema>;

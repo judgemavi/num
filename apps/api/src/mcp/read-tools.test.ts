@@ -45,7 +45,7 @@ function tempBook() {
   migrateDatabase(sqlite);
   const db = createDb(sqlite);
   runSetup(db, { asOf: "2026-10-07", currency: "CAD", categorySet: "default", ...saved });
-  const app = createApp(db, { dataDir: dir });
+  const app = createApp(db);
   return {
     dir,
     db,
@@ -102,7 +102,7 @@ async function restJson(app: OpenAPIHono, path: string): Promise<Record<string, 
   return response.json() as Promise<Record<string, unknown>>;
 }
 
-function seed(db: Db, dir: string) {
+function seed(db: Db) {
   const account = createAccount(db, {
     asOf: "2026-10-07",
     name: "Everyday",
@@ -161,13 +161,12 @@ function seed(db: Db, dir: string) {
     businessDayShift: "none",
     ...saved,
   });
-  const imported = importStatement(db, dir, {
+  const imported = importStatement(db, {
     source: "import",
     at,
     asOf,
     accountId: account.id,
     filename: "march.csv",
-    mimeType: "text/csv",
     bytes: new TextEncoder().encode("date,description,amount\n03/04/2026,CITY TRANSIT,-2.00\n"),
     columnMap: map,
   });
@@ -180,7 +179,7 @@ function seed(db: Db, dir: string) {
 test("a read tool returns the same data as REST", async () => {
   const book = tempBook();
   try {
-    const { accountId, bucketId } = seed(book.db, book.dir);
+    const { accountId, bucketId } = seed(book.db);
     const cases: [string, Record<string, unknown>, string][] = [
       ["list_accounts", { sort: "name", dir: "asc", asOf }, `/api/accounts?sort=name&dir=asc&asOf=${asOf}`],
       [
@@ -225,7 +224,7 @@ test("tools that need today require asOf", async () => {
 test("date tools reject a call without asOf", async () => {
   const book = tempBook();
   try {
-    const { bucketId } = seed(book.db, book.dir);
+    const { bucketId } = seed(book.db);
     for (const name of ["list_occurrences", "get_forecast", "get_insights", "get_needs_you", "list_accounts"] as const) {
       const missing = await callTool(book.app, name, name === "list_occurrences" ? { id: bucketId } : {});
       expect(missing.result?.isError).toBe(true);
@@ -267,7 +266,7 @@ test("OpenAPI and MCP use the same money descriptions from schema metadata", asy
 test("an unknown tool or bad input returns an error code", async () => {
   const book = tempBook();
   try {
-    seed(book.db, book.dir);
+    seed(book.db);
     const unknown = await callTool(book.app, "propose_transactions", {});
     expect(unknown.error?.code).toEqual(expect.any(Number));
     expect(unknown.result).toBeUndefined();

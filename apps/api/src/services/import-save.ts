@@ -1,11 +1,9 @@
-import { rmSync } from "node:fs";
-import { accounts, documents, importBatches, importRows, transactionLines, transactions } from "@num/db";
+import { accounts, importBatches, importRows, transactionLines, transactions } from "@num/db";
 import { ofxPresetId, normalizePayee, storedPayee, type ColumnMap, type ImportBatch, type MatchResult, type UnreadableRow } from "@num/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountAuditSnapshot } from "./account-snapshot";
-import { saveImportBankBalance } from "./bank-balances";
-import { storedFile, writeStoredFile } from "./documents";
+import { latestBankStatus, saveImportBankBalance } from "./bank-balances";
 import { countOutcomes, presentBatch } from "./import-read";
 import type { PlannedImportRow } from "./import-plan";
 import { labelFields, linkRecurring, mortgageSplitLines } from "./match-apply";
@@ -16,25 +14,12 @@ import { linkAutomatic } from "./auto-link";
 import { auditTransaction, readTransaction } from "./transaction-record";
 import { write, type AuditSource, type WriteTx } from "./write";
 
-type DocumentInsert = {
-  id: string;
-  filename: string;
-  hash: string;
-  mimeType: string;
-  storagePath: string;
-  uploadedAt: string;
-  deletedAt: string | null;
-};
-
 type SaveInput = {
   source: AuditSource;
   at: string;
   accountId: string;
-  dataDir: string;
-  bytes: Uint8Array | null;
-  document: DocumentInsert;
-  newFile: boolean;
-  restoreDocument: boolean;
+  filename: string;
+  hash: string;
   parser: "ofx" | "csv";
   rows: PlannedImportRow[];
   closingBalance: number | null;
@@ -229,55 +214,26 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
   if (!periodStart || !periodEnd) {
     throw new Error("A batch needs a statement row");
   }
-  if ((input.newFile || input.restoreDocument) && !input.bytes) {
-    throw new Error("A new or restored document needs file bytes");
-  }
-  if (input.bytes) {
-    writeStoredFile(input.dataDir, input.document.hash, input.bytes);
-  }
   const batchId = crypto.randomUUID();
-  try {
-    return write(db, { source: input.source, at: input.at }, (tx) => {
-      if (input.newFile) {
-        tx.insert(documents).values(input.document).run();
-        tx.audit({
-          entity: "documents",
-          entityId: input.document.id,
-          action: "create",
-          before: null,
-          after: {
-            filename: input.document.filename,
-            hash: input.document.hash,
-            mimeType: input.document.mimeType,
-            storagePath: input.document.storagePath,
-            uploadedAt: input.document.uploadedAt,
-            deletedAt: null,
-          },
-        });
-      } else if (input.restoreDocument) {
-        const current = tx.select().from(documents).where(eq(documents.id, input.document.id)).get();
-        if (!current) {
-          throw new Error("Document is missing");
-        }
-        tx.update(documents).set({ deletedAt: null }).where(eq(documents.id, current.id)).run();
-        tx.audit({
-          entity: "documents",
-          entityId: current.id,
-          action: "restore",
-          before: { ...current },
-          after: { ...current, deletedAt: null },
-        });
+  return write(db, { source: input.source, at: input.at }, (tx) => {
+      const account = tx.select().from(accounts).where(eq(accounts.id, input.accountId)).get();
+      if (!account) {
+        throw new Error("Account is missing");
       }
+      // Before this import: did the account match its latest bank balance?
+      const matchedBefore = latestBankStatus(tx, account)?.difference === 0;
       tx.insert(importBatches)
         .values({
           id: batchId,
           accountId: input.accountId,
-          documentId: input.document.id,
+          filename: input.filename,
+          hash: input.hash,
           parser: input.parser,
           periodStart,
           periodEnd,
           closingBalance: input.closingBalance,
           closingDate: input.closingDate,
+          matchedBefore,
           unreadableJson: input.unreadable,
           createdAt: input.at,
           importedOn: input.asOf,
@@ -333,23 +289,19 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
         before: null,
         after: {
           accountId: batch.accountId,
-          documentId: batch.documentId,
+          filename: batch.filename,
+          hash: batch.hash,
           parser: batch.parser,
           importedOn: batch.importedOn,
           periodStart: batch.periodStart,
           periodEnd: batch.periodEnd,
           closingBalance: batch.closingBalance,
           closingDate: batch.closingDate,
+          matchedBefore: batch.matchedBefore,
           previousBankBalance: batch.previousBankBalance,
           counts: countOutcomes(input.rows, input.unreadable.length),
         },
       });
       return presented;
-    });
-  } catch (error) {
-    if (input.bytes) {
-      rmSync(storedFile(input.dataDir, input.document.hash), { force: true });
-    }
-    throw error;
-  }
+  });
 }

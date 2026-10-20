@@ -55,14 +55,13 @@ function book() {
   };
 }
 
-function importCsv(db: Db, dir: string, accountId: string, filename: string, lines: string[]) {
-  return importStatement(db, dir, {
+function importCsv(db: Db, accountId: string, filename: string, lines: string[]) {
+  return importStatement(db, {
     asOf: "2026-10-07",
     source: "import",
     at,
     accountId,
     filename,
-    mimeType: "text/csv",
     bytes: new TextEncoder().encode(["date,description,amount", ...lines].join("\n")),
     columnMap: map,
   });
@@ -244,7 +243,7 @@ test("an import labels only its own rows and undo removes those labels", () => {
       lines: [{ amount: -4000, categoryId: food.id, memo: null, tagIds: [] }],
       ...saved,
     });
-    const imported = importCsv(sample.db, sample.dir, sample.account.id, "learn.csv", ["03/12/2026,NORTH CAFE,-4.00"]);
+    const imported = importCsv(sample.db, sample.account.id, "learn.csv", ["03/12/2026,NORTH CAFE,-4.00"]);
     expect(imported.kind).toBe("batch");
     if (imported.kind !== "batch") {
       return;

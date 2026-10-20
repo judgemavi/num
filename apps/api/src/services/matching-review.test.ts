@@ -52,14 +52,13 @@ function book() {
   };
 }
 
-function importCsv(db: Db, dir: string, accountId: string, filename: string, lines: string[], asOf: string) {
-  return importStatement(db, dir, {
+function importCsv(db: Db, accountId: string, filename: string, lines: string[], asOf: string) {
+  return importStatement(db, {
     source: "import",
     at,
     asOf,
     accountId,
     filename,
-    mimeType: "text/csv",
     bytes: new TextEncoder().encode(["date,description,amount", ...lines].join("\n")),
     columnMap: map,
   });
@@ -112,7 +111,7 @@ test("undo removes the mortgage mirror created for an imported payment", () => {
       endDate: null,
       ...saved,
     });
-    const imported = importCsv(sample.db, sample.dir, sample.account.id, "loan.csv", ["03/01/2026,MORTGAGE,-581.60"], "2026-03-05");
+    const imported = importCsv(sample.db, sample.account.id, "loan.csv", ["03/01/2026,MORTGAGE,-581.60"], "2026-03-05");
     expect(imported.kind).toBe("batch");
     if (imported.kind !== "batch") {
       return;
@@ -192,7 +191,7 @@ test("a mortgage import links an existing opposite row", () => {
       endDate: null,
       ...saved,
     });
-    importCsv(sample.db, sample.dir, sample.account.id, "loan.csv", ["03/01/2026,MORTGAGE,-581.60"], "2026-03-05");
+    importCsv(sample.db, sample.account.id, "loan.csv", ["03/01/2026,MORTGAGE,-581.60"], "2026-03-05");
     const payment = active(sample.db).find((row) => row.accountId === sample.account.id);
     expect(payment?.transferPeerId).toBe(existing.id);
     expect(getTransaction(sample.db, existing.id)?.mirror).toBe(false);
@@ -235,7 +234,7 @@ test("a recurring link labels even when payee history disagrees", () => {
       endDate: null,
       ...saved,
     });
-    importCsv(sample.db, sample.dir, sample.account.id, "rent.csv", ["03/12/2026,NORTH CAFE,-4.00"], "2026-03-20");
+    importCsv(sample.db, sample.account.id, "rent.csv", ["03/12/2026,NORTH CAFE,-4.00"], "2026-03-20");
     const labeled = active(sample.db).find((row) => row.date === "2026-03-12");
     expect(labeled?.autoReason).toBe("recurring");
     expect(getTransaction(sample.db, labeled?.id ?? "")?.lines[0]?.categoryId).toBe(rent.id);
@@ -248,7 +247,7 @@ test("a spread label does not block import undo", () => {
   const sample = book();
   try {
     const food = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
-    const imported = importCsv(sample.db, sample.dir, sample.account.id, "cafe.csv", ["03/02/2026,NORTH CAFE,-4.00"], "2026-03-20");
+    const imported = importCsv(sample.db, sample.account.id, "cafe.csv", ["03/02/2026,NORTH CAFE,-4.00"], "2026-03-20");
     expect(imported.kind).toBe("batch");
     if (imported.kind !== "batch") {
       return;

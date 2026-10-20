@@ -1,5 +1,16 @@
-import { readAmount, splitCsvLine, statementDate, stripBom, type AmountProblem, type UnreadableReason, type UnreadableRow, type ColumnMap, type DecimalSeparator, type SignConvention } from "@num/shared";
-import type { ParsedStatement, StatementRow } from "./statement";
+import { splitCsvLine } from "./detect-format";
+import { readAmount, type AmountProblem } from "./read-amount";
+import {
+  statementDate,
+  stripBom,
+  type ColumnMap,
+  type DecimalSeparator,
+  type ParsedStatement,
+  type SignConvention,
+  type StatementRow,
+  type UnreadableReason,
+  type UnreadableRow,
+} from "./statement";
 
 type BalanceRow = {
   date: string;

@@ -170,13 +170,12 @@ test("each no decision hides its review item until undo", () => {
       roundTrip(sample.db, asOf, planProposalKey(proposal), "not_recurring");
     }
 
-    importStatement(sample.db, sample.dir, {
+    importStatement(sample.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,
       filename: "bad.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n03/01/2026,GOOD ROW,-1.00\nxx/yy/2026,BAD ROW,1.00\n"),
       columnMap: map,
     });

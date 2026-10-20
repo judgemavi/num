@@ -27,7 +27,7 @@ test("a reviewed bank match keeps its mirror after the source is unlinked", () =
       accountId: book.account.id, date: "2026-04-02", amount: 10_000, payeeRaw: "Other deposit",
       lines: [{ amount: 10_000 }], ...saved,
     });
-    const batch = importCsv(book.db, book.dir, book.account.id, "review.csv", ["04/02/2026,Deposit,10.00"]);
+    const batch = importCsv(book.db, book.account.id, "review.csv", ["04/02/2026,Deposit,10.00"]);
     expect(batch.kind).toBe("batch");
     const row = book.db.select().from(importRows).where(eq(importRows.outcome, "needs_review")).get();
     if (!row) throw new Error("The bank row needs review");
@@ -46,8 +46,8 @@ test("an OFX import saves its format, opens manual entries and selects its only 
   const book = tempBook();
   try {
     const text = "<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST><STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20260401<TRNAMT>-10.00<FITID>synthetic-1<NAME>Example</STMTTRN></BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>";
-    const result = importStatement(book.db, book.dir, {
-      accountId: book.account.id, filename: "statement.ofx", mimeType: "application/x-ofx",
+    const result = importStatement(book.db, {
+      accountId: book.account.id, filename: "statement.ofx",
       bytes: new TextEncoder().encode(text), presetId: ofxPresetId, asOf: "2026-10-07", source: "import", at,
     });
     expect(result.kind).toBe("batch");
@@ -87,8 +87,8 @@ test("account detail and the archive check use the balance at asOf", () => {
 test("the Imports filter uses the local import date across UTC midnight", () => {
   const book = tempBook();
   try {
-    importStatement(book.db, book.dir, {
-      accountId: book.account.id, filename: "local.csv", mimeType: "text/csv", columnMap: map,
+    importStatement(book.db, {
+      accountId: book.account.id, filename: "local.csv", columnMap: map,
       bytes: csv(["04/01/2026,Example,-10.00"]), asOf: "2026-10-06", at: "2026-10-07T02:00:00Z", source: "import",
     });
     const local = listImportView(book.db, importViewQuerySchema.parse({ from: "2026-10-06", to: "2026-10-06" }));

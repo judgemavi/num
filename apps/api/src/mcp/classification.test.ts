@@ -8,7 +8,6 @@ const classifications = [
   ["delete_accounts_id_bank_balances_balanceid", "delete", "/api/accounts/{id}/bank-balances/{balanceId}", true],
   ["delete_accounts_id_valuations_valuationid", "delete", "/api/accounts/{id}/valuations/{valuationId}", true],
   ["delete_category_groups_id", "delete", "/api/category-groups/{id}", true],
-  ["delete_documents_id", "delete", "/api/documents/{id}", true],
   ["delete_transactions_id", "delete", "/api/transactions/{id}", true],
   ["get_accounts_id", "get", "/api/accounts/{id}", false],
   ["get_accounts_id_bank_balances", "get", "/api/accounts/{id}/bank-balances", false],
@@ -26,7 +25,6 @@ const classifications = [
   ["get_buckets_signals", "get", "/api/buckets/signals", false],
   ["get_categories_id", "get", "/api/categories/{id}", false],
   ["get_category_groups_id", "get", "/api/category-groups/{id}", false],
-  ["get_documents_id", "get", "/api/documents/{id}", false],
   ["get_forecast", "get", "/api/forecast", false],
   ["get_funding_available", "get", "/api/funding/available", false],
   ["get_funding_owed", "get", "/api/funding/owed", false],
@@ -114,7 +112,7 @@ const classifications = [
 test("every route keeps its reviewed MCP classification", () => {
   const book = tempDatabase();
   try {
-    const app = createApp(book.db, { dataDir: book.dir });
+    const app = createApp(book.db);
     const routes = mcpRoutes(app).sort((left, right) => left.operationId.localeCompare(right.operationId));
     expect(routes.map((route) => [route.operationId, route.method, route.path, route.destructive])).toEqual(classifications);
   } finally {

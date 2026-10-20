@@ -1,6 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { dataDirectory, type Db } from "./db";
+import type { Db } from "./db";
 import { addMoneyDescriptions } from "./route-descriptions";
 import { registerMcp } from "./mcp/register";
 import { accountRoutes } from "./routes/accounts";
@@ -8,7 +8,6 @@ import { bucketRoutes } from "./routes/buckets";
 import { categoryRoutes } from "./routes/categories";
 import { valuationRoutes } from "./routes/valuations";
 import { bankBalanceRoutes } from "./routes/bank-balances";
-import { documentRoutes } from "./routes/documents";
 import { forecastRoutes } from "./routes/forecast";
 import { fundingRoutes } from "./routes/funding";
 import { healthRoutes } from "./routes/health";
@@ -28,7 +27,7 @@ import { ServiceError } from "./service-error";
 import { validationHook } from "./validation";
 import { hasFileExtension, webFile, webIndex } from "./web-files";
 
-export function createApp(db: Db, options: { dataDir?: string } = {}) {
+export function createApp(db: Db) {
   const base = new OpenAPIHono({
     defaultHook: validationHook,
   });
@@ -44,12 +43,10 @@ export function createApp(db: Db, options: { dataDir?: string } = {}) {
     return c.json({ code: "internal_error" as const, params: {} }, 500);
   });
 
-  const dataDir = options.dataDir ?? dataDirectory(undefined);
   const app = base
     .route("/", healthRoutes())
     .route("/", setupRoutes(db))
-    .route("/", documentRoutes(db, dataDir))
-    .route("/", importRoutes(db, dataDir))
+    .route("/", importRoutes(db))
     .route("/", inboxRoutes(db))
     .route("/", accountRoutes(db))
     .route("/", mortgageRoutes(db))

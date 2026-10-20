@@ -43,7 +43,7 @@ function ImportRows({ accountId }: { accountId: string }) {
         item.undoneAt ? null : (
           <RowMenu label={`Actions for the import on ${formatImportDate(item.createdAt)}`}>
             <DropdownMenuItem className="min-h-11" onSelect={() => void undo(item)}>
-              Undo
+              Undo this import
             </DropdownMenuItem>
           </RowMenu>
         )
@@ -52,7 +52,7 @@ function ImportRows({ accountId }: { accountId: string }) {
       <div className={listName}>
         {formatImportDate(item.createdAt)}
         <small>
-          {item.filename ?? "Statement"}
+          {item.filename}
           {item.undoneAt ? " · Undone" : ""}
         </small>
       </div>

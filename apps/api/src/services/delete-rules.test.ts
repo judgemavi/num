@@ -151,13 +151,12 @@ test("import undo skips a row the user linked as a transfer", () => {
       openingBalance: 0,
       ...saved,
     });
-    const imported = importStatement(sample.db, sample.dir, {
+    const imported = importStatement(sample.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,
       filename: "pay.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n01/02/2026,CARD PAYMENT,-8.00\n"),
       columnMap: map,
     });
@@ -198,13 +197,12 @@ test("undo of a row with a refund pointing at it clears the link", () => {
       ...saved,
     });
     const groceries = createCategory(sample.db, { name: "Groceries", kind: "expense", ...saved });
-    const imported = importStatement(sample.db, sample.dir, {
+    const imported = importStatement(sample.db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: cash.id,
       filename: "shop.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode("date,description,amount\n01/02/2026,NORTH MARKET,-12.00\n"),
       columnMap: map,
     });

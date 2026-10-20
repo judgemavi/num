@@ -178,6 +178,7 @@ export function ImportForm({ accountId }: EditorInput["import"]) {
                 onFormat={onFormat}
                 onAccount={onAccount}
                 onOpeningApplied={(key) => changeRow(key, { openingSuggestion: null })}
+                onUndone={(key) => changeRow(key, { undone: true, counts: null, openingSuggestion: null, balanceCheck: null })}
               />
               {finished ? <p className="text-lg font-semibold">Total: {importCountText(totalCounts(rows))}</p> : null}
             </div>

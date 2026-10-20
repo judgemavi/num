@@ -64,13 +64,12 @@ function book() {
   const score = (amount: number, normalized = payee) => scorePayee(loadMatchBook(db), { payee: normalized, amount, recurring: null });
   const hit = (id: string) => listNeedsReview(db, asOf).find((item) => item.id === id);
   const importRows = (lines: string[]) =>
-    importStatement(db, dir, {
+    importStatement(db, {
       asOf: "2026-10-07",
       source: "import",
       at,
       accountId: account.id,
       filename: "statement.csv",
-      mimeType: "text/csv",
       bytes: new TextEncoder().encode(["date,description,amount", ...lines].join("\n")),
       columnMap,
     });
