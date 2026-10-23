@@ -32,7 +32,7 @@ export const importBatches = sqliteTable(
     createdAt: text("created_at").notNull(),
     undoneAt: text("undone_at"),
   },
-  (table) => [uniqueIndex("import_batches_hash_active").on(table.hash).where(sql`${table.undoneAt} is null`)],
+  (table) => [index("import_batches_hash").on(table.hash)],
 );
 export type ImportBatchRow = typeof importBatches.$inferSelect;
 

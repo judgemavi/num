@@ -199,12 +199,21 @@ export function listImportBatches(db: Db, accountId: string) {
   return { items: batches.map((batch) => presentBatch(db, batch)) };
 }
 
-/** The same file again: the batch that is not undone with the hash of the file. */
-function activeBatchWithHash(db: Db, hash: string) {
+/**
+ * The same file again: a batch with the hash of the file that is not undone, and that has no undone row.
+ * After a partial undo, the file imports again. The rows that stay active make the same rows duplicates.
+ */
+function importedBatchWithHash(db: Db, hash: string) {
   return db
     .select()
     .from(importBatches)
-    .where(and(eq(importBatches.hash, hash), isNull(importBatches.undoneAt)))
+    .where(
+      and(
+        eq(importBatches.hash, hash),
+        isNull(importBatches.undoneAt),
+        sql`not exists (select 1 from ${importRows} where ${importRows.batchId} = ${importBatches.id} and ${importRows.active} = 0 and ${importRows.outcome} <> 'duplicate')`,
+      ),
+    )
     .get();
 }
 
@@ -215,7 +224,7 @@ export function importStatement(db: Db, input: ImportInput): ImportResult {
   }
   const at = input.at ?? utcNow();
   const hash = createHash("sha256").update(input.bytes).digest("hex");
-  const existing = activeBatchWithHash(db, hash);
+  const existing = importedBatchWithHash(db, hash);
   if (existing) {
     return { kind: "batch", alreadyImported: true, openingSuggestion: null, ...presentBatch(db, existing) };
   }

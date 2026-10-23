@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountAuditSnapshot } from "./account-snapshot";
 import { latestBankStatus, saveImportBankBalance } from "./bank-balances";
-import { countOutcomes, presentBatch } from "./import-read";
+import { presentBatch } from "./import-read";
 import type { PlannedImportRow } from "./import-plan";
 import { labelFields, linkRecurring, mortgageSplitLines } from "./match-apply";
 import { loadMatchBook, recurringForRows, scorePayee } from "./match-book";
@@ -299,7 +299,7 @@ export function saveImportBatch(db: Db, input: SaveInput): ImportBatch {
           closingDate: batch.closingDate,
           matchedBefore: batch.matchedBefore,
           previousBankBalance: batch.previousBankBalance,
-          counts: countOutcomes(input.rows, input.unreadable.length),
+          counts: presented.counts,
         },
       });
       return presented;

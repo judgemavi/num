@@ -25,7 +25,7 @@ function statusVariant(status: ImportViewItem["status"]) {
   if (status === "needs_you") {
     return "attention";
   }
-  if (status === "undone") {
+  if (status === "undone" || status === "partly_undone") {
     return "neutral";
   }
   return "positive";

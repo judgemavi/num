@@ -1,13 +1,17 @@
 import { bankBalances, importRows, transactions } from "@num/db";
+import { importViewQuerySchema } from "@num/shared";
 import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
+import type { Db } from "../db";
 import { createAccount } from "./accounts";
 import { createBankBalance, listBankBalances } from "./bank-balances";
+import { getImportDetail, listImportView } from "./import-list";
 import { resolveImportReview } from "./import-review";
 import { undoImportBatch } from "./import-undo";
 import { importStatement } from "./imports";
 import { at, csv, importCsv, map, tempBook } from "./import-test-book";
-import { createTransaction, getTransaction } from "./transactions";
+import { getsImports } from "./transaction-test-book";
+import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 
 const saved = { source: "ui" as const, at };
 
@@ -118,3 +122,67 @@ for (const olderFirst of [true, false]) {
     }
   });
 }
+
+const month = ["01/20/2026,KEEP,-1.00", "01/21/2026,EDIT,-2.00", "01/13/2026,MANUAL MATCH,-4.00"];
+
+function importMonth(db: Db, accountId: string, lines = month) {
+  const result = importCsv(db, accountId, "month.csv", lines);
+  if (result.kind !== "batch") throw new Error("Expected a batch");
+  return result;
+}
+
+/** A book with a manual transaction, an import of `lines` and an edit of the created row "EDIT". */
+function editedImport(lines = month) {
+  const book = tempBook();
+  getsImports(book.db, book.account.id);
+  const manual = createTransaction(book.db, {
+    accountId: book.account.id, date: "2026-01-12", amount: -4_000, payeeRaw: "MANUAL",
+    lines: [{ amount: -4_000 }], ...saved,
+  });
+  const first = importMonth(book.db, book.account.id, lines);
+  const edit = book.db.select().from(transactions).all().find((row) => row.payeeRaw === "EDIT");
+  const current = edit ? getTransaction(book.db, edit.id) : null;
+  if (!current) throw new Error("Expected the created row");
+  updateTransaction(book.db, current.id, {
+    lines: current.lines.map((line) => ({ amount: line.amount, memo: "Changed", tagIds: line.tagIds })),
+    ...saved,
+  });
+  return { book, manual, first, edited: current.id };
+}
+
+test("a partial undo counts only active rows and the same file imports again", () => {
+  const { book, manual, first, edited } = editedImport();
+  try {
+    const undone = undoImportBatch(book.db, first.id, saved);
+    expect(undone.blocked.map((row) => row.reason)).toEqual(["edited"]);
+    expect(undone.batch.undoneAt).toBeNull();
+    expect(undone.batch.counts).toMatchObject({ created: 1, matched: 0, duplicate: 0, needsReview: 0 });
+    expect(getImportDetail(book.db, first.id).item).toMatchObject({ status: "partly_undone", counts: { created: 1, matched: 0 } });
+    expect(getTransaction(book.db, manual.id)?.status).toBe("open");
+
+    const again = importMonth(book.db, book.account.id);
+    expect(again.alreadyImported).toBe(false);
+    expect(again.counts).toMatchObject({ created: 1, matched: 1, duplicate: 1, needsReview: 0 });
+    expect(getTransaction(book.db, manual.id)).toMatchObject({ status: "cleared", importRowId: expect.any(String) });
+    expect(book.db.select().from(transactions).all().map((row) => row.payeeRaw).sort()).toEqual(["EDIT", "KEEP", "MANUAL"]);
+    expect(book.db.select().from(importRows).where(eq(importRows.transactionId, edited)).all()).toHaveLength(1);
+
+    const third = importMonth(book.db, book.account.id);
+    expect(third).toMatchObject({ alreadyImported: true, id: again.id });
+    const view = listImportView(book.db, importViewQuerySchema.parse({ status: "partly_undone" }));
+    expect(view.items.map((item) => item.id)).toEqual([first.id]);
+  } finally {
+    book.close();
+  }
+});
+
+test("needs you wins over partly undone while an unreadable line has no decision", () => {
+  const { book, first } = editedImport([...month, "not a date,BROKEN,-9.00"]);
+  try {
+    expect(first.counts.unreadable).toBe(1);
+    undoImportBatch(book.db, first.id, saved);
+    expect(getImportDetail(book.db, first.id).item.status).toBe("needs_you");
+  } finally {
+    book.close();
+  }
+});

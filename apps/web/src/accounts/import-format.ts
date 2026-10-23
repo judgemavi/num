@@ -55,6 +55,7 @@ const outcomeText: Record<ImportRowOutcome, string> = {
 
 const statusText: Record<ImportViewStatus, string> = {
   imported: "Imported",
+  partly_undone: "Partly undone",
   undone: "Undone",
   needs_you: "Needs you",
 };

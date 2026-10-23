@@ -428,7 +428,7 @@ Fields: `accountId`, `date`, `balance`, `note?`.
 Batch fields: `accountId`, `filename`, `hash`, `parser`, `periodStart`, `periodEnd`, `closingBalance?`, `closingDate?`,
 `matchedBefore`, `unreadableJson` (the unreadable rows: line, raw text, reason), `createdAt`, `undoneAt?`.
 - `importedOn`: the local import date, from the required request `asOf`.
-- `hash` is the hash of the file. It is unique over the batches that are not undone. The app does not keep the file.
+- `hash` is the hash of the file (§7.2 step 1). The app does not keep the file.
   An MCP client sends a file the same way as the UI (§12).
 - `matchedBefore`: before the import, the cleared balance on the date of the latest bank balance was equal to that
   balance (§5.13).
@@ -547,8 +547,8 @@ The user can create, edit and archive accounts.
 ### 7.2 Import (CSV)
 
 1. The user uploads a file (maximum 20 MB). The app reads it and does not store it.
-   If a batch that is not undone has the same hash, show that batch. Do not import again. If its batch is undone,
-   import the file again.
+   If a batch with the same hash is not undone and has no undone row, show that batch. Do not import again.
+   If not, import the file again. The rows of the file that are still active are duplicates (step 3).
 2. The app selects the parser for the account:
    - **OFX/QFX parser.** It uses the bank transaction ID (`FITID`) as `bankId`. It reads the closing balance (`LEDGERBAL`).
    - **CSV parser with a column map.** The column map gives the columns for date, description, amount
@@ -580,7 +580,8 @@ The user can create, edit and archive accounts.
    - The app removes the bank balance that the batch saved and restores the balance it replaced on the same account
      and date, with its earlier import batch link, if any, unless that earlier batch is undone.
    - The app removes the links of matched rows and restores `mirror = true` on a row that was a mirror before import.
-   - The app shows the rows that it cannot undo.
+   - The app shows the rows that it cannot undo. They stay active. The batch is undone when no row stays active.
+     Until then it is partly undone.
    - The app removes the recurring occurrence links of the transactions that it removes (audited).
 
 If the user imports the same file again, or a file with overlapping dates, the app must not create duplicate transactions.
@@ -596,13 +597,13 @@ If the user imports the same file again, or a file with overlapping dates, the a
   Otherwise the user selects it. "Use this account for all files" is available.
 - "Import all" imports the files in order of their first date, oldest first.
 - Each file is its own batch, with its own undo. If one file fails, the other files still import, and its row shows the reason.
-- A file that is already imported shows "already imported" and imports nothing.
+- A file that is already imported (step 1) shows "already imported" and imports nothing.
 - The summary shows the counts for each file and a total.
 
 **Imports view** (Accounts → Imports):
-- All import batches, newest first: date, file name, account, period, status (`imported | undone | needs_you`),
-  and the counts (created, matched, duplicate, needs review, unreadable). `needs_you` means rows need review
-  or unreadable rows are not handled.
+- All import batches, newest first: date, file name, account, period, status (`imported | partly_undone | undone | needs_you`),
+  and the counts of the rows that are not undone (created, matched, duplicate, needs review, unreadable).
+  `needs_you` means active rows need review or unreadable rows are not handled.
 - Filters: account, status, date (compact filter bar).
 - Import detail: each row of the file with its outcome and a link to its transaction (created or matched),
   the duplicate's earlier row, or the unreadable reason. Action: undo (More menu).

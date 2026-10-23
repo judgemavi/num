@@ -17,6 +17,7 @@ const sortOptions = [
 const statusOptions = [
   { value: "any", label: "Any status" },
   { value: "imported", label: "Imported" },
+  { value: "partly_undone", label: "Partly undone" },
   { value: "undone", label: "Undone" },
   { value: "needs_you", label: "Needs you" },
 ] as const;

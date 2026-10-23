@@ -4,7 +4,9 @@ import { eq } from "drizzle-orm";
 import { balanceChecksOf } from "./import-check";
 import type { Reader } from "./write";
 
-export function countOutcomes(rows: readonly { outcome: string }[], unreadable: number): ImportCounts {
+/** The counts of the rows that are in effect: the active rows and the duplicates. An undone row does not count. */
+function countOutcomes(all: readonly { outcome: string; active: boolean }[], unreadable: number): ImportCounts {
+  const rows = all.filter((row) => row.active || row.outcome === "duplicate");
   return {
     created: rows.filter((row) => row.outcome === "created").length,
     matched: rows.filter((row) => row.outcome === "matched").length,
@@ -15,7 +17,7 @@ export function countOutcomes(rows: readonly { outcome: string }[], unreadable: 
 }
 
 export function presentBatch(db: Reader, batch: ImportBatchRow): ImportBatch {
-  const rows = db.select({ outcome: importRows.outcome }).from(importRows).where(eq(importRows.batchId, batch.id)).all();
+  const rows = db.select({ outcome: importRows.outcome, active: importRows.active }).from(importRows).where(eq(importRows.batchId, batch.id)).all();
   const account = db.select().from(accounts).where(eq(accounts.id, batch.accountId)).get();
   if (!account) {
     throw new Error("Account is missing");

@@ -16,7 +16,7 @@ const importCountsSchema = z.object({
 
 export type ImportCounts = z.infer<typeof importCountsSchema>;
 
-const importViewStatuses = ["imported", "undone", "needs_you"] as const;
+const importViewStatuses = ["imported", "partly_undone", "undone", "needs_you"] as const;
 
 export type ImportViewStatus = (typeof importViewStatuses)[number];
 

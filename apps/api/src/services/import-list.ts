@@ -8,7 +8,7 @@ import {
   type ImportViewQuery,
   type ImportViewStatus,
 } from "@num/shared";
-import { and, asc, count, desc, eq, gte, isNull, lte, ne, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
 import { balanceChecksOf } from "./import-check";
@@ -54,12 +54,16 @@ function newestFirst(query: ImportViewQuery) {
 }
 
 /**
- * The status of a batch: undone; needs you when a row needs review or an unreadable line has no decision; else imported.
+ * The status of a batch: undone; needs you when an active row needs review or an unreadable line has no decision;
+ * partly undone when a row that is not a duplicate is undone; else imported.
  * The status is a SQL value, thus the list filters, sorts and pages in SQL.
  */
 const statusSql = sql<ImportViewStatus>`case
   when ${importBatches.undoneAt} is not null then 'undone'
-  when exists (select 1 from ${importRows} where ${importRows.batchId} = ${importBatches.id} and ${importRows.outcome} = 'needs_review')
+  when exists (
+      select 1 from ${importRows}
+      where ${importRows.batchId} = ${importBatches.id} and ${importRows.active} = 1 and ${importRows.outcome} = 'needs_review'
+    )
     or exists (
       select 1 from json_each(${importBatches.unreadableJson}) as line
       where not exists (
@@ -68,6 +72,11 @@ const statusSql = sql<ImportViewStatus>`case
       )
     )
   then 'needs_you'
+  when exists (
+    select 1 from ${importRows}
+    where ${importRows.batchId} = ${importBatches.id} and ${importRows.active} = 0 and ${importRows.outcome} <> 'duplicate'
+  )
+  then 'partly_undone'
   else 'imported'
 end`;
 
@@ -76,11 +85,12 @@ export function countImportsNeedingYou(db: Db) {
   return totalOf(db, importBatches, sql`${statusSql} = 'needs_you'`);
 }
 
+/** The counts of the rows that are in effect: the active rows and the duplicates. An undone row does not count. */
 function outcomeCounts(db: Db, batchIds: string[]) {
   const outcomes = db
     .select({ batchId: importRows.batchId, outcome: importRows.outcome, total: count() })
     .from(importRows)
-    .where(idIn(importRows.batchId, batchIds))
+    .where(and(idIn(importRows.batchId, batchIds), or(eq(importRows.active, true), eq(importRows.outcome, "duplicate"))))
     .groupBy(importRows.batchId, importRows.outcome)
     .all();
   const byBatch = new Map<string, OutcomeCounts>();
