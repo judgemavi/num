@@ -49,6 +49,15 @@ function useRows(items: readonly NeedsYouItem[]): Row[] {
           detail: item.oldCount > 0 ? `${item.oldCount} older than ${reviewAgeDays} days` : null,
           open: () => void go({ to: "/transactions/review" }),
         }];
+      case "imports_review":
+        return [{
+          key: item.code,
+          hue: "teal",
+          icon: Upload,
+          title: `${plural(item.count, "import needs", "imports need")} review`,
+          detail: null,
+          open: () => void go({ to: "/accounts/imports", search: { status: "needs_you" } }),
+        }];
       case "bank_mismatch":
         return [{
           key: `${item.code}-${item.accountId}`,

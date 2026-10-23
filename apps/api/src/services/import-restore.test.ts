@@ -69,7 +69,7 @@ for (const reviewed of [false, true]) {
       const before = getTransaction(book.db, source.transferPeerId);
       if (reviewed) {
         createTransaction(book.db, {
-          accountId: book.account.id, date: "2026-03-01", amount: 10_000, payeeRaw: "Other candidate",
+          accountId: book.account.id, date: "2026-03-01", amount: 10_000, payeeRaw: "Move funds",
           lines: [{ amount: 10_000 }], ...saved,
         });
       }

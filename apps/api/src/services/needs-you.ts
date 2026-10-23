@@ -2,6 +2,7 @@ import { addDays, type NeedsYou, type NeedsYouItem } from "@num/shared";
 import type { Db } from "../db";
 import { createFundingReads } from "./funding-reads";
 import { listBankStatuses } from "./bank-balances";
+import { countImportsNeedingYou } from "./import-list";
 import { needsYouChecks, type NeedsYouCheck } from "./needs-you-checks";
 import { readFeasibility } from "./feasibility";
 import { loadReviewState, requireAsOf } from "./needs-review";
@@ -37,6 +38,10 @@ export function readNeedsYou(db: Db, asOf: string): NeedsYou {
   if (state.hits.length > 0) {
     const old = failed.find((check) => check.code === "review");
     items.push({ code: "review", count: state.hits.length, oldCount: old?.oldCount ?? 0 });
+  }
+  const importReviews = countImportsNeedingYou(db);
+  if (importReviews > 0) {
+    items.push({ code: "imports_review", count: importReviews });
   }
   for (const status of listBankStatuses(db).items) {
     if (status.difference !== 0) {

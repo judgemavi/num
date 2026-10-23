@@ -1,7 +1,10 @@
-import { transactions } from "@num/db";
+import { importRows, transactions } from "@num/db";
 import { expect, test } from "bun:test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import type { Db } from "../db";
 import { createAccount } from "./accounts";
+import { countImportsNeedingYou } from "./import-list";
+import { resolveImportReview } from "./import-review";
 import { undoImportBatch } from "./import-undo";
 import { createTransaction, getTransaction, updateTransaction } from "./transactions";
 import { at, tempBook, importCsv, activeCount } from "./import-test-book";
@@ -193,6 +196,99 @@ test("a transfer suggestion at import does not create a transfer", () => {
     expect(saved?.lines[0]?.transferAccountId).toBeNull();
     expect(book.db.select().from(transactions).where(eq(transactions.accountId, visa.id)).all()).toHaveLength(0);
     expect(saved?.lines[0]?.categoryId).toBeNull();
+  } finally {
+    book.close();
+  }
+});
+
+function fare(db: Db, accountId: string, date: string, payeeRaw: string) {
+  return createTransaction(db, { accountId, date, amount: -3350, payeeRaw, lines: [{ amount: -3350 }], source: "ui", at });
+}
+
+function batchOf(result: ReturnType<typeof importCsv>) {
+  if (result.kind !== "batch") {
+    throw new Error("Expected a batch");
+  }
+  return result;
+}
+
+function reviewRow(db: Db, batchId: string) {
+  const row = db
+    .select()
+    .from(importRows)
+    .where(and(eq(importRows.batchId, batchId), eq(importRows.outcome, "needs_review")))
+    .get();
+  if (!row) {
+    throw new Error("Expected a row that needs review");
+  }
+  return row;
+}
+
+test("the payee links each row to its own candidate when the amounts and dates agree", () => {
+  const book = tempBook();
+  try {
+    const christie = fare(book.db, book.account.id, "2026-09-16", "PRESTO CHRISTIE STN");
+    const king = fare(book.db, book.account.id, "2026-09-17", "PRESTO KING STN");
+    const first = batchOf(
+      importCsv(book.db, book.account.id, "one.csv", ["09/17/2026,PRESTO KING STN,-3.35", "09/16/2026,PRESTO CHRISTIE STN,-3.35"]),
+    );
+    expect(first.counts).toMatchObject({ matched: 2, needsReview: 0, created: 0 });
+    const rows = book.db.select().from(importRows).where(eq(importRows.batchId, first.id)).all();
+    expect(rows.find((row) => row.payeeRaw === "PRESTO KING STN")?.transactionId).toBe(king.id);
+    expect(rows.find((row) => row.payeeRaw === "PRESTO CHRISTIE STN")?.transactionId).toBe(christie.id);
+
+    const second = batchOf(importCsv(book.db, book.account.id, "two.csv", ["09/20/2026,PRESTO NRTH YRK CTR STN,-3.35"]));
+    expect(second.counts).toMatchObject({ matched: 0, needsReview: 0, created: 1 });
+    expect(countImportsNeedingYou(book.db)).toBe(0);
+  } finally {
+    book.close();
+  }
+});
+
+test("a candidate of an open review is held: a later row with it needs review, also with the same payee", () => {
+  const book = tempBook();
+  try {
+    fare(book.db, book.account.id, "2026-09-16", "PRESTO CHRISTIE STN");
+    const king = fare(book.db, book.account.id, "2026-09-17", "PRESTO KING STN");
+    const first = batchOf(importCsv(book.db, book.account.id, "one.csv", ["09/16/2026,PRESTO UNION STN,-3.35"]));
+    expect(first.counts).toMatchObject({ matched: 0, needsReview: 1, created: 0 });
+
+    const later = batchOf(importCsv(book.db, book.account.id, "two.csv", ["09/20/2026,PRESTO NRTH YRK CTR STN,-3.35"]));
+    expect(later.counts).toMatchObject({ matched: 0, needsReview: 1, created: 0 });
+    const samePayee = batchOf(importCsv(book.db, book.account.id, "three.csv", ["09/17/2026,PRESTO KING STN,-3.35"]));
+    expect(samePayee.counts).toMatchObject({ matched: 0, needsReview: 1, created: 0 });
+    expect(getTransaction(book.db, king.id)?.importRowId).toBeNull();
+    expect(countImportsNeedingYou(book.db)).toBe(3);
+  } finally {
+    book.close();
+  }
+});
+
+test("when the user resolves the review, the hold stops and a later import can match the candidate", () => {
+  const book = tempBook();
+  try {
+    const christie = fare(book.db, book.account.id, "2026-09-16", "PRESTO CHRISTIE STN");
+    const king = fare(book.db, book.account.id, "2026-09-17", "PRESTO KING STN");
+    const first = batchOf(importCsv(book.db, book.account.id, "one.csv", ["09/16/2026,PRESTO UNION STN,-3.35"]));
+    expect(countImportsNeedingYou(book.db)).toBe(1);
+    resolveImportReview(book.db, reviewRow(book.db, first.id).id, { decision: "match", transactionId: christie.id }, { source: "ui", at });
+    expect(countImportsNeedingYou(book.db)).toBe(0);
+
+    const later = batchOf(importCsv(book.db, book.account.id, "two.csv", ["09/20/2026,PRESTO NRTH YRK CTR STN,-3.35"]));
+    expect(later.counts).toMatchObject({ matched: 1, needsReview: 0, created: 0 });
+    expect(getTransaction(book.db, king.id)?.importRowId).not.toBeNull();
+  } finally {
+    book.close();
+  }
+});
+
+test("two candidates with the same payee still need review", () => {
+  const book = tempBook();
+  try {
+    fare(book.db, book.account.id, "2026-09-16", "PRESTO KING STN");
+    fare(book.db, book.account.id, "2026-09-17", "PRESTO KING STN");
+    const result = batchOf(importCsv(book.db, book.account.id, "one.csv", ["09/17/2026,PRESTO KING STN,-3.35"]));
+    expect(result.counts).toMatchObject({ matched: 0, needsReview: 1, created: 0 });
   } finally {
     book.close();
   }

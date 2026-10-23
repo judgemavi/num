@@ -19,7 +19,7 @@ import {
 import { and, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { ServiceError } from "../service-error";
-import { planImportRows } from "./import-plan";
+import { isMatchCandidate, planImportRows, type PlanCandidate } from "./import-plan";
 import { presentBatch } from "./import-read";
 import { saveImportBatch } from "./import-save";
 import { importOpeningSuggestion } from "./opening-suggestion";
@@ -156,6 +156,29 @@ function dateWindow(dates: readonly string[]) {
   };
 }
 
+/**
+ * The candidates that an open review holds: a candidate of an active row that needs review, in a batch that is not
+ * undone. The review rows are read for the match window around the candidates.
+ */
+function heldCandidates(db: Db, accountId: string, candidates: readonly PlanCandidate[], window: { start: string; end: string }) {
+  const reviews = db
+    .select({ date: importRows.date, amount: importRows.amount })
+    .from(importRows)
+    .innerJoin(importBatches, eq(importBatches.id, importRows.batchId))
+    .where(
+      and(
+        eq(importRows.accountId, accountId),
+        eq(importRows.active, true),
+        eq(importRows.outcome, "needs_review"),
+        isNull(importBatches.undoneAt),
+        gte(importRows.date, addDays(window.start, -matchDateWindowDays)),
+        lte(importRows.date, addDays(window.end, matchDateWindowDays)),
+      ),
+    )
+    .all();
+  return new Set(candidates.filter((item) => reviews.some((row) => isMatchCandidate(item, row))).map((item) => item.id));
+}
+
 export function listImportPresets() {
   return {
     presets,
@@ -228,7 +251,7 @@ export function importStatement(db: Db, input: ImportInput): ImportResult {
       .map((row) => row.identity),
   );
   const candidates = db
-    .select({ id: transactions.id, date: transactions.date, amount: transactions.amount })
+    .select({ id: transactions.id, date: transactions.date, amount: transactions.amount, payeeNormalized: transactions.payeeNormalized })
     .from(transactions)
     .where(
       and(
@@ -249,6 +272,7 @@ export function importStatement(db: Db, input: ImportInput): ImportResult {
     })),
     taken,
     candidates,
+    heldCandidates(db, account.id, candidates, window),
   );
   const filename = input.filename.split(/[/\\]/).pop()?.replace(/[\r\n"]/g, "").trim() || "upload";
   const openingSuggestion = importOpeningSuggestion(

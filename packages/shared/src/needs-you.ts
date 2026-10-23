@@ -17,6 +17,8 @@ export const staleImportDays = 10;
 const needsYouItemSchema = z.discriminatedUnion("code", [
   /** Transactions need review. `oldCount` is the number older than `reviewAgeDays`. */
   z.object({ code: z.literal("review"), count: nonNegative, oldCount: nonNegative }),
+  /** Import batches with rows that need review or unreadable rows that are not handled (spec §7.2). */
+  z.object({ code: z.literal("imports_review"), count: nonNegative }),
   /** One account that does not match its bank (spec §5.13). */
   z.object({ code: z.literal("bank_mismatch"), accountId: z.uuid(), difference: money }),
   /** The on-budget accounts whose last import is older than `staleImportDays`. */

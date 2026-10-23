@@ -71,6 +71,11 @@ const statusSql = sql<ImportViewStatus>`case
   else 'imported'
 end`;
 
+/** The number of batches with the status `needs_you`. */
+export function countImportsNeedingYou(db: Db) {
+  return totalOf(db, importBatches, sql`${statusSql} = 'needs_you'`);
+}
+
 function outcomeCounts(db: Db, batchIds: string[]) {
   const outcomes = db
     .select({ batchId: importRows.batchId, outcome: importRows.outcome, total: count() })
