@@ -32,6 +32,8 @@ The health route is `GET /api/health`.
 
 Set `PORT` to use a different port.
 
+To install Num on a server, see `docs/self-hosting.md`.
+
 ## MCP
 
 The API serves MCP at `/mcp` on the same process.

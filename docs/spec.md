@@ -1065,10 +1065,10 @@ To correct other records, the user edits them. The audit log records each edit.
   React, Vite, TanStack Router and Query, shadcn/ui, Tailwind. Tests use `bun test`.
   `AGENTS.md` gives the package boundary, the code rules and the test policy.
 - **One process:** Hono serves the API, MCP and the built web app on one port.
-- **Hosting:** One Docker image. It runs on any Docker host. `docs/self-hosting.md` tells how to install it.
+- **Hosting:** One systemd service on Linux. `docs/self-hosting.md` tells how to install it.
   - Use one instance only.
-  - Use **stop-first** deploys. Two containers must not use the same database.
-  - The owner's hosting is not decided yet (roadmap X.1). The code does not require any one host or proxy.
+  - Use **stop-first** deploys. Two processes must not use the same database.
+  - The code does not require any one host or proxy.
 - **Access control is outside the app.** Num has no login, no users and no tokens.
   - The operator must run Num on a private network, with no public port.
   - The operator must put an authenticating proxy in front of all remote access.
@@ -1076,9 +1076,10 @@ To correct other records, the user edits them. The audit log records each edit.
     and the Cloudflare MCP portal with Cloudflare Access for MCP.
   - `docs/self-hosting.md` must tell this in a warning at the start.
   - The server listens on `HOST` (default `127.0.0.1`) and `PORT` (default `3000`).
-    The Docker image sets `HOST=0.0.0.0`.
-- **Storage:** One volume. It contains `num.sqlite` (WAL mode).
-- **Migrations:** Drizzle. At startup, first copy the database to `backups/pre-migrate-<timestamp>.sqlite` on the volume.
+    MCP accepts only a loopback `Host` header when `HOST` is a loopback address.
+    A server behind a proxy sets `HOST=0.0.0.0`, and the firewall blocks the port.
+- **Storage:** One data directory (`DATA_DIR`). It contains `num.sqlite` (WAL mode).
+- **Migrations:** Drizzle. At startup, first copy the database to `backups/pre-migrate-<timestamp>.sqlite` in the data directory.
   Then apply the migrations with foreign keys off, and run `PRAGMA foreign_key_check` after them. A violation stops
   startup. The hash guard also stops startup when the SQL hash of a journal entry is not in the applied migrations.
 - **Backups:**
