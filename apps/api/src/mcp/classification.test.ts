@@ -112,7 +112,7 @@ const classifications = [
 test("every route keeps its reviewed MCP classification", () => {
   const book = tempDatabase();
   try {
-    const app = createApp(book.db);
+    const app = createApp(book.db, "127.0.0.1");
     const routes = mcpRoutes(app).sort((left, right) => left.operationId.localeCompare(right.operationId));
     expect(routes.map((route) => [route.operationId, route.method, route.path, route.destructive])).toEqual(classifications);
   } finally {

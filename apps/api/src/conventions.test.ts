@@ -5,7 +5,7 @@ import { Database } from "bun:sqlite";
 import { createApp } from "./app";
 import { createDb } from "./db";
 
-const app = createApp(createDb(new Database(":memory:")));
+const app = createApp(createDb(new Database(":memory:")), "127.0.0.1");
 
 const datedRoute = createRoute({
   method: "get",
@@ -60,7 +60,7 @@ const listRoute = createRoute({
 });
 
 test("a date-dependent route without asOf returns 400", async () => {
-  const app = createApp(createDb(new Database(":memory:")));
+  const app = createApp(createDb(new Database(":memory:")), "127.0.0.1");
   app.openapi(datedRoute, (c) => c.json({ asOf: c.req.valid("query").asOf }, 200));
 
   const missing = await app.request("/api/dated");
@@ -83,7 +83,7 @@ test("health does not require asOf", async () => {
 });
 
 test("sort with an unknown column returns 400", async () => {
-  const app = createApp(createDb(new Database(":memory:")));
+  const app = createApp(createDb(new Database(":memory:")), "127.0.0.1");
   app.openapi(listRoute, (c) => {
     const query = c.req.valid("query");
     return c.json({ items: [], page: query.page, pageSize: query.pageSize, total: 0 }, 200);

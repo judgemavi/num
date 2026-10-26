@@ -32,8 +32,11 @@ function createServer(app: OpenAPIHono, db: Db, catalog: ReturnType<typeof build
   return server;
 }
 
-export function registerMcp(app: OpenAPIHono, db: Db) {
+// The adapter checks the Host and Origin headers only when the server listens on a loopback address.
+// A server that listens on all interfaces relies on the proxy in front of it (spec §13).
+export function registerMcp(app: OpenAPIHono, db: Db, listenHost: string) {
   const mcp = createMcpHonoApp({
+    host: listenHost,
     maxRequestBodySize: maxBodyBytes,
   });
   const catalog = buildToolCatalog(app);

@@ -44,7 +44,7 @@ function tempBook() {
   return {
     dir,
     db,
-    app: createApp(db),
+    app: createApp(db, "127.0.0.1"),
     close() {
       sqlite.close();
       rmSync(dir, { recursive: true, force: true });

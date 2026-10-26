@@ -27,7 +27,7 @@ import { ServiceError } from "./service-error";
 import { validationHook } from "./validation";
 import { hasFileExtension, webFile, webIndex } from "./web-files";
 
-export function createApp(db: Db) {
+export function createApp(db: Db, listenHost: string) {
   const base = new OpenAPIHono({
     defaultHook: validationHook,
   });
@@ -65,7 +65,7 @@ export function createApp(db: Db) {
     .route("/", suggestionRoutes(db))
     .route("/", transactionRoutes(db));
   addMoneyDescriptions(app);
-  registerMcp(app, db);
+  registerMcp(app, db, listenHost);
 
   app.doc("/api/openapi.json", {
     openapi: "3.0.0",

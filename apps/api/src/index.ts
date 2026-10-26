@@ -11,7 +11,7 @@ const { hostname, port } = listenAddress({
   PORT: Bun.env.PORT,
 });
 
-const app = serveWeb(createApp(db));
+const app = serveWeb(createApp(db, hostname));
 
 console.log(`Num http://${hostname}:${port}`);
 
